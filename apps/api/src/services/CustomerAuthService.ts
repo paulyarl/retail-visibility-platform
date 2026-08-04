@@ -14,6 +14,11 @@ import { randomUUID } from 'crypto';
 import { generateCustomerId, generateCustomerKey } from '../lib/id-generator';
 import { logger } from '../logger';
 
+export interface CustomerContexts {
+  storefront: boolean;
+  platform: boolean;
+}
+
 export interface CustomerAuthResult {
   success: boolean;
   customer?: {
@@ -25,6 +30,7 @@ export interface CustomerAuthResult {
     phone?: string;
     emailVerified: boolean;
   };
+  contexts?: CustomerContexts;
   error?: string;
   isNewCustomer?: boolean;
 }
@@ -92,12 +98,10 @@ export class CustomerAuthService {
           // Reconcile any guest orders placed with this email
           await this.reconcileGuestOrders(customer.id, customer.email);
 
-          return {
-            success: true,
-            customer: this.formatCustomer(customer),
+          return this.buildAuthResult(customer, {
             isNewCustomer: false,
             error: 'Account created. Please verify your email.',
-          };
+          });
         }
 
         return {
@@ -129,11 +133,7 @@ export class CustomerAuthService {
       // Reconcile any guest orders placed with this email before account existed
       await this.reconcileGuestOrders(customer.id, customer.email);
 
-      return {
-        success: true,
-        customer: this.formatCustomer(customer),
-        isNewCustomer: true,
-      };
+      return this.buildAuthResult(customer, { isNewCustomer: true });
     } catch (error: any) {
       logger.error('[CustomerAuth] Register error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
@@ -213,10 +213,7 @@ export class CustomerAuthService {
         },
       });
 
-      return {
-        success: true,
-        customer: this.formatCustomer(customer),
-      };
+      return this.buildAuthResult(customer);
     } catch (error: any) {
       logger.error('[CustomerAuth] Login error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
@@ -255,10 +252,7 @@ export class CustomerAuthService {
         },
       });
 
-      return {
-        success: true,
-        customer: this.formatCustomer(updatedCustomer),
-      };
+      return this.buildAuthResult(updatedCustomer);
     } catch (error: any) {
       logger.error('[CustomerAuth] Update profile error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
@@ -404,11 +398,7 @@ export class CustomerAuthService {
         });
       });
 
-      return {
-        success: true,
-        customer: this.formatCustomer(customer),
-        isNewCustomer,
-      };
+      return this.buildAuthResult(customer, { isNewCustomer });
     } catch (error: any) {
       logger.error('[CustomerAuth] OAuth login error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
@@ -538,10 +528,7 @@ export class CustomerAuthService {
         },
       });
 
-      return {
-        success: true,
-        customer: this.formatCustomer(updatedCustomer),
-      };
+      return this.buildAuthResult(updatedCustomer);
     } catch (error: any) {
       logger.error('[CustomerAuth] Reset password error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
@@ -647,6 +634,37 @@ export class CustomerAuthService {
 
   // Private helper methods
 
+  /**
+   * Compute context signals for a customer (§4.2).
+   *
+   * hasStorefrontContext = EXISTS(active customer_tenant_relationships) OR EXISTS(orders)
+   * hasPlatformContext   = EXISTS(mkt_campaigns_list.customer_id) OR EXISTS(marketing_revenue.customer_id)
+   *
+   * Server-computed from actual relationships — never admin-set or customer-edited.
+   * Cached in CustomerAuthContext and refreshed on login, claim, and purchase events.
+   */
+  async computeContexts(customerId: string): Promise<CustomerContexts> {
+    const [activeRels, orders, campaigns, revenue] = await Promise.all([
+      prisma.customer_tenant_relationships.count({
+        where: { customer_id: customerId, is_active: true },
+      }),
+      prisma.orders.count({
+        where: { customer_id: customerId },
+      }),
+      prisma.mkt_campaigns_list.count({
+        where: { customer_id: customerId },
+      }),
+      prisma.marketing_revenue.count({
+        where: { customer_id: customerId },
+      }),
+    ]);
+
+    return {
+      storefront: activeRels > 0 || orders > 0,
+      platform: campaigns > 0 || revenue > 0,
+    };
+  }
+
   private generateToken(): string {
     return randomUUID().replace(/-/g, '') + Date.now().toString(36);
   }
@@ -667,6 +685,25 @@ export class CustomerAuthService {
       lastName: customer.last_name,
       phone: customer.phone,
       emailVerified: customer.email_verified,
+    };
+  }
+
+  /**
+   * Build a CustomerAuthResult with contexts computed (§4.2).
+   * Used by register/login/verifyEmail/oauthLogin/resetPassword so every
+   * auth response carries the context signals for frontend sidebar gating.
+   */
+  private async buildAuthResult(
+    customer: any,
+    extra?: { isNewCustomer?: boolean; error?: string; success?: boolean },
+  ): Promise<CustomerAuthResult> {
+    const contexts = await this.computeContexts(customer.id);
+    return {
+      success: extra?.success ?? true,
+      customer: this.formatCustomer(customer),
+      contexts,
+      isNewCustomer: extra?.isNewCustomer,
+      error: extra?.error,
     };
   }
 }

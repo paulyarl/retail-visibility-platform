@@ -21,6 +21,11 @@ export interface Customer {
   emailVerified: boolean;
 }
 
+export interface CustomerContexts {
+  storefront: boolean;
+  platform: boolean;
+}
+
 export interface CustomerAuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -30,6 +35,7 @@ export interface CustomerAuthTokens {
 export interface CustomerAuthResponse {
   success: boolean;
   customer?: Customer;
+  contexts?: CustomerContexts;
   isNewCustomer?: boolean;
   tokens?: CustomerAuthTokens;
   error?: string;
@@ -467,6 +473,31 @@ class CustomerAuthService extends CustomerApiSingleton {
    */
   getCustomer(): Customer | null {
     return this.customer;
+  }
+
+  /**
+   * Fetch context signals from /api/customer-auth/me (§4.2).
+   * Called after initialize and after claim/purchase events to refresh
+   * the storefront/platform context flags for sidebar gating.
+   */
+  async getContexts(): Promise<CustomerContexts | null> {
+    if (!this.getToken()) return null;
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        contexts?: CustomerContexts;
+      }>(
+        '/api/customer-auth/me',
+        { method: 'GET', credentials: 'include' },
+        'customer-auth-me',
+      );
+      if (result.success && result.data?.contexts) {
+        return result.data.contexts;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   /**

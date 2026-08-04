@@ -570,6 +570,9 @@ router.get('/me', async (req: Request, res: Response) => {
       });
     }
 
+    // §4.2: include context signals for frontend sidebar gating
+    const contexts = await customerAuthService.computeContexts(customer.id);
+
     res.json({
       success: true,
       customer: {
@@ -581,6 +584,7 @@ router.get('/me', async (req: Request, res: Response) => {
         phone: customer.phone,
         emailVerified: customer.emailVerified,
       },
+      contexts,
     });
   } catch (error: any) {
     logger.error('[CustomerAuth API] Get me error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });

@@ -774,18 +774,19 @@ model crm_activities {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_alerts {
-  id           String    @id(map: "pk_crm_alerts") @default(dbgenerated("('alert_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
-  tenant_id    String    @db.VarChar(255)
-  type         String    @db.VarChar(50)
-  title        String    @db.VarChar(255)
-  body         String?
-  icon         String?   @db.VarChar(10)
-  is_read      Boolean?  @default(false)
-  is_dismissed Boolean?  @default(false)
-  metadata     Json?
-  created_at   DateTime? @default(now()) @db.Timestamptz(6)
-  read_at      DateTime? @db.Timestamptz(6)
-  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_alerts_tenant")
+  id                        String                      @id(map: "pk_crm_alerts") @default(dbgenerated("('alert_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
+  tenant_id                 String                      @db.VarChar(255)
+  type                      String                      @db.VarChar(50)
+  title                     String                      @db.VarChar(255)
+  body                      String?
+  icon                      String?                     @db.VarChar(10)
+  is_read                   Boolean?                    @default(false)
+  is_dismissed              Boolean?                    @default(false)
+  metadata                  Json?
+  created_at                DateTime?                   @default(now()) @db.Timestamptz(6)
+  read_at                   DateTime?                   @db.Timestamptz(6)
+  tenants                   tenants                     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_alerts_tenant")
+  crm_customer_alert_states crm_customer_alert_states[]
 
   @@index([tenant_id, type], map: "idx_crm_alerts_tenant_type")
   @@index([tenant_id, is_read, is_dismissed, created_at], map: "idx_crm_alerts_tenant_unread")
@@ -888,6 +889,7 @@ model crm_support_tickets {
   sort_order          Int?                  @default(0)
   inquiry_id          String?               @db.VarChar(255)
   project_id          String?               @db.VarChar(255)
+  campaign_id         String?               @db.VarChar(255)
   crm_activities      crm_activities[]
   crm_contacts        crm_contacts?         @relation(fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_crm_tickets_contact")
   customers           customers?            @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_crm_tickets_customer")
@@ -903,6 +905,7 @@ model crm_support_tickets {
   @@index([tenant_id, status, sort_order], map: "idx_crm_tickets_sort_order")
   @@index([tenant_id, status], map: "idx_crm_tickets_tenant_status")
   @@index([project_id], map: "idx_crm_tickets_project_id")
+  @@index([campaign_id], map: "idx_crm_tickets_campaign")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -1136,6 +1139,7 @@ model customers {
   email_verification_expires        DateTime?                          @db.Timestamp(6)
   customer_key                      String?                            @unique @db.VarChar(7)
   crm_contacts                      crm_contacts[]
+  crm_customer_alert_states         crm_customer_alert_states[]
   crm_customer_read_states          crm_customer_read_states[]
   crm_inquiries                     crm_inquiries[]
   crm_support_tickets               crm_support_tickets[]
@@ -1148,6 +1152,7 @@ model customers {
   digital_access_grants             digital_access_grants[]
   marketing_revenue                 marketing_revenue[]
   mkt_campaigns_list                mkt_campaigns_list[]
+  mkt_customer_branding             mkt_customer_branding?
   orders                            orders[]
 
   @@index([auth0_id], map: "idx_customers_auth0_id")
@@ -6993,6 +6998,35 @@ model mkt_customer_claim_tokens {
   created_at   DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([email], map: "idx_mkt_claim_email")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_customer_alert_states {
+  id           String     @id(map: "pk_crm_customer_alert_states") @db.VarChar(255)
+  alert_id     String     @db.VarChar(255)
+  customer_id  String     @db.VarChar(255)
+  read_at      DateTime?  @db.Timestamptz(6)
+  dismissed_at DateTime?  @db.Timestamptz(6)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  crm_alerts   crm_alerts @relation(fields: [alert_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_alert_states_alert")
+  customers    customers  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_alert_states_customer")
+
+  @@unique([alert_id, customer_id], map: "crm_customer_alert_states_unique")
+  @@index([customer_id, dismissed_at], map: "idx_crm_alert_states_customer")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_customer_branding {
+  id          String    @id(map: "pk_mkt_customer_branding") @db.VarChar(255)
+  customer_id String    @unique(map: "mkt_customer_branding_customer_id_unique") @db.VarChar(255)
+  logo_url    String?   @db.VarChar(500)
+  asset_url   String?   @db.VarChar(500)
+  brand_color String?   @db.VarChar(7)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
+  customers   customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_customer_branding_customer")
+
+  @@index([customer_id], map: "idx_mkt_customer_branding_customer")
 }
 
 enum action {

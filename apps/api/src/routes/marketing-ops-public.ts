@@ -24,7 +24,7 @@ import MarketingServiceCategoryService from '../services/MarketingServiceCategor
 import { MarketingReceiptPdfService } from '../services/marketing/MarketingReceiptPdfService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
-import { CustomerAuthService } from '../services/CustomerAuthService';
+import { CustomerAuthService, CustomerAuthResult } from '../services/CustomerAuthService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 
 const router = express.Router();
@@ -446,7 +446,7 @@ router.post('/public/marketing/pay/claim', async (req, res) => {
     }
 
     // Register or OAuth-login
-    let authResult: { success: boolean; customer?: any; error?: string };
+    let authResult: CustomerAuthResult;
     if (oauthProvider && oauthId) {
       authResult = await customerAuthService.oauthLogin(
         oauthProvider,
@@ -486,6 +486,7 @@ router.post('/public/marketing/pay/claim', async (req, res) => {
     return res.status(201).json({
       success: true,
       customer: authResult.customer,
+      contexts: authResult.contexts,
       tokens,
       claim: claimResult,
     });
@@ -547,6 +548,7 @@ router.post('/public/marketing/pay/claim/login', async (req, res) => {
     return res.json({
       success: true,
       customer: authResult.customer,
+      contexts: authResult.contexts,
       tokens,
       claim: claimResult,
     });
@@ -666,7 +668,7 @@ router.post('/public/marketing/claim/:token/complete', async (req, res) => {
 
     const normalizedEmail = tokenRow.email; // locked to the token's email
 
-    let authResult: { success: boolean; customer?: any; error?: string };
+    let authResult: CustomerAuthResult;
     if (mode === 'register') {
       if (oauthProvider && oauthId) {
         authResult = await customerAuthService.oauthLogin(
@@ -729,6 +731,7 @@ router.post('/public/marketing/claim/:token/complete', async (req, res) => {
     return res.json({
       success: true,
       customer: authResult.customer,
+      contexts: authResult.contexts,
       tokens,
       claim: claimResult,
     });

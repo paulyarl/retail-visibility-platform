@@ -13,7 +13,7 @@
  *   - POST /api/public/marketing/claim/:token/complete (Path B complete)
  */
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
-import type { Customer } from './CustomerAuthService';
+import type { Customer, CustomerContexts } from './CustomerAuthService';
 
 export interface ClaimTokenSummary {
   token: string;
@@ -35,6 +35,7 @@ export interface ClaimResult {
 export interface ClaimAuthResult {
   success: boolean;
   customer?: Customer;
+  contexts?: CustomerContexts;
   tokens?: { accessToken: string; refreshToken: string };
   claim?: ClaimResult;
   error?: string;
@@ -80,7 +81,7 @@ export class MarketingClaimPublicService extends PublicApiSingleton {
       return { success: false, error: typeof result.error === 'string' ? result.error : 'Claim failed' };
     }
     const data = result.data?.data ?? result.data;
-    return { success: true, customer: data.customer, tokens: data.tokens, claim: data.claim };
+    return { success: true, customer: data.customer, contexts: data.contexts, tokens: data.tokens, claim: data.claim };
   }
 
   /**
@@ -100,7 +101,7 @@ export class MarketingClaimPublicService extends PublicApiSingleton {
       return { success: false, error: typeof result.error === 'string' ? result.error : 'Login failed' };
     }
     const data = result.data?.data ?? result.data;
-    return { success: true, customer: data.customer, tokens: data.tokens, claim: data.claim };
+    return { success: true, customer: data.customer, contexts: data.contexts, tokens: data.tokens, claim: data.claim };
   }
 
   /**
@@ -178,7 +179,7 @@ export class MarketingClaimPublicService extends PublicApiSingleton {
       };
     }
     const data = result.data?.data ?? result.data;
-    return { success: true, customer: data.customer, tokens: data.tokens, claim: data.claim };
+    return { success: true, customer: data.customer, contexts: data.contexts, tokens: data.tokens, claim: data.claim };
   }
 }
 

@@ -10,12 +10,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import customerAuthService, { Customer, CustomerAuthResponse } from '@/services/CustomerAuthService';
+import customerAuthService, { Customer, CustomerAuthResponse, CustomerContexts } from '@/services/CustomerAuthService';
 import { clientLogger } from '@/lib/client-logger';
 
 interface CustomerAuthContextType {
   // State
   customer: Customer | null;
+  contexts: CustomerContexts | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -41,20 +42,21 @@ interface CustomerAuthProviderProps {
 
 export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [contexts, setContexts] = useState<CustomerContexts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Initialize on mount
   useEffect(() => {
     const initAuth = async () => {
-      // console.log('[CustomerAuthContext] Initializing auth...');
       setIsLoading(true);
       try {
-        // console.log('[CustomerAuthContext] Calling initialize...');
         const existingCustomer = await customerAuthService.initialize();
-        // console.log('[CustomerAuthContext] Initialize result:', existingCustomer);
         if (existingCustomer) {
           setCustomer(existingCustomer);
+          // Fetch context signals after init (§4.2)
+          const ctxResult = await customerAuthService.getContexts();
+          if (ctxResult) setContexts(ctxResult);
         }
         setIsLoading(false);
       } catch (err) {
@@ -83,6 +85,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
 
       if (result.success && result.customer) {
         setCustomer(result.customer);
+        if (result.contexts) setContexts(result.contexts);
       } else {
         setError(result.error || 'Login failed');
       }
@@ -112,6 +115,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
 
       if (result.success && result.customer) {
         setCustomer(result.customer);
+        if (result.contexts) setContexts(result.contexts);
       } else {
         setError(result.error || 'Registration failed');
       }
@@ -131,6 +135,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
     try {
       await customerAuthService.logout();
       setCustomer(null);
+      setContexts(null);
     } catch (err) {
       clientLogger.error('[CustomerAuthContext] Logout error:', { detail: err });
       setCustomer(null); // Clear anyway
@@ -154,6 +159,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
 
       if (result.success && result.customer) {
         setCustomer(result.customer);
+        if (result.contexts) setContexts(result.contexts);
       } else {
         setError(result.error || 'OAuth login failed');
       }
@@ -193,6 +199,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
 
       if (result.success && result.customer) {
         setCustomer(result.customer);
+        if (result.contexts) setContexts(result.contexts);
       } else {
         setError(result.error || 'Password reset failed');
       }
@@ -241,6 +248,9 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       const existingCustomer = await customerAuthService.initialize();
       if (existingCustomer) {
         setCustomer(existingCustomer);
+        // Refresh context signals (§4.2) — needed after claim/purchase events
+        const ctxResult = await customerAuthService.getContexts();
+        if (ctxResult) setContexts(ctxResult);
       }
     } catch (err) {
       clientLogger.error('[CustomerAuthContext] Refresh customer error:', { detail: err });
@@ -253,6 +263,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
 
   const value: CustomerAuthContextType = {
     customer,
+    contexts,
     isAuthenticated: !!customer,
     isLoading,
     error,

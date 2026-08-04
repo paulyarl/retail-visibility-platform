@@ -216,6 +216,7 @@ import couponsRoutes from '../routes/coupons';
 import couponAnalyticsRoutes from '../routes/coupon-analytics';
 import marketingOpsRoutes from '../routes/marketing-ops';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
+import marketingCustomerRoutes from '../routes/marketing-customer';
 import recoveryIntakePublicRoutes from '../routes/recovery-intake-public';
 
 // Inline handler route files (extracted from index.ts)
@@ -1059,6 +1060,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public',
     comment: 'Customer auth token fallback routes',
+  },
+  {
+    path: '/api/customer/marketing',
+    router: marketingCustomerRoutes,
+    domain: 'customer',
+    authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
+    comment: 'Marketing Ops customer portal routes — authenticated, hasPlatformContext-gated (§6.2)',
   },
   {
     path: '/api/customer-addresses',
