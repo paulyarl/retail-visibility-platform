@@ -20,6 +20,7 @@ import {
   ThemeIcon,
   Paper,
   Tabs,
+  Checkbox,
 } from '@mantine/core';
 import {
   IconCheck,
@@ -58,6 +59,7 @@ function CheckoutForm({
   amountCents,
   couponCode,
   email,
+  saveCard,
   onSuccess,
 }: {
   ptoken: string;
@@ -65,6 +67,7 @@ function CheckoutForm({
   amountCents: number;
   couponCode?: string;
   email?: string;
+  saveCard?: boolean;
   onSuccess: (result: PayConfirmResult) => void;
 }) {
   const stripe = useStripe();
@@ -93,6 +96,15 @@ function CheckoutForm({
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       try {
         const result = await marketingPayPublicService.confirmPayment(ptoken, paymentIntent.id, couponCode, undefined, email);
+        // §6.3 — save card for future portal checkout if opted in
+        if (saveCard && paymentIntent.id) {
+          try {
+            const { marketingCustomerService } = await import('@/services/MarketingCustomerService');
+            await marketingCustomerService.savePaymentMethodFromIntent(paymentIntent.id);
+          } catch {
+            // Non-critical — payment already succeeded, card save is best-effort
+          }
+        }
         onSuccess(result);
       } catch (confirmError: any) {
         setErrorMessage(`Payment succeeded but confirmation failed: ${confirmError.message}. Please contact support.`);
@@ -142,6 +154,7 @@ export default function PayPageClient() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [payResult, setPayResult] = useState<PayConfirmResult | null>(null);
   const [initiatingCheckout, setInitiatingCheckout] = useState(false);
+  const [saveCard, setSaveCard] = useState(false); // §6.3 — opt-in to save card for portal checkout
 
   // §7.1 item 1: optional email field (prefilled from campaign.email)
   const [emailInput, setEmailInput] = useState('');
@@ -209,7 +222,7 @@ export default function PayPageClient() {
     setInitiatingCheckout(true);
     setError(null);
     try {
-      const result = await marketingPayPublicService.createCheckout(ptoken, appliedCoupon);
+      const result = await marketingPayPublicService.createCheckout(ptoken, appliedCoupon, saveCard);
       setCheckout(result);
     } catch (err: any) {
       setError(err.message || 'Failed to start checkout. Please try again.');
@@ -732,15 +745,28 @@ export default function PayPageClient() {
             )}
 
             {!checkout && (
-              <Button
-                size="lg"
-                fullWidth
-                onClick={handleInitiateCheckout}
-                loading={initiatingCheckout}
-                leftSection={<IconLock size="1rem" />}
-              >
-                Proceed to Payment
-              </Button>
+              <>
+                {/* §6.3 — save card opt-in for authenticated customers */}
+                {authedCustomer && (
+                  <Checkbox
+                    label="Save this card for future purchases"
+                    description="Your card will be available for one-click checkout in your portal."
+                    checked={saveCard}
+                    onChange={(e) => setSaveCard(e.currentTarget.checked)}
+                    mt="md"
+                  />
+                )}
+                <Button
+                  size="lg"
+                  fullWidth
+                  onClick={handleInitiateCheckout}
+                  loading={initiatingCheckout}
+                  leftSection={<IconLock size="1rem" />}
+                  mt={authedCustomer ? 'md' : 0}
+                >
+                  Proceed to Payment
+                </Button>
+              </>
             )}
 
             {checkout && stripePromise && (
@@ -757,6 +783,7 @@ export default function PayPageClient() {
                   amountCents={checkout.amountCents}
                   couponCode={appliedCoupon}
                   email={emailInput || undefined}
+                  saveCard={saveCard}
                   onSuccess={handlePaymentSuccess}
                 />
               </Elements>

@@ -32,6 +32,7 @@ const router = express.Router();
 const checkoutSchema = z.object({
   ptoken: z.string().min(1, 'ptoken is required'),
   couponCode: z.string().optional(),
+  saveCard: z.boolean().optional(), // §6.3 — opt-in to save card for future portal checkout
 });
 
 const couponValidateSchema = z.object({
@@ -131,7 +132,7 @@ router.post('/public/marketing/checkout', async (req, res) => {
       return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const { ptoken, couponCode } = parsed.data;
+    const { ptoken, couponCode, saveCard } = parsed.data;
     const token = await resolvePreviewToken(ptoken);
     if (!token) {
       return res.status(404).json({ success: false, error: 'Invalid or expired token' });
@@ -184,6 +185,7 @@ router.post('/public/marketing/checkout', async (req, res) => {
       campaignId: campaign.id,
       serviceCategory: campaign.service_category || undefined,
       couponCode: couponCode || undefined,
+      setupFutureUsage: saveCard ? 'off_session' : undefined,
     });
 
     if ('error' in result) {

@@ -68,12 +68,12 @@ export class MarketingPayPublicService extends PublicApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async createCheckout(ptoken: string, couponCode?: string): Promise<CheckoutResult> {
+  async createCheckout(ptoken: string, couponCode?: string, saveCard?: boolean): Promise<CheckoutResult> {
     const result = await this.makeDefaultRequest<any>(
       '/api/public/marketing/checkout',
       {
         method: 'POST',
-        body: JSON.stringify({ ptoken, couponCode }),
+        body: JSON.stringify({ ptoken, couponCode, saveCard }),
       },
       undefined,
       0,

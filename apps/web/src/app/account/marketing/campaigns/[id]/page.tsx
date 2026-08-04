@@ -81,14 +81,23 @@ export default function CampaignDetailPage() {
             <p className="text-gray-500 mt-1">{campaign.serviceCategoryLabel} · {campaign.city}</p>
             <p className="text-xs text-gray-400 mt-2">Order reference: {campaign.displayId}</p>
           </div>
-          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-            campaign.status.status === 'delivered' ? 'bg-green-50 text-green-700' :
-            campaign.status.status === 'in_production' ? 'bg-blue-50 text-blue-700' :
-            campaign.status.status === 'active_plan' ? 'bg-purple-50 text-purple-700' :
-            'bg-gray-50 text-gray-700'
-          }`}>
-            {campaign.status.label}
-          </span>
+          <div className="flex items-center gap-3">
+            {/* Purchase again / Upgrade button (§7.6) — visible when a follow-on package exists */}
+            <Link
+              href={`/account/marketing/campaigns/${campaign.id}/checkout`}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              Purchase again / Upgrade
+            </Link>
+            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+              campaign.status.status === 'delivered' ? 'bg-green-50 text-green-700' :
+              campaign.status.status === 'in_production' ? 'bg-blue-50 text-blue-700' :
+              campaign.status.status === 'active_plan' ? 'bg-purple-50 text-purple-700' :
+              'bg-gray-50 text-gray-700'
+            }`}>
+              {campaign.status.label}
+            </span>
+          </div>
         </div>
       </div>
 

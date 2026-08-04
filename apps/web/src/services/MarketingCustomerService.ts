@@ -142,6 +142,35 @@ export interface CustomerAlert {
   isDismissed: boolean;
 }
 
+export interface ApplicableCoupon {
+  savedCouponId: string;
+  code: string;
+  label: string;
+  discountCents: number;
+  discountType: string;
+  expiresAt: string | null;
+}
+
+export interface CheckoutResult {
+  clientSecret?: string;
+  paymentIntentId?: string;
+  amountCents: number;
+  discountCents: number;
+  campaignId: string;
+  // Off-session success (no clientSecret needed)
+  stage?: string;
+  gatewayTransactionId?: string;
+  receiptUrl?: string;
+}
+
+export interface CheckoutConfirmResult {
+  campaignId: string;
+  stage: string;
+  amountCents: number;
+  discountCents: number;
+  gatewayTransactionId: string;
+}
+
 // ── Service ─────────────────────────────────────────────────────────────
 
 class MarketingCustomerService extends CustomerApiSingleton {
@@ -385,6 +414,77 @@ class MarketingCustomerService extends CustomerApiSingleton {
     );
     await this.invalidateCache('marketing-portal-alerts');
     await this.invalidateCache('marketing-portal-alert-count');
+  }
+
+  // ── Payment methods (§6.3) ────────────────────────────────────────────
+
+  async savePaymentMethodFromIntent(paymentIntentId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/payment-methods/save-from-payment',
+      {
+        method: 'POST',
+        body: JSON.stringify({ paymentIntentId }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to save payment method'));
+    return result.data?.data ?? result.data;
+  }
+
+  // ── Applicable coupons (§7.5) ─────────────────────────────────────────
+
+  async getApplicableCoupons(campaignId: string): Promise<ApplicableCoupon[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/coupons/applicable?campaignId=${encodeURIComponent(campaignId)}`,
+      {},
+      `marketing-portal-coupons-${campaignId}`,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load coupons'));
+    return result.data?.data ?? result.data;
+  }
+
+  // ── Portal checkout (§7.6) ────────────────────────────────────────────
+
+  async createCheckout(input: {
+    campaignId: string;
+    couponCode?: string;
+    savedCouponId?: string;
+    useSavedMethodId?: string;
+    billingAddressId?: string;
+  }): Promise<CheckoutResult> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/checkout',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to create checkout'));
+    return result.data?.data ?? result.data;
+  }
+
+  async confirmCheckout(input: {
+    campaignId: string;
+    paymentIntentId: string;
+    couponCode?: string;
+    savedCouponId?: string;
+    billingAddressId?: string;
+  }): Promise<CheckoutConfirmResult> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/checkout/confirm',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to confirm checkout'));
+    await this.invalidateServiceCaches();
+    return result.data?.data ?? result.data;
   }
 }
 
