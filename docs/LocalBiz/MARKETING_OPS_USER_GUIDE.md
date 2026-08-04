@@ -11,6 +11,7 @@
 - `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
 - `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
 - `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
+- `docs/LocalBiz/MARKETING_OPS_CUSTOMER_PORTAL_SPEC.md` — customer portal (§34)
 
 ---
 
@@ -854,10 +855,12 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 1. The prospect receives a pay link (via QR code, demo storefront, or direct URL) containing a `ptoken`.
 2. The page resolves the token server-side to load campaign details, package price, and service category.
 3. The prospect can optionally enter a **coupon code** — the page validates it server-side and shows the discounted total.
-4. The prospect enters payment details via Stripe Elements and clicks **Pay**.
-5. The backend creates a Stripe PaymentIntent, confirms the payment, and transitions the campaign to `paid`.
-6. On success, the page shows a confirmation with a **Download Receipt** button (PDF receipt generated server-side).
-7. Deliverables are automatically upgraded from preview to paid (watermarks removed).
+4. If the prospect is already authenticated (has a customer account), a **"Save this card"** checkbox appears (Phase 3, §6.3). When checked, the card is saved to their platform-scoped wallet for future one-click portal checkout.
+5. The prospect enters payment details via Stripe Elements and clicks **Pay**.
+6. The backend creates a Stripe PaymentIntent (with `setup_future_usage: 'off_session'` if save-card was opted in), confirms the payment, and transitions the campaign to `paid`.
+7. On success, the page shows a confirmation with a **Download Receipt** button (PDF receipt generated server-side) and, for anonymous payers, a **"Create your free account"** CTA to claim the purchase (Path A, §34.2).
+8. Deliverables are automatically upgraded from preview to paid (watermarks removed).
+9. A receipt email is sent fire-and-forget (idempotent via `receipt_emailed_at`).
 
 ### Admin Setup
 
@@ -1567,3 +1570,120 @@ Queue entries are not campaigns and do not appear in pipeline metrics. They are 
 - §3 — Campaign Cycle Mental Model (Review vs Recovery vs Profile Repair)
 - §19 — Stage Transitions and Rules (the transition tables the board columns mirror)
 - §32 — Operator Playbook Checklists (the soft gate that board stage advances go through)
+
+---
+
+## 34. Customer Portal — `/account/marketing`
+
+The customer portal is the authenticated self-service surface for business owners who have paid for Marketing Ops campaigns. It extends the existing customer architecture (same JWT, same `CustomerApiSingleton` base) — no parallel auth system.
+
+**Spec:** `docs/LocalBiz/MARKETING_OPS_CUSTOMER_PORTAL_SPEC.md`
+
+### 34.1 Who sees the portal
+
+The portal is **signal-gated** (§4.2). A customer sees the "My Services" nav group only when they have `platform` context — meaning at least one campaign is claimed (linked to their customer account). Storefront-only shoppers never see it; both-context customers see both "Shopping" and "My Services" groups.
+
+Server-side enforcement: every `/api/customer/marketing/*` route returns `403 context_required` for customers without platform context. The gate is not just hidden nav — it's enforced on every request.
+
+### 34.2 Account creation paths (Phase 1)
+
+Three paths link a payment to a customer account:
+
+| Path | Trigger | Flow |
+|------|---------|------|
+| **A (at payment)** | Pay page success screen | "Create your free account" → register/login → `claimViaPayRegister` / `claimViaPayLogin` → all eligible campaigns linked |
+| **B (email awareness)** | Customer visits `/marketing/claim` | Enters email → receives claim link → `/marketing/claim/[token]` → register/login → all past campaigns with that email linked |
+| **C (registration sweep)** | Customer registers/verifies email independently | `registrationClaimSweep` runs fire-and-forget at email verification → links any matching campaigns |
+
+All three paths call `MarketingCustomerService.claimAllEligible` — one action links **all** eligible campaigns for the email, not just one.
+
+### 34.3 Portal overview — `/account/marketing`
+
+The landing page shows:
+- **Summary cards:** total spent, active engagements, deliverables ready
+- **Campaigns list:** customer-safe projection (no internal stages, pain scores, or notes)
+- **Recent purchases:** latest payment history entries
+
+### 34.4 Campaign detail — `/account/marketing/campaigns/[id]`
+
+Shows:
+- Business name, service category, city, order reference
+- **Customer-facing status** (not internal stage): "Payment received" → "We're working on it" → "Delivered" → "Active service plan"
+- **Progress timeline** with dates
+- **Deliverables** (paid only — preview/watermarked versions never shown)
+- **Receipts** with PDF download links
+- **"Purchase again / Upgrade" button** (Phase 3) — links to portal checkout when a follow-on package price is set
+
+### 34.5 Receipts — `/account/marketing/receipts/[revenueId]`
+
+- Full HTML receipt view with line items, discount, total, payment date
+- **QR code** on every receipt — scans to the customer's asset URL (carries their uploaded logo when provided)
+- PDF download with the same QR embedded
+- Billing address block rendered when snapshotted at checkout or set as default billing
+
+### 34.6 Branding settings — `/account/marketing/settings`
+
+Customers can personalize their receipts:
+- **Logo upload** (≤2MB, PNG/JPG/SVG) — composited onto the QR code
+- **Asset URL** — the destination the QR scans to (validated: http/https only, no platform-internal hosts)
+- **Brand color** — applied to receipt accents (with contrast fallback)
+- **Live QR preview** — updates instantly as settings change
+
+When no branding is set, receipts fall back to platform branding.
+
+### 34.7 Support tickets — `/account/marketing/support`
+
+Customers file support tickets against the platform (not a tenant):
+- **Create ticket** with title, description, category, and optional campaign link ("Which service is this about?")
+- **Thread view** at `/account/marketing/support/[ticketId]` — customer replies reopen waiting tickets
+- Internal notes (`is_internal`) are stripped at the service layer, never visible to customers
+- Tickets land in the **existing operator personal CRM hub** (platform-scope aggregation already built)
+
+### 34.8 Alerts — `/account/marketing/alerts`
+
+Platform alerts from the operator:
+- **Targeted** (one customer) or **broadcast** (all platform-context customers)
+- Unread badge on the sidebar "Notifications" link (refreshes every 60s)
+- Mark read / dismiss individually, or mark all read
+- Storefront-only customers see neither the badge nor the alerts page
+
+### 34.9 Saved cards + repeat purchase (Phase 3)
+
+**Saving a card at payment time (§6.3):**
+- On the pay page (`/marketing/pay`), authenticated customers see a **"Save this card"** checkbox
+- When checked, the PaymentIntent is created with `setup_future_usage: 'off_session'`
+- After successful payment, the card is attached to the customer's platform-scoped Stripe customer
+- Saved cards are manageable in `/account/payment-methods` (filtered to platform scope)
+
+**Portal checkout — `/account/marketing/campaigns/[id]/checkout`:**
+- Accessible from the campaign detail "Purchase again / Upgrade" button
+- **Saved card selection** — default card preselected for one-click off-session charge
+- **Coupon application** — applicable wallet coupons listed with one-click apply + discount preview; ad-hoc code entry also supported
+- **SCA fallback** — if a saved card requires authentication (Stripe `authentication_required`), the page falls back to interactive Stripe Elements checkout
+- **Order summary** with discount + total before confirming
+- On success: campaign marked paid, receipt emailed, wallet coupon flipped to `redeemed`
+
+**Coupon parity (§7.5):**
+- Platform coupons saved to the existing wallet (`/account/coupons`) under "VisibleShelf services" group
+- Save-by-code accepts platform coupon codes (from operator campaigns, receipt emails, retainer pitches)
+- Applicable coupons surfaced at portal checkout with one-click apply
+- Wallet row flips to `redeemed` on successful checkout; savings shown on the receipt
+
+### 34.10 Address wallet — `/account/addresses`
+
+Addresses are customer-global (no tenant scoping). Platform-only customers use the same address book as storefront customers — typically one entry: their business billing address. The portal checkout offers wallet addresses for the billing address field, prefilled from the default billing address.
+
+### 34.11 Operator touchpoints
+
+Operators interact with the customer portal indirectly:
+- **Payment Link panel** (§8.1) — shows pay link + QR + status (viewed/paid)
+- **Send claim invite** (§8.2) — emails a claim link to a paid, unclaimed campaign's email
+- **Personal CRM hub** — platform-scope support tickets already aggregate here
+- **Alert composer** (§8.3) — send targeted or broadcast alerts to platform-context customers
+- **Campaign detail** — shows support ticket chip when `campaign_id`-linked tickets exist
+
+### 34.12 See Also
+
+- `docs/LocalBiz/MARKETING_OPS_CUSTOMER_PORTAL_SPEC.md` — full functional spec
+- §24 — Public Pay Page (the pre-account payment surface)
+- `AGENTS.md` — "Marketing Ops Customer Portal" sections (Phase 1, 2, 3) for implementation details
