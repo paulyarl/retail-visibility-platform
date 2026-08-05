@@ -542,6 +542,7 @@ export class MarketingCampaignService extends BaseService {
     location?: string;
     detectedSignals?: string[];
     assignedTo?: string;
+    note?: string;
   }, ctx?: RequestCtx): Promise<any> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -576,6 +577,7 @@ export class MarketingCampaignService extends BaseService {
         input.reviewCount != null ? `Reviews: ${input.reviewCount}` : null,
         outreachAngle ? `Outreach angle: ${outreachAngle}` : null,
         input.detectedSignals?.length ? `Detected signals: ${input.detectedSignals.join(', ')}` : null,
+        input.note ? `Operator note: ${input.note}` : null,
       ].filter(Boolean);
       const notes = noteParts.join('\n');
 

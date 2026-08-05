@@ -819,7 +819,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                                   handleChange('directory_profiles', next);
                                 }}
                                 placeholder="—"
-                            //    className={`${inputClass} w-20`} 
+                                className={`${inputClass} w-20`} 
                                 />
                             </td>
                             <td className="py-1 pr-2">

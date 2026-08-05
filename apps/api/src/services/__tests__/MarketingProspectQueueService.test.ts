@@ -46,6 +46,7 @@ vi.mock('../../lib/id-generator', () => ({
 vi.mock('../MarketingCampaignService', () => ({
   default: {
     deriveBusinessCampaign: vi.fn(),
+    createCampaign: vi.fn(),
   },
 }));
 
@@ -498,15 +499,152 @@ describe('MarketingProspectQueueService', () => {
       );
     });
 
-    it('throws NotFoundError when source_campaign_id is null (parent deleted)', async () => {
-      mockQueue.findUnique.mockResolvedValue(queueRow({ source_campaign_id: null }));
+    it('treats source_campaign_id=null as a manual entry (no parent) and creates a business-scope campaign', async () => {
+      // The manual path intentionally handles null source_campaign_id — there
+      // is no parent to derive from, so the campaign is seeded from the queue
+      // entry's own fields. This is the "manually queued prospect" flow.
+      const entry = queueRow({
+        source_kind: 'manual',
+        source_campaign_id: null,
+        source_scope: null,
+        detected_signals: [],
+        signal_count: 0,
+        note: null,
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      const newCampaign = { id: 'mcamp-manual-003' };
+      (MarketingCampaignService as any).createCampaign.mockResolvedValue(newCampaign);
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve({ ...entry, ...data, id: where.id }),
+      );
 
-      await expect(
-        MarketingProspectQueueService.createCampaignFromQueue({
-          queueEntryId: 'pque-test-001',
-          actingUserId: ACTING_USER_ID,
+      const result = await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.created).toBe(true);
+      expect(result.campaign.id).toBe('mcamp-manual-003');
+      expect(MarketingCampaignService.createCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'business', businessName: 'Joe Pizza' }),
+        undefined,
+      );
+    });
+
+    // ─── operator note carryover ────────────────────────────────────────
+    // The queue entry's `note` field (operator-entered at queue time) must
+    // be carried forward into the campaign's `notes` on every spawn path.
+
+    it('carries the operator note into the campaign on the manual path (no parent)', async () => {
+      const entry = queueRow({
+        source_kind: 'manual',
+        source_campaign_id: null,
+        source_scope: null,
+        city: 'Indianapolis',
+        category: 'African Grocery Store',
+        detected_signals: [],
+        signal_count: 0,
+        note: 'Owner mentioned they are closing soon.',
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      const newCampaign = { id: 'mcamp-manual-001', notes: '' };
+      (MarketingCampaignService as any).createCampaign.mockResolvedValue(newCampaign);
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve({ ...entry, ...data, id: where.id }),
+      );
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(MarketingCampaignService.createCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'business',
+          businessName: 'Joe Pizza',
+          notes: expect.stringContaining('Operator note: Owner mentioned they are closing soon.'),
         }),
-      ).rejects.toThrow(/re-queue/i);
+        undefined,
+      );
+    });
+
+    it('does not add an operator note line on the manual path when note is null', async () => {
+      const entry = queueRow({
+        source_kind: 'manual',
+        source_campaign_id: null,
+        source_scope: null,
+        detected_signals: [],
+        signal_count: 0,
+        note: null,
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      (MarketingCampaignService as any).createCampaign.mockResolvedValue({ id: 'mcamp-manual-002' });
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve({ ...entry, ...data, id: where.id }),
+      );
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      const callArgs = (MarketingCampaignService as any).createCampaign.mock.calls[0][0];
+      expect(callArgs.notes).not.toContain('Operator note');
+    });
+
+    it('passes the operator note through to deriveBusinessCampaign on the thin path', async () => {
+      const entry = queueRow({
+        business_name: 'Sushi Bar',
+        source_kind: 'category_analysis',
+        business_snapshot: thinSnapshot(),
+        detected_signals: ['RA_NO_WEBSITE'],
+        signal_count: 1,
+        note: 'Prefers email contact.',
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      (MarketingCampaignService as any).deriveBusinessCampaign.mockResolvedValue({ id: 'mcamp-thin-001' });
+      mockQueue.update.mockResolvedValue({ ...entry, status: 'campaign_created', processed_campaign_id: 'mcamp-thin-001' });
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(MarketingCampaignService.deriveBusinessCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parentId: PARENT_CAMPAIGN_ID,
+          businessName: 'Sushi Bar',
+          note: 'Prefers email contact.',
+        }),
+        undefined,
+      );
+    });
+
+    it('passes the operator note through to deriveBusinessCampaignFromScanBusiness on the scan path', async () => {
+      const entry = queueRow({
+        source_kind: 'scan_unmatched',
+        note: 'High-intent — requested callback.',
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      (MarketingHotProspectService as any).getInstance().deriveBusinessCampaignFromScanBusiness.mockResolvedValue({
+        campaign: { id: 'mcamp-scan-001', assigned_to: null },
+        created: true,
+      });
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve({ ...entry, ...data, id: where.id }),
+      );
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect((MarketingHotProspectService as any).getInstance().deriveBusinessCampaignFromScanBusiness).toHaveBeenCalledWith(
+        PARENT_CAMPAIGN_ID,
+        scanSnapshot(),
+        undefined,
+        { note: 'High-intent — requested callback.' },
+      );
     });
   });
 

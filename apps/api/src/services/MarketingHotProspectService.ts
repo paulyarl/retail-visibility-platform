@@ -657,6 +657,7 @@ export class MarketingHotProspectService extends BaseService {
     parentId: string,
     business: BusinessJson,
     ctx?: RequestCtx,
+    options?: { note?: string },
   ): Promise<{ campaign: any; created: boolean }> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -737,7 +738,10 @@ export class MarketingHotProspectService extends BaseService {
           parent_campaign_id: parentId,
           stage: 'seek',
           stage_entered_at: new Date(),
-          notes: `Derived from parent campaign ${parent.display_id ?? parent.id} (${parent.scope} scope) via City Pain Scan sync.`,
+          notes: [
+            `Derived from parent campaign ${parent.display_id ?? parent.id} (${parent.scope} scope) via City Pain Scan sync.`,
+            options?.note ? `Operator note: ${options.note}` : null,
+          ].filter(Boolean).join('\n'),
         },
       });
 

@@ -392,6 +392,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
             (entry.detected_signals as string[])?.length
               ? `Detected signals: ${(entry.detected_signals as string[]).join(', ')}`
               : null,
+            entry.note ? `Operator note: ${entry.note}` : null,
           ].filter(Boolean).join('\n'),
         }, ctx);
 
@@ -435,6 +436,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           entry.source_campaign_id,
           snapshot,
           ctx,
+          { note: entry.note ?? undefined },
         );
         result = r;
         // Carry ownership forward for the scan path (deriveBusinessCampaign
@@ -457,6 +459,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           location: (snapshot.location as string) ?? undefined,
           detectedSignals: (entry.detected_signals as string[]) ?? undefined,
           assignedTo: assignee ?? undefined,
+          note: entry.note ?? undefined,
         }, ctx);
         result = { campaign, created: true };
       }
