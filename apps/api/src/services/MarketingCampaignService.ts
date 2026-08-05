@@ -226,10 +226,10 @@ export interface CampaignUpdateInput {
   assignedTo?: string;
   notes?: string;
   tone?: string;
-  retainer?: 'Fast' | 'Medium' | 'Slow';
+  retainer?: 'Fast' | 'Medium' | 'Slow' | null;
   attributes?: string[];
   stage?: CampaignStage;
-  retainerStatus?: RetainerStatus;
+  retainerStatus?: RetainerStatus | null;
   retainerAmountCents?: number;
   retainerStartDate?: Date | null;
   amountPaidCents?: number;
@@ -737,9 +737,9 @@ export class MarketingCampaignService extends BaseService {
     if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
     if (input.city !== undefined) data.city = input.city;
-    if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood;
-    if (input.contactMethod !== undefined) data.contact_method = input.contactMethod;
-    if (input.contactInfo !== undefined) data.contact_info = input.contactInfo;
+    if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood || null;
+    if (input.contactMethod !== undefined) data.contact_method = input.contactMethod || null;
+    if (input.contactInfo !== undefined) data.contact_info = input.contactInfo || null;
     if (input.phone !== undefined) data.phone = input.phone || null;
     if (input.email !== undefined) data.email = input.email || null;
     if (input.websiteUrl !== undefined) {
@@ -767,26 +767,26 @@ export class MarketingCampaignService extends BaseService {
     if (input.gbpClaimed !== undefined) data.gbp_claimed = input.gbpClaimed;
     if (input.unaddressedReviews !== undefined) data.unaddressed_reviews = input.unaddressedReviews;
     if (input.lastReviewDate !== undefined) data.last_review_date = input.lastReviewDate;
-    if (input.hasWebsite !== undefined) data.has_website = input.hasWebsite;
+    if (input.hasWebsite !== undefined) data.has_website = input.hasWebsite || null;
     if (input.napConsistent !== undefined) data.nap_consistent = input.napConsistent;
-    if (input.estimatedTier !== undefined) data.estimated_tier = input.estimatedTier;
+    if (input.estimatedTier !== undefined) data.estimated_tier = input.estimatedTier || null;
     if (input.estimatedFeeCents !== undefined) data.estimated_fee_cents = input.estimatedFeeCents;
     if (input.painScore !== undefined) data.pain_score = input.painScore;
-    if (input.assignedTo !== undefined) data.assigned_to = input.assignedTo;
-    if (input.notes !== undefined) data.notes = input.notes;
-    if (input.tone !== undefined) data.tone = input.tone;
+    if (input.assignedTo !== undefined) data.assigned_to = input.assignedTo || null;
+    if (input.notes !== undefined) data.notes = input.notes || null;
+    if (input.tone !== undefined) data.tone = input.tone || null;
     if (input.retainer !== undefined) data.retainer = input.retainer;
     if (input.attributes !== undefined) data.attributes = input.attributes;
     if (input.retainerStatus !== undefined) data.retainer_status = input.retainerStatus;
     if (input.retainerAmountCents !== undefined) data.retainer_amount_cents = input.retainerAmountCents;
     if (input.retainerStartDate !== undefined) data.retainer_start_date = input.retainerStartDate;
     if (input.amountPaidCents !== undefined) data.amount_paid_cents = input.amountPaidCents;
-    if (input.packageDelivered !== undefined) data.package_delivered = input.packageDelivered;
+    if (input.packageDelivered !== undefined) data.package_delivered = input.packageDelivered || null;
     if (input.campaignOrigin !== undefined) data.campaign_origin = input.campaignOrigin;
     if (input.packagePriceCents !== undefined) data.package_price_cents = input.packagePriceCents;
-    if (input.subscriptionTierId !== undefined) data.subscription_tier_id = input.subscriptionTierId;
-    if (input.couponCode !== undefined) data.coupon_code = input.couponCode;
-    if (input.serviceCategory !== undefined) data.service_category = input.serviceCategory;
+    if (input.subscriptionTierId !== undefined) data.subscription_tier_id = input.subscriptionTierId || null;
+    if (input.couponCode !== undefined) data.coupon_code = input.couponCode || null;
+    if (input.serviceCategory !== undefined) data.service_category = input.serviceCategory || null;
 
     try {
       const updated = await this.prisma.mkt_campaigns_list.update({ where: { id }, data });

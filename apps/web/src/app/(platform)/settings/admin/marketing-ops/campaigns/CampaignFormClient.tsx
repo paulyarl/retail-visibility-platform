@@ -377,66 +377,72 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         const created = await marketingOpsService.createCampaign(input);
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
       } else if (mode === 'edit' && campaignId) {
-        // Same legacy backfill as create.
-        const legacyContactMethod = strOrUndef(form.contact_method);
-        const legacyContactInfo = strOrUndef(form.contact_info);
+        // Edit-mode helpers: send real values (empty string / 0 / false / null
+        // / []) instead of undefined so the backend's `if (input.X !== undefined)`
+        // guards always enter and persist the cleared state. Using undefined
+        // would drop the key from the JSON payload and the backend would skip
+        // the update, silently retaining the old value (the website_url bug).
+        const numOrZero = (v: number | '') => v === '' ? 0 : v;
+        const boolOrFalse = (v: boolean | '') => v === '' ? false : v;
+        const dateOrNull = (v: string) => v ? new Date(v).toISOString() : null as any;
+        const enumOrNull = (v: string) => (v || null) as any;
+
+        // Same legacy backfill as create, but using raw (non-undefined) values.
+        const legacyContactMethod = form.contact_method;
+        const legacyContactInfo = form.contact_info;
         const backfillMethod = !legacyContactMethod && (form.phone || form.email || form.website_url);
         const backfilledMethod = backfillMethod
           ? (form.phone ? 'phone' : form.email ? 'email' : 'website')
           : legacyContactMethod;
         const backfilledInfo = backfillMethod
-          ? (form.phone || form.email || form.website_url || undefined)
+          ? (form.phone || form.email || form.website_url || '')
           : legacyContactInfo;
 
         const input: CampaignUpdateInput = {
           campaign_category: form.campaign_category,
           scope: form.scope,
-          business_name: strOrUndef(form.business_name),
+          business_name: form.business_name,
           category: form.category,
           city: form.city,
-          neighborhood: strOrUndef(form.neighborhood),
+          neighborhood: form.neighborhood,
           contact_method: backfilledMethod,
           contact_info: backfilledInfo,
-          phone: strOrUndef(form.phone),
-          email: strOrUndef(form.email),
-          // Send empty string (not undefined) when cleared so the backend's
-          // `input.websiteUrl || null` branch sets the column to NULL. Using
-          // undefined would drop the key from the JSON payload and the
-          // backend would skip the update block, leaving the old URL in place.
+          phone: form.phone,
+          email: form.email,
           website_url: form.website_url,
-          social_profiles: cleanSocial.length > 0 ? cleanSocial : undefined,
-          owner_names: cleanOwnerNames.length > 0 ? cleanOwnerNames : undefined,
-          phones: cleanPhones.length > 0 ? cleanPhones : undefined,
-          address_line1: strOrUndef(form.address_line1),
-          address_line2: strOrUndef(form.address_line2),
-          address_city: strOrUndef(form.address_city),
-          address_state: strOrUndef(form.address_state),
-          address_zip: strOrUndef(form.address_zip),
-          address_country: strOrUndef(form.address_country),
-          directory_profiles: cleanDirectoryProfiles.length > 0 ? cleanDirectoryProfiles : undefined,
-          gbp_claimed: boolOrUndef(form.gbp_claimed),
-          unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
-          last_review_date: form.last_review_date ? new Date(form.last_review_date).toISOString() : undefined,
-          has_website: strOrUndef(form.has_website),
-          nap_consistent: boolOrUndef(form.nap_consistent),
-          estimated_tier: strOrUndef(form.estimated_tier),
-          estimated_fee_cents: numOrUndef(form.estimated_fee_cents),
-          pain_score: numOrUndef(form.pain_score),
-          tone: strOrUndef(form.tone),
-          retainer: form.retainer || undefined,
+          social_profiles: cleanSocial,
+          owner_names: cleanOwnerNames,
+          phones: cleanPhones,
+          address_line1: form.address_line1,
+          address_line2: form.address_line2,
+          address_city: form.address_city,
+          address_state: form.address_state,
+          address_zip: form.address_zip,
+          address_country: form.address_country,
+          directory_profiles: cleanDirectoryProfiles,
+          gbp_claimed: boolOrFalse(form.gbp_claimed),
+          unaddressed_reviews: numOrZero(form.unaddressed_reviews),
+          last_review_date: dateOrNull(form.last_review_date),
+          has_website: form.has_website,
+          nap_consistent: boolOrFalse(form.nap_consistent),
+          estimated_tier: form.estimated_tier,
+          estimated_fee_cents: numOrZero(form.estimated_fee_cents),
+          pain_score: numOrZero(form.pain_score),
+          tone: form.tone,
+          retainer: enumOrNull(form.retainer),
           attributes: form.attributes,
-          assigned_to: strOrUndef(form.assigned_to),
-          notes: strOrUndef(form.notes),
+          assigned_to: form.assigned_to,
+          notes: form.notes,
           stage: form.stage,
-          retainer_status: form.retainer_status || undefined,
-          retainer_amount_cents: numOrUndef(form.retainer_amount_cents),
-          retainer_start_date: form.retainer_start_date ? new Date(form.retainer_start_date).toISOString() : undefined,
-          amount_paid_cents: numOrUndef(form.amount_paid_cents),
-          package_delivered: strOrUndef(form.package_delivered),
-          package_price_cents: numOrUndef(form.package_price_cents),
-          subscription_tier_id: strOrUndef(form.subscription_tier_id),
-          coupon_code: strOrUndef(form.coupon_code),
-          service_category: strOrUndef(form.service_category),
+          retainer_status: enumOrNull(form.retainer_status),
+          retainer_amount_cents: numOrZero(form.retainer_amount_cents),
+          retainer_start_date: dateOrNull(form.retainer_start_date),
+          amount_paid_cents: numOrZero(form.amount_paid_cents),
+          package_delivered: form.package_delivered,
+          package_price_cents: numOrZero(form.package_price_cents),
+          subscription_tier_id: form.subscription_tier_id,
+          coupon_code: form.coupon_code,
+          service_category: form.service_category,
         };
         await marketingOpsService.updateCampaign(campaignId, input);
         router.push(`/settings/admin/marketing-ops/campaigns/${campaignId}`);
