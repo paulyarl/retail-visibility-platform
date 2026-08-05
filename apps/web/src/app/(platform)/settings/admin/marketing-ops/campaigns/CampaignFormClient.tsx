@@ -808,7 +808,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                                   handleChange('directory_profiles', next);
                                 }}
                                 placeholder="—"
-                                className={`${inputClass} w-24`} />
+                              //  className={`${inputClass} w-30`}
+                                 />
                             </td>
                             <td className="py-1 pr-2">
                               <input type="number" min={0} value={dp.review_count ?? ''}
@@ -818,7 +819,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                                   handleChange('directory_profiles', next);
                                 }}
                                 placeholder="—"
-                                className={`${inputClass} w-20`} />
+                            //    className={`${inputClass} w-20`} 
+                                />
                             </td>
                             <td className="py-1 pr-2">
                               <input type="text" value={dp.category ?? ''} placeholder="Platform category"
