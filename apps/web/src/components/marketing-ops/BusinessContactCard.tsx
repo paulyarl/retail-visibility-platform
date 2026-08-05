@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Phone, Mail, Globe, Share2, Sparkles, ExternalLink, RefreshCw, MapPin, User, Store } from 'lucide-react';
+import { Phone, Mail, Globe, Share2, Sparkles, ExternalLink, RefreshCw, MapPin, User, Store, Star, CheckCircle, XCircle, HelpCircle, ListChecks } from 'lucide-react';
 import type { Campaign } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
@@ -45,6 +45,7 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
   const socials = campaign.social_profiles ?? [];
   const ownerNames = campaign.owner_names ?? [];
   const additionalPhones = campaign.phones ?? [];
+  const directoryProfiles = campaign.directory_profiles ?? [];
 
   // Compose a single display string for the structured address.
   const addressParts: string[] = [];
@@ -172,9 +173,68 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
           />
         )}
       </div>
+
+      {directoryProfiles.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+          <div className="mb-2 flex items-center gap-1.5">
+            <ListChecks className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300">Directory Profiles</h4>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {directoryProfiles.map((dp, idx) => {
+              const platformLabel = DIRECTORY_PLATFORM_LABELS[dp.platform] || dp.platform || 'Unknown';
+              const claimIcon = dp.claim_status === 'claimed'
+                ? <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                : dp.claim_status === 'unclaimed'
+                  ? <XCircle className="h-3.5 w-3.5 text-red-500" />
+                  : <HelpCircle className="h-3.5 w-3.5 text-gray-400" />;
+              const claimLabel = dp.claim_status === 'claimed' ? 'Claimed' : dp.claim_status === 'unclaimed' ? 'Unclaimed' : 'Unknown';
+              const ratingText = dp.star_rating != null
+                ? `${dp.star_rating.toFixed(1)}★`
+                : null;
+              const reviewText = dp.review_count != null
+                ? `${dp.review_count} reviews`
+                : null;
+              const summary = [ratingText, reviewText].filter(Boolean).join(' · ') || null;
+              return (
+                <div key={`dp-${idx}`} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      {claimIcon}
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{platformLabel}</span>
+                    </div>
+                    {dp.url && (
+                      <a href={dp.url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400">
+                        <ExternalLink className="h-3 w-3" /> Open
+                      </a>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span>{claimLabel}</span>
+                    {summary && <span>· {summary}</span>}
+                    {dp.category && <span>· {dp.category}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const DIRECTORY_PLATFORM_LABELS: Record<string, string> = {
+  google: 'Google',
+  yelp: 'Yelp',
+  yellow_pages: 'Yellow Pages',
+  apple_maps: 'Apple Maps',
+  bbb: 'BBB',
+  mapquest: 'MapQuest',
+  yahoo_local: 'Yahoo Local',
+  other: 'Other',
+};
 
 interface ContactRowProps {
   icon: React.ReactNode;

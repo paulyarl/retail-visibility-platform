@@ -409,6 +409,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           address_state: strOrUndef(form.address_state),
           address_zip: strOrUndef(form.address_zip),
           address_country: strOrUndef(form.address_country),
+          directory_profiles: cleanDirectoryProfiles.length > 0 ? cleanDirectoryProfiles : undefined,
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
           last_review_date: form.last_review_date ? new Date(form.last_review_date).toISOString() : undefined,
@@ -733,6 +734,116 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 placeholder="US"
                 maxLength={2}
                 className={inputClass} />
+            </FormField>
+            <FormField label="Directory Profiles" className="sm:col-span-2">
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Per-platform business directory profile status discovered during citation audits.
+                  The Google row auto-syncs GBP Claimed and Unaddressed Reviews above.
+                </p>
+                {form.directory_profiles.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">
+                          <th className="pb-1 pr-2 font-medium">Platform</th>
+                          <th className="pb-1 pr-2 font-medium">Profile URL</th>
+                          <th className="pb-1 pr-2 font-medium">Claimed</th>
+                          <th className="pb-1 pr-2 font-medium">Stars</th>
+                          <th className="pb-1 pr-2 font-medium">Reviews</th>
+                          <th className="pb-1 pr-2 font-medium">Category</th>
+                          <th className="pb-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {form.directory_profiles.map((dp, idx) => (
+                          <tr key={idx} className="border-b border-gray-100 dark:border-gray-800">
+                            <td className="py-1 pr-2">
+                              <select value={dp.platform}
+                                onChange={(e) => {
+                                  const next = [...form.directory_profiles];
+                                  next[idx] = { ...dp, platform: e.target.value };
+                                  handleChange('directory_profiles', next);
+                                }}
+                                className={inputClass}>
+                                <option value="">—</option>
+                                {DIRECTORY_PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-1 pr-2">
+                              <input type="url" value={dp.url} placeholder="https://..."
+                                onChange={(e) => {
+                                  const next = [...form.directory_profiles];
+                                  next[idx] = { ...dp, url: e.target.value };
+                                  handleChange('directory_profiles', next);
+                                }}
+                                className={inputClass} />
+                            </td>
+                            <td className="py-1 pr-2">
+                              <select value={dp.claim_status}
+                                onChange={(e) => {
+                                  const next = [...form.directory_profiles];
+                                  next[idx] = { ...dp, claim_status: e.target.value as 'claimed' | 'unclaimed' | 'unknown' };
+                                  handleChange('directory_profiles', next);
+                                }}
+                                className={inputClass}>
+                                {CLAIM_STATUSES.map((s) => <option key={s} value={s}>{s === 'claimed' ? 'Claimed' : s === 'unclaimed' ? 'Unclaimed' : 'Unknown'}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-1 pr-2">
+                              <input type="number" min={0} max={5} step={0.1} value={dp.star_rating ?? ''}
+                                onChange={(e) => {
+                                  const next = [...form.directory_profiles];
+                                  next[idx] = { ...dp, star_rating: e.target.value === '' ? null : parseFloat(e.target.value) };
+                                  handleChange('directory_profiles', next);
+                                }}
+                                placeholder="—"
+                                className={`${inputClass} w-16`} />
+                            </td>
+                            <td className="py-1 pr-2">
+                              <input type="number" min={0} value={dp.review_count ?? ''}
+                                onChange={(e) => {
+                                  const next = [...form.directory_profiles];
+                                  next[idx] = { ...dp, review_count: e.target.value === '' ? null : parseInt(e.target.value) };
+                                  handleChange('directory_profiles', next);
+                                }}
+                                placeholder="—"
+                                className={`${inputClass} w-20`} />
+                            </td>
+                            <td className="py-1 pr-2">
+                              <input type="text" value={dp.category ?? ''} placeholder="Platform category"
+                                onChange={(e) => {
+                                  const next = [...form.directory_profiles];
+                                  next[idx] = { ...dp, category: e.target.value };
+                                  handleChange('directory_profiles', next);
+                                }}
+                                className={inputClass} />
+                            </td>
+                            <td className="py-1">
+                              <button type="button"
+                                onClick={() => handleChange('directory_profiles', form.directory_profiles.filter((_, i) => i !== idx))}
+                                className="text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button type="button"
+                    onClick={() => handleChange('directory_profiles', [...form.directory_profiles, { platform: 'google', url: '', claim_status: 'unknown', star_rating: null, review_count: null, category: '' }])}
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add Google profile</button>
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
+                  <button type="button"
+                    onClick={() => handleChange('directory_profiles', [...form.directory_profiles, { platform: 'yelp', url: '', claim_status: 'unknown', star_rating: null, review_count: null, category: '' }])}
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add Yelp</button>
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
+                  <button type="button"
+                    onClick={() => handleChange('directory_profiles', [...form.directory_profiles, { platform: '', url: '', claim_status: 'unknown', star_rating: null, review_count: null, category: '' }])}
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add other platform</button>
+                </div>
+              </div>
             </FormField>
             <FormField label="Legacy contact method (optional)" className="sm:col-span-2">
               <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
