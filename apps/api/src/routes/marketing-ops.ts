@@ -190,7 +190,7 @@ const campaignBaseSchema = z.object({
   phone: z.string().max(40).optional(),
   email: z.string().max(255).optional(),
   website_url: z.string().max(500).optional(),
-  social_profiles: z.array(z.object({ platform: z.string().max(50), url: z.string().max(500) })).optional(),
+  social_profiles: z.array(z.object({ platform: z.string().max(500), url: z.string().max(500) })).optional(),
   owner_names: z.array(z.string().max(255)).optional(),
   phones: z.array(z.object({ label: z.string().max(50), number: z.string().max(40) })).optional(),
   address_line1: z.string().max(255).optional(),

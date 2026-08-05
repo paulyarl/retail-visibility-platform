@@ -268,8 +268,31 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
       // Filter out empty entries from structured arrays so partial rows
       // (e.g. a social profile with only a platform label and no URL) don't
-      // get persisted or trip backend validation.
-      const cleanSocial = form.social_profiles.filter((sp) => sp.platform.trim() || sp.url.trim());
+      // get persisted or trip backend validation. Also auto-swap when the
+      // operator pasted a URL into the platform field and left url empty.
+      const cleanSocial = form.social_profiles
+        .map((sp) => {
+          let platform = sp.platform.trim();
+          let url = sp.url.trim();
+          // Auto-swap: operator pasted URL into the platform field
+          if (!url && /^https?:\/\//i.test(platform)) {
+            url = platform;
+            platform = '';
+          }
+          // Derive a label from the URL hostname when platform is blank
+          if (!platform && url) {
+            try {
+              const host = new URL(url).hostname.replace(/^www\./, '');
+              const known = ['facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com', 'youtube.com', 'yelp.com', 'tiktok.com', 'pinterest.com', 'bbb.org'];
+              const match = known.find((k) => host.includes(k));
+              platform = match
+                ? match.split('.')[0].replace(/^\w/, (c) => c.toUpperCase())
+                : host.split('.')[0].replace(/^\w/, (c) => c.toUpperCase());
+            } catch { /* leave blank */ }
+          }
+          return { platform, url };
+        })
+        .filter((sp) => sp.platform || sp.url);
       const cleanOwnerNames = form.owner_names.map((n) => n.trim()).filter(Boolean);
       const cleanPhones = form.phones.filter((p) => p.label.trim() || p.number.trim());
 
@@ -582,23 +605,23 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Additional Phones" className="sm:col-span-2">
               <div className="space-y-2">
                 {form.phones.map((p, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <input type="text" value={p.label} placeholder="Label (e.g. Mobile, Landline, After-hours)"
+                  <div key={idx} className="grid grid-cols-[1fr_2fr_auto] gap-2 items-center">
+                    <input type="text" value={p.label} placeholder="Label (e.g. Mobile, Landline)"
                       onChange={(e) => {
                         const next = [...form.phones];
                         next[idx] = { ...p, label: e.target.value };
                         handleChange('phones', next);
                       }}
-                      className={`${inputClass} w-1/3`} />
+                      className={inputClass} />
                     <input type="tel" value={p.number} placeholder="+1 555-0100"
                       onChange={(e) => {
                         const next = [...form.phones];
                         next[idx] = { ...p, number: e.target.value };
                         handleChange('phones', next);
                       }}
-                      className={`${inputClass} flex-1`} />
+                      className={inputClass} />
                     <button type="button" onClick={() => handleChange('phones', form.phones.filter((_, i) => i !== idx))}
-                      className="px-2 text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
+                      className="px-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
                   </div>
                 ))}
                 <button type="button"
@@ -609,23 +632,23 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Social Profiles" className="sm:col-span-2">
               <div className="space-y-2">
                 {form.social_profiles.map((sp, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <input type="text" value={sp.platform} placeholder="Platform (e.g. Instagram, Facebook, LinkedIn)"
+                  <div key={idx} className="grid grid-cols-[1fr_2fr_auto] gap-2 items-center">
+                    <input type="text" value={sp.platform} placeholder="Platform (e.g. Instagram)"
                       onChange={(e) => {
                         const next = [...form.social_profiles];
                         next[idx] = { ...sp, platform: e.target.value };
                         handleChange('social_profiles', next);
                       }}
-                      className={`${inputClass} w-1/3`} />
+                      className={inputClass} />
                     <input type="url" value={sp.url} placeholder="Full profile URL (e.g. https://instagram.com/business)"
                       onChange={(e) => {
                         const next = [...form.social_profiles];
                         next[idx] = { ...sp, url: e.target.value };
                         handleChange('social_profiles', next);
                       }}
-                      className={`${inputClass} flex-1`} />
+                      className={inputClass} />
                     <button type="button" onClick={() => handleChange('social_profiles', form.social_profiles.filter((_, i) => i !== idx))}
-                      className="px-2 text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
+                      className="px-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
                   </div>
                 ))}
                 <button type="button"
