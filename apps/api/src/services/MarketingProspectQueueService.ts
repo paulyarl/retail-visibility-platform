@@ -68,6 +68,9 @@ export interface ListQueueFilters {
   city?: string;
   source_kind?: ProspectSourceKind;
   assigned_to?: string; // 'me' resolved to userId at route layer; 'unassigned' → null filter
+  // When true, the assigned_to filter is OR'd with assigned_to IS NULL
+  // (matches the "Assigned to me + unassigned" checkbox label on the queue page).
+  include_unassigned?: boolean;
   limit?: number;
   includeCampaigns?: boolean;
 }
@@ -224,6 +227,14 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (filters.source_kind) where.source_kind = filters.source_kind;
       if (filters.assigned_to === 'unassigned') {
         where.assigned_to = null;
+      } else if (filters.assigned_to && filters.include_unassigned) {
+        // "Assigned to me + unassigned" — OR the assignee with NULL rows so
+        // newly-queued (unassigned) prospects are visible alongside the
+        // operator's own claims.
+        where.OR = [
+          { assigned_to: filters.assigned_to },
+          { assigned_to: null },
+        ];
       } else if (filters.assigned_to) {
         where.assigned_to = filters.assigned_to;
       }

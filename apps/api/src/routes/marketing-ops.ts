@@ -3144,10 +3144,12 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       ? (statusRaw.split(',').map((s) => s.trim()).filter(Boolean) as any)
       : undefined;
     const assignedTo = req.query.assigned_to as string | undefined;
-    // 'me' resolves to the caller's id; 'unassigned' → null filter; any other
-    // value is treated as a literal user id.
+    // 'me' resolves to the caller's id and includes unassigned entries
+    // (matches the "Assigned to me + unassigned" checkbox label);
+    // 'unassigned' → null filter; any other value is a literal user id.
+    const isMeFilter = assignedTo === 'me';
     const resolvedAssignedTo =
-      assignedTo === 'me' ? req.user?.id :
+      isMeFilter ? req.user?.id :
       assignedTo === 'unassigned' ? 'unassigned' :
       assignedTo;
 
@@ -3157,6 +3159,7 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       city: req.query.city as string | undefined,
       source_kind: req.query.source_kind as any,
       assigned_to: resolvedAssignedTo,
+      include_unassigned: isMeFilter,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       includeCampaigns: req.query.include === 'campaigns',
     }, getCtx(req));

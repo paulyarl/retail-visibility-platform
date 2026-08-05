@@ -244,7 +244,7 @@ export default function ProspectQueueClient() {
     setAddModalOpen(true);
   };
 
-  const handleAddToQueue = async () => {
+  const handleAddToQueue = async (keepOpen: boolean) => {
     const businessName = addForm.business_name.trim();
     if (!businessName) {
       setAddFeedback({ kind: 'exists', message: 'Business name is required.' });
@@ -277,9 +277,15 @@ export default function ProspectQueueClient() {
       } else if (result.kind === 'already_queued') {
         setAddFeedback({ kind: 'already', message: 'Already in the queue.' });
       } else {
-        setAddFeedback({ kind: 'created', message: 'Added to the queue.' });
-        setAddForm({ business_name: '', category: '', city: '', state: '', priority: 'normal', note: '' });
         await fetchQueue();
+        if (keepOpen) {
+          // "Save and New" — clear the form, show brief confirmation, keep modal open.
+          setAddForm({ business_name: '', category: '', city: '', state: '', priority: 'normal', note: '' });
+          setAddFeedback({ kind: 'created', message: 'Added to the queue. Add another?' });
+        } else {
+          // "Add to Queue" — close the modal immediately.
+          setAddModalOpen(false);
+        }
       }
     } catch (err: any) {
       setAddFeedback({ kind: 'exists', message: err.message || 'Failed to add to queue' });
@@ -848,7 +854,16 @@ export default function ProspectQueueClient() {
                 Close
               </button>
               <button
-                onClick={handleAddToQueue}
+                onClick={() => handleAddToQueue(true)}
+                disabled={addingToQueue || !addForm.business_name.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 disabled:opacity-50"
+                title="Save and keep the modal open for another entry"
+              >
+                {addingToQueue ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Save and New
+              </button>
+              <button
+                onClick={() => handleAddToQueue(false)}
                 disabled={addingToQueue || !addForm.business_name.trim()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
               >
