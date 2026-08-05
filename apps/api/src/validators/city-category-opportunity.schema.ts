@@ -100,7 +100,16 @@ const concentrationCoerced = z.preprocess((val) => {
     const s = val.trim().toLowerCase();
     if (s === 'mixed' || s === 'balanced' || s === 'moderate') return 'moderately_concentrated';
     if (s === 'high' || s === 'concentrated' || s === 'high_concentration') return 'highly_concentrated';
-    if (s === 'monopoly' || s === 'single_dominant') return 'dominated_by_one';
+    if (
+      s === 'monopoly' ||
+      s === 'single_dominant' ||
+      s === 'one_dominant_leader_with_weak_fragmented_remainder' ||
+      s === 'one_dominant_leader' ||
+      s === 'one_dominant' ||
+      s === 'dominant_leader' ||
+      s === 'leader_dominant' ||
+      s === 'dominated_by_one_leader'
+    ) return 'dominated_by_one';
     if (s === 'dispersed' || s === 'very_fragmented') return 'fragmented';
   }
   return val;
@@ -166,13 +175,28 @@ const photoActivityCoerced = z.preprocess((val) => {
   'unable_to_verify',
 ]));
 
-const napStatusEnum = z.enum([
+/**
+ * Tolerant coercion for nap_status.
+ * Agents sometimes emit "material_inconsistencies" instead of "major_inconsistencies",
+ * "minor_inconsistency" instead of "minor_variations", or "name_only_drift" instead
+ * of "name_drift".
+ */
+const napStatusCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'material_inconsistencies' || s === 'material_inconsistency' || s === 'significant_inconsistencies' || s === 'major_drift' || s === 'severe_inconsistencies') return 'major_inconsistencies';
+    if (s === 'minor_inconsistency' || s === 'minor_inconsistencies' || s === 'small_variations' || s === 'minor_drift' || s === 'slight_variations') return 'minor_variations';
+    if (s === 'name_only_drift' || s === 'name_only' || s === 'name_mismatch' || s === 'name_inconsistency') return 'name_drift';
+    if (s === 'unverified' || s === 'unknown' || s === 'not_verifiable') return 'unable_to_verify';
+  }
+  return val;
+}, z.enum([
   'consistent',
   'minor_variations',
   'major_inconsistencies',
   'name_drift',
   'unable_to_verify',
-]);
+]));
 const severityEnum = z.enum(['low', 'medium', 'high']);
 const confidenceEnum = z.enum(['low', 'medium', 'high']);
 const evidenceStatusEnum = z.enum([
@@ -393,7 +417,7 @@ const sampledBusinessSchema = z.object({
   yelp: competitorYelpSchema.optional(),
   facebook: competitorFacebookSchema.optional(),
   website_assessment: sampledBusinessWebsiteSchema.optional(),
-  nap_status: napStatusEnum,
+  nap_status: napStatusCoerced,
   observed_opportunities: z.array(z.string()).optional(),
   data_confidence: confidenceEnum,
 }).passthrough();
