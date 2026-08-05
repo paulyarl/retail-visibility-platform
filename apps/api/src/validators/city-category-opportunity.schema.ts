@@ -170,6 +170,7 @@ const napStatusEnum = z.enum([
   'consistent',
   'minor_variations',
   'major_inconsistencies',
+  'name_drift',
   'unable_to_verify',
 ]);
 const severityEnum = z.enum(['low', 'medium', 'high']);
@@ -654,7 +655,7 @@ Return your response as JSON matching this exact schema:
         "clear_call_to_action": "yes|no|unable_to_verify",
         "issues": ["<string>"]
       },
-      "nap_status": "consistent|minor_variations|major_inconsistencies|unable_to_verify",
+      "nap_status": "consistent|minor_variations|major_inconsistencies|name_drift|unable_to_verify",
       "observed_opportunities": ["<string>"],
       "data_confidence": "low|medium|high"
     }
