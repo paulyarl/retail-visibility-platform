@@ -640,7 +640,8 @@ export interface AddToQueueInput {
   city?: string;
   state?: string;
   source_kind: ProspectSourceKind;
-  source_campaign_id: string;
+  // Optional for manual entries added directly from the queue page.
+  source_campaign_id?: string;
   source_audit_id?: string;
   source_execution_id?: string;
   audit_date?: string; // ISO datetime

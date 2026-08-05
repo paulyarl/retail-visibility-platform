@@ -45,7 +45,9 @@ export interface ProspectQueueAddInput {
   city?: string;
   state?: string;
   source_kind: ProspectSourceKind;
-  source_campaign_id: string;
+  // Optional for manual entries added directly from the queue page (no parent
+  // campaign to inherit scope/category/city/state from).
+  source_campaign_id?: string;
   source_audit_id?: string;
   source_execution_id?: string;
   audit_date?: Date;
@@ -106,17 +108,23 @@ class MarketingProspectQueueServiceClass extends BaseService {
       }
 
       // Load parent campaign to inherit scope/category/city/state defaults.
-      const parent = await this.prisma.mkt_campaigns_list.findUnique({
-        where: { id: input.source_campaign_id },
-      });
-      if (!parent) {
-        throw new NotFoundError(`Source campaign ${input.source_campaign_id} not found`);
+      // Manual entries (added directly from the queue page) may have no parent
+      // campaign — fall back to the input values directly.
+      const isManual = input.source_kind === 'manual' && !input.source_campaign_id;
+      let parent: any = null;
+      if (!isManual) {
+        parent = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: input.source_campaign_id! },
+        });
+        if (!parent) {
+          throw new NotFoundError(`Source campaign ${input.source_campaign_id} not found`);
+        }
       }
 
-      const category = (input.category ?? parent.category ?? null) as string | null;
-      const city = (input.city ?? parent.city ?? null) as string | null;
-      const state = (input.state ?? (parent as any).state ?? null) as string | null;
-      const sourceScope = parent.scope as string | null;
+      const category = (input.category ?? parent?.category ?? null) as string | null;
+      const city = (input.city ?? parent?.city ?? null) as string | null;
+      const state = (input.state ?? parent?.state ?? null) as string | null;
+      const sourceScope = parent ? (parent.scope as string | null) : null;
 
       // Denormalize signal/rating/review fields from the snapshot so the card
       // can render without unpacking business_snapshot per row.
@@ -170,7 +178,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           state,
           source_kind: input.source_kind,
           source_scope: sourceScope,
-          source_campaign_id: input.source_campaign_id,
+          source_campaign_id: input.source_campaign_id ?? null,
           source_audit_id: input.source_audit_id ?? null,
           source_execution_id: input.source_execution_id ?? null,
           audit_date: input.audit_date ?? null,
@@ -348,20 +356,70 @@ class MarketingProspectQueueServiceClass extends BaseService {
         // Campaign was deleted — fall through to re-create.
       }
 
-      if (!entry.source_campaign_id) {
-        throw new NotFoundError(
-          `Source campaign was deleted for queue entry ${input.queueEntryId}; re-queue the prospect manually`,
-        );
-      }
-
       const assignee = entry.assigned_to ?? input.actingUserId ?? null;
       const snapshot = (entry.business_snapshot as any) ?? {};
 
       let result: { campaign: any; created: boolean };
 
-      // Replay path is selected by source_kind — scan-derived entries carry
-      // the full business JSON; category-analysis entries carry a thin payload.
-      if (entry.source_kind === 'city_category_audit' || entry.source_kind === 'scan_unmatched') {
+      // Manual entries with no parent campaign (added directly from the queue
+      // page) create a business-scope campaign directly — there is no parent
+      // to derive category/city/tone/attributes from, so we seed from the
+      // queue entry's own fields.
+      if (!entry.source_campaign_id) {
+        const campaign = await MarketingCampaignService.createCampaign({
+          scope: 'business',
+          businessName: entry.business_name,
+          category: entry.category ?? '',
+          city: entry.city ?? '',
+          assignedTo: assignee ?? undefined,
+          notes: [
+            `Manually queued prospect (no parent campaign).`,
+            entry.city ? `City: ${entry.city}` : null,
+            entry.category ? `Category: ${entry.category}` : null,
+            entry.rating != null ? `Rating: ${Number(entry.rating).toFixed(1)}` : null,
+            entry.review_count != null ? `Reviews: ${entry.review_count}` : null,
+            (entry.detected_signals as string[])?.length
+              ? `Detected signals: ${(entry.detected_signals as string[]).join(', ')}`
+              : null,
+          ].filter(Boolean).join('\n'),
+        }, ctx);
+
+        // Seed a business_analysis audit with the queued signals so triage can
+        // assign a playbook immediately (mirrors the derive path).
+        const signals = (entry.detected_signals as string[]) ?? [];
+        if (signals.length > 0) {
+          const { generateMarketingAuditId } = await import('../lib/id-generator.js');
+          const auditId = generateMarketingAuditId();
+          await this.prisma.mkt_audits_list.create({
+            data: {
+              id: auditId,
+              campaign_id: campaign.id,
+              platform: 'business_analysis',
+              audit_data: {
+                audit_metadata: {
+                  business_name: entry.business_name,
+                  source: 'manual_queue',
+                },
+                detected_signals: signals,
+                summary: `Manually queued with ${signals.length} detected signals.`,
+              } as any,
+            },
+          });
+          try {
+            const { CampaignTriageService } = await import('./CampaignTriageService.js');
+            await CampaignTriageService.evaluateTriageForCampaign({ campaignId: campaign.id }, ctx);
+          } catch (triageError) {
+            logger.warn('Auto-triage failed for manual queue campaign (non-fatal)', ctx, {
+              campaignId: campaign.id,
+              error: (triageError as Error).message,
+            });
+          }
+        }
+
+        result = { campaign, created: true };
+      } else if (entry.source_kind === 'city_category_audit' || entry.source_kind === 'scan_unmatched') {
+        // Replay path is selected by source_kind — scan-derived entries carry
+        // the full business JSON; category-analysis entries carry a thin payload.
         const r = await MarketingHotProspectService.getInstance().deriveBusinessCampaignFromScanBusiness(
           entry.source_campaign_id,
           snapshot,
@@ -379,7 +437,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           r.campaign = { ...r.campaign, assigned_to: entry.assigned_to };
         }
       } else {
-        // category_analysis / manual → thin path.
+        // category_analysis / manual (with parent) → thin path.
         const campaign = await MarketingCampaignService.deriveBusinessCampaign({
           parentId: entry.source_campaign_id,
           businessName: entry.business_name,

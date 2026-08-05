@@ -3070,13 +3070,23 @@ const prospectQueueAddSchema = z.object({
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
   source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual']),
-  source_campaign_id: z.string().min(1),
+  // source_campaign_id is required for audit-derived entries; optional for
+  // manual entries added directly from the queue page (no parent campaign).
+  source_campaign_id: z.string().min(1).optional(),
   source_audit_id: z.string().optional(),
   source_execution_id: z.string().optional(),
   audit_date: z.string().datetime().optional(),
   business_snapshot: z.record(z.string(), z.any()).default({}),
   priority: z.enum(['high', 'normal']).default('normal'),
   note: z.string().max(2000).optional(),
+}).superRefine((data, ctx) => {
+  if (data.source_kind !== 'manual' && !data.source_campaign_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['source_campaign_id'],
+      message: 'source_campaign_id is required for non-manual source kinds',
+    });
+  }
 });
 
 // POST /prospect-queue — add a business to the queue (no navigation).

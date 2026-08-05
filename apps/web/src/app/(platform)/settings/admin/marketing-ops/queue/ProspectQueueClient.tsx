@@ -8,6 +8,7 @@ import {
 import Link from 'next/link';
 import marketingOpsService, {
   ProspectQueueEntry, ProspectStatus, ProspectPriority, ProspectDismissReason,
+  AddToQueueInput, AddToQueueResult,
 } from '@/services/MarketingOpsService';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import ProspectQueueBoard from '@/components/marketing-ops/ProspectQueueBoard';
@@ -98,6 +99,20 @@ export default function ProspectQueueClient() {
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
   const [togglingPriorityId, setTogglingPriorityId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+
+  // "Add to Queue" modal — lets operators capture a hot prospect discovered
+  // during a deep dive, outside the audit "Add to queue" context.
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    business_name: '',
+    category: '',
+    city: '',
+    state: '',
+    priority: 'normal' as ProspectPriority,
+    note: '',
+  });
+  const [addingToQueue, setAddingToQueue] = useState(false);
+  const [addFeedback, setAddFeedback] = useState<{ kind: 'created' | 'already' | 'exists'; campaignId?: string; message: string } | null>(null);
 
   const staffUsers = useStaffUsers();
   // The current user's id — used for "assign to me". We don't have a direct
@@ -216,6 +231,63 @@ export default function ProspectQueueClient() {
     }
   };
 
+  const openAddModal = () => {
+    setAddForm({
+      business_name: '',
+      category: '',
+      city: '',
+      state: '',
+      priority: 'normal',
+      note: '',
+    });
+    setAddFeedback(null);
+    setAddModalOpen(true);
+  };
+
+  const handleAddToQueue = async () => {
+    const businessName = addForm.business_name.trim();
+    if (!businessName) {
+      setAddFeedback({ kind: 'exists', message: 'Business name is required.' });
+      return;
+    }
+    setAddingToQueue(true);
+    setAddFeedback(null);
+    try {
+      const input: AddToQueueInput = {
+        business_name: businessName,
+        category: addForm.category.trim() || undefined,
+        city: addForm.city.trim() || undefined,
+        state: addForm.state.trim() || undefined,
+        source_kind: 'manual',
+        priority: addForm.priority,
+        note: addForm.note.trim() || undefined,
+        business_snapshot: {
+          rating: null,
+          review_count: null,
+          location: [addForm.city, addForm.state].filter(Boolean).join(', ') || null,
+        },
+      };
+      const result: AddToQueueResult = await marketingOpsService.addToQueue(input);
+      if (result.kind === 'campaign_exists') {
+        setAddFeedback({
+          kind: 'exists',
+          campaignId: result.campaignId,
+          message: 'A campaign already exists for this business.',
+        });
+      } else if (result.kind === 'already_queued') {
+        setAddFeedback({ kind: 'already', message: 'Already in the queue.' });
+      } else {
+        setAddFeedback({ kind: 'created', message: 'Added to the queue.' });
+        setAddForm({ business_name: '', category: '', city: '', state: '', priority: 'normal', note: '' });
+        await fetchQueue();
+      }
+    } catch (err: any) {
+      setAddFeedback({ kind: 'exists', message: err.message || 'Failed to add to queue' });
+    } finally {
+      setAddingToQueue(false);
+    }
+  };
+
   // ─── Derived ──────────────────────────────────────────────────────────
 
   const categoryOptions = useMemo(
@@ -275,6 +347,14 @@ export default function ProspectQueueClient() {
                 Board
               </button>
             </div>
+            <button
+              onClick={openAddModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
+              title="Manually add a prospect to the queue (outside an audit)"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add to Queue
+            </button>
             <button
               onClick={fetchQueue}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
@@ -361,7 +441,7 @@ export default function ProspectQueueClient() {
             <Inbox className="w-12 h-12 mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {statusTab === 'queued'
-                ? 'No queued prospects. Use "Queue" on any audit card to capture prospects for later.'
+                ? 'No queued prospects. Use "Add to Queue" above or "Queue" on any audit card to capture prospects for later.'
                 : `No ${statusTab === 'campaign_created' ? 'created' : 'dismissed'} entries.`}
             </p>
           </div>
@@ -628,6 +708,157 @@ export default function ProspectQueueClient() {
           />
         )}
       </div>
+
+      {/* Add to Queue modal — manual prospect capture */}
+      {addModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !addingToQueue && setAddModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Add Prospect to Queue</h2>
+              <button
+                onClick={() => !addingToQueue && setAddModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                disabled={addingToQueue}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 space-y-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Capture a hot prospect discovered outside an audit. Source will be recorded as <span className="font-medium">Manual</span>.
+              </p>
+
+              {/* Business name */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Business name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={addForm.business_name}
+                  onChange={(e) => setAddForm((f) => ({ ...f, business_name: e.target.value }))}
+                  autoFocus
+                  disabled={addingToQueue}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  placeholder="e.g. Joe's Pizza"
+                />
+              </div>
+
+              {/* Category + City */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                  <input
+                    type="text"
+                    value={addForm.category}
+                    onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value }))}
+                    disabled={addingToQueue}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    placeholder="restaurant"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={addForm.city}
+                    onChange={(e) => setAddForm((f) => ({ ...f, city: e.target.value }))}
+                    disabled={addingToQueue}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    placeholder="Austin"
+                  />
+                </div>
+              </div>
+
+              {/* State + Priority */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
+                  <input
+                    type="text"
+                    value={addForm.state}
+                    onChange={(e) => setAddForm((f) => ({ ...f, state: e.target.value }))}
+                    disabled={addingToQueue}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    placeholder="TX"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+                  <select
+                    value={addForm.priority}
+                    onChange={(e) => setAddForm((f) => ({ ...f, priority: e.target.value as ProspectPriority }))}
+                    disabled={addingToQueue}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Note</label>
+                <textarea
+                  value={addForm.note}
+                  onChange={(e) => setAddForm((f) => ({ ...f, note: e.target.value }))}
+                  disabled={addingToQueue}
+                  rows={2}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  placeholder="Optional context (e.g. discovered while auditing a competitor)"
+                />
+              </div>
+
+              {/* Feedback */}
+              {addFeedback && (
+                <div className={`rounded-lg px-3 py-2 text-xs ${
+                  addFeedback.kind === 'created'
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                    : addFeedback.kind === 'already'
+                      ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                      : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                }`}>
+                  <span>{addFeedback.message}</span>
+                  {addFeedback.kind === 'exists' && addFeedback.campaignId && (
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${addFeedback.campaignId}`}
+                      className="ml-1 underline hover:no-underline"
+                    >
+                      View campaign
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-neutral-700">
+              <button
+                onClick={() => setAddModalOpen(false)}
+                disabled={addingToQueue}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleAddToQueue}
+                disabled={addingToQueue || !addForm.business_name.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+              >
+                {addingToQueue ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Add to Queue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
