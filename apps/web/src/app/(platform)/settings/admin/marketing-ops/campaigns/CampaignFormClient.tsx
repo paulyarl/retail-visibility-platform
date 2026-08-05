@@ -399,7 +399,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           contact_info: backfilledInfo,
           phone: strOrUndef(form.phone),
           email: strOrUndef(form.email),
-          website_url: strOrUndef(form.website_url),
+          // Send empty string (not undefined) when cleared so the backend's
+          // `input.websiteUrl || null` branch sets the column to NULL. Using
+          // undefined would drop the key from the JSON payload and the
+          // backend would skip the update block, leaving the old URL in place.
+          website_url: form.website_url,
           social_profiles: cleanSocial.length > 0 ? cleanSocial : undefined,
           owner_names: cleanOwnerNames.length > 0 ? cleanOwnerNames : undefined,
           phones: cleanPhones.length > 0 ? cleanPhones : undefined,
