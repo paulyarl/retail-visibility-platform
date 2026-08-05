@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Phone, Mail, Globe, Share2, Sparkles, ExternalLink, RefreshCw } from 'lucide-react';
+import { Phone, Mail, Globe, Share2, Sparkles, ExternalLink, RefreshCw, MapPin, User, Store } from 'lucide-react';
 import type { Campaign } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
@@ -43,6 +43,35 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
   const email = campaign.email;
   const website = campaign.website_url;
   const socials = campaign.social_profiles ?? [];
+  const ownerNames = campaign.owner_names ?? [];
+  const additionalPhones = campaign.phones ?? [];
+
+  // Compose a single display string for the structured address.
+  const addressParts: string[] = [];
+  if (campaign.address_line1) {
+    addressParts.push(campaign.address_line1 + (campaign.address_line2 ? `, ${campaign.address_line2}` : ''));
+  }
+  const cityStateZip = [campaign.address_city, campaign.address_state, campaign.address_zip]
+    .filter(Boolean)
+    .join(', ')
+    .replace(/,\s*,/g, ', ')
+    .trim();
+  if (cityStateZip) addressParts.push(cityStateZip);
+  if (campaign.address_country && campaign.address_country !== 'US') {
+    addressParts.push(campaign.address_country);
+  }
+  const addressString = addressParts.join(', ') || null;
+
+  // Google Maps directions link from the structured address.
+  const mapsQuery = [
+    campaign.address_line1,
+    campaign.address_line2,
+    campaign.address_city,
+    campaign.address_state,
+    campaign.address_zip,
+    campaign.address_country,
+  ].filter(Boolean).join(', ');
+  const mapsHref = mapsQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}` : null;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -72,11 +101,47 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <ContactRow
+          icon={<Store className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
+          label="Business Name"
+          value={campaign.business_name}
+        />
+        {ownerNames.length > 0 ? (
+          ownerNames.map((name, idx) => (
+            <ContactRow
+              key={`owner-${idx}-${name}`}
+              icon={<User className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
+              label={ownerNames.length > 1 ? `Owner ${idx + 1}` : 'Business Owner'}
+              value={name}
+            />
+          ))
+        ) : (
+          <ContactRow
+            icon={<User className="h-4 w-4 text-gray-400 dark:text-gray-500" />}
+            label="Business Owner"
+            value={null}
+          />
+        )}
+        <ContactRow
+          icon={<MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
+          label="Address"
+          value={addressString}
+          action={mapsHref ? { href: mapsHref, label: 'Maps', icon: <ExternalLink className="h-3 w-3" />, external: true } : undefined}
+        />
+        <ContactRow
           icon={<Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
-          label="Phone"
+          label="Primary Phone"
           value={phone}
           action={phone ? { href: `sms:${phone}`, label: 'Text', icon: <Phone className="h-3 w-3" /> } : undefined}
         />
+        {additionalPhones.map((p, idx) => (
+          <ContactRow
+            key={`phone-${idx}-${p.number}`}
+            icon={<Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />}
+            label={p.label || `Phone ${idx + 2}`}
+            value={p.number}
+            action={p.number ? { href: `sms:${p.number}`, label: 'Text', icon: <Phone className="h-3 w-3" /> } : undefined}
+          />
+        ))}
         <ContactRow
           icon={<Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
           label="Email"
@@ -96,7 +161,7 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
               icon={<Share2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
               label={sp.platform || 'Social'}
               value={sp.url}
-              action={{ href: sp.url, label: 'Open DM', icon: <ExternalLink className="h-3 w-3" />, external: true }}
+              action={sp.url ? { href: sp.url, label: 'Open', icon: <ExternalLink className="h-3 w-3" />, external: true } : undefined}
             />
           ))
         ) : (

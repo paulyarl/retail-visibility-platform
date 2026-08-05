@@ -8,6 +8,7 @@ import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCa
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
+import { addressParser } from '@/lib/address-parser';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
@@ -223,6 +224,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Smart-paste handler for Address Line 1: if the pasted/typed value looks
+  // like a full address (e.g. "123 Main St, Suite 200, Austin, TX 78701"),
+  // parse it into all address components at once — mirroring the onboarding
+  // wizard behavior. Otherwise, treat it as a normal single-field update.
+  const handleAddressLine1Change = (value: string) => {
+    if (addressParser.canParse(value)) {
+      const parsed = addressParser.parse(value);
+      setForm((prev) => ({
+        ...prev,
+        address_line1: parsed.address_line1 ?? value,
+        address_line2: parsed.address_line2 ?? prev.address_line2,
+        address_city: parsed.city ?? prev.address_city,
+        address_state: parsed.state ?? prev.address_state,
+        address_zip: parsed.postal_code ?? prev.address_zip,
+        address_country: parsed.country_code ?? prev.address_country,
+      }));
+    } else {
+      handleChange('address_line1', value);
+    }
   };
 
   const handleCreateServiceCategory = async (value: string, label: string) => {
@@ -633,8 +655,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               </div>
             </FormField>
             <FormField label="Address Line 1" className="sm:col-span-2">
-              <input type="text" value={form.address_line1} onChange={(e) => handleChange('address_line1', e.target.value)}
-                placeholder="123 Main St"
+              <input type="text" value={form.address_line1} onChange={(e) => handleAddressLine1Change(e.target.value)}
+                placeholder="123 Main St  —  paste a full address to auto-split into city/state/zip"
                 className={inputClass} />
             </FormField>
             <FormField label="Address Line 2" className="sm:col-span-2">
