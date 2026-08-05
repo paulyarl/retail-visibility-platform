@@ -36,6 +36,12 @@ interface FormState {
   social_profiles: { platform: string; url: string }[];
   owner_names: string[];
   phones: { label: string; number: string }[];
+  address_line1: string;
+  address_line2: string;
+  address_city: string;
+  address_state: string;
+  address_zip: string;
+  address_country: string;
   display_id: string;
   gbp_claimed: boolean | '';
   unaddressed_reviews: number | '';
@@ -79,6 +85,12 @@ const EMPTY_FORM: FormState = {
   social_profiles: [],
   owner_names: [],
   phones: [],
+  address_line1: '',
+  address_line2: '',
+  address_city: '',
+  address_state: '',
+  address_zip: '',
+  address_country: 'US',
   display_id: '',
   gbp_claimed: '',
   unaddressed_reviews: '',
@@ -166,6 +178,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         social_profiles: c.social_profiles ?? [],
         owner_names: c.owner_names ?? [],
         phones: c.phones ?? [],
+        address_line1: c.address_line1 ?? '',
+        address_line2: c.address_line2 ?? '',
+        address_city: c.address_city ?? '',
+        address_state: c.address_state ?? '',
+        address_zip: c.address_zip ?? '',
+        address_country: c.address_country ?? 'US',
         display_id: c.display_id ?? '',
         gbp_claimed: c.gbp_claimed ?? '',
         unaddressed_reviews: c.unaddressed_reviews ?? '',
@@ -263,6 +281,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           social_profiles: cleanSocial.length > 0 ? cleanSocial : undefined,
           owner_names: cleanOwnerNames.length > 0 ? cleanOwnerNames : undefined,
           phones: cleanPhones.length > 0 ? cleanPhones : undefined,
+          address_line1: strOrUndef(form.address_line1),
+          address_line2: strOrUndef(form.address_line2),
+          address_city: strOrUndef(form.address_city),
+          address_state: strOrUndef(form.address_state),
+          address_zip: strOrUndef(form.address_zip),
+          address_country: strOrUndef(form.address_country),
           display_id: strOrUndef(form.display_id),
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
@@ -308,6 +332,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           social_profiles: cleanSocial.length > 0 ? cleanSocial : undefined,
           owner_names: cleanOwnerNames.length > 0 ? cleanOwnerNames : undefined,
           phones: cleanPhones.length > 0 ? cleanPhones : undefined,
+          address_line1: strOrUndef(form.address_line1),
+          address_line2: strOrUndef(form.address_line2),
+          address_city: strOrUndef(form.address_city),
+          address_state: strOrUndef(form.address_state),
+          address_zip: strOrUndef(form.address_zip),
+          address_country: strOrUndef(form.address_country),
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
           last_review_date: form.last_review_date ? new Date(form.last_review_date).toISOString() : undefined,
@@ -601,6 +631,37 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                   onClick={() => handleChange('owner_names', [...form.owner_names, ''])}
                   className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add owner name</button>
               </div>
+            </FormField>
+            <FormField label="Address Line 1" className="sm:col-span-2">
+              <input type="text" value={form.address_line1} onChange={(e) => handleChange('address_line1', e.target.value)}
+                placeholder="123 Main St"
+                className={inputClass} />
+            </FormField>
+            <FormField label="Address Line 2" className="sm:col-span-2">
+              <input type="text" value={form.address_line2} onChange={(e) => handleChange('address_line2', e.target.value)}
+                placeholder="Suite 200 (optional)"
+                className={inputClass} />
+            </FormField>
+            <FormField label="City">
+              <input type="text" value={form.address_city} onChange={(e) => handleChange('address_city', e.target.value)}
+                placeholder="Austin"
+                className={inputClass} />
+            </FormField>
+            <FormField label="State / Province">
+              <input type="text" value={form.address_state} onChange={(e) => handleChange('address_state', e.target.value)}
+                placeholder="TX"
+                className={inputClass} />
+            </FormField>
+            <FormField label="ZIP / Postal Code">
+              <input type="text" value={form.address_zip} onChange={(e) => handleChange('address_zip', e.target.value)}
+                placeholder="78701"
+                className={inputClass} />
+            </FormField>
+            <FormField label="Country">
+              <input type="text" value={form.address_country} onChange={(e) => handleChange('address_country', e.target.value)}
+                placeholder="US"
+                maxLength={2}
+                className={inputClass} />
             </FormField>
             <FormField label="Legacy contact method (optional)" className="sm:col-span-2">
               <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">

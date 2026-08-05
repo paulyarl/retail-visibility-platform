@@ -160,6 +160,12 @@ export interface CampaignInput {
   socialProfiles?: { platform: string; url: string }[];
   ownerNames?: string[];
   phones?: { label: string; number: string }[];
+  addressLine1?: string;
+  addressLine2?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  addressCountry?: string;
   displayId?: string;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
@@ -192,6 +198,12 @@ export interface CampaignUpdateInput {
   socialProfiles?: { platform: string; url: string }[];
   ownerNames?: string[];
   phones?: { label: string; number: string }[];
+  addressLine1?: string;
+  addressLine2?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  addressCountry?: string;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
   lastReviewDate?: Date | null;
@@ -353,6 +365,12 @@ export class MarketingCampaignService extends BaseService {
           social_profiles: (input.socialProfiles ?? undefined) as any,
           owner_names: (input.ownerNames ?? undefined) as any,
           phones: (input.phones ?? undefined) as any,
+          address_line1: input.addressLine1 || null,
+          address_line2: input.addressLine2 || null,
+          address_city: input.addressCity || null,
+          address_state: input.addressState || null,
+          address_zip: input.addressZip || null,
+          address_country: input.addressCountry || null,
           gbp_claimed: input.gbpClaimed || false,
           unaddressed_reviews: input.unaddressedReviews || 0,
           last_review_date: input.lastReviewDate || null,
@@ -715,6 +733,12 @@ export class MarketingCampaignService extends BaseService {
     if (input.socialProfiles !== undefined) data.social_profiles = (input.socialProfiles || undefined) as any;
     if (input.ownerNames !== undefined) data.owner_names = (input.ownerNames || undefined) as any;
     if (input.phones !== undefined) data.phones = (input.phones || undefined) as any;
+    if (input.addressLine1 !== undefined) data.address_line1 = input.addressLine1 || null;
+    if (input.addressLine2 !== undefined) data.address_line2 = input.addressLine2 || null;
+    if (input.addressCity !== undefined) data.address_city = input.addressCity || null;
+    if (input.addressState !== undefined) data.address_state = input.addressState || null;
+    if (input.addressZip !== undefined) data.address_zip = input.addressZip || null;
+    if (input.addressCountry !== undefined) data.address_country = input.addressCountry || null;
     if (input.gbpClaimed !== undefined) data.gbp_claimed = input.gbpClaimed;
     if (input.unaddressedReviews !== undefined) data.unaddressed_reviews = input.unaddressedReviews;
     if (input.lastReviewDate !== undefined) data.last_review_date = input.lastReviewDate;

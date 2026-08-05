@@ -91,6 +91,12 @@ export interface Campaign {
   social_profiles: { platform: string; url: string }[] | null;
   owner_names: string[] | null;
   phones: { label: string; number: string }[] | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_zip: string | null;
+  address_country: string | null;
   gbp_claimed: boolean | null;
   unaddressed_reviews: number | null;
   last_review_date: string | null;
@@ -952,6 +958,12 @@ export interface CampaignCreateInput {
   social_profiles?: { platform: string; url: string }[];
   owner_names?: string[];
   phones?: { label: string; number: string }[];
+  address_line1?: string;
+  address_line2?: string;
+  address_city?: string;
+  address_state?: string;
+  address_zip?: string;
+  address_country?: string;
   display_id?: string;
   gbp_claimed?: boolean;
   unaddressed_reviews?: number;

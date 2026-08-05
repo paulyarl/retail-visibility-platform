@@ -6168,6 +6168,12 @@ model mkt_campaigns_list {
   customer_id                                                                     String?                              @db.VarChar(255)
   owner_names                                                                     Json?                                @db.Json
   phones                                                                          Json?                                @db.Json
+  address_line1                                                                   String?                              @db.VarChar(255)
+  address_line2                                                                   String?                              @db.VarChar(255)
+  address_city                                                                    String?                              @db.VarChar(100)
+  address_state                                                                   String?                              @db.VarChar(50)
+  address_zip                                                                     String?                              @db.VarChar(20)
+  address_country                                                                 String?                              @default("US") @db.VarChar(2)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]
