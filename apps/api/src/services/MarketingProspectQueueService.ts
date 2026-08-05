@@ -406,7 +406,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
             },
           });
           try {
-            const { CampaignTriageService } = await import('./CampaignTriageService.js');
+            const { default: CampaignTriageService } = await import('./CampaignTriageService.js');
             await CampaignTriageService.evaluateTriageForCampaign({ campaignId: campaign.id }, ctx);
           } catch (triageError) {
             logger.warn('Auto-triage failed for manual queue campaign (non-fatal)', ctx, {
