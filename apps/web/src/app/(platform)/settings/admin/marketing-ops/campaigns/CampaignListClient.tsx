@@ -246,6 +246,7 @@ export default function CampaignListClient() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-neutral-700/50">
                   <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Open</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Scope</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Business</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
@@ -259,7 +260,6 @@ export default function CampaignListClient() {
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Est. Fee</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Paid</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Assigned</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Open</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
@@ -272,6 +272,14 @@ export default function CampaignListClient() {
                   ) : (
                     filteredCampaigns.map((c) => (
                       <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-neutral-700/30">
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            Open
+                          </Link>
+                        </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.scope}</td>
                         <td className="px-4 py-3">
                           <Link href={`/settings/admin/marketing-ops/campaigns/${c.id}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
@@ -309,14 +317,6 @@ export default function CampaignListClient() {
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.amount_paid_cents)}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{staffDisplayName(staffUsers, c.assigned_to) ?? '—'}</td>
-                        <td className="px-4 py-3">
-                          <Link
-                            href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
-                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            Open
-                          </Link>
-                        </td>
                       </tr>
                     ))
                   )}
