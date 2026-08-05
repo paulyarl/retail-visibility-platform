@@ -71,6 +71,15 @@ export type DeliverableType =
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 
+export interface DirectoryProfileEntry {
+  platform: string;
+  url: string;
+  claim_status: 'claimed' | 'unclaimed' | 'unknown';
+  star_rating?: number | null;
+  review_count?: number | null;
+  category?: string;
+}
+
 export interface Campaign {
   id: string;
   display_id: string | null;
@@ -97,6 +106,7 @@ export interface Campaign {
   address_state: string | null;
   address_zip: string | null;
   address_country: string | null;
+  directory_profiles: DirectoryProfileEntry[] | null;
   gbp_claimed: boolean | null;
   unaddressed_reviews: number | null;
   last_review_date: string | null;
@@ -964,6 +974,7 @@ export interface CampaignCreateInput {
   address_state?: string;
   address_zip?: string;
   address_country?: string;
+  directory_profiles?: DirectoryProfileEntry[];
   display_id?: string;
   gbp_claimed?: boolean;
   unaddressed_reviews?: number;

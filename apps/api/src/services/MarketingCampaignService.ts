@@ -143,6 +143,15 @@ const STAGE_DATE_FIELDS: Record<string, string> = {
   tenant_onboarded: 'date_tenant_onboarded',
 };
 
+export interface DirectoryProfileEntry {
+  platform: string;
+  url: string;
+  claim_status: 'claimed' | 'unclaimed' | 'unknown';
+  star_rating?: number | null;
+  review_count?: number | null;
+  category?: string;
+}
+
 export interface CampaignInput {
   scope?: CampaignScope;
   campaignCategory?: CampaignCategory;
@@ -166,6 +175,7 @@ export interface CampaignInput {
   addressState?: string;
   addressZip?: string;
   addressCountry?: string;
+  directoryProfiles?: DirectoryProfileEntry[];
   displayId?: string;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
@@ -204,6 +214,7 @@ export interface CampaignUpdateInput {
   addressState?: string;
   addressZip?: string;
   addressCountry?: string;
+  directoryProfiles?: DirectoryProfileEntry[];
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
   lastReviewDate?: Date | null;
@@ -371,8 +382,13 @@ export class MarketingCampaignService extends BaseService {
           address_state: input.addressState || null,
           address_zip: input.addressZip || null,
           address_country: input.addressCountry || null,
-          gbp_claimed: input.gbpClaimed || false,
-          unaddressed_reviews: input.unaddressedReviews || 0,
+          directory_profiles: (input.directoryProfiles ?? undefined) as any,
+          gbp_claimed: input.directoryProfiles
+            ? (input.directoryProfiles.find((p) => p.platform.toLowerCase() === 'google')?.claim_status === 'claimed') || input.gbpClaimed || false
+            : input.gbpClaimed || false,
+          unaddressed_reviews: input.directoryProfiles
+            ? (input.directoryProfiles.find((p) => p.platform.toLowerCase() === 'google')?.review_count ?? input.unaddressedReviews ?? 0)
+            : input.unaddressedReviews || 0,
           last_review_date: input.lastReviewDate || null,
           has_website: input.websiteUrl ? 'yes' : (input.hasWebsite || null),
           nap_consistent: input.napConsistent ?? null,
@@ -739,6 +755,15 @@ export class MarketingCampaignService extends BaseService {
     if (input.addressState !== undefined) data.address_state = input.addressState || null;
     if (input.addressZip !== undefined) data.address_zip = input.addressZip || null;
     if (input.addressCountry !== undefined) data.address_country = input.addressCountry || null;
+    if (input.directoryProfiles !== undefined) {
+      data.directory_profiles = (input.directoryProfiles || undefined) as any;
+      // Auto-sync legacy GBP fields from the Google row
+      const googleRow = input.directoryProfiles.find((p) => p.platform.toLowerCase() === 'google');
+      if (googleRow) {
+        data.gbp_claimed = googleRow.claim_status === 'claimed';
+        if (googleRow.review_count != null) data.unaddressed_reviews = googleRow.review_count;
+      }
+    }
     if (input.gbpClaimed !== undefined) data.gbp_claimed = input.gbpClaimed;
     if (input.unaddressedReviews !== undefined) data.unaddressed_reviews = input.unaddressedReviews;
     if (input.lastReviewDate !== undefined) data.last_review_date = input.lastReviewDate;

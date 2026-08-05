@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory, DirectoryProfileEntry } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
@@ -20,6 +20,18 @@ const ALL_REPAIR_ISSUE_TYPES = [...REPAIR_ISSUE_TYPES_STANDARD, ...REPAIR_ISSUE_
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const CAMPAIGN_ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
+
+const DIRECTORY_PLATFORMS: Array<{ value: string; label: string }> = [
+  { value: 'google', label: 'Google' },
+  { value: 'yelp', label: 'Yelp' },
+  { value: 'yellow_pages', label: 'Yellow Pages' },
+  { value: 'apple_maps', label: 'Apple Maps' },
+  { value: 'bbb', label: 'BBB' },
+  { value: 'mapquest', label: 'MapQuest' },
+  { value: 'yahoo_local', label: 'Yahoo Local' },
+  { value: 'other', label: 'Other' },
+];
+const CLAIM_STATUSES: Array<'claimed' | 'unclaimed' | 'unknown'> = ['claimed', 'unclaimed', 'unknown'];
 
 interface FormState {
   campaign_category: CampaignCategory;
@@ -43,6 +55,7 @@ interface FormState {
   address_state: string;
   address_zip: string;
   address_country: string;
+  directory_profiles: DirectoryProfileEntry[];
   display_id: string;
   gbp_claimed: boolean | '';
   unaddressed_reviews: number | '';
@@ -92,6 +105,7 @@ const EMPTY_FORM: FormState = {
   address_state: '',
   address_zip: '',
   address_country: 'US',
+  directory_profiles: [],
   display_id: '',
   gbp_claimed: '',
   unaddressed_reviews: '',
@@ -185,6 +199,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         address_state: c.address_state ?? '',
         address_zip: c.address_zip ?? '',
         address_country: c.address_country ?? 'US',
+        directory_profiles: c.directory_profiles ?? [],
         display_id: c.display_id ?? '',
         gbp_claimed: c.gbp_claimed ?? '',
         unaddressed_reviews: c.unaddressed_reviews ?? '',
@@ -222,7 +237,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     fetchCampaign();
   }, [fetchCampaign]);
 
-  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[]) => {
+  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -295,6 +310,16 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         .filter((sp) => sp.platform || sp.url);
       const cleanOwnerNames = form.owner_names.map((n) => n.trim()).filter(Boolean);
       const cleanPhones = form.phones.filter((p) => p.label.trim() || p.number.trim());
+      const cleanDirectoryProfiles = form.directory_profiles
+        .map((dp) => ({
+          platform: dp.platform.trim(),
+          url: dp.url.trim(),
+          claim_status: dp.claim_status || 'unknown' as const,
+          star_rating: dp.star_rating ?? null,
+          review_count: dp.review_count ?? null,
+          category: dp.category?.trim() || undefined,
+        }))
+        .filter((dp) => dp.platform || dp.url);
 
       if (mode === 'create') {
         // Backfill legacy contact_method/contact_info from the first non-empty
@@ -332,6 +357,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           address_state: strOrUndef(form.address_state),
           address_zip: strOrUndef(form.address_zip),
           address_country: strOrUndef(form.address_country),
+          directory_profiles: cleanDirectoryProfiles.length > 0 ? cleanDirectoryProfiles : undefined,
           display_id: strOrUndef(form.display_id),
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
