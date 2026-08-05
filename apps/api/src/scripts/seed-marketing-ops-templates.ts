@@ -13,8 +13,8 @@
 
 import { MarketingPromptService } from '../services/MarketingPromptService';
 import { logger } from '../logger';
-import { MARKET_ANALYSIS_SCHEMA_NAME } from '../validators/market-analysis.schema';
 import { BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
+import { CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME } from '../validators/city-category-opportunity.schema';
 
 const SEED_TEMPLATES = [
   {
@@ -63,8 +63,8 @@ Provide:
 Format as structured JSON.`,
     variables: ['category', 'city'],
     outputSchema: {
-      name: MARKET_ANALYSIS_SCHEMA_NAME,
-      description: 'Category- or city-level market analysis with GBP metrics, top competitors, pain points, opportunity gaps, and a recommended outreach angle.',
+      name: CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME,
+      description: 'Single-category, single-city market scan with business discovery, deduplication, sampling, per-platform benchmarks, competitive landscape, top competitor rankings, sampled business details, common digital-presence issues, opportunity gaps, category digital opportunity score, outreach recommendation, recommended tier + fee, data quality, and structured sources.',
     },
     isDefault: false,
   },
