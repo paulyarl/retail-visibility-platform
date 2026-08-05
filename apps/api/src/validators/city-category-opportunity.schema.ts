@@ -128,14 +128,16 @@ const locationStatusEnum = z.enum([
 
 /**
  * Tolerant coercion for hours_status.
- * Agents sometimes emit "likely_current" or "appears_current" instead of "current".
+ * Agents sometimes emit "likely_current" or "appears_current" instead of "current",
+ * or "conflicting"/"inconsistent" when hours differ across aggregators (treat as
+ * incomplete — the data is present but unreliable).
  */
 const hoursStatusCoerced = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
     if (s === 'likely_current' || s === 'appears_current' || s === 'probably_current') return 'current';
     if (s === 'likely_outdated' || s === 'appears_outdated') return 'outdated';
-    if (s === 'partial' || s === 'missing_some') return 'incomplete';
+    if (s === 'partial' || s === 'missing_some' || s === 'conflicting' || s === 'inconsistent' || s === 'mismatched' || s === 'malformed') return 'incomplete';
   }
   return val;
 }, z.enum([
