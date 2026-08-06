@@ -162,7 +162,7 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
   }
 
   const accepted = triage?.isOperatorAccepted === true;
-  const overridden = triage?.overriddenPlaybook !== null;
+  const overridden = triage?.overriddenPlaybook != null;
   const decided = accepted || overridden;
   const recommended = triage?.recommendedPlaybook;
   const effective = triage?.overriddenPlaybook ?? triage?.recommendedPlaybook;
