@@ -762,9 +762,10 @@ export class RecoveryResolutionService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      const intake = campaign.mkt_dispute_intake.find((i: any) => i.id === intakeId);
+      // mkt_dispute_intake is 1:N — find the dispute intake for this campaign
+      const intake = campaign.mkt_dispute_intake.find((i: any) => i.intake_kind === 'dispute');
       if (!intake) {
-        throw new Error(`Dispute intake ${intakeId} for campaign ${campaignId} not found`);
+        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
       }
 
       // Load the prompt template
@@ -842,9 +843,9 @@ export class RecoveryResolutionService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      const intake = campaign.mkt_dispute_intake.find((i: any) => i.id === intakeId);
+      const intake = campaign.mkt_dispute_intake.find((i: any) => i.intake_kind === 'dispute');
       if (!intake) {
-        throw new Error(`Dispute intake ${intakeId} for campaign ${campaignId} not found`);
+        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
       }
 
       // Build variables (same as enqueue)

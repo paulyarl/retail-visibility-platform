@@ -21,8 +21,38 @@ export interface IntakeContext {
   serviceDate: string | null;
   expiresAt: string;
   alreadySubmitted: boolean;
-  intakeKind?: 'dispute' | 'profile_repair';
+  intakeKind?: string;
   issueType?: string | null;
+  // Registry-driven definition (populated for registry kinds only)
+  definition?: {
+    label: string;
+    description: string | null;
+    formSchema: FormField[];
+    ownerCopy: OwnerCopy;
+    driver: 'code' | 'registry';
+    downstreamAgent: string | null;
+  } | null;
+}
+
+export interface FormField {
+  key: string;
+  type: string;
+  label: string;
+  help_text?: string;
+  required?: boolean;
+  validation?: { min?: number; max?: number; pattern?: string };
+  options?: Array<{ value: string; label: string }>;
+  options_source?: string;
+  custom_validator?: string;
+  fields?: FormField[];
+}
+
+export interface OwnerCopy {
+  title?: string;
+  subtitle?: string;
+  intro?: string;
+  statement_label?: string;
+  success_message?: string;
 }
 
 export interface SubmitResult {
