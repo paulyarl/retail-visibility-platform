@@ -14,20 +14,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── Mocks ───────────────────────────────────────────────────────────────
 
 const {
-  mockTriageResults,
+  mockTriageGetResult,
   mockCampaigns,
-  mockPlaybookCatalog,
 } = vi.hoisted(() => ({
-  mockTriageResults: { findUnique: vi.fn() },
+  mockTriageGetResult: vi.fn(),
   mockCampaigns: { findUnique: vi.fn() },
-  mockPlaybookCatalog: { findUnique: vi.fn() },
+}));
+
+// Mock CampaignTriageService directly — the real service does complex Prisma
+// joins + field mapping that's hard to mock at the prisma layer.
+vi.mock('../CampaignTriageService', () => ({
+  default: {
+    getInstance: () => ({
+      getTriageResult: mockTriageGetResult,
+    }),
+  },
 }));
 
 vi.mock('../../prisma', () => ({
   prisma: {
-    mkt_campaign_triage_results: mockTriageResults,
     mkt_campaigns_list: mockCampaigns,
-    mkt_playbook_catalog: mockPlaybookCatalog,
     mkt_owner_voice_profile: { findUnique: vi.fn() },
   },
 }));
@@ -100,17 +106,25 @@ const productBusinessAudit = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
-const triageRow = (archetype: string, code: string, accepted: boolean, overriddenArchetype?: string) => ({
+/** StoredTriageResult shape — matches what CampaignTriageService.getTriageResult returns. */
+const triageResult = (
+  archetype: string,
+  code: string,
+  accepted: boolean,
+  overriddenArchetype?: string,
+) => ({
   id: 'triage-1',
-  campaign_id: 'mcamp-a6',
-  playbook: { archetype, code },
-  overridden_playbook: overriddenArchetype ? { archetype: overriddenArchetype, code: 'PB-07' } : null,
-  is_operator_accepted: accepted,
-  confidence_score: 0.85,
-  triage_reasoning: 'test',
-  detected_signals: [],
-  evaluated_at: new Date(),
-  source_audit_id: 'audit-a6',
+  campaignId: 'mcamp-a6',
+  recommendedPlaybook: { archetype, code, name: 'Test Playbook' },
+  overriddenPlaybook: overriddenArchetype
+    ? { archetype: overriddenArchetype, code: 'PB-07', name: 'Product Visibility' }
+    : null,
+  confidenceScore: 0.85,
+  triageReasoning: 'test',
+  detectedSignals: [],
+  isOperatorAccepted: accepted,
+  evaluatedAt: new Date(),
+  sourceAudit: null,
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────
@@ -121,7 +135,7 @@ describe('resolveCampaignArchetype — Sprint 2 shared resolver', () => {
   });
 
   it('returns the triage archetype when operator-accepted (source: triage)', async () => {
-    mockTriageResults.findUnique.mockResolvedValue(triageRow('A6', 'PB-07', true));
+    mockTriageGetResult.mockResolvedValue(triageResult('A6', 'PB-07', true));
     mockCampaigns.findUnique.mockResolvedValue(productBusinessAudit());
 
     const result = await resolveCampaignArchetype('mcamp-a6');
@@ -133,7 +147,7 @@ describe('resolveCampaignArchetype — Sprint 2 shared resolver', () => {
 
   it('returns the overridden playbook archetype when override is present', async () => {
     // Recommended was A1, but operator overrode to A6
-    mockTriageResults.findUnique.mockResolvedValue(triageRow('A1', 'PB-02', true, 'A6'));
+    mockTriageGetResult.mockResolvedValue(triageResult('A1', 'PB-02', true, 'A6'));
     mockCampaigns.findUnique.mockResolvedValue(productBusinessAudit());
 
     const result = await resolveCampaignArchetype('mcamp-a6');
@@ -143,7 +157,7 @@ describe('resolveCampaignArchetype — Sprint 2 shared resolver', () => {
   });
 
   it('falls back to selectArchetype when triage is not accepted (source: fallback)', async () => {
-    mockTriageResults.findUnique.mockResolvedValue(triageRow('A6', 'PB-07', false));
+    mockTriageGetResult.mockResolvedValue(triageResult('A6', 'PB-07', false));
     mockCampaigns.findUnique.mockResolvedValue(productBusinessAudit());
 
     const result = await resolveCampaignArchetype('mcamp-a6');
@@ -155,7 +169,7 @@ describe('resolveCampaignArchetype — Sprint 2 shared resolver', () => {
   });
 
   it('falls back to selectArchetype when no triage result exists', async () => {
-    mockTriageResults.findUnique.mockResolvedValue(null);
+    mockTriageGetResult.mockResolvedValue(null);
     mockCampaigns.findUnique.mockResolvedValue(productBusinessAudit());
 
     const result = await resolveCampaignArchetype('mcamp-a6');
@@ -164,7 +178,7 @@ describe('resolveCampaignArchetype — Sprint 2 shared resolver', () => {
   });
 
   it('throws when no audit exists and no triage is accepted', async () => {
-    mockTriageResults.findUnique.mockResolvedValue(null);
+    mockTriageGetResult.mockResolvedValue(null);
     mockCampaigns.findUnique.mockResolvedValue({
       id: 'mcamp-empty',
       mkt_audits_list: [],
@@ -176,7 +190,7 @@ describe('resolveCampaignArchetype — Sprint 2 shared resolver', () => {
   });
 
   it('returns A1 for a service-business audit via fallback', async () => {
-    mockTriageResults.findUnique.mockResolvedValue(null);
+    mockTriageGetResult.mockResolvedValue(null);
     mockCampaigns.findUnique.mockResolvedValue({
       id: 'mcamp-a1',
       business_name: 'Reliable HVAC',

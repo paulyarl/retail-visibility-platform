@@ -12,8 +12,7 @@ const {
   mockSections,
   mockCampaigns,
   mockVoiceProfile,
-  mockTriageResults,
-  mockPlaybookCatalog,
+  mockTriageGetResult,
   aiMock,
 } = vi.hoisted(() => ({
   mockSections: {
@@ -25,9 +24,18 @@ const {
   },
   mockCampaigns: { findUnique: vi.fn() },
   mockVoiceProfile: { findUnique: vi.fn() },
-  mockTriageResults: { findUnique: vi.fn() },
-  mockPlaybookCatalog: { findUnique: vi.fn() },
+  mockTriageGetResult: vi.fn(),
   aiMock: { generateChatCompletion: vi.fn() },
+}));
+
+// Mock CampaignTriageService directly — the real service does complex Prisma
+// joins + field mapping that's hard to mock at the prisma layer.
+vi.mock('../CampaignTriageService', () => ({
+  default: {
+    getInstance: () => ({
+      getTriageResult: mockTriageGetResult,
+    }),
+  },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -35,8 +43,6 @@ vi.mock('../../prisma', () => ({
     mkt_deliverable_section: mockSections,
     mkt_campaigns_list: mockCampaigns,
     mkt_owner_voice_profile: mockVoiceProfile,
-    mkt_campaign_triage_results: mockTriageResults,
-    mkt_playbook_catalog: mockPlaybookCatalog,
   },
 }));
 
@@ -151,32 +157,32 @@ const serviceBusinessAudit = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
-/** Triage result row for PB-07/A6 (operator-accepted). */
-const triageRowA6 = () => ({
+/** StoredTriageResult for PB-07/A6 (operator-accepted). */
+const triageResultA6 = () => ({
   id: 'triage-1',
-  campaign_id: 'mcamp-a6',
-  playbook: { archetype: 'A6', code: 'PB-07' },
-  overridden_playbook: null,
-  is_operator_accepted: true,
-  confidence_score: 0.85,
-  triage_reasoning: 'Product visibility gap',
-  detected_signals: [],
-  evaluated_at: new Date(),
-  source_audit_id: 'audit-a6',
+  campaignId: 'mcamp-a6',
+  recommendedPlaybook: { archetype: 'A6', code: 'PB-07', name: 'Product Visibility & Catalog Refresh' },
+  overriddenPlaybook: null,
+  confidenceScore: 0.85,
+  triageReasoning: 'Product visibility gap',
+  detectedSignals: [],
+  isOperatorAccepted: true,
+  evaluatedAt: new Date(),
+  sourceAudit: null,
 });
 
-/** Triage result row for PB-02/A1 (operator-accepted). */
-const triageRowA1 = () => ({
+/** StoredTriageResult for PB-02/A1 (operator-accepted). */
+const triageResultA1 = () => ({
   id: 'triage-2',
-  campaign_id: 'mcamp-a2',
-  playbook: { archetype: 'A1', code: 'PB-02' },
-  overridden_playbook: null,
-  is_operator_accepted: true,
-  confidence_score: 0.90,
-  triage_reasoning: 'Review gap',
-  detected_signals: [],
-  evaluated_at: new Date(),
-  source_audit_id: 'audit-a2',
+  campaignId: 'mcamp-a2',
+  recommendedPlaybook: { archetype: 'A1', code: 'PB-02', name: 'Review Gap & Stagnation' },
+  overriddenPlaybook: null,
+  confidenceScore: 0.90,
+  triageReasoning: 'Review gap',
+  detectedSignals: [],
+  isOperatorAccepted: true,
+  evaluatedAt: new Date(),
+  sourceAudit: null,
 });
 
 const baseSection = (overrides: Partial<any> = {}) => ({
@@ -213,7 +219,7 @@ describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () =>
   describe('generateAllSections — A6 archetype', () => {
     it('generates all 5 product-visibility sections for an A6 campaign', async () => {
       mockCampaigns.findUnique.mockResolvedValue(productBusinessAudit());
-      mockTriageResults.findUnique.mockResolvedValue(triageRowA6());
+      mockTriageGetResult.mockResolvedValue(triageResultA6());
       mockVoiceProfile.findUnique.mockResolvedValue(null);
       mockSections.findFirst.mockResolvedValue(null);
       mockSections.create.mockImplementation(({ data }: any) =>
@@ -238,7 +244,7 @@ describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () =>
 
     it('does NOT generate product-visibility sections for a service-business A1 campaign', async () => {
       mockCampaigns.findUnique.mockResolvedValue(serviceBusinessAudit());
-      mockTriageResults.findUnique.mockResolvedValue(triageRowA1());
+      mockTriageGetResult.mockResolvedValue(triageResultA1());
       mockVoiceProfile.findUnique.mockResolvedValue(null);
       mockSections.findFirst.mockResolvedValue(null);
       mockSections.create.mockImplementation(({ data }: any) =>
