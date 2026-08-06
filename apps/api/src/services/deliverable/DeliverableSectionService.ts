@@ -18,10 +18,17 @@ import {
   buildRecoveryPlaybookPrompt,
   buildListingCorrectionsPrompt,
   buildCtaFixesPrompt,
+  buildMobileCatalogPrompt,
+  buildGbpPhotoOptimizationPrompt,
+  buildAvailabilityInquiryFlowPrompt,
+  buildFulfillmentPathwayPrompt,
+  buildHoursSyncPlanPrompt,
 } from './prompts';
 import type { OwnerVoiceFields } from './prompts';
 import OwnerVoiceService from './OwnerVoiceService';
 import BusinessContextService from './BusinessContextService';
+import { resolveCampaignArchetype } from '../OutreachOpenerService';
+import { MarketingBusinessTypeService } from '../MarketingBusinessTypeService';
 
 export interface DeliverableSection {
   id: string;
@@ -39,7 +46,16 @@ export interface DeliverableSection {
   updatedAt: string;
 }
 
-export type SectionType = 'recovery_playbook' | 'listing_corrections' | 'cta_fixes';
+export type SectionType =
+  | 'recovery_playbook'
+  | 'listing_corrections'
+  | 'cta_fixes'
+  // Sprint 2 — product-visibility sections (A6):
+  | 'mobile_catalog_preview'
+  | 'gbp_photo_optimization'
+  | 'availability_inquiry_flow'
+  | 'fulfillment_pathway'
+  | 'hours_sync_plan';
 
 export class DeliverableSectionService extends BaseService {
   private static instance: DeliverableSectionService;
@@ -71,7 +87,18 @@ export class DeliverableSectionService extends BaseService {
   }
 
   // ====================
-  // GENERATE ALL — generate playbook, corrections, CTA based on audit archetype
+  // GENERATE ALL — archetype-aware section generation via shared resolver
+  //
+  // Sprint 2 (§5.5d): branches on the resolved campaign archetype:
+  //   A1–A2 → existing condition-based sections (unchanged)
+  //   A3    → existing sections + hours_sync_plan (product/hybrid only)
+  //   A4    → existing sections + availability_inquiry_flow (product/hybrid only)
+  //   A5    → existing sections + hours_sync_plan (product/hybrid only)
+  //   A6    → mobile_catalog_preview + gbp_photo_optimization +
+  //           availability_inquiry_flow + fulfillment_pathway + hours_sync_plan
+  //
+  // The A3/A4/A5 additions are conditional on business type, so service-
+  // business deliverables are byte-identical to pre-Sprint-2 behavior.
   // ====================
 
   async generateAllSections(campaignId: string, ctx?: RequestCtx): Promise<{ generated: string[]; errors: string[] }> {
@@ -85,6 +112,49 @@ export class DeliverableSectionService extends BaseService {
       const generated: string[] = [];
       const errors: string[] = [];
 
+      // Resolve archetype via shared resolver (triage-accepted → selectArchetype fallback)
+      let archetype: string;
+      try {
+        const resolved = await resolveCampaignArchetype(campaignId, ctx);
+        archetype = resolved.archetype;
+      } catch {
+        // No triage and no audit — but we already have auditResult above, so
+        // this only fires if resolveCampaignArchetype throws for a different
+        // reason. Fall back to condition-based generation (legacy behavior).
+        archetype = 'A1';
+      }
+
+      // Resolve business type for product-conditional sections
+      let businessType: string | null = null;
+      try {
+        businessType = await MarketingBusinessTypeService.getInstance().resolveBusinessType(auditData);
+      } catch {
+        // Business type resolution failure is non-fatal — treat as unknown
+      }
+      const isProductOrHybrid = businessType === 'product' || businessType === 'hybrid';
+
+      // ─── A6: Product Visibility Gap — generate all 5 product sections ───
+      if (archetype === 'A6') {
+        const a6Sections: SectionType[] = [
+          'mobile_catalog_preview',
+          'gbp_photo_optimization',
+          'availability_inquiry_flow',
+          'fulfillment_pathway',
+          'hours_sync_plan',
+        ];
+        for (const sectionType of a6Sections) {
+          try {
+            await this.generateSection(campaignId, sectionType, ctx);
+            generated.push(sectionType);
+          } catch (e) {
+            errors.push(`${sectionType}: ${(e as Error).message}`);
+          }
+        }
+        logger.info('A6 deliverable sections generated', ctx, { campaignId, archetype, generated, errors: errors.length });
+        return { generated, errors };
+      }
+
+      // ─── A1–A5: existing condition-based sections (unchanged) ──────────
       // Always generate recovery playbook (it's relevant for all archetypes with negative reviews)
       const themes = auditData.negative_review_themes ?? [];
       if (themes.length > 0) {
@@ -118,7 +188,27 @@ export class DeliverableSectionService extends BaseService {
         }
       }
 
-      logger.info('Deliverable sections generated', ctx, { campaignId, generated, errors: errors.length });
+      // ─── A3/A5 product-conditional: hours_sync_plan ───────────────────
+      if ((archetype === 'A3' || archetype === 'A5') && isProductOrHybrid) {
+        try {
+          await this.generateSection(campaignId, 'hours_sync_plan', ctx);
+          generated.push('hours_sync_plan');
+        } catch (e) {
+          errors.push(`hours_sync_plan: ${(e as Error).message}`);
+        }
+      }
+
+      // ─── A4 product-conditional: availability_inquiry_flow ────────────
+      if (archetype === 'A4' && isProductOrHybrid) {
+        try {
+          await this.generateSection(campaignId, 'availability_inquiry_flow', ctx);
+          generated.push('availability_inquiry_flow');
+        } catch (e) {
+          errors.push(`availability_inquiry_flow: ${(e as Error).message}`);
+        }
+      }
+
+      logger.info('Deliverable sections generated', ctx, { campaignId, archetype, businessType, generated, errors: errors.length });
       return { generated, errors };
     } catch (error) {
       logger.error('Failed to generate sections', ctx, { error: (error as Error).message, campaignId });
@@ -196,6 +286,85 @@ export class DeliverableSectionService extends BaseService {
           );
           title = 'CTA & Website Fixes';
           sectionIndex = 300;
+          break;
+        }
+
+        // ─── Sprint 2: Product-visibility sections (A6) ────────────────
+
+        case 'mobile_catalog_preview': {
+          const website = auditData.website;
+          const productCats = (website as any)?.product_categories_visible ?? [];
+          prompt = buildMobileCatalogPrompt(
+            businessCtx,
+            Array.isArray(productCats) ? productCats.join(', ') : String(productCats),
+          );
+          title = 'Mobile Catalog Preview';
+          sectionIndex = 400;
+          break;
+        }
+
+        case 'gbp_photo_optimization': {
+          const google = auditData.platforms?.google;
+          const photoCount = (google as any)?.photo_count ?? 0;
+          const photoTypes: string[] = (google as any)?.photo_types ?? [];
+          const knownTypes = ['storefront', 'exterior', 'interior', 'product', 'team', 'logo', 'signage'];
+          const missingTypes = knownTypes.filter((t) => !photoTypes.includes(t));
+          prompt = buildGbpPhotoOptimizationPrompt(
+            businessCtx,
+            photoCount,
+            photoTypes.join(', '),
+            missingTypes.join(', '),
+          );
+          title = 'GBP Photo Optimization';
+          sectionIndex = 500;
+          break;
+        }
+
+        case 'availability_inquiry_flow': {
+          const website = auditData.website;
+          const contactMethods: string[] = [];
+          if (businessCtx.phone) contactMethods.push(`Phone: ${businessCtx.phone} (click-to-call)`);
+          if (website && (website as any).has_availability_inquiry === false) {
+            contactMethods.push('No web-based inquiry currently');
+          }
+          if (contactMethods.length === 0) contactMethods.push('Phone only (click-to-call from GBP)');
+          prompt = buildAvailabilityInquiryFlowPrompt(
+            businessCtx,
+            contactMethods.join('\n'),
+          );
+          title = 'Availability Inquiry Flow';
+          sectionIndex = 600;
+          break;
+        }
+
+        case 'fulfillment_pathway': {
+          const website = auditData.website;
+          const fulfillmentParts: string[] = [];
+          if (website) {
+            if ((website as any).has_pickup_ordering === false) fulfillmentParts.push('No in-store/curbside pickup option');
+            if ((website as any).has_delivery_option === false) fulfillmentParts.push('No delivery option');
+          }
+          if (fulfillmentParts.length === 0) fulfillmentParts.push('No pickup or delivery options currently offered');
+          prompt = buildFulfillmentPathwayPrompt(
+            businessCtx,
+            fulfillmentParts.join('\n'),
+          );
+          title = 'Fulfillment Pathway';
+          sectionIndex = 700;
+          break;
+        }
+
+        case 'hours_sync_plan': {
+          const google = auditData.platforms?.google;
+          const specialHours = (google as any)?.special_hours_present;
+          prompt = buildHoursSyncPlanPrompt(
+            businessCtx,
+            'See GBP listing for current hours',
+            specialHours === false ? 'Not present on GBP' : specialHours === true ? 'Present on GBP' : 'Not assessed',
+            (auditData as any).business_type ?? 'Unknown',
+          );
+          title = 'Hours Sync Plan';
+          sectionIndex = 800;
           break;
         }
 
