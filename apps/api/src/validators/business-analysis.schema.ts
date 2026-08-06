@@ -212,6 +212,10 @@ const googlePlatformSchema = platformSchema.extend({
   displayed_phone: z.string().nullable().optional(),
   displayed_website: z.string().nullable().optional(),
   profile_issues: z.array(z.string()).optional(),
+  // Product-visibility fields (Sprint 1 — Universal Recalibration)
+  photo_count: coercedNumberNullable.optional(),
+  photo_types: z.array(z.string()).optional(),
+  special_hours_present: coercedBooleanNullableTolerant.optional(),
 }).passthrough();
 
 const platformsSchema = z.object({
@@ -258,6 +262,12 @@ const websiteSchema = z.object({
   location_information_present: coercedBooleanNullableTolerant.optional(),
   issues: z.array(z.string()).optional(),
   conversion_opportunities: z.array(z.string()).optional(),
+  // Product-visibility fields (Sprint 1 — Universal Recalibration)
+  has_product_browsing: coercedBooleanNullableTolerant.optional(),
+  has_availability_inquiry: coercedBooleanNullableTolerant.optional(),
+  has_pickup_ordering: coercedBooleanNullableTolerant.optional(),
+  has_delivery_option: coercedBooleanNullableTolerant.optional(),
+  product_categories_visible: z.array(z.string()).optional(),
 }).passthrough();
 
 const napConsistencySchema = z.object({
@@ -326,6 +336,8 @@ const sourceSchema = z.object({
 export const businessAnalysisSchema = z.object({
   audit_metadata: auditMetadataSchema,
   detected_signals: z.array(z.string()).optional(),
+  // Product-visibility classification (Sprint 1 — Universal Recalibration)
+  business_type: z.enum(['service', 'product', 'hybrid', 'unable_to_verify']).nullable().optional(),
   summary: z.string(),
   platforms: platformsSchema,
   combined_review_metrics: combinedReviewMetricsSchema.optional(),
@@ -471,8 +483,19 @@ Return your response as JSON matching this exact schema:
   },
   "sources": [
     { "platform": "<string>", "source_type": "<string|null>", "url": "<string|null>", "accessed_date": "<string|null>" }
-  ]
+  ],
+  "business_type": "service|product|hybrid|unable_to_verify" (classify the business: 'service' for service businesses like HVAC/plumbing/dental, 'product' for inventory businesses like grocery stores/bakeries/pharmacies, 'hybrid' for businesses with both service and product components like restaurants/caterers, 'unable_to_verify' when the business model is unclear)
 }
+
+PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types):
+- website.has_product_browsing: <boolean|null> — can customers browse products or categories on the website? (null when unable to verify or no website)
+- website.has_availability_inquiry: <boolean|null> — is there a way to check if a specific product is in stock (WhatsApp, SMS, click-to-call, web form)?
+- website.has_pickup_ordering: <boolean|null> — does the business offer pickup ordering online?
+- website.has_delivery_option: <boolean|null> — does the business offer delivery?
+- website.product_categories_visible: ["<string>", ...] — product categories visible on the website or GBP
+- platforms.google.photo_count: <number|null> — total number of photos on GBP
+- platforms.google.photo_types: ["storefront"|"exterior"|"interior"|"product"|"team"|"logo", ...] — categorize GBP photos by type
+- platforms.google.special_hours_present: <boolean|null> — are special/holiday hours present on GBP?
 
 CRITICAL JSON RULES:
 - Every element of a JSON array (e.g. "unanswered_negative_review_examples",

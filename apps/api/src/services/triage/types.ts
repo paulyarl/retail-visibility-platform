@@ -15,7 +15,7 @@ import type { SignalCode } from './signal-taxonomy';
 
 // ─── Playbook codes & categories ─────────────────────────────────────────
 
-export const PLAYBOOK_CODES = ['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06'] as const;
+export const PLAYBOOK_CODES = ['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07'] as const;
 export type PlaybookCode = (typeof PLAYBOOK_CODES)[number];
 
 export const PLAYBOOK_CATEGORIES = [
@@ -25,16 +25,20 @@ export const PLAYBOOK_CATEGORIES = [
 ] as const;
 export type PlaybookCategory = (typeof PLAYBOOK_CATEGORIES)[number];
 
-// ─── Archetype (extended with A5) ────────────────────────────────────────
+// ─── Archetype (extended with A5 + A6) ───────────────────────────────────
 
-export type ArchetypeCodeWithA5 = 'A1' | 'A2' | 'A3' | 'A4' | 'A5';
+export type ArchetypeCodeWithA6 = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6';
 
-export const ARCHETYPE_LABELS: Record<ArchetypeCodeWithA5, string> = {
+/** @deprecated use ArchetypeCodeWithA6 — kept for backward-compat with existing importers. */
+export type ArchetypeCodeWithA5 = ArchetypeCodeWithA6;
+
+export const ARCHETYPE_LABELS: Record<ArchetypeCodeWithA6, string> = {
   A1: 'A1_REVIEW_GAP',
   A2: 'A2_NEGATIVE_RECOVERY',
   A3: 'A3_LISTING_DRIFT',
   A4: 'A4_CTA_GAP',
   A5: 'A5_DUAL_TRIAGE',
+  A6: 'A6_PRODUCT_VISIBILITY_GAP',
 };
 
 // ─── Rules DSL (§6.4) ────────────────────────────────────────────────────
@@ -82,7 +86,7 @@ export interface DetectedSignal {
 export interface TriageRecommendation {
   playbookCode: PlaybookCode;
   category: PlaybookCategory;
-  archetype: ArchetypeCodeWithA5;
+  archetype: ArchetypeCodeWithA6;
   confidence: number;
   reasoning: string;
   detectedSignals: DetectedSignal[];
@@ -147,7 +151,7 @@ export interface PlaybookCatalogRow {
   code: PlaybookCode;
   name: string;
   category: PlaybookCategory;
-  archetype: ArchetypeCodeWithA5;
+  archetype: ArchetypeCodeWithA6;
   archetypeLabel: string;
   description: string | null;
   matchingRules: MatchingRules;

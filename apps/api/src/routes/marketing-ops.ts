@@ -443,9 +443,9 @@ const scorecardUpdateSchema = z.object({
 });
 
 // ─── Playbook Catalog + Triage schemas (Sprint 3) ───────────────────────
-const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05']);
+const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07']);
 const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'triage_management']);
-const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5']);
+const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5', 'A6']);
 
 // ─── Matching rules DSL schema (§6.4) ────────────────────────────────────
 // Structured validation for the any/all/none/dual set-membership DSL.
@@ -608,7 +608,7 @@ const triageOverrideSchema = z.object({
 
 const deliverableTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
   category: z.string().max(100).optional(),
   layout_spec: z.any(),
   page_size: z.string().max(20).optional(),
@@ -621,7 +621,7 @@ const deliverableTemplateUpdateSchema = deliverableTemplateCreateSchema.partial(
 const deliverableCreateSchema = z.object({
   execution_id: z.string().optional(),
   template_id: z.string().optional(),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
   status: z.enum(['preview', 'paid', 'archived']),
   file_name: z.string().min(1).max(255),
   storage_path: z.string().min(1).max(500),
@@ -1923,7 +1923,7 @@ router.delete('/branding/:id', async (req: any, res: Response) => {
 const deliverableGenerateSchema = z.object({
   template_id: z.string().optional(),
   execution_id: z.string().optional(),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
   is_preview: z.boolean().default(true),
   content: z.string().optional(),
 });

@@ -65,7 +65,7 @@ export interface A4Fields extends CommonFields {
   conversion_opportunities: string[];
 }
 
-export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields;
+export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields | A6Fields;
 
 /**
  * A5: Dual-Signal Footprint Triage. Combines repair (NAP/URL) and review-gap
@@ -78,6 +78,25 @@ export interface A5Fields extends CommonFields {
   days_since_last_review: number;
   unaddressed_review_count: number;
   platforms_with_listings: string[];
+}
+
+/**
+ * A6: Product Visibility Gap. For product/inventory businesses (grocery
+ * stores, bakeries, specialty markets) with no online product browsing.
+ * Populated by Sprint 1 (Universal Recalibration); the field shape is
+ * defined here so the dispatcher is exhaustive and A6 prompt can reference it.
+ */
+export interface A6Fields extends CommonFields {
+  business_type: 'product' | 'hybrid';
+  has_website: boolean;
+  has_product_browsing: boolean;
+  has_availability_inquiry: boolean;
+  has_pickup_option: boolean;
+  has_delivery_option: boolean;
+  photo_count: number;
+  photo_types: string[];
+  missing_photo_types: string[];         // ['storefront','product'] — what's absent
+  product_categories_sample: string[];   // from GBP or website, if visible
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -210,6 +229,51 @@ export function extractA5Fields(
   };
 }
 
+/**
+ * A6: Product Visibility Gap. Extracts product-visibility fields from the
+ * audit data for the A6 prompt. The business_type is resolved by the caller
+ * (via MarketingBusinessTypeService) and passed through the auditData's
+ * business_type field.
+ */
+export function extractA6Fields(
+  auditData: BusinessAnalysisAuditData,
+  common: CommonFields,
+): A6Fields {
+  const website = auditData.website;
+  const google = auditData.platforms?.google;
+
+  const hasWebsite = !!website?.url || website?.status === 'working';
+  const hasProductBrowsing = website?.has_product_browsing === true;
+  const hasAvailabilityInquiry = website?.has_availability_inquiry === true;
+  const hasPickup = website?.has_pickup_ordering === true;
+  const hasDelivery = website?.has_delivery_option === true;
+
+  const photoCount = google?.photo_count ?? 0;
+  const photoTypes = google?.photo_types ?? [];
+  const knownPhotoTypes = ['storefront', 'exterior', 'interior', 'product', 'team', 'logo'];
+  const missingPhotoTypes = knownPhotoTypes.filter((t) => !photoTypes.includes(t));
+
+  const productCategories = website?.product_categories_visible ?? [];
+
+  const businessType = auditData.business_type;
+  const resolvedType: 'product' | 'hybrid' =
+    businessType === 'service' ? 'product' : (businessType as 'product' | 'hybrid') ?? 'product';
+
+  return {
+    ...common,
+    business_type: resolvedType,
+    has_website: hasWebsite,
+    has_product_browsing: hasProductBrowsing,
+    has_availability_inquiry: hasAvailabilityInquiry,
+    has_pickup_option: hasPickup,
+    has_delivery_option: hasDelivery,
+    photo_count: photoCount,
+    photo_types: photoTypes,
+    missing_photo_types: missingPhotoTypes,
+    product_categories_sample: productCategories,
+  };
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────
 
 export function extractFields(
@@ -230,5 +294,7 @@ export function extractFields(
       return extractA4Fields(auditData, common);
     case 'A5':
       return extractA5Fields(auditData, common);
+    case 'A6':
+      return extractA6Fields(auditData, common);
   }
 }

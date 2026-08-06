@@ -192,7 +192,7 @@ export class OutreachOpenerService extends BaseService {
       // Triage not found or not accepted — fall through to selectArchetype
     }
 
-    if (triageArchetype && ['A1', 'A2', 'A3', 'A4', 'A5'].includes(triageArchetype)) {
+    if (triageArchetype && ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].includes(triageArchetype)) {
       // Use the triage-derived archetype. For A2, we still need a theme —
       // re-run selectArchetype to get the theme if the triage archetype is A2.
       // For A5, there is no theme (it's dual-signal, not theme-driven).

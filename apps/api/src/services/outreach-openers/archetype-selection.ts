@@ -19,7 +19,7 @@
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5';
+export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6';
 
 export interface NegativeReviewTheme {
   theme: string;
@@ -59,6 +59,12 @@ export interface WebsiteAudit {
   has_booking?: boolean;
   contact_information_visible?: string;
   conversion_opportunities?: string[];
+  // Product-visibility fields (Sprint 1 — Universal Recalibration)
+  has_product_browsing?: boolean | null;
+  has_availability_inquiry?: boolean | null;
+  has_pickup_ordering?: boolean | null;
+  has_delivery_option?: boolean | null;
+  product_categories_visible?: string[];
 }
 
 export interface PlatformAudit {
@@ -74,6 +80,10 @@ export interface PlatformAudit {
   observable_response_rate_percent?: number;
   observable_unanswered_negative_reviews?: number;
   observable_unanswered_positive_reviews?: number;
+  // Product-visibility fields (Sprint 1 — Universal Recalibration)
+  photo_count?: number | null;
+  photo_types?: string[];
+  special_hours_present?: boolean | null;
 }
 
 export interface BusinessAnalysisAuditData {
@@ -97,6 +107,8 @@ export interface BusinessAnalysisAuditData {
   estimated_monthly_service_fee?: { minimum: number; maximum: number; currency: string };
   data_quality?: any;
   audit_metadata?: any;
+  // Product-visibility fields (Sprint 1 — Universal Recalibration)
+  business_type?: 'service' | 'product' | 'hybrid' | 'unable_to_verify' | null;
 }
 
 export interface ArchetypeSelection {
@@ -111,7 +123,13 @@ export interface ArchetypeSelection {
  * Deterministically select the best opener archetype from audit data.
  * No LLM, no async, no side effects — pure function.
  *
- * Priority: A2 > A1 > A3 > A4
+ * Priority: A2 > A1 > A6 > A3 > A4
+ *
+ * A6 (Product Visibility Gap) fires for product/hybrid businesses with no
+ * product browsing. It sits above A3/A4 because product invisibility is more
+ * urgent than listing drift or CTA gap for inventory businesses. A2/A1 still
+ * win when reviews are the dominant pain — a grocery store with a cluster of
+ * negative reviews should still get A2.
  */
 export function selectArchetype(auditData: BusinessAnalysisAuditData): ArchetypeSelection {
   const metrics = auditData.combined_review_metrics;
@@ -141,6 +159,23 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
       archetype: 'A1',
       reason: `review response gap: ${metrics.observable_unanswered_reviews} unanswered (${metrics.observable_unanswered_rate_percent}%)`,
     };
+  }
+
+  // A6: product visibility gap (product/hybrid business with no product browsing)
+  // Fires when business_type is product/hybrid AND either:
+  //   - has_product_browsing === false (website exists but no product browsing), OR
+  //   - no website detected (WC_MISSING_WEBSITE would fire, but for a product
+  //     business the lack of any online product presence is the dominant gap)
+  const businessType = auditData.business_type;
+  if (businessType === 'product' || businessType === 'hybrid') {
+    const hasWebsite = !!website?.url || website?.status === 'working';
+    const noProductBrowsing = website?.has_product_browsing === false;
+    if (!hasWebsite || noProductBrowsing) {
+      return {
+        archetype: 'A6',
+        reason: `product visibility gap: ${businessType} business with ${!hasWebsite ? 'no website' : 'no product browsing'}`,
+      };
+    }
   }
 
   // A3: listing inconsistency

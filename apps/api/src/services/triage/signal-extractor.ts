@@ -40,7 +40,8 @@ const REVIEW_DROUGHT_DAYS = 180;        // RA_REVIEW_DROUGHT
 const LOW_REVIEW_VOLUME_THRESHOLD = 15; // RA_LOW_REVIEW_VOLUME
 const NEGATIVE_BACKLOG_THRESHOLD = 3;   // RA_UNADDRESSED_NEGATIVE_BACKLOG
 const POSITIVE_BACKLOG_THRESHOLD = 5;   // RA_UNADDRESSED_POSITIVE_BACKLOG
-const PHOTO_DEFICIT_THRESHOLD = 5;      // DS_PHOTO_DEFICIT
+const PHOTO_DEFICIT_THRESHOLD_SERVICE = 5;  // DS_PHOTO_DEFICIT (service businesses)
+const PHOTO_DEFICIT_THRESHOLD_PRODUCT = 10; // DS_PHOTO_DEFICIT (product/inventory businesses)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -251,11 +252,52 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
       }
     }
 
-    // DS_PHOTO_DEFICIT — fewer than 5 photos on GBP
+    // DS_PHOTO_DEFICIT — fewer than threshold photos on GBP (business-type-sensitive)
     if (!signals.has('DS_PHOTO_DEFICIT')) {
       const photoCount = (google as any)?.photo_count;
-      if (typeof photoCount === 'number' && photoCount < PHOTO_DEFICIT_THRESHOLD) {
-        signals.add('DS_PHOTO_DEFICIT');
+      if (typeof photoCount === 'number') {
+        const businessType = (auditData as any).business_type;
+        const threshold = businessType === 'product' || businessType === 'hybrid'
+          ? PHOTO_DEFICIT_THRESHOLD_PRODUCT
+          : PHOTO_DEFICIT_THRESHOLD_SERVICE;
+        if (photoCount < threshold) {
+          signals.add('DS_PHOTO_DEFICIT');
+        }
+      }
+    }
+
+    // DS_OUTDATED_HOLIDAY_HOURS — GBP special/holiday hours are absent
+    if (!signals.has('DS_OUTDATED_HOLIDAY_HOURS')) {
+      const specialHours = (google as any)?.special_hours_present;
+      if (specialHours === false || specialHours === null) {
+        // Only emit when the field is explicitly false (agent confirmed absence).
+        // null/undefined means the agent didn't assess it — don't emit.
+        if (specialHours === false) {
+          signals.add('DS_OUTDATED_HOLIDAY_HOURS');
+        }
+      }
+    }
+
+    // VP_MISSING_STOREFRONT_PHOTOS — GBP photos lack storefront/exterior/interior
+    if (!signals.has('VP_MISSING_STOREFRONT_PHOTOS')) {
+      const photoTypes = (google as any)?.photo_types;
+      if (Array.isArray(photoTypes) && photoTypes.length > 0) {
+        const hasStorefront = photoTypes.some((t: string) =>
+          t === 'storefront' || t === 'exterior' || t === 'interior');
+        if (!hasStorefront) {
+          signals.add('VP_MISSING_STOREFRONT_PHOTOS');
+        }
+      }
+    }
+
+    // VP_MISSING_PRODUCT_PHOTOS — GBP photos lack product close-ups
+    if (!signals.has('VP_MISSING_PRODUCT_PHOTOS')) {
+      const photoTypes = (google as any)?.photo_types;
+      if (Array.isArray(photoTypes) && photoTypes.length > 0) {
+        const hasProduct = photoTypes.some((t: string) => t === 'product');
+        if (!hasProduct) {
+          signals.add('VP_MISSING_PRODUCT_PHOTOS');
+        }
       }
     }
   }
@@ -310,10 +352,48 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
         signals.add('WC_MOBILE_FRICTION');
       }
     }
+
+    // WC_MISSING_PRODUCT_BROWSING — website exists but no product/category browsing
+    if (!signals.has('WC_MISSING_PRODUCT_BROWSING')) {
+      if (website.has_product_browsing === false) {
+        signals.add('WC_MISSING_PRODUCT_BROWSING');
+      }
+    }
+
+    // WC_MISSING_AVAILABILITY_INQUIRY — no way to check stock before visiting
+    if (!signals.has('WC_MISSING_AVAILABILITY_INQUIRY')) {
+      if (website.has_availability_inquiry === false) {
+        signals.add('WC_MISSING_AVAILABILITY_INQUIRY');
+      }
+    }
+
+    // WC_MISSING_PICKUP_DELIVERY — no pickup or delivery option surfaced online
+    if (!signals.has('WC_MISSING_PICKUP_DELIVERY')) {
+      if (website.has_pickup_ordering === false && website.has_delivery_option === false) {
+        signals.add('WC_MISSING_PICKUP_DELIVERY');
+      }
+    }
   } else if (!signals.has('WC_MISSING_WEBSITE')) {
     // No website audit at all + campaign says no website
     if (!campaign.has_website || campaign.has_website === 'no') {
       signals.add('WC_MISSING_WEBSITE');
+    }
+  }
+
+  // DS_MISSING_PRODUCT_CATALOG — product/hybrid business with no website or
+  // no product browsing. Distinct from WC_MISSING_WEBSITE (which fires for
+  // any business with no website) and WC_MISSING_PRODUCT_BROWSING (which
+  // fires when a website exists but has no product browsing). This code
+  // captures the product-business-specific gap: customers can't see what
+  // products are carried before visiting.
+  if (!signals.has('DS_MISSING_PRODUCT_CATALOG')) {
+    const businessType = (auditData as any)?.business_type;
+    if (businessType === 'product' || businessType === 'hybrid') {
+      const hasWebsite = !!auditData?.website?.url || auditData?.website?.status === 'working';
+      const hasProductBrowsing = auditData?.website?.has_product_browsing === true;
+      if (!hasWebsite || !hasProductBrowsing) {
+        signals.add('DS_MISSING_PRODUCT_CATALOG');
+      }
     }
   }
 

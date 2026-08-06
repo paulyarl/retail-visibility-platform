@@ -29,7 +29,8 @@ export type DeliverableType =
   | 'lead_magnet'
   | 'recovery_resolution'
   | 'reinstatement_appeal'
-  | 'citation_repair_package';
+  | 'citation_repair_package'
+  | 'product_visibility_preview';
 
 export interface DeliverableTemplateInput {
   name: string;
@@ -445,6 +446,7 @@ export class MarketingDeliverableService extends BaseService {
       recovery_resolution: 'Recovery Resolution',
       reinstatement_appeal: 'Reinstatement Appeal',
       citation_repair_package: 'Citation & Profile Repair Package',
+      product_visibility_preview: 'Product Visibility Preview',
     };
     return labels[type] || type;
   }

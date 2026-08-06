@@ -7041,6 +7041,15 @@ model mkt_customer_branding {
   @@index([customer_id], map: "idx_mkt_customer_branding_customer")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_business_type_categories {
+  category      String   @id @db.VarChar(255)
+  business_type String   @db.VarChar(20)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+}
+
 enum action {
   create
   update

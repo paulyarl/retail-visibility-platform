@@ -27,7 +27,7 @@ export const FAMILY_LABELS: Record<SignalFamily, string> = {
   VP: 'Content & Visual Proof',
 };
 
-// ─── Canonical 24 signal codes (TS fallback / validation set) ────────────
+// ─── Canonical 31 signal codes (TS fallback / validation set) ────────────
 //
 // The DB registry (`mkt_signal_registry`) is the runtime source of truth.
 // This union exists so the extractor, engine, and tests have compile-time
@@ -48,7 +48,9 @@ export const KNOWN_SIGNAL_CODES = [
   'DS_MISSING_PROFILE',
   'DS_BROKEN_PROFILE_LINK',
   'DS_MISSING_SERVICE_MENU',
+  'DS_MISSING_PRODUCT_CATALOG',
   'DS_OUTDATED_HOURS',
+  'DS_OUTDATED_HOLIDAY_HOURS',
   'DS_PHOTO_DEFICIT',
   // Website & Conversion (WC)
   'WC_MISSING_WEBSITE',
@@ -56,6 +58,9 @@ export const KNOWN_SIGNAL_CODES = [
   'WC_URL_MISMATCH',
   'WC_MISSING_CTA',
   'WC_MISSING_SERVICE_PAGES',
+  'WC_MISSING_PRODUCT_BROWSING',
+  'WC_MISSING_AVAILABILITY_INQUIRY',
+  'WC_MISSING_PICKUP_DELIVERY',
   'WC_MOBILE_FRICTION',
   // Cross-Platform Consistency (CP)
   'CP_NAP_NAME_DRIFT',
@@ -65,6 +70,8 @@ export const KNOWN_SIGNAL_CODES = [
   // Content & Visual Proof (VP)
   'VP_MISSING_PROJECT_PHOTOS',
   'VP_STALE_SOCIAL_ACTIVITY',
+  'VP_MISSING_STOREFRONT_PHOTOS',
+  'VP_MISSING_PRODUCT_PHOTOS',
 ] as const;
 
 /**
@@ -96,9 +103,16 @@ export function signalFamily(code: SignalCode): SignalFamily | null {
 
 export function isRepairSignal(code: SignalCode): boolean {
   // Repair signals: CP_* (NAP drift), WC_URL_MISMATCH, WC_BROKEN_WEBSITE,
-  // DS_BROKEN_PROFILE_LINK. These are the "groupA" signals for PB-05 dual.
+  // DS_BROKEN_PROFILE_LINK, DS_OUTDATED_HOLIDAY_HOURS (hours drift is
+  // repair-class — a missing special-hours schedule is a listing defect).
+  // These are the "groupA" signals for PB-05 dual.
   if (code.startsWith('CP_')) return true;
-  return code === 'WC_URL_MISMATCH' || code === 'WC_BROKEN_WEBSITE' || code === 'DS_BROKEN_PROFILE_LINK';
+  return (
+    code === 'WC_URL_MISMATCH' ||
+    code === 'WC_BROKEN_WEBSITE' ||
+    code === 'DS_BROKEN_PROFILE_LINK' ||
+    code === 'DS_OUTDATED_HOLIDAY_HOURS'
+  );
 }
 
 export function isReviewSignal(code: SignalCode): boolean {
@@ -207,13 +221,18 @@ export const SIGNAL_LABELS: Record<string, string> = {
   DS_MISSING_PROFILE: 'Missing Platform Profile',
   DS_BROKEN_PROFILE_LINK: 'Broken Profile Link',
   DS_MISSING_SERVICE_MENU: 'Missing Service Menu',
+  DS_MISSING_PRODUCT_CATALOG: 'Missing Product Catalog',
   DS_OUTDATED_HOURS: 'Outdated Hours of Operation',
+  DS_OUTDATED_HOLIDAY_HOURS: 'Missing Holiday Hours',
   DS_PHOTO_DEFICIT: 'Photo Deficit (<5 photos)',
   WC_MISSING_WEBSITE: 'No Website Detected',
   WC_BROKEN_WEBSITE: 'Broken Website (dead URL)',
   WC_URL_MISMATCH: 'URL Mismatch (audit vs campaign)',
   WC_MISSING_CTA: 'Missing Call-to-Action',
   WC_MISSING_SERVICE_PAGES: 'Missing Service Pages',
+  WC_MISSING_PRODUCT_BROWSING: 'Missing Product Browsing',
+  WC_MISSING_AVAILABILITY_INQUIRY: 'Missing Availability Inquiry',
+  WC_MISSING_PICKUP_DELIVERY: 'Missing Pickup/Delivery Pathway',
   WC_MOBILE_FRICTION: 'Mobile Friction',
   CP_NAP_NAME_DRIFT: 'NAP Name Drift',
   CP_NAP_ADDRESS_DRIFT: 'NAP Address Drift',
@@ -221,6 +240,8 @@ export const SIGNAL_LABELS: Record<string, string> = {
   CP_MISSING_CONTACT_INFO: 'Missing Contact Info',
   VP_MISSING_PROJECT_PHOTOS: 'Missing Project Photos',
   VP_STALE_SOCIAL_ACTIVITY: 'Stale Social Activity',
+  VP_MISSING_STOREFRONT_PHOTOS: 'Missing Storefront Photos',
+  VP_MISSING_PRODUCT_PHOTOS: 'Missing Product Photos',
 };
 
 export function signalLabel(code: SignalCode): string {
