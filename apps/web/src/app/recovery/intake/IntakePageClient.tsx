@@ -38,6 +38,7 @@ import {
 } from '@tabler/icons-react';
 import recoveryIntakePublicService from '@/services/RecoveryIntakePublicService';
 import type { IntakeContext, SubmitResult, AttachmentUploadResult } from '@/services/RecoveryIntakePublicService';
+import IntakeFormRenderer from './IntakeFormRenderer';
 
 const RESOLUTION_OPTIONS = [
   { value: 'Full Refund', label: 'Full Refund' },
@@ -83,6 +84,10 @@ export default function IntakePageClient() {
   const [suspensionDate, setSuspensionDate] = useState('');
   const [suspensionReason, setSuspensionReason] = useState('');
   const [duplicateListingUrl, setDuplicateListingUrl] = useState('');
+
+  // Registry-driven form state (gbp_optimization, review_response_setup, ...)
+  const isRegistryKind = !!context?.definition && context?.intakeKind !== 'dispute' && context?.intakeKind !== 'profile_repair';
+  const [registryFormValues, setRegistryFormValues] = useState<Record<string, any>>({});
 
   const resolveToken = useCallback(async () => {
     if (!token) {
@@ -137,12 +142,34 @@ export default function IntakePageClient() {
 
   const handleSubmit = async () => {
     if (!token) return;
-    if (ownerStatement.length < 20) {
-      setError('Please provide a statement of at least 20 characters.');
-      return;
-    }
     if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
       setError('Please provide a valid email address so we can deliver your resolution.');
+      return;
+    }
+
+    // Registry-driven kinds: dynamic form submission
+    if (isRegistryKind && context?.definition) {
+      setSubmitting(true);
+      setError(null);
+      try {
+        const result = await recoveryIntakePublicService.submitRegistryIntake(token, {
+          ownerEmail,
+          ownerPhone: ownerPhone || null,
+          ownerStatement: ownerStatement || undefined,
+          evidencePayload: registryFormValues,
+          attachmentIds: uploadedAttachments.map((a) => a.attachmentId),
+        });
+        setSubmitted(result);
+      } catch (err) {
+        setError((err as Error).message || 'Failed to submit intake');
+      }
+      setSubmitting(false);
+      return;
+    }
+
+    // Code-defined kinds require a statement
+    if (ownerStatement.length < 20) {
+      setError('Please provide a statement of at least 20 characters.');
       return;
     }
 
@@ -281,12 +308,16 @@ export default function IntakePageClient() {
             </Title>
             <Text c="dimmed" ta="center" maw={500}>
               {submitted.alreadySubmitted
-                ? isProfileRepair
-                  ? 'Your profile repair intake was already submitted. No further action is needed — your representative will follow up with your appeal letter.'
-                  : 'Your dispute intake was already submitted. No further action is needed — your representative will follow up.'
-                : isProfileRepair
-                  ? 'Thank you for submitting your evidence. Your representative will review your case and draft a reinstatement appeal letter, then follow up with next steps.'
-                  : 'Thank you for submitting your dispute intake. Your representative will review your statement and proposed resolution, then follow up with next steps.'}
+                ? isRegistryKind
+                  ? (context?.definition?.ownerCopy?.success_message || 'Your intake was already submitted. No further action is needed — your representative will follow up.')
+                  : isProfileRepair
+                    ? 'Your profile repair intake was already submitted. No further action is needed — your representative will follow up with your appeal letter.'
+                    : 'Your dispute intake was already submitted. No further action is needed — your representative will follow up.'
+                : isRegistryKind
+                  ? (context?.definition?.ownerCopy?.success_message || 'Thank you for your submission. Your representative will review your information and follow up with next steps.')
+                  : isProfileRepair
+                    ? 'Thank you for submitting your evidence. Your representative will review your case and draft a reinstatement appeal letter, then follow up with next steps.'
+                    : 'Thank you for submitting your dispute intake. Your representative will review your statement and proposed resolution, then follow up with next steps.'}
             </Text>
             <Badge variant="light" color="blue" size="lg">
               Stage: {submitted.stage.replace(/_/g, ' ')}
@@ -311,8 +342,20 @@ export default function IntakePageClient() {
                 <IconShield size={20} />
               </ThemeIcon>
               <div>
-                <Title order={3}>{isProfileRepair ? 'Profile Repair Appeal Intake' : 'Dispute Resolution Intake'}</Title>
-                <Text size="sm" c="dimmed">{isProfileRepair ? 'Profile Repair Portal' : 'Recovery Management Portal'}</Text>
+                <Title order={3}>
+                  {isRegistryKind
+                    ? (context?.definition?.ownerCopy?.title || context?.definition?.label || 'Intake Form')
+                    : isProfileRepair
+                      ? 'Profile Repair Appeal Intake'
+                      : 'Dispute Resolution Intake'}
+                </Title>
+                <Text size="sm" c="dimmed">
+                  {isRegistryKind
+                    ? (context?.definition?.ownerCopy?.subtitle || context?.definition?.label || 'Intake Portal')
+                    : isProfileRepair
+                      ? 'Profile Repair Portal'
+                      : 'Recovery Management Portal'}
+                </Text>
               </div>
             </Group>
             <Badge variant="light" color="gray">Secure</Badge>
@@ -338,6 +381,62 @@ export default function IntakePageClient() {
         {/* Form */}
         <Card withBorder shadow="sm" p="lg">
           <Stack gap="md">
+            {isRegistryKind && context?.definition ? (
+              <>
+                {/* Registry-driven form: dynamic fields from definition.formSchema */}
+                {context.definition.ownerCopy?.intro && (
+                  <Text size="sm" c="dimmed">{context.definition.ownerCopy.intro}</Text>
+                )}
+                <IntakeFormRenderer
+                  token={token}
+                  fields={context.definition.formSchema}
+                  values={registryFormValues}
+                  onChange={setRegistryFormValues}
+                  uploadedAttachments={uploadedAttachments}
+                  onUploadAttachments={handleFileUpload}
+                  uploading={uploading}
+                />
+
+                {/* Optional owner statement (uses definition's statement_label) */}
+                {context.definition.ownerCopy?.statement_label && (
+                  <div>
+                    <Title order={4} mb="xs">{context.definition.ownerCopy.statement_label}</Title>
+                    <Textarea
+                      value={ownerStatement}
+                      onChange={(e) => setOwnerStatement(e.currentTarget.value)}
+                      placeholder="Add any additional context..."
+                      minRows={3}
+                      autosize
+                    />
+                  </div>
+                )}
+
+                {/* Contact information (shared across all kinds) */}
+                <div>
+                  <Title order={4} mb="xs">Contact Information</Title>
+                  <Text size="sm" c="dimmed" mb="sm">
+                    We need your email to follow up on your submission. Phone is optional.
+                  </Text>
+                  <Stack gap="sm">
+                    <TextInput
+                      label="Email Address"
+                      required
+                      type="email"
+                      value={ownerEmail}
+                      onChange={(e) => setOwnerEmail(e.currentTarget.value)}
+                      placeholder="owner@example.com"
+                    />
+                    <TextInput
+                      label="Phone Number (optional)"
+                      value={ownerPhone}
+                      onChange={(e) => setOwnerPhone(e.currentTarget.value)}
+                      placeholder="+1 (555) 123-4567"
+                    />
+                  </Stack>
+                </div>
+              </>
+            ) : (
+            <>
             <div>
               <Title order={4} mb="xs">Your Statement</Title>
               <Text size="sm" c="dimmed" mb="sm">
@@ -564,6 +663,8 @@ export default function IntakePageClient() {
                   )}
                 </div>
               </>
+            )}
+            </>
             )}
 
             {error && (

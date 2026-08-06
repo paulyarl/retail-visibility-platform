@@ -163,18 +163,56 @@ export class RecoveryIntakePublicService extends PublicApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async reissueLink(campaignId: string): Promise<ReissueResult> {
+  async reissueLink(campaignId: string, intakeKind: string = 'dispute'): Promise<ReissueResult> {
     const result = await this.makeDefaultRequest<any>(
       '/api/public/recovery/intake/reissue',
       {
         method: 'POST',
-        body: JSON.stringify({ campaignId }),
+        body: JSON.stringify({ campaignId, intakeKind }),
       },
       undefined,
       0,
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to reissue link');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async submitRegistryIntake(
+    token: string,
+    payload: {
+      ownerEmail: string;
+      ownerPhone?: string | null;
+      ownerStatement?: string;
+      evidencePayload: Record<string, any>;
+      attachmentIds?: string[];
+    },
+  ): Promise<SubmitResult> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/public/recovery/intake/submit',
+      {
+        method: 'POST',
+        body: JSON.stringify({ token, ...payload }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to submit intake');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async getOptions(token: string, source: string): Promise<{ options: Array<{ value: string; label: string }> }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/public/recovery/intake/options?token=${encodeURIComponent(token)}&source=${encodeURIComponent(source)}`,
+      {},
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load options');
     }
     return result.data?.data ?? result.data;
   }
