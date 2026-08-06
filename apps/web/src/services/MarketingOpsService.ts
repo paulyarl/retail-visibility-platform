@@ -4130,6 +4130,12 @@ export interface DetectedSignal {
   contributedToRule: boolean;
 }
 
+export interface TriageSourceAudit {
+  id: string;
+  platform: string;
+  createdAt: string;
+}
+
 export interface TriageResult {
   id: string;
   campaignId: string;
@@ -4152,6 +4158,7 @@ export interface TriageResult {
   detectedSignals: DetectedSignal[];
   isOperatorAccepted: boolean | null;
   evaluatedAt: string;
+  sourceAudit: TriageSourceAudit | null;
 }
 
 // ─── Playbook catalog types (Sprint 4) ───────────────────────────────────

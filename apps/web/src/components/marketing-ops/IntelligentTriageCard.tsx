@@ -29,10 +29,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
-  ShieldCheck, ArrowRightCircle, Building2, DollarSign,
+  ShieldCheck, ArrowRightCircle, Building2, DollarSign, FileText, Info,
 } from 'lucide-react';
 import marketingOpsService, {
   type TriageResult,
+  type TriageSourceAudit,
   type PlaybookCatalogEntry,
   type Campaign,
 } from '@/services/MarketingOpsService';
@@ -207,6 +208,32 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
         <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 mb-3">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Source audit lineage — show which audit fed the triage */}
+      {triage && (
+        <div className="flex items-start gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+          {triage.sourceAudit ? (
+            <>
+              <FileText className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <span>
+                Evaluated from{' '}
+                <strong className="font-mono text-gray-600 dark:text-gray-300">
+                  {triage.sourceAudit.platform}
+                </strong>{' '}
+                audit ({new Date(triage.sourceAudit.createdAt).toLocaleDateString()})
+              </span>
+            </>
+          ) : (
+            <>
+              <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <span>
+                No signal-aware audit found — signals derived from campaign fields only.
+                Run a <strong>business_analysis</strong> audit for stronger triage matches.
+              </span>
+            </>
+          )}
         </div>
       )}
 

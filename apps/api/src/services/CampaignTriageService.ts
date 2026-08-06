@@ -68,6 +68,12 @@ export interface TriageOverrideInput {
 
 // ─── Stored result shape (returned to the API) ───────────────────────────
 
+export interface TriageSourceAudit {
+  id: string;
+  platform: string;
+  createdAt: Date;
+}
+
 export interface StoredTriageResult {
   id: string;
   campaignId: string;
@@ -78,6 +84,12 @@ export interface StoredTriageResult {
   detectedSignals: DetectedSignal[];
   isOperatorAccepted: boolean | null;
   evaluatedAt: Date;
+  /**
+   * The audit whose audit_data fed the signal extractor. NULL when no audit
+   * was used (signals derived from campaign columns only). Surfaced in the UI
+   * so operators know the lineage of the recommendation.
+   */
+  sourceAudit: TriageSourceAudit | null;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -116,14 +128,20 @@ export class CampaignTriageService extends BaseService {
     });
     if (!campaign) throw new NotFoundError('Campaign not found');
 
-    // 2. Load latest business_analysis audit_data (if any).
-    // The audit is identified by platform === 'business_analysis' (not an
-    // audit_type column — mkt_audits_list has no audit_type field).
-    const audit = await this.prisma.mkt_audits_list.findFirst({
-      where: { campaign_id: campaignId, platform: 'business_analysis' },
+    // 2. Load all audits for the campaign, ordered newest first. A campaign
+    //    can have multiple audits from different platforms (business_analysis,
+    //    city_category_analysis, category_analysis, etc.). Selection priority:
+    //      a. Latest business_analysis audit (canonical signal-aware contract).
+    //      b. Latest audit with a top-level detected_signals[] array
+    //         (forward-compatible — any audit platform that emits signals).
+    //      c. null — no audit used; signals derived from campaign columns only.
+    const allAudits = await this.prisma.mkt_audits_list.findMany({
+      where: { campaign_id: campaignId },
       orderBy: { created_at: 'desc' },
     });
-    const auditData = audit?.audit_data as SignalExtractorInput['auditData'] ?? null;
+    const selectedAudit = this.selectAuditForTriage(allAudits);
+    const auditData = (selectedAudit?.audit_data as SignalExtractorInput['auditData']) ?? null;
+    const sourceAuditId = selectedAudit?.id ?? null;
 
     // 3. Extract SignalCode[] (Sprint 2A: extractor emits SignalCode[], not NormalizedSignals)
     const extractorInput: SignalExtractorInput = {
@@ -189,6 +207,8 @@ export class CampaignTriageService extends BaseService {
         detected_signals: recommendation.detectedSignals as any,
         is_operator_accepted: null,
         overridden_playbook_id: null,
+        source_audit_id: sourceAuditId,
+        evaluated_at: new Date(),
       },
       update: {
         recommended_playbook_id: playbook.id,
@@ -198,6 +218,7 @@ export class CampaignTriageService extends BaseService {
         // Re-evaluation resets the operator decision — they must re-accept.
         is_operator_accepted: null,
         overridden_playbook_id: null,
+        source_audit_id: sourceAuditId,
         evaluated_at: new Date(),
       },
     });
@@ -206,9 +227,14 @@ export class CampaignTriageService extends BaseService {
       campaignId,
       playbookCode: recommendation.playbookCode,
       confidence: recommendation.confidence,
+      sourceAuditId: sourceAuditId,
+      auditPlatform: selectedAudit?.platform ?? null,
     });
 
-    return this.toStoredResult(row, playbook, null);
+    const sourceAudit = selectedAudit
+      ? { id: selectedAudit.id, platform: selectedAudit.platform, createdAt: selectedAudit.created_at }
+      : null;
+    return this.toStoredResult(row, playbook, null, sourceAudit);
   }
 
   // ─── Accept ────────────────────────────────────────────────────────────
@@ -232,7 +258,8 @@ export class CampaignTriageService extends BaseService {
 
     if (result.is_operator_accepted === true && !result.overridden_playbook_id) {
       // Already accepted — return as-is (idempotent).
-      return this.toStoredResult(result, this.toRow(result.playbook), null);
+      const sourceAudit = await this.resolveSourceAudit(result.source_audit_id);
+      return this.toStoredResult(result, this.toRow(result.playbook), null, sourceAudit);
     }
 
     const playbook = this.toRow(result.playbook);
@@ -262,7 +289,8 @@ export class CampaignTriageService extends BaseService {
       fitdFeeCents: playbook.fitdDefaultFeeCents,
     });
 
-    return this.toStoredResult(updated, this.toRow(updated.playbook), null);
+    const sourceAudit = await this.resolveSourceAudit(updated.source_audit_id);
+    return this.toStoredResult(updated, this.toRow(updated.playbook), null, sourceAudit);
   }
 
   // ─── Override ──────────────────────────────────────────────────────────
@@ -319,7 +347,8 @@ export class CampaignTriageService extends BaseService {
       reason,
     });
 
-    return this.toStoredResult(updated, this.toRow(updated.playbook), overridePlaybook);
+    const sourceAudit = await this.resolveSourceAudit(updated.source_audit_id);
+    return this.toStoredResult(updated, this.toRow(updated.playbook), overridePlaybook, sourceAudit);
   }
 
   // ─── Read ──────────────────────────────────────────────────────────────
@@ -331,7 +360,8 @@ export class CampaignTriageService extends BaseService {
     });
     if (!result) return null;
     const overridden = result.overridden_playbook ? this.toRow(result.overridden_playbook) : null;
-    return this.toStoredResult(result, this.toRow(result.playbook), overridden);
+    const sourceAudit = await this.resolveSourceAudit(result.source_audit_id);
+    return this.toStoredResult(result, this.toRow(result.playbook), overridden, sourceAudit);
   }
 
   // ─── Mapper ────────────────────────────────────────────────────────────
@@ -363,7 +393,12 @@ export class CampaignTriageService extends BaseService {
     };
   }
 
-  private toStoredResult(r: any, playbook: PlaybookCatalogRow, overridden: PlaybookCatalogRow | null): StoredTriageResult {
+  private toStoredResult(
+    r: any,
+    playbook: PlaybookCatalogRow,
+    overridden: PlaybookCatalogRow | null,
+    sourceAudit?: TriageSourceAudit | null,
+  ): StoredTriageResult {
     return {
       id: r.id,
       campaignId: r.campaign_id,
@@ -374,7 +409,47 @@ export class CampaignTriageService extends BaseService {
       detectedSignals: (r.detected_signals as DetectedSignal[]) ?? [],
       isOperatorAccepted: r.is_operator_accepted,
       evaluatedAt: r.evaluated_at,
+      sourceAudit: sourceAudit ?? null,
     };
+  }
+
+  /**
+   * Resolve a TriageSourceAudit from a stored source_audit_id by looking up
+   * the audit row. Returns null if the id is null or the audit was deleted.
+   */
+  private async resolveSourceAudit(sourceAuditId: string | null): Promise<TriageSourceAudit | null> {
+    if (!sourceAuditId) return null;
+    const audit = await this.prisma.mkt_audits_list.findUnique({
+      where: { id: sourceAuditId },
+      select: { id: true, platform: true, created_at: true },
+    });
+    if (!audit) return null;
+    return { id: audit.id, platform: audit.platform, createdAt: audit.created_at };
+  }
+
+  /**
+   * Select the best audit for triage from a campaign's audit list (ordered
+   * newest first). Priority:
+   *   1. Latest business_analysis audit (canonical signal-aware contract).
+   *   2. Latest audit with a top-level detected_signals[] array
+   *      (forward-compatible — any platform that emits signals).
+   *   3. null — no suitable audit; signals will be derived from campaign columns.
+   */
+  private selectAuditForTriage(audits: any[]): any | null {
+    if (audits.length === 0) return null;
+
+    // 1. Prefer latest business_analysis audit
+    const businessAnalysis = audits.find((a) => a.platform === 'business_analysis');
+    if (businessAnalysis) return businessAnalysis;
+
+    // 2. Fall back to latest audit with detected_signals[] in audit_data
+    const withSignals = audits.find(
+      (a) => a.audit_data && Array.isArray((a.audit_data as any).detected_signals),
+    );
+    if (withSignals) return withSignals;
+
+    // 3. No suitable audit
+    return null;
   }
 }
 
