@@ -419,7 +419,7 @@ export class IntakeDefinitionService {
           }
           schema = z.object(nestedShape);
         } else {
-          schema = z.record(z.any());
+          schema = z.record(z.string(), z.any());
         }
         break;
 

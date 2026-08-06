@@ -87,9 +87,9 @@ export class RecoveryResolutionService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      const intake = campaign.mkt_dispute_intake;
+      const intake = campaign.mkt_dispute_intake.find((i: any) => i.id === intakeId);
       if (!intake) {
-        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+        throw new Error(`Dispute intake ${intakeId} for campaign ${campaignId} not found`);
       }
 
       // Build variable inputs for the prompt template
@@ -374,9 +374,11 @@ export class RecoveryResolutionService extends BaseService {
         });
       }
 
-      // Re-enqueue a fresh execution (loads current intake state)
-      const intake = await this.prisma.mkt_dispute_intake.findUnique({
-        where: { campaign_id: campaignId },
+      // Re-enqueue a fresh execution (loads current intake state).
+      // campaign_id is no longer UNIQUE (composite UNIQUE(campaign_id, intake_kind)
+      // as of migration 173) — use findFirst to get the dispute intake.
+      const intake = await this.prisma.mkt_dispute_intake.findFirst({
+        where: { campaign_id: campaignId, intake_kind: 'dispute' },
       });
 
       if (!intake) {
@@ -483,7 +485,7 @@ export class RecoveryResolutionService extends BaseService {
       //    typed it themselves)
       // 2. Fall back to the campaign's business email (captured during audit)
       // 3. If neither exists, log a delivery failure for manual intervention
-      const intakeEmail = campaign.mkt_dispute_intake?.owner_email;
+      const intakeEmail = campaign.mkt_dispute_intake?.[0]?.owner_email;
       const campaignEmail = campaign.email;
       const deliveryEmail = intakeEmail || campaignEmail;
 
@@ -491,7 +493,7 @@ export class RecoveryResolutionService extends BaseService {
         logger.warn('Recovery resolution delivery failed — no email destination', ctx, {
           campaignId,
           deliverableId,
-          intakePhone: campaign.mkt_dispute_intake?.owner_phone || null,
+          intakePhone: campaign.mkt_dispute_intake?.[0]?.owner_phone || null,
         });
         // Log the failed delivery so it surfaces in the outreach log
         const { MarketingOutreachService } = await import('./MarketingOutreachService.js');
@@ -627,7 +629,7 @@ export class RecoveryResolutionService extends BaseService {
       });
       if (!campaign) throw new Error(`Campaign ${log.campaign_id} not found`);
 
-      const deliveryEmail = campaign.mkt_dispute_intake?.owner_email || campaign.email;
+      const deliveryEmail = campaign.mkt_dispute_intake?.[0]?.owner_email || campaign.email;
       if (!deliveryEmail) {
         // No destination — mark as permanently failed
         await this.prisma.mkt_outreach_log.update({
@@ -760,9 +762,9 @@ export class RecoveryResolutionService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      const intake = campaign.mkt_dispute_intake;
+      const intake = campaign.mkt_dispute_intake.find((i: any) => i.id === intakeId);
       if (!intake) {
-        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+        throw new Error(`Dispute intake ${intakeId} for campaign ${campaignId} not found`);
       }
 
       // Load the prompt template
@@ -840,9 +842,9 @@ export class RecoveryResolutionService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      const intake = campaign.mkt_dispute_intake;
+      const intake = campaign.mkt_dispute_intake.find((i: any) => i.id === intakeId);
       if (!intake) {
-        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+        throw new Error(`Dispute intake ${intakeId} for campaign ${campaignId} not found`);
       }
 
       // Build variables (same as enqueue)
@@ -1031,8 +1033,8 @@ export class RecoveryResolutionService extends BaseService {
     errors?: string[];
   }> {
     try {
-      const intake = await this.prisma.mkt_dispute_intake.findUnique({
-        where: { campaign_id: campaignId },
+      const intake = await this.prisma.mkt_dispute_intake.findFirst({
+        where: { campaign_id: campaignId, intake_kind: 'dispute' },
       });
 
       if (!intake) {

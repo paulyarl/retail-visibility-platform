@@ -160,7 +160,9 @@ async function runIntakeTimeoutSweep(): Promise<void> {
     let sweptCount = 0;
 
     for (const campaign of stuckCampaigns) {
-      const intake = campaign.mkt_dispute_intake;
+      // mkt_dispute_intake is now 1:N (composite unique on campaign_id + intake_kind).
+      // For the recovery sweep, we care about the dispute intake's token expiry.
+      const intake = campaign.mkt_dispute_intake?.[0];
       if (!intake) continue;
 
       const expiryWithBuffer = new Date(intake.expires_at.getTime() + cascadeBufferMs);

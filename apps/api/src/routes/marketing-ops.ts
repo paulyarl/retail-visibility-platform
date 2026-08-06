@@ -3797,20 +3797,34 @@ router.get('/recovery/campaigns', async (req: any, res: Response) => {
   }
 });
 
-// Get full intake + attachments for a campaign
+// Get full intake + attachments for a campaign.
+// Returns all intakes for the campaign (composite unique on campaign_id + intake_kind
+// means a campaign can have multiple intakes of different kinds).
 router.get('/recovery/:campaignId/intake', async (req: any, res: Response) => {
   try {
     const { campaignId } = req.params;
-    const intake = await prisma.mkt_dispute_intake.findUnique({
+    const intakeKind = req.query.intakeKind as string | undefined;
+    if (intakeKind) {
+      // Specific kind — return the single matching intake
+      const intake = await prisma.mkt_dispute_intake.findFirst({
+        where: { campaign_id: campaignId, intake_kind: intakeKind },
+        include: { mkt_dispute_attachments: true },
+      });
+      if (!intake) {
+        return res.status(404).json({ success: false, error: 'No intake found for this campaign + kind' });
+      }
+      return res.json({ success: true, data: intake });
+    }
+    // No kind filter — return all intakes for the campaign
+    const intakes = await prisma.mkt_dispute_intake.findMany({
       where: { campaign_id: campaignId },
       include: { mkt_dispute_attachments: true },
+      orderBy: { created_at: 'asc' },
     });
-
-    if (!intake) {
+    if (intakes.length === 0) {
       return res.status(404).json({ success: false, error: 'No dispute intake found for this campaign' });
     }
-
-    res.json({ success: true, data: intake });
+    res.json({ success: true, data: intakes });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
@@ -3821,7 +3835,8 @@ router.get('/recovery/:campaignId/intake', async (req: any, res: Response) => {
 router.get('/recovery/:campaignId/intake/attachments/:id', async (req: any, res: Response) => {
   try {
     const { campaignId, id } = req.params;
-    const result = await disputeIntakeService.downloadAttachmentByCampaign(campaignId, id, getCtx(req));
+    const intakeKind = req.query.intakeKind as string | undefined;
+    const result = await disputeIntakeService.downloadAttachmentByCampaign(campaignId, id, intakeKind, getCtx(req));
     if (!result) {
       return res.status(404).json({ success: false, error: 'Attachment not found for this campaign' });
     }
@@ -3847,7 +3862,8 @@ router.get('/recovery/:campaignId/intake/attachments/:id', async (req: any, res:
 router.post('/recovery/:campaignId/reissue-link', async (req: any, res: Response) => {
   try {
     const { campaignId } = req.params;
-    const result = await disputeIntakeService.reissueLink(campaignId, getCtx(req));
+    const intakeKind = (req.body?.intakeKind as string) || 'dispute';
+    const result = await disputeIntakeService.reissueLink(campaignId, intakeKind, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

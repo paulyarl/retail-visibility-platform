@@ -83,6 +83,7 @@ const adapters: Record<string, WriteBehindAdapter> = {
           id: `bhl-${adapterCtx.tenantId}`,
           tenant_id: adapterCtx.tenantId,
           periods: periods as any,
+          updated_at: new Date(),
         },
         update: {
           periods: periods as any,
@@ -109,6 +110,7 @@ const adapters: Record<string, WriteBehindAdapter> = {
               open: special.hours || null,
               close: null,
               note: special.hours || null,
+              updated_at: new Date(),
             },
             update: {
               isClosed: special.closed ?? false,
