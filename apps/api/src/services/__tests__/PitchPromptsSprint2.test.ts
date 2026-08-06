@@ -101,7 +101,9 @@ describe('outreach-pitch/prompts — Sprint 2 A6 branching', () => {
 
     it('A6 closer instructs NOT to reference reviews or booking', () => {
       const prompt = buildCloserPromptForArchetype('A6', sampleFieldsJson, 5);
-      expect(prompt).toContain('Do NOT reference reviews or booking');
+      // The template has a line break: "Do NOT\nreference reviews or booking"
+      const normalized = prompt.replace(/\n/g, ' ');
+      expect(normalized).toContain('Do NOT reference reviews or booking');
     });
 
     it('injects remaining count correctly for A6', () => {

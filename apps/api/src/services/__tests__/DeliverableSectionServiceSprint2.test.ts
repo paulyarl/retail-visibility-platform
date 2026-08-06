@@ -28,13 +28,12 @@ const {
   aiMock: { generateChatCompletion: vi.fn() },
 }));
 
-// Mock CampaignTriageService directly — the real service does complex Prisma
-// joins + field mapping that's hard to mock at the prisma layer.
+// Mock CampaignTriageService directly — the default export is the singleton
+// instance (export default CampaignTriageService.getInstance()), so we mock
+// it as a plain object with the getTriageResult method.
 vi.mock('../CampaignTriageService', () => ({
   default: {
-    getInstance: () => ({
-      getTriageResult: mockTriageGetResult,
-    }),
+    getTriageResult: mockTriageGetResult,
   },
 }));
 

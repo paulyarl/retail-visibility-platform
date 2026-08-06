@@ -16,6 +16,7 @@ const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   recovery_resolution: 'Recovery Resolution',
   reinstatement_appeal: 'Reinstatement Appeal',
   citation_repair_package: 'Citation & Profile Repair Package',
+  product_visibility_preview: 'Product Visibility Preview',
 };
 
 const DELIVERABLE_TYPE_COLORS: Record<DeliverableType, string> = {
@@ -29,9 +30,10 @@ const DELIVERABLE_TYPE_COLORS: Record<DeliverableType, string> = {
   recovery_resolution: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   reinstatement_appeal: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
   citation_repair_package: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+  product_visibility_preview: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
 };
 
-const ALL_TYPES: DeliverableType[] = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'recovery_resolution', 'reinstatement_appeal', 'citation_repair_package'];
+const ALL_TYPES: DeliverableType[] = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'recovery_resolution', 'reinstatement_appeal', 'citation_repair_package', 'product_visibility_preview'];
 
 export default function DeliverableTemplateLibraryClient() {
   const [templates, setTemplates] = useState<DeliverableTemplate[]>([]);
