@@ -139,6 +139,11 @@ export function scanFileForParamShadowing(filePath: string): ParamViolation[] {
       continue;
     }
 
+    // Skip line comments (// ...) — these often contain route patterns in
+    // explanatory comments (e.g. "IMPORTANT: before router.get('/openers/:id', ...)")
+    // and would be falsely matched as real route declarations.
+    if (line.trim().startsWith('//')) continue;
+
     const entry = extractRouteEntry(line, i + 1);
     if (entry) routes.push(entry);
   }

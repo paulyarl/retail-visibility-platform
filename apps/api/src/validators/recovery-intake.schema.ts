@@ -42,6 +42,7 @@ export type IntakeSubmitInput = z.infer<typeof intakeSubmitSchema>;
 
 export const reissueSchema = z.object({
   campaignId: z.string().min(1, 'campaignId is required'),
+  intakeKind: z.string().optional().default('dispute'),
 });
 
 export type ReissueInput = z.infer<typeof reissueSchema>;

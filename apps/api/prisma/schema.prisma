@@ -6189,7 +6189,7 @@ model mkt_campaigns_list {
   mkt_deliverable_review_slot                                                     mkt_deliverable_review_slot[]
   mkt_deliverable_section                                                         mkt_deliverable_section[]
   mkt_deliverables_list                                                           mkt_deliverables_list[]
-  mkt_dispute_intake                                                              mkt_dispute_intake?
+  mkt_dispute_intake                                                              mkt_dispute_intake[]
   mkt_files_list                                                                  mkt_files_list[]
   mkt_outreach_closers_list                                                       mkt_outreach_closers_list[]
   mkt_outreach_contacts_list                                                      mkt_outreach_contacts_list[]
@@ -6792,7 +6792,7 @@ model mkt_dispute_attachments {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_dispute_intake {
   id                      String                    @id @db.VarChar(255)
-  campaign_id             String                    @unique @db.VarChar(255)
+  campaign_id             String                    @db.VarChar(255)
   tenant_id               String?                   @db.VarChar(255)
   access_token            String                    @unique @db.VarChar(255)
   expires_at              DateTime                  @db.Timestamptz(6)
@@ -6806,11 +6806,13 @@ model mkt_dispute_intake {
   updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
   owner_email             String?                   @db.VarChar(255)
   owner_phone             String?                   @db.VarChar(40)
-  intake_kind             String                    @default("dispute") @db.VarChar(20)
+  intake_kind             String                    @default("dispute") @db.VarChar(40)
   evidence_payload        Json?
   mkt_dispute_attachments mkt_dispute_attachments[]
   mkt_campaigns_list      mkt_campaigns_list        @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dispute_intake_campaign")
+  mkt_intake_definitions  mkt_intake_definitions    @relation(fields: [intake_kind], references: [intake_kind], onDelete: NoAction, onUpdate: NoAction, map: "fk_dispute_intake_kind")
 
+  @@unique([campaign_id, intake_kind], map: "uq_mkt_dispute_intake_campaign_kind")
   @@index([campaign_id], map: "idx_dispute_intake_campaign")
   @@index([access_token], map: "idx_dispute_intake_token")
 }
@@ -7048,6 +7050,33 @@ model mkt_business_type_categories {
   is_active     Boolean  @default(true)
   created_at    DateTime @default(now()) @db.Timestamptz(6)
   updated_at    DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_intake_definitions {
+  intake_kind        String               @id @db.VarChar(40)
+  label              String               @db.VarChar(255)
+  description        String?
+  driver             String               @default("registry") @db.VarChar(10)
+  service_category   String?              @db.VarChar(100)
+  trigger_stages     Json                 @default("[]")
+  submitted_stage    String?              @db.VarChar(50)
+  form_schema        Json                 @default("[]")
+  field_mappings     Json                 @default("[]")
+  owner_copy         Json                 @default("{}")
+  niche_overrides    Json                 @default("{}")
+  downstream_agent   String?              @db.VarChar(100)
+  version            Int                  @default(1)
+  is_active          Boolean              @default(true)
+  is_draft           Boolean              @default(false)
+  created_by         String?              @db.VarChar(255)
+  updated_by         String?              @db.VarChar(255)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  mkt_dispute_intake mkt_dispute_intake[]
+
+  @@index([is_active, is_draft], map: "idx_mkt_intake_definitions_active")
 }
 
 enum action {

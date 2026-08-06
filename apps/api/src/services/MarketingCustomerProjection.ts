@@ -60,8 +60,14 @@ export function mapCustomerStatus(
     return { status: 'completed', label: 'Completed' };
   }
 
-  // Payment received (includes recovery intake_submitted pre-draft)
-  if (stage === 'paid' || stage === 'intake_submitted') {
+  // Payment received (includes recovery intake_submitted pre-draft +
+  // registry-driven intake submitted stages)
+  if (
+    stage === 'paid' ||
+    stage === 'intake_submitted' ||
+    stage === 'gbp_intake_submitted' ||
+    stage === 'review_setup_submitted'
+  ) {
     return { status: 'payment_received', label: 'Payment received' };
   }
 

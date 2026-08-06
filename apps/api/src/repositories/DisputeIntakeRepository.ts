@@ -29,7 +29,7 @@ export interface CreateDisputeIntakeInput {
   campaignId: string;
   tenantId?: string;
   ttlDays?: number;
-  intakeKind?: 'dispute' | 'profile_repair';
+  intakeKind?: string;
 }
 
 export interface SubmitIntakeInput {
@@ -145,15 +145,38 @@ export class DisputeIntakeRepository {
     }
   }
 
-  async findByCampaign(campaignId: string, ctx?: RequestCtx): Promise<DisputeIntakeRecord | null> {
+  async findByCampaign(campaignId: string, intakeKind?: string, ctx?: RequestCtx): Promise<DisputeIntakeRecord | null> {
     try {
-      const record = await prisma.mkt_dispute_intake.findUnique({
-        where: { campaign_id: campaignId },
+      // campaign_id is no longer UNIQUE (composite UNIQUE(campaign_id, intake_kind)
+      // as of migration 173). Use findFirst with optional kind filter.
+      const record = await prisma.mkt_dispute_intake.findFirst({
+        where: intakeKind
+          ? { campaign_id: campaignId, intake_kind: intakeKind }
+          : { campaign_id: campaignId },
         include: { mkt_dispute_attachments: true },
+        orderBy: { created_at: 'asc' },
       });
       return record as unknown as DisputeIntakeRecord | null;
     } catch (error) {
       logger.error('Failed to find dispute intake by campaign', ctx, {
+        error: (error as Error).message,
+        campaignId,
+        intakeKind,
+      });
+      throw error;
+    }
+  }
+
+  async findAllByCampaign(campaignId: string, ctx?: RequestCtx): Promise<DisputeIntakeRecord[]> {
+    try {
+      const records = await prisma.mkt_dispute_intake.findMany({
+        where: { campaign_id: campaignId },
+        include: { mkt_dispute_attachments: true },
+        orderBy: { created_at: 'asc' },
+      });
+      return records as unknown as DisputeIntakeRecord[];
+    } catch (error) {
+      logger.error('Failed to find all dispute intakes by campaign', ctx, {
         error: (error as Error).message,
         campaignId,
       });

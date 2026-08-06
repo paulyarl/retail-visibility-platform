@@ -75,6 +75,8 @@ router.post(
   asyncErrorWrapper(async (req, res) => {
     // Dispatch on intake_kind: profile_repair intakes have a different
     // schema (evidence payload + issue type) vs dispute intakes.
+    // Registry-driven kinds (gbp_optimization, review_response_setup, ...)
+    // go through submitRegistryIntake with dynamic Zod validation.
     const token = req.body?.token as string;
     if (!token) {
       return res.status(400).json({ success: false, error: 'token is required' });
@@ -82,7 +84,7 @@ router.post(
 
     // Resolve the intake to determine the kind. We don't expose the full
     // context here — just need the kind to pick the right schema.
-    let intakeKind: 'dispute' | 'profile_repair' = 'dispute';
+    let intakeKind: string = 'dispute';
     try {
       const resolved = await disputeIntakeService.resolveIntake(token, req.ctx);
       if (resolved && 'intakeKind' in resolved && resolved.intakeKind) {
@@ -91,6 +93,21 @@ router.post(
     } catch {
       // If resolve fails, fall through to the dispute schema which will
       // produce a clearer token-invalid error.
+    }
+
+    // Registry-driven kinds: dynamic validation + write-behind adapters
+    if (intakeKind !== 'dispute' && intakeKind !== 'profile_repair') {
+      try {
+        const result = await disputeIntakeService.submitRegistryIntake(req.body, req.ctx);
+        return res.json({ success: true, data: result });
+      } catch (error) {
+        const msg = (error as Error).message;
+        if (msg.includes('expired') || msg.includes('Invalid') || msg.includes('Validation failed') || msg.includes('No active intake definition')) {
+          return res.status(400).json({ success: false, error: msg });
+        }
+        logger.error('[recovery-intake-public] POST /submit (registry) error', req.ctx, { error: msg, intakeKind });
+        return res.status(500).json({ success: false, error: 'Failed to submit intake' });
+      }
     }
 
     if (intakeKind === 'profile_repair') {
@@ -167,7 +184,8 @@ router.post(
     }
 
     try {
-      const result = await disputeIntakeService.reissueLink(parsed.data.campaignId, req.ctx);
+      const intakeKind = parsed.data.intakeKind || 'dispute';
+      const result = await disputeIntakeService.reissueLink(parsed.data.campaignId, intakeKind, req.ctx);
       return res.json({ success: true, data: result });
     } catch (error) {
       logger.error('[recovery-intake-public] POST /reissue error', req.ctx, {
@@ -223,6 +241,85 @@ router.post(
       }
       logger.error('[recovery-intake-public] POST /attachments error', req.ctx, { error: msg });
       return res.status(500).json({ success: false, error: 'Failed to upload attachment' });
+    }
+  }),
+);
+
+// ====================
+// GET /api/public/recovery/intake/options — dynamic option source for form fields
+// ====================
+// Returns option lists for fields that reference options_source (e.g.,
+// gbp_categories, gbp_attribute_definitions). Token-gated — the token
+// resolves the intake + tenant context for tenant-scoped option queries.
+
+router.get(
+  '/public/recovery/intake/options',
+  asyncErrorWrapper(async (req, res) => {
+    const token = req.query.token as string;
+    const source = req.query.source as string;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'token is required' });
+    }
+    if (!source) {
+      return res.status(400).json({ success: false, error: 'source is required' });
+    }
+
+    // Resolve the intake to get the tenant context
+    const resolved = await disputeIntakeService.resolveIntake(token, req.ctx);
+    if (!resolved || 'expired' in resolved) {
+      return res.status(404).json({ success: false, error: 'Invalid or expired token' });
+    }
+    if (!('campaignId' in resolved)) {
+      return res.status(404).json({ success: false, error: 'Invalid or expired token' });
+    }
+
+    try {
+      const { prisma } = await import('../prisma');
+      let options: Array<{ value: string; label: string }> = [];
+
+      switch (source) {
+        case 'gbp_categories': {
+          // Global GBP category list (not tenant-scoped)
+          const categories = await prisma.gbp_categories_list.findMany({
+            select: { id: true, display_name: true },
+            orderBy: { display_name: 'asc' },
+          });
+          options = categories.map((c: any) => ({
+            value: c.id,
+            label: c.display_name || c.id,
+          }));
+          break;
+        }
+
+        case 'gbp_attribute_definitions': {
+          // Attribute definitions for the tenant's GBP category
+          // For now, return a flat list of known attributes
+          // (future: filter by tenant's primary category)
+          const tenantId = (resolved as any).tenantId || null;
+          if (tenantId) {
+            const existing = await prisma.gbp_attributes.findMany({
+              where: { tenant_id: tenantId },
+              select: { attribute_id: true, value_type: true, value_enum: true },
+            });
+            options = existing.map((a: any) => ({
+              value: a.attribute_id,
+              label: a.attribute_id,
+            }));
+          }
+          break;
+        }
+
+        default:
+          return res.status(400).json({ success: false, error: `Unknown option source: ${source}` });
+      }
+
+      return res.json({ success: true, data: { options } });
+    } catch (error) {
+      logger.error('[recovery-intake-public] GET /options error', req.ctx, {
+        error: (error as Error).message,
+        source,
+      });
+      return res.status(500).json({ success: false, error: 'Failed to load options' });
     }
   }),
 );

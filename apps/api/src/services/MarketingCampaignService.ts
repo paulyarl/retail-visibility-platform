@@ -68,8 +68,13 @@ const REVIEW_TRANSITIONS: Record<string, string[]> = {
   seek:           ['preview_built', 'dead'],
   preview_built:  ['shown', 'dead'],
   shown:          ['paid', 'lost', 'tenant_onboarded'],
-  paid:           ['delivered', 'tenant_onboarded'],
-  delivered:      ['retainer_pitched', 'closed', 'tenant_onboarded'],
+  paid:           ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
+  delivered:      ['retainer_pitched', 'closed', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
+  // Registry-driven intake submitted stages — flow back to delivered for
+  // the normal pipeline to continue (operator sees the intake evidence +
+  // proceeds with fulfillment)
+  gbp_intake_submitted:    ['delivered', 'tenant_onboarded'],
+  review_setup_submitted:  ['delivered', 'tenant_onboarded'],
   retainer_pitched: ['retainer_won', 'closed'],
   retainer_won:   ['lost', 'tenant_onboarded'],
   lost:           ['seek', 'tenant_onboarded'],   // resurrection: late QR/demo conversion (G1)
@@ -864,6 +869,43 @@ export class MarketingCampaignService extends BaseService {
           logger.warn('Intake link generation failed, proceeding with transition', ctx, {
             campaignId,
             error: (intakeError as Error).message,
+          });
+        }
+      }
+
+      // Registry-driven intake auto-gen: for non-recovery campaigns, check
+      // mkt_intake_definitions for registry kinds whose trigger_stages
+      // include the target stage. Generate an intake link for each match.
+      // Best-effort — failure must NOT block the transition.
+      if (category !== 'recovery_management' && category !== 'profile_repair') {
+        try {
+          const { intakeDefinitionService } = await import('./intake/IntakeDefinitionService.js');
+          const { DisputeIntakeService } = await import('./DisputeIntakeService.js');
+          const defs = await intakeDefinitionService.getDefinitionsForTrigger(
+            toStage,
+            campaign?.service_category || null,
+            ctx,
+          );
+          for (const def of defs) {
+            try {
+              await DisputeIntakeService.getInstance().generateIntakeLink(campaignId, ctx, def.intake_kind);
+              logger.info('Registry intake link auto-generated', ctx, {
+                campaignId,
+                intakeKind: def.intake_kind,
+                triggerStage: toStage,
+              });
+            } catch (genError) {
+              logger.warn('Registry intake link generation failed, proceeding with transition', ctx, {
+                campaignId,
+                intakeKind: def.intake_kind,
+                error: (genError as Error).message,
+              });
+            }
+          }
+        } catch (defError) {
+          logger.warn('Registry intake definition lookup failed, proceeding with transition', ctx, {
+            campaignId,
+            error: (defError as Error).message,
           });
         }
       }

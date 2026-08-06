@@ -30,8 +30,17 @@ export interface IntakeContext {
   serviceDate: string | null;
   expiresAt: string;
   alreadySubmitted: boolean;
-  intakeKind: 'dispute' | 'profile_repair';
+  intakeKind: string;
   issueType?: string | null;
+  // Registry-driven fields (populated for registry kinds only)
+  definition?: {
+    label: string;
+    description: string | null;
+    formSchema: any[];
+    ownerCopy: any;
+    driver: 'code' | 'registry';
+    downstreamAgent: string | null;
+  } | null;
 }
 
 export interface SubmitResult {
@@ -68,7 +77,7 @@ export class DisputeIntakeService extends BaseService {
   async generateIntakeLink(
     campaignId: string,
     ctx?: RequestCtx,
-    intakeKind: 'dispute' | 'profile_repair' = 'dispute',
+    intakeKind: string = 'dispute',
   ): Promise<{ intakeId: string; token: string; url: string }> {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -78,9 +87,9 @@ export class DisputeIntakeService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      // Reuse existing intake row if one exists (campaign_id is UNIQUE).
+      // Reuse existing intake row if one exists for this (campaign, kind) pair.
       // Reissue the token + reset expiry rather than creating a duplicate.
-      const existing = await this.repo.findByCampaign(campaignId, ctx);
+      const existing = await this.repo.findByCampaign(campaignId, intakeKind, ctx);
       if (existing) {
         const reissued = await this.repo.reissueToken(existing.id, undefined, ctx);
         const url = this.buildIntakeUrl(reissued.access_token);
@@ -131,7 +140,30 @@ export class DisputeIntakeService extends BaseService {
       });
 
       const alreadySubmitted = record.submitted_at !== null;
-      const intakeKind = ((record as any).intake_kind as 'dispute' | 'profile_repair') || 'dispute';
+      const intakeKind = ((record as any).intake_kind as string) || 'dispute';
+
+      // Load registry definition for registry-driven kinds (so the frontend
+      // can render the dynamic form). Code-defined kinds (dispute, profile_repair)
+      // have hardcoded forms and don't need the definition payload.
+      let definition: IntakeContext['definition'] = null;
+      if (intakeKind !== 'dispute' && intakeKind !== 'profile_repair') {
+        const { intakeDefinitionService } = await import('./intake/IntakeDefinitionService.js');
+        const def = await intakeDefinitionService.resolve(
+          intakeKind,
+          campaign?.category || null,
+          ctx,
+        );
+        if (def) {
+          definition = {
+            label: def.label,
+            description: def.description,
+            formSchema: def.form_schema,
+            ownerCopy: def.owner_copy,
+            driver: def.driver,
+            downstreamAgent: def.downstream_agent,
+          };
+        }
+      }
 
       return {
         intakeId: record.id,
@@ -145,6 +177,7 @@ export class DisputeIntakeService extends BaseService {
         alreadySubmitted,
         intakeKind,
         issueType: (campaign as any)?.repair_issue_type ?? null,
+        definition,
       };
     } catch (error) {
       logger.error('Failed to resolve dispute intake', ctx, { error: (error as Error).message });
@@ -330,25 +363,184 @@ export class DisputeIntakeService extends BaseService {
   }
 
   // ====================
+  // SUBMIT REGISTRY INTAKE (registry-driven kinds: gbp_optimization, review_response_setup, ...)
+  // ====================
+
+  async submitRegistryIntake(
+    input: {
+      token: string;
+      ownerEmail: string;
+      ownerPhone?: string | null;
+      ownerStatement?: string;
+      evidencePayload: Record<string, any>;
+      attachmentIds?: string[];
+    },
+    ctx?: RequestCtx,
+  ): Promise<SubmitResult> {
+    try {
+      const record = await this.repo.findByToken(input.token, ctx);
+      if (!record) throw new Error('Invalid or expired token');
+
+      const now = new Date();
+      if (record.expires_at < now) throw new Error('Token has expired');
+
+      const intakeKind = ((record as any).intake_kind as string) || 'dispute';
+
+      // Idempotency
+      if (record.submitted_at) {
+        const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: record.campaign_id },
+        });
+        logger.info('Registry intake double-submit blocked (idempotent)', ctx, { intakeId: record.id, intakeKind });
+        return {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+          stage: campaign?.stage || 'intake_submitted',
+          alreadySubmitted: true,
+        };
+      }
+
+      // Load the definition to get submitted_stage + field_mappings
+      const { intakeDefinitionService } = await import('./intake/IntakeDefinitionService.js');
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: record.campaign_id },
+      });
+      const definition = await intakeDefinitionService.resolve(
+        intakeKind,
+        campaign?.category || null,
+        ctx,
+      );
+      if (!definition) {
+        throw new Error(`No active intake definition found for kind "${intakeKind}"`);
+      }
+
+      // Validate the evidence payload against the dynamic Zod schema
+      const submitSchema = intakeDefinitionService.buildSubmitSchema(definition);
+      const parsed = submitSchema.safeParse({
+        token: input.token,
+        ownerEmail: input.ownerEmail,
+        ownerPhone: input.ownerPhone ?? null,
+        evidencePayload: input.evidencePayload,
+        attachmentIds: input.attachmentIds ?? [],
+      });
+      if (!parsed.success) {
+        const firstError = parsed.error.issues[0];
+        throw new Error(`Validation failed: ${firstError?.path?.join('.') || 'root'} — ${firstError?.message || 'invalid'}`);
+      }
+
+      // Run custom validators (e.g., gbp_category_ids_exist)
+      const customErrors = await intakeDefinitionService.runCustomValidators(
+        definition,
+        input.evidencePayload,
+        ctx,
+      );
+      if (Object.keys(customErrors).length > 0) {
+        const firstField = Object.keys(customErrors)[0];
+        throw new Error(`Validation failed: ${firstField} — ${customErrors[firstField]}`);
+      }
+
+      // Persist the submission (owner statement is optional for registry kinds —
+      // the evidence_payload is the primary data)
+      await this.repo.submitIntake(record.id, {
+        ownerStatement: input.ownerStatement || '',
+        ownerEmail: input.ownerEmail,
+        ownerPhone: input.ownerPhone || null,
+        serviceDate: null,
+        proposedResolution: '',
+        statusFlag: undefined,
+      }, ctx);
+
+      // Persist the evidence payload on the intake row
+      await this.prisma.mkt_dispute_intake.update({
+        where: { id: record.id },
+        data: {
+          evidence_payload: input.evidencePayload as any,
+        },
+      });
+
+      // Transition the campaign to the definition's submitted_stage
+      const submittedStage = definition.submitted_stage || 'intake_submitted';
+      const updated = await MarketingCampaignService.transitionStage({
+        campaignId: record.campaign_id,
+        toStage: submittedStage,
+        triggerType: 'system',
+        notes: `Owner submitted ${intakeKind} intake`,
+      }, ctx);
+
+      // Execute write-behind adapters (best-effort — failures don't block submission)
+      try {
+        const { executeFieldMappings } = await import('./intake/writeBehindAdapters.js');
+        await executeFieldMappings(
+          definition.field_mappings,
+          input.evidencePayload,
+          {
+            intakeId: record.id,
+            campaignId: record.campaign_id,
+            tenantId: record.tenant_id,
+            ctx,
+          },
+        );
+      } catch (adapterError) {
+        logger.warn('Write-behind adapters failed — evidence_payload is system of record', ctx, {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+          intakeKind,
+          error: (adapterError as Error).message,
+        });
+      }
+
+      // Enqueue downstream agent (stubbed — plan §7.4)
+      if (definition.downstream_agent) {
+        logger.warn('Downstream agent enqueue stubbed — operator manual import path', ctx, {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+          intakeKind,
+          downstreamAgent: definition.downstream_agent,
+        });
+      }
+
+      logger.info('Registry intake submitted', ctx, {
+        intakeId: record.id,
+        campaignId: record.campaign_id,
+        intakeKind,
+        submittedStage,
+      });
+
+      return {
+        intakeId: record.id,
+        campaignId: record.campaign_id,
+        stage: updated.stage,
+        alreadySubmitted: false,
+      };
+    } catch (error) {
+      logger.error('Failed to submit registry intake', ctx, {
+        error: (error as Error).message,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
   // REISSUE LINK
   // ====================
 
-  async reissueLink(campaignId: string, ctx?: RequestCtx): Promise<{ intakeId: string; token: string; url: string }> {
+  async reissueLink(campaignId: string, intakeKind: string = 'dispute', ctx?: RequestCtx): Promise<{ intakeId: string; token: string; url: string }> {
     try {
-      const existing = await this.repo.findByCampaign(campaignId, ctx);
+      const existing = await this.repo.findByCampaign(campaignId, intakeKind, ctx);
       if (!existing) {
         // No intake row yet — generate a fresh one
-        return this.generateIntakeLink(campaignId, ctx);
+        return this.generateIntakeLink(campaignId, ctx, intakeKind);
       }
 
       const reissued = await this.repo.reissueToken(existing.id, undefined, ctx);
       const url = this.buildIntakeUrl(reissued.access_token);
-      logger.info('Dispute intake link reissued via reissue endpoint', ctx, { campaignId, intakeId: existing.id });
+      logger.info('Dispute intake link reissued via reissue endpoint', ctx, { campaignId, intakeId: existing.id, intakeKind });
       return { intakeId: existing.id, token: reissued.access_token, url };
     } catch (error) {
       logger.error('Failed to reissue dispute intake link', ctx, {
         error: (error as Error).message,
         campaignId,
+        intakeKind,
       });
       throw this.handleError(error, ctx);
     }
@@ -488,10 +680,11 @@ export class DisputeIntakeService extends BaseService {
   async downloadAttachmentByCampaign(
     campaignId: string,
     attachmentId: string,
+    intakeKind?: string,
     ctx?: RequestCtx,
   ): Promise<{ buffer: Buffer; fileName: string; fileType: string } | null> {
     try {
-      const record = await this.repo.findByCampaign(campaignId, ctx);
+      const record = await this.repo.findByCampaign(campaignId, intakeKind, ctx);
       if (!record) return null;
 
       const attachments = await this.repo.listAttachments(record.id, ctx);
