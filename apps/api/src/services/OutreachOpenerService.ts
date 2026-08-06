@@ -18,6 +18,7 @@ import type { RequestCtx } from '../context';
 import { generateOutreachOpenerId } from '../lib/id-generator';
 import MarketingCampaignService from './MarketingCampaignService';
 import CampaignTriageService from './CampaignTriageService';
+import BusinessContextService from './deliverable/BusinessContextService';
 import aiProviderFactory from './ai-providers';
 import {
   selectArchetype,
@@ -67,6 +68,82 @@ export interface OpenerResult {
   extractedFields: ArchetypeFields;
   qualityGate: QualityGateResult;
   resolvedPrompt: string;
+}
+
+// ─── Shared Archetype Resolver (Sprint 2 §5.5) ──────────────────────────
+//
+// The campaign has no persisted archetype column. Today every consumer
+// (opener, header, closer, deliverable sections, render service) recomputes
+// selectArchetype(auditData) independently, which diverges from the
+// operator-accepted triage result. This shared helper centralizes the
+// resolution: (1) read the accepted/overridden triage result's playbook →
+// its archetype column; (2) fall back to selectArchetype(latestAuditData).
+//
+// Used by: DeliverableSectionService.generateAllSections,
+//          DeliverableRenderService, HeaderService, CloserService.
+//          OutreachOpenerService.executeOpener uses the same logic inline
+//          (it needs the theme for A2, which the shared helper does not
+//          return — but the helper covers the archetype-only consumers).
+
+export interface ResolvedArchetype {
+  archetype: ArchetypeSelection['archetype'];
+  source: 'triage' | 'fallback';
+  reason: string;
+}
+
+/**
+ * Resolve the effective archetype for a campaign.
+ *
+ * Precedence:
+ *   1. Operator-accepted triage result's playbook archetype (honors overrides)
+ *   2. selectArchetype(latestAuditData) fallback
+ *
+ * Returns { archetype, source, reason }. Throws if no audit exists.
+ */
+export async function resolveCampaignArchetype(
+  campaignId: string,
+  ctx?: RequestCtx,
+): Promise<ResolvedArchetype> {
+  // 1. Check for an operator-accepted triage result
+  let triageArchetype: string | null = null;
+  try {
+    const triage = await CampaignTriageService.getTriageResult(campaignId, ctx);
+    if (triage?.isOperatorAccepted === true) {
+      // Use overridden playbook if present, otherwise recommended
+      const pb = triage.overriddenPlaybook ?? triage.recommendedPlaybook;
+      if (pb?.archetype) {
+        triageArchetype = pb.archetype;
+      }
+    }
+  } catch {
+    // Triage not found or not accepted — fall through to selectArchetype
+  }
+
+  if (
+    triageArchetype &&
+    ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].includes(triageArchetype)
+  ) {
+    return {
+      archetype: triageArchetype as ArchetypeSelection['archetype'],
+      source: 'triage',
+      reason: `triage-accepted: ${triageArchetype} (playbook recommendation)`,
+    };
+  }
+
+  // 2. Fallback: recompute from latest audit data
+  const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+  if (!auditResult) {
+    throw new Error(
+      `Campaign ${campaignId} has no business_analysis audit. Run a seek-stage business analysis first.`,
+    );
+  }
+
+  const selection = selectArchetype(auditResult.auditData);
+  return {
+    archetype: selection.archetype,
+    source: 'fallback',
+    reason: selection.reason,
+  };
 }
 
 // ─── Service ────────────────────────────────────────────────────────────
