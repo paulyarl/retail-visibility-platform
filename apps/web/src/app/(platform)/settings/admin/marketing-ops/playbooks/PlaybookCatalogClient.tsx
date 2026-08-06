@@ -22,7 +22,7 @@ import marketingOpsService, {
 import RuleBuilder from './RuleBuilder';
 import ChecklistBuilderTab from './ChecklistBuilderTab';
 
-const ARCHETYPES = ['A1', 'A2', 'A3', 'A4', 'A5'];
+const ARCHETYPES = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
 const CATEGORIES = ['review_management', 'recovery_management', 'triage_management'];
 const PLAYBOOK_CODES = ['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07', 'PB-08'];
 const DETECTION_SOURCES = ['model_emitted', 'derived', 'operator_input'];

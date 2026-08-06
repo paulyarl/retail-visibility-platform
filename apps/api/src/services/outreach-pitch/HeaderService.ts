@@ -27,7 +27,8 @@ import {
   type ArchetypeFields,
   type CommonFields,
 } from '../outreach-openers';
-import { buildHeaderPrompt } from './prompts';
+import { resolveCampaignArchetype } from '../OutreachOpenerService';
+import { buildHeaderPromptForArchetype } from './prompts';
 import { runHeaderQualityGate, type QualityGateResult } from './quality-gates';
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -130,7 +131,25 @@ export class HeaderService extends BaseService {
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const common = this.buildCommonFields(campaign);
 
-    const selection = selectArchetype(auditResult.auditData);
+    // Sprint 2 (§5.6): Use the shared archetype resolver so the header
+    // matches the operator-accepted triage result (honors overrides).
+    let selection: ArchetypeSelection;
+    let resolvedArchetype: string;
+    try {
+      const resolved = await resolveCampaignArchetype(campaignId, ctx);
+      resolvedArchetype = resolved.archetype;
+      // For A2, we still need a theme — re-run selectArchetype to get it.
+      // For other archetypes, the theme is optional.
+      const autoSel = selectArchetype(auditResult.auditData);
+      selection = resolved.archetype === 'A2'
+        ? { archetype: 'A2', reason: resolved.reason, theme: autoSel.theme }
+        : { archetype: resolved.archetype as ArchetypeSelection['archetype'], reason: resolved.reason };
+    } catch {
+      // Fallback to deterministic selection if resolver fails
+      selection = selectArchetype(auditResult.auditData);
+      resolvedArchetype = selection.archetype;
+    }
+
     const extractedFields = extractFields(
       selection.archetype,
       auditResult.auditData,
@@ -138,7 +157,10 @@ export class HeaderService extends BaseService {
       selection.theme,
     );
 
-    const resolvedPrompt = buildHeaderPrompt(JSON.stringify(extractedFields, null, 2));
+    const resolvedPrompt = buildHeaderPromptForArchetype(
+      resolvedArchetype,
+      JSON.stringify(extractedFields, null, 2),
+    );
 
     return { selection, extractedFields, resolvedPrompt };
   }

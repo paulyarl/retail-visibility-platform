@@ -35,6 +35,16 @@ Provide:
 5. Pain score (0-10) based on: unclaimed GBP, low review response rate, no website, NAP inconsistencies
 6. Recommended tier (tier_1: high pain + budget, tier_2: medium, tier_3: low)
 7. Estimated monthly fee range
+8. Business type classification — classify as "service", "product", "hybrid", or "unable_to_verify":
+   - "service" = business sells labor/expertise (HVAC, plumbing, dental, law firm)
+   - "product" = business sells physical inventory (grocery store, bakery, specialty market, pharmacy)
+   - "hybrid" = sells both significantly (restaurant with retail, auto repair with parts sales)
+   - "unable_to_verify" = cannot determine from available data
+9. Product browsing — does the website (if any) allow customers to browse products/categories? (true/false/null)
+10. Availability inquiry — is there a way for customers to check if a specific product is in stock? (WhatsApp, SMS, click-to-call-to-check-stock, web form) (true/false/null)
+11. Pickup/delivery — does the business offer pickup or delivery? Is it surfaced online? (has_pickup_ordering, has_delivery_option — true/false/null each)
+12. GBP photo types — categorize the GBP photos by type and count per type: storefront, exterior, interior, product, team, logo, signage. Provide as photo_types array + photo_count number.
+13. Holiday hours — are special/holiday hours present and current on GBP? (special_hours_present — true/false/null)
 
 Format as structured JSON.`,
     variables: ['business_name', 'city', 'category'],
@@ -147,9 +157,14 @@ Provide:
 2. Recommended GBP categories (primary + 2 secondary)
 3. Service area description
 4. 5 suggested GBP posts (What's New format, 100-300 words each)
-5. Attributes to enable (e.g., "Women-led", "Identifies as Black-owned")
+5. Attributes to enable (e.g., "Women-led", "Identifies as Black-owned", "In-store shopping", "Curbside pickup")
 6. Q&A section: 5 common questions with answers
-7. Photo recommendations: types and captions for 5 photos
+7. Photo recommendations: types and captions for 8-12 photos, prioritized by impact:
+   - For product/inventory businesses (grocery, bakery, pharmacy, specialty market): include storefront exterior, interior aisles, product close-ups (3-5 shots showing actual inventory), team/owner, signage
+   - For service businesses: include storefront exterior, interior/workspace, team, project photos, signage
+   - Each caption: keyword-rich, location-aware, ≤100 characters
+8. Hours sync checklist — list every platform where hours should be synchronized (GBP, website, Yelp, Facebook, Apple Maps, Bing Places) + holiday hours calendar for the next 12 months (include culturally relevant holidays for ethnic markets — e.g., Eid, Kwanzaa, Lunar New Year — alongside US federal holidays)
+9. Fulfillment attributes — recommend enabling "In-store shopping", "Curbside pickup", "Delivery" attributes if applicable to the business type
 
 Format as structured JSON.`,
     variables: ['business_name', 'city', 'category', 'services'],
@@ -191,11 +206,13 @@ End with: Overall pass rate (X/N responses passed all checks).`,
     promptType: 'retainer' as const,
     body: `You are a customer success strategist for local business marketing services. Create a 4-week follow-up sequence for {{business_name}}, a {{category}} business in {{city}} that just received their marketing deliverable.
 
+The retainer pitch in Week 4 should be tailored to the business type. If {{business_name}} is a product/inventory business (grocery store, bakery, specialty market, pharmacy — i.e., a business that sells physical inventory rather than labor/services), the Week 4 retainer pitch should reference: monthly storefront + product photography, GBP photo refresh, catalog updates, hours/holiday-hours sync, availability-inquiry monitoring, and local visibility reporting. If {{business_name}} is a service business (HVAC, plumbing, dental, law firm), the Week 4 retainer pitch should reference: GBP monitoring, review responses, monthly reports, and content posts.
+
 Provide:
 1. Week 1: Check-in email (deliverable received, initial results, ask for feedback)
 2. Week 2: Value-add email (share a relevant industry insight or tip)
 3. Week 3: Case study email (share a success story from a similar business)
-4. Week 4: Retainer pitch email (propose ongoing monthly services with clear ROI)
+4. Week 4: Retainer pitch email (propose ongoing monthly services with clear ROI — tailored to the business type as described above)
 
 For each email:
 - Subject line
@@ -205,8 +222,8 @@ For each email:
 
 Include a summary of the retainer offer:
 - Monthly fee range
-- Services included (GBP monitoring, review responses, monthly reports, content posts)
-- Value proposition (time saved, consistent online presence)`,
+- Services included (tailored to the business type — product-visibility services for product businesses, review-management services for service businesses)
+- Value proposition (time saved, consistent online presence, customers can find and verify the business before visiting)`,
     variables: ['business_name', 'category', 'city'],
     isDefault: true,
   },

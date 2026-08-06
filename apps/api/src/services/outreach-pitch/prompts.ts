@@ -11,6 +11,10 @@
  * re-built here — the opener is selected from existing variants at pitch
  * assembly time.
  *
+ * Sprint 2 (§5.6): Added product-visibility pitch prompt variants for A6
+ * campaigns. The header/closer prompts now branch on archetype via
+ * buildHeaderPromptForArchetype / buildCloserPromptForArchetype.
+ *
  * Hard constraints shared with the opener prompts:
  *   - No pricing, no tier labels, no "digital opportunity score", no jargon
  *   - No positive-infrastructure notes (HTTPS, mobile-friendly)
@@ -18,10 +22,12 @@
  *   - Specificity over cleverness — name the business + the audit signal
  *
  * See: docs/LocalBiz/marketing_ops_outreach_pitch_construction_sprint_plan.md §3
+ *      docs/LocalBiz/marketing_ops_universal_recalibration_sprint_plan.md §5.6
  */
 
 /**
- * Shared persona preamble — mirrors the one in outreach-openers/archetype-prompts.ts.
+ * Shared persona preamble for review-management archetypes (A1–A5) — mirrors
+ * the one in outreach-openers/archetype-prompts.ts.
  * Establishes WHO is writing and WHY: a visibility auditor who found
  * unanswered customer reviews on the business's public listings.
  */
@@ -35,6 +41,26 @@ actually looked at their reviews, surface the specific gap, and offer a
 concrete deliverable that fixes it — not a sales pitch. The tone is quiet,
 specific, and useful. You are not a vendor. You are someone who did the
 homework for them.`;
+
+/**
+ * Sprint 2 (§5.6): Persona preamble for A6 (Product Visibility Gap) campaigns.
+ * The auditor found that customers can't see the store or its products online —
+ * not a review problem. Leading with "reviews are going unanswered" would be
+ * factually wrong for a grocery store with strong community loyalty.
+ */
+const PERSONA_PREAMBLE_A6 = `You are a local-business visibility auditor. You looked at this business's
+online presence — its Google Business Profile, website, and directory listings —
+and found that customers cannot see the store or its products before visiting.
+The GBP photos don't show the storefront or the products. There's no way to
+browse what's carried, check if something is in stock, or see pickup/delivery
+options. The business has loyal customers who walk in — but new customers
+searching online can't tell what's inside.
+
+You're reaching out cold to the small business owner. The goal: prove you
+actually looked at their online presence, surface the specific visibility gap,
+and offer a concrete deliverable that fixes it — not a sales pitch. The tone
+is quiet, specific, and useful. You are not a vendor. You are someone who did
+the homework for them.`;
 
 /**
  * Shared NAP context note — mirrors the one in outreach-openers/archetype-prompts.ts.
@@ -70,6 +96,25 @@ no emojis. Specificity over cleverness.
 
 Output the subject line only — no preamble, no quotes, no explanation.`;
 
+// ─── Header (Subject Line) — A6 Product Visibility ───────────────────────
+
+const HEADER_PROMPT_A6 = `${PERSONA_PREAMBLE_A6}
+
+Write the subject line for this cold first-touch outreach.
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write one subject line, 4–60 characters, that names the business and
+references the product-visibility gap — the missing storefront/product photos,
+the missing product browsing, or the missing availability inquiry path.
+No pricing, no jargon, no exclamation points, no emojis. Specificity over
+cleverness. Do NOT reference reviews or booking — this is a product
+discoverability problem, not a review or booking problem.
+
+Output the subject line only — no preamble, no quotes, no explanation.`;
+
 // ─── Closer ──────────────────────────────────────────────────────────────
 
 const CLOSER_PROMPT = `${PERSONA_PREAMBLE}
@@ -86,6 +131,28 @@ Task: Write one closer line, ≤25 words, that conveys "the remaining
 {{remaining}} responses are written and ready to deliver today." Vary the
 phrasing but keep the itch — the owner should feel that more evidence is
 one reply away. No pricing, no exclamation points, no emojis.
+
+Output the closer only — no preamble, no signoff, no explanation.`;
+
+// ─── Closer — A6 Product Visibility ──────────────────────────────────────
+
+const CLOSER_PROMPT_A6 = `${PERSONA_PREAMBLE_A6}
+
+Write the closer line for this cold first-touch outreach pitch. The closer
+creates the itch — it tells the owner that more proof exists beyond the 3
+previews shown (mobile catalog mockup, GBP photo optimization, availability-
+inquiry flow).
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write one closer line, ≤25 words, that conveys "the full product
+visibility plan — including the fulfillment pathway and hours sync — plus
+the remaining {{remaining}} sections are ready to deliver today." Vary the
+phrasing but keep the itch — the owner should feel that more evidence is
+one reply away. No pricing, no exclamation points, no emojis. Do NOT
+reference reviews or booking.
 
 Output the closer only — no preamble, no signoff, no explanation.`;
 
@@ -117,12 +184,43 @@ export function buildHeaderPrompt(extractedFieldsJson: string): string {
 }
 
 /**
+ * Sprint 2 (§5.6): Build the resolved header prompt for a specific archetype.
+ * A6 → product-visibility header; A1–A5 or unknown → review-management header.
+ */
+export function buildHeaderPromptForArchetype(
+  archetype: string,
+  extractedFieldsJson: string,
+): string {
+  if (archetype === 'A6') {
+    return HEADER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson);
+  }
+  return buildHeaderPrompt(extractedFieldsJson);
+}
+
+/**
  * Build the resolved closer prompt by injecting extracted fields + the
  * computed remaining count.
  */
 export function buildCloserPrompt(extractedFieldsJson: string, remaining: number): string {
   return CLOSER_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson)
     .replace('{{remaining}}', String(remaining));
+}
+
+/**
+ * Sprint 2 (§5.6): Build the resolved closer prompt for a specific archetype.
+ * A6 → product-visibility closer (references the product visibility plan, not
+ * review responses); A1–A5 or unknown → review-management closer.
+ */
+export function buildCloserPromptForArchetype(
+  archetype: string,
+  extractedFieldsJson: string,
+  remaining: number,
+): string {
+  if (archetype === 'A6') {
+    return CLOSER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson)
+      .replace('{{remaining}}', String(remaining));
+  }
+  return buildCloserPrompt(extractedFieldsJson, remaining);
 }
 
 /**

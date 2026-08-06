@@ -18,8 +18,9 @@ import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MarketingDeliverableService } from '../MarketingDeliverableService';
+import { MarketingDeliverableService, type DeliverableType } from '../MarketingDeliverableService';
 import DeliverableAssemblyService from './DeliverableAssemblyService';
+import { resolveCampaignArchetype } from '../OutreachOpenerService';
 
 export interface RenderResult {
   deliverableId: string;
@@ -50,10 +51,31 @@ export class DeliverableRenderService extends BaseService {
       // 1. Assemble content
       const assembly = await DeliverableAssemblyService.assemble(campaignId, ctx);
 
-      // 2. Generate branded PDF via existing MarketingDeliverableService
+      // 2. Derive deliverable type from the campaign's resolved archetype.
+      // A6 → 'product_visibility_preview'; A1–A5 or unknown → 'review_responses'.
+      // Sprint 2 §5.5e: warn-log on fallback so misrouted deliverables are observable.
+      let deliverableType: DeliverableType = 'review_responses';
+      let archetypeSource = 'fallback';
+      try {
+        const resolved = await resolveCampaignArchetype(campaignId, ctx);
+        archetypeSource = resolved.source;
+        if (resolved.archetype === 'A6') {
+          deliverableType = 'product_visibility_preview';
+        }
+      } catch (e) {
+        // Archetype resolution failed (no audit, no triage) — warn-log and
+        // use the legacy default so the render doesn't hard-fail.
+        logger.warn('DeliverableRenderService: archetype resolution failed, using fallback deliverableType', ctx, {
+          campaignId,
+          error: (e as Error).message,
+          fallbackType: deliverableType,
+        });
+      }
+
+      // 3. Generate branded PDF via existing MarketingDeliverableService
       const deliverable = await MarketingDeliverableService.getInstance().generateDeliverable({
         campaignId,
-        deliverableType: 'review_responses',
+        deliverableType,
         isPreview: false,
         content: assembly.content,
         generatedBy: ctx?.userId,
@@ -106,6 +128,8 @@ export class DeliverableRenderService extends BaseService {
       logger.info('Deliverable rendered', ctx, {
         campaignId,
         deliverableId: deliverable.id,
+        deliverableType,
+        archetypeSource,
         pdfPath: deliverable.storage_path,
         txtPath: txtStoragePath,
         slotCount: assembly.slotCount,

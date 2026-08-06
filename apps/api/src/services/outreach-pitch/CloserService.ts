@@ -28,7 +28,8 @@ import {
   type ArchetypeFields,
   type CommonFields,
 } from '../outreach-openers';
-import { buildCloserPrompt } from './prompts';
+import { resolveCampaignArchetype } from '../OutreachOpenerService';
+import { buildCloserPromptForArchetype } from './prompts';
 import { runCloserQualityGate, type QualityGateResult } from './quality-gates';
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -153,7 +154,22 @@ export class CloserService extends BaseService {
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const common = this.buildCommonFields(campaign);
 
-    const selection = selectArchetype(auditResult.auditData);
+    // Sprint 2 (§5.6): Use the shared archetype resolver so the closer
+    // matches the operator-accepted triage result (honors overrides).
+    let selection: ArchetypeSelection;
+    let resolvedArchetype: string;
+    try {
+      const resolved = await resolveCampaignArchetype(campaignId, ctx);
+      resolvedArchetype = resolved.archetype;
+      const autoSel = selectArchetype(auditResult.auditData);
+      selection = resolved.archetype === 'A2'
+        ? { archetype: 'A2', reason: resolved.reason, theme: autoSel.theme }
+        : { archetype: resolved.archetype as ArchetypeSelection['archetype'], reason: resolved.reason };
+    } catch {
+      selection = selectArchetype(auditResult.auditData);
+      resolvedArchetype = selection.archetype;
+    }
+
     const extractedFields = extractFields(
       selection.archetype,
       auditResult.auditData,
@@ -163,7 +179,11 @@ export class CloserService extends BaseService {
 
     const remaining = this.computeRemaining(auditResult.auditData);
     const defaultTemplate = this.buildDefaultTemplate(remaining);
-    const resolvedPrompt = buildCloserPrompt(JSON.stringify(extractedFields, null, 2), remaining);
+    const resolvedPrompt = buildCloserPromptForArchetype(
+      resolvedArchetype,
+      JSON.stringify(extractedFields, null, 2),
+      remaining,
+    );
 
     return { selection, extractedFields, resolvedPrompt, remaining, defaultTemplate };
   }

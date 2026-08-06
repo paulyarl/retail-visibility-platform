@@ -19,6 +19,8 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A2: 'Negative Review Recovery',
   A3: 'Listing Inconsistency',
   A4: 'Conversion / CTA Gap',
+  A5: 'Multi-Signal Footprint',
+  A6: 'Product Visibility Gap',
 };
 
 const CLOSE_VARIANT_LABELS: Record<CloseVariant, { label: string; hint: string }> = {

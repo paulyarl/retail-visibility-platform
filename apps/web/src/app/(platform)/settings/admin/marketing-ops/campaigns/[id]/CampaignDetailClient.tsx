@@ -1223,6 +1223,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   <option value="nap_report">NAP Consistency Report</option>
                   <option value="seo_content">SEO Content</option>
                   <option value="lead_magnet">Lead Magnet</option>
+                  <option value="product_visibility_preview">Product Visibility Preview</option>
                 </select>
               </div>
 
