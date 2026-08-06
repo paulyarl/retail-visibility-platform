@@ -92,7 +92,7 @@ export class MarketingBusinessTypeService extends BaseService {
     if (typeof matched === 'string' && matched.trim()) {
       return matched.trim().toLowerCase();
     }
-    const googleCategory = auditData.platforms?.google?.primary_category;
+    const googleCategory = (auditData.platforms?.google as any)?.primary_category;
     if (typeof googleCategory === 'string' && googleCategory.trim()) {
       return googleCategory.trim().toLowerCase();
     }

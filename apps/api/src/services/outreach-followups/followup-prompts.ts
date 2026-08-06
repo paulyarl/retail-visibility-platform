@@ -429,6 +429,79 @@ exclamation points, emojis, "just checking in", introducing new data.
 
 Output the follow-up only.`;
 
+// ─── A6: Product Visibility Gap ──────────────────────────────────────────
+//
+// Follow-up for product/inventory businesses (grocery stores, bakeries,
+// specialty markets). 'doing' leads with new product-visibility evidence
+// (new photos, new catalog entries, new availability signals); 'telling'
+// reminds the prospect of the product-visibility previews.
+
+const DOING_TEMPLATE_A6 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Data diff (what changed since the opener):
+{{data_diff}}
+
+Task: Write the follow-up, ~70 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Since the snapshot last week —"
+
+3. New proof (USE THE DATA DIFF):
+   - If new GBP photos appeared: "noticed [N] new photos on your Google
+     listing — though the product catalog is still invisible online."
+   - If the website gained product browsing: "your site's now showing
+     product categories — good start, though availability inquiry is
+     still missing."
+   - If nothing product-related changed: "the product-discoverability
+     gap is still there — customers still can't browse before visiting."
+   - Do NOT stack numbers. Lead with the single most relevant change.
+
+4. One line: "Updated the catalog mockup and GBP photo plan — new previews attached."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "online booking," "scheduling," "service menu," "project
+photos," stacking stats, repeating the opener's hook verbatim,
+pricing/tier jargon, exclamation points, emojis.
+
+Output the follow-up only.`;
+
+const TELLING_TEMPLATE_A6 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write the follow-up, ~60 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Following up on the visibility snapshot from
+   last week —"
+
+3. Reminder:
+   "the three previews are still there — the mobile catalog mockup,
+   the GBP photo optimization, and the availability-inquiry flow."
+
+4. Soft re-engagement: "Happy to walk through any of them if useful."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "online booking," "scheduling," "service menu," "project
+photos," repeating the opener's hook, pricing/tier jargon,
+exclamation points, emojis, "just checking in", introducing new data.
+
+Output the follow-up only.`;
+
 // ─── Template registry ──────────────────────────────────────────────────
 
 const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = {
@@ -437,4 +510,5 @@ const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = 
   A3: { doing: DOING_TEMPLATE_A3, telling: TELLING_TEMPLATE_A3 },
   A4: { doing: DOING_TEMPLATE_A4, telling: TELLING_TEMPLATE_A4 },
   A5: { doing: DOING_TEMPLATE_A5, telling: TELLING_TEMPLATE_A5 },
+  A6: { doing: DOING_TEMPLATE_A6, telling: TELLING_TEMPLATE_A6 },
 };
