@@ -463,6 +463,16 @@ export interface ReviewPair {
   response_ai_model?: string | null;
   response_tokens_used?: number;
   is_negative_first: boolean;
+  // ── Archetype-aware preview-slot labels (additive, optional) ──
+  // Mirror the backend pitch-renderer fields. When present, the assembled
+  // pitch renders with archetype-appropriate labels instead of the
+  // review-centric defaults. Passed straight through to assemblePitch.
+  evidence_label?: string;
+  fix_label?: string;
+  slot_label?: string;
+  slot_label_prefix?: string;
+  section_title?: string;
+  first_slot_label?: string;
 }
 
 export interface AssemblePitchInput {
@@ -3013,6 +3023,37 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import review response');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach Pitch — Preview-Slot Drafts (archetype-aware) ────────────
+  // Generalizes generateReviewResponse to archetype-aware preview slots.
+  // The frontend calls this when the campaign archetype is anything other
+  // than A1/A2/A5 (review-response). Returns the same ReviewResponseDraft
+  // shape so the slot wiring in PitchConstructionPanel is unchanged.
+  async generatePreviewSlot(
+    campaignId: string,
+    evidenceText: string,
+    archetype: string,
+    slotLabel?: string,
+  ): Promise<ReviewResponseDraft> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/preview-slots/generate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          campaign_id: campaignId,
+          evidence_text: evidenceText,
+          archetype,
+          slot_label: slotLabel,
+        }),
+      },
+      `mkt-ops-preview-slot-generate-${campaignId}-${archetype}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate preview-slot fix');
     }
     return result.data?.data ?? result.data;
   }

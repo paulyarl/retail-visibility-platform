@@ -256,14 +256,152 @@ function StarterExamples({ examples, onPick, archetype }: StarterExamplesProps) 
   );
 }
 
+// ─── Archetype-aware preview-slot config ──────────────────────────────
+// The 3-slot preview generalizes beyond review responses. Each archetype
+// has its own "evidence → fix" pair shape, slot labels, placeholders, and
+// the "first slot" framing (which slot is rendered first and why). The
+// wire format (ReviewPair) is unchanged — review_text holds the evidence,
+// response_text holds the fix — but the labels the operator sees and the
+// labels stamped into the assembled pitch are archetype-appropriate.
+//
+// `useReviewEndpoint` controls which AI Draft endpoint the slot calls:
+//   true  → POST /openers/review-responses/generate (legacy review response)
+//   false → POST /openers/preview-slots/generate (archetype-aware slot fix)
+
+interface PreviewSlotConfig {
+  sectionTitle: string;           // "The Preview (3 completed reviews + responses):"
+  sectionBlurb: string;           // explanatory text under the section header
+  firstSlotLabel: string;         // "THE NEGATIVE - The handled 1-star goes first"
+  firstSlotBadge: string;         // "NEGATIVE FIRST" / "MOST VISIBLE FIRST"
+  firstSlotCheckboxLabel: string; // "1-star negative" / "most visible platform"
+  slotLabelPrefix: string;        // "Review #" / "Platform #" / "Fix #"
+  evidenceLabel: string;          // "Customer Review" / "Current Listing"
+  fixLabel: string;               // "Owner Response Message" / "Corrected Listing"
+  evidencePlaceholder: string;    // textarea placeholder for the evidence field
+  fixPlaceholder: string;         // textarea placeholder for the fix field
+  slotLabels: string[];           // per-slot label (e.g. ["Google", "Yelp", "Facebook"])
+  useReviewEndpoint: boolean;     // true → review-response endpoint, false → preview-slot endpoint
+}
+
+const PREVIEW_SLOT_CONFIGS: Record<OpenerArchetype, PreviewSlotConfig> = {
+  A1: {
+    sectionTitle: 'The Preview (3 completed reviews + responses):',
+    sectionBlurb:
+      'Slot 1 is the handled 1-star negative (rendered first). Paste the real customer review from a public platform, then AI-draft or import the owner response.',
+    firstSlotLabel: 'THE NEGATIVE - The handled 1-star goes first',
+    firstSlotBadge: 'NEGATIVE FIRST',
+    firstSlotCheckboxLabel: '1-star negative',
+    slotLabelPrefix: 'Review #',
+    evidenceLabel: 'Customer Review',
+    fixLabel: 'Owner Response Message',
+    evidencePlaceholder: 'Customer review (paste from Google/Yelp/Facebook)...',
+    fixPlaceholder: 'Owner response (AI-drafted or imported)...',
+    slotLabels: ['Google', 'Yelp', 'Facebook'],
+    useReviewEndpoint: true,
+  },
+  A2: {
+    sectionTitle: 'The Preview (3 negative-review recoveries + responses):',
+    sectionBlurb:
+      'Slot 1 is the strongest negative on the recurring theme (rendered first). Paste the real customer review, then AI-draft or import the owner response.',
+    firstSlotLabel: 'THE THEME NEGATIVE - The strongest themed 1-star goes first',
+    firstSlotBadge: 'THEME NEGATIVE FIRST',
+    firstSlotCheckboxLabel: 'strongest themed negative',
+    slotLabelPrefix: 'Review #',
+    evidenceLabel: 'Customer Review',
+    fixLabel: 'Owner Response Message',
+    evidencePlaceholder: 'Negative review on the recurring theme (paste from Google/Yelp)...',
+    fixPlaceholder: 'Owner response (AI-drafted or imported)...',
+    slotLabels: ['Google', 'Yelp', 'Facebook'],
+    useReviewEndpoint: true,
+  },
+  A3: {
+    sectionTitle: 'The Preview (3 listing corrections):',
+    sectionBlurb:
+      'Slot 1 is the most visible platform (rendered first). Paste the current (wrong) listing state from the platform, then AI-draft or import the corrected entry.',
+    firstSlotLabel: 'THE MOST VISIBLE - The highest-traffic platform goes first',
+    firstSlotBadge: 'MOST VISIBLE FIRST',
+    firstSlotCheckboxLabel: 'highest-traffic platform',
+    slotLabelPrefix: 'Platform #',
+    evidenceLabel: 'Current Listing',
+    fixLabel: 'Corrected Listing',
+    evidencePlaceholder: 'Current listing on this platform (paste name/address/phone as shown)...',
+    fixPlaceholder: 'Corrected listing entry (AI-drafted or imported)...',
+    slotLabels: ['Google', 'Yelp', 'Facebook'],
+    useReviewEndpoint: false,
+  },
+  A4: {
+    sectionTitle: 'The Preview (3 conversion fixes):',
+    sectionBlurb:
+      'Slot 1 is the highest-impact friction point (rendered first). Paste the current website state, then AI-draft or import the proposed fix.',
+    firstSlotLabel: 'THE HIGHEST IMPACT - The biggest conversion gap goes first',
+    firstSlotBadge: 'HIGHEST IMPACT FIRST',
+    firstSlotCheckboxLabel: 'highest-impact gap',
+    slotLabelPrefix: 'Fix #',
+    evidenceLabel: 'Current State',
+    fixLabel: 'Proposed Fix',
+    evidencePlaceholder: 'Current website state (paste what the visitor sees today)...',
+    fixPlaceholder: 'Proposed fix (AI-drafted or imported)...',
+    slotLabels: ['Booking button', 'Click-to-call', 'Scheduling link'],
+    useReviewEndpoint: false,
+  },
+  A5: {
+    sectionTitle: 'The Preview (3 footprint corrections):',
+    sectionBlurb:
+      'Slot 1 is the most visible gap (rendered first). Paste the current state — listing or review — then AI-draft or import the fix.',
+    firstSlotLabel: 'THE MOST VISIBLE - The highest-traffic gap goes first',
+    firstSlotBadge: 'MOST VISIBLE FIRST',
+    firstSlotCheckboxLabel: 'highest-traffic gap',
+    slotLabelPrefix: 'Gap #',
+    evidenceLabel: 'Current State',
+    fixLabel: 'Proposed Fix',
+    evidencePlaceholder: 'Current state (paste the listing inconsistency or unanswered review)...',
+    fixPlaceholder: 'Proposed fix (AI-drafted or imported)...',
+    slotLabels: ['Google listing', 'Yelp listing', 'Google reviews'],
+    useReviewEndpoint: true,
+  },
+  A6: {
+    sectionTitle: 'The Preview (3 product-visibility fixes):',
+    sectionBlurb:
+      'Slot 1 is the highest-impact visibility gap (rendered first). Paste the current online presence, then AI-draft or import the proposed fix.',
+    firstSlotLabel: 'THE HIGHEST IMPACT - The biggest discoverability gap goes first',
+    firstSlotBadge: 'HIGHEST IMPACT FIRST',
+    firstSlotCheckboxLabel: 'highest-impact gap',
+    slotLabelPrefix: 'Fix #',
+    evidenceLabel: 'Current State',
+    fixLabel: 'Proposed Fix',
+    evidencePlaceholder: 'Current online presence (paste what customers can/can\'t see today)...',
+    fixPlaceholder: 'Proposed visibility fix (AI-drafted or imported)...',
+    slotLabels: ['Storefront photos', 'Product browsing', 'Availability inquiry'],
+    useReviewEndpoint: false,
+  },
+};
+
 export default function PitchConstructionPanel({ campaignId, openers, archetype }: PitchConstructionPanelProps) {
-  // Resolve the starter set for the detected archetype. Falls back to A1
-  // (review-response) when the archetype is unknown — matches the opener
-  // resolver's fallback behavior.
+  // Resolve the starter set + preview-slot config for the detected archetype.
+  // Falls back to A1 (review-response) when the archetype is unknown —
+  // matches the opener resolver's fallback behavior.
   const effectiveArchetype: OpenerArchetype = archetype ?? 'A1';
   const headerStarters = HEADER_STARTERS[effectiveArchetype] ?? HEADER_STARTERS.A1;
   const closerStarters = CLOSER_STARTERS[effectiveArchetype] ?? CLOSER_STARTERS.A1;
   const contactStarters = CONTACT_STARTERS[effectiveArchetype] ?? CONTACT_STARTERS.A1;
+  const slotConfig = PREVIEW_SLOT_CONFIGS[effectiveArchetype] ?? PREVIEW_SLOT_CONFIGS.A1;
+
+  // Stamp the renderer labels onto a review pair. The labels are read from
+  // the first pair by the backend renderer, so we only need them on pair[0],
+  // but stamping on every pair is harmless and survives reordering.
+  const stampRendererLabels = useCallback(
+    (pairs: ReviewPair[]): ReviewPair[] =>
+      pairs.map((p, idx) => ({
+        ...p,
+        evidence_label: slotConfig.evidenceLabel,
+        fix_label: slotConfig.fixLabel,
+        slot_label: slotConfig.slotLabels[idx] ?? undefined,
+        slot_label_prefix: slotConfig.slotLabelPrefix,
+        section_title: slotConfig.sectionTitle,
+        first_slot_label: slotConfig.firstSlotLabel,
+      })),
+    [slotConfig],
+  );
   // ─── Variant lists ──────────────────────────────────────────────────
   const [headers, setHeaders] = useState<OutreachHeader[]>([]);
   const [closers, setClosers] = useState<OutreachCloser[]>([]);
@@ -280,11 +418,16 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const [closerResolution, setCloserResolution] = useState<CloserResolution | null>(null);
 
   // ─── Review pairs (3 slots) ─────────────────────────────────────────
-  const [reviewPairs, setReviewPairs] = useState<ReviewPair[]>([
-    { review_text: '', response_text: '', response_source: 'ai', is_negative_first: true },
-    { review_text: '', response_text: '', response_source: 'ai', is_negative_first: false },
-    { review_text: '', response_text: '', response_source: 'ai', is_negative_first: false },
-  ]);
+  // Initialized with the A1 (review-response) slot config; re-stamped
+  // whenever the archetype changes via the effect below so the renderer
+  // labels always match the detected archetype.
+  const [reviewPairs, setReviewPairs] = useState<ReviewPair[]>(
+    stampRendererLabels([
+      { review_text: '', response_text: '', response_source: 'ai', is_negative_first: true },
+      { review_text: '', response_text: '', response_source: 'ai', is_negative_first: false },
+      { review_text: '', response_text: '', response_source: 'ai', is_negative_first: false },
+    ]),
+  );
   const [pairLoading, setPairLoading] = useState<number | null>(null);
   const [pairError, setPairError] = useState<string | null>(null);
 
@@ -363,6 +506,15 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
       setSelectedOpenerId(openers[0].id);
     }
   }, [openers, selectedOpenerId]);
+
+  // Re-stamp renderer labels on the review pairs whenever the archetype
+  // changes (campaign switch). Preserves the evidence/fix text the operator
+  // already typed; only the labels (evidence_label, fix_label, slot_label,
+  // section_title, etc.) are refreshed so the assembled pitch renders with
+  // archetype-appropriate framing.
+  useEffect(() => {
+    setReviewPairs((prev) => stampRendererLabels(prev));
+  }, [stampRendererLabels]);
 
   // ─── Header handlers ────────────────────────────────────────────────
   const handleExecuteHeader = async () => {
@@ -465,23 +617,34 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
     setReviewPairs((prev) => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
   };
 
+  // AI Draft for one preview slot. Dispatches to the review-response
+  // endpoint for review archetypes (A1/A2/A5) and to the archetype-aware
+  // preview-slot endpoint for non-review archetypes (A3/A4/A6). The wire
+  // format (ReviewResponseDraft) is the same either way.
   const handleGenerateResponse = async (idx: number) => {
     const pair = reviewPairs[idx];
     if (!pair.review_text.trim()) {
-      setPairError(`Slot ${idx + 1}: paste a customer review first`);
+      setPairError(`Slot ${idx + 1}: paste the ${slotConfig.evidenceLabel.toLowerCase()} first`);
       return;
     }
     setPairLoading(idx);
     setPairError(null);
     try {
-      const draft = await marketingOpsService.generateReviewResponse(campaignId, pair.review_text.trim());
+      const draft = slotConfig.useReviewEndpoint
+        ? await marketingOpsService.generateReviewResponse(campaignId, pair.review_text.trim())
+        : await marketingOpsService.generatePreviewSlot(
+            campaignId,
+            pair.review_text.trim(),
+            effectiveArchetype,
+            slotConfig.slotLabels[idx],
+          );
       updatePair(idx, 'response_text', draft.response_text);
       updatePair(idx, 'response_source', 'ai');
       updatePair(idx, 'response_ai_provider', draft.response_ai_provider);
       updatePair(idx, 'response_ai_model', draft.response_ai_model);
       updatePair(idx, 'response_tokens_used', draft.response_tokens_used);
     } catch (err: any) {
-      setPairError(err.message || `Slot ${idx + 1}: failed to generate response`);
+      setPairError(err.message || `Slot ${idx + 1}: failed to generate ${slotConfig.fixLabel.toLowerCase()}`);
     } finally {
       setPairLoading(null);
     }
@@ -490,11 +653,11 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const handleImportResponse = async (idx: number) => {
     const pair = reviewPairs[idx];
     if (!pair.review_text.trim()) {
-      setPairError(`Slot ${idx + 1}: paste a customer review first`);
+      setPairError(`Slot ${idx + 1}: paste the ${slotConfig.evidenceLabel.toLowerCase()} first`);
       return;
     }
     if (!pair.response_text.trim()) {
-      setPairError(`Slot ${idx + 1}: paste the owner response text first`);
+      setPairError(`Slot ${idx + 1}: paste the ${slotConfig.fixLabel.toLowerCase()} text first`);
       return;
     }
     // No API call needed — just mark as external source
@@ -518,7 +681,10 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
         headerId: selectedHeaderId || null,
         closerId: selectedCloserId || null,
         contactId: selectedContactId || null,
-        reviewPairs,
+        // Stamp the archetype-aware renderer labels right before assemble
+        // so the persisted pitch always carries the right framing even if
+        // the operator switched archetypes mid-assembly.
+        reviewPairs: stampRendererLabels(reviewPairs),
       });
       setAssembledText(result.assembledText);
       setAssembledPitchId(result.pitch.id);
@@ -640,13 +806,19 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
             />
           </section>
 
-          {/* ─── 3-Slot Preview ──────────────────────────────────────── */}
+          {/* ─── 3-Slot Preview (archetype-aware) ─────────────────────── */}
           <section className="border-t border-gray-100 dark:border-neutral-700 pt-4">
-            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
-              Preview (3 completed reviews + responses)
+            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+              {slotConfig.sectionTitle.replace(/:$/, '')}
+              <span
+                title={`Aligned to the detected campaign archetype (${effectiveArchetype} — ${ARCHETYPE_LABELS[effectiveArchetype]})`}
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              >
+                {effectiveArchetype}
+              </span>
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Slot 1 is the handled 1-star negative (rendered first). Paste the real customer review from a public platform, then AI-draft or import the owner response.
+              {slotConfig.sectionBlurb}
             </p>
             {pairError && (
               <div className="mb-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-2">
@@ -658,10 +830,13 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                 <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                      Slot {idx + 1}
+                      {slotConfig.slotLabelPrefix} {idx + 1}
+                      {slotConfig.slotLabels[idx] && (
+                        <span className="ml-1 text-gray-500 dark:text-gray-500">— {slotConfig.slotLabels[idx]}</span>
+                      )}
                       {pair.is_negative_first && (
                         <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                          NEGATIVE FIRST
+                          {slotConfig.firstSlotBadge}
                         </span>
                       )}
                     </span>
@@ -673,21 +848,21 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                           onChange={(e) => updatePair(idx, 'is_negative_first', e.target.checked)}
                           className="w-3 h-3"
                         />
-                        1-star negative
+                        {slotConfig.firstSlotCheckboxLabel}
                       </label>
                     )}
                   </div>
                   <textarea
                     value={pair.review_text}
                     onChange={(e) => updatePair(idx, 'review_text', e.target.value)}
-                    placeholder={`Customer review ${idx + 1} (paste from Google/Yelp/Facebook)...`}
+                    placeholder={slotConfig.evidencePlaceholder}
                     rows={3}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
                   />
                   <textarea
                     value={pair.response_text}
                     onChange={(e) => updatePair(idx, 'response_text', e.target.value)}
-                    placeholder="Owner response (AI-drafted or imported)..."
+                    placeholder={slotConfig.fixPlaceholder}
                     rows={3}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
                   />
