@@ -390,7 +390,7 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
                     <p className="text-sm text-gray-700 dark:text-gray-300">{intake.status_flag}</p>
                   </div>
                 )}
-                {/* Evidence payload — only for profile_repair intakes */}
+                {/* Evidence payload — profile_repair intakes (structured display) */}
                 {(intake as any).intake_kind === 'profile_repair' && (intake as any).evidence_payload && (
                   <div className="rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 p-3 space-y-2">
                     <p className="text-xs font-semibold text-purple-700 dark:text-purple-400">Evidence Payload</p>
@@ -433,6 +433,25 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
                         </>
                       );
                     })()}
+                  </div>
+                )}
+
+                {/* Evidence payload — registry-driven intakes (generic JSON display) */}
+                {(intake as any).intake_kind &&
+                  (intake as any).intake_kind !== 'dispute' &&
+                  (intake as any).intake_kind !== 'profile_repair' &&
+                  (intake as any).evidence_payload && (
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">
+                      Evidence Payload ({(intake as any).intake_kind})
+                    </p>
+                    <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap overflow-x-auto max-h-80">
+                      {JSON.stringify((intake as any).evidence_payload, null, 2)}
+                    </pre>
+                    {/* Downstream agent status — stubbed (plan §7.4) */}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+                      Downstream import: manual operator path (agent enqueue stubbed)
+                    </p>
                   </div>
                 )}
                 <div>

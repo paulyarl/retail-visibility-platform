@@ -127,18 +127,20 @@ class RecoveryOpsService extends AdminApiSingleton {
 
   // ─── Get intake + attachments ──────────────────────────────────
 
-  async getIntake(campaignId: string): Promise<DisputeIntake | null> {
+  async getIntake(campaignId: string, intakeKind: string = 'dispute'): Promise<DisputeIntake | null> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        `${BASE_URL}/${campaignId}/intake`,
+        `${BASE_URL}/${campaignId}/intake?intakeKind=${encodeURIComponent(intakeKind)}`,
         {},
-        `recovery-intake-${campaignId}`,
+        `recovery-intake-${campaignId}-${intakeKind}`,
         this.cacheTTL,
       );
       if (!result.success) {
         throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch intake');
       }
-      return result.data?.data ?? result.data;
+      const data = result.data?.data ?? result.data;
+      // The API returns a single intake when intakeKind is specified
+      return data;
     } catch (error) {
       clientLogger.error('[RecoveryOpsService] Failed to get intake:', { detail: error, campaignId });
       return null;
@@ -332,17 +334,18 @@ class RecoveryOpsService extends AdminApiSingleton {
 
   // ─── Reissue intake link (admin) ───────────────────────────────
 
-  async reissueLink(campaignId: string): Promise<{ intakeId: string; token: string; url: string }> {
+  async reissueLink(campaignId: string, intakeKind: string = 'dispute'): Promise<{ intakeId: string; token: string; url: string }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${campaignId}/reissue-link`,
-      { method: 'POST', body: JSON.stringify({}) },
-      `recovery-reissue-${campaignId}`,
+      { method: 'POST', body: JSON.stringify({ intakeKind }) },
+      `recovery-reissue-${campaignId}-${intakeKind}`,
       0,
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to reissue intake link');
     }
     // Invalidate cached intake so the new access_token is picked up.
+    await this.invalidateCachePattern(`recovery-intake-${campaignId}-${intakeKind}`);
     await this.invalidateCachePattern(`recovery-intake-${campaignId}`);
     return result.data?.data ?? result.data;
   }
@@ -352,8 +355,9 @@ class RecoveryOpsService extends AdminApiSingleton {
   // send the x-auth0-id/x-auth0-email headers the API requires), then triggers
   // a browser download via a blob URL.
 
-  async downloadAttachment(campaignId: string, attachmentId: string, fileName: string): Promise<void> {
-    const url = `${BASE_URL}/${campaignId}/intake/attachments/${attachmentId}`;
+  async downloadAttachment(campaignId: string, attachmentId: string, fileName: string, intakeKind?: string): Promise<void> {
+    const kindQuery = intakeKind ? `?intakeKind=${encodeURIComponent(intakeKind)}` : '';
+    const url = `${BASE_URL}/${campaignId}/intake/attachments/${attachmentId}${kindQuery}`;
     const headers: Record<string, string> = {};
     const auth0Id = this.readCookie('auth0_id');
     const auth0Email = this.readCookie('auth0_email');

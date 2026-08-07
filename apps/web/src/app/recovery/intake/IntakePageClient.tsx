@@ -388,7 +388,7 @@ export default function IntakePageClient() {
                   <Text size="sm" c="dimmed">{context.definition.ownerCopy.intro}</Text>
                 )}
                 <IntakeFormRenderer
-                  token={token}
+                  token={token || ''}
                   fields={context.definition.formSchema}
                   values={registryFormValues}
                   onChange={setRegistryFormValues}
