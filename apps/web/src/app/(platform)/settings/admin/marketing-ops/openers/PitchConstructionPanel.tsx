@@ -37,54 +37,202 @@ import marketingOpsService, {
   OutreachPitch,
   ReviewPair,
   CloserResolution,
+  OpenerArchetype,
 } from '@/services/MarketingOpsService';
 
 interface PitchConstructionPanelProps {
   campaignId: string;
   openers: OutreachOpener[];
+  // Detected archetype for the selected campaign (from the opener
+  // resolution). Drives which starter copy set is offered in each
+  // section so the operator sees header/closer/contact starters that
+  // match the campaign's actual pain (reviews, listings, CTA, product
+  // visibility) instead of always review-response copy. Falls back to
+  // A1 (review-response) when unknown.
+  archetype?: OpenerArchetype;
 }
 
-// ─── Common convertable starters ─────────────────────────────────────
-// Unpersonalized starter copy that tends to convert well. Click to load
-// into the import field, then edit the {{placeholders}} before importing.
-// AI Generate remains the recommended path — it personalizes these for
-// the prospect using the audit data; the starters are for fast manual
-// assembly when the operator already knows what they want.
+// ─── Common convertable starters (archetype-aware) ───────────────────
+// Unpersonalized starter copy that tends to convert well, keyed by the
+// campaign's detected archetype so the operator sees starters aligned
+// with the actual pain (reviews vs listings vs CTA vs product
+// visibility). Click to load into the import field, then edit the
+// {{placeholders}} before importing. AI Generate remains the recommended
+// path — it personalizes these for the prospect using the audit data;
+// the starters are for fast manual assembly when the operator already
+// knows what they want.
 
-const HEADER_STARTER_EXAMPLES: string[] = [
-  'PREVIEW - {{shown}} of your {{total}} completed review responses',
-  '{{business}} — your unanswered Google reviews',
-  '{{business}} — three reviews need responses',
-  'Quick note about {{business}}\'s reviews',
-  '{{business}} — your Yelp listing has gaps',
-];
+const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
+  // A1 — Review Response Gap
+  A1: [
+    'PREVIEW - {{shown}} of your {{total}} completed review responses',
+    '{{business}} — your unanswered Google reviews',
+    '{{business}} — three reviews need responses',
+    'Quick note about {{business}}\'s reviews',
+    '{{business}} — your Yelp listing has gaps',
+  ],
+  // A2 — Negative Review Recovery (theme-led)
+  A2: [
+    'PREVIEW - responses to the {{theme}} reviews on {{business}}',
+    '{{business}} — your {{theme}} reviews are going unanswered',
+    '{{business}} — three negative reviews, one pattern',
+    'Quick note about the {{theme}} complaints on {{business}}',
+    '{{business}} — I drafted replies to your negative reviews',
+  ],
+  // A3 — Listing Inconsistency (NAP drift)
+  A3: [
+    'PREVIEW - your listings across Google, Yelp, and Facebook',
+    '{{business}} — your address is different on Yelp',
+    '{{business}} — customers are being sent to the wrong location',
+    'Quick note about {{business}}\'s listings',
+    '{{business}} — your phone number doesn\'t match across directories',
+  ],
+  // A4 — Conversion / CTA Gap (website)
+  A4: [
+    'PREVIEW - your website, with one fix suggested',
+    '{{business}} — your website has no booking button',
+    '{{business}} — visitors can\'t book online',
+    'Quick note about {{business}}\'s website',
+    '{{business}} — every visitor has to call to become a customer',
+  ],
+  // A5 — Multi-Signal Footprint (combined)
+  A5: [
+    'PREVIEW - your listings and your reviews',
+    '{{business}} — wrong directions and unanswered reviews',
+    '{{business}} — two gaps I found in your footprint',
+    'Quick note about {{business}}\'s online presence',
+    '{{business}} — listings + reviews, both need work',
+  ],
+  // A6 — Product Visibility Gap (discoverability)
+  A6: [
+    'PREVIEW - what your store looks like online',
+    '{{business}} — customers can\'t see what you carry',
+    '{{business}} — your Google photos don\'t show the store',
+    'Quick note about {{business}}\'s online presence',
+    '{{business}} — no way to browse your products before visiting',
+  ],
+};
 
-const CLOSER_STARTER_EXAMPLES: string[] = [
-  'The remaining {{remaining}} responses are written and ready to deliver today.',
-  'I\'ve drafted replies to the other {{remaining}} unanswered reviews — ready when you are.',
-  '{{remaining}} more responses are written and waiting. Want them?',
-  'There are {{remaining}} more responses ready to send. Say the word.',
-  'I\'ve handled {{remaining}} more reviews beyond these three. Should I send them?',
-];
+const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
+  A1: [
+    'The remaining {{remaining}} responses are written and ready to deliver today.',
+    'I\'ve drafted replies to the other {{remaining}} unanswered reviews — ready when you are.',
+    '{{remaining}} more responses are written and waiting. Want them?',
+    'There are {{remaining}} more responses ready to send. Say the word.',
+    'I\'ve handled {{remaining}} more reviews beyond these three. Should I send them?',
+  ],
+  A2: [
+    'The remaining {{remaining}} negative-review responses are written and ready today.',
+    'I\'ve drafted replies to the other {{remaining}} negative reviews — ready when you are.',
+    '{{remaining}} more responses to the {{theme}} reviews are ready. Want them?',
+    'There are {{remaining}} more negative reviews I\'ve handled. Say the word.',
+    'I\'ve addressed {{remaining}} more reviews on the same pattern. Should I send them?',
+  ],
+  A3: [
+    'The full listing reconciliation — across {{remaining}} directories — is ready today.',
+    'I\'ve mapped every variation across the other {{remaining}} directories. Ready when you are.',
+    '{{remaining}} more directories are reconciled and waiting. Want the list?',
+    'There are {{remaining}} more platforms with the wrong info. Say the word.',
+    'I\'ve corrected the other {{remaining}} listings. Should I send the diff?',
+  ],
+  A4: [
+    'The full CTA fix — booking button, click-to-call, and the {{remaining}} follow-on tweaks — is ready today.',
+    'I\'ve drafted the other {{remaining}} conversion fixes. Ready when you are.',
+    '{{remaining}} more tweaks are staged and waiting. Want them?',
+    'There are {{remaining}} more friction points I\'ve mapped. Say the word.',
+    'I\'ve handled {{remaining}} more conversion gaps beyond this one. Should I send them?',
+  ],
+  A5: [
+    'The full fix — listings and the {{remaining}} review responses — is ready today.',
+    'I\'ve drafted the other {{remaining}} pieces. Ready when you are.',
+    '{{remaining}} more sections are written and waiting. Want them?',
+    'There are {{remaining}} more gaps mapped out. Say the word.',
+    'I\'ve handled {{remaining}} more items across both fronts. Should I send them?',
+  ],
+  A6: [
+    'The full product visibility plan — photos, catalog, and the {{remaining}} sections — is ready today.',
+    'I\'ve drafted the other {{remaining}} pieces of the visibility plan. Ready when you are.',
+    '{{remaining}} more sections are ready — fulfillment, hours sync, the rest. Want them?',
+    'There are {{remaining}} more pieces staged. Say the word.',
+    'I\'ve handled {{remaining}} more sections beyond these. Should I send them?',
+  ],
+};
 
-const CONTACT_STARTER_EXAMPLES: string[] = [
-  '— {{name}} | {{email}} | {{phone}}',
-  '— {{name}}, VisibleShelf — {{email}}',
-  'Reply with "go" and I\'ll send the rest. — {{name}}',
-  '— {{name}} | {{phone}}',
-  'Text "more" to {{phone}} and I\'ll send the rest. — {{name}}',
-];
+const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
+  A1: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the rest. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "more" to {{phone}} and I\'ll send the rest. — {{name}}',
+  ],
+  A2: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the rest. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "more" to {{phone}} and I\'ll send the rest. — {{name}}',
+  ],
+  A3: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the full reconciliation. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "list" to {{phone}} and I\'ll send the directory diff. — {{name}}',
+  ],
+  A4: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the full CTA fix. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "fix" to {{phone}} and I\'ll send the conversion tweaks. — {{name}}',
+  ],
+  A5: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the rest. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "more" to {{phone}} and I\'ll send the full plan. — {{name}}',
+  ],
+  A6: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the visibility plan. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "catalog" to {{phone}} and I\'ll send the product mockup. — {{name}}',
+  ],
+};
+
+const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
+  A1: 'Review Response Gap',
+  A2: 'Negative Review Recovery',
+  A3: 'Listing Inconsistency',
+  A4: 'Conversion / CTA Gap',
+  A5: 'Multi-Signal Footprint',
+  A6: 'Product Visibility Gap',
+};
 
 interface StarterExamplesProps {
   examples: string[];
   onPick: (text: string) => void;
+  archetype?: OpenerArchetype;
 }
 
-function StarterExamples({ examples, onPick }: StarterExamplesProps) {
+function StarterExamples({ examples, onPick, archetype }: StarterExamplesProps) {
   return (
     <details className="mt-3 group rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/60 dark:bg-neutral-900/30">
       <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
-        <span>Common convertable starters (click to load)</span>
+        <span className="flex items-center gap-2">
+          Common convertable starters (click to load)
+          {archetype && (
+            <span
+              title={`Aligned to the detected campaign archetype (${archetype} — ${ARCHETYPE_LABELS[archetype]})`}
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+            >
+              {archetype}
+            </span>
+          )}
+        </span>
         <span className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 group-open:hidden">
           AI Generate recommended for personalization
         </span>
@@ -108,7 +256,14 @@ function StarterExamples({ examples, onPick }: StarterExamplesProps) {
   );
 }
 
-export default function PitchConstructionPanel({ campaignId, openers }: PitchConstructionPanelProps) {
+export default function PitchConstructionPanel({ campaignId, openers, archetype }: PitchConstructionPanelProps) {
+  // Resolve the starter set for the detected archetype. Falls back to A1
+  // (review-response) when the archetype is unknown — matches the opener
+  // resolver's fallback behavior.
+  const effectiveArchetype: OpenerArchetype = archetype ?? 'A1';
+  const headerStarters = HEADER_STARTERS[effectiveArchetype] ?? HEADER_STARTERS.A1;
+  const closerStarters = CLOSER_STARTERS[effectiveArchetype] ?? CLOSER_STARTERS.A1;
+  const contactStarters = CONTACT_STARTERS[effectiveArchetype] ?? CONTACT_STARTERS.A1;
   // ─── Variant lists ──────────────────────────────────────────────────
   const [headers, setHeaders] = useState<OutreachHeader[]>([]);
   const [closers, setClosers] = useState<OutreachCloser[]>([]);
@@ -479,8 +634,9 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
             </div>
             {headerError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{headerError}</p>}
             <StarterExamples
-              examples={HEADER_STARTER_EXAMPLES}
+              examples={headerStarters}
               onPick={(text) => setHeaderImportText(text)}
+              archetype={archetype}
             />
           </section>
 
@@ -623,8 +779,9 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
             </div>
             {closerError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{closerError}</p>}
             <StarterExamples
-              examples={CLOSER_STARTER_EXAMPLES}
+              examples={closerStarters}
               onPick={(text) => setCloserImportText(text)}
+              archetype={archetype}
             />
           </section>
 
@@ -683,8 +840,9 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
             </div>
             {contactError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{contactError}</p>}
             <StarterExamples
-              examples={CONTACT_STARTER_EXAMPLES}
+              examples={contactStarters}
               onPick={(text) => setContactText(text)}
+              archetype={archetype}
             />
           </section>
 

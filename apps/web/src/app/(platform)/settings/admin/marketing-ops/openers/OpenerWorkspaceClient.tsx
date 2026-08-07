@@ -623,7 +623,11 @@ export default function OpenerWorkspaceClient() {
           preview + closer + contact → assembled pitch. Only renders when a
           campaign is selected and the Pitch Construction tab is active. */}
       {selectedCampaignId && activeTab === 'pitch' && (
-        <PitchConstructionPanel campaignId={selectedCampaignId} openers={openers} />
+        <PitchConstructionPanel
+          campaignId={selectedCampaignId}
+          openers={openers}
+          archetype={resolution?.selection.archetype}
+        />
       )}
     </MarketingOpsPageShell>
   );
