@@ -173,6 +173,66 @@ with an invitation to return.
 
 Output the response only — no preamble, no explanation.`;
 
+// ─── Preview-Slot Drafts (archetype-aware) ───────────────────────────────
+//
+// The 3-slot preview generalizes beyond review responses. Each archetype has
+// its own "evidence → fix" pair shape. These prompts draft the FIX half from
+// the EVIDENCE the operator pastes (the wrong listing, the missing CTA, the
+// missing product presence). The evidence itself is never AI-generated — the
+// operator pastes the real public state from the platform/website.
+
+const LISTING_FIX_PROMPT = `You are drafting a corrected listing entry for a small business's
+{{slot_label}} listing. The operator pasted the current (wrong) state; you
+produce the corrected version that reconciles it against the business's
+canonical name/address/phone. Tone: {{tone}}.
+
+Current listing (wrong):
+{{evidence_text}}
+
+Business name: {{business_name}}
+
+Task: Write the corrected listing entry, ≤80 words. State the canonical
+value clearly (name, address, and/or phone as relevant), note what was
+wrong in one phrase, and confirm the correction is ready to push. No
+exclamation points, no emojis, no pricing.
+
+Output the corrected entry only — no preamble, no explanation.`;
+
+const CTA_FIX_PROMPT = `You are drafting a concrete conversion fix for a small business's website.
+The operator pasted the current state (the missing booking button, the
+missing click-to-call, the missing scheduling link); you produce the
+specific fix and where it goes. Tone: {{tone}}.
+
+Current state:
+{{evidence_text}}
+
+Business name: {{business_name}}
+
+Task: Write the proposed fix, ≤80 words. Name the exact element to add
+(button label, placement, link target), why it removes the friction, and
+confirm it's ready to implement. No exclamation points, no emojis, no
+pricing.
+
+Output the fix only — no preamble, no explanation.`;
+
+const PRODUCT_VISIBILITY_FIX_PROMPT = `You are drafting a concrete product-visibility fix for a small business.
+The operator pasted the current state (no storefront photos, no product
+browsing, no availability inquiry); you produce the specific fix that
+makes the store's products visible online. Tone: {{tone}}.
+
+Current state:
+{{evidence_text}}
+
+Business name: {{business_name}}
+
+Task: Write the proposed fix, ≤80 words. Name the exact change (photo set,
+catalog page, availability/inquiry flow), what it lets the customer do
+that they couldn't before, and confirm it's ready to deliver. No
+exclamation points, no emojis, no pricing. Do NOT reference reviews or
+booking — this is a product discoverability problem.
+
+Output the fix only — no preamble, no explanation.`;
+
 // ─── Builders ────────────────────────────────────────────────────────────
 
 /**
@@ -232,4 +292,48 @@ export function buildReviewResponsePrompt(reviewText: string, businessName: stri
     .replace('{{review_text}}', reviewText)
     .replace('{{business_name}}', businessName)
     .replace('{{tone}}', tone || 'short informal');
+}
+
+/**
+ * Build the resolved preview-slot draft prompt for a specific archetype.
+ *
+ * The 3-slot preview generalizes beyond review responses:
+ *   - A1/A2 (and A5 fallback) → review-response prompt (the original behavior)
+ *   - A3 → listing correction prompt (evidence = wrong listing, fix = corrected entry)
+ *   - A4 → CTA fix prompt (evidence = current state, fix = proposed conversion fix)
+ *   - A6 → product-visibility fix prompt (evidence = current presence, fix = proposed visibility fix)
+ *
+ * `slotLabel` is the per-slot label (e.g. "Google", "Booking button",
+ * "Storefront photos") used to focus the draft on that specific platform/gap.
+ */
+export function buildPreviewSlotPrompt(
+  archetype: string,
+  evidenceText: string,
+  businessName: string,
+  tone: string,
+  slotLabel?: string,
+): string {
+  const label = slotLabel || 'the listing';
+  const toneStr = tone || 'short informal';
+  if (archetype === 'A3') {
+    return LISTING_FIX_PROMPT
+      .replace('{{slot_label}}', label.toLowerCase())
+      .replace('{{evidence_text}}', evidenceText)
+      .replace('{{business_name}}', businessName)
+      .replace('{{tone}}', toneStr);
+  }
+  if (archetype === 'A4') {
+    return CTA_FIX_PROMPT
+      .replace('{{evidence_text}}', evidenceText)
+      .replace('{{business_name}}', businessName)
+      .replace('{{tone}}', toneStr);
+  }
+  if (archetype === 'A6') {
+    return PRODUCT_VISIBILITY_FIX_PROMPT
+      .replace('{{evidence_text}}', evidenceText)
+      .replace('{{business_name}}', businessName)
+      .replace('{{tone}}', toneStr);
+  }
+  // A1, A2, A5, or unknown → review-response prompt (legacy behavior)
+  return buildReviewResponsePrompt(evidenceText, businessName, toneStr);
 }

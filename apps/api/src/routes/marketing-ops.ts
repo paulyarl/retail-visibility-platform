@@ -104,6 +104,7 @@
  *   Outreach Pitch — Review Response Drafts (no persistence — returns draft for slot):
  *     POST   /openers/review-responses/generate — Path 1: AI draft owner response using campaign tone
  *     POST   /openers/review-responses/import   — Path 2: validate externally-drafted owner response
+ *     POST   /openers/preview-slots/generate    — Archetype-aware slot draft (A3 listing fix, A4 CTA fix, A6 visibility fix; A1/A2/A5 → review response)
  *
  *   Outreach Pitch — Assembly:
  *     GET    /openers/pitches           — list assembled pitches (filter: campaignId)
@@ -2556,6 +2557,38 @@ router.post('/openers/review-responses/import', async (req: any, res: Response) 
   }
 });
 
+// ─── Outreach Pitch — Preview-Slot Drafts (archetype-aware) ──────────────
+// Generalizes the review-response draft path to archetype-aware preview
+// slots. A1/A2 draft owner responses (legacy behavior); A3 drafts corrected
+// listing entries; A4 drafts CTA fixes; A6 drafts product-visibility fixes.
+// The wire format (ReviewResponseDraft) is reused so the assemble path is
+// unchanged. The frontend picks this endpoint when the campaign archetype is
+// anything other than A1/A2/A5.
+const previewSlotGenerateSchema = z.object({
+  campaign_id: z.string().min(1),
+  evidence_text: z.string().min(1),
+  archetype: z.string().min(1),
+  slot_label: z.string().optional(),
+});
+
+router.post('/openers/preview-slots/generate', async (req: any, res: Response) => {
+  try {
+    const parsed = previewSlotGenerateSchema.parse(req.body);
+    const draft = await ReviewResponseDraftService.generateSlotFix({
+      campaignId: parsed.campaign_id,
+      evidenceText: parsed.evidence_text,
+      archetype: parsed.archetype,
+      slotLabel: parsed.slot_label,
+    }, getCtx(req));
+    res.status(200).json({ success: true, data: draft });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ─── Outreach Pitch — Assembly ───────────────────────────────────────────
 const pitchAssembleSchema = z.object({
   campaign_id: z.string().min(1),
@@ -2572,6 +2605,16 @@ const pitchAssembleSchema = z.object({
       response_ai_model: z.string().nullable().optional(),
       response_tokens_used: z.number().optional(),
       is_negative_first: z.boolean(),
+      // Archetype-aware preview-slot labels (additive, optional). When
+      // present, the renderer uses them instead of the review-centric
+      // defaults so the assembled pitch reads appropriately for the
+      // campaign's archetype.
+      evidence_label: z.string().optional(),
+      fix_label: z.string().optional(),
+      slot_label: z.string().optional(),
+      slot_label_prefix: z.string().optional(),
+      section_title: z.string().optional(),
+      first_slot_label: z.string().optional(),
     }),
   ).min(1),
 });
