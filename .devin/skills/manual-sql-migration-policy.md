@@ -133,6 +133,13 @@ policy is not applied today.
 The `mkt_*` family also omits explicit `updated_at` trigger functions — they
 rely on `DEFAULT NOW()` + app-layer Prisma `@updatedAt`. New `mkt_*` tables
 follow the same pattern (no `CREATE TRIGGER` block in the migration).
+
+**Supabase SQL Editor RLS prompt:** when running `mkt_*` migrations, the
+editor may show "This query creates tables without enabling Row Level
+Security" with a "Run and Enable RLS" button. Always choose plain **Run** —
+the wrapper rewrites the query before executing (and can fail with spurious
+errors like `relation "a" does not exist`), and RLS is intentionally not
+enabled on `mkt_*` tables per the namespace exception above.
 - **Verification:** Add commented-out `SELECT` queries at the bottom for manual verification
 
 ### Migration 159 — Operator Playbook Checklists (worked example)
