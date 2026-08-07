@@ -287,7 +287,7 @@ const PREVIEW_SLOT_CONFIGS: Record<OpenerArchetype, PreviewSlotConfig> = {
   A1: {
     sectionTitle: 'The Preview (3 completed reviews + responses):',
     sectionBlurb:
-      'Slot 1 is the handled 1-star negative (rendered first). Paste the real customer review from a public platform, then AI-draft or import the owner response.',
+      'Slot 1 is the handled 1-star negative (rendered first). Paste the real customer review from any platform (same or mixed), then AI-draft or import the owner response. Label each slot if useful — or leave blank.',
     firstSlotLabel: 'THE NEGATIVE - The handled 1-star goes first',
     firstSlotBadge: 'NEGATIVE FIRST',
     firstSlotCheckboxLabel: '1-star negative',
@@ -296,13 +296,16 @@ const PREVIEW_SLOT_CONFIGS: Record<OpenerArchetype, PreviewSlotConfig> = {
     fixLabel: 'Owner Response Message',
     evidencePlaceholder: 'Customer review (paste from Google/Yelp/Facebook)...',
     fixPlaceholder: 'Owner response (AI-drafted or imported)...',
-    slotLabels: ['Google', 'Yelp', 'Facebook'],
+    // No default per-slot labels — the 3 reviews can be from any platform,
+    // same or mixed. The operator can label each slot via the editable
+    // slot-label input if they want to track provenance.
+    slotLabels: ['', '', ''],
     useReviewEndpoint: true,
   },
   A2: {
     sectionTitle: 'The Preview (3 negative-review recoveries + responses):',
     sectionBlurb:
-      'Slot 1 is the strongest negative on the recurring theme (rendered first). Paste the real customer review, then AI-draft or import the owner response.',
+      'Slot 1 is the strongest negative on the recurring theme (rendered first). Paste the real customer review from any platform (same or mixed), then AI-draft or import the owner response. Label each slot if useful — or leave blank.',
     firstSlotLabel: 'THE THEME NEGATIVE - The strongest themed 1-star goes first',
     firstSlotBadge: 'THEME NEGATIVE FIRST',
     firstSlotCheckboxLabel: 'strongest themed negative',
@@ -311,7 +314,7 @@ const PREVIEW_SLOT_CONFIGS: Record<OpenerArchetype, PreviewSlotConfig> = {
     fixLabel: 'Owner Response Message',
     evidencePlaceholder: 'Negative review on the recurring theme (paste from Google/Yelp)...',
     fixPlaceholder: 'Owner response (AI-drafted or imported)...',
-    slotLabels: ['Google', 'Yelp', 'Facebook'],
+    slotLabels: ['', '', ''],
     useReviewEndpoint: true,
   },
   A3: {
@@ -389,13 +392,20 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   // Stamp the renderer labels onto a review pair. The labels are read from
   // the first pair by the backend renderer, so we only need them on pair[0],
   // but stamping on every pair is harmless and survives reordering.
+  //
+  // `slot_label` is operator-editable via the per-slot input, so we only
+  // fill it from the config default when the pair doesn't already have one.
+  // This lets the operator override the suggested label (e.g. "Google review
+  // 1" instead of "Google") or clear it entirely for archetypes where a
+  // per-slot label isn't meaningful (A1/A2 — the 3 reviews can be from any
+  // platform, same or mixed).
   const stampRendererLabels = useCallback(
     (pairs: ReviewPair[]): ReviewPair[] =>
       pairs.map((p, idx) => ({
         ...p,
         evidence_label: slotConfig.evidenceLabel,
         fix_label: slotConfig.fixLabel,
-        slot_label: slotConfig.slotLabels[idx] ?? undefined,
+        slot_label: p.slot_label ?? slotConfig.slotLabels[idx] ?? undefined,
         slot_label_prefix: slotConfig.slotLabelPrefix,
         section_title: slotConfig.sectionTitle,
         first_slot_label: slotConfig.firstSlotLabel,
@@ -828,29 +838,41 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
             <div className="space-y-3">
               {reviewPairs.map((pair, idx) => (
                 <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
                       {slotConfig.slotLabelPrefix} {idx + 1}
-                      {slotConfig.slotLabels[idx] && (
-                        <span className="ml-1 text-gray-500 dark:text-gray-500">— {slotConfig.slotLabels[idx]}</span>
-                      )}
                       {pair.is_negative_first && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                           {slotConfig.firstSlotBadge}
                         </span>
                       )}
                     </span>
-                    {idx === 0 && (
-                      <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                        <input
-                          type="checkbox"
-                          checked={pair.is_negative_first}
-                          onChange={(e) => updatePair(idx, 'is_negative_first', e.target.checked)}
-                          className="w-3 h-3"
-                        />
-                        {slotConfig.firstSlotCheckboxLabel}
-                      </label>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {/* Editable per-slot label. Defaults from the archetype
+                          config (e.g. "Google" for A3) but the operator can
+                          override or clear it. For A1/A2 the default is empty
+                          — the 3 reviews can be from any platform, same or
+                          mixed. Flows through to slot_label on the pair and
+                          into the assembled pitch rendering. */}
+                      <input
+                        type="text"
+                        value={pair.slot_label ?? ''}
+                        onChange={(e) => updatePair(idx, 'slot_label', e.target.value || undefined)}
+                        placeholder={slotConfig.slotLabels[idx] ? `e.g. ${slotConfig.slotLabels[idx]}` : 'label (optional)'}
+                        className="w-32 px-2 py-1 text-xs border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      {idx === 0 && (
+                        <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                          <input
+                            type="checkbox"
+                            checked={pair.is_negative_first}
+                            onChange={(e) => updatePair(idx, 'is_negative_first', e.target.checked)}
+                            className="w-3 h-3"
+                          />
+                          {slotConfig.firstSlotCheckboxLabel}
+                        </label>
+                      )}
+                    </div>
                   </div>
                   <textarea
                     value={pair.review_text}
