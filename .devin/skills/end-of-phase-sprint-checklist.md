@@ -239,3 +239,4 @@ cd apps/web && npx tsc --noEmit
 | Render loops | `debug-infinite-render-loops.md` |
 | Cache invalidation | `cross-context-cache-invalidation.md` |
 | Database schema changes | `manual-sql-migration-policy.md` |
+| Vitest mock errors / `vi.hoisted` | `vitest-hoisted-mock-pattern.md` |

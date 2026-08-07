@@ -67,6 +67,7 @@ cd apps/web && npx tsc --noEmit
 | Feature flags | `feature-flag-catalog.md` |
 | Badge system | `meaningful-badge-architecture.md` + `badge-architecture-insights.md` |
 | Database schema changes | `manual-sql-migration-policy.md` |
+| Vitest mock errors / `vi.hoisted` | `vitest-hoisted-mock-pattern.md` |
 
 - [ ] **Flag skills that will need updates after this phase.** This is a mandatory planning task, not optional. As you read each skill, note:
   - Which specific section(s) will need updates (e.g., "Phase 5 route section — add URL namespace rule")
