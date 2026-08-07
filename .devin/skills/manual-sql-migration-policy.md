@@ -30,6 +30,10 @@ Editing `schema.prisma` without a corresponding SQL migration creates **schema d
    - Add verification queries as comments at the bottom
 
 2. **Apply the migration** to the database via SQL editor (staging first, then production)
+   - Team workflow: apply to staging, run `npx prisma db pull && npx prisma generate`
+     against staging to confirm a clean generate, then apply the **same query** to
+     production. In the Supabase SQL Editor always choose plain **Run**, never
+     "Run and Enable RLS" (see the `mkt_*` exception note below).
 
 3. **Run Prisma introspection** to update `schema.prisma` from the live database:
    ```bash
