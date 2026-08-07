@@ -4,10 +4,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // MOCKS
 // ====================
 
-const { mockDisputeIntake, mockCampaignsList, mockStageHistory } = vi.hoisted(() => ({
+const { mockDisputeIntake, mockDisputeAttachments, mockCampaignsList, mockStageHistory } = vi.hoisted(() => ({
   mockDisputeIntake: {
     create: vi.fn(),
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
     update: vi.fn(),
   },
   mockDisputeAttachments: {
@@ -62,7 +64,42 @@ vi.mock('../MarketingServiceCategoryService', () => ({
   default: { getLabel: vi.fn().mockResolvedValue(null) },
 }));
 
+// Mock the IntakeDefinitionService (imported dynamically by submitRegistryIntake)
+vi.mock('../intake/IntakeDefinitionService', () => ({
+  intakeDefinitionService: {
+    resolve: vi.fn().mockResolvedValue(null),
+    buildSubmitSchema: vi.fn().mockReturnValue({
+      safeParse: vi.fn().mockReturnValue({ success: true }),
+    }),
+    runCustomValidators: vi.fn().mockResolvedValue({}),
+  },
+  IntakeDefinitionService: { getInstance: vi.fn() },
+}));
+
+// Mock writeBehindAdapters (imported dynamically by submitRegistryIntake)
+vi.mock('../intake/writeBehindAdapters', () => ({
+  executeFieldMappings: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock MarketingCampaignService.transitionStage (imported dynamically)
+// Default returns intake_submitted; registry tests override this in beforeEach
+vi.mock('../MarketingCampaignService', () => ({
+  default: {
+    transitionStage: vi.fn().mockResolvedValue({ id: 'mcamp-1', stage: 'intake_submitted' }),
+  },
+}));
+
+// Mock RecoveryResolutionService (imported dynamically by submitIntake for enqueue)
+vi.mock('../RecoveryResolutionService', () => ({
+  default: {
+    enqueue: vi.fn().mockResolvedValue({ executionId: 'exec-1' }),
+  },
+}));
+
 import DisputeIntakeService from '../DisputeIntakeService';
+// Import mocked modules for asserting on their calls
+import MarketingCampaignService from '../MarketingCampaignService';
+import { intakeDefinitionService as mockIntakeDefService } from '../intake/IntakeDefinitionService';
 
 // ====================
 // HELPERS
@@ -212,7 +249,14 @@ describe('DisputeIntakeService', () => {
 
       expect(result.alreadySubmitted).toBe(false);
       expect(result.stage).toBe('intake_submitted');
-      expect(mockCampaignsList.update).toHaveBeenCalled();
+      expect(MarketingCampaignService.transitionStage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          campaignId: 'mcamp-1',
+          toStage: 'intake_submitted',
+          triggerType: 'system',
+        }),
+        undefined,
+      );
     });
 
     it('is idempotent — double-submit returns original without re-transitioning', async () => {
@@ -277,7 +321,7 @@ describe('DisputeIntakeService', () => {
   describe('generateIntakeLink', () => {
     it('creates a new intake row when none exists', async () => {
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
-      mockDisputeIntake.findUnique.mockResolvedValue(null); // no existing intake
+      mockDisputeIntake.findFirst.mockResolvedValue(null); // no existing intake
       mockDisputeIntake.create.mockResolvedValue(mockIntakeRecord);
 
       const result = await DisputeIntakeService.generateIntakeLink('mcamp-1');
@@ -290,7 +334,7 @@ describe('DisputeIntakeService', () => {
 
     it('reissues token when an intake row already exists (no duplicate)', async () => {
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
-      mockDisputeIntake.findUnique.mockResolvedValue(mockIntakeRecord);
+      mockDisputeIntake.findFirst.mockResolvedValue(mockIntakeRecord);
       mockDisputeIntake.update.mockResolvedValue({
         ...mockIntakeRecord,
         access_token: 'new-token-32chars-bbbbbbbbbbbb',
@@ -318,7 +362,7 @@ describe('DisputeIntakeService', () => {
 
   describe('reissueLink', () => {
     it('reissues token for existing intake', async () => {
-      mockDisputeIntake.findUnique.mockResolvedValue(mockIntakeRecord);
+      mockDisputeIntake.findFirst.mockResolvedValue(mockIntakeRecord);
       mockDisputeIntake.update.mockResolvedValue({
         ...mockIntakeRecord,
         access_token: 'reissued-token-32chars-cccccccc',
@@ -331,7 +375,7 @@ describe('DisputeIntakeService', () => {
     });
 
     it('generates fresh link if no existing intake', async () => {
-      mockDisputeIntake.findUnique.mockResolvedValue(null);
+      mockDisputeIntake.findFirst.mockResolvedValue(null);
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
       mockDisputeIntake.create.mockResolvedValue(mockIntakeRecord);
 
@@ -339,6 +383,146 @@ describe('DisputeIntakeService', () => {
 
       expect(result.intakeId).toBe('mdint-1');
       expect(mockDisputeIntake.create).toHaveBeenCalled();
+    });
+  });
+
+  // ─── submitRegistryIntake ───────────────────────────────────────
+
+  describe('submitRegistryIntake', () => {
+    const gbpIntakeRecord = {
+      ...mockIntakeRecord,
+      intake_kind: 'gbp_optimization',
+    };
+
+    const gbpDefinition = {
+      intake_kind: 'gbp_optimization',
+      label: 'GBP Optimization',
+      description: null,
+      driver: 'registry',
+      service_category: null,
+      trigger_stages: ['paid', 'delivered'],
+      submitted_stage: 'gbp_intake_submitted',
+      form_schema: [],
+      field_mappings: [],
+      owner_copy: {},
+      niche_overrides: {},
+      downstream_agent: null,
+      version: 1,
+      is_active: true,
+      is_draft: false,
+    };
+
+    beforeEach(() => {
+      // Reset the IntakeDefinitionService mock to return a valid definition
+      mockIntakeDefService.resolve.mockResolvedValue(gbpDefinition);
+      mockIntakeDefService.buildSubmitSchema.mockReturnValue({
+        safeParse: vi.fn().mockReturnValue({ success: true }),
+      });
+      mockIntakeDefService.runCustomValidators.mockResolvedValue({});
+      // Override the transitionStage mock to return the GBP submitted stage
+      MarketingCampaignService.transitionStage.mockResolvedValue({ id: 'mcamp-1', stage: 'gbp_intake_submitted' });
+    });
+
+    it('submits a registry intake and transitions to the definition submitted_stage', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue(gbpIntakeRecord); // findByToken uses findUnique
+      mockDisputeIntake.update.mockResolvedValue({ ...gbpIntakeRecord, evidence_payload: {} });
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+
+      const result = await DisputeIntakeService.submitRegistryIntake({
+        token: 'valid-token',
+        ownerEmail: 'owner@example.com',
+        ownerPhone: null,
+        evidencePayload: { business_hours: { monday: { open: '09:00', close: '17:00', closed: false } } },
+        attachmentIds: [],
+      });
+
+      expect(result.alreadySubmitted).toBe(false);
+      expect(result.stage).toBe('gbp_intake_submitted');
+      expect(mockDisputeIntake.update).toHaveBeenCalled();
+    });
+
+    it('is idempotent — double-submit returns original without re-transitioning', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue({
+        ...gbpIntakeRecord,
+        submitted_at: pastDate(1),
+      });
+      mockCampaignsList.findUnique.mockResolvedValue({ ...mockCampaign, stage: 'gbp_intake_submitted' });
+
+      const result = await DisputeIntakeService.submitRegistryIntake({
+        token: 'valid-token',
+        ownerEmail: 'owner@example.com',
+        evidencePayload: {},
+        attachmentIds: [],
+      });
+
+      expect(result.alreadySubmitted).toBe(true);
+      expect(result.stage).toBe('gbp_intake_submitted');
+      // Campaign transition should NOT be called (idempotent)
+      expect(mockCampaignsList.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired token', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue({
+        ...gbpIntakeRecord,
+        expires_at: pastDate(1),
+      });
+
+      await expect(
+        DisputeIntakeService.submitRegistryIntake({
+          token: 'expired-token',
+          ownerEmail: 'owner@example.com',
+          evidencePayload: {},
+          attachmentIds: [],
+        }),
+      ).rejects.toThrow('expired');
+    });
+
+    it('rejects an invalid token', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue(null);
+
+      await expect(
+        DisputeIntakeService.submitRegistryIntake({
+          token: 'invalid-token',
+          ownerEmail: 'owner@example.com',
+          evidencePayload: {},
+          attachmentIds: [],
+        }),
+      ).rejects.toThrow('Invalid');
+    });
+
+    it('rejects when no active definition exists for the kind', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue(gbpIntakeRecord);
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+      mockIntakeDefService.resolve.mockResolvedValue(null); // no definition
+
+      await expect(
+        DisputeIntakeService.submitRegistryIntake({
+          token: 'valid-token',
+          ownerEmail: 'owner@example.com',
+          evidencePayload: {},
+          attachmentIds: [],
+        }),
+      ).rejects.toThrow('No active intake definition');
+    });
+
+    it('rejects when Zod validation fails', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue(gbpIntakeRecord);
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+      mockIntakeDefService.buildSubmitSchema.mockReturnValue({
+        safeParse: vi.fn().mockReturnValue({
+          success: false,
+          error: { issues: [{ path: ['ownerEmail'], message: 'Invalid email' }] },
+        }),
+      });
+
+      await expect(
+        DisputeIntakeService.submitRegistryIntake({
+          token: 'valid-token',
+          ownerEmail: 'not-an-email',
+          evidencePayload: {},
+          attachmentIds: [],
+        }),
+      ).rejects.toThrow('Validation failed');
     });
   });
 });
