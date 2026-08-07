@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, ChevronUp, ChevronDown, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, ChevronUp, ChevronDown, X, AlertCircle, CheckCircle2, Copy } from 'lucide-react';
 import marketingOpsService, {
   type PlaybookCatalogEntry,
   type PlaybookCreateInput,
@@ -88,6 +88,9 @@ export default function PlaybookCatalogClient() {
 
   // Signal editor state
   const [showSignalForm, setShowSignalForm] = useState(false);
+  // `editingSignal` is null for register/clone, set for edit. `code` is empty
+  // for clone (user must enter a new unique code) and read-only for edit.
+  const [editingSignal, setEditingSignal] = useState<SignalRegistryEntry | null>(null);
   const [signalForm, setSignalForm] = useState({
     code: '',
     family: '',
@@ -197,24 +200,86 @@ export default function PlaybookCatalogClient() {
 
   // ─── Signal CRUD ────────────────────────────────────────────────────
 
+  /**
+   * Count playbooks whose matching_rules reference this signal code in any
+   * of the any/all/none/dual sets. Used for the delete confirmation so the
+   * operator sees the blast radius before removing a code.
+   */
+  const countPlaybookReferences = (code: string): number => {
+    return playbooks.filter((pb) => {
+      const r = pb.matchingRules;
+      if (r.any?.includes(code)) return true;
+      if (r.all?.includes(code)) return true;
+      if (r.none?.includes(code)) return true;
+      if (r.dual && (r.dual.groupA?.includes(code) || r.dual.groupB?.includes(code))) return true;
+      return false;
+    }).length;
+  };
+
+  const handleNewSignal = () => {
+    setEditingSignal(null);
+    setSignalForm({ code: '', family: '', label: '', description: '', detection_source: 'model_emitted', is_active: true });
+    setShowSignalForm(true);
+  };
+
+  const handleEditSignal = (signal: SignalRegistryEntry) => {
+    setEditingSignal(signal);
+    setSignalForm({
+      code: signal.code,
+      family: signal.family,
+      label: signal.label,
+      description: signal.description ?? '',
+      detection_source: signal.detectionSource,
+      is_active: signal.isActive,
+    });
+    setShowSignalForm(true);
+  };
+
+  const handleCloneSignal = (signal: SignalRegistryEntry) => {
+    setEditingSignal(null);
+    setSignalForm({
+      code: '',
+      family: signal.family,
+      label: signal.label,
+      description: signal.description ?? '',
+      detection_source: signal.detectionSource,
+      is_active: signal.isActive,
+    });
+    setShowSignalForm(true);
+  };
+
   const handleSaveSignal = async () => {
     setSavingSignal(true);
     setError(null);
     try {
-      await marketingOpsService.createSignal({
-        code: signalForm.code,
-        family: signalForm.family,
-        label: signalForm.label,
-        description: signalForm.description || undefined,
-        detection_source: signalForm.detection_source,
-        is_active: signalForm.is_active,
-      });
-      setSuccess(`Registered signal ${signalForm.code}`);
+      if (editingSignal) {
+        // Edit mode: code is immutable, send the other fields.
+        await marketingOpsService.updateSignal(editingSignal.id, {
+          family: signalForm.family,
+          label: signalForm.label,
+          description: signalForm.description || null,
+          detection_source: signalForm.detection_source,
+          is_active: signalForm.is_active,
+        });
+        setSuccess(`Updated signal ${editingSignal.code}`);
+      } else {
+        // Register / clone: a new unique code is required.
+        await marketingOpsService.createSignal({
+          code: signalForm.code,
+          family: signalForm.family,
+          label: signalForm.label,
+          description: signalForm.description || undefined,
+          detection_source: signalForm.detection_source,
+          is_active: signalForm.is_active,
+        });
+        setSuccess(`Registered signal ${signalForm.code}`);
+      }
       setShowSignalForm(false);
+      setEditingSignal(null);
       setSignalForm({ code: '', family: '', label: '', description: '', detection_source: 'model_emitted', is_active: true });
       await fetchAll();
     } catch (err: any) {
-      setError(err.message || 'Failed to register signal');
+      setError(err.message || 'Failed to save signal');
     } finally {
       setSavingSignal(false);
     }
@@ -230,7 +295,11 @@ export default function PlaybookCatalogClient() {
   };
 
   const handleDeleteSignal = async (id: string, code: string) => {
-    if (!confirm(`Delete signal ${code}? Playbooks referencing it will stop matching on this code.`)) return;
+    const refCount = countPlaybookReferences(code);
+    const msg = refCount > 0
+      ? `Delete signal ${code}?\n\nThis code is referenced by ${refCount} playbook${refCount === 1 ? '' : 's'}' matching rules. Those playbooks will stop matching on this code and may no longer fire for campaigns that previously triaged to them.\n\nThis cannot be undone.`
+      : `Delete signal ${code}?\n\nNo playbooks currently reference this code.\n\nThis cannot be undone.`;
+    if (!confirm(msg)) return;
     try {
       await marketingOpsService.deleteSignal(id);
       setSuccess(`Deleted signal ${code}`);
@@ -463,7 +532,7 @@ export default function PlaybookCatalogClient() {
               Signal codes as data. The triage engine and audit prompts reference these codes. Derived signals also need extractor code to fire.
             </p>
             <button
-              onClick={() => setShowSignalForm(true)}
+              onClick={handleNewSignal}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
             >
               <Plus className="w-3 h-3" /> Register Signal
@@ -498,9 +567,17 @@ export default function PlaybookCatalogClient() {
                       <button onClick={() => handleToggleSignalActive(sig)} className={`inline-block w-2 h-2 rounded-full ${sig.isActive ? 'bg-green-500' : 'bg-gray-300 dark:bg-neutral-600'}`} title={sig.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'} />
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button onClick={() => handleDeleteSignal(sig.id, sig.code)} className="text-gray-400 hover:text-red-600" title="Delete">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button onClick={() => handleEditSignal(sig)} className="text-gray-400 hover:text-blue-600" title="Edit">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleCloneSignal(sig)} className="text-gray-400 hover:text-blue-600" title="Clone">
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteSignal(sig.id, sig.code)} className="text-gray-400 hover:text-red-600" title="Delete">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -513,14 +590,28 @@ export default function PlaybookCatalogClient() {
             <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-auto">
               <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full my-8">
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-700">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Register Signal</h3>
-                  <button onClick={() => setShowSignalForm(false)} className="text-gray-400 hover:text-gray-600">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {editingSignal ? `Edit Signal — ${editingSignal.code}` : 'Register Signal'}
+                  </h3>
+                  <button onClick={() => { setShowSignalForm(false); setEditingSignal(null); }} className="text-gray-400 hover:text-gray-600">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="p-4 space-y-3">
-                  <Field label="Code (FAMILY_UPPER_SNAKE)">
-                    <input type="text" value={signalForm.code} onChange={(e) => setSignalForm({ ...signalForm, code: e.target.value.toUpperCase() })} placeholder="e.g. RA_REVIEW_DROUGHT" className="w-full text-xs font-mono border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent" />
+                  <Field label={editingSignal ? 'Code (immutable)' : 'Code (FAMILY_UPPER_SNAKE)'}>
+                    <input
+                      type="text"
+                      value={signalForm.code}
+                      onChange={(e) => setSignalForm({ ...signalForm, code: e.target.value.toUpperCase() })}
+                      placeholder={editingSignal ? '' : 'e.g. RA_REVIEW_DROUGHT'}
+                      disabled={!!editingSignal}
+                      className="w-full text-xs font-mono border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                    {editingSignal && (
+                      <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+                        Code is the unique business key referenced by playbook matching rules and audit prompts, so it cannot be renamed. Deactivate or delete and re-register if a new code is needed.
+                      </p>
+                    )}
                   </Field>
                   <Field label="Family (2-3 letter prefix)">
                     <input type="text" value={signalForm.family} onChange={(e) => setSignalForm({ ...signalForm, family: e.target.value.toUpperCase() })} placeholder="e.g. RA" className="w-full text-xs font-mono border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent" />
@@ -543,11 +634,20 @@ export default function PlaybookCatalogClient() {
                   </Field>
                 </div>
                 <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-neutral-700">
-                  <button onClick={() => setShowSignalForm(false)} className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded">
+                  <button
+                    onClick={() => { setShowSignalForm(false); setEditingSignal(null); }}
+                    className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded"
+                  >
                     Cancel
                   </button>
-                  <button onClick={handleSaveSignal} disabled={savingSignal || !signalForm.code || !signalForm.family || !signalForm.label} className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
-                    {savingSignal ? 'Registering...' : 'Register Signal'}
+                  <button
+                    onClick={handleSaveSignal}
+                    disabled={savingSignal || (!editingSignal && !signalForm.code) || !signalForm.family || !signalForm.label}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {savingSignal
+                      ? (editingSignal ? 'Saving...' : 'Registering...')
+                      : (editingSignal ? 'Save Changes' : 'Register Signal')}
                   </button>
                 </div>
               </div>
