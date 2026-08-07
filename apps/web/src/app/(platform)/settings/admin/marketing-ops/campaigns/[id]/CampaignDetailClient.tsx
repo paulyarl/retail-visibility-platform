@@ -1092,6 +1092,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
             {activeTab === 'checklist' && campaign && (
               <CampaignChecklistTab
                 campaignId={campaign.id}
+                currentStage={campaign.stage}
                 onGoToTriage={() => setActiveTab('overview')}
               />
             )}

@@ -36,6 +36,7 @@ import marketingOpsService, {
 
 interface Props {
   campaignId: string;
+  currentStage?: string | null;
   onGoToTriage?: () => void;
 }
 
@@ -73,13 +74,16 @@ function StageTagBadge({ stageTag }: { stageTag: string | null }) {
   );
 }
 
-export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props) {
+export default function CampaignChecklistTab({ campaignId, currentStage, onGoToTriage }: Props) {
   const [view, setView] = useState<CampaignChecklistView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingStepId, setTogglingStepId] = useState<string | null>(null);
   const [noteStepId, setNoteStepId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
+  // Stage-aware filter: default shows steps due by the campaign's current
+  // stage (untagged steps always show); "all" reveals the full playbook.
+  const [stageFilter, setStageFilter] = useState<'due' | 'all'>('due');
 
   // Suggestion submission
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
@@ -276,6 +280,19 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
     ? Math.round((view.requiredCompleted / view.requiredTotal) * 100)
     : 100;
 
+  // Stage-aware filtering. Untagged steps (stageTag null) appear in both
+  // views. Campaigns on a non-review-track stage (e.g. recovery pipeline)
+  // can't filter — they see the full list.
+  const currentStageOrder = currentStage ? CHECKLIST_STAGE_TAGS.indexOf(currentStage as ChecklistStageTag) : -1;
+  const canStageFilter = currentStageOrder >= 0;
+  const dueSteps = canStageFilter
+    ? view.steps.filter((s) => s.stageTag == null || CHECKLIST_STAGE_TAGS.indexOf(s.stageTag) <= currentStageOrder)
+    : view.steps;
+  const visibleSteps = stageFilter === 'due' ? dueSteps : view.steps;
+  const currentStageLabel = currentStage
+    ? (CHECKLIST_STAGE_TAG_LABELS[currentStage as ChecklistStageTag] ?? currentStage.replace(/_/g, ' '))
+    : null;
+
   return (
     <div className="space-y-4">
       {/* Progress header */}
@@ -310,9 +327,46 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
         </div>
       </div>
 
+      {/* Stage filter toggle */}
+      {canStageFilter && (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setStageFilter('due')}
+            className={`px-2.5 py-1 text-[11px] font-medium rounded-full border transition-colors ${
+              stageFilter === 'due'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-neutral-700 hover:border-gray-300'
+            }`}
+          >
+            Due by {currentStageLabel} ({dueSteps.length})
+          </button>
+          <button
+            onClick={() => setStageFilter('all')}
+            className={`px-2.5 py-1 text-[11px] font-medium rounded-full border transition-colors ${
+              stageFilter === 'all'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-neutral-700 hover:border-gray-300'
+            }`}
+          >
+            All stages ({view.steps.length})
+          </button>
+          {stageFilter === 'due' && dueSteps.length < view.steps.length && (
+            <span className="text-[10px] text-gray-400 ml-1">
+              {view.steps.length - dueSteps.length} later-stage {view.steps.length - dueSteps.length === 1 ? 'step' : 'steps'} hidden
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Step list */}
       <div className="space-y-2">
-        {view.steps.map((step) => {
+        {visibleSteps.length === 0 && (
+          <div className="text-center py-8 text-xs text-gray-400 border border-dashed border-gray-200 dark:border-neutral-700 rounded-lg">
+            No steps due by {currentStageLabel}.{' '}
+            <button onClick={() => setStageFilter('all')} className="text-blue-600 hover:underline">Show all stages</button>
+          </div>
+        )}
+        {visibleSteps.map((step) => {
           const isCompleted = step.progress?.completedAt != null;
           const isToggling = togglingStepId === step.id;
           return (
