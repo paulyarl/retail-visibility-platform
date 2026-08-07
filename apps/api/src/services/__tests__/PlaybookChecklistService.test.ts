@@ -13,6 +13,7 @@ const {
   mockSuggestions,
   mockTriage,
   mockPlaybook,
+  mockCampaigns,
   transactionOps,
 } = vi.hoisted(() => ({
   mockSteps: {
@@ -40,6 +41,9 @@ const {
   mockPlaybook: {
     findUnique: vi.fn(),
   },
+  mockCampaigns: {
+    findUnique: vi.fn(),
+  },
   transactionOps: { updates: [] as any[] },
 }));
 
@@ -50,6 +54,7 @@ vi.mock('../../prisma', () => ({
     mkt_playbook_checklist_suggestions: mockSuggestions,
     mkt_campaign_triage_results: mockTriage,
     mkt_playbook_catalog: mockPlaybook,
+    mkt_campaigns_list: mockCampaigns,
     $transaction: vi.fn(async (arg: any) => {
       if (typeof arg === 'function') {
         // Callback form — pass a tx that proxies to the model mocks
@@ -158,6 +163,8 @@ const suggestionRow = (overrides: Partial<any> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockProgress.count.mockResolvedValue(0);
+  // Default: campaign sits at 'seek' (pre-sale) for the stage-aware soft gate.
+  mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek' });
 });
 
 // ====================
@@ -282,6 +289,50 @@ describe('PlaybookChecklistService — step CRUD', () => {
       });
 
       expect(mockSteps.create).toHaveBeenCalled();
+    });
+
+    it('persists stage_tag when provided', async () => {
+      mockSteps.findMany.mockResolvedValue([]);
+      mockSteps.create.mockResolvedValue(stepRow({ step_order: 1, stage_tag: 'preview_built' }));
+
+      const result = await PlaybookChecklistService.createStep(PLAYBOOK_ID, {
+        title: 'Build preview',
+        stepType: 'deliverable',
+        stageTag: 'preview_built',
+      });
+
+      expect(mockSteps.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ stage_tag: 'preview_built' }),
+        }),
+      );
+      expect(result.stageTag).toBe('preview_built');
+    });
+
+    it('defaults stage_tag to null when omitted', async () => {
+      mockSteps.findMany.mockResolvedValue([]);
+      mockSteps.create.mockResolvedValue(stepRow({ step_order: 1 }));
+
+      await PlaybookChecklistService.createStep(PLAYBOOK_ID, {
+        title: 'Untagged step',
+        stepType: 'manual',
+      });
+
+      expect(mockSteps.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ stage_tag: null }),
+        }),
+      );
+    });
+
+    it('rejects invalid stage_tag', async () => {
+      await expect(
+        PlaybookChecklistService.createStep(PLAYBOOK_ID, {
+          title: 'Bad stage step',
+          stepType: 'manual',
+          stageTag: 'closing_soon' as any,
+        }),
+      ).rejects.toThrow(/Invalid stage_tag/);
     });
   });
 
@@ -473,6 +524,70 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('req-2');
     });
+
+    // ─── Stage-aware soft gate (migration 175) ─────────────────────────
+
+    it('stage-aware: later-stage steps do not gate a seek-stage campaign', async () => {
+      mockTriage.findUnique.mockResolvedValue(triageAcceptedRow());
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek' });
+      mockSteps.findMany.mockResolvedValue([
+        stepRow({ id: 'seek-step', is_required: true, stage_tag: 'seek' }),
+        stepRow({ id: 'paid-step', is_required: true, stage_tag: 'paid' }),
+        stepRow({ id: 'delivered-step', is_required: true, stage_tag: 'delivered' }),
+        stepRow({ id: 'untagged-step', is_required: true, stage_tag: null }),
+      ]);
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getIncompleteRequiredSteps(CAMPAIGN_ID);
+
+      // seek-tagged + untagged gate; paid/delivered-tagged do not
+      expect(result.map((s) => s.id)).toEqual(['seek-step', 'untagged-step']);
+      expect(result[0].stageTag).toBe('seek');
+    });
+
+    it('stage-aware: at paid stage, paid-tagged steps gate but delivered-tagged do not', async () => {
+      mockTriage.findUnique.mockResolvedValue(triageAcceptedRow());
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'paid' });
+      mockSteps.findMany.mockResolvedValue([
+        stepRow({ id: 'seek-step', is_required: true, stage_tag: 'seek' }),
+        stepRow({ id: 'paid-step', is_required: true, stage_tag: 'paid' }),
+        stepRow({ id: 'delivered-step', is_required: true, stage_tag: 'delivered' }),
+      ]);
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getIncompleteRequiredSteps(CAMPAIGN_ID);
+
+      expect(result.map((s) => s.id)).toEqual(['seek-step', 'paid-step']);
+    });
+
+    it('stage-aware: completed later-stage steps never gate regardless', async () => {
+      mockTriage.findUnique.mockResolvedValue(triageAcceptedRow());
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek' });
+      mockSteps.findMany.mockResolvedValue([
+        stepRow({ id: 'paid-step', is_required: true, stage_tag: 'paid' }),
+      ]);
+      mockProgress.findMany.mockResolvedValue([
+        { step_id: 'paid-step', completed_at: new Date(), completed_by: 'uid-1', note: null },
+      ]);
+
+      const result = await PlaybookChecklistService.getIncompleteRequiredSteps(CAMPAIGN_ID);
+
+      expect(result).toEqual([]);
+    });
+
+    it('stage-aware: unknown campaign stage (recovery track) falls back to gating everything', async () => {
+      mockTriage.findUnique.mockResolvedValue(triageAcceptedRow());
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'audit_identified' });
+      mockSteps.findMany.mockResolvedValue([
+        stepRow({ id: 'seek-step', is_required: true, stage_tag: 'seek' }),
+        stepRow({ id: 'paid-step', is_required: true, stage_tag: 'paid' }),
+      ]);
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getIncompleteRequiredSteps(CAMPAIGN_ID);
+
+      expect(result.map((s) => s.id)).toEqual(['seek-step', 'paid-step']);
+    });
   });
 });
 
@@ -617,7 +732,6 @@ describe('PlaybookChecklistService — suggestions', () => {
         { title: 'Check NAP', stepType: 'manual' },
         'uid-admin',
       );
-
       // Shift steps at step_order >= 4 (anchor.order + 1)
       expect(mockSteps.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -632,6 +746,72 @@ describe('PlaybookChecklistService — suggestions', () => {
         }),
       );
       expect(result.status).toBe('accepted');
+    });
+
+    it('accept — add + after: inherits the anchor stage_tag when the proposal omits one', async () => {
+      const anchor = stepRow({ step_order: 3, stage_tag: 'shown' });
+      mockSuggestions.findUnique.mockResolvedValueOnce(
+        suggestionRow({ suggestion_kind: 'add', position: 'after', step_id: STEP_ID }),
+      );
+      mockSteps.findUnique.mockResolvedValueOnce(anchor); // anchor lookup in tx
+      mockSteps.updateMany.mockResolvedValue({ count: 1 });
+      mockSteps.create.mockResolvedValue(stepRow({ id: 'pbcs-new', step_order: 4, stage_tag: 'shown' }));
+      mockSuggestions.update.mockResolvedValue({});
+      mockSuggestions.findUnique.mockResolvedValueOnce(
+        suggestionRow({ status: 'accepted', suggestion_kind: 'add', position: 'after' }),
+      );
+
+      await PlaybookChecklistService.acceptSuggestion(
+        'pbsg-001',
+        { title: 'Follow up with owner', stepType: 'outreach' },
+        'uid-admin',
+      );
+
+      expect(mockSteps.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ step_order: 4, stage_tag: 'shown' }),
+        }),
+      );
+    });
+
+    it('accept — add + after: explicit proposed stage_tag wins over the anchor tag', async () => {
+      const anchor = stepRow({ step_order: 3, stage_tag: 'shown' });
+      mockSuggestions.findUnique.mockResolvedValueOnce(
+        suggestionRow({ suggestion_kind: 'add', position: 'after', step_id: STEP_ID }),
+      );
+      mockSteps.findUnique.mockResolvedValueOnce(anchor);
+      mockSteps.updateMany.mockResolvedValue({ count: 1 });
+      mockSteps.create.mockResolvedValue(stepRow({ id: 'pbcs-new', step_order: 4, stage_tag: 'paid' }));
+      mockSuggestions.update.mockResolvedValue({});
+      mockSuggestions.findUnique.mockResolvedValueOnce(
+        suggestionRow({ status: 'accepted', suggestion_kind: 'add', position: 'after' }),
+      );
+
+      await PlaybookChecklistService.acceptSuggestion(
+        'pbsg-001',
+        { title: 'Start fulfillment', stepType: 'manual', stage_tag: 'paid' },
+        'uid-admin',
+      );
+
+      expect(mockSteps.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ stage_tag: 'paid' }),
+        }),
+      );
+    });
+
+    it('accept — rejects an invalid proposed stage_tag', async () => {
+      mockSuggestions.findUnique.mockResolvedValueOnce(
+        suggestionRow({ suggestion_kind: 'add', position: 'after', step_id: STEP_ID }),
+      );
+
+      await expect(
+        PlaybookChecklistService.acceptSuggestion(
+          'pbsg-001',
+          { title: 'Bad stage', stepType: 'manual', stage_tag: 'nope' },
+          'uid-admin',
+        ),
+      ).rejects.toThrow(/Invalid stage_tag/);
     });
 
     it('accept — add + supersede: inserts at anchor order and deactivates anchor', async () => {

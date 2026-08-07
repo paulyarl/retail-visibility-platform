@@ -1017,7 +1017,7 @@ export interface StageTransitionInput {
 
 export interface ChecklistIncompleteError {
   code: 'checklist_incomplete';
-  incompleteSteps: { id: string; title: string }[];
+  incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   message: string;
 }
 
@@ -3581,6 +3581,7 @@ class MarketingOpsService extends AdminApiSingleton {
         action_config: input.actionConfig,
         is_required: input.isRequired,
         is_active: input.isActive,
+        stage_tag: input.stageTag,
       }),
     });
     if (!res.ok) {
@@ -3604,6 +3605,7 @@ class MarketingOpsService extends AdminApiSingleton {
         is_required: input.isRequired,
         is_active: input.isActive,
         step_order: input.stepOrder,
+        stage_tag: input.stageTag,
       }),
     });
     if (!res.ok) {
@@ -4219,6 +4221,40 @@ export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
 export const SUGGESTION_POSITIONS = ['before', 'after', 'supersede'] as const;
 export type SuggestionPosition = (typeof SUGGESTION_POSITIONS)[number];
 
+/**
+ * Stage tags — which campaign stage a checklist step belongs to (migration 175).
+ * The checklist is visible at every stage; the tag shows what each stage
+ * expects. Steps tagged at or before the campaign's current stage feed the
+ * transition soft gate; later-stage and null-tagged steps do not restrict
+ * early transitions (null = untagged, always gates).
+ */
+export const CHECKLIST_STAGE_TAGS = [
+  'seek',
+  'preview_built',
+  'shown',
+  'paid',
+  'delivered',
+  'retainer_pitched',
+  'retainer_won',
+  'lost',
+  'dead',
+  'tenant_onboarded',
+] as const;
+export type ChecklistStageTag = (typeof CHECKLIST_STAGE_TAGS)[number];
+
+export const CHECKLIST_STAGE_TAG_LABELS: Record<ChecklistStageTag, string> = {
+  seek: 'Seek',
+  preview_built: 'Preview Built',
+  shown: 'Shown',
+  paid: 'Paid',
+  delivered: 'Delivered',
+  retainer_pitched: 'Retainer Pitched',
+  retainer_won: 'Retainer Won',
+  lost: 'Lost',
+  dead: 'Dead',
+  tenant_onboarded: 'Tenant Onboarded',
+};
+
 export interface ChecklistStepInput {
   title: string;
   instructions?: string;
@@ -4226,6 +4262,7 @@ export interface ChecklistStepInput {
   actionConfig?: Record<string, any>;
   isRequired?: boolean;
   isActive?: boolean;
+  stageTag?: ChecklistStageTag | null;
 }
 
 export interface PlaybookChecklistStep {
@@ -4238,6 +4275,7 @@ export interface PlaybookChecklistStep {
   actionConfig: Record<string, any>;
   isRequired: boolean;
   isActive: boolean;
+  stageTag: ChecklistStageTag | null;
   createdAt: string;
   updatedAt: string;
 }

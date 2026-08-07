@@ -20,9 +20,12 @@ import marketingOpsService, {
   type PlaybookChecklistStep,
   type PlaybookChecklistSuggestion,
   type ChecklistStepType,
+  type ChecklistStageTag,
   type SuggestionKind,
   type SuggestionPosition,
   CHECKLIST_STEP_TYPES,
+  CHECKLIST_STAGE_TAGS,
+  CHECKLIST_STAGE_TAG_LABELS,
 } from '@/services/MarketingOpsService';
 
 const STEP_TYPE_COLORS: Record<ChecklistStepType, string> = {
@@ -40,6 +43,19 @@ const CATEGORY_COLORS: Record<string, string> = {
   triage_management: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
 };
 
+const STAGE_TAG_COLORS: Record<string, string> = {
+  seek: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  preview_built: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  shown: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  paid: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  delivered: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  retainer_pitched: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  retainer_won: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  lost: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  dead: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  tenant_onboarded: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+};
+
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
@@ -51,6 +67,7 @@ const emptyStepForm = () => ({
   actionConfig: {} as Record<string, any>,
   isRequired: true,
   isActive: true,
+  stageTag: 'seek' as ChecklistStageTag,
 });
 
 interface Props {
@@ -122,6 +139,7 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
       actionConfig: step.actionConfig ?? {},
       isRequired: step.isRequired,
       isActive: step.isActive,
+      stageTag: step.stageTag ?? 'seek',
     });
     setShowStepForm(true);
   };
@@ -142,6 +160,7 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
           actionConfig: stepForm.actionConfig,
           isRequired: stepForm.isRequired,
           isActive: stepForm.isActive,
+          stageTag: stepForm.stageTag,
         });
         onSuccess(`Updated step "${stepForm.title}"`);
       } else {
@@ -152,6 +171,7 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
           actionConfig: stepForm.actionConfig,
           isRequired: stepForm.isRequired,
           isActive: stepForm.isActive,
+          stageTag: stepForm.stageTag,
         });
         onSuccess(`Created step "${stepForm.title}"`);
       }
@@ -365,7 +385,7 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
           {/* Step list header */}
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Ordered checklist steps. Required steps gate stage transitions (soft gate).
+              Ordered checklist steps tagged by pipeline stage. Required steps gate stage transitions (soft gate — only steps at or before the current stage).
             </p>
             <button
               onClick={handleNewStep}
@@ -387,6 +407,7 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
                   <tr>
                     <th className="text-left px-3 py-2 font-medium">Order</th>
                     <th className="text-left px-3 py-2 font-medium">Type</th>
+                    <th className="text-left px-3 py-2 font-medium">Stage</th>
                     <th className="text-left px-3 py-2 font-medium">Title</th>
                     <th className="text-center px-3 py-2 font-medium">Required</th>
                     <th className="text-center px-3 py-2 font-medium">Active</th>
@@ -411,6 +432,15 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
                         <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${STEP_TYPE_COLORS[step.stepType] ?? 'bg-gray-100 text-gray-700'}`}>
                           {step.stepType.replace(/_/g, ' ')}
                         </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {step.stageTag ? (
+                          <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${STAGE_TAG_COLORS[step.stageTag] ?? 'bg-gray-100 text-gray-700'}`}>
+                            {CHECKLIST_STAGE_TAG_LABELS[step.stageTag] ?? step.stageTag.replace(/_/g, ' ')}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 italic">untagged</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
                         {step.title}
@@ -469,6 +499,15 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
                         <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Stage</label>
+                    <select value={stepForm.stageTag} onChange={(e) => setStepForm({ ...stepForm, stageTag: e.target.value as ChecklistStageTag })} className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800">
+                      {CHECKLIST_STAGE_TAGS.map((t) => (
+                        <option key={t} value={t}>{CHECKLIST_STAGE_TAG_LABELS[t]}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-gray-400 mt-1">Which pipeline stage this step belongs to. Required steps gate transitions out of stages at or after their tag.</p>
                   </div>
 
                   {/* Type-specific action config */}

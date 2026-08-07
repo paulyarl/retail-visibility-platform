@@ -87,7 +87,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   // Soft gate for incomplete required checklist steps — operator may acknowledge and proceed.
   const [checklistIncompleteDialog, setChecklistIncompleteDialog] = useState<{
     toStage: CampaignStage;
-    incompleteSteps: { id: string; title: string }[];
+    incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   } | null>(null);
   const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
   // Sprint 5: latest city_analysis execution for SyncReportCard
@@ -386,6 +386,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
               {checklistIncompleteDialog.incompleteSteps.map((s) => (
                 <li key={s.id} className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
                   <Circle className="w-3 h-3" /> {s.title}
+                  {s.stage_tag && (
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400">({s.stage_tag.replace(/_/g, ' ')})</span>
+                  )}
                 </li>
               ))}
             </ul>

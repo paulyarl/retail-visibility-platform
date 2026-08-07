@@ -50,6 +50,45 @@ export type SuggestionPosition = (typeof SUGGESTION_POSITIONS)[number];
 export const SUGGESTION_STATUSES = ['pending', 'accepted', 'rejected'] as const;
 export type SuggestionStatus = (typeof SUGGESTION_STATUSES)[number];
 
+/**
+ * Stage tags — which campaign stage a checklist step belongs to. Mirrors the
+ * review-track pipeline stages (stageTransitionSchema in marketing-ops.ts).
+ * The checklist stays visible at every stage; the tag tells the operator what
+ * each stage expects. NULL/undefined tag = untagged (always gates).
+ */
+export const CHECKLIST_STAGE_TAGS = [
+  'seek',
+  'preview_built',
+  'shown',
+  'paid',
+  'delivered',
+  'retainer_pitched',
+  'retainer_won',
+  'lost',
+  'dead',
+  'tenant_onboarded',
+] as const;
+export type ChecklistStageTag = (typeof CHECKLIST_STAGE_TAGS)[number];
+
+/**
+ * Pipeline order for the stage-aware soft gate: when leaving stage F, only
+ * required steps tagged at or before F gate the transition. Steps tagged with
+ * later stages (e.g. fulfillment work tagged 'paid') must not warn on early
+ * pre-sale transitions.
+ */
+const STAGE_PIPELINE_ORDER: Record<string, number> = {
+  seek: 0,
+  preview_built: 1,
+  shown: 2,
+  paid: 3,
+  delivered: 4,
+  retainer_pitched: 5,
+  retainer_won: 6,
+  lost: 7,
+  dead: 8,
+  tenant_onboarded: 9,
+};
+
 export interface ChecklistStepInput {
   title: string;
   instructions?: string;
@@ -57,6 +96,7 @@ export interface ChecklistStepInput {
   actionConfig?: Record<string, any>;
   isRequired?: boolean;
   isActive?: boolean;
+  stageTag?: ChecklistStageTag | null;
 }
 
 export interface ChecklistStepUpdateInput {
@@ -67,6 +107,7 @@ export interface ChecklistStepUpdateInput {
   isRequired?: boolean;
   isActive?: boolean;
   stepOrder?: number;
+  stageTag?: ChecklistStageTag | null;
 }
 
 export interface ChecklistStepRow {
@@ -79,6 +120,7 @@ export interface ChecklistStepRow {
   actionConfig: Record<string, any>;
   isRequired: boolean;
   isActive: boolean;
+  stageTag: ChecklistStageTag | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -108,6 +150,7 @@ export interface CampaignChecklistView {
 export interface IncompleteRequiredStep {
   id: string;
   title: string;
+  stageTag: string | null;
 }
 
 export interface SuggestionSubmitInput {
@@ -174,6 +217,12 @@ export class PlaybookChecklistService extends BaseService {
     }
   }
 
+  private validateStageTag(stageTag: string): asserts stageTag is ChecklistStageTag {
+    if (!CHECKLIST_STAGE_TAGS.includes(stageTag as ChecklistStageTag)) {
+      throw new Error(`Invalid stage_tag: ${stageTag}. Must be one of ${CHECKLIST_STAGE_TAGS.join(', ')}`);
+    }
+  }
+
   /**
    * Reject credential configs that look like they contain secret material.
    * credential_ref must be a pointer (vault path, password-manager entry name),
@@ -236,6 +285,7 @@ export class PlaybookChecklistService extends BaseService {
     this.validateStepType(input.stepType);
     const actionConfig = input.actionConfig ?? {};
     this.validateActionConfig(input.stepType, actionConfig);
+    if (input.stageTag != null) this.validateStageTag(input.stageTag);
 
     // Next step_order = max + 1 (append at end by default)
     const existing = await this.prisma.mkt_playbook_checklist_steps.findMany({
@@ -259,6 +309,7 @@ export class PlaybookChecklistService extends BaseService {
           action_config: actionConfig as any,
           is_required: input.isRequired ?? true,
           is_active: input.isActive ?? true,
+          stage_tag: input.stageTag ?? null,
         },
       });
       logger.info('Checklist step created', ctx, { stepId: id, playbookId, stepType: input.stepType });
@@ -274,6 +325,7 @@ export class PlaybookChecklistService extends BaseService {
     if (input.stepType && input.actionConfig) {
       this.validateActionConfig(input.stepType, input.actionConfig);
     }
+    if (input.stageTag != null) this.validateStageTag(input.stageTag);
 
     const data: any = {};
     if (input.title !== undefined) data.title = input.title;
@@ -283,6 +335,7 @@ export class PlaybookChecklistService extends BaseService {
     if (input.isRequired !== undefined) data.is_required = input.isRequired;
     if (input.isActive !== undefined) data.is_active = input.isActive;
     if (input.stepOrder !== undefined) data.step_order = input.stepOrder;
+    if (input.stageTag !== undefined) data.stage_tag = input.stageTag;
 
     try {
       const row = await this.prisma.mkt_playbook_checklist_steps.update({ where: { id: stepId }, data });
@@ -470,13 +523,31 @@ export class PlaybookChecklistService extends BaseService {
 
   /**
    * Incomplete required steps for the soft gate. Consumed by the transition route.
+   *
+   * Stage-aware (migration 175): only steps tagged at or before the campaign's
+   * CURRENT stage gate the transition — leaving 'seek' is gated by 'seek'
+   * steps, not by future fulfillment work tagged 'paid'. Untagged steps always
+   * gate (legacy behavior), and an unknown campaign stage (e.g. a
+   * recovery-track pipeline stage) falls back to gating on everything.
    */
   async getIncompleteRequiredSteps(campaignId: string, ctx?: RequestCtx): Promise<IncompleteRequiredStep[]> {
     const view = await this.getCampaignChecklist(campaignId, ctx);
     if (!view.playbook) return [];
+
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { stage: true },
+    });
+    const currentOrder = campaign?.stage != null ? STAGE_PIPELINE_ORDER[campaign.stage] : undefined;
+
     return view.steps
       .filter((s) => s.isRequired && (s.progress?.completedAt == null))
-      .map((s) => ({ id: s.id, title: s.title }));
+      .filter((s) => {
+        if (s.stageTag == null || currentOrder === undefined) return true;
+        const tagOrder = STAGE_PIPELINE_ORDER[s.stageTag];
+        return tagOrder === undefined || tagOrder <= currentOrder;
+      })
+      .map((s) => ({ id: s.id, title: s.title, stageTag: s.stageTag }));
   }
 
   // ─── Suggestions (operator feedback loop) ──────────────────────────────
@@ -641,6 +712,10 @@ export class PlaybookChecklistService extends BaseService {
     this.validateStepType(stepType);
     const actionConfig = proposedStep.actionConfig ?? proposedStep.action_config ?? {};
     this.validateActionConfig(stepType as ChecklistStepType, actionConfig);
+    // Stage tag: explicit proposal wins; otherwise inherit the anchor's tag so
+    // suggested steps land in the same stage as the step they relate to.
+    const proposedStageTag = proposedStep.stageTag ?? proposedStep.stage_tag ?? null;
+    if (proposedStageTag != null) this.validateStageTag(proposedStageTag);
 
     if (!anchorStepId || !position) {
       // Append at end
@@ -662,6 +737,7 @@ export class PlaybookChecklistService extends BaseService {
           action_config: actionConfig,
           is_required: proposedStep.isRequired ?? proposedStep.is_required ?? true,
           is_active: true,
+          stage_tag: proposedStageTag,
         },
       });
       return;
@@ -669,6 +745,7 @@ export class PlaybookChecklistService extends BaseService {
 
     const anchor = await tx.mkt_playbook_checklist_steps.findUnique({ where: { id: anchorStepId } });
     if (!anchor) throw new NotFoundError('Anchor step not found (may have been deleted)');
+    const stageTag = proposedStageTag ?? anchor.stage_tag ?? null;
 
     if (position === 'supersede') {
       // Insert new step at anchor's step_order, deactivate anchor
@@ -683,6 +760,7 @@ export class PlaybookChecklistService extends BaseService {
           action_config: actionConfig,
           is_required: proposedStep.isRequired ?? proposedStep.is_required ?? true,
           is_active: true,
+          stage_tag: stageTag,
         },
       });
       await tx.mkt_playbook_checklist_steps.update({
@@ -709,6 +787,7 @@ export class PlaybookChecklistService extends BaseService {
         action_config: actionConfig,
         is_required: proposedStep.isRequired ?? proposedStep.is_required ?? true,
         is_active: true,
+        stage_tag: stageTag,
       },
     });
   }
@@ -739,6 +818,7 @@ export class PlaybookChecklistService extends BaseService {
         stepType: target.step_type,
         actionConfig: target.action_config,
         isRequired: target.is_required,
+        stageTag: target.stage_tag,
       };
       throw err;
     }
@@ -760,6 +840,13 @@ export class PlaybookChecklistService extends BaseService {
     }
     if (proposedStep.isRequired !== undefined) data.is_required = proposedStep.isRequired;
     else if (proposedStep.is_required !== undefined) data.is_required = proposedStep.is_required;
+    if (proposedStep.stageTag !== undefined) {
+      if (proposedStep.stageTag != null) this.validateStageTag(proposedStep.stageTag);
+      data.stage_tag = proposedStep.stageTag;
+    } else if (proposedStep.stage_tag !== undefined) {
+      if (proposedStep.stage_tag != null) this.validateStageTag(proposedStep.stage_tag);
+      data.stage_tag = proposedStep.stage_tag;
+    }
 
     if (data.step_type && data.action_config) {
       this.validateActionConfig(data.step_type, data.action_config);
@@ -823,6 +910,7 @@ export class PlaybookChecklistService extends BaseService {
       actionConfig: (r.action_config ?? {}) as Record<string, any>,
       isRequired: r.is_required,
       isActive: r.is_active,
+      stageTag: (r.stage_tag ?? null) as ChecklistStageTag | null,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
     };

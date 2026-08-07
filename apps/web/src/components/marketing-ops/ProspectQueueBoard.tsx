@@ -74,7 +74,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [checklistError, setChecklistError] = useState<{ campaignId: string; steps: { id: string; title: string }[] } | null>(null);
+  const [checklistError, setChecklistError] = useState<{ campaignId: string; steps: { id: string; title: string; stage_tag?: string | null }[] } | null>(null);
 
   const staffUsers = useStaffUsers();
   const currentUserId = staffUsers[0]?.id ?? null;
@@ -320,6 +320,9 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                 <li key={s.id} className="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   {s.title}
+                  {s.stage_tag && (
+                    <span className="text-[9px] text-gray-400">({s.stage_tag.replace(/_/g, ' ')})</span>
+                  )}
                 </li>
               ))}
             </ul>

@@ -542,6 +542,11 @@ const playbookReorderSchema = z.object({
 
 const checklistStepTypeEnum = z.enum(['manual', 'url_check', 'ai_prompt', 'deliverable', 'outreach', 'credentials']);
 
+const checklistStageTagEnum = z.enum([
+  'seek', 'preview_built', 'shown', 'paid', 'delivered',
+  'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded',
+]);
+
 const checklistStepCreateSchema = z.object({
   title: z.string().min(1).max(255),
   instructions: z.string().optional(),
@@ -549,6 +554,7 @@ const checklistStepCreateSchema = z.object({
   action_config: z.record(z.string(), z.any()).optional(),
   is_required: z.boolean().optional(),
   is_active: z.boolean().optional(),
+  stage_tag: checklistStageTagEnum.nullable().optional(),
 });
 
 const checklistStepUpdateSchema = z.object({
@@ -559,6 +565,7 @@ const checklistStepUpdateSchema = z.object({
   is_required: z.boolean().optional(),
   is_active: z.boolean().optional(),
   step_order: z.number().int().min(0).optional(),
+  stage_tag: checklistStageTagEnum.nullable().optional(),
 });
 
 const checklistReorderSchema = z.object({
@@ -861,7 +868,9 @@ router.post('/:id/transition', async (req: any, res: Response) => {
     const parsed = stageTransitionSchema.parse(req.body);
 
     // Soft gate: if the campaign has an effective playbook with incomplete
-    // required checklist steps, warn unless acknowledge_incomplete is true.
+    // required checklist steps at or before the campaign's current stage,
+    // warn unless acknowledge_incomplete is true. Steps tagged with later
+    // stages (e.g. fulfillment work) do not gate early pre-sale transitions.
     // Never hard-blocks — the operator may acknowledge and proceed.
     if (!parsed.acknowledge_incomplete) {
       const incomplete = await PlaybookChecklistService.getIncompleteRequiredSteps(req.params.id, getCtx(req));
@@ -869,7 +878,7 @@ router.post('/:id/transition', async (req: any, res: Response) => {
         return res.status(409).json({
           success: false,
           error: 'checklist_incomplete',
-          incomplete_steps: incomplete.map((s) => ({ id: s.id, title: s.title })),
+          incomplete_steps: incomplete.map((s) => ({ id: s.id, title: s.title, stage_tag: s.stageTag })),
         });
       }
     }
@@ -2868,6 +2877,7 @@ router.post('/playbooks/:id/checklist', async (req: any, res: Response) => {
       actionConfig: parsed.action_config,
       isRequired: parsed.is_required,
       isActive: parsed.is_active,
+      stageTag: parsed.stage_tag,
     }, getCtx(req));
     res.status(201).json({ success: true, data: step });
   } catch (error) {
@@ -2906,6 +2916,7 @@ router.put('/checklist-steps/:id', async (req: any, res: Response) => {
       isRequired: parsed.is_required,
       isActive: parsed.is_active,
       stepOrder: parsed.step_order,
+      stageTag: parsed.stage_tag,
     }, getCtx(req));
     res.json({ success: true, data: step });
   } catch (error) {

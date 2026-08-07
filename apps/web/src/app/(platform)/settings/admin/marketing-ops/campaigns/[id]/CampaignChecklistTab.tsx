@@ -27,8 +27,11 @@ import marketingOpsService, {
   type PlaybookChecklistSuggestion,
   type SuggestionKind,
   type SuggestionPosition,
+  type ChecklistStageTag,
   SUGGESTION_KINDS,
   SUGGESTION_POSITIONS,
+  CHECKLIST_STAGE_TAGS,
+  CHECKLIST_STAGE_TAG_LABELS,
 } from '@/services/MarketingOpsService';
 
 interface Props {
@@ -45,6 +48,31 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   credentials: 'Credentials',
 };
 
+// Stage badge colors — pre-sale blue, fulfillment teal, retainer amber/green,
+// terminal stages gray/red, tenant conversion purple.
+const STAGE_TAG_COLORS: Record<string, string> = {
+  seek: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  preview_built: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  shown: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  paid: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  delivered: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  retainer_pitched: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  retainer_won: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  lost: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  dead: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  tenant_onboarded: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+};
+
+function StageTagBadge({ stageTag }: { stageTag: string | null }) {
+  if (!stageTag) return null;
+  const label = CHECKLIST_STAGE_TAG_LABELS[stageTag as ChecklistStageTag] ?? stageTag.replace(/_/g, ' ');
+  return (
+    <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-medium ${STAGE_TAG_COLORS[stageTag] ?? 'bg-gray-100 text-gray-600'}`}>
+      {label}
+    </span>
+  );
+}
+
 export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props) {
   const [view, setView] = useState<CampaignChecklistView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +86,7 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
   const [suggestionStep, setSuggestionStep] = useState<ChecklistStepView | null>(null);
   const [suggestionKind, setSuggestionKind] = useState<SuggestionKind>('add');
   const [suggestionPosition, setSuggestionPosition] = useState<SuggestionPosition | ''>('');
+  const [suggestionStageTag, setSuggestionStageTag] = useState<ChecklistStageTag | ''>('');
   const [proposedTitle, setProposedTitle] = useState('');
   const [proposedInstructions, setProposedInstructions] = useState('');
   const [rationale, setRationale] = useState('');
@@ -121,6 +150,7 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
     setSuggestionStep(step);
     setSuggestionKind(kind);
     setSuggestionPosition(kind === 'add' && step ? 'after' : '');
+    setSuggestionStageTag(step?.stageTag ?? '');
     setProposedTitle(step?.title ?? '');
     setProposedInstructions(step?.instructions ?? '');
     setRationale('');
@@ -141,6 +171,7 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
     try {
       const proposedStep: Record<string, any> = { title: proposedTitle };
       if (proposedInstructions) proposedStep.instructions = proposedInstructions;
+      if (suggestionStageTag) proposedStep.stage_tag = suggestionStageTag;
       await marketingOpsService.submitChecklistSuggestion(campaignId, {
         stepId: suggestionStep?.id ?? null,
         suggestionKind,
@@ -226,6 +257,8 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
           suggestionPosition={suggestionPosition}
           setSuggestionKind={setSuggestionKind}
           setSuggestionPosition={setSuggestionPosition}
+          suggestionStageTag={suggestionStageTag}
+          setSuggestionStageTag={setSuggestionStageTag}
           proposedTitle={proposedTitle}
           setProposedTitle={setProposedTitle}
           proposedInstructions={proposedInstructions}
@@ -329,8 +362,11 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{step.instructions}</p>
                       )}
                     </div>
-                    <span className="text-[10px] text-gray-400 flex-shrink-0">
-                      {STEP_TYPE_LABELS[step.stepType] ?? step.stepType}
+                    <span className="flex items-center gap-1.5 flex-shrink-0">
+                      <StageTagBadge stageTag={step.stageTag} />
+                      <span className="text-[10px] text-gray-400">
+                        {STEP_TYPE_LABELS[step.stepType] ?? step.stepType}
+                      </span>
                     </span>
                   </div>
 
@@ -430,6 +466,8 @@ export default function CampaignChecklistTab({ campaignId, onGoToTriage }: Props
         suggestionPosition={suggestionPosition}
         setSuggestionKind={setSuggestionKind}
         setSuggestionPosition={setSuggestionPosition}
+        suggestionStageTag={suggestionStageTag}
+        setSuggestionStageTag={setSuggestionStageTag}
         proposedTitle={proposedTitle}
         setProposedTitle={setProposedTitle}
         proposedInstructions={proposedInstructions}
@@ -453,6 +491,8 @@ interface SuggestionFormModalProps {
   suggestionPosition: SuggestionPosition | '';
   setSuggestionKind: (k: SuggestionKind) => void;
   setSuggestionPosition: (p: SuggestionPosition | '') => void;
+  suggestionStageTag: ChecklistStageTag | '';
+  setSuggestionStageTag: (t: ChecklistStageTag | '') => void;
   proposedTitle: string;
   setProposedTitle: (s: string) => void;
   proposedInstructions: string;
@@ -465,7 +505,8 @@ interface SuggestionFormModalProps {
 
 function SuggestionFormModal({
   show, onClose, suggestionStep, suggestionKind, suggestionPosition,
-  setSuggestionKind, setSuggestionPosition, proposedTitle, setProposedTitle,
+  setSuggestionKind, setSuggestionPosition, suggestionStageTag, setSuggestionStageTag,
+  proposedTitle, setProposedTitle,
   proposedInstructions, setProposedInstructions, rationale, setRationale,
   onSubmit, submitting,
 }: SuggestionFormModalProps) {
@@ -537,6 +578,19 @@ function SuggestionFormModal({
                   placeholder="e.g. Verify GBP listing is claimed"
                   className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Stage</label>
+                <select
+                  value={suggestionStageTag}
+                  onChange={(e) => setSuggestionStageTag(e.target.value as ChecklistStageTag | '')}
+                  className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800"
+                >
+                  <option value="">untagged</option>
+                  {CHECKLIST_STAGE_TAGS.map((t) => (
+                    <option key={t} value={t}>{CHECKLIST_STAGE_TAG_LABELS[t]}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Proposed instructions</label>
