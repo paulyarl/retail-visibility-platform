@@ -36,7 +36,9 @@ import MarketingCampaignService, {
   CAMPAIGN_CATEGORY_DEFAULT,
 } from '../MarketingCampaignService';
 
-const service = MarketingCampaignService.getInstance();
+// MarketingCampaignService default export is already the singleton instance
+// (export default MarketingCampaignService.getInstance() at the bottom of the file)
+const service = MarketingCampaignService;
 
 // ====================
 // REVIEW TRACK REGRESSION
@@ -52,8 +54,11 @@ describe('review track transitions (regression)', () => {
       seek:             ['preview_built', 'dead'],
       preview_built:    ['shown', 'dead'],
       shown:            ['paid', 'lost', 'tenant_onboarded'],
-      paid:             ['delivered', 'tenant_onboarded'],
-      delivered:        ['retainer_pitched', 'closed', 'tenant_onboarded'],
+      paid:             ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
+      delivered:        ['retainer_pitched', 'closed', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
+      // Registry-driven intake submitted stages — flow back to delivered
+      gbp_intake_submitted:   ['delivered', 'tenant_onboarded'],
+      review_setup_submitted: ['delivered', 'tenant_onboarded'],
       retainer_pitched: ['retainer_won', 'closed'],
       retainer_won:     ['lost', 'tenant_onboarded'],
       lost:             ['seek', 'tenant_onboarded'],

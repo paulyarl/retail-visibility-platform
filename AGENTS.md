@@ -159,4 +159,44 @@ Alert targeting (stored in `crm_alerts.metadata`):
 
 All alerts use `tenant_id = PLATFORM_SCOPE`. Customer-side reader is in `marketing-customer.ts` (`GET /alerts`, `POST /alerts/:id/read`, etc.).
 
+## Intake Portal Generalization (Registry-Driven Intake Forms)
+
+Spec: `docs/LocalBiz/INTAKE_PORTAL_GENERALIZATION_PLAN.md`
+
+Generalizes the token-gated "owner data collection" framework to support multiple intake types (dispute, profile_repair, gbp_optimization, review_response_setup, ...) via a registry-driven architecture.
+
+### Schema (Migration 173)
+- `mkt_intake_definitions` table — declarative `form_schema`, `field_mappings`, `owner_copy`, `niche_overrides` in JSONB
+- `mkt_dispute_intake` — `campaign_id` UNIQUE relaxed to `@@unique([campaign_id, intake_kind])` (1:N relation)
+- FK from `mkt_dispute_intake.intake_kind` → `mkt_intake_definitions.intake_kind`
+
+### Backend Services
+- `apps/api/src/services/intake/IntakeDefinitionService.ts` — loads + caches definitions, builds dynamic Zod schemas from `form_schema`, resolves niche overrides, runs custom validators
+- `apps/api/src/services/intake/writeBehindAdapters.ts` — maps evidence_payload to existing backend domain models (business_hours_list, review_response_settings, etc.)
+- `apps/api/src/services/DisputeIntakeService.ts` — extended with `submitRegistryIntake` (kind-aware idempotency, dynamic Zod validation, write-behind adapters, downstream agent enqueue stub)
+- `apps/api/src/services/MarketingCampaignService.ts` — registry-driven auto-gen hook: checks `getDefinitionsForTrigger(stage)` on non-recovery transitions; `REVIEW_TRANSITIONS` extended with `gbp_intake_submitted` + `review_setup_submitted` stages
+- `apps/api/src/services/RecoveryResolutionService.ts` — updated for 1:N relation (uses `find` on `mkt_dispute_intake` array, `findFirst` for `findByCampaign`)
+
+### Routes
+- `apps/api/src/routes/recovery-intake-public.ts` — dispatches to `submitRegistryIntake` for registry kinds; `GET /options` endpoint for dynamic option sources; `reissue` accepts `intakeKind`
+- `apps/api/src/routes/marketing-ops.ts` — `GET /recovery/:campaignId/intake` accepts `intakeKind` query param (returns single intake) or returns all intakes (array); `reissue-link` + `attachments/:id` accept `intakeKind`
+
+### Frontend
+- `apps/web/src/app/recovery/intake/IntakeFormRenderer.tsx` — generic, registry-driven form renderer (text, url, email, phone, textarea, select, radio, multiselect, checkbox, chips, hours_grid, attachments, number, date, object/nested)
+- `apps/web/src/app/recovery/intake/IntakePageClient.tsx` — registry render path: detects `context.definition` and renders `IntakeFormRenderer` instead of hardcoded form fields
+- `apps/web/src/services/RecoveryIntakePublicService.ts` — `submitRegistryIntake`, `getOptions`, `reissueLink(campaignId, intakeKind)`
+- `apps/web/src/services/RecoveryOpsService.ts` — `getIntake(campaignId, intakeKind)`, `reissueLink(campaignId, intakeKind)`, `downloadAttachment(campaignId, attachmentId, fileName, intakeKind)`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/recovery/[campaignId]/RecoveryDetailClient.tsx` — generic evidence payload renderer for registry kinds (JSON display + downstream action panel)
+
+### Tests
+- `apps/api/src/services/__tests__/IntakeDefinitionService.test.ts` (15 tests) — getByKind, getDefinitionsForTrigger, resolve (niche overrides), buildSubmitSchema (dynamic Zod), cache invalidation
+- `apps/api/src/services/__tests__/DisputeIntakeService.test.ts` (21 tests) — existing dispute tests + 6 new submitRegistryIntake tests (success, idempotency, expired/invalid token, missing definition, Zod validation failure)
+
+### Key Patterns
+- **Code-defined kinds** (`dispute`, `profile_repair`): hardcoded form fields in `IntakePageClient`, validated by `recovery-intake.schema.ts`
+- **Registry-driven kinds** (`gbp_optimization`, `review_response_setup`): dynamic form fields from `mkt_intake_definitions.form_schema`, validated by `IntakeDefinitionService.buildSubmitSchema`
+- **Niche overrides**: `niche_overrides[category]` can add fields, override field labels/help, and override owner copy per business category
+- **Downstream handoff**: stubbed enqueue with manual import path (plan §7.4)
+
+
 

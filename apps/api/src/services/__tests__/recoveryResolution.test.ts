@@ -12,6 +12,11 @@ const {
   mockSections,
   mockFilterFlags,
   mockStageHistory,
+  mockPromptService,
+  mockCampaignService,
+  mockAiResult,
+  mockProvider,
+  mockFactoryInstance,
 } = vi.hoisted(() => ({
   mockExecutions: {
     findFirst: vi.fn(),
@@ -25,6 +30,26 @@ const {
   mockSections: { createMany: vi.fn() },
   mockFilterFlags: { create: vi.fn() },
   mockStageHistory: { create: vi.fn() },
+  mockPromptService: {
+    createExecution: vi.fn(),
+    getExecution: vi.fn(),
+    updateExecution: vi.fn(),
+  },
+  mockCampaignService: {
+    transitionStage: vi.fn(),
+  },
+  mockAiResult: {
+    content: '{"recovery_resolution": {"deliverableText": "This is a professionally drafted response to the complaint that acknowledges the issue and offers a fair resolution. We take all feedback seriously and appreciate the opportunity to make things right.", "submissionGuide": "1. Log into your Google Business Profile. 2. Navigate to Reviews. 3. Click Reply on the complaint. 4. Paste the response draft. 5. Click Post."}}',
+    usage: { totalTokens: 450 },
+  },
+  mockProvider: {
+    generateChatCompletion: vi.fn(),
+    isAvailable: vi.fn().mockReturnValue(true),
+  },
+  mockFactoryInstance: {
+    getChatConfig: vi.fn(),
+    generateChatCompletion: vi.fn(),
+  },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -59,36 +84,20 @@ vi.mock('../../config/unifiedConfig', () => ({
 }));
 
 // Mock MarketingPromptService (default export is an instance)
-const mockPromptService = {
-  createExecution: vi.fn(),
-  getExecution: vi.fn(),
-  updateExecution: vi.fn(),
-};
 vi.mock('../MarketingPromptService', () => ({
   default: mockPromptService,
 }));
 
 // Mock MarketingCampaignService (default export is an instance)
-const mockCampaignService = {
-  transitionStage: vi.fn(),
-};
 vi.mock('../MarketingCampaignService', () => ({
   default: mockCampaignService,
 }));
 
 // Mock AiProviderFactory (default export is the singleton instance)
-const mockAiResult = {
-  content: '{"recovery_resolution": {"deliverableText": "This is a professionally drafted response to the complaint that acknowledges the issue and offers a fair resolution. We take all feedback seriously and appreciate the opportunity to make things right.", "submissionGuide": "1. Log into your Google Business Profile. 2. Navigate to Reviews. 3. Click Reply on the complaint. 4. Paste the response draft. 5. Click Post."}}',
-  usage: { totalTokens: 450 },
-};
-const mockProvider = {
-  generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
-  isAvailable: vi.fn().mockReturnValue(true),
-};
-const mockFactoryInstance = {
-  getChatConfig: vi.fn().mockResolvedValue({ provider: mockProvider, model: 'gpt-4o-mini' }),
-  generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
-};
+// mockAiResult, mockProvider, mockFactoryInstance are in vi.hoisted above
+mockProvider.generateChatCompletion.mockResolvedValue(mockAiResult);
+mockFactoryInstance.getChatConfig.mockResolvedValue({ provider: mockProvider, model: 'gpt-4o-mini' });
+mockFactoryInstance.generateChatCompletion.mockResolvedValue(mockAiResult);
 vi.mock('../ai-providers/AiProviderFactory', () => ({
   default: mockFactoryInstance,
 }));
@@ -105,14 +114,16 @@ const mockCampaign = {
   campaign_category: 'recovery_management',
   notes: 'Customer complained about late delivery and damaged product.',
   mkt_audits_list: [],
-  mkt_dispute_intake: {
+  // mkt_dispute_intake is now 1:N (composite unique on campaign_id + intake_kind)
+  mkt_dispute_intake: [{
     id: 'mdint-1',
+    intake_kind: 'dispute',
     owner_statement: 'The delivery was late due to a courier issue, not our fault.',
     proposed_resolution: 'Partial Refund',
     service_date: null,
     status_flag: null,
     mkt_dispute_attachments: [{ file_name: 'receipt.pdf', file_type: 'pdf' }],
-  },
+  }],
 };
 
 const mockExecution = {
