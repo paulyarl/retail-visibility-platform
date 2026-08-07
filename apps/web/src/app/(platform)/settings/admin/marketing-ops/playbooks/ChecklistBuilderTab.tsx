@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, RefreshCw, ChevronUp, ChevronDown, X, AlertCircle,
-  CheckCircle2, Lightbulb, MessageSquare, ArrowUpRight,
+  CheckCircle2, Lightbulb, MessageSquare, ArrowUpRight, Copy,
 } from 'lucide-react';
 import marketingOpsService, {
   type PlaybookCatalogEntry,
@@ -137,6 +137,20 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
       instructions: step.instructions ?? '',
       stepType: step.stepType,
       actionConfig: step.actionConfig ?? {},
+      isRequired: step.isRequired,
+      isActive: step.isActive,
+      stageTag: step.stageTag ?? 'seek',
+    });
+    setShowStepForm(true);
+  };
+
+  const handleCloneStep = (step: PlaybookChecklistStep) => {
+    setEditingStep(null);
+    setStepForm({
+      title: `Copy of ${step.title}`,
+      instructions: step.instructions ?? '',
+      stepType: step.stepType,
+      actionConfig: step.actionConfig ? { ...step.actionConfig } : {},
       isRequired: step.isRequired,
       isActive: step.isActive,
       stageTag: step.stageTag ?? 'seek',
@@ -458,6 +472,9 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
                         <div className="inline-flex items-center gap-1">
                           <button onClick={() => handleEditStep(step)} className="text-gray-400 hover:text-blue-600" title="Edit">
                             <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleCloneStep(step)} className="text-gray-400 hover:text-blue-600" title="Clone">
+                            <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button onClick={() => handleDeleteStep(step)} className="text-gray-400 hover:text-red-600" title="Delete">
                             <Trash2 className="w-3.5 h-3.5" />
