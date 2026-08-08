@@ -260,6 +260,24 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start log purge job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start gallery analytics aggregation job (daily at 2:00 AM UTC)
+      try {
+        const { startGalleryAnalyticsSync } = await import('./jobs/gallery-analytics-sync');
+        startGalleryAnalyticsSync();
+        logger.info('Gallery analytics sync started (daily at 2 AM UTC)');
+      } catch (err) {
+        logger.error('Failed to start gallery analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start gallery events purge job (daily at 2:30 AM UTC — after aggregation)
+      try {
+        const { startGalleryEventsPurge } = await import('./jobs/gallery-events-purge');
+        startGalleryEventsPurge();
+        logger.info('Gallery events purge job started (daily, 90-day retention)');
+      } catch (err) {
+        logger.error('Failed to start gallery events purge job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start abandoned cart recovery job (every 30 minutes)
       try {
         const { startAbandonedCartRecovery } = await import('./jobs/abandoned-cart-recovery');

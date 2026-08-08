@@ -186,7 +186,13 @@ When `cycleToNextEngagement` runs, the following fields are reset and the follow
 
 **Stage history:** A `cycle_started` transition is logged with `fromStage = 'delivered'` (or `retainer_won`), `toStage = 'seek'` (or `preview_built`), `notes = 'Engagement cycle N→N+1'`, `triggerType = 'manual'`. This preserves the full history of all cycles within the campaign row.
 
+**Stage history + cycle tracking:** The `notes` field on `mkt_stage_history_list` includes the cycle number (e.g., `'Engagement cycle 1→2'`) so the stage history timeline can display which cycle each transition belongs to. No schema change to `mkt_stage_history_list` is needed — the `notes` field is sufficient for display. If per-cycle querying becomes a need later, a `engagement_cycle` column can be added to `mkt_stage_history_list` in a future migration.
+
 **`mkt_revenue`:** Each cycle's payment creates a new `mkt_revenue` row (the existing model already supports this). The `amount_paid_cents` field on the campaign row reflects only the current cycle's payment — historical payments are queryable via `mkt_revenue` ordered by `created_at`.
+
+**`mkt_deliverables_list` per cycle:** Deliverables are 1:N per campaign (the existing model supports multiple). Each cycle generates a NEW deliverable row — the old cycle's deliverable is NOT updated or overwritten. This preserves the historical deliverable for the customer portal (which shows all deliverables for a campaign). The new deliverable's `title` includes the cycle number (e.g., `'Review Response Package — Engagement 2'`) to distinguish it from prior cycles. The `package_delivered` field on the campaign row is updated to the new deliverable's title.
+
+**`customer_id` across cycles:** The `customer_id` field is preserved across cycles (the customer relationship doesn't change). This ensures the customer portal continues to show the campaign with all its historical receipts and deliverables.
 
 ---
 
@@ -305,6 +311,23 @@ if (runsReviewPipeline) {
 
 4. **`MarketingPlaybookCatalogService.toRow`** — fix `ArchetypeCodeWithA5` → `ArchetypeCodeWithA6` cast (line 277). The deprecated `ArchetypeCodeWithA5` type should be replaced with `ArchetypeCodeWithA6` since A6 is now a first-class archetype. This is a type-only change — both types resolve to the same union.
 
+5. **`apps/api/src/routes/marketing-ops.ts`** — update `playbookCategoryEnum` Zod schema (line 452) to include `profile_repair`. The current enum only allows `review_management`, `recovery_management`, `triage_management`. After Migration 178, the playbook catalog will have rows with `category = 'profile_repair'`, and the playbook create/update routes (lines 471, 487) will reject them with a validation error.
+
+```typescript
+// CURRENT (line 452):
+const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'triage_management']);
+
+// FIXED:
+const playbookCategoryEnum = z.enum([
+  'review_management',
+  'recovery_management',
+  'profile_repair',        // NEW
+  'triage_management',
+]);
+```
+
+**Migration ordering constraint:** Migration 178 (which re-categorizes the playbook rows) MUST be applied AFTER the code deploy that adds `profile_repair` to `PLAYBOOK_CATEGORIES` and `playbookCategoryEnum`. If the migration runs first, the playbook catalog will have rows with a category that the type system and route validation reject — causing runtime errors on any playbook list/create/update operation. The deploy sequence is: code deploy → migration apply.
+
 **Impact on existing campaigns:**
 - Campaigns that previously accepted PB-01/PB-03/PB-06/PB-07 triage have `campaign_category: 'review_management'`. They are NOT automatically re-categorized (that would change their pipeline behavior). They keep `review_management` until the operator manually changes the category or re-accepts triage.
 - New campaigns accepting these playbooks after the migration will get `profile_repair` + `standard` track.
@@ -336,11 +359,27 @@ CREATE INDEX idx_mkt_campaigns_business_prospect
   ON mkt_campaigns_list (business_prospect_id)
   WHERE business_prospect_id IS NOT NULL;
 
+-- Sibling uniqueness: one archetype per prospect group. This prevents
+-- duplicate siblings (e.g., two A1 campaigns for the same prospect).
+-- Enforced at DB level in addition to the application-level 409 check.
+-- Note: archetype is resolved at runtime (not persisted on the campaign),
+-- so we use campaign_category as the proxy for uniqueness. This allows
+-- one review_management, one recovery_management, one profile_repair,
+-- and one triage_management sibling per prospect. Multiple profile_repair
+-- siblings with different repair_tracks (standard vs escalated) are allowed
+-- by using (business_prospect_id, campaign_category, repair_track) as the
+-- unique key.
+CREATE UNIQUE INDEX idx_mkt_campaigns_prospect_sibling_unique
+  ON mkt_campaigns_list (business_prospect_id, campaign_category, COALESCE(repair_track, 'none'))
+  WHERE business_prospect_id IS NOT NULL AND scope = 'business';
+
 -- Backfill: for existing business-scope campaigns without a prospect_id,
--- set business_prospect_id = id (each existing business campaign becomes
--- its own prospect group with one sibling — itself).
+-- generate a dedicated prospect ID with a 'bp_' prefix to avoid collisions
+-- with campaign IDs (which are used as foreign keys and could be confused
+-- with prospect IDs in queries). Each existing business campaign becomes
+-- its own prospect group with one sibling — itself.
 UPDATE mkt_campaigns_list
-  SET business_prospect_id = id, is_primary_sibling = true
+  SET business_prospect_id = CONCAT('bp_', id), is_primary_sibling = true
   WHERE scope = 'business' AND business_prospect_id IS NULL;
 ```
 
@@ -518,6 +557,10 @@ class BusinessProspectService extends BaseService {
    * Initialize a prospect group from an existing campaign.
    * Called when the operator creates the first sibling from a campaign
    * that doesn't yet have a business_prospect_id.
+   *
+   * Generates a prospect ID with the 'bp_' prefix (e.g., 'bp_abc123def456')
+   * to avoid collisions with campaign IDs. This matches the backfill format
+   * in Migration 179.
    */
   async initializeProspectFromCampaign(campaignId: string, ctx?: RequestCtx): Promise<string>;
 
@@ -543,7 +586,7 @@ class BusinessProspectService extends BaseService {
 **Sibling creation flow:**
 1. Operator selects an archetype from the triage-presented list (which now includes repair playbooks PB-01/PB-03/PB-06/PB-07 alongside review PB-02 and recovery PB-04), OR manually chooses `profile_repair` as the category with a specific `repairTrack` (for repair-centric siblings not driven by triage — e.g., escalated track for a known suspension)
 2. `initializeProspectFromCampaign` is called if the source campaign has no `business_prospect_id` yet (generates a new prospect ID, sets it on the source campaign, marks source as primary)
-3. `createSiblingCampaign` copies business info (name, category, city, phone, email, website, address) from the primary sibling, creates a new campaign at `seek` stage with `business_prospect_id` set
+3. `createSiblingCampaign` copies business info (name, category, city, phone, email, website, address) from the primary sibling, creates a new campaign at `seek` stage with `business_prospect_id` set. **`customer_id` is also copied** from the primary sibling — if the primary sibling has been claimed by a customer, all siblings inherit the same `customer_id` so the customer portal shows the full sibling group. If the primary sibling has no `customer_id` (not yet claimed), siblings start with `customer_id = null` and inherit it when any sibling is claimed (the claim sweep already matches by business identity, so all siblings for the same prospect get claimed together).
 4. **For triage-driven siblings:** the new sibling gets its own triage evaluation — the operator accepts the chosen playbook to lock in the archetype and category. Accepting PB-01/PB-03/PB-06/PB-07 sets `campaign_category: 'profile_repair'` + `repair_track: 'standard'`. Accepting PB-02 sets `review_management`. Accepting PB-04 sets `recovery_management`. **For manually-created `profile_repair` siblings:** the category and track are set directly at creation — no triage acceptance needed
 5. The new sibling runs its own pipeline independently — review pipeline for `review_management` / `profile_repair` + `standard`, recovery pipeline for `recovery_management` / `profile_repair` + `escalated`
 
@@ -1127,15 +1170,49 @@ Category-scope and city-scope campaigns do not get `business_prospect_id` (they 
 ### Sprint 2 (Weeks 3–4): Multi-Diagnostic Gallery
 
 **Scope:**
+- Migration 181 (`mkt_gallery_events.sibling_campaign_id` column — for per-sibling event tracking in multi-gallery context)
 - Multi-gallery token issuance route (`POST /prospects/:prospectId/multi-gallery-token`)
 - Multi-gallery public API (`GET /api/public/gallery/multi/:token`)
 - Multi-gallery frontend page (`/preview/[token]?prospect=true`)
-- Multi-gallery engagement tracking (events with `sibling_campaign_id` metadata)
+- Multi-gallery engagement tracking (events with `sibling_campaign_id` — see Migration 181 below)
 - `MarketingOpsService` frontend — `generateMultiGalleryToken`
 - `MarketingOpsPublicService` frontend — `getMultiGalleryData`
 - Outreach integration — multi-archetype message template + dispatch with `prospect_id`
 
+**Migration 181: `mkt_gallery_events.sibling_campaign_id`**
+
+The existing `mkt_gallery_events` table has `token_id` + `campaign_id` but no `sibling_campaign_id`. For multi-gallery tokens, the `campaign_id` is the primary sibling's campaign, but engagement events (screenshot views, CTA clicks) happen on individual sibling galleries. Without `sibling_campaign_id`, we can't attribute engagement to a specific sibling — only to the prospect group as a whole.
+
+```sql
+-- 181_mkt_gallery_events_sibling_campaign.sql
+
+-- sibling_campaign_id: the specific sibling campaign the engagement event
+-- was on. NULL for single-gallery tokens (the campaign_id is the sibling).
+-- For multi-gallery tokens, this identifies which sibling's gallery section
+-- the user was viewing when the event fired.
+ALTER TABLE mkt_gallery_events
+  ADD COLUMN sibling_campaign_id VARCHAR(255);
+
+-- Index for per-sibling analytics queries
+CREATE INDEX idx_mkt_gallery_events_sibling
+  ON mkt_gallery_events (sibling_campaign_id, event_type, created_at DESC)
+  WHERE sibling_campaign_id IS NOT NULL;
+```
+
+**Prisma schema update (model `mkt_gallery_events`):**
+```prisma
+model mkt_gallery_events {
+  // ... existing fields ...
+  sibling_campaign_id String?   @db.VarChar(255)
+  // ... existing indexes ...
+}
+```
+
+**Event tracking extension:** The `galleryEventSchema` Zod schema in `marketing-ops-public.ts` gains an optional `siblingCampaignId` field. The `GalleryAnalyticsService.trackEvent` method passes it through to the `mkt_gallery_events` row. For single-gallery tokens, `siblingCampaignId` is null (the `campaign_id` is the sibling). For multi-gallery tokens, the frontend sends `siblingCampaignId` with each event so the analytics can attribute engagement to the correct sibling.
+
 **Files touched:**
+- `database/migrations/181_mkt_gallery_events_sibling_campaign.sql` (new)
+- `apps/api/prisma/schema.prisma` (extend — `sibling_campaign_id` on `mkt_gallery_events`)
 - `apps/api/src/routes/marketing-ops.ts` (extend — multi-gallery token route)
 - `apps/api/src/routes/marketing-ops-public.ts` (extend — multi-gallery public API)
 - `apps/api/src/services/marketing/GalleryMultiService.ts` (new — multi-gallery data assembly)
@@ -1295,7 +1372,7 @@ The sibling model does not change any of this — it simply allows multiple inde
 | Sprint | Goal | Depends On | Key Deliverables |
 |---|---|---|---|
 | 1 | Repair Re-Categorization + Schema + Backend Foundation | — | Migration 178 (repair re-categorization), Migrations 179/180 (siblings + multi-gallery metadata), `profile_repair` as `PlaybookCategory`, accept+override `repair_track` fix, `transitionStage` intake regression fix, `ArchetypeCodeWithA6` fix, `loadSignalsAndPlaybooks` refactor, BusinessProspectService, triage multi-archetype (with `detectedSignals`), sibling + cycle routes, `SiblingSummary` type |
-| 2 | Multi-Diagnostic Gallery | S1 | Multi-gallery token, public API, frontend page, outreach integration |
+| 2 | Multi-Diagnostic Gallery | S1 | Migration 181 (gallery events sibling_campaign_id), multi-gallery token, public API, frontend page, outreach integration |
 | 3 | Frontend + Portal + Tests | S1, S2 | Triage card alternatives, siblings tab, cycle button, portal grouping, full test suite |
 
 **Parallelism:** Sprint 2's backend work (multi-gallery API) can start as soon as Sprint 1's schema is landed. Sprint 3's frontend work depends on both S1 and S2 APIs.

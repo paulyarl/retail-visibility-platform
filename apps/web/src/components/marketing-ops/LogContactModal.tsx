@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Link2 } from 'lucide-react';
 import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
@@ -54,6 +54,7 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [insertingLink, setInsertingLink] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +89,32 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
   };
 
   const inputClass = 'w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100';
+
+  const handleInsertGalleryLink = async () => {
+    setInsertingLink(true);
+    setError(null);
+    try {
+      const tokens = await marketingOpsService.listGalleryTokens(campaign.id);
+      // Find the most recent active (non-expired, non-converted) token
+      const now = new Date();
+      const activeToken = tokens
+        .filter((t) => !t.converted_at && (!t.expires_at || new Date(t.expires_at) > now))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      if (!activeToken) {
+        setError('No active gallery link found. Generate one in the Diagnostic Gallery tab first.');
+        return;
+      }
+
+      const galleryUrl = `${window.location.origin}/preview/${activeToken.token}`;
+      const linkText = `\n\nView your diagnostic report: ${galleryUrl}\n`;
+      setMessageSnapshot((prev) => (prev ? prev + linkText : linkText.trim()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch gallery link');
+    } finally {
+      setInsertingLink(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -156,7 +183,19 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
           )}
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Message sent (optional)</span>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">Message sent (optional)</span>
+              <button
+                type="button"
+                onClick={handleInsertGalleryLink}
+                disabled={insertingLink}
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400"
+                title="Insert the active diagnostic gallery link into the message body"
+              >
+                {insertingLink ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                Insert Gallery Link
+              </button>
+            </div>
             <textarea value={messageSnapshot} onChange={(e) => setMessageSnapshot(e.target.value)} rows={4} placeholder="Paste the message body you sent to the prospect" className={inputClass} />
           </label>
 
