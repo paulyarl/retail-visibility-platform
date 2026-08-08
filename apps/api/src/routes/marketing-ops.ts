@@ -145,7 +145,9 @@ import MarketingBrandingService from '../services/MarketingBrandingService';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 import { ReviewResponseService } from '../services/ReviewResponseService';
-import { OutreachOpenerService } from '../services/OutreachOpenerService';
+import { OutreachOpenerService, resolveCampaignArchetype } from '../services/OutreachOpenerService';
+import { selectArchetype, type BusinessAnalysisAuditData } from '../services/outreach-openers/archetype-selection';
+import { resolveGalleryArchetypeDefaults } from '../services/marketing/GalleryArchetypeDefaults';
 import HeaderService from '../services/outreach-pitch/HeaderService';
 import CloserService from '../services/outreach-pitch/CloserService';
 import ContactService from '../services/outreach-pitch/ContactService';
@@ -4397,6 +4399,174 @@ router.post('/campaigns/:id/pay-links', async (req: any, res: Response) => {
         qrPayload: payUrl,
         expiresAt: token.expires_at,
         createdAt: token.created_at,
+      },
+      priceWarning: campaign.package_price_cents == null || campaign.package_price_cents <= 0,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// DIAGNOSTIC GALLERY TOKEN (§12 Sprint 2)
+// ====================
+
+const galleryTokenCreateSchema = z.object({
+  gallery_title: z.string().max(255).optional(),
+  gallery_subtitle: z.string().optional(),
+  friction_summary: z.any().optional(),
+  cta_label: z.string().max(255).optional(),
+  cta_amount_cents: z.number().int().min(0).optional(),
+  expires_in_days: z.number().int().min(1).max(365).default(7),
+});
+
+/**
+ * POST /campaigns/:id/gallery-token
+ *
+ * Mint a diagnostic gallery token for a campaign at the preview_built or
+ * shown stage. The token doubles as the pay token (Option A in spec §4.4) —
+ * the pay endpoint resolves the campaign from the token regardless of type.
+ *
+ * Stage gate: only preview_built + shown can generate gallery tokens.
+ * Screenshot gate: campaign must have at least 1 file with file_type='screenshot'.
+ * Archetype: resolved via resolveCampaignArchetype (honors operator-accepted
+ * triage). For A2, the theme is re-extracted via selectArchetype so the
+ * gallery title can include it. Defaults are archetype-aware (§5).
+ *
+ * Supersedes prior unconverted diagnostic_gallery tokens for this campaign
+ * (marks them converted_at = now()) so only one active gallery token remains.
+ */
+router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
+  try {
+    const parsed = galleryTokenCreateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const { id } = req.params;
+    const ctx = getCtx(req);
+
+    // 1. Load campaign + stage gate
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        stage: true,
+        package_price_cents: true,
+        mkt_files_list: {
+          where: { file_type: 'screenshot' },
+          select: { id: true, file_name: true },
+        },
+      },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    const ALLOWED_STAGES = ['preview_built', 'shown'];
+    if (!ALLOWED_STAGES.includes(campaign.stage)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_stage',
+        message: `Gallery tokens can only be generated for campaigns at the preview_built or shown stage (current: ${campaign.stage}).`,
+      });
+    }
+
+    // 2. Screenshot gate
+    if (campaign.mkt_files_list.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'no_screenshots',
+        message: 'Upload at least one screenshot before generating a gallery token.',
+      });
+    }
+
+    // 3. Resolve archetype (honors operator-accepted triage overrides)
+    let archetype: string;
+    let theme: any = null;
+    try {
+      const resolved = await resolveCampaignArchetype(id, ctx);
+      archetype = resolved.archetype;
+      // For A2, re-run selectArchetype to get the theme (HeaderService pattern).
+      // resolveCampaignArchetype does not return the theme field.
+      if (resolved.archetype === 'A2') {
+        // Need the audit data to re-run selectArchetype — fetch via BusinessContextService
+        const BusinessContextService = (await import('../services/deliverable/BusinessContextService')).default;
+        const auditResult = await BusinessContextService.getLatestAuditData(id, ctx);
+        if (auditResult) {
+          const autoSel = selectArchetype(auditResult.auditData as BusinessAnalysisAuditData);
+          theme = autoSel.theme ?? null;
+        }
+      }
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'archetype_unresolved',
+        message: 'Could not resolve campaign archetype. Ensure a business_analysis audit exists or triage is accepted.',
+      });
+    }
+
+    // 4. Build archetype-aware defaults
+    const defaults = resolveGalleryArchetypeDefaults(archetype as any, theme);
+
+    // 5. Merge operator overrides (if any) with defaults
+    const galleryMeta = {
+      galleryTitle: parsed.data.gallery_title ?? defaults.galleryTitle,
+      gallerySubtitle: parsed.data.gallery_subtitle ?? defaults.gallerySubtitle,
+      frictionSummary: parsed.data.friction_summary ?? defaults.frictionSummary,
+      ctaLabel: parsed.data.cta_label ?? defaults.ctaLabel,
+      ctaAmountCents: parsed.data.cta_amount_cents ?? campaign.package_price_cents ?? undefined,
+      galleryArchetype: archetype,
+    };
+
+    // 6. Supersede prior unconverted diagnostic_gallery tokens
+    await prisma.mkt_deliverable_preview_tokens.updateMany({
+      where: {
+        campaign_id: id,
+        token_type: 'diagnostic_gallery',
+        converted_at: null,
+        paid_at: null,
+      },
+      data: { converted_at: new Date() },
+    });
+
+    // 7. Mint the new token
+    const token = await MarketingDeliverableService.generateCampaignToken(
+      id,
+      'diagnostic_gallery',
+      undefined,
+      parsed.data.expires_in_days,
+      ctx,
+      galleryMeta,
+    );
+
+    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
+    const galleryUrl = `${baseUrl}/preview/${token.token}`;
+
+    logger.info('Gallery token generated', ctx, {
+      campaignId: id,
+      archetype,
+      screenshotCount: campaign.mkt_files_list.length,
+      expiresAt: token.expires_at,
+    });
+
+    return res.status(201).json({
+      success: true,
+      token: {
+        id: token.id,
+        token: token.token,
+        tokenType: token.token_type,
+        galleryUrl,
+        expiresAt: token.expires_at,
+        createdAt: token.created_at,
+        archetype,
+        galleryTitle: galleryMeta.galleryTitle,
+        gallerySubtitle: galleryMeta.gallerySubtitle,
+        ctaLabel: galleryMeta.ctaLabel,
+        ctaAmountCents: galleryMeta.ctaAmountCents ?? null,
+        screenshotCount: campaign.mkt_files_list.length,
       },
       priceWarning: campaign.package_price_cents == null || campaign.package_price_cents <= 0,
     });

@@ -591,16 +591,27 @@ export class MarketingDeliverableService extends BaseService {
 
   /**
    * Shared token factory — single issuance path for ALL public CTAs
-   * (QR deliverable links and demo storefront banners). The campaign_id is
-   * the trust anchor: public pages carry only the token; campaign + source
-   * are always resolved server-side.
+   * (QR deliverable links, demo storefront banners, diagnostic gallery).
+   * The campaign_id is the trust anchor: public pages carry only the token;
+   * campaign + source are always resolved server-side.
+   *
+   * For diagnostic_gallery tokens, galleryMeta carries the archetype-aware
+   * defaults (title, subtitle, friction summary, CTA label/amount, archetype).
    */
   async generateCampaignToken(
     campaignId: string,
-    tokenType: 'deliverable' | 'demo_storefront',
+    tokenType: 'deliverable' | 'demo_storefront' | 'diagnostic_gallery',
     deliverableId?: string,
     expiryDays: number = 30,
-    ctx?: RequestCtx
+    ctx?: RequestCtx,
+    galleryMeta?: {
+      galleryTitle?: string;
+      gallerySubtitle?: string;
+      frictionSummary?: any;
+      ctaLabel?: string;
+      ctaAmountCents?: number;
+      galleryArchetype?: string;
+    }
   ): Promise<any> {
     try {
       const token = await this.prisma.mkt_deliverable_preview_tokens.create({
@@ -611,6 +622,14 @@ export class MarketingDeliverableService extends BaseService {
           token_type: tokenType,
           token: generatePreviewToken(),
           expires_at: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+          ...(galleryMeta ? {
+            gallery_title: galleryMeta.galleryTitle ?? null,
+            gallery_subtitle: galleryMeta.gallerySubtitle ?? null,
+            friction_summary: galleryMeta.frictionSummary ?? null,
+            cta_label: galleryMeta.ctaLabel ?? null,
+            cta_amount_cents: galleryMeta.ctaAmountCents ?? null,
+            gallery_archetype: galleryMeta.galleryArchetype ?? null,
+          } : {}),
         },
       });
 
