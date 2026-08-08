@@ -4170,7 +4170,7 @@ export interface GalleryDashboard {
 
 // ─── Gallery methods (added to the prototype) ────────────────────────────
 
-export interface MarketingOpsService {
+interface MarketingOpsService {
   generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GalleryToken>;
   listGalleryTokens(campaignId: string): Promise<GalleryToken[]>;
   getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;

@@ -144,6 +144,50 @@ When triage detects A1 + A3 + A6 signals, the current system pitches only A1 (hi
 4. Operator can re-run triage, generate new gallery, dispatch new outreach
 5. New `mkt_revenue` row created on payment
 
+**Cycle reset semantics (explicit):**
+
+When `cycleToNextEngagement` runs, the following fields are reset and the following are preserved:
+
+| Field | Reset to | Rationale |
+|---|---|---|
+| `stage` | `seek` (or `preview_built` if `resetToStage` is passed) | New engagement starts at the top of the pipeline |
+| `stage_entered_at` | `now()` | New stage entry timestamp |
+| `date_entered` | `now()` | New engagement start date |
+| `date_preview_built` | `null` (unless resetting to `preview_built`) | Old preview is stale |
+| `date_shown` | `null` | Old outreach is stale |
+| `date_paid` | `null` | New payment hasn't happened yet |
+| `date_delivered` | `null` | New deliverable hasn't been generated |
+| `date_retainer_pitched` | `null` | Retainer is per-cycle |
+| `date_retainer_won` | `null` | Retainer is per-cycle |
+| `amount_paid_cents` | `0` | New cycle starts at zero; prior payments are in `mkt_revenue` |
+| `retainer_status` | `'not_pitched'` | Retainer is per-cycle |
+| `retainer_amount_cents` | `0` | Per-cycle |
+| `engagement_cycle` | `+1` | Incremented |
+| `cascade_enabled` | `false` | Old cascade config is stale |
+| `cascade_config` | `null` | Old cascade config is stale |
+
+**Preserved (NOT reset):**
+- `business_prospect_id` — the prospect group doesn't change
+- `is_primary_sibling` — primary status doesn't change
+- `campaign_category` — the archetype pillar doesn't change (the operator can still override triage)
+- `repair_track` — the track doesn't change (operator can still switch via `switchRepairTrack`)
+- `customer_id` — the customer relationship carries across cycles (they're the same business owner)
+- `tenant_id` — tenant assignment doesn't change
+- `business_name`, `category`, `city`, `phone`, `email`, `website_url`, address fields — business identity doesn't change
+- `parent_campaign_id` — lineage doesn't change
+- `estimated_fee_cents` — kept as the starting estimate; triage re-acceptance can update it
+- `pain_score` — kept; re-evaluation can update it
+- `notes` — kept (historical context)
+- `assigned_to` — kept (operator assignment doesn't change)
+- `service_category` — kept
+- `tone` — kept
+- `attributes` — kept
+- `scope` — kept
+
+**Stage history:** A `cycle_started` transition is logged with `fromStage = 'delivered'` (or `retainer_won`), `toStage = 'seek'` (or `preview_built`), `notes = 'Engagement cycle N→N+1'`, `triggerType = 'manual'`. This preserves the full history of all cycles within the campaign row.
+
+**`mkt_revenue`:** Each cycle's payment creates a new `mkt_revenue` row (the existing model already supports this). The `amount_paid_cents` field on the campaign row reflects only the current cycle's payment — historical payments are queryable via `mkt_revenue` ordered by `created_at`.
+
 ---
 
 ## 4. Schema Changes
@@ -218,6 +262,49 @@ if (playbook.category === 'profile_repair') {
 - `switchRepairTrack` already handles track switching — no change needed
 - Existing `profile_repair` campaigns created manually are unaffected — they already work correctly
 
+**Code changes required (Sprint 1):**
+
+1. **`CampaignTriageService.acceptTriage`** — set `repair_track: 'standard'` when accepting a `profile_repair` playbook (shown above).
+
+2. **`CampaignTriageService.overrideTriage`** — same fix: set `repair_track: 'standard'` when the override playbook's category is `profile_repair`. Without this, overriding to PB-01/PB-03/PB-06/PB-07 sets `campaign_category: 'profile_repair'` but leaves `repair_track: null` (undecided), which produces undefined pipeline behavior.
+
+```typescript
+// In overrideTriage — after setting campaign_category + estimated_fee_cents:
+await this.prisma.mkt_campaigns_list.update({
+  where: { id: campaignId },
+  data: {
+    campaign_category: overridePlaybook.category,
+    estimated_fee_cents: overridePlaybook.fitdDefaultFeeCents,
+    // NEW: set repair_track when overriding to a profile_repair playbook
+    ...(overridePlaybook.category === 'profile_repair' ? { repair_track: 'standard' } : {}),
+  },
+});
+```
+
+3. **`MarketingCampaignService.transitionStage`** — fix the registry-driven intake condition. The current code excludes ALL `profile_repair` campaigns from registry-driven intake auto-gen:
+
+```typescript
+// CURRENT (buggy after Migration 178):
+if (category !== 'recovery_management' && category !== 'profile_repair') {
+  // registry-driven intake (gbp_optimization, review_response_setup, etc.)
+}
+```
+
+After Migration 178, campaigns that accept PB-01/PB-03/PB-06/PB-07 become `profile_repair` + `standard` (review pipeline). They MUST still get registry-driven intake. Only `profile_repair` + `escalated` (recovery pipeline) should be excluded (it gets dispute intake via the first block):
+
+```typescript
+// FIXED:
+const runsReviewPipeline =
+  category === 'review_management' ||
+  category === 'triage_management' ||
+  (category === 'profile_repair' && repairTrack === 'standard');
+if (runsReviewPipeline) {
+  // registry-driven intake (gbp_optimization, review_response_setup, etc.)
+}
+```
+
+4. **`MarketingPlaybookCatalogService.toRow`** — fix `ArchetypeCodeWithA5` → `ArchetypeCodeWithA6` cast (line 277). The deprecated `ArchetypeCodeWithA5` type should be replaced with `ArchetypeCodeWithA6` since A6 is now a first-class archetype. This is a type-only change — both types resolve to the same union.
+
 **Impact on existing campaigns:**
 - Campaigns that previously accepted PB-01/PB-03/PB-06/PB-07 triage have `campaign_category: 'review_management'`. They are NOT automatically re-categorized (that would change their pipeline behavior). They keep `review_management` until the operator manually changes the category or re-accepts triage.
 - New campaigns accepting these playbooks after the migration will get `profile_repair` + `standard` track.
@@ -262,19 +349,34 @@ UPDATE mkt_campaigns_list
 ```sql
 -- 180_multi_diagnostic_gallery_tokens.sql
 
--- The existing mkt_deliverable_preview_tokens table already has a token_type
--- column. We add 'multi_diagnostic_gallery' as a valid value.
+-- The existing mkt_deliverable_preview_tokens table has a token_type column
+-- (VARCHAR). We add 'multi_diagnostic_gallery' as a valid value, enforced at
+-- the application layer (Zod schema).
+--
 -- For multi-gallery tokens, the campaign_id column references the primary
--- sibling campaign, and a new metadata field 'sibling_campaign_ids' lists
--- all sibling campaign IDs included in the multi-gallery.
+-- sibling campaign. A new metadata JSONB column stores:
+--   - business_prospect_id: the prospect group ID
+--   - sibling_campaign_ids: array of all sibling campaign IDs included
+--   - sibling_summaries: per-sibling gallery metadata (archetype, title, CTA)
 
--- No schema change needed — token_type is a VARCHAR and metadata is JSONB.
--- The new token_type value is enforced at the application layer (Zod schema).
+-- Add metadata column (does not exist today — friction_summary is used for
+-- the gallery friction summary, not prospect/sibling metadata)
+ALTER TABLE mkt_deliverable_preview_tokens
+  ADD COLUMN metadata JSONB;
 
 -- Add an index for prospect-level gallery lookups
 CREATE INDEX idx_mkt_preview_tokens_prospect
   ON mkt_deliverable_preview_tokens ((metadata->>'business_prospect_id'))
   WHERE token_type = 'multi_diagnostic_gallery';
+```
+
+**Prisma schema update (model `mkt_deliverable_preview_tokens`):**
+```prisma
+model mkt_deliverable_preview_tokens {
+  // ... existing fields ...
+  metadata              Json?
+  // ... existing relations ...
+}
 ```
 
 ### 4.3 Prisma Schema Updates
@@ -291,6 +393,86 @@ is_primary_sibling                                                              
 Add relation for self-referencing sibling grouping (optional — lookups use `business_prospect_id` directly):
 ```prisma
 @@index([business_prospect_id])
+```
+
+### 4.4 Type & Interface Extensions
+
+**Backend (`apps/api/src/services/MarketingCampaignService.ts`):**
+
+The `CampaignDetail` type (returned by `getCampaign`) gains three fields + a siblings array:
+
+```typescript
+export interface SiblingSummary {
+  id: string;
+  display_id: string | null;
+  business_name: string | null;
+  campaign_category: string;
+  repair_track: string | null;
+  stage: string;
+  archetype: string | null;        // resolved archetype (A1–A6)
+  is_primary_sibling: boolean;
+  engagement_cycle: number;
+  pipeline: 'review' | 'recovery';
+  estimated_fee_cents: number;
+  amount_paid_cents: number;
+  created_at: string;
+}
+
+export interface CampaignDetail extends Campaign {
+  // ... existing fields ...
+  business_prospect_id: string | null;
+  engagement_cycle: number;
+  is_primary_sibling: boolean;
+  siblings: SiblingSummary[];      // all siblings for this prospect (excluding self), ordered by archetype priority
+}
+```
+
+The base `Campaign` type (returned by `listCampaigns`) gains the three scalar fields so list views can group/filter by prospect:
+
+```typescript
+export interface Campaign {
+  // ... existing fields ...
+  business_prospect_id: string | null;
+  engagement_cycle: number;
+  is_primary_sibling: boolean;
+}
+```
+
+**Frontend (`apps/web/src/services/MarketingOpsService.ts`):**
+
+The frontend `Campaign` and `CampaignDetail` interfaces mirror the backend additions. The `SiblingSummary` type is also exported for the siblings tab UI:
+
+```typescript
+export interface SiblingSummary {
+  id: string;
+  display_id: string | null;
+  business_name: string | null;
+  campaign_category: CampaignCategory;
+  repair_track: RepairTrack | null;
+  stage: CampaignStage;
+  archetype: string | null;
+  is_primary_sibling: boolean;
+  engagement_cycle: number;
+  pipeline: 'review' | 'recovery';
+  estimated_fee_cents: number;
+  amount_paid_cents: number;
+  created_at: string;
+}
+
+export interface Campaign {
+  // ... existing fields (lines 84-163) ...
+  business_prospect_id?: string | null;
+  engagement_cycle?: number;
+  is_primary_sibling?: boolean;
+}
+
+export interface CampaignDetail extends Campaign {
+  // ... existing fields ...
+  business_prospect_id?: string | null;
+  engagement_cycle?: number;
+  is_primary_sibling?: boolean;
+  siblings?: SiblingSummary[];
+}
 ```
 
 ---
@@ -369,46 +551,132 @@ class BusinessProspectService extends BaseService {
 
 **File:** `apps/api/src/services/triage/TriageEngineService.ts` (extend)
 
-**Current:** `evaluateTriage` returns the first matching playbook in priority order.
+**Current:** `evaluateTriage` returns the first matching playbook in priority order. The recommendation is built inline (there is no `buildRecommendation` function — the `TriageRecommendation` object is constructed inside the `for` loop at lines 211-218).
 
-**Extension:** Add `evaluateAllMatchingPlaybooks` that returns **all** playbooks whose `matching_rules` match the signal set, ranked by `priority_rank`. This is the "suggestion list" the operator picks from.
+**Extension:** Add `evaluateAllMatchingPlaybooks` that returns **all** playbooks whose `matching_rules` match the signal set, ranked by `priority_rank`. This is the "suggestion list" the operator picks from. Each result includes `detectedSignals` so the UI can show which signals triggered each alternative — the operator needs this to make an informed sibling creation decision.
 
 ```typescript
 /**
  * Evaluate all playbooks that match the signal set, ranked by priority.
  * Used by the multi-archetype triage card to present sibling-creation
  * suggestions. The winner (rank 1) is the same as evaluateTriage's result.
+ *
+ * Each TriageRecommendation includes detectedSignals (the signals that
+ * contributed to this playbook's rule match) so the UI can show the
+ * operator which signals triggered each alternative.
  */
 export function evaluateAllMatchingPlaybooks(
-  signals: ReadonlySet<SignalCode>,
+  signals: SignalCode[],
   playbooks: PlaybookCatalogRow[],
 ): TriageRecommendation[] {
+  const signalSet = new Set(signals);
   return playbooks
-    .filter((pb) => ruleMatches(pb.matchingRules, signals))
+    .filter((pb) => pb.isActive && ruleMatches(pb.matchingRules, signalSet))
     .sort((a, b) => a.priorityRank - b.priorityRank)
-    .map((pb) => buildRecommendation(pb, signals));
+    .map((pb) => ({
+      playbookCode: pb.code,
+      category: pb.category,
+      archetype: pb.archetype,
+      confidence: pb.matchingRules.confidence,
+      reasoning: buildReasoning(pb, signalSet, pb.matchingRules),
+      detectedSignals: buildDetectedSignals(signalSet, pb.matchingRules),
+    }));
 }
 ```
 
+**Note:** `buildReasoning` and `buildDetectedSignals` already exist as private functions in `TriageEngineService.ts` (lines 102-152). They are reused here — no new helpers needed. The inline recommendation construction in `evaluateTriage` (lines 211-218) should be refactored to call a shared `buildRecommendation` helper to avoid duplication, but this is optional.
+
 **File:** `apps/api/src/services/CampaignTriageService.ts` (extend)
 
-Add `evaluateAllForCampaign` that wraps `evaluateAllMatchingPlaybooks` with DB access (loads campaign + audit + signals, returns all matching recommendations).
+Add `evaluateAllForCampaign` that wraps `evaluateAllMatchingPlaybooks` with DB access. This requires extracting a `loadSignalsAndPlaybooks` helper from the existing `evaluateTriageForCampaign` (which currently inlines signal extraction at lines 145-170 and playbook loading at line 175). The helper is a pure refactor — no behavior change to `evaluateTriageForCampaign`.
 
 ```typescript
+/**
+ * Extract the signal-loading + playbook-loading logic from evaluateTriageForCampaign
+ * into a reusable helper. This is a refactor of lines 145-175 of the existing method —
+ * no behavior change. Used by both evaluateTriageForCampaign and evaluateAllForCampaign.
+ */
+private async loadSignalsAndPlaybooks(
+  input: TriageEvaluateInput,
+  ctx?: RequestCtx,
+): Promise<{ signals: SignalCode[]; playbooks: PlaybookCatalogRow[]; sourceAuditId: string | null }> {
+  const { campaignId, bbb, operatorAddedSignals, operatorRemovedSignals } = input;
+
+  const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+    where: { id: campaignId },
+  });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+
+  const allAudits = await this.prisma.mkt_audits_list.findMany({
+    where: { campaign_id: campaignId },
+    orderBy: { created_at: 'desc' },
+  });
+  const selectedAudit = this.selectAuditForTriage(allAudits);
+  const auditData = (selectedAudit?.audit_data as SignalExtractorInput['auditData']) ?? null;
+  const sourceAuditId = selectedAudit?.id ?? null;
+
+  const extractorInput: SignalExtractorInput = {
+    campaign: {
+      last_review_date: campaign.last_review_date,
+      unaddressed_reviews: campaign.unaddressed_reviews ?? 0,
+      nap_consistent: campaign.nap_consistent,
+      has_website: campaign.has_website,
+      website_url: campaign.website_url,
+      gbp_claimed: (campaign as any).gbp_claimed ?? null,
+    },
+    auditData,
+    bbb,
+  };
+  let signals: SignalCode[] = extractSignals(extractorInput);
+
+  // Operator enrichment (same as existing lines 160-170)
+  if (operatorAddedSignals?.length) {
+    const existing = new Set(signals);
+    for (const code of operatorAddedSignals) {
+      if (typeof code === 'string' && code.length > 0) {
+        existing.add(code as SignalCode);
+      }
+    }
+    signals = Array.from(existing);
+  }
+  if (operatorRemovedSignals?.length) {
+    const removeSet = new Set(operatorRemovedSignals);
+    signals = signals.filter((s) => !removeSet.has(s));
+  }
+
+  const playbooks = await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx);
+  return { signals, playbooks, sourceAuditId };
+}
+
+/**
+ * Evaluate all matching playbooks for a campaign (winner + alternatives).
+ * The winner is stored via evaluateTriageForCampaign (same as today).
+ * The alternatives are returned for the UI to present as sibling-creation
+ * suggestions.
+ */
 async evaluateAllForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<{
   winner: StoredTriageResult;
   alternatives: TriageRecommendation[];
 }> {
-  // 1. Run the normal evaluation (stores the winner)
+  // 1. Run the normal evaluation (stores the winner, same as today)
   const winner = await this.evaluateTriageForCampaign(input, ctx);
-  // 2. Re-run the engine in "all matches" mode
+  // 2. Re-load signals + playbooks (the helper is idempotent — no side effects)
   const { signals, playbooks } = await this.loadSignalsAndPlaybooks(input, ctx);
+  // 3. Run the engine in "all matches" mode
   const allMatches = evaluateAllMatchingPlaybooks(signals, playbooks);
-  // 3. Alternatives = all matches except the winner
+  // 4. Alternatives = all matches except the winner
   const alternatives = allMatches.filter(
     (m) => m.playbookCode !== winner.recommendedPlaybook.code
   );
   return { winner, alternatives };
+}
+```
+
+**`MultiArchetypeTriageResult` type (in `triage/types.ts`):**
+```typescript
+export interface MultiArchetypeTriageResult {
+  winner: StoredTriageResult;
+  alternatives: TriageRecommendation[];  // each includes detectedSignals
 }
 ```
 
@@ -782,28 +1050,34 @@ Category-scope and city-scope campaigns do not get `business_prospect_id` (they 
 **Scope:**
 - Migration 178 (repair playbook re-categorization — PB-01/PB-03/PB-06/PB-07 → `profile_repair`)
 - Migration 179 (`business_prospect_id` + `engagement_cycle` + `is_primary_sibling`)
-- Migration 180 (multi-gallery token index)
+- Migration 180 (multi-gallery token `metadata` column + prospect index)
 - Prisma schema update + `pnpm prisma:generate`
-- `triage/types.ts` — add `profile_repair` to `PLAYBOOK_CATEGORIES`
+- `triage/types.ts` — add `profile_repair` to `PLAYBOOK_CATEGORIES`, add `MultiArchetypeTriageResult`
 - `CampaignTriageService.acceptTriage` — set `repair_track: 'standard'` when accepting a `profile_repair` playbook
+- `CampaignTriageService.overrideTriage` — set `repair_track: 'standard'` when overriding to a `profile_repair` playbook (C2 fix)
+- `MarketingCampaignService.transitionStage` — fix registry-driven intake condition to include `profile_repair` + `standard` (C1 fix)
+- `MarketingPlaybookCatalogService.toRow` — fix `ArchetypeCodeWithA5` → `ArchetypeCodeWithA6` cast (S1 fix)
+- `CampaignTriageService.loadSignalsAndPlaybooks` — extract helper from `evaluateTriageForCampaign` (refactor, A2 fix)
 - `BusinessProspectService` (new) — sibling creation, listing, cycling
-- `TriageEngineService.evaluateAllMatchingPlaybooks` (pure function extension)
-- `CampaignTriageService.evaluateAllForCampaign` (DB wrapper)
+- `TriageEngineService.evaluateAllMatchingPlaybooks` (pure function extension, includes `detectedSignals` per alternative — A1 fix)
+- `CampaignTriageService.evaluateAllForCampaign` (DB wrapper using `loadSignalsAndPlaybooks`)
 - New routes: `GET /triage/alternatives`, `POST /siblings`, `GET /siblings`, `POST /cycle`
 - `MarketingCampaignService` — extend `CampaignInput` + `CampaignListFilters` with `businessProspectId`
 - `listCampaigns` filter by `business_prospect_id`
-- `CampaignDetail` type — include `business_prospect_id`, `engagement_cycle`, `is_primary_sibling`, `siblings[]`
+- `CampaignDetail` type — include `business_prospect_id`, `engagement_cycle`, `is_primary_sibling`, `siblings[]` (S2 fix)
+- `SiblingSummary` type (new) — sibling list element shape
 
 **Files touched:**
-- `apps/api/prisma/schema.prisma` — 3 new fields + index
+- `apps/api/prisma/schema.prisma` — 3 new fields on `mkt_campaigns_list` + `metadata` on `mkt_deliverable_preview_tokens` + indexes
 - `database/migrations/178_mkt_repair_playbook_recategory.sql` (new)
 - `database/migrations/179_mkt_business_prospect_siblings.sql` (new)
-- `database/migrations/180_multi_diagnostic_gallery_tokens.sql` (new)
+- `database/migrations/180_multi_diagnostic_gallery_tokens.sql` (new — adds `metadata` column)
 - `apps/api/src/services/triage/types.ts` (extend — add `profile_repair` to `PLAYBOOK_CATEGORIES`, `MultiArchetypeTriageResult`)
-- `apps/api/src/services/CampaignTriageService.ts` (extend — `profile_repair` accept logic, `evaluateAllForCampaign`)
+- `apps/api/src/services/CampaignTriageService.ts` (extend — `profile_repair` accept + override logic, `loadSignalsAndPlaybooks` refactor, `evaluateAllForCampaign`)
 - `apps/api/src/services/BusinessProspectService.ts` (new)
-- `apps/api/src/services/triage/TriageEngineService.ts` (extend)
-- `apps/api/src/services/MarketingCampaignService.ts` (extend — filters, input, detail shape)
+- `apps/api/src/services/triage/TriageEngineService.ts` (extend — `evaluateAllMatchingPlaybooks` with `detectedSignals`)
+- `apps/api/src/services/MarketingCampaignService.ts` (extend — fix `transitionStage` intake condition, filters, input, detail shape, `SiblingSummary` type)
+- `apps/api/src/services/MarketingPlaybookCatalogService.ts` (fix — `ArchetypeCodeWithA5` → `ArchetypeCodeWithA6`)
 - `apps/api/src/routes/marketing-ops.ts` (extend — 4 new routes)
 
 **Tests:**
