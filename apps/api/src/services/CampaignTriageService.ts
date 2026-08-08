@@ -21,7 +21,7 @@ import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError } from '../middleware/errorHandler';
 import { generateCampaignTriageId } from '../lib/id-generator';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
-import { extractSignals, evaluateTriage, fallbackRecommendation } from './triage';
+import { extractSignals, evaluateTriage, fallbackRecommendation, evaluateAllMatchingPlaybooks } from './triage';
 import type {
   TriageRecommendation,
   DetectedSignal,
@@ -29,6 +29,7 @@ import type {
   PlaybookCatalogRow,
   SignalExtractorInput,
   MatchingRules,
+  MultiArchetypeTriageResult,
 } from './triage/types';
 import type { SignalCode } from './triage/signal-taxonomy';
 
@@ -120,67 +121,12 @@ export class CampaignTriageService extends BaseService {
    * Re-evaluating overwrites the previous result (one row per campaign).
    */
   async evaluateTriageForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<StoredTriageResult> {
-    const { campaignId, bbb, operatorAddedSignals, operatorRemovedSignals } = input;
+    const { campaignId } = input;
 
-    // 1. Load campaign
-    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
-      where: { id: campaignId },
-    });
-    if (!campaign) throw new NotFoundError('Campaign not found');
+    // 1. Load signals + playbooks (shared with evaluateAllForCampaign)
+    const { signals, playbooks, sourceAuditId } = await this.loadSignalsAndPlaybooks(input, ctx);
 
-    // 2. Load all audits for the campaign, ordered newest first. A campaign
-    //    can have multiple audits from different platforms (business_analysis,
-    //    city_category_analysis, category_analysis, etc.). Selection priority:
-    //      a. Latest business_analysis audit (canonical signal-aware contract).
-    //      b. Latest audit with a top-level detected_signals[] array
-    //         (forward-compatible — any audit platform that emits signals).
-    //      c. null — no audit used; signals derived from campaign columns only.
-    const allAudits = await this.prisma.mkt_audits_list.findMany({
-      where: { campaign_id: campaignId },
-      orderBy: { created_at: 'desc' },
-    });
-    const selectedAudit = this.selectAuditForTriage(allAudits);
-    const auditData = (selectedAudit?.audit_data as SignalExtractorInput['auditData']) ?? null;
-    const sourceAuditId = selectedAudit?.id ?? null;
-
-    // 3. Extract SignalCode[] (Sprint 2A: extractor emits SignalCode[], not NormalizedSignals)
-    const extractorInput: SignalExtractorInput = {
-      campaign: {
-        last_review_date: campaign.last_review_date,
-        unaddressed_reviews: campaign.unaddressed_reviews ?? 0,
-        nap_consistent: campaign.nap_consistent,
-        has_website: campaign.has_website,
-        website_url: campaign.website_url,
-        gbp_claimed: (campaign as any).gbp_claimed ?? null,
-      },
-      auditData,
-      bbb,
-    };
-    let signals: SignalCode[] = extractSignals(extractorInput);
-
-    // 3a. Operator enrichment — merge manually added signals, remove false positives.
-    // This is the "human-in-the-loop" correction path: the AI scan may miss
-    // signals (e.g. BBB grade not in audit) or flag false positives (e.g.
-    // www vs non-www URL "mismatch"). Operators can enrich on re-evaluate.
-    if (operatorAddedSignals?.length) {
-      const existing = new Set(signals);
-      for (const code of operatorAddedSignals) {
-        if (typeof code === 'string' && code.length > 0) {
-          existing.add(code as SignalCode);
-        }
-      }
-      signals = Array.from(existing);
-    }
-    if (operatorRemovedSignals?.length) {
-      const removeSet = new Set(operatorRemovedSignals);
-      signals = signals.filter((s) => !removeSet.has(s));
-    }
-
-    // 4. Load active playbooks ordered by priority_rank (the cascade order
-    //    lives in the catalog, not in code — Sprint 2A generic evaluator).
-    const playbooks = await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx);
-
-    // 5. Run the generic DSL evaluator over the SignalCode[] set.
+    // 2. Run the generic DSL evaluator over the SignalCode[] set.
     let recommendation: TriageRecommendation | null = evaluateTriage(signals, playbooks);
     let playbook: PlaybookCatalogRow;
     if (recommendation) {
@@ -194,7 +140,7 @@ export class CampaignTriageService extends BaseService {
       logger.warn('Triage fallback: no playbook rule matched', ctx, { campaignId, signals });
     }
 
-    // 6. Upsert the triage result row (one row per campaign, re-evaluated in place)
+    // 3. Upsert the triage result row (one row per campaign, re-evaluated in place)
     const id = generateCampaignTriageId();
     const row = await this.prisma.mkt_campaign_triage_results.upsert({
       where: { campaign_id: campaignId },
@@ -228,13 +174,88 @@ export class CampaignTriageService extends BaseService {
       playbookCode: recommendation.playbookCode,
       confidence: recommendation.confidence,
       sourceAuditId: sourceAuditId,
-      auditPlatform: selectedAudit?.platform ?? null,
     });
 
-    const sourceAudit = selectedAudit
-      ? { id: selectedAudit.id, platform: selectedAudit.platform, createdAt: selectedAudit.created_at }
+    const sourceAudit = sourceAuditId
+      ? await this.resolveSourceAudit(sourceAuditId)
       : null;
     return this.toStoredResult(row, playbook, null, sourceAudit);
+  }
+
+  /**
+   * Extract the signal-loading + playbook-loading logic from evaluateTriageForCampaign
+   * into a reusable helper. No behavior change — used by both evaluateTriageForCampaign
+   * and evaluateAllForCampaign.
+   */
+  private async loadSignalsAndPlaybooks(
+    input: TriageEvaluateInput,
+    ctx?: RequestCtx,
+  ): Promise<{ signals: SignalCode[]; playbooks: PlaybookCatalogRow[]; sourceAuditId: string | null }> {
+    const { campaignId, bbb, operatorAddedSignals, operatorRemovedSignals } = input;
+
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+    });
+    if (!campaign) throw new NotFoundError('Campaign not found');
+
+    const allAudits = await this.prisma.mkt_audits_list.findMany({
+      where: { campaign_id: campaignId },
+      orderBy: { created_at: 'desc' },
+    });
+    const selectedAudit = this.selectAuditForTriage(allAudits);
+    const auditData = (selectedAudit?.audit_data as SignalExtractorInput['auditData']) ?? null;
+    const sourceAuditId = selectedAudit?.id ?? null;
+
+    const extractorInput: SignalExtractorInput = {
+      campaign: {
+        last_review_date: campaign.last_review_date,
+        unaddressed_reviews: campaign.unaddressed_reviews ?? 0,
+        nap_consistent: campaign.nap_consistent,
+        has_website: campaign.has_website,
+        website_url: campaign.website_url,
+        gbp_claimed: (campaign as any).gbp_claimed ?? null,
+      },
+      auditData,
+      bbb,
+    };
+    let signals: SignalCode[] = extractSignals(extractorInput);
+
+    if (operatorAddedSignals?.length) {
+      const existing = new Set(signals);
+      for (const code of operatorAddedSignals) {
+        if (typeof code === 'string' && code.length > 0) {
+          existing.add(code as SignalCode);
+        }
+      }
+      signals = Array.from(existing);
+    }
+    if (operatorRemovedSignals?.length) {
+      const removeSet = new Set(operatorRemovedSignals);
+      signals = signals.filter((s) => !removeSet.has(s));
+    }
+
+    const playbooks = await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx);
+    return { signals, playbooks, sourceAuditId };
+  }
+
+  /**
+   * Evaluate all matching playbooks for a campaign (winner + alternatives).
+   * The winner is stored via evaluateTriageForCampaign (same as today).
+   * The alternatives are returned for the UI to present as sibling-creation
+   * suggestions. Each alternative includes its detectedSignals.
+   */
+  async evaluateAllForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<MultiArchetypeTriageResult> {
+    // 1. Run the normal evaluation (stores the winner, same as today)
+    const winner = await this.evaluateTriageForCampaign(input, ctx);
+    // 2. Re-load signals + playbooks (the helper is idempotent — no side effects)
+    const { signals, playbooks } = await this.loadSignalsAndPlaybooks(input, ctx);
+    // 3. Run the engine in "all matches" mode
+    const allMatches = evaluateAllMatchingPlaybooks(signals, playbooks);
+    // 4. Alternatives = all matches except the winner
+    const alternatives = allMatches.filter(
+      (m) => m.playbookCode !== winner.recommendedPlaybook.code,
+    );
+    return { winner, alternatives };
   }
 
   // ─── Accept ────────────────────────────────────────────────────────────
@@ -265,11 +286,14 @@ export class CampaignTriageService extends BaseService {
     const playbook = this.toRow(result.playbook);
 
     // Re-categorize the campaign + apply FITD fee.
+    // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
+    // For non-profile_repair playbooks, clear repair_track (not applicable).
     await this.prisma.mkt_campaigns_list.update({
       where: { id: campaignId },
       data: {
         campaign_category: playbook.category,
         estimated_fee_cents: playbook.fitdDefaultFeeCents,
+        repair_track: playbook.category === 'profile_repair' ? 'standard' : null,
       },
     });
 
@@ -319,11 +343,14 @@ export class CampaignTriageService extends BaseService {
     }
 
     // Re-categorize to the override playbook's category + apply its FITD fee.
+    // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
+    // For non-profile_repair playbooks, clear repair_track (not applicable).
     await this.prisma.mkt_campaigns_list.update({
       where: { id: campaignId },
       data: {
         campaign_category: overridePlaybook.category,
         estimated_fee_cents: overridePlaybook.fitdDefaultFeeCents,
+        repair_track: overridePlaybook.category === 'profile_repair' ? 'standard' : null,
       },
     });
 

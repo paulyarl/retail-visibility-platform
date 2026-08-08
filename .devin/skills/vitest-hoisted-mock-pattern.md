@@ -116,9 +116,26 @@ Do **not** use `require()` inside `beforeEach` to access the mock — vitest's `
 
 5. **Shared mock state across test files.** Vitest isolates mocks per file by default, but if tests run in the same worker and a mock leaks via a shared module (e.g., a base class that caches), it can cause cross-file failures. If you see a test pass alone but fail when run with others, check for singleton caching in the mocked module.
 
+6. **Date columns must use `Date` objects in mocks, not ISO strings.** Prisma returns `Date` objects for `TIMESTAMPTZ`/`TIMESTAMP` columns. Route code compares with `token.expires_at < new Date()` — if the mock returns a string, the comparison yields `NaN` → `false`, causing expired-token checks to silently pass. Always use `new Date(...)` in test fixtures for date columns.
+
+7. **Sync functions must use `mockReturnValue`, not `mockResolvedValue`.** If a function is synchronous (e.g., `resolveGalleryArchetypeDefaults` is a pure function with no DB access), mocking it with `mockResolvedValue` returns a `Promise` instead of the value. The caller gets a Promise object where it expects a plain object, causing downstream property access to fail. Check whether the real function is async before choosing `mockReturnValue` (sync) vs `mockResolvedValue` (async).
+
+8. **`vi.doMock` cannot override an already-cached module.** If a module was already imported via `vi.mock` at the top of the file, `vi.doMock` with a new factory will not replace it — the original mock is cached. To test different config values (e.g., empty salt for graceful degradation), mutate the mock object's properties at runtime instead:
+   ```ts
+   const originalSalt = (unifiedConfig as any).galleryIpHashSalt;
+   (unifiedConfig as any).galleryIpHashSalt = '';
+   // ... run test ...
+   (unifiedConfig as any).galleryIpHashSalt = originalSalt; // restore
+   ```
+
+9. **Admin router request paths must include the mount prefix.** When an Express router is mounted with `app.use('/api/admin/marketing-ops', router)`, supertest requests must use the full path: `request(app).get('/api/admin/marketing-ops/campaigns/:id/gallery-analytics')`. Using just `/campaigns/:id/gallery-analytics` returns 404 because Express doesn't match the mount prefix.
+
 ## Files That Follow This Pattern
 
 - `apps/api/src/services/__tests__/DisputeIntakeService.test.ts` — mocks prisma, logger, IntakeDefinitionService, MarketingCampaignService, RecoveryResolutionService
 - `apps/api/src/services/__tests__/IntakeDefinitionService.test.ts` — mocks prisma, logger, unifiedConfig
 - `apps/api/src/services/__tests__/recoveryResolution.test.ts` — mocks prisma, logger, id-generator, MarketingPromptService, MarketingCampaignService, AiProviderFactory
 - `apps/api/src/services/__tests__/marketingCampaign.recovery.test.ts` — mocks prisma, logger, id-generator
+- `apps/api/src/services/__tests__/GalleryAnalyticsService.test.ts` — mocks prisma, logger, unifiedConfig, audit, id-generator; tests trackEvent, trackEvents, aggregateAnalytics, getTokenAnalytics, getCampaignAnalytics, getDashboardAnalytics
+- `apps/api/src/tests/diagnostic-gallery-routes.test.ts` — mocks prisma, logger, unifiedConfig, audit, id-generator, MarketingDeliverableService (default export singleton), GalleryArchetypeDefaults (sync function), OutreachOpenerService (resolveCampaignArchetype), auth middleware, supabase; tests token resolution, first-view stamping, gallery-token generation
+- `apps/api/src/tests/diagnostic-gallery-tracking-routes.test.ts` — mocks same as above + hoisted auth middleware for 401/200 testing; tests event tracking, batch tracking, rate limiting (60/min → 429), admin analytics auth gating

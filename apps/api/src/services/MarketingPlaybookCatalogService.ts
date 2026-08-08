@@ -22,7 +22,7 @@ import { generatePlaybookCatalogId } from '../lib/id-generator';
 import type {
   PlaybookCode,
   PlaybookCategory,
-  ArchetypeCodeWithA5,
+  ArchetypeCodeWithA6,
   PlaybookCatalogRow,
   MatchingRules,
 } from './triage/types';
@@ -34,7 +34,7 @@ export interface PlaybookCreateInput {
   code: PlaybookCode;
   name: string;
   category: PlaybookCategory;
-  archetype: ArchetypeCodeWithA5;
+  archetype: ArchetypeCodeWithA6;
   description?: string;
   matchingRules?: MatchingRules;
   priorityRank?: number;
@@ -50,7 +50,7 @@ export interface PlaybookCreateInput {
 export interface PlaybookUpdateInput {
   name?: string;
   category?: PlaybookCategory;
-  archetype?: ArchetypeCodeWithA5;
+  archetype?: ArchetypeCodeWithA6;
   description?: string | null;
   matchingRules?: MatchingRules;
   priorityRank?: number;
@@ -65,7 +65,7 @@ export interface PlaybookUpdateInput {
 
 export interface PlaybookListFilters {
   category?: PlaybookCategory;
-  archetype?: ArchetypeCodeWithA5;
+  archetype?: ArchetypeCodeWithA6;
   isActive?: boolean;
 }
 
@@ -99,8 +99,8 @@ export class MarketingPlaybookCatalogService extends BaseService {
     }
   }
 
-  private validateArchetype(archetype: string): asserts archetype is ArchetypeCodeWithA5 {
-    if (!ARCHETYPE_LABELS[archetype as ArchetypeCodeWithA5]) {
+  private validateArchetype(archetype: string): asserts archetype is ArchetypeCodeWithA6 {
+    if (!ARCHETYPE_LABELS[archetype as ArchetypeCodeWithA6]) {
       throw new Error(`Invalid archetype: ${archetype}. Must be one of ${Object.keys(ARCHETYPE_LABELS).join(', ')}`);
     }
   }
@@ -274,7 +274,7 @@ export class MarketingPlaybookCatalogService extends BaseService {
       code: r.code as PlaybookCode,
       name: r.name,
       category: r.category as PlaybookCategory,
-      archetype: r.archetype as ArchetypeCodeWithA5,
+      archetype: r.archetype as ArchetypeCodeWithA6,
       archetypeLabel: r.archetype_label,
       description: r.description,
       matchingRules: (r.matching_rules ?? {

@@ -44,6 +44,7 @@ export {
 // Triage engine (generic DSL evaluator)
 export {
   evaluateTriage,
+  evaluateAllMatchingPlaybooks,
   ruleMatches,
   fallbackRecommendation,
 } from './TriageEngineService';
@@ -55,9 +56,11 @@ export type {
   PlaybookCode,
   PlaybookCategory,
   ArchetypeCodeWithA5,
+  ArchetypeCodeWithA6,
   SignalExtractorInput,
   PlaybookCatalogRow,
   MatchingRules,
+  MultiArchetypeTriageResult,
 } from './types';
 
 export {

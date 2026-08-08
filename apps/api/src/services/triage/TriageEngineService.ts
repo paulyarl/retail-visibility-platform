@@ -225,6 +225,54 @@ export function evaluateTriage(
   return null;
 }
 
+// ─── Multi-archetype: all matching playbooks (sibling creation) ──────────
+
+/**
+ * Evaluate ALL matching playbooks for a signal set, ranked by priority_rank.
+ * Unlike evaluateTriage (which returns only the first match), this returns
+ * every playbook whose matching_rules are satisfied by the signal set.
+ *
+ * Used by CampaignTriageService.evaluateAllForCampaign to present the
+ * operator with all qualifying archetypes as sibling-creation suggestions.
+ * The first element is the winner (same as evaluateTriage's result).
+ *
+ * Each recommendation includes detectedSignals so the operator can see
+ * which signals triggered each alternative playbook.
+ *
+ * @param signals  SignalCode[] from the extractor (post operator enrichment).
+ * @param playbooks Active playbooks from mkt_playbook_catalog, ordered by
+ *                  priority_rank ascending.
+ * @returns TriageRecommendation[] — all matching playbooks, ranked by
+ *          priority_rank. Empty if no playbook matched (should not happen
+ *          if PB-03 is seeded as the fallback).
+ */
+export function evaluateAllMatchingPlaybooks(
+  signals: SignalCode[],
+  playbooks: PlaybookCatalogRow[],
+): TriageRecommendation[] {
+  const signalSet = new Set(signals);
+  const sorted = [...playbooks].sort((a, b) => a.priorityRank - b.priorityRank);
+  const matches: TriageRecommendation[] = [];
+
+  for (const playbook of sorted) {
+    if (!playbook.isActive) continue;
+
+    const rules = playbook.matchingRules;
+    if (ruleMatches(rules, signalSet)) {
+      matches.push({
+        playbookCode: playbook.code,
+        category: playbook.category,
+        archetype: playbook.archetype,
+        confidence: rules.confidence,
+        reasoning: buildReasoning(playbook, signalSet, rules),
+        detectedSignals: buildDetectedSignals(signalSet, rules),
+      });
+    }
+  }
+
+  return matches;
+}
+
 // ─── Fallback recommendation (for misconfiguration) ──────────────────────
 
 /**

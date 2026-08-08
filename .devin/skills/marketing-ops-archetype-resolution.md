@@ -46,6 +46,7 @@ Returns `{ archetype, source: 'triage' | 'fallback', reason }`.
 - `HeaderService.resolveHeader` — A6 → product-visibility preamble; A1–A5 → review-management preamble
 - `CloserService.resolveCloser` — A6 → product-visibility closer; A1–A5 → review-management closer
 - `OutreachOpenerService.executeOpener` — uses the same logic inline (needs the theme for A2, which the shared helper doesn't return)
+- **Diagnostic Gallery token generation** (`marketing-ops.ts` → `POST /campaigns/:id/gallery-token`) — resolves archetype to stamp `gallery_archetype` on the token + apply archetype-aware gallery defaults (title, subtitle, CTA label) via `resolveGalleryArchetypeDefaults()`. For A2, re-runs `selectArchetype` to extract the negative review theme. See `diagnostic-gallery-user-guide.md` for the full gallery workflow.
 
 **Mocking pattern for tests:** `CampaignTriageService` exports the singleton instance (`export default CampaignTriageService.getInstance()`), so mock it as:
 ```typescript

@@ -1622,6 +1622,22 @@ export function generateCampaignId(): string {
 }
 
 /**
+ * Generate business prospect ID (global, mkt_* family — no tenant key).
+ * Format: bp-{nanoid} (11 chars)
+ *
+ * Groups sibling campaigns for the same business prospect. Each sibling
+ * campaign shares the same business_prospect_id. The first sibling created
+ * generates the prospect ID; subsequent siblings reuse it.
+ *
+ * Legacy backfilled IDs use bp_{campaignId} (underscore) to visually
+ * distinguish them from generated IDs (hyphen).
+ */
+export function generateBusinessProspectId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `bp-${nanoid()}`;
+}
+
+/**
  * Generate marketing audit ID
  * Format: maud-{nanoid} (13 chars)
  */

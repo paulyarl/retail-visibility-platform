@@ -367,6 +367,13 @@ export default function MarketingOpsDashboardClient() {
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Scorecards</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Daily activity tracking</p>
               </Link>
+              <Link
+                href="/settings/admin/marketing-ops/gallery-dashboard"
+                className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-cyan-400 dark:hover:border-cyan-600 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Gallery Dashboard</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Diagnostic gallery engagement analytics</p>
+              </Link>
             </div>
           </>
         ) : null}

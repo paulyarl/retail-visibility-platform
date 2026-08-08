@@ -167,6 +167,7 @@ import MarketingPlaybookCatalogService from '../services/MarketingPlaybookCatalo
 import MarketingSignalRegistryService from '../services/MarketingSignalRegistryService';
 import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
+import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
@@ -449,7 +450,7 @@ const scorecardUpdateSchema = z.object({
 
 // ─── Playbook Catalog + Triage schemas (Sprint 3) ───────────────────────
 const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07']);
-const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'triage_management']);
+const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'profile_repair', 'triage_management']);
 const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5', 'A6']);
 
 // ─── Matching rules DSL schema (§6.4) ────────────────────────────────────
@@ -616,6 +617,26 @@ const triageEvaluateSchema = z.object({
 const triageOverrideSchema = z.object({
   playbook_code: playbookCodeEnum,
   reason: z.string().max(500).optional(),
+});
+
+// ─── Multi-archetype sibling + cycling schemas ───────────────────────────
+
+const createSiblingSchema = z.object({
+  archetype: archetypeEnum,
+  playbook_code: playbookCodeEnum.optional(),
+  campaign_category: z.enum(['profile_repair']).optional(),
+  repair_track: z.enum(['standard', 'escalated']).optional(),
+  repair_issue_type: z.string().max(255).optional(),
+  assigned_to: z.string().max(255).optional(),
+  notes: z.string().max(2000).optional(),
+}).refine(
+  (data) => data.playbook_code || data.campaign_category,
+  { message: 'At least one of playbook_code or campaign_category must be provided' },
+);
+
+const cycleEngagementSchema = z.object({
+  reset_to_stage: z.enum(['seek', 'preview_built']).optional(),
+  notes: z.string().max(2000).optional(),
 });
 
 const deliverableTemplateCreateSchema = z.object({
@@ -4339,6 +4360,84 @@ router.post('/:campaignId/triage/override', async (req: any, res: Response) => {
       reason: parsed.reason,
     }, getCtx(req));
     res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// MULTI-ARCHETYPE SIBLING + CYCLING ROUTES
+// ====================
+// These use /:campaignId/{siblings,cycle,triage/alternatives} (multi-segment)
+// so they are NOT shadowed by router.get('/:id', ...) below.
+
+// GET /:campaignId/triage/alternatives — list all matching playbooks for sibling creation
+router.get('/:campaignId/triage/alternatives', async (req: any, res: Response) => {
+  try {
+    const result = await CampaignTriageService.evaluateAllForCampaign({
+      campaignId: req.params.campaignId,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /:campaignId/siblings — create a sibling campaign from a chosen archetype
+router.post('/:campaignId/siblings', async (req: any, res: Response) => {
+  try {
+    const parsed = createSiblingSchema.parse(req.body ?? {});
+    const sibling = await BusinessProspectService.createSiblingCampaign({
+      sourceCampaignId: req.params.campaignId,
+      archetype: parsed.archetype,
+      playbookCode: parsed.playbook_code,
+      campaignCategory: parsed.campaign_category,
+      repairTrack: parsed.repair_track,
+      repairIssueType: parsed.repair_issue_type,
+      assignedTo: parsed.assigned_to,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: sibling });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /:campaignId/siblings — list sibling campaigns for this prospect
+router.get('/:campaignId/siblings', async (req: any, res: Response) => {
+  try {
+    const campaign = await MarketingCampaignService.getCampaign(req.params.campaignId, getCtx(req));
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const prospectId = (campaign as any).business_prospect_id;
+    if (!prospectId) {
+      return res.json({ success: true, data: [] });
+    }
+    const siblings = await BusinessProspectService.listSiblings(prospectId, getCtx(req));
+    res.json({ success: true, data: siblings });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /:campaignId/cycle — cycle to next engagement (sequential)
+router.post('/:campaignId/cycle', async (req: any, res: Response) => {
+  try {
+    const parsed = cycleEngagementSchema.parse(req.body ?? {});
+    const updated = await BusinessProspectService.cycleToNextEngagement({
+      campaignId: req.params.campaignId,
+      resetToStage: parsed.reset_to_stage,
+      notes: parsed.notes,
+      changedBy: (req as any).user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });

@@ -197,6 +197,7 @@ export interface CampaignInput {
   assignedTo?: string;
   notes?: string;
   parentCampaignId?: string;
+  businessProspectId?: string;
 }
 
 export interface CampaignUpdateInput {
@@ -296,6 +297,7 @@ export interface CampaignListFilters {
   page?: number;
   limit?: number;
   parentCampaignId?: string;
+  businessProspectId?: string;
 }
 
 export interface MarkCampaignPaidInput {
@@ -407,6 +409,7 @@ export class MarketingCampaignService extends BaseService {
           assigned_to: input.assignedTo || null,
           notes: input.notes || null,
           parent_campaign_id: input.parentCampaignId || null,
+          business_prospect_id: input.businessProspectId || null,
           stage: initialStage,
           stage_entered_at: new Date(),
         },
@@ -689,6 +692,7 @@ export class MarketingCampaignService extends BaseService {
     if (filters.tone) where.tone = filters.tone;
     if (filters.retainer) where.retainer = filters.retainer;
     if (filters.parentCampaignId) where.parent_campaign_id = filters.parentCampaignId;
+    if (filters.businessProspectId) where.business_prospect_id = filters.businessProspectId;
     if (filters.attributes && filters.attributes.length > 0) {
       where.attributes = { hasEvery: filters.attributes };
     }
@@ -874,11 +878,20 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
-      // Registry-driven intake auto-gen: for non-recovery campaigns, check
-      // mkt_intake_definitions for registry kinds whose trigger_stages
-      // include the target stage. Generate an intake link for each match.
-      // Best-effort — failure must NOT block the transition.
-      if (category !== 'recovery_management' && category !== 'profile_repair') {
+      // Registry-driven intake auto-gen: for campaigns running the review
+      // pipeline (review_management, triage_management, or profile_repair on
+      // the standard track), check mkt_intake_definitions for registry kinds
+      // whose trigger_stages include the target stage. Generate an intake
+      // link for each match. Best-effort — failure must NOT block the
+      // transition.
+      //
+      // profile_repair + escalated is excluded here because it gets dispute
+      // intake via the recovery block above.
+      const runsReviewPipeline =
+        category === 'review_management' ||
+        category === 'triage_management' ||
+        (category === 'profile_repair' && repairTrack === 'standard');
+      if (runsReviewPipeline) {
         try {
           const { intakeDefinitionService } = await import('./intake/IntakeDefinitionService.js');
           const { DisputeIntakeService } = await import('./DisputeIntakeService.js');

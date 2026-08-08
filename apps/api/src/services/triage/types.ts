@@ -21,6 +21,7 @@ export type PlaybookCode = (typeof PLAYBOOK_CODES)[number];
 export const PLAYBOOK_CATEGORIES = [
   'review_management',
   'recovery_management',
+  'profile_repair',
   'triage_management',
 ] as const;
 export type PlaybookCategory = (typeof PLAYBOOK_CATEGORIES)[number];
@@ -163,4 +164,22 @@ export interface PlaybookCatalogRow {
   openerPromptTemplateId: string | null;
   previewDeliverableType: string | null;
   isActive: boolean;
+}
+
+// ─── Multi-archetype triage (sibling creation support) ───────────────────
+//
+// When triage detects multiple qualifying archetypes, the winner is stored
+// as usual (via evaluateTriageForCampaign). The alternatives are returned
+// for the UI to present as sibling-creation suggestions. Each alternative
+// includes its detectedSignals so the operator can see which signals
+// triggered each alternative playbook.
+
+/**
+ * Result of evaluating all matching playbooks for a campaign.
+ * The winner is the same as evaluateTriageForCampaign's result.
+ * The alternatives are all other matching playbooks ranked by priority.
+ */
+export interface MultiArchetypeTriageResult {
+  winner: import('../CampaignTriageService').StoredTriageResult;
+  alternatives: TriageRecommendation[];
 }
