@@ -160,7 +160,7 @@ export class BusinessProspectService extends BaseService {
     if (playbookCode) {
       // Triage-driven sibling — resolve category from the playbook
       const { MarketingPlaybookCatalogService } = await import('./MarketingPlaybookCatalogService.js');
-      const playbook = await MarketingPlaybookCatalogService.getPlaybookByCode(playbookCode, ctx);
+      const playbook = await MarketingPlaybookCatalogService.getInstance().getPlaybookByCode(playbookCode, ctx);
       siblingCategory = playbook.category;
       estimatedFeeCents = playbook.fitdDefaultFeeCents;
       // For profile_repair playbooks, default to standard track

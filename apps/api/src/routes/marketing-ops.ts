@@ -4390,7 +4390,7 @@ router.get('/:campaignId/triage/alternatives', async (req: any, res: Response) =
 router.post('/:campaignId/siblings', async (req: any, res: Response) => {
   try {
     const parsed = createSiblingSchema.parse(req.body ?? {});
-    const sibling = await BusinessProspectService.createSiblingCampaign({
+    const sibling = await BusinessProspectService.getInstance().createSiblingCampaign({
       sourceCampaignId: req.params.campaignId,
       archetype: parsed.archetype,
       playbookCode: parsed.playbook_code,
@@ -4420,7 +4420,7 @@ router.get('/:campaignId/siblings', async (req: any, res: Response) => {
     if (!prospectId) {
       return res.json({ success: true, data: [] });
     }
-    const siblings = await BusinessProspectService.listSiblings(prospectId, getCtx(req));
+    const siblings = await BusinessProspectService.getInstance().listSiblings(prospectId, getCtx(req));
     res.json({ success: true, data: siblings });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
@@ -4431,7 +4431,7 @@ router.get('/:campaignId/siblings', async (req: any, res: Response) => {
 router.post('/:campaignId/cycle', async (req: any, res: Response) => {
   try {
     const parsed = cycleEngagementSchema.parse(req.body ?? {});
-    const updated = await BusinessProspectService.cycleToNextEngagement({
+    const updated = await BusinessProspectService.getInstance().cycleToNextEngagement({
       campaignId: req.params.campaignId,
       resetToStage: parsed.reset_to_stage,
       notes: parsed.notes,
