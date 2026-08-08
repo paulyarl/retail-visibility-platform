@@ -24,8 +24,9 @@ import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageC
 import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
 import GalleryAnalyticsTab from './GalleryAnalyticsTab';
+import SiblingsTab from './SiblingsTab';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'history' | 'lineage' | 'cascade' | 'gallery';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -329,6 +330,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     // Gallery tab — diagnostic gallery (screenshots + token + analytics).
     // Visible for all campaigns (operator can upload screenshots at preview_built+).
     { key: 'gallery', label: 'Diagnostic Gallery' },
+    // Siblings tab — multi-archetype sibling campaigns (Sprint 3).
+    // Visible for all campaigns (shows siblings if they exist, or a hint
+    // about creating them via triage alternatives).
+    { key: 'siblings', label: 'Siblings' },
   ];
 
   return (
@@ -1189,6 +1194,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
 
             {activeTab === 'gallery' && campaign && (
               <GalleryAnalyticsTab campaignId={campaign.id} />
+            )}
+
+            {activeTab === 'siblings' && campaign && (
+              <SiblingsTab campaignId={campaign.id} campaign={campaign} onRefresh={fetchCampaign} />
             )}
           </>
         ) : (

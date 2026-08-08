@@ -3476,6 +3476,78 @@ class MarketingOpsService extends AdminApiSingleton {
     return json.data;
   }
 
+  // ─── Multi-archetype: triage alternatives + siblings + cycling (Sprint 1/3) ──
+
+  async getTriageAlternatives(campaignId: string): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/triage/alternatives`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to get triage alternatives (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async createSiblingCampaign(campaignId: string, input: {
+    archetype: string;
+    playbookCode?: string;
+    campaignCategory?: string;
+    repairTrack?: string;
+    repairIssueType?: string;
+    assignedTo?: string;
+    notes?: string;
+  }): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/siblings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to create sibling campaign (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async listSiblings(campaignId: string): Promise<any[]> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/siblings`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to list siblings (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data ?? [];
+  }
+
+  async cycleToNextEngagement(campaignId: string, input?: {
+    resetToStage?: string;
+    notes?: string;
+  }): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cycle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input ?? {}),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to cycle to next engagement (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
   // ─── Playbook catalog CRUD (Sprint 4) ────────────────────────────────
 
   async listPlaybooks(filters?: { category?: string; isActive?: boolean }): Promise<PlaybookCatalogEntry[]> {

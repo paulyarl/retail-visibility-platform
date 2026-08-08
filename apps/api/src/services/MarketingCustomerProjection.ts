@@ -96,6 +96,10 @@ export interface CustomerCampaignProjection {
   websiteUrl: string | null;
   deliverables: CustomerDeliverableProjection[];
   receipts: CustomerReceiptProjection[];
+  // Multi-archetype sibling fields (Sprint 3)
+  businessProspectId: string | null;
+  isPrimarySibling: boolean;
+  engagementCycle: number;
 }
 
 export interface CustomerDeliverableProjection {
@@ -184,6 +188,9 @@ export async function projectCampaign(
     websiteUrl: campaign.website_url || null,
     deliverables,
     receipts,
+    businessProspectId: campaign.business_prospect_id || null,
+    isPrimarySibling: campaign.is_primary_sibling ?? false,
+    engagementCycle: campaign.engagement_cycle ?? 1,
   };
 }
 
@@ -204,11 +211,19 @@ export async function projectCampaigns(
 
 // ── Portal overview DTO (§7.2) ──────────────────────────────────────────
 
+export interface CampaignGroup {
+  businessProspectId: string | null;
+  businessName: string;
+  campaigns: CustomerCampaignProjection[];
+  primaryCampaignId: string | null;
+}
+
 export interface CustomerPortalOverview {
   totalSpentCents: number;
   activeEngagements: number;
   deliverablesReady: number;
   campaigns: CustomerCampaignProjection[];
+  campaignGroups: CampaignGroup[];
   recentPurchases: CustomerReceiptProjection[];
 }
 
@@ -255,13 +270,66 @@ export async function buildPortalOverview(
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 10);
 
+  // Group campaigns by business_prospect_id (Sprint 3 — multi-archetype).
+  // Legacy campaigns (null prospect ID) are each their own group.
+  const campaignGroups = groupCampaignsByProspect(projected);
+
   return {
     totalSpentCents,
     activeEngagements,
     deliverablesReady,
     campaigns: projected,
+    campaignGroups,
     recentPurchases,
   };
+}
+
+/**
+ * Group projected campaigns by business_prospect_id (Sprint 3).
+ *
+ * - Campaigns sharing a prospect ID are grouped together (siblings).
+ * - Legacy campaigns (null prospect ID) are each their own group.
+ * - Within each group, the primary sibling is first, then by datePaid desc.
+ */
+export function groupCampaignsByProspect(
+  campaigns: CustomerCampaignProjection[],
+): CampaignGroup[] {
+  const groups = new Map<string, CampaignGroup>();
+
+  for (const c of campaigns) {
+    const key = c.businessProspectId ?? c.id; // legacy → own group
+    if (!groups.has(key)) {
+      groups.set(key, {
+        businessProspectId: c.businessProspectId,
+        businessName: c.businessName,
+        campaigns: [],
+        primaryCampaignId: null,
+      });
+    }
+    const group = groups.get(key)!;
+    group.campaigns.push(c);
+    if (c.isPrimarySibling) {
+      group.primaryCampaignId = c.id;
+    }
+  }
+
+  // Sort each group: primary first, then by datePaid desc
+  for (const group of groups.values()) {
+    group.campaigns.sort((a, b) => {
+      if (a.isPrimarySibling && !b.isPrimarySibling) return -1;
+      if (!a.isPrimarySibling && b.isPrimarySibling) return 1;
+      const aTime = a.datePaid?.getTime() ?? 0;
+      const bTime = b.datePaid?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+  }
+
+  // Sort groups: groups with most recent activity first
+  return Array.from(groups.values()).sort((a, b) => {
+    const aTime = a.campaigns[0]?.datePaid?.getTime() ?? 0;
+    const bTime = b.campaigns[0]?.datePaid?.getTime() ?? 0;
+    return bTime - aTime;
+  });
 }
 
 // ── Receipt view model (§6.5, §7.4) ─────────────────────────────────────

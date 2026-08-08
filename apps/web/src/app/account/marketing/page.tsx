@@ -102,7 +102,7 @@ export default function MarketingOverviewPage() {
         </div>
       </div>
 
-      {/* Campaigns list */}
+      {/* Campaigns list — grouped by business prospect (Sprint 3) */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Your Campaigns</h2>
@@ -111,6 +111,58 @@ export default function MarketingOverviewPage() {
           <div className="p-12 text-center text-gray-500">
             <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
             <p>No campaigns yet. Once you purchase a marketing package, it will appear here.</p>
+          </div>
+        ) : (overview as any).campaignGroups && (overview as any).campaignGroups.length > 0 ? (
+          <div className="divide-y divide-gray-100">
+            {(overview as any).campaignGroups.map((group: any) => (
+              <div key={group.businessProspectId ?? group.primaryCampaignId ?? group.campaigns[0]?.id}>
+                {group.campaigns.length > 1 && (
+                  <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
+                    <p className="text-xs font-medium text-gray-500">
+                      {group.businessName} — {group.campaigns.length} sibling campaigns
+                    </p>
+                  </div>
+                )}
+                {group.campaigns.map((campaign: any) => (
+                  <Link
+                    key={campaign.id}
+                    href={`/account/marketing/campaigns/${campaign.id}`}
+                    className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <Package className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{campaign.businessName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-500">{campaign.serviceCategoryLabel}</p>
+                          {group.campaigns.length > 1 && (
+                            <span className="text-[10px] text-gray-400">
+                              · Cycle {campaign.engagementCycle ?? 1}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                          campaign.status.status === 'delivered' ? 'bg-green-50 text-green-700' :
+                          campaign.status.status === 'in_production' ? 'bg-blue-50 text-blue-700' :
+                          campaign.status.status === 'active_plan' ? 'bg-purple-50 text-purple-700' :
+                          'bg-gray-50 text-gray-700'
+                        }`}>
+                          {campaign.status.label}
+                        </span>
+                        <p className="text-xs text-gray-400 mt-1">Paid {formatDate(campaign.datePaid)}</p>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-gray-400" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
