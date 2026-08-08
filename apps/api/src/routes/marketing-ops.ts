@@ -128,6 +128,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import * as fs from 'fs';
+import multer from 'multer';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 import { HttpError } from '../middleware/errorHandler';
 import { logger } from '../logger';
@@ -1348,6 +1349,91 @@ router.post('/:campaignId/files', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Multipart upload config for diagnostic screenshots — memory storage, 10MB cap.
+const diagnosticScreenshotUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: unifiedConfig.recoveryMaxAttachmentBytes },
+});
+
+/**
+ * POST /:campaignId/files/upload
+ *
+ * One-step multipart upload for diagnostic screenshots. Accepts a single
+ * file field named "file", uploads to the Supabase disputes bucket, and
+ * creates an mkt_files_list record with file_type='diagnostic_screenshot'.
+ *
+ * Mirrors the DisputeIntakeService upload pattern (line 588).
+ */
+router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file'), async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'no_file', message: 'A file named "file" is required.' });
+    }
+
+    // Validate MIME type — screenshots only (PNG, JPEG, WebP)
+    const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!ALLOWED_MIME.includes(file.mimetype)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_file_type',
+        message: `Only PNG, JPEG, and WebP screenshots are accepted (got: ${file.mimetype}).`,
+      });
+    }
+
+    // Verify campaign exists
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { id: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    // Upload to Supabase disputes bucket
+    const { createClient } = await import('@supabase/supabase-js');
+    const { StorageBuckets } = await import('../storage-config');
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ success: false, error: 'storage_not_configured' });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const pathKey = `diagnostic-${campaignId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .upload(pathKey, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      logger.error('Diagnostic screenshot upload failed', getCtx(req), { error: uploadError.message, campaignId });
+      return res.status(500).json({ success: false, error: 'upload_failed', message: uploadError.message });
+    }
+
+    // Create mkt_files_list record
+    const fileRecord = await MarketingFileService.createFile({
+      campaignId,
+      fileType: 'diagnostic_screenshot',
+      fileName: file.originalname,
+      storagePath: pathKey,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      uploadedBy: req.user?.id,
+    }, getCtx(req));
+
+    logger.info('Diagnostic screenshot uploaded', getCtx(req), { campaignId, fileId: fileRecord.id, fileName: file.originalname });
+
+    return res.status(201).json({ success: true, data: fileRecord });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });
@@ -4456,7 +4542,7 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
         stage: true,
         package_price_cents: true,
         mkt_files_list: {
-          where: { file_type: 'screenshot' },
+          where: { file_type: 'diagnostic_screenshot' },
           select: { id: true, file_name: true },
         },
       },

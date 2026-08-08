@@ -16,6 +16,7 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
@@ -70,6 +71,159 @@ async function resolveSource(token: any): Promise<string> {
   if (token.token_type === 'diagnostic_gallery') return 'diagnostic_gallery';
   return 'qr_deliverable';
 }
+
+/**
+ * Resolve a diagnostic gallery token. Unlike resolvePreviewToken, this
+ * returns the token row even when expired (with an expired flag) so the
+ * frontend can render the re-activation hook.
+ *
+ * Returns null if the token does not exist or is not a diagnostic_gallery token.
+ */
+async function resolveGalleryToken(ptoken: string) {
+  const token = await prisma.mkt_deliverable_preview_tokens.findFirst({
+    where: { token: ptoken },
+    include: {
+      mkt_campaigns_list: true,
+    },
+  });
+  if (!token) {
+    return null;
+  }
+  if (token.token_type !== 'diagnostic_gallery') {
+    return null;
+  }
+  const expired = !!(token.expires_at && token.expires_at < new Date());
+  return { token, campaign: token.mkt_campaigns_list, expired };
+}
+
+// ====================
+// DIAGNOSTIC GALLERY (§12 Sprint 3)
+// ====================
+
+/**
+ * GET /api/public/marketing/gallery/:token
+ *
+ * Public, token-gated endpoint that returns all data needed to render the
+ * diagnostic gallery page. No auth required — the token is the trust boundary.
+ *
+ * - 404 if token not found or wrong type
+ * - 200 with { expired: true, ... } if token expired (frontend renders re-activation hook)
+ * - 200 with full gallery payload if active
+ *
+ * Signed screenshot URLs have a 5-minute TTL (Supabase signed URL).
+ */
+router.get('/public/marketing/gallery/:token', async (req, res) => {
+  try {
+    const { token: ptoken } = req.params;
+    if (!ptoken) {
+      return res.status(400).json({ success: false, error: 'Token is required' });
+    }
+
+    const resolved = await resolveGalleryToken(ptoken);
+    if (!resolved) {
+      return res.status(404).json({ success: false, error: 'Invalid or unknown token' });
+    }
+
+    const { token, campaign, expired } = resolved;
+
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    // Expired token — return minimal payload for re-activation hook
+    if (expired) {
+      return res.json({
+        success: true,
+        expired: true,
+        expiredAt: token.expires_at,
+        businessName: campaign.business_name ?? null,
+        reactivationUrl: `/marketing/pay?ptoken=${token.token}`,
+      });
+    }
+
+    // Active token — stamp viewed_at on first view
+    if (!token.viewed_at) {
+      await prisma.mkt_deliverable_preview_tokens.update({
+        where: { id: token.id },
+        data: { viewed_at: new Date() },
+      });
+    }
+
+    // Fetch screenshots (file_type = 'diagnostic_screenshot', ordered by uploaded_at ASC)
+    const screenshots = await prisma.mkt_files_list.findMany({
+      where: {
+        campaign_id: campaign.id,
+        file_type: 'diagnostic_screenshot',
+      },
+      orderBy: { uploaded_at: 'asc' },
+      select: {
+        id: true,
+        file_name: true,
+        storage_path: true,
+        mime_type: true,
+        file_size: true,
+        uploaded_at: true,
+      },
+    });
+
+    // Generate signed URLs via Supabase client (5-minute TTL)
+    const { createClient } = await import('@supabase/supabase-js');
+    const { StorageBuckets } = await import('../storage-config');
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+
+    const screenshotsWithUrls = await Promise.all(
+      screenshots.map(async (s) => {
+        let signedUrl: string | null = null;
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const { data, error } = await supabase.storage
+            .from(StorageBuckets.DISPUTES.name)
+            .createSignedUrl(s.storage_path, 300);
+          if (!error && data) {
+            signedUrl = data.signedUrl;
+          }
+        }
+        return {
+          id: s.id,
+          fileName: s.file_name,
+          signedUrl,
+          mimeType: s.mime_type,
+          fileSize: s.file_size,
+          uploadedAt: s.uploaded_at,
+        };
+      })
+    );
+
+    // Build gallery payload per §4.3
+    return res.json({
+      success: true,
+      expired: false,
+      token: {
+        id: token.id,
+        expiresAt: token.expires_at,
+        viewedAt: token.viewed_at,
+      },
+      campaign: {
+        id: campaign.id,
+        businessName: campaign.business_name ?? null,
+      },
+      gallery: {
+        archetype: token.gallery_archetype ?? null,
+        title: token.gallery_title ?? null,
+        subtitle: token.gallery_subtitle ?? null,
+        frictionSummary: token.friction_summary ?? null,
+        ctaLabel: token.cta_label ?? null,
+        ctaAmountCents: token.cta_amount_cents ?? null,
+      },
+      screenshots: screenshotsWithUrls,
+      payUrl: `/marketing/pay?ptoken=${token.token}`,
+    });
+  } catch (error: any) {
+    logger.error('[marketing-ops-public] GET /gallery/:token error', undefined, { error: error.message });
+    return res.status(500).json({ success: false, error: 'Failed to resolve gallery' });
+  }
+});
 
 router.get('/public/marketing/pay', async (req, res) => {
   try {
