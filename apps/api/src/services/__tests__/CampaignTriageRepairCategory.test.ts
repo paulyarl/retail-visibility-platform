@@ -16,6 +16,7 @@ const {
   mockTriageResults,
   mockAudits,
   mockPlaybookCatalog,
+  mockGetPlaybookByCode,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findUnique: vi.fn(), update: vi.fn() },
   mockTriageResults: {
@@ -25,6 +26,7 @@ const {
   },
   mockAudits: { findMany: vi.fn() },
   mockPlaybookCatalog: { findMany: vi.fn(), findUnique: vi.fn() },
+  mockGetPlaybookByCode: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -44,18 +46,19 @@ vi.mock('../../lib/id-generator', () => ({
   generateCampaignTriageId: () => 'mct-test-001',
 }));
 
-// Mock MarketingPlaybookCatalogService — static methods used by CampaignTriageService
+// Mock MarketingPlaybookCatalogService — default export is the singleton instance
 vi.mock('../MarketingPlaybookCatalogService', () => ({
   default: {
     listActivePlaybooksOrdered: vi.fn().mockResolvedValue([]),
-    getPlaybookByCode: vi.fn(),
-    getInstance: () => ({
-      getPlaybookByCode: vi.fn(),
-    }),
+    getPlaybookByCode: mockGetPlaybookByCode,
   },
 }));
 
 import CampaignTriageService from '../CampaignTriageService';
+
+// CampaignTriageService default export is the singleton instance
+// (export default CampaignTriageService.getInstance()), so we call
+// methods directly on the import.
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
 
@@ -116,7 +119,7 @@ describe('acceptTriage — repair_track for profile_repair', () => {
     mockTriageResults.update.mockResolvedValue(triageResultRow(profileRepairPlaybook));
     mockCampaignsList.update.mockResolvedValue({});
 
-    await CampaignTriageService.getInstance().acceptTriage({ campaignId: 'mkt-001' });
+    await CampaignTriageService.acceptTriage({ campaignId: 'mkt-001' });
 
     expect(mockCampaignsList.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -134,7 +137,7 @@ describe('acceptTriage — repair_track for profile_repair', () => {
     mockTriageResults.update.mockResolvedValue(triageResultRow(reviewManagementPlaybook));
     mockCampaignsList.update.mockResolvedValue({});
 
-    await CampaignTriageService.getInstance().acceptTriage({ campaignId: 'mkt-001' });
+    await CampaignTriageService.acceptTriage({ campaignId: 'mkt-001' });
 
     expect(mockCampaignsList.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -152,7 +155,7 @@ describe('acceptTriage — repair_track for profile_repair', () => {
     mockTriageResults.update.mockResolvedValue(triageResultRow(profileRepairPlaybook));
     mockCampaignsList.update.mockResolvedValue({});
 
-    await CampaignTriageService.getInstance().acceptTriage({ campaignId: 'mkt-001' });
+    await CampaignTriageService.acceptTriage({ campaignId: 'mkt-001' });
 
     expect(mockCampaignsList.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -172,14 +175,13 @@ describe('overrideTriage — repair_track for profile_repair', () => {
   });
 
   it('sets repair_track to standard when overriding to a profile_repair playbook', async () => {
-    const { MarketingPlaybookCatalogService } = await import('../MarketingPlaybookCatalogService');
-    (MarketingPlaybookCatalogService as any).getPlaybookByCode.mockResolvedValue(profileRepairPlaybook);
+    mockGetPlaybookByCode.mockResolvedValue(profileRepairPlaybook);
 
     mockTriageResults.findUnique.mockResolvedValue(triageResultRow(reviewManagementPlaybook));
     mockTriageResults.update.mockResolvedValue(triageResultRow(profileRepairPlaybook));
     mockCampaignsList.update.mockResolvedValue({});
 
-    await CampaignTriageService.getInstance().overrideTriage({
+    await CampaignTriageService.overrideTriage({
       campaignId: 'mkt-001',
       playbookCode: 'PB-01',
       reason: 'operator override',
@@ -197,14 +199,13 @@ describe('overrideTriage — repair_track for profile_repair', () => {
   });
 
   it('clears repair_track (null) when overriding to a review_management playbook', async () => {
-    const { MarketingPlaybookCatalogService } = await import('../MarketingPlaybookCatalogService');
-    (MarketingPlaybookCatalogService as any).getPlaybookByCode.mockResolvedValue(reviewManagementPlaybook);
+    mockGetPlaybookByCode.mockResolvedValue(reviewManagementPlaybook);
 
     mockTriageResults.findUnique.mockResolvedValue(triageResultRow(profileRepairPlaybook));
     mockTriageResults.update.mockResolvedValue(triageResultRow(reviewManagementPlaybook));
     mockCampaignsList.update.mockResolvedValue({});
 
-    await CampaignTriageService.getInstance().overrideTriage({
+    await CampaignTriageService.overrideTriage({
       campaignId: 'mkt-001',
       playbookCode: 'PB-02',
       reason: 'switching to review',

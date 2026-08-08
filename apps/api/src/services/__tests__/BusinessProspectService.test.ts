@@ -46,14 +46,12 @@ vi.mock('../../lib/id-generator', () => ({
 
 vi.mock('../MarketingPlaybookCatalogService', () => ({
   default: {
-    getInstance: () => ({
-      getPlaybookByCode: vi.fn().mockResolvedValue({
-        id: 'pbk-pb01',
-        code: 'PB-01',
-        category: 'profile_repair',
-        archetype: 'A3',
-        fitdDefaultFeeCents: 14900,
-      }),
+    getPlaybookByCode: vi.fn().mockResolvedValue({
+      id: 'pbk-pb01',
+      code: 'PB-01',
+      category: 'profile_repair',
+      archetype: 'A3',
+      fitdDefaultFeeCents: 14900,
     }),
   },
 }));
