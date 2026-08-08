@@ -1,8 +1,8 @@
 # Sprint Plan: Marketing Ops — Multi-Archetype Campaigns (Concurrent Siblings + Sequential Cycling)
 
-**Document Version:** 1.0
+**Document Version:** 1.2
 **Date:** 2026-08-08
-**Status:** Draft — Ready for Review
+**Status:** Ready for Sprint Planning — Pre-Flight Checklist Applied (§14), Open Questions Resolved (§13)
 
 **Supersedes:** The single-archetype-per-campaign assumption inherited from:
 - `marketing_ops_outreach_opener_sprint_plan.md` (A1–A4 archetype system, one archetype per campaign)
@@ -779,7 +779,7 @@ POST /prospects/:prospectId/multi-gallery-token  — mint a multi-diagnostic gal
 **Request body:**
 ```typescript
 {
-  expires_in_days?: number;  // default: 72
+  expires_in_days?: number;  // default: 7 (same as individual gallery tokens — see §13.1)
   gallery_title?: string;    // default: "Digital Health Diagnostic — {businessName}"
   gallery_subtitle?: string; // default: "{N} issues found across {M} areas"
 }
@@ -1039,7 +1039,7 @@ I noticed a few things affecting {businessName}'s online presence:
 I put together a free diagnostic report showing exactly what's happening:
 {multiGalleryUrl}
 
-The report expires in 72 hours. Take a look and let me know which areas
+The report expires in 7 days. Take a look and let me know which areas
 you'd like to tackle first.
 
 — {operatorName}
@@ -1381,12 +1381,453 @@ The sibling model does not change any of this — it simply allows multiple inde
 
 ---
 
-## 13. Open Questions for Review
+## 13. Open Questions — Resolved
 
-1. **Multi-gallery expiry:** Should the multi-gallery token have the same 72h default as individual gallery tokens, or a longer window (e.g., 7 days) since it represents a broader engagement?
+### 13.1 Multi-gallery expiry — RESOLVED: 7 days (same as individual gallery tokens)
 
-2. **Cross-sibling analytics:** Should the dashboard analytics (`getDashboardAnalytics`) add a "prospect-level" view that aggregates engagement across siblings, or keep analytics per-campaign?
+**Decision:** The multi-gallery token defaults to `expires_in_days: 7`, the same as individual gallery tokens.
 
-3. **Retainer scope:** When a sibling reaches `retainer_won`, does the retainer cover only that archetype's ongoing service, or can it be expanded to cover all siblings? (Current model: retainer is per-campaign.)
+**Premise correction:** The question originally asked whether the multi-gallery should match the "72h default" of individual gallery tokens. Inspection of the actual code (`apps/api/src/routes/marketing-ops.ts` line 4510) shows individual gallery tokens already default to **7 days** (`expires_in_days: z.number().int().min(1).max(365).default(7)`), not 72 hours. The "72 hours" in the outreach message template (§7.1) was a template string, not the token expiry.
 
-4. **A5 interaction:** If triage detects a dual-signal (A5) and the operator creates siblings instead, should A5 be offered as an alternative? Or should A5 suppress sibling creation (since it's the combined approach)?
+**Rationale:**
+- The multi-gallery landing page links to individual sibling galleries. If the multi-gallery expired before the individual galleries it links to, the prospect would see dead links — confusing and broken UX.
+- 7 days is already a reasonable window for a multi-dimensional diagnostic (the prospect may need to discuss with co-owners / business partners).
+- The operator can override via `expires_in_days` (1–365 range, same as individual gallery tokens).
+- No special case needed — the multi-gallery uses the same expiry contract as individual galleries.
+
+**Impacts:**
+- §5.4 request body: fix `expires_in_days?: number; // default: 72` → `expires_in_days?: number; // default: 7` (the field is `expires_in_days`, so 72 would mean 72 days — a spec typo).
+- §7.1 outreach template: fix "The report expires in 72 hours" → "The report expires in 7 days" (or make it dynamic based on actual `expires_at`).
+- §14 §5 Zod schema table: fix `multiGalleryTokenSchema` default from 72 to 7.
+
+### 13.2 Cross-sibling analytics — RESOLVED: Defer prospect-level view to a future sprint
+
+**Decision:** Keep analytics per-campaign for this sprint. The data model already captures everything needed for future prospect-level aggregation — no additional migrations will be needed.
+
+**Rationale:**
+- The data is already captured: `mkt_gallery_events.sibling_campaign_id` (Migration 181) attributes engagement to specific siblings, and `business_prospect_id` groups siblings for prospect-level aggregation.
+- A prospect-level analytics UI (aggregating engagement across siblings, showing which dimensions got the most views, tracking conversion paths) is a separate concern from the sibling model + multi-gallery infrastructure.
+- This sprint is already 3 sprints (6 weeks). Adding analytics UI would expand scope without blocking the core sibling + multi-gallery functionality.
+- The operator can manually review each sibling's analytics for now.
+
+**Future sprint note:** `getDashboardAnalytics` can be extended with an optional `prospectId` filter that aggregates across `business_prospect_id`. No schema changes needed — the query joins `mkt_gallery_events` on `business_prospect_id` via `mkt_campaigns_list.business_prospect_id`. The `sibling_campaign_id` column enables per-sibling attribution within the prospect-level view.
+
+**Impact on this sprint:** None — no changes to current scope.
+
+### 13.3 Retainer scope — RESOLVED: Retainer stays per-sibling (per-campaign)
+
+**Decision:** The retainer remains per-campaign, as in the current model. When a sibling reaches `retainer_won`, the retainer covers only that sibling's archetype-specific ongoing service.
+
+**Rationale:**
+- Different archetypes have fundamentally different ongoing services: review monitoring (A1) vs. listing drift monitoring (A3) vs. product catalog maintenance (A6). Different cadence, different deliverables, different pricing.
+- Bundling multiple archetypes into one retainer would create scope creep and pricing complexity — the operator would need to track which services are included vs. excluded for each retainer.
+- The independent-pipeline design decision (§3.1) explicitly chose siblings over the A5 umbrella to preserve "independent pipelines, payments, deliverables, and stage transitions." Retainers are part of that independence.
+- If the operator wants a "bundle retainer" covering multiple dimensions, they can create an A5-style campaign for that purpose (A5 is the bundle archetype by design).
+- The `cycleToNextEngagement` flow (§3.5) already handles follow-on engagements per-sibling — the retainer is the natural endpoint of a cycle within a sibling.
+
+**Impact on this sprint:** None — this is the current model. No schema or service changes needed.
+
+### 13.4 A5 interaction with sibling creation — RESOLVED: A5 offered as alternative with informational note
+
+**Decision:** A5 is offered as an alternative in the triage alternatives list alongside individual archetypes. The operator can create A5 as a sibling (it has `campaign_category: 'triage_management'`, which passes the sibling uniqueness check). The UI shows an informational note when A5 is selected alongside individual archetype siblings for the same prospect. No hard block — the operator has final say.
+
+**Rationale:**
+- A5 is the multi-signal umbrella archetype — it bundles multiple pain dimensions into one package. It's a valid sales strategy that the operator should be able to choose.
+- A5 has `campaign_category: 'triage_management'`, which is distinct from `review_management`, `recovery_management`, and `profile_repair`. It passes the sibling uniqueness constraint `(business_prospect_id, campaign_category, COALESCE(repair_track, 'none'))` without collision.
+- Hard-blocking A5 alongside individual siblings would be overly restrictive — the operator may have valid reasons to pitch A5 (bundle) + A6 (individual product visibility) if A6 isn't part of the A5 bundle's scope.
+- The informational note ("A5 bundles multiple dimensions — creating individual siblings alongside A5 may result in overlapping deliverables") prevents accidental redundancy without enforcing a business rule at the schema level.
+- This keeps the model simple: every archetype is a potential sibling, A5 is just one option in the alternatives list.
+
+**UI behavior (Sprint 3 — triage alternatives card):**
+- The alternatives list includes A5 if triage detected a dual-signal match.
+- When the operator clicks "Create sibling" for A5 while individual archetype siblings already exist for the same prospect, show a confirmation dialog with the informational note.
+- The operator confirms → A5 sibling is created normally.
+- No server-side validation block — the note is a UX guardrail only.
+
+**Impact on this sprint:** Sprint 3 triage alternatives card must include A5 in the list and show the informational note. No schema impact.
+
+---
+
+## 14. Start-of-Phase Pre-Flight Checklist
+
+*Applied per `.devin/skills/start-of-phase-sprint-checklist.md` before implementation begins. All items below are filled in from the sprint plan above and codebase verification (latest migration = 177, route mounts in `routeRegistry.ts`, id-generator catalog).*
+
+### §0 Hard Rule — TypeScript Checks at Phase End
+
+**Non-negotiable.** Every sprint (S1, S2, S3) MUST end with zero new TypeScript errors on both apps:
+
+```bash
+pnpm checkapi   # apps/api  — tsc --noEmit
+pnpm checkweb   # apps/web  — tsc --noEmit
+```
+
+Pre-existing error count must not increase. Allocate time at the end of each sprint session to run both checks and fix errors before committing. S1 touches `triage/types.ts`, `CampaignTriageService`, `MarketingCampaignService`, `MarketingPlaybookCatalogService`, `marketing-ops.ts` routes — all high-TS-surface files. S2 touches `marketing-ops-public.ts` + new `GalleryMultiService` + frontend `MultiGalleryPage`. S3 touches frontend services + components.
+
+---
+
+### §1 Singleton Service Strategy
+
+**Skill:** `deploy-service-extending-base-singleton.md`
+
+#### New backend services
+
+| Service | Sprint | Base class | Rationale |
+|---|---|---|---|
+| `BusinessProspectService` | S1 | `BaseService` | Admin-scoped, stateless CRUD over `mkt_campaigns_list` (sibling create/list/cycle). No caching needed — operator-driven, low frequency. Not capability-gated. |
+| `GalleryMultiService` | S2 | `BaseService` | Public-facing, token-gated multi-gallery data assembly. Read-only, no caching (token-gated, `ttl: 0` equivalent on the public route). |
+
+Neither needs `UniversalSingleton` (no cross-service caching/metrics) nor `PermissionEnhancedBaseService` (no capability gate).
+
+#### Frontend services (extend existing singletons — no new services)
+
+| Frontend service | Base singleton | New methods | Cache contract |
+|---|---|---|---|
+| `MarketingOpsService` (admin) | `AdminApiSingleton` (existing) | `getTriageAlternatives`, `createSiblingCampaign`, `listSiblings`, `cycleToNextEngagement`, `generateMultiGalleryToken` | Invalidate `['mkt-ops', 'campaign', campaignId]` + `['mkt-ops', 'siblings', campaignId]` after `createSiblingCampaign` + `cycleToNextEngagement`. `generateMultiGalleryToken` is one-shot (no cache). |
+| `MarketingOpsPublicService` (public) | `PublicApiSingleton` with `ttl: 0` (existing, per AGENTS.md) | `getMultiGalleryData` | `ttl: 0` — no caching (token-gated public data, per marketing public page convention). |
+
+- [x] **No direct `fetch`** — all frontend API calls go through `makeDefaultRequest` on the singleton.
+- [x] **Cache invalidation planned** — sibling create + cycle invalidate the campaign detail + siblings list cache keys on `MarketingOpsService`.
+
+---
+
+### §2 Skill Document Awareness
+
+#### Skills to read before starting
+
+| Skill | Why | Sprint |
+|---|---|---|
+| `manual-sql-migration-policy.md` | 4 new `mkt_*` migrations (178-181). Confirms: no RLS, no `updated_at` triggers on `mkt_*` family; `IF NOT EXISTS` guards; `prisma db pull` only (never edit `schema.prisma`). **Read.** | S1 |
+| `tenant-scoped-id-generation.md` | New `business_prospect_id` entity + new `generateBusinessProspectId()` generator. Confirms `mkt_*` IDs are global (no tenant key). **Read.** | S1 |
+| `api-route-architecture-audit.md` | New routes under `/api/admin/marketing-ops/:campaignId/*` and `/api/public/marketing/gallery/*` — both prefixes have existing catch-alls. **Read.** Critical route-order risk — see §5 below. | S1, S2 |
+| `database-navigation-system.md` | Sprint 3 admin sub-pages (siblings tab, cycle button). Confirm no new `navigation_links` INSERTs needed (extensions to existing campaign detail page). | S3 |
+| `deploy-service-extending-base-singleton.md` | Frontend service method additions on `MarketingOpsService` + `MarketingOpsPublicService`. | S1, S2 |
+| `skill-frontend-ux-guardrails` | Sprint 3 frontend components (siblings tab, cycle modal, triage alternatives card, multi-gallery page). | S2, S3 |
+
+#### Skills to update after completion (mandatory)
+
+| Skill | Section to update | What to capture |
+|---|---|---|
+| `tenant-scoped-id-generation.md` | §3 "Exceptions (No Tenant Key)" table + §4 catalog | Add `generateBusinessProspectId()` → `bp-{nanoid}` (global, `mkt_*` family). Note the `bp_` backfill prefix (underscore) vs `bp-` generated prefix (hyphen) distinction for visual traceability of legacy vs new prospect IDs. |
+| `manual-sql-migration-policy.md` | §4 "Marketing Ops (`mkt_*`) namespace exception" worked examples | Add Migrations 178-181 as examples. Capture: (1) partial unique index with `COALESCE(repair_track, 'none')` pattern for nullable-column uniqueness, (2) expression index on JSONB `metadata->>'business_prospect_id'` for prospect lookups, (3) `bp_` backfill prefix to avoid FK collision with campaign IDs, (4) migration ordering constraint (code deploy before migration 178). |
+| `api-route-architecture-audit.md` | "Common Pitfalls" or route-order examples | Add the `/api/public/marketing/gallery/multi/:token` vs `/api/public/marketing/gallery/:token` shadowing risk — literal `multi` MUST be mounted before the `:token` catch-all. Same for `/prospects/:prospectId` vs `/:campaignId` on the admin router. |
+| `AGENTS.md` | Marketing Ops conventions section | Add: `BusinessProspectService` (sibling creation/listing/cycling), sibling routes at `/api/admin/marketing-ops/:campaignId/{siblings,cycle,triage/alternatives}`, multi-gallery public route at `/api/public/marketing/gallery/multi/:token`, `generateBusinessProspectId()` ID format. |
+
+#### New skill to create (if any)
+
+**`multi-archetype-campaign-model.md`** (proposed) — captures the sibling + cycling domain model:
+- `business_prospect_id` semantics (peer grouping, not parent-child)
+- `engagement_cycle` reset/preserve field table (§3.5)
+- `repair_track` switching between standard (review pipeline) and escalated (recovery pipeline)
+- Multi-gallery token type (`multi_diagnostic_gallery`) + `metadata` JSONB schema
+- Sibling uniqueness constraint via `(business_prospect_id, campaign_category, COALESCE(repair_track, 'none'))`
+- When to cycle vs. create a new sibling (§8.5)
+
+This is a recurring domain pattern that future sprints (cross-sibling analytics, retainer scope, A5 interaction) will reference. Create at phase completion.
+
+---
+
+### §3 Tenant-Scoped ID Planning
+
+**Skill:** `tenant-scoped-id-generation.md`
+
+#### New entities
+
+| Entity | Scope | ID format | DB column type | New generator? |
+|---|---|---|---|---|
+| `business_prospect_id` | Global (admin-scoped, `mkt_*` family — NOT tenant-scoped) | `bp-{nanoid}` (generated) / `bp_{campaignId}` (backfill) | `VarChar(255)` | YES — `generateBusinessProspectId()` |
+
+**No other new entities.** Siblings reuse `mkt_campaigns_list` rows (existing `mcamp-{nanoid}` ID). Multi-gallery tokens reuse `mkt_deliverable_preview_tokens` (existing `mdpt-{nanoid}` ID) with `token_type = 'multi_diagnostic_gallery'`. Gallery events reuse `mkt_gallery_events` (existing ID) with new `sibling_campaign_id` column.
+
+#### ID generator to add
+
+Add to `apps/api/src/lib/id-generator.ts` **before** creating `BusinessProspectService`:
+
+```typescript
+/**
+ * Generate a business prospect ID (global, mkt_* family — no tenant key).
+ * Format: bp-{nanoid}
+ * Used to group sibling campaigns for the same business prospect.
+ * Legacy backfilled IDs use bp_{campaignId} (underscore) to distinguish
+ * from generated IDs (hyphen).
+ */
+export function generateBusinessProspectId(): string {
+  return `bp-${nanoid(NANOID_LENGTH)}`;
+}
+```
+
+Add to the "Exceptions (No Tenant Key)" table in `tenant-scoped-id-generation.md` §3.
+
+- [x] **DB column is `VarChar(255)`** — confirmed in Migration 179 (`ADD COLUMN business_prospect_id VARCHAR(255)`).
+- [x] **No existing `randomUUID()` patterns touched** — the sprint adds new columns but does not migrate existing ID formats. The backfill uses `CONCAT('bp_', id)` on existing campaign IDs (string concat, not UUID generation).
+- [x] **No multi-key IDs needed** — `business_prospect_id` is a single global key (no tenant + customer correlation).
+
+---
+
+### §4 Navigation & Page Planning
+
+**Skill:** `database-navigation-system.md`
+
+#### New pages/routes
+
+| Page | Route path | Sprint | Sidebar target | Icon | Root or child? |
+|---|---|---|---|---|---|
+| Multi-gallery public page | `/preview/[token]?prospect=true` | S2 | N/A (token-gated public page) | N/A | N/A (standalone public page) |
+| Siblings tab | Extension of `/settings/admin/marketing-ops/campaigns/[id]` | S3 | N/A (tab within existing page) | N/A | N/A (sub-component) |
+| Cycle button + modal | Extension of campaign detail page | S3 | N/A | N/A | N/A (sub-component) |
+| Triage alternatives card | Extension of existing triage card | S3 | N/A | N/A | N/A (sub-component) |
+
+**Result: NO new sidebar links, NO new `navigation_links` INSERTs, NO new settings cards.**
+
+All new UI is either:
+- A token-gated public page (`/preview/[token]?prospect=true`) — discovered via the multi-gallery token URL, not the sidebar
+- An extension to the existing campaign detail page (siblings tab, cycle button) — already linked from the Marketing Ops admin section
+- An extension to the existing triage card (alternatives list) — already rendered in the campaign detail
+
+- [x] **No SQL INSERT for `navigation_links`** needed.
+- [x] **No file-based fallback updates** (`buildTenantNav()` / `buildAdminNavItems()`) needed.
+- [x] **No settings cards** needed (tenant or admin).
+- [x] **No dynamic template conflicts** — `/preview/[token]` is not a `tenant-locations` or `organization-locations` template child.
+
+---
+
+### §5 Backend Architecture Planning
+
+#### New route files
+
+**NONE new.** All new routes extend existing files:
+
+| File | Mount path (existing) | Auth level | New routes | Sprint |
+|---|---|---|---|---|
+| `apps/api/src/routes/marketing-ops.ts` | `/api/admin/marketing-ops` (admin) | admin | `GET /:campaignId/triage/alternatives`, `POST /:campaignId/siblings`, `GET /:campaignId/siblings`, `POST /:campaignId/cycle`, `POST /prospects/:prospectId/multi-gallery-token` | S1, S2 |
+| `apps/api/src/routes/marketing-ops-public.ts` | `/api` (public, routes resolve to `/api/public/marketing/*`) | public | `GET /gallery/multi/:token` | S2 |
+
+#### Route order risk — CRITICAL
+
+**Skill:** `api-route-architecture-audit.md` (read before implementing routes)
+
+1. **Admin router (`marketing-ops.ts`):** The existing router has `/:campaignId` catch-all routes (e.g., `GET /:campaignId`, `PUT /:campaignId`). The new sub-paths `/:campaignId/triage/alternatives`, `/:campaignId/siblings`, `/:campaignId/cycle` are fine — Express matches the full path, so `/:campaignId` won't shadow `/:campaignId/siblings`. **BUT** `POST /prospects/:prospectId/multi-gallery-token` (S2) uses the literal `prospects` segment — this MUST be registered BEFORE any `/:campaignId` catch-all on the same method+path-prefix, or `prospects` will be captured as `campaignId`. Verify the existing router doesn't have a top-level `POST /:something` catch-all that would shadow `POST /prospects/:prospectId/...`.
+
+2. **Public router (`marketing-ops-public.ts`):** The existing router has `GET /gallery/:token`. The new `GET /gallery/multi/:token` MUST be registered BEFORE `GET /gallery/:token`, or `multi` will be captured as `:token`. **This is a classic catch-all shadowing bug.** Mount `/gallery/multi/:token` first, then `/gallery/:token`.
+
+**Action:** Before merging S1/S2 routes, run the route-order verification:
+```bash
+# From apps/api — verify no shadowing
+grep -n "router\.\(get\|post\|put\|delete\|patch\)" apps/api/src/routes/marketing-ops.ts | head -30
+grep -n "router\.\(get\|post\)" apps/api/src/routes/marketing-ops-public.ts | grep gallery
+```
+
+#### Zod validation schemas needed
+
+| Schema | Route | Fields |
+|---|---|---|
+| `createSiblingSchema` | `POST /:campaignId/siblings` | `archetype` (enum A1-A6), `playbookCode?` (enum PB-01..PB-07), `campaignCategory?` (`'profile_repair'`), `repairTrack?` (`'standard' \| 'escalated'`), `repairIssueType?` (string), `assignedTo?` (string), `notes?` (string). At least one of `playbookCode` or `campaignCategory` required. |
+| `cycleEngagementSchema` | `POST /:campaignId/cycle` | `resetToStage?` (`'seek' \| 'preview_built'`), `notes?` (string) |
+| `multiGalleryTokenSchema` | `POST /prospects/:prospectId/multi-gallery-token` | `expires_in_days?` (number, default 7 — same as individual gallery tokens per §13.1), `gallery_title?` (string), `gallery_subtitle?` (string) |
+| `galleryEventSchema` (extend) | `POST /gallery/:token/events` | Add optional `siblingCampaignId?: string` |
+
+#### New background jobs
+
+**NONE.** The sibling creation, cycling, and multi-gallery token issuance are all operator-initiated (synchronous admin routes). No cron/interval jobs needed.
+
+#### Logger usage
+
+All new routes use `logger.method(message, undefined, { ...meta })` per convention. No webhook handlers (no `rawBody` needed).
+
+#### Existing services modified
+
+| Service | Changes | Cache invalidation? |
+|---|---|---|
+| `CampaignTriageService` | `acceptTriage` + `overrideTriage` set `repair_track: 'standard'` for `profile_repair` playbooks (C2 fix); `loadSignalsAndPlaybooks` refactor (extract from `evaluateTriageForCampaign`); `evaluateAllForCampaign` (new method) | No cache (triage is one-shot per evaluation) |
+| `TriageEngineService` | `evaluateAllMatchingPlaybooks` (pure function extension) with `detectedSignals` per alternative (A1 fix) | No cache (pure function) |
+| `MarketingCampaignService` | `transitionStage` intake condition fix — include `profile_repair` + `standard` in registry-driven intake (C1 fix); `CampaignInput` + `CampaignListFilters` + `CampaignDetail` type extensions; `SiblingSummary` type (new); `listCampaigns` filter by `business_prospect_id` | Frontend `MarketingOpsService` campaign detail cache invalidated after sibling create + cycle |
+| `MarketingPlaybookCatalogService` | `toRow` — `ArchetypeCodeWithA5` → `ArchetypeCodeWithA6` cast fix (S1 fix, type-only) | No cache impact |
+| `GalleryAnalyticsService` / `GalleryEventService` | `trackEvent` passes `sibling_campaign_id` to `mkt_gallery_events` row (S2) | No cache (event ingestion) |
+| `triage/types.ts` | Add `profile_repair` to `PLAYBOOK_CATEGORIES`; add `MultiArchetypeTriageResult` interface | N/A (types) |
+| `apps/api/src/routes/marketing-ops.ts` | `playbookCategoryEnum` Zod schema — add `profile_repair` (§4.0 fix) | N/A |
+
+---
+
+### §6 Database & Migration Planning
+
+**Skill:** `manual-sql-migration-policy.md` (read)
+
+#### Migration file names (confirmed: latest = 177)
+
+| Migration | File name | Sprint |
+|---|---|---|
+| 178 | `178_mkt_repair_playbook_recategory.sql` | S1 |
+| 179 | `179_mkt_business_prospect_siblings.sql` | S1 |
+| 180 | `180_multi_diagnostic_gallery_tokens.sql` | S1 |
+| 181 | `181_mkt_gallery_events_sibling_campaign.sql` | S2 |
+
+#### New tables
+
+**NONE.** All migrations are `ALTER TABLE` + `CREATE INDEX` on existing `mkt_*` tables.
+
+#### New columns
+
+| Table | Column | Type | Migration |
+|---|---|---|---|
+| `mkt_campaigns_list` | `business_prospect_id` | `VARCHAR(255)` (nullable) | 179 |
+| `mkt_campaigns_list` | `engagement_cycle` | `INT NOT NULL DEFAULT 1` | 179 |
+| `mkt_campaigns_list` | `is_primary_sibling` | `BOOLEAN NOT NULL DEFAULT false` | 179 |
+| `mkt_deliverable_preview_tokens` | `metadata` | `JSONB` (nullable) | 180 |
+| `mkt_gallery_events` | `sibling_campaign_id` | `VARCHAR(255)` (nullable) | 181 |
+
+#### New indexes
+
+| Index | Table | Columns | Type | Migration |
+|---|---|---|---|---|
+| `idx_mkt_campaigns_business_prospect` | `mkt_campaigns_list` | `(business_prospect_id)` | Partial (`WHERE NOT NULL`) | 179 |
+| `idx_mkt_campaigns_prospect_sibling_unique` | `mkt_campaigns_list` | `(business_prospect_id, campaign_category, COALESCE(repair_track, 'none'))` | UNIQUE, partial (`WHERE NOT NULL AND scope = 'business'`) | 179 |
+| `idx_mkt_preview_tokens_prospect` | `mkt_deliverable_preview_tokens` | `((metadata->>'business_prospect_id'))` | Expression, partial (`WHERE token_type = 'multi_diagnostic_gallery'`) | 180 |
+| `idx_mkt_gallery_events_sibling` | `mkt_gallery_events` | `(sibling_campaign_id, event_type, created_at DESC)` | Partial (`WHERE NOT NULL`) | 181 |
+
+#### RLS, triggers, idempotency
+
+- [x] **RLS:** NONE — `mkt_*` namespace exception (per `manual-sql-migration-policy.md` §4). The public pay route and recovery intake portal read `mkt_*` tables by token without auth, which RLS would block.
+- [x] **Triggers:** NONE — `mkt_*` family omits `updated_at` trigger functions (relies on `DEFAULT NOW()` + app-layer Prisma `@updatedAt`).
+- [x] **Idempotency:** All DDL uses `ADD COLUMN IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`. Migration 178 INSERTs use `WHERE NOT EXISTS`. Migration 179 backfill UPDATE is idempotent (`WHERE business_prospect_id IS NULL`).
+
+#### Prisma introspection (not edits)
+
+- [x] **Never edit `schema.prisma` directly.** After each migration is applied to the DB, run:
+  ```bash
+  doppler run --config local -- pnpm prisma db pull
+  doppler run --config local -- pnpm prisma generate
+  ```
+  The `schema.prisma` snippets in §4.2/§4.3 are **target state** documentation only — they will be produced by `prisma db pull`, not hand-edited.
+
+#### Materialized views
+
+- [x] **NONE affected.** No `mkt_*` tables feed into materialized views (e.g., `mv_storefront_discovery`). No `REFRESH MATERIALIZED VIEW` needed.
+
+#### Migration ordering constraint (CRITICAL)
+
+**Migration 178 MUST be applied AFTER the code deploy** that adds `profile_repair` to `PLAYBOOK_CATEGORIES` (in `triage/types.ts`) and `playbookCategoryEnum` (in `marketing-ops.ts`). If the migration runs first, the playbook catalog will have rows with `category = 'profile_repair'` that the type system and route validation reject — causing runtime errors on any playbook list/create/update operation.
+
+**Deploy sequence:** code deploy → migration 178 apply → `prisma db pull && prisma generate` → migration 179 apply → `prisma db pull && prisma generate` → migration 180 apply → `prisma db pull && prisma generate`.
+
+---
+
+### §7 Frontend Architecture Planning
+
+#### New components
+
+| Component | Sprint | Server/client? | Reuses | States needed |
+|---|---|---|---|---|
+| `MultiGalleryPage.tsx` | S2 | Client (Mantine UI per marketing public page convention) | Existing `GalleryPage` archetype section components, `GalleryArchetypeDefaults` resolution, `MarketingOpsPublicService` | Loading (token validation), empty (no siblings with galleries ready), error (expired/invalid token), per-sibling CTA |
+| Siblings tab component | S3 | Client | Existing campaign detail tab pattern, `MarketingOpsService.listSiblings` | Loading, empty (no siblings), error, 409 conflict display |
+| Cycle button + confirm modal | S3 | Client | Existing modal patterns, `MarketingOpsService.cycleToNextEngagement` | Disabled (campaign not at `delivered`/`retainer_won`), confirm, loading, success, error |
+| Triage alternatives card extension | S3 | Client | Existing triage card, `MarketingOpsService.getTriageAlternatives` | Loading, empty (single archetype), alternatives list, create-sibling action, A5 informational note when A5 selected alongside individual siblings (§13.4) |
+
+#### React Query cache keys
+
+| Cache key | Scope | Invalidation trigger |
+|---|---|---|
+| `['mkt-ops', 'campaigns', campaignId, 'siblings']` | Admin | `createSiblingCampaign`, `cycleToNextEngagement` |
+| `['mkt-ops', 'campaigns', campaignId, 'triage-alternatives']` | Admin | `createSiblingCampaign` (alternative consumed) |
+| `['mkt-ops', 'campaigns', campaignId]` | Admin | `createSiblingCampaign`, `cycleToNextEngagement` (campaign detail `siblings[]` changes) |
+| `['mkt-public', 'multi-gallery', token]` | Public | `ttl: 0` — no caching (token-gated) |
+
+No collision with existing `['mkt-ops', 'campaigns', campaignId]` keys — the sub-keys (`siblings`, `triage-alternatives`) are new suffixes.
+
+#### SSR safety
+
+- `MultiGalleryPage` reads token from `params.token` + `searchParams.prospect` (Next.js server component props passed to client component) — no `localStorage`/`window` access.
+- Siblings tab + cycle modal + triage alternatives are client components using React Query — no direct `window` access. Any `localStorage` usage (if needed for cycle confirm preference) must be guarded with `typeof window !== 'undefined'`.
+
+#### Server-resolved context impact
+
+- [x] **No changes to auth or tenant state flow.** Multi-gallery is token-gated public (no `ServerResolvedContextProvider` involvement). Admin sibling/cycle routes use existing admin auth.
+
+#### Frontend singleton service methods
+
+| Method | Service | API endpoint | Cache key |
+|---|---|---|---|
+| `getTriageAlternatives(campaignId)` | `MarketingOpsService` | `GET /api/admin/marketing-ops/campaigns/:id/triage/alternatives` | `['mkt-ops', 'campaigns', campaignId, 'triage-alternatives']` |
+| `createSiblingCampaign(campaignId, input)` | `MarketingOpsService` | `POST /api/admin/marketing-ops/campaigns/:id/siblings` | One-shot → invalidates campaign + siblings cache |
+| `listSiblings(campaignId)` | `MarketingOpsService` | `GET /api/admin/marketing-ops/campaigns/:id/siblings` | `['mkt-ops', 'campaigns', campaignId, 'siblings']` |
+| `cycleToNextEngagement(campaignId, opts)` | `MarketingOpsService` | `POST /api/admin/marketing-ops/campaigns/:id/cycle` | One-shot → invalidates campaign cache |
+| `generateMultiGalleryToken(prospectId, opts)` | `MarketingOpsService` | `POST /api/admin/marketing-ops/prospects/:prospectId/multi-gallery-token` | One-shot (no cache) |
+| `getMultiGalleryData(token)` | `MarketingOpsPublicService` | `GET /api/public/marketing/gallery/multi/:token` | `ttl: 0` (no cache) |
+
+---
+
+### §8 Capability System Planning
+
+**Skills:** `capability-deployment-flow.md`, `capability-data-flow-rules.md`, `capability-constraint-relationships.md`
+
+- [x] **This phase introduces NO new capability features.** The multi-archetype sibling model is an internal marketing ops operator workflow, not a tenant-facing capability. It does not appear in `canonical-features.ts`, `tier-hierarchies.ts`, or any resolver.
+
+| Checklist item | Result |
+|---|---|
+| New capability features? | **No** — skip 8-phase deployment |
+| Cross-capability constraints? | **None** |
+| Feature key naming conventions? | N/A |
+| Frontend fallback resolver impact? | **None** — no resolver changes |
+| API route settings file updates (R32)? | **None** — no merchant preference fields |
+| `buildExpiredCapabilitiesResponse` updates (R13)? | **None** — no `EffectiveXxx` interface changes |
+| Group gate fallback regression tests? | **None** |
+
+---
+
+### §9 Design Doc & Memory Planning
+
+- [x] **Design doc:** YES — this sprint plan IS the design doc (`docs/LocalBiz/marketing_ops_multi_archetype_campaign_sprint_plan.md`). Read fully before starting. ✓
+- [x] **Plan the memory entry:** At phase completion, a memory entry should summarize: what was built (sibling model, cycling, multi-gallery, repair re-categorization), key files (`BusinessProspectService`, `GalleryMultiService`, Migrations 178-181, sibling/cycle routes, multi-gallery public route), next steps (prospect-level analytics UI — deferred per §13.2, no schema changes needed). Tags: `multi-archetype`, `siblings`, `profile-repair`, `cycling`, `multi-gallery`, `complete`. All 4 open questions in §13 are now resolved.
+- [x] **Check for existing memories:** Search session summaries for prior marketing ops sprint context (Sprint 1-6, Universal Recalibration, Diagnostic Gallery, Intake Portal Generalization) to avoid re-discovering context. The conversation history summary at `C:\Users\pauly\AppData\Roaming\devin\cli\summaries\history_ba6de6e561fa47b2.md` contains the prior session context.
+
+---
+
+### §10 Pre-Flight Summary
+
+```
+Phase/Sprint: Marketing Ops — Multi-Archetype Campaigns (Concurrent Siblings + Sequential Cycling)
+             S1 (Weeks 1-2): Repair Re-Categorization + Schema + Backend Foundation
+             S2 (Weeks 3-4): Multi-Diagnostic Gallery
+             S3 (Weeks 5-6): Frontend + Portal + Tests
+
+Design doc: docs/LocalBiz/marketing_ops_multi_archetype_campaign_sprint_plan.md (this document)
+
+New services: BusinessProspectService (S1, BaseService), GalleryMultiService (S2, BaseService)
+New entities: business_prospect_id (global, mkt_* family — bp-{nanoid} / bp_{campaignId} backfill)
+New ID generators needed: generateBusinessProspectId() → bp-{nanoid} (add to id-generator.ts before BusinessProspectService)
+New pages/routes: /preview/[token]?prospect=true (S2, public multi-gallery — no sidebar link); 5 new API routes on existing route files (no new route files)
+New sidebar links: NONE (all new UI is token-gated public or extensions to existing campaign detail page)
+New settings cards (tenant and/or admin): NONE
+New migration: 178_mkt_repair_playbook_recategory.sql, 179_mkt_business_prospect_siblings.sql, 180_multi_diagnostic_gallery_tokens.sql, 181_mkt_gallery_events_sibling_campaign.sql
+New background jobs: NONE
+New capability features: NONE (internal operator workflow, not tenant-facing capability)
+Skills to read before starting: manual-sql-migration-policy.md (read), tenant-scoped-id-generation.md (read), api-route-architecture-audit.md (read), database-navigation-system.md (S3), deploy-service-extending-base-singleton.md, skill-frontend-ux-guardrails (S2/S3)
+Skills to update after completion (mandatory — list specific sections):
+  - tenant-scoped-id-generation.md §3 "Exceptions (No Tenant Key)" table + §4 catalog — add generateBusinessProspectId()
+  - manual-sql-migration-policy.md §4 mkt_* worked examples — add Migrations 178-181 (partial unique index with COALESCE, JSONB expression index, bp_ backfill prefix, migration ordering constraint)
+  - api-route-architecture-audit.md — add /gallery/multi/:token vs /gallery/:token shadowing pitfall + /prospects/:prospectId vs /:campaignId on admin router
+  - AGENTS.md Marketing Ops conventions — add BusinessProspectService, sibling routes, multi-gallery public route, generateBusinessProspectId() format
+Insights to capture in skills (patterns, pitfalls, conventions learned):
+  - Partial unique index with COALESCE(repair_track, 'none') for nullable-column uniqueness
+  - Expression index on JSONB metadata->>'business_prospect_id' for prospect-level lookups
+  - bp_ (underscore) backfill prefix vs bp- (hyphen) generated prefix for visual traceability
+  - Migration ordering constraint: code deploy BEFORE migration 178 (type system must accept new category before DB has rows with it)
+  - Route order: literal /gallery/multi MUST be before /gallery/:token catch-all (classic shadowing)
+  - Engagement cycle reset/preserve field table (§3.5) — which fields reset vs. preserve on cycleToNextEngagement
+  - Deliverables are 1:N per campaign — each cycle generates a NEW deliverable row (never overwrite)
+New skill to create (if any): multi-archetype-campaign-model.md — captures sibling + cycling domain model, business_prospect_id semantics, repair_track switching, multi-gallery token type, sibling uniqueness constraint, cycle vs. new-sibling decision
+```
+
+---
+
+### Route Order Verification Checklist (pre-merge gate for S1 + S2)
+
+Before merging new routes, verify:
+
+```bash
+# Admin router — confirm /prospects/:prospectId is not shadowed by /:campaignId
+grep -nE "router\.(get|post|put|delete|patch)\(['\"]/" apps/api/src/routes/marketing-ops.ts | head -40
+
+# Public router — confirm /gallery/multi/:token is BEFORE /gallery/:token
+grep -nE "router\.(get|post)\(['\"]/gallery" apps/api/src/routes/marketing-ops-public.ts
+```
+
+Expected: `/gallery/multi` line number < `/gallery/:token` line number. If not, reorder before merging.
