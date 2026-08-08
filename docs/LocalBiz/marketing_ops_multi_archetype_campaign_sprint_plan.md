@@ -359,10 +359,10 @@ class BusinessProspectService extends BaseService {
 ```
 
 **Sibling creation flow:**
-1. Operator selects an archetype from the triage-presented list, OR manually chooses `profile_repair` as the category (for repair-centric siblings not driven by triage)
+1. Operator selects an archetype from the triage-presented list (which now includes repair playbooks PB-01/PB-03/PB-06/PB-07 alongside review PB-02 and recovery PB-04), OR manually chooses `profile_repair` as the category with a specific `repairTrack` (for repair-centric siblings not driven by triage — e.g., escalated track for a known suspension)
 2. `initializeProspectFromCampaign` is called if the source campaign has no `business_prospect_id` yet (generates a new prospect ID, sets it on the source campaign, marks source as primary)
 3. `createSiblingCampaign` copies business info (name, category, city, phone, email, website, address) from the primary sibling, creates a new campaign at `seek` stage with `business_prospect_id` set
-4. **For triage-driven siblings:** the new sibling gets its own triage evaluation — the operator accepts the chosen playbook to lock in the archetype and category. **For `profile_repair` siblings:** the category is set directly at creation (`campaignCategory: 'profile_repair'`), the operator sets `repairTrack` (`standard` or `escalated`) and `repairIssueType` — no triage acceptance needed
+4. **For triage-driven siblings:** the new sibling gets its own triage evaluation — the operator accepts the chosen playbook to lock in the archetype and category. Accepting PB-01/PB-03/PB-06/PB-07 sets `campaign_category: 'profile_repair'` + `repair_track: 'standard'`. Accepting PB-02 sets `review_management`. Accepting PB-04 sets `recovery_management`. **For manually-created `profile_repair` siblings:** the category and track are set directly at creation — no triage acceptance needed
 5. The new sibling runs its own pipeline independently — review pipeline for `review_management` / `profile_repair` + `standard`, recovery pipeline for `recovery_management` / `profile_repair` + `escalated`
 
 ### 5.2 Triage Multi-Archetype Presentation
@@ -929,36 +929,43 @@ Category-scope and city-scope campaigns do not get `business_prospect_id` (they 
 
 ### 10.1 Per-Sibling Pipeline Behavior (Review vs Recovery vs Repair)
 
-Each sibling inherits its pipeline behavior from its `campaign_category` (and `repair_track` for `profile_repair`) — this is the existing `transitionsFor(category, repairTrack)` + `pipelineFor(category, repairTrack)` dispatch, unchanged. The key insight: **siblings can run different pipeline machines** because each is an independent campaign row with its own `campaign_category`.
+Each sibling inherits its pipeline behavior from its `campaign_category` (and `repair_track` for `profile_repair`) — this is the existing `transitionsFor(category, repairTrack)` + `pipelineFor(category, repairTrack)` dispatch. The key insight: **siblings can run different pipeline machines** because each is an independent campaign row with its own `campaign_category`.
+
+**Three signal domains, three triage pillars:**
+
+| Pillar | Signal families | What it's about | Triage category |
+|---|---|---|---|
+| **Review** | RA (review drought, low volume, unanswered backlog) | Customer feedback + owner response engagement | `review_management` |
+| **Recovery** | RA (BBB grade, unanswered complaints, negative backlog) | BBB reputation recovery | `recovery_management` |
+| **Repair** | DS + CP + VP + WC (NAP drift, URL mismatch, broken links, missing photos, missing CTA, missing product catalog) | Fixing actual profile/website/product drifts | `profile_repair` |
 
 **Four campaign categories, three pipeline machines:**
 
 | `campaign_category` | `repair_track` | Pipeline | Stage Machine | How it's assigned |
 |---|---|---|---|---|
-| `review_management` | — | Review | `REVIEW_TRANSITIONS` | Triage accept of PB-01/02/03/06/07 |
+| `review_management` | — | Review | `REVIEW_TRANSITIONS` | Triage accept of PB-02 |
 | `recovery_management` | — | Recovery | `RECOVERY_TRANSITIONS` | Triage accept of PB-04 |
 | `triage_management` | — | Review (stuck at `seek`) | `REVIEW_TRANSITIONS` | Default before operator accepts triage |
 | `profile_repair` | `null` (undecided) | Review | `REVIEW_TRANSITIONS` (starts at `seek`) | Manual operator creation — track decided later |
-| `profile_repair` | `standard` | Review | `REVIEW_TRANSITIONS` | Operator chooses standard repair (NAP drift, unclaimed profile, missing category/hours, platform gap) |
-| `profile_repair` | `escalated` | Recovery | `RECOVERY_TRANSITIONS` | Operator escalates (suspension, duplicate listing, hijacked listing, ownership dispute, address verification block) — can de-escalate back via `switchRepairTrack` |
+| `profile_repair` | `standard` | Review | `REVIEW_TRANSITIONS` | Triage accept of PB-01/PB-03/PB-06/PB-07 (default), OR manual operator choice for standard repair (NAP drift, unclaimed profile, missing category/hours, platform gap) |
+| `profile_repair` | `escalated` | Recovery | `RECOVERY_TRANSITIONS` | Operator escalates from standard (suspension, duplicate listing, hijacked listing, ownership dispute, address verification block) — can de-escalate back via `switchRepairTrack` |
 
-**`profile_repair` is a hybrid category** — it's not produced by any playbook's triage acceptance. It's a **manual operator choice** at campaign creation time (`CampaignFormClient` category dropdown). It starts on the review pipeline at `seek` with no track decided. The operator later chooses `standard` (stays on review pipeline) or `escalated` (switches to recovery pipeline via `switchRepairTrack`, which remaps stages: `seek → audit_identified`, `preview_built → framework_preview_generated`, `shown → outreach_dispatched`). The operator can also de-escalate back (recovery → review) before intake is submitted.
+**`profile_repair` is now a first-class triage category** (corrected by Migration 178). When triage accepts PB-01/PB-03/PB-06/PB-07, the campaign gets `campaign_category: 'profile_repair'` + `repair_track: 'standard'` (default — runs the review pipeline). The operator can later escalate to `repair_track: 'escalated'` (switches to the recovery pipeline via `switchRepairTrack`, which remaps stages: `seek → audit_identified`, `preview_built → framework_preview_generated`, `shown → outreach_dispatched`). The operator can also de-escalate back (recovery → review) before intake is submitted.
 
 The key difference from `recovery_management`: a `profile_repair` + `escalated` campaign runs the **recovery pipeline** but uses the `profile_repair` intake kind (not `dispute`), and the operator can **switch tracks** mid-flight. A `recovery_management` campaign is locked to the recovery pipeline with no track switching.
 
-**Playbook → Category → Pipeline → Behavior:**
+**Playbook → Category → Pipeline → Behavior (corrected):**
 
-| Playbook | Archetype | Category | Pipeline | Stage Machine | Gallery Framing | Deliverable |
-|---|---|---|---|---|---|---|
-| PB-04 | A2 | `recovery_management` | Recovery | `audit_identified → framework_preview_generated → outreach_dispatched → awaiting_owner_intake → intake_submitted → final_resolution_drafted → owner_approved → resolved_and_closed` | "Review Recovery Diagnostic" | Recovery playbook + dispute intake |
-| PB-05 | A5 | `triage_management` → (accept → re-categorize) | Review or Recovery | Depends on accepted playbook | "Multi-Signal Diagnostic" | Combined sections |
-| PB-01 | A3 | `review_management` | Review | `seek → preview_built → shown → paid → delivered → retainer_pitched → retainer_won` | "Listing Accuracy Diagnostic" | Listing corrections |
-| PB-02 | A1 | `review_management` | Review | Same review stages | "Review Response Diagnostic" | Review responses |
-| PB-06 | A3 | `review_management` | Review | Same review stages | "Listing Accuracy Diagnostic" | Visual/asset refresh |
-| PB-03 | A4 | `review_management` | Review | Same review stages | "Conversion Gap Diagnostic" | CTA fixes |
-| PB-07 | A6 | `review_management` | Review | Same review stages | "Product Visibility Diagnostic" | Product visibility sections |
-| *(manual)* | A3 | `profile_repair` + `standard` | Review | Same review stages | "Listing Accuracy Diagnostic" | Listing corrections + profile repair intake |
-| *(manual)* | A3 | `profile_repair` + `escalated` | Recovery | Same recovery stages | "Listing Accuracy Diagnostic" | Profile repair intake (escalated: suspension, hijacked, etc.) |
+| Playbook | Archetype | Category | Track | Pipeline | Stage Machine | Gallery Framing | Deliverable |
+|---|---|---|---|---|---|---|---|
+| PB-02 | A1 | `review_management` | — | Review | `seek → preview_built → shown → paid → delivered → retainer_pitched → retainer_won` | "Review Response Diagnostic" | Review responses |
+| PB-04 | A2 | `recovery_management` | — | Recovery | `audit_identified → framework_preview_generated → outreach_dispatched → awaiting_owner_intake → intake_submitted → final_resolution_drafted → owner_approved → resolved_and_closed` | "Review Recovery Diagnostic" | Recovery playbook + dispute intake |
+| PB-05 | A5 | `triage_management` → (accept → re-categorize) | — | Review or Recovery | Depends on accepted playbook | "Multi-Signal Diagnostic" | Combined sections |
+| PB-01 | A3 | `profile_repair` | `standard` | Review | `seek → preview_built → shown → paid → delivered → retainer_pitched → retainer_won` | "Listing Accuracy Diagnostic" | Listing corrections + profile repair intake |
+| PB-03 | A4 | `profile_repair` | `standard` | Review | Same review stages | "Conversion Gap Diagnostic" | CTA fixes + profile repair intake |
+| PB-06 | A3 | `profile_repair` | `standard` | Review | Same review stages | "Listing Accuracy Diagnostic" | Visual/asset refresh + profile repair intake |
+| PB-07 | A6 | `profile_repair` | `standard` | Review | Same review stages | "Product Visibility Diagnostic" | Product visibility sections + profile repair intake |
+| *(manual)* | A3 | `profile_repair` | `escalated` | Recovery | Same recovery stages | "Listing Accuracy Diagnostic" | Profile repair intake (escalated: suspension, hijacked, etc.) |
 
 **Concrete example — same business prospect, 4 siblings:**
 
@@ -966,20 +973,22 @@ The key difference from `recovery_management`: a `profile_repair` + `escalated` 
 |---|---|---|---|---|---|
 | 1 (primary) | PB-02 (A1) | `review_management` | — | Review | Review response deliverable — "Fix All Reviews" — review pipeline stages, review-centric opener, review response intake |
 | 2 | PB-04 (A2) | `recovery_management` | — | Recovery | Dispute intake machine — "Fix the Negative Review Cluster" — recovery pipeline stages, recovery-centric opener, dispute intake form |
-| 3 | PB-07 (A6) | `review_management` | — | Review | Product visibility deliverable — "Show My Products" — review pipeline stages, product-centric opener, GBP optimization intake |
-| 4 | *(manual)* | `profile_repair` | `escalated` | Recovery | Profile repair — "Fix Your Suspended Google Listing" — recovery pipeline stages, repair-centric opener, profile_repair intake (escalated track: suspension/hijacked) |
+| 3 | PB-07 (A6) | `profile_repair` | `standard` | Review | Product visibility deliverable — "Show My Products" — review pipeline stages, product-centric opener, GBP optimization intake |
+| 4 | PB-01 (A3) | `profile_repair` | `escalated` | Recovery | Profile repair — "Fix Your Suspended Google Listing" — recovery pipeline stages, repair-centric opener, profile_repair intake (escalated track: suspension/hijacked) |
 
-Sibling 4 is created manually (not from triage) with `campaignCategory: 'profile_repair'`, then the operator sets `repair_track: 'escalated'` and `repair_issue_type: 'suspension'`. It runs the recovery pipeline but with `profile_repair` intake kind instead of `dispute`. The operator could de-escalate it back to the review pipeline if the suspension turns out to be a simple NAP fix.
+Sibling 3 is triage-driven: the operator accepts PB-07, which sets `campaign_category: 'profile_repair'` + `repair_track: 'standard'`. It runs the review pipeline with product-visibility deliverable sections.
+
+Sibling 4 is triage-driven then escalated: the operator accepts PB-01 (standard track, review pipeline), then escalates to `repair_track: 'escalated'` via `switchRepairTrack` when they discover the listing is suspended. It switches to the recovery pipeline with `profile_repair` intake kind. The operator could de-escalate it back to the review pipeline if the suspension turns out to be a simple NAP fix.
 
 Each sibling:
-- Has its own `campaign_category` set by `CampaignTriageService.acceptTriage` / `overrideTriage` (for triage-assigned siblings) or manually at creation (for `profile_repair` siblings)
-- Has its own `repair_track` (only relevant for `profile_repair` siblings — `null` for all others)
+- Has its own `campaign_category` set by `CampaignTriageService.acceptTriage` / `overrideTriage` (for triage-assigned siblings, including `profile_repair` playbooks) or manually at creation (for manually-created `profile_repair` siblings)
+- Has its own `repair_track` — `standard` by default when triage assigns `profile_repair`, `null` for `review_management` / `recovery_management` siblings
 - Runs its own stage transitions via `transitionsFor(category, repairTrack)` — review siblings use `REVIEW_TRANSITIONS`, recovery siblings use `RECOVERY_TRANSITIONS`, `profile_repair` siblings use whichever track is active
-- Routes to its own pipeline tab via `pipelineFor(category, repairTrack)` — review siblings appear in Openers/Follow-Ups, recovery + escalated-repair siblings appear in Recovery tab
+- Routes to its own pipeline tab via `pipelineFor(category, repairTrack)` — review + standard-repair siblings appear in Openers/Follow-Ups, recovery + escalated-repair siblings appear in Recovery tab
 - Generates its own archetype-specific deliverable sections via `DeliverableSectionService.generateAllSections` (A6 → product sections, A1–A5 → review-management sections)
 - Renders its own archetype-specific gallery via `resolveGalleryArchetypeDefaults`
 - Dispatches its own archetype-specific outreach via `HeaderService` / `CloserService` (A6 → product-visibility framing, A1–A5 → review-management framing)
-- Fires its own registry-driven intake forms on stage transitions (dispute intake for recovery, gbp_optimization/review_response_setup for review)
+- Fires its own registry-driven intake forms on stage transitions (dispute intake for recovery, profile_repair intake for escalated repair, gbp_optimization/review_response_setup for review + standard repair)
 - Has its own independent payment, revenue, receipt, and retainer
 
 The sibling model does not change any of this — it simply allows multiple independent campaign rows to exist for the same business prospect, each with its own category/archetype/pipeline, linked by `business_prospect_id`.
@@ -988,11 +997,12 @@ The sibling model does not change any of this — it simply allows multiple inde
 
 ## 11. Migration Path for Existing Campaigns
 
-1. **Migration 178** backfills `business_prospect_id = id` for all existing `scope = 'business'` campaigns. Each becomes its own prospect group with one sibling (itself), marked as primary.
-2. No existing campaign changes behavior — `resolveCampaignArchetype` still returns one archetype, the gallery still renders one archetype, outreach still works per-campaign.
-3. The operator can create siblings from any existing campaign's triage alternatives (if the audit detected multiple signals).
-4. The operator can cycle any delivered campaign to its next engagement.
-5. The multi-gallery is opt-in — the operator generates it only when they want to present multiple dimensions.
+1. **Migration 178** re-categorizes PB-01/PB-03/PB-06/PB-07 from `review_management` to `profile_repair` in the playbook catalog. Existing campaigns that already accepted these playbooks keep `review_management` (no automatic re-categorization — that would change pipeline behavior). New campaigns accepting these playbooks after the migration get `profile_repair` + `standard` track.
+2. **Migration 179** backfills `business_prospect_id = id` for all existing `scope = 'business'` campaigns. Each becomes its own prospect group with one sibling (itself), marked as primary.
+3. No existing campaign changes behavior — `resolveCampaignArchetype` still returns one archetype, the gallery still renders one archetype, outreach still works per-campaign.
+4. The operator can create siblings from any existing campaign's triage alternatives (if the audit detected multiple signals — now including repair playbooks as separate suggestions from review playbooks).
+5. The operator can cycle any delivered campaign to its next engagement.
+6. The multi-gallery is opt-in — the operator generates it only when they want to present multiple dimensions.
 
 ---
 
@@ -1000,7 +1010,7 @@ The sibling model does not change any of this — it simply allows multiple inde
 
 | Sprint | Goal | Depends On | Key Deliverables |
 |---|---|---|---|
-| 1 | Schema + Backend Foundation | — | Migrations 178/179, BusinessProspectService, triage multi-archetype, sibling + cycle routes |
+| 1 | Repair Re-Categorization + Schema + Backend Foundation | — | Migration 178 (repair re-categorization), Migrations 179/180 (siblings + multi-gallery), `profile_repair` as `PlaybookCategory`, BusinessProspectService, triage multi-archetype, sibling + cycle routes |
 | 2 | Multi-Diagnostic Gallery | S1 | Multi-gallery token, public API, frontend page, outreach integration |
 | 3 | Frontend + Portal + Tests | S1, S2 | Triage card alternatives, siblings tab, cycle button, portal grouping, full test suite |
 
