@@ -448,19 +448,19 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
           )}
 
           {/* Multi-archetype alternatives — sibling campaign suggestions */}
-          {alternatives && alternatives.length > 1 && (
+          {alternatives && alternatives.length > 0 && (
             <div className="rounded-lg bg-gray-50 dark:bg-neutral-800/50 border border-gray-200 dark:border-neutral-700 p-3 space-y-2">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-purple-500" />
                 <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  Multi-archetype suggestions ({alternatives.length - 1} alternative{alternatives.length - 1 !== 1 ? 's' : ''})
+                  Multi-archetype suggestions ({alternatives.length} alternative{alternatives.length !== 1 ? 's' : ''})
                 </p>
               </div>
               <p className="text-[10px] text-gray-500 dark:text-gray-400">
                 Create sibling campaigns for additional signal matches. The winner is already selected above.
               </p>
               <div className="space-y-1.5">
-                {alternatives.slice(1).map((alt: any) => (
+                {alternatives.map((alt: any) => (
                   <div key={alt.playbookCode} className="flex items-center justify-between gap-2 rounded bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 px-2.5 py-1.5">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-mono text-xs font-bold text-gray-900 dark:text-white">{alt.playbookCode}</span>

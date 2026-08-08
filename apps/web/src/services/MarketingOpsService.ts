@@ -4294,7 +4294,7 @@ MarketingOpsService.prototype.listGalleryTokens = async function (
 ): Promise<GalleryToken[]> {
   // Reuse the existing pay-links list endpoint, filtered client-side by token_type
   const result = await this.makeDefaultRequest<any>(
-    `${BASE_URL}/${campaignId}/pay-links`,
+    `${BASE_URL}/campaigns/${campaignId}/pay-links`,
     {},
     `mkt-ops-gallery-tokens-${campaignId}`,
     this.cacheTTL,
