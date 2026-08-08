@@ -6531,6 +6531,12 @@ model mkt_deliverable_preview_tokens {
   coupon_code           String?                @db.VarChar(100)
   subscription_tier_id  String?                @db.VarChar(255)
   paid_at               DateTime?              @db.Timestamptz(6)
+  gallery_title         String?                @db.VarChar(255)
+  gallery_subtitle      String?
+  friction_summary      Json?
+  cta_label             String?                @db.VarChar(255)
+  cta_amount_cents      Int?
+  gallery_archetype     String?                @db.VarChar(10)
   mkt_campaigns_list    mkt_campaigns_list     @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_preview_campaign")
   mkt_deliverables_list mkt_deliverables_list? @relation(fields: [deliverable_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_preview_deliverable")
 
@@ -7078,6 +7084,68 @@ model mkt_intake_definitions {
   mkt_dispute_intake mkt_dispute_intake[]
 
   @@index([is_active, is_draft], map: "idx_mkt_intake_definitions_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_gallery_analytics {
+  id                      String    @id @db.VarChar(255)
+  tenant_id               String    @default("platform") @db.VarChar(255)
+  token_id                String    @db.VarChar(255)
+  campaign_id             String    @db.VarChar(255)
+  period_start            DateTime  @db.Date
+  period_type             String?   @default("day") @db.VarChar(10)
+  total_opens             Int?      @default(0)
+  unique_sessions         Int?      @default(0)
+  total_screenshot_views  Int?      @default(0)
+  total_carousel_navs     Int?      @default(0)
+  cta_clicks              Int?      @default(0)
+  cta_hovers              Int?      @default(0)
+  avg_session_duration_ms Int?      @default(0)
+  avg_screenshots_viewed  Int?      @default(0)
+  mobile_views            Int?      @default(0)
+  desktop_views           Int?      @default(0)
+  tablet_views            Int?      @default(0)
+  top_country             String?   @db.VarChar(10)
+  top_city                String?   @db.VarChar(100)
+  created_at              DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@unique([token_id, period_start, period_type])
+  @@index([campaign_id], map: "idx_mkt_gallery_analytics_campaign")
+  @@index([period_start(sort: Desc)], map: "idx_mkt_gallery_analytics_period")
+  @@index([tenant_id], map: "idx_mkt_gallery_analytics_tenant")
+  @@index([token_id], map: "idx_mkt_gallery_analytics_token")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_gallery_events {
+  id               String    @id @db.VarChar(255)
+  tenant_id        String    @default("platform") @db.VarChar(255)
+  token_id         String    @db.VarChar(255)
+  campaign_id      String    @db.VarChar(255)
+  session_id       String?   @db.VarChar(255)
+  event_type       String    @db.VarChar(30)
+  screenshot_index Int?
+  screenshot_id    String?   @db.VarChar(255)
+  dwell_ms         Int?
+  client_width     Int?
+  client_height    Int?
+  referrer         String?
+  user_agent       String?
+  ip_hash          String?   @db.VarChar(64)
+  geo_country      String?   @db.VarChar(10)
+  geo_city         String?   @db.VarChar(100)
+  device_type      String?   @db.VarChar(20)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([campaign_id], map: "idx_mkt_gallery_events_campaign")
+  @@index([campaign_id, event_type, created_at(sort: Desc)], map: "idx_mkt_gallery_events_campaign_type_time")
+  @@index([created_at(sort: Desc)], map: "idx_mkt_gallery_events_created")
+  @@index([session_id], map: "idx_mkt_gallery_events_session")
+  @@index([tenant_id], map: "idx_mkt_gallery_events_tenant")
+  @@index([token_id], map: "idx_mkt_gallery_events_token")
+  @@index([token_id, event_type, created_at(sort: Desc)], map: "idx_mkt_gallery_events_token_type_time")
+  @@index([event_type], map: "idx_mkt_gallery_events_type")
 }
 
 enum action {

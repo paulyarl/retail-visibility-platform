@@ -138,6 +138,13 @@ class UnifiedConfig {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
   }
 
+  // Diagnostic Gallery — IP hash salt for analytics privacy.
+  // If unset, ip_hash is stored as null (graceful degradation).
+  // Used by GalleryAnalyticsService: SHA-256(ip + salt) — never stores raw IP.
+  get galleryIpHashSalt(): string | undefined {
+    return this.env.GALLERY_IP_HASH_SALT;
+  }
+
   // Hot-prospect + auto-follow-up config (Sprint 3)
   get marketingOpsHotProspectThreshold(): number {
     const parsed = parseInt(this.env.MARKETING_OPS_HOT_PROSPECT_THRESHOLD || '', 10);

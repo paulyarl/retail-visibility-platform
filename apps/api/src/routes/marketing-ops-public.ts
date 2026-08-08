@@ -67,6 +67,7 @@ async function resolvePreviewToken(ptoken: string) {
 
 async function resolveSource(token: any): Promise<string> {
   if (token.token_type === 'demo_storefront') return 'demo_storefront';
+  if (token.token_type === 'diagnostic_gallery') return 'diagnostic_gallery';
   return 'qr_deliverable';
 }
 

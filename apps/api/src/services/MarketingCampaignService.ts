@@ -57,7 +57,8 @@ export type ConversionSource =
   | 'directory_preview'
   | 'manual'
   | 'external'
-  | 'portal_checkout';
+  | 'portal_checkout'
+  | 'diagnostic_gallery';
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 

@@ -1966,3 +1966,25 @@ export function generateClaimTokenSecret(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
   return nanoid();
 }
+
+// ─── Diagnostic Gallery (Sprint 1) ──────────────────────────────────────
+// Global IDs (mkt_* family convention — admin-scoped, no tenant key).
+// Matches generatePreviewTokenId, generateCampaignId, etc.
+
+/**
+ * Generate gallery event ID (raw engagement event row)
+ * Format: gevt-{nanoid} (13 chars)
+ */
+export function generateGalleryEventId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `gevt-${nanoid()}`;
+}
+
+/**
+ * Generate gallery analytics ID (per-token per-day aggregate rollup row)
+ * Format: ga-{nanoid} (11 chars)
+ */
+export function generateGalleryAnalyticsId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ga-${nanoid()}`;
+}
