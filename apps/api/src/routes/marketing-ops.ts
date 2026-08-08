@@ -149,6 +149,7 @@ import { ReviewResponseService } from '../services/ReviewResponseService';
 import { OutreachOpenerService, resolveCampaignArchetype } from '../services/OutreachOpenerService';
 import { selectArchetype, type BusinessAnalysisAuditData } from '../services/outreach-openers/archetype-selection';
 import { resolveGalleryArchetypeDefaults } from '../services/marketing/GalleryArchetypeDefaults';
+import galleryAnalyticsService from '../services/GalleryAnalyticsService';
 import HeaderService from '../services/outreach-pitch/HeaderService';
 import CloserService from '../services/outreach-pitch/CloserService';
 import ContactService from '../services/outreach-pitch/ContactService';
@@ -4660,6 +4661,54 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// DIAGNOSTIC GALLERY — ADMIN ANALYTICS (§12 Sprint 4)
+// ====================
+
+/**
+ * GET /campaigns/:id/gallery-analytics
+ *
+ * Per-campaign gallery analytics summary with per-token breakdown.
+ * Admin auth required.
+ */
+router.get('/campaigns/:id/gallery-analytics', async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const ctx = getCtx(req);
+
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id },
+      select: { id: true, business_name: true, stage: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    const analytics = await galleryAnalyticsService.getCampaignAnalytics(id, ctx);
+    return res.json({ success: true, data: { ...analytics, businessName: campaign.business_name, stage: campaign.stage } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * GET /gallery-analytics/dashboard
+ *
+ * Cross-campaign dashboard with byArchetype breakdown.
+ * Admin auth required. Optional ?daysBack= query param (default 30).
+ */
+router.get('/gallery-analytics/dashboard', async (req: any, res: Response) => {
+  try {
+    const daysBack = parseInt(req.query.daysBack as string, 10);
+    const validDaysBack = Number.isFinite(daysBack) && daysBack > 0 && daysBack <= 365 ? daysBack : 30;
+
+    const dashboard = await galleryAnalyticsService.getDashboardAnalytics({ daysBack: validDaysBack }, getCtx(req));
+    return res.json({ success: true, data: dashboard });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

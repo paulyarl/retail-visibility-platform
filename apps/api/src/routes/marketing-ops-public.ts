@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
+import galleryAnalyticsService, { checkRateLimit } from '../services/GalleryAnalyticsService';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
@@ -222,6 +223,162 @@ router.get('/public/marketing/gallery/:token', async (req, res) => {
   } catch (error: any) {
     logger.error('[marketing-ops-public] GET /gallery/:token error', undefined, { error: error.message });
     return res.status(500).json({ success: false, error: 'Failed to resolve gallery' });
+  }
+});
+
+// ====================
+// DIAGNOSTIC GALLERY — EVENT TRACKING (§12 Sprint 4)
+// ====================
+
+const galleryEventSchema = z.object({
+  eventType: z.enum([
+    'gallery_opened',
+    'screenshot_viewed',
+    'carousel_next',
+    'carousel_prev',
+    'cta_clicked',
+    'cta_hovered',
+    'session_heartbeat',
+    'session_end',
+  ]),
+  sessionId: z.string().optional(),
+  screenshotIndex: z.number().int().optional(),
+  screenshotId: z.string().optional(),
+  dwellMs: z.number().int().optional(),
+  clientWidth: z.number().int().optional(),
+  clientHeight: z.number().int().optional(),
+  referrer: z.string().optional(),
+});
+
+const galleryEventBatchSchema = z.object({
+  events: z.array(galleryEventSchema).min(1).max(50),
+});
+
+/**
+ * POST /api/public/marketing/gallery/:token/events
+ *
+ * Track a single engagement event. Public, token-gated — no auth required.
+ * Rate limited: 60 events/min per IP. Always returns 200 (fire-and-forget).
+ *
+ * On expired token: gallery_opened still tracked (200), other events → 404.
+ */
+router.post('/public/marketing/gallery/:token/events', async (req, res) => {
+  try {
+    const { token: ptoken } = req.params;
+    const parsed = galleryEventSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    // Rate limit check (IP-based, 60/min)
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip)) {
+      return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
+    }
+
+    // Resolve token
+    const resolved = await resolveGalleryToken(ptoken);
+    if (!resolved) {
+      return res.status(404).json({ success: false, error: 'Invalid or unknown token' });
+    }
+
+    const { token, campaign, expired } = resolved;
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    // On expired token: only gallery_opened is tracked (for re-activation analytics)
+    if (expired && parsed.data.eventType !== 'gallery_opened') {
+      return res.status(404).json({ success: false, error: 'Token expired' });
+    }
+
+    // Fire-and-forget — never block UX on analytics
+    galleryAnalyticsService.trackEvent({
+      tokenId: token.id,
+      campaignId: campaign.id,
+      eventType: parsed.data.eventType,
+      sessionId: parsed.data.sessionId,
+      screenshotIndex: parsed.data.screenshotIndex,
+      screenshotId: parsed.data.screenshotId,
+      dwellMs: parsed.data.dwellMs,
+      clientWidth: parsed.data.clientWidth,
+      clientHeight: parsed.data.clientHeight,
+      referrer: parsed.data.referrer,
+      userAgent: req.headers['user-agent'],
+      ip,
+    }).catch(() => { /* fire-and-forget — errors logged in service */ });
+
+    return res.status(200).json({ success: true, tracked: true });
+  } catch (error: any) {
+    // Always return 200 for analytics — never block UX
+    logger.error('[marketing-ops-public] POST /gallery/:token/events error', undefined, { error: error.message });
+    return res.status(200).json({ success: true, tracked: false });
+  }
+});
+
+/**
+ * POST /api/public/marketing/gallery/:token/events/batch
+ *
+ * Track multiple engagement events in a batch. Public, token-gated.
+ * Rate limited: 60 events/min per IP. Always returns 200 (fire-and-forget).
+ * Max 50 events per batch.
+ */
+router.post('/public/marketing/gallery/:token/events/batch', async (req, res) => {
+  try {
+    const { token: ptoken } = req.params;
+    const parsed = galleryEventBatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    // Rate limit check (IP-based, 60/min)
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip)) {
+      return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
+    }
+
+    // Resolve token
+    const resolved = await resolveGalleryToken(ptoken);
+    if (!resolved) {
+      return res.status(404).json({ success: false, error: 'Invalid or unknown token' });
+    }
+
+    const { token, campaign, expired } = resolved;
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    // Filter out non-gallery_opened events on expired tokens
+    const events = expired
+      ? parsed.data.events.filter((e) => e.eventType === 'gallery_opened')
+      : parsed.data.events;
+
+    if (events.length === 0) {
+      return res.status(200).json({ success: true, tracked: 0 });
+    }
+
+    // Fire-and-forget
+    const inputs = events.map((e) => ({
+      tokenId: token.id,
+      campaignId: campaign.id,
+      eventType: e.eventType,
+      sessionId: e.sessionId,
+      screenshotIndex: e.screenshotIndex,
+      screenshotId: e.screenshotId,
+      dwellMs: e.dwellMs,
+      clientWidth: e.clientWidth,
+      clientHeight: e.clientHeight,
+      referrer: e.referrer,
+      userAgent: req.headers['user-agent'],
+      ip,
+    }));
+
+    galleryAnalyticsService.trackEvents(inputs).catch(() => { /* fire-and-forget */ });
+
+    return res.status(200).json({ success: true, tracked: events.length });
+  } catch (error: any) {
+    logger.error('[marketing-ops-public] POST /gallery/:token/events/batch error', undefined, { error: error.message });
+    return res.status(200).json({ success: true, tracked: 0 });
   }
 });
 

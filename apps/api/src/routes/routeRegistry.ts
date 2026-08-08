@@ -1314,7 +1314,7 @@ export const routeRegistry: RouteEntry[] = [
     router: marketingOpsPublicRoutes,
     domain: 'misc',
     authLevel: 'public',
-    comment: 'Public Marketing Ops payment routes at /api/public/marketing/pay, /api/public/marketing/checkout, /api/public/marketing/coupons/validate, /api/public/marketing/pay/confirm, /api/public/marketing/receipt/:campaignId, /api/public/marketing/gallery/:token (diagnostic gallery)',
+    comment: 'Public Marketing Ops payment routes at /api/public/marketing/pay, /api/public/marketing/checkout, /api/public/marketing/coupons/validate, /api/public/marketing/pay/confirm, /api/public/marketing/receipt/:campaignId, /api/public/marketing/gallery/:token (diagnostic gallery), /api/public/marketing/gallery/:token/events, /api/public/marketing/gallery/:token/events/batch (gallery tracking)',
   },
   {
     path: '/api',
@@ -1328,7 +1328,7 @@ export const routeRegistry: RouteEntry[] = [
     router: marketingOpsRoutes,
     domain: 'admin',
     authLevel: 'admin',
-    comment: 'Marketing Ops admin routes — campaigns, audits, files, files/upload (diagnostic screenshots), prompts, executions, filter flags, scorecards, deliverables, branding, gallery-token',
+    comment: 'Marketing Ops admin routes — campaigns, audits, files, files/upload (diagnostic screenshots), prompts, executions, filter flags, scorecards, deliverables, branding, gallery-token, campaigns/:id/gallery-analytics, gallery-analytics/dashboard',
   },
 
   // ── Permissions ──────────────────────────────────────────────────────
