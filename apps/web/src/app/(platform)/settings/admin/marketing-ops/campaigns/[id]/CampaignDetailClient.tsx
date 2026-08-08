@@ -22,8 +22,10 @@ import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessW
 import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
 import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageCard';
 import CampaignChecklistTab from './CampaignChecklistTab';
+import GalleryPanel from './GalleryPanel';
+import GalleryAnalyticsTab from './GalleryAnalyticsTab';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'history' | 'lineage' | 'cascade';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'history' | 'lineage' | 'cascade' | 'gallery';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -324,6 +326,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     // Cascade tab is review-pipeline only (Track A yes, Track B no).
     // Recovery-pipeline campaigns use RecoveryCascadeService instead.
     ...((campaign as any)?.pipeline === 'review' ? [{ key: 'cascade' as Tab, label: 'Cascade' }] : []),
+    // Gallery tab — diagnostic gallery (screenshots + token + analytics).
+    // Visible for all campaigns (operator can upload screenshots at preview_built+).
+    { key: 'gallery', label: 'Diagnostic Gallery' },
   ];
 
   return (
@@ -1176,6 +1181,14 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
 
             {activeTab === 'cascade' && campaign && (
               <CascadePanel campaignId={campaign.id} />
+            )}
+
+            {activeTab === 'gallery' && campaign && (
+              <GalleryPanel campaignId={campaign.id} campaign={campaign} onRefresh={fetchCampaign} />
+            )}
+
+            {activeTab === 'gallery' && campaign && (
+              <GalleryAnalyticsTab campaignId={campaign.id} />
             )}
           </>
         ) : (

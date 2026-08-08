@@ -4090,6 +4090,188 @@ export interface MarketingAlertHistory {
   recipientCount: number;
 }
 
+// ====================
+// DIAGNOSTIC GALLERY (§12 Sprint 6)
+// ====================
+
+export interface GalleryTokenParams {
+  expiryDays?: number;
+  galleryTitle?: string;
+  gallerySubtitle?: string;
+  frictionSummary?: Record<string, any>;
+  ctaLabel?: string;
+}
+
+export interface GalleryToken {
+  id: string;
+  token: string;
+  token_type: string;
+  campaign_id: string;
+  expires_at: string | null;
+  viewed_at: string | null;
+  converted_at: string | null;
+  gallery_archetype: string | null;
+  gallery_title: string | null;
+  gallery_subtitle: string | null;
+  friction_summary: Record<string, any> | null;
+  cta_label: string | null;
+  cta_amount_cents: number | null;
+  created_at: string;
+}
+
+export interface GalleryAnalytics {
+  campaignId: string;
+  totalTokens: number;
+  viewedTokens: number;
+  totalOpens: number;
+  uniqueSessions: number;
+  ctaClicks: number;
+  ctaCtr: number;
+  perToken: Array<{
+    tokenId: string;
+    archetype: string | null;
+    createdAt: string;
+    viewedAt: string | null;
+    convertedAt: string | null;
+    expiresAt: string | null;
+    totalEvents: number;
+    totalOpens: number;
+    uniqueSessions: number;
+    totalScreenshotViews: number;
+    totalCarouselNavs: number;
+    ctaClicks: number;
+    ctaHovers: number;
+    avgSessionDurationMs: number;
+    mobileViews: number;
+    desktopViews: number;
+    tabletViews: number;
+  }>;
+}
+
+export interface GalleryDashboard {
+  period: { daysBack: number; since: string };
+  funnel: {
+    totalTokens: number;
+    viewedTokens: number;
+    convertedTokens: number;
+    viewRate: number;
+    conversionRate: number;
+  };
+  totalEvents: number;
+  byArchetype: Array<{
+    archetype: string;
+    totalTokens: number;
+    viewedTokens: number;
+    convertedTokens: number;
+    viewRate: number;
+    conversionRate: number;
+  }>;
+}
+
+// ─── Gallery methods (added to the prototype) ────────────────────────────
+
+export interface MarketingOpsService {
+  generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GalleryToken>;
+  listGalleryTokens(campaignId: string): Promise<GalleryToken[]>;
+  getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;
+  getGalleryDashboard(daysBack?: number): Promise<GalleryDashboard>;
+  uploadDiagnosticScreenshot(campaignId: string, file: File): Promise<MarketingFile>;
+}
+
+MarketingOpsService.prototype.generateGalleryToken = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+  params: GalleryTokenParams,
+): Promise<GalleryToken> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/campaigns/${campaignId}/gallery-token`,
+    { method: 'POST', body: JSON.stringify(params) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate gallery token');
+  }
+  await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.listGalleryTokens = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+): Promise<GalleryToken[]> {
+  // Reuse the existing pay-links list endpoint, filtered client-side by token_type
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/${campaignId}/pay-links`,
+    {},
+    `mkt-ops-gallery-tokens-${campaignId}`,
+    this.cacheTTL,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch gallery tokens');
+  }
+  const data = result.data?.data ?? result.data;
+  const all = Array.isArray(data) ? data : [];
+  return all.filter((t: any) => t.token_type === 'diagnostic_gallery');
+};
+
+MarketingOpsService.prototype.getGalleryAnalytics = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+): Promise<GalleryAnalytics> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/campaigns/${campaignId}/gallery-analytics`,
+    {},
+    `mkt-ops-gallery-analytics-${campaignId}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch gallery analytics');
+  }
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.getGalleryDashboard = async function (
+  this: MarketingOpsService,
+  daysBack: number = 30,
+): Promise<GalleryDashboard> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/gallery-analytics/dashboard?daysBack=${daysBack}`,
+    {},
+    `mkt-ops-gallery-dashboard-${daysBack}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch gallery dashboard');
+  }
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+  file: File,
+): Promise<MarketingFile> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/${campaignId}/files/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to upload screenshot');
+  }
+  await this.invalidateCachePattern(`mkt-ops-files-${campaignId}`);
+  await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  return result.data?.data ?? result.data;
+};
+
 const marketingOpsService = MarketingOpsService.getInstance();
 export { marketingOpsService, MarketingOpsService };
 export default marketingOpsService;
