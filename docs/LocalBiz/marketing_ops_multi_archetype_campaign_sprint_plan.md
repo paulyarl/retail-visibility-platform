@@ -1102,16 +1102,26 @@ Category-scope and city-scope campaigns do not get `business_prospect_id` (they 
   - `acceptTriage` with PB-07 → sets `campaign_category: 'profile_repair'` + `repair_track: 'standard'`
   - `acceptTriage` with PB-02 → sets `campaign_category: 'review_management'` (unchanged)
   - `acceptTriage` with PB-04 → sets `campaign_category: 'recovery_management'` (unchanged)
+  - `overrideTriage` to PB-01 → sets `campaign_category: 'profile_repair'` + `repair_track: 'standard'` (C2 fix)
+  - `overrideTriage` to PB-07 → sets `campaign_category: 'profile_repair'` + `repair_track: 'standard'` (C2 fix)
+  - `overrideTriage` to PB-02 → sets `campaign_category: 'review_management'` + `repair_track: null` (unchanged)
   - `transitionsFor('profile_repair', 'standard')` returns `REVIEW_TRANSITIONS`
   - `transitionsFor('profile_repair', 'escalated')` returns `RECOVERY_TRANSITIONS`
   - `pipelineFor('profile_repair', 'standard')` returns `'review'`
   - `pipelineFor('profile_repair', 'escalated')` returns `'recovery'`
+- `apps/api/src/services/__tests__/MarketingCampaignServiceIntakeRegression.test.ts` (new — C1 fix):
+  - `transitionStage` to `outreach_dispatched` for `profile_repair` + `standard` → auto-generates registry intake (gbp_optimization / review_response_setup)
+  - `transitionStage` to `outreach_dispatched` for `profile_repair` + `escalated` → auto-generates dispute intake (NOT registry intake)
+  - `transitionStage` to `outreach_dispatched` for `review_management` → auto-generates registry intake (unchanged)
+  - `transitionStage` to `outreach_dispatched` for `recovery_management` → auto-generates dispute intake (unchanged)
 - `apps/api/src/tests/marketing-ops-sibling-routes.test.ts` (new):
   - `POST /siblings` — creates triage-driven sibling, returns 201
   - `POST /siblings` — creates `profile_repair` sibling with `repairTrack`, returns 201
   - `POST /siblings` — 409 when archetype already exists
   - `GET /siblings` — lists siblings for prospect
-  - `POST /cycle` — increments engagement_cycle, resets stage
+  - `POST /cycle` — increments engagement_cycle, resets stage + date_* fields (per §3.5 reset semantics)
+  - `POST /cycle` — preserves `business_prospect_id`, `customer_id`, `campaign_category`, `repair_track`
+  - `GET /triage/alternatives` — returns winner + alternatives with `detectedSignals` per alternative (A1 fix)
   - Auth required on all routes
 
 ### Sprint 2 (Weeks 3–4): Multi-Diagnostic Gallery
@@ -1284,7 +1294,7 @@ The sibling model does not change any of this — it simply allows multiple inde
 
 | Sprint | Goal | Depends On | Key Deliverables |
 |---|---|---|---|
-| 1 | Repair Re-Categorization + Schema + Backend Foundation | — | Migration 178 (repair re-categorization), Migrations 179/180 (siblings + multi-gallery), `profile_repair` as `PlaybookCategory`, BusinessProspectService, triage multi-archetype, sibling + cycle routes |
+| 1 | Repair Re-Categorization + Schema + Backend Foundation | — | Migration 178 (repair re-categorization), Migrations 179/180 (siblings + multi-gallery metadata), `profile_repair` as `PlaybookCategory`, accept+override `repair_track` fix, `transitionStage` intake regression fix, `ArchetypeCodeWithA6` fix, `loadSignalsAndPlaybooks` refactor, BusinessProspectService, triage multi-archetype (with `detectedSignals`), sibling + cycle routes, `SiblingSummary` type |
 | 2 | Multi-Diagnostic Gallery | S1 | Multi-gallery token, public API, frontend page, outreach integration |
 | 3 | Frontend + Portal + Tests | S1, S2 | Triage card alternatives, siblings tab, cycle button, portal grouping, full test suite |
 
