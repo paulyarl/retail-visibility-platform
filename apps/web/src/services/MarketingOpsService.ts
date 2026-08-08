@@ -4172,6 +4172,7 @@ export interface GalleryDashboard {
 
 interface MarketingOpsService {
   generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GalleryToken>;
+  generateMultiGalleryToken(prospectId: string, expiryDays?: number): Promise<GalleryToken>;
   listGalleryTokens(campaignId: string): Promise<GalleryToken[]>;
   getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;
   getGalleryDashboard(daysBack?: number): Promise<GalleryDashboard>;
@@ -4193,6 +4194,25 @@ MarketingOpsService.prototype.generateGalleryToken = async function (
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate gallery token');
   }
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  return result.data?.data ?? result.data;
+};
+
+// ─── Multi-Diagnostic Gallery (Sprint 2 — Multi-Archetype) ───────────────
+
+MarketingOpsService.prototype.generateMultiGalleryToken = async function (
+  this: MarketingOpsService,
+  prospectId: string,
+  expiryDays: number = 7,
+): Promise<GalleryToken> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/prospects/${prospectId}/multi-gallery-token`,
+    { method: 'POST', body: JSON.stringify({ expires_in_days: expiryDays }) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate multi-gallery token');
+  }
   return result.data?.data ?? result.data;
 };
 

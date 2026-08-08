@@ -35,6 +35,7 @@ export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
 export interface GalleryEventInput {
   tokenId: string;
   campaignId: string;
+  siblingCampaignId?: string;
   tenantId?: string;
   sessionId?: string;
   eventType: GalleryEventType;
@@ -148,6 +149,7 @@ export class GalleryAnalyticsService extends BaseService {
           tenant_id: input.tenantId || 'platform',
           token_id: input.tokenId,
           campaign_id: input.campaignId,
+          sibling_campaign_id: input.siblingCampaignId || null,
           session_id: input.sessionId || null,
           event_type: input.eventType,
           screenshot_index: input.screenshotIndex ?? null,
@@ -159,7 +161,7 @@ export class GalleryAnalyticsService extends BaseService {
           user_agent: input.userAgent || null,
           ip_hash: ipHash,
           device_type: deviceType,
-        },
+        } as any,
       });
 
       // First-view side effects (G24)

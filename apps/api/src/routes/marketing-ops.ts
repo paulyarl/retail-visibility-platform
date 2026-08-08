@@ -150,6 +150,7 @@ import { OutreachOpenerService, resolveCampaignArchetype } from '../services/Out
 import { selectArchetype, type BusinessAnalysisAuditData } from '../services/outreach-openers/archetype-selection';
 import { resolveGalleryArchetypeDefaults } from '../services/marketing/GalleryArchetypeDefaults';
 import galleryAnalyticsService from '../services/GalleryAnalyticsService';
+import { GalleryMultiService } from '../services/marketing/GalleryMultiService';
 import HeaderService from '../services/outreach-pitch/HeaderService';
 import CloserService from '../services/outreach-pitch/CloserService';
 import ContactService from '../services/outreach-pitch/ContactService';
@@ -4757,6 +4758,101 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
       priceWarning: campaign.package_price_cents == null || campaign.package_price_cents <= 0,
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// MULTI-DIAGNOSTIC GALLERY TOKEN (Sprint 2 — Multi-Archetype)
+// ====================
+
+const multiGalleryTokenSchema = z.object({
+  expires_in_days: z.number().int().min(1).max(365).default(7),
+});
+
+/**
+ * POST /prospects/:prospectId/multi-gallery-token
+ *
+ * Issue a multi-diagnostic gallery token for a business prospect. The token
+ * references the primary sibling campaign and stores the prospect ID +
+ * sibling campaign IDs in the metadata JSONB column.
+ *
+ * Gates:
+ * - At least 1 sibling must be at preview_built/shown stage
+ * - At least 1 sibling must have diagnostic screenshots
+ *
+ * The public API (GET /api/public/gallery/multi/:token) assembles the full
+ * multi-gallery data from all eligible siblings at view time.
+ */
+router.post('/prospects/:prospectId/multi-gallery-token', async (req: any, res: Response) => {
+  try {
+    const { prospectId } = req.params;
+    const parsed = multiGalleryTokenSchema.parse(req.body ?? {});
+    const ctx = getCtx(req);
+
+    // 1. Check eligibility — at least 1 sibling at preview_built/shown with screenshots
+    const eligibility = await GalleryMultiService.getInstance().checkEligibility(prospectId, ctx);
+    if (!eligibility.eligible) {
+      return res.status(400).json({
+        success: false,
+        error: 'no_eligible_siblings',
+        message: `No siblings at preview_built/shown stage with diagnostic screenshots. Total siblings: ${eligibility.siblingCount}, eligible: ${eligibility.eligibleCount}`,
+      });
+    }
+
+    // 2. Load the primary sibling campaign (token references it)
+    const { BusinessProspectService } = await import('../services/BusinessProspectService.js');
+    const primarySibling = await BusinessProspectService.getInstance().getPrimarySibling(prospectId, ctx);
+    if (!primarySibling) {
+      return res.status(404).json({ success: false, error: 'prospect_not_found', message: 'No campaigns found for this prospect' });
+    }
+
+    // 3. Load all sibling campaign IDs for metadata
+    const siblings = await BusinessProspectService.getInstance().listSiblings(prospectId, ctx);
+    const siblingCampaignIds = siblings.map((s) => s.id);
+
+    // 4. Supersede prior multi-gallery tokens for this prospect
+    await prisma.mkt_deliverable_preview_tokens.updateMany({
+      where: {
+        token_type: 'multi_diagnostic_gallery',
+        converted_at: null,
+        expires_at: { gt: new Date() },
+      } as any,
+      data: { converted_at: new Date() },
+    });
+
+    // 5. Mint the multi-gallery token (references primary sibling campaign)
+    const token = await MarketingDeliverableService.generateCampaignToken(
+      primarySibling.id,
+      'multi_diagnostic_gallery' as any,
+      undefined,
+      parsed.expires_in_days,
+      ctx,
+    );
+
+    // 6. Store metadata (prospect ID + sibling campaign IDs)
+    await prisma.mkt_deliverable_preview_tokens.update({
+      where: { id: token.id },
+      data: {
+        metadata: {
+          business_prospect_id: prospectId,
+          sibling_campaign_ids: siblingCampaignIds,
+        } as any,
+      } as any,
+    });
+
+    logger.info('Multi-gallery token issued', ctx, {
+      prospectId,
+      primaryCampaignId: primarySibling.id,
+      siblingCount: siblingCampaignIds.length,
+      tokenId: token.id,
+    });
+
+    res.status(201).json({ success: true, data: token });
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }

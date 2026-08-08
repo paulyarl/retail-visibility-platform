@@ -49,12 +49,46 @@ export interface GalleryData {
 export interface GalleryEventPayload {
   eventType: string;
   sessionId?: string;
+  siblingCampaignId?: string;
   screenshotIndex?: number;
   screenshotId?: string;
   dwellMs?: number;
   clientWidth?: number;
   clientHeight?: number;
   referrer?: string;
+}
+
+// ─── Multi-Gallery types ─────────────────────────────────────────────────
+
+export interface MultiGallerySiblingSection {
+  campaignId: string;
+  businessName: string | null;
+  archetype: string;
+  galleryTitle: string;
+  gallerySubtitle: string;
+  frictionSummary: Record<string, any>;
+  ctaLabel: string;
+  ctaAmountCents: number | null;
+  estimatedFeeCents: number;
+  isPrimarySibling: boolean;
+  screenshots: GalleryScreenshot[];
+}
+
+export interface MultiGalleryData {
+  expired: boolean;
+  // Expired payload
+  expiredAt?: string | null;
+  reactivationUrl?: string;
+  // Active payload
+  token?: {
+    id: string;
+    expiresAt: string | null;
+    viewedAt: string | null;
+  };
+  prospectId?: string;
+  businessName?: string | null;
+  siblings?: MultiGallerySiblingSection[];
+  payUrl?: string;
 }
 
 export class DiagnosticGalleryPublicService extends PublicApiSingleton {
@@ -123,6 +157,23 @@ export class DiagnosticGalleryPublicService extends PublicApiSingleton {
     } catch {
       // Fire-and-forget
     }
+  }
+
+  /**
+   * Resolve a multi-gallery token and return all sibling gallery data.
+   * Used by the MultiGalleryPage frontend component.
+   */
+  async getMultiGallery(token: string): Promise<MultiGalleryData> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/public/marketing/gallery/multi/${encodeURIComponent(token)}`,
+      {},
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load multi-gallery');
+    }
+    return result.data?.data ?? result.data;
   }
 }
 

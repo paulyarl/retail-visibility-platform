@@ -1,7 +1,15 @@
 'use client';
 
 import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import GalleryClient from './GalleryClient';
+import MultiGalleryPage from './MultiGalleryPage';
+
+function PreviewRouter() {
+  const searchParams = useSearchParams();
+  const isMultiGallery = searchParams.get('prospect') === 'true';
+  return isMultiGallery ? <MultiGalleryPage /> : <GalleryClient />;
+}
 
 export default function DiagnosticGalleryPage() {
   return (
@@ -12,7 +20,7 @@ export default function DiagnosticGalleryPage() {
         </div>
       }
     >
-      <GalleryClient />
+      <PreviewRouter />
     </Suspense>
   );
 }

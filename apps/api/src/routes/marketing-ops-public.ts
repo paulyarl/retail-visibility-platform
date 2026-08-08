@@ -18,6 +18,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
 import galleryAnalyticsService, { checkRateLimit } from '../services/GalleryAnalyticsService';
+import { GalleryMultiService } from '../services/marketing/GalleryMultiService';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
@@ -242,6 +243,7 @@ const galleryEventSchema = z.object({
     'session_end',
   ]),
   sessionId: z.string().optional(),
+  siblingCampaignId: z.string().max(255).optional(),
   screenshotIndex: z.number().int().optional(),
   screenshotId: z.string().optional(),
   dwellMs: z.number().int().optional(),
@@ -296,6 +298,7 @@ router.post('/public/marketing/gallery/:token/events', async (req, res) => {
     galleryAnalyticsService.trackEvent({
       tokenId: token.id,
       campaignId: campaign.id,
+      siblingCampaignId: parsed.data.siblingCampaignId,
       eventType: parsed.data.eventType,
       sessionId: parsed.data.sessionId,
       screenshotIndex: parsed.data.screenshotIndex,
@@ -361,6 +364,7 @@ router.post('/public/marketing/gallery/:token/events/batch', async (req, res) =>
     const inputs = events.map((e) => ({
       tokenId: token.id,
       campaignId: campaign.id,
+      siblingCampaignId: e.siblingCampaignId,
       eventType: e.eventType,
       sessionId: e.sessionId,
       screenshotIndex: e.screenshotIndex,
@@ -379,6 +383,86 @@ router.post('/public/marketing/gallery/:token/events/batch', async (req, res) =>
   } catch (error: any) {
     logger.error('[marketing-ops-public] POST /gallery/:token/events/batch error', undefined, { error: error.message });
     return res.status(200).json({ success: true, tracked: 0 });
+  }
+});
+
+// ====================
+// MULTI-DIAGNOSTIC GALLERY (Sprint 2 — Multi-Archetype)
+// ====================
+
+/**
+ * GET /api/public/marketing/gallery/multi/:token
+ *
+ * Public, token-gated endpoint that returns multi-gallery data for all
+ * eligible sibling campaigns of a business prospect. No auth required —
+ * the token is the trust boundary.
+ *
+ * - 404 if token not found or wrong type
+ * - 200 with { expired: true, ... } if token expired (frontend renders re-activation hook)
+ * - 200 with full multi-gallery payload if active
+ *
+ * The token's metadata.business_prospect_id identifies the prospect group.
+ * The GalleryMultiService assembles per-sibling sections at view time.
+ */
+router.get('/public/marketing/gallery/multi/:token', async (req, res) => {
+  try {
+    const { token: ptoken } = req.params;
+    if (!ptoken) {
+      return res.status(400).json({ success: false, error: 'Token is required' });
+    }
+
+    // Resolve multi-gallery token
+    const token = await prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: { token: ptoken },
+    });
+    if (!token || token.token_type !== 'multi_diagnostic_gallery') {
+      return res.status(404).json({ success: false, error: 'Invalid or unknown token' });
+    }
+
+    const expired = !!(token.expires_at && token.expires_at < new Date());
+    if (expired) {
+      return res.json({
+        success: true,
+        expired: true,
+        expiredAt: token.expires_at,
+        reactivationUrl: `/marketing/pay?ptoken=${token.token}`,
+      });
+    }
+
+    // Extract prospect ID from metadata
+    const metadata = token.metadata as any;
+    const prospectId = metadata?.business_prospect_id;
+    if (!prospectId) {
+      return res.status(404).json({ success: false, error: 'Token metadata missing prospect ID' });
+    }
+
+    // Stamp viewed_at on first view
+    if (!token.viewed_at) {
+      await prisma.mkt_deliverable_preview_tokens.update({
+        where: { id: token.id },
+        data: { viewed_at: new Date() },
+      });
+    }
+
+    // Assemble multi-gallery data from all eligible siblings
+    const galleryData = await GalleryMultiService.getInstance().assembleMultiGallery(prospectId);
+    if (!galleryData) {
+      return res.status(404).json({ success: false, error: 'No eligible sibling galleries found' });
+    }
+
+    return res.json({
+      success: true,
+      expired: false,
+      token: {
+        id: token.id,
+        expiresAt: token.expires_at,
+        viewedAt: token.viewed_at,
+      },
+      ...galleryData,
+    });
+  } catch (error: any) {
+    logger.error('[marketing-ops-public] GET /gallery/multi/:token error', undefined, { error: error.message });
+    return res.status(500).json({ success: false, error: 'Failed to resolve multi-gallery' });
   }
 });
 
