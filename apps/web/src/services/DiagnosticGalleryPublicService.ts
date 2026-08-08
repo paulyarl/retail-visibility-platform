@@ -74,6 +74,19 @@ export interface MultiGallerySiblingSection {
   screenshots: GalleryScreenshot[];
 }
 
+export interface CompletedSiblingSection {
+  campaignId: string;
+  businessName: string | null;
+  archetype: string;
+  galleryTitle: string;
+  campaignCategory: string;
+  stage: string;
+  dateDelivered: string | null;
+  datePaid: string | null;
+  isPrimarySibling: boolean;
+  engagementCycle: number;
+}
+
 export interface MultiGalleryData {
   expired: boolean;
   // Expired payload
@@ -88,6 +101,7 @@ export interface MultiGalleryData {
   prospectId?: string;
   businessName?: string | null;
   siblings?: MultiGallerySiblingSection[];
+  completedSiblings?: CompletedSiblingSection[];
   payUrl?: string;
 }
 

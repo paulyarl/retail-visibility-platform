@@ -248,3 +248,111 @@ describe('checkEligibility', () => {
     expect(result.siblingCount).toBe(0);
   });
 });
+
+// ─── Completed siblings (badge of honor — §8.3, §8.4) ────────────────────
+
+describe('assembleMultiGallery — completed siblings', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('includes completed siblings (paid/delivered) in completedSiblings', async () => {
+    const active = makeCampaign({ id: 'mkt-001', stage: 'preview_built', is_primary_sibling: true });
+    const completed = makeCampaign({
+      id: 'mkt-002',
+      stage: 'delivered',
+      is_primary_sibling: false,
+      date_delivered: new Date('2025-01-15'),
+      date_paid: new Date('2025-01-10'),
+      engagement_cycle: 1,
+    });
+    mockCampaignsList.findMany.mockResolvedValue([active, completed]);
+    mockFilesList.findMany.mockResolvedValue([makeScreenshot('s1')]);
+
+    const result = await GalleryMultiService.getInstance().assembleMultiGallery('bp-test001');
+
+    expect(result).not.toBeNull();
+    expect(result!.siblings.length).toBe(1); // active only
+    expect(result!.completedSiblings.length).toBe(1);
+    expect(result!.completedSiblings[0].campaignId).toBe('mkt-002');
+    expect(result!.completedSiblings[0].stage).toBe('delivered');
+    expect(result!.completedSiblings[0].archetype).toBe('A3');
+    expect(result!.completedSiblings[0].galleryTitle).toBe('Listing Accuracy Diagnostic');
+  });
+
+  it('does not include completed siblings in the active siblings list', async () => {
+    const active = makeCampaign({ id: 'mkt-001', stage: 'shown' });
+    const completed = makeCampaign({ id: 'mkt-002', stage: 'paid', is_primary_sibling: false });
+    mockCampaignsList.findMany.mockResolvedValue([active, completed]);
+    mockFilesList.findMany.mockResolvedValue([makeScreenshot('s1')]);
+
+    const result = await GalleryMultiService.getInstance().assembleMultiGallery('bp-test001');
+
+    expect(result).not.toBeNull();
+    expect(result!.siblings.length).toBe(1);
+    expect(result!.siblings[0].campaignId).toBe('mkt-001');
+    expect(result!.completedSiblings.length).toBe(1);
+    expect(result!.completedSiblings[0].campaignId).toBe('mkt-002');
+  });
+
+  it('sorts completed siblings by datePaid desc (most recent first)', async () => {
+    const active = makeCampaign({ id: 'mkt-001', stage: 'preview_built' });
+    const older = makeCampaign({
+      id: 'mkt-002',
+      stage: 'delivered',
+      is_primary_sibling: false,
+      date_paid: new Date('2025-01-01'),
+    });
+    const newer = makeCampaign({
+      id: 'mkt-003',
+      stage: 'delivered',
+      is_primary_sibling: false,
+      date_paid: new Date('2025-02-01'),
+    });
+    mockCampaignsList.findMany.mockResolvedValue([active, older, newer]);
+    mockFilesList.findMany.mockResolvedValue([makeScreenshot('s1')]);
+
+    const result = await GalleryMultiService.getInstance().assembleMultiGallery('bp-test001');
+
+    expect(result).not.toBeNull();
+    expect(result!.completedSiblings.length).toBe(2);
+    expect(result!.completedSiblings[0].campaignId).toBe('mkt-003'); // newer first
+    expect(result!.completedSiblings[1].campaignId).toBe('mkt-002');
+  });
+
+  it('returns empty completedSiblings when no siblings are converted', async () => {
+    mockCampaignsList.findMany.mockResolvedValue([makeCampaign({ stage: 'preview_built' })]);
+    mockFilesList.findMany.mockResolvedValue([makeScreenshot('s1')]);
+
+    const result = await GalleryMultiService.getInstance().assembleMultiGallery('bp-test001');
+
+    expect(result).not.toBeNull();
+    expect(result!.completedSiblings).toEqual([]);
+  });
+
+  it('still returns null if no active siblings exist even with completed siblings', async () => {
+    const completed = makeCampaign({ id: 'mkt-002', stage: 'delivered', is_primary_sibling: false });
+    mockCampaignsList.findMany.mockResolvedValue([completed]);
+    mockFilesList.findMany.mockResolvedValue([makeScreenshot('s1')]);
+
+    const result = await GalleryMultiService.getInstance().assembleMultiGallery('bp-test001');
+
+    expect(result).toBeNull(); // no active siblings → nothing to show in gallery
+  });
+
+  it('includes retainer_won siblings in completedSiblings', async () => {
+    const active = makeCampaign({ id: 'mkt-001', stage: 'shown' });
+    const retainerWon = makeCampaign({
+      id: 'mkt-002',
+      stage: 'retainer_won',
+      is_primary_sibling: false,
+      date_paid: new Date('2025-01-10'),
+    });
+    mockCampaignsList.findMany.mockResolvedValue([active, retainerWon]);
+    mockFilesList.findMany.mockResolvedValue([makeScreenshot('s1')]);
+
+    const result = await GalleryMultiService.getInstance().assembleMultiGallery('bp-test001');
+
+    expect(result).not.toBeNull();
+    expect(result!.completedSiblings.length).toBe(1);
+    expect(result!.completedSiblings[0].stage).toBe('retainer_won');
+  });
+});

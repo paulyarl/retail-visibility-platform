@@ -29,11 +29,14 @@ import {
   IconExternalLink,
   IconRefresh,
   IconAlertTriangle,
+  IconCheck,
+  IconHistory,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import diagnosticGalleryPublicService, {
   type MultiGalleryData,
   type MultiGallerySiblingSection,
+  type CompletedSiblingSection,
 } from '@/services/DiagnosticGalleryPublicService';
 
 const ARCHETYPE_COLORS: Record<string, string> = {
@@ -205,6 +208,11 @@ export default function MultiGalleryPage() {
           </Accordion>
         )}
 
+        {/* Completed Work — badge of honor history section (§8.3, §8.4) */}
+        {data.completedSiblings && data.completedSiblings.length > 0 && (
+          <CompletedWorkSection completedSiblings={data.completedSiblings} />
+        )}
+
         {/* Global CTA */}
         <Card withBorder p="lg" radius="md" bg="var(--mantine-color-blue-0)">
           <Group justify="space-between" align="center">
@@ -365,5 +373,70 @@ function SiblingSectionContent({
         </Button>
       </Group>
     </Stack>
+  );
+}
+
+// ─── Completed Work section (badge of honor — §8.3, §8.4) ────────────────
+
+const STAGE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  paid: { label: 'In Progress', color: 'blue' },
+  delivered: { label: 'Delivered', color: 'green' },
+  retainer_pitched: { label: 'Retainer Pitched', color: 'teal' },
+  retainer_won: { label: 'Active Plan', color: 'grape' },
+  tenant_onboarded: { label: 'Onboarded', color: 'indigo' },
+};
+
+function CompletedWorkSection({ completedSiblings }: { completedSiblings: CompletedSiblingSection[] }) {
+  return (
+    <Card withBorder p="lg" radius="md" bg="var(--mantine-color-gray-0)">
+      <Stack gap="md">
+        <Group gap="sm">
+          <IconHistory size={20} className="text-gray-500" />
+          <Stack gap={0}>
+            <Text fw={700} size="sm">Completed Work</Text>
+            <Text c="dimmed" size="xs">
+              {completedSiblings.length} service{completedSiblings.length !== 1 ? 's' : ''} already purchased — your journey so far
+            </Text>
+          </Stack>
+        </Group>
+
+        <Divider />
+
+        <Stack gap="xs">
+          {completedSiblings.map((sibling) => {
+            const status = STAGE_STATUS_LABELS[sibling.stage] ?? { label: sibling.stage, color: 'gray' };
+            return (
+              <Group key={sibling.campaignId} justify="space-between" align="center">
+                <Group gap="sm">
+                  <IconCheck size={16} className="text-green-600" />
+                  <Stack gap={0}>
+                    <Group gap="xs">
+                      <Badge color={ARCHETYPE_COLORS[sibling.archetype] ?? 'gray'} variant="light" size="sm">
+                        {sibling.archetype}
+                      </Badge>
+                      <Text size="sm" fw={500}>{sibling.galleryTitle}</Text>
+                    </Group>
+                    <Text c="dimmed" size="xs">
+                      {sibling.campaignCategory.replace(/_/g, ' ')}
+                      {sibling.engagementCycle > 1 && ` · Cycle ${sibling.engagementCycle}`}
+                    </Text>
+                  </Stack>
+                </Group>
+                <Group gap="sm">
+                  <Badge variant="light" color={status.color} size="sm">
+                    {status.label}
+                  </Badge>
+                  {sibling.datePaid && (
+                    <Text c="dimmed" size="xs">
+                      {new Date(sibling.datePaid).toLocaleDateString()}
+                    </Text>
+                  )}
+                </Group>
+              </Group>
+            );
+          })}
+        </Stack>
+      </Stack>
+    </Card>
   );
 }

@@ -54,10 +54,30 @@ export interface MultiGalleryScreenshot {
   uploadedAt: Date;
 }
 
+/**
+ * A converted/delivered sibling shown in the "Completed Work" history section.
+ * Lighter than MultiGallerySiblingSection — no screenshots or signed URLs
+ * (the prospect already has the deliverable). Shows status + archetype +
+ * delivered date as a "badge of honor".
+ */
+export interface CompletedSiblingSection {
+  campaignId: string;
+  businessName: string | null;
+  archetype: ArchetypeCode;
+  galleryTitle: string;
+  campaignCategory: string;
+  stage: string;
+  dateDelivered: Date | null;
+  datePaid: Date | null;
+  isPrimarySibling: boolean;
+  engagementCycle: number;
+}
+
 export interface MultiGalleryData {
   prospectId: string;
   businessName: string | null;
   siblings: MultiGallerySiblingSection[];
+  completedSiblings: CompletedSiblingSection[];
   payUrl: string;
 }
 
@@ -73,6 +93,16 @@ const ARCHETYPE_PRIORITY: Record<ArchetypeCode, number> = {
 };
 
 const ELIGIBLE_STAGES = new Set(['preview_built', 'shown']);
+
+// Stages that indicate the prospect has converted on this sibling.
+// These are shown in the "Completed Work" history section (badge of honor).
+const COMPLETED_STAGES = new Set([
+  'paid',
+  'delivered',
+  'retainer_pitched',
+  'retainer_won',
+  'tenant_onboarded',
+]);
 
 // ─── Service ─────────────────────────────────────────────────────────────
 
@@ -93,11 +123,18 @@ export class GalleryMultiService extends BaseService {
   /**
    * Assemble multi-gallery data for a business prospect.
    *
-   * Loads all sibling campaigns, filters to eligible ones (preview_built/shown
-   * with screenshots), resolves archetype-aware defaults per sibling, fetches
-   * screenshots with signed URLs, and returns the assembled data.
+   * Loads all sibling campaigns, splits them into:
+   *   - Active gallery siblings (preview_built/shown with screenshots) → `siblings`
+   *   - Completed siblings (paid/delivered/retainer_won) → `completedSiblings`
    *
-   * Returns null if no eligible siblings exist (caller should 404).
+   * Completed siblings are shown in a collapsed "Completed Work" history
+   * section on the multi-gallery page — a badge of honor showing the prospect's
+   * journey of work already delivered.
+   *
+   * Returns null if no active siblings with screenshots exist (caller should 404).
+   * Completed siblings are returned even if 0 active siblings exist, but only
+   * when at least 1 active sibling has screenshots (otherwise the gallery has
+   * nothing to show).
    */
   async assembleMultiGallery(
     prospectId: string,
@@ -113,13 +150,15 @@ export class GalleryMultiService extends BaseService {
       return null;
     }
 
-    // 2. Filter to eligible stages
+    // 2. Split into active (gallery-ready) + completed (badge of honor)
     const eligible = siblings.filter((s) => ELIGIBLE_STAGES.has(s.stage));
+    const completed = siblings.filter((s) => COMPLETED_STAGES.has(s.stage));
+
     if (eligible.length === 0) {
       return null;
     }
 
-    // 3. Sort: primary first, then by archetype priority, then by created_at
+    // 3. Sort eligible: primary first, then by archetype priority, then by created_at
     eligible.sort((a, b) => {
       const aPrimary = a.is_primary_sibling ?? false;
       const bPrimary = b.is_primary_sibling ?? false;
@@ -152,11 +191,30 @@ export class GalleryMultiService extends BaseService {
       return 0;
     });
 
+    // 5. Build completed siblings sections (badge of honor — no screenshots needed)
+    const completedSections: CompletedSiblingSection[] = [];
+    for (const campaign of completed) {
+      const section = await this.buildCompletedSection(campaign, ctx);
+      if (section) {
+        completedSections.push(section);
+      }
+    }
+
+    // Sort completed: primary first, then by datePaid desc (most recent first)
+    completedSections.sort((a, b) => {
+      if (a.isPrimarySibling && !b.isPrimarySibling) return -1;
+      if (!a.isPrimarySibling && b.isPrimarySibling) return 1;
+      const aTime = a.datePaid?.getTime() ?? 0;
+      const bTime = b.datePaid?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+
     const businessName = eligible[0]?.business_name ?? null;
 
     logger.info('Multi-gallery assembled', ctx, {
       prospectId,
       siblingCount: sections.length,
+      completedCount: completedSections.length,
       businessName,
     });
 
@@ -164,6 +222,7 @@ export class GalleryMultiService extends BaseService {
       prospectId,
       businessName,
       siblings: sections,
+      completedSiblings: completedSections,
       payUrl: `/marketing/pay?prospect=${prospectId}`,
     };
   }
@@ -231,6 +290,47 @@ export class GalleryMultiService extends BaseService {
       estimatedFeeCents: campaign.estimated_fee_cents ?? 0,
       isPrimarySibling: campaign.is_primary_sibling ?? false,
       screenshots: screenshotsWithUrls,
+    };
+  }
+
+  /**
+   * Build a completed sibling section for the "Completed Work" history.
+   * Lighter than buildSiblingSection — no screenshots needed (the prospect
+   * already has the deliverable). Resolves archetype for the gallery title
+   * + uses the campaign's stage/dates for the badge of honor display.
+   *
+   * Returns null if archetype can't be resolved (shouldn't happen for
+   * converted campaigns, but defensive).
+   */
+  private async buildCompletedSection(
+    campaign: any,
+    ctx?: RequestCtx,
+  ): Promise<CompletedSiblingSection | null> {
+    const campaignId = campaign.id as string;
+
+    // Resolve archetype (honors operator-accepted triage)
+    let archetype: ArchetypeCode;
+    try {
+      const resolved = await resolveCampaignArchetype(campaignId, ctx);
+      archetype = resolved.archetype;
+    } catch {
+      logger.warn('Multi-gallery: could not resolve archetype for completed sibling', ctx, { campaignId });
+      return null;
+    }
+
+    const defaults = resolveGalleryArchetypeDefaults(archetype, null);
+
+    return {
+      campaignId,
+      businessName: campaign.business_name ?? null,
+      archetype,
+      galleryTitle: defaults.galleryTitle,
+      campaignCategory: campaign.campaign_category ?? 'review_management',
+      stage: campaign.stage,
+      dateDelivered: campaign.date_delivered ?? null,
+      datePaid: campaign.date_paid ?? null,
+      isPrimarySibling: campaign.is_primary_sibling ?? false,
+      engagementCycle: campaign.engagement_cycle ?? 1,
     };
   }
 

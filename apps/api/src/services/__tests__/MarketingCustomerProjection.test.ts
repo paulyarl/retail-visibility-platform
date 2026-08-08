@@ -27,6 +27,7 @@ import {
   mapCustomerStatus,
   projectCampaign,
   projectCampaigns,
+  groupCampaignsByProspect,
 } from '../MarketingCustomerProjection';
 
 // ── Status mapper (§7.3) ────────────────────────────────────────────────
@@ -207,5 +208,69 @@ describe('projectCampaigns', () => {
     ];
     const results = await projectCampaigns(campaigns);
     expect(results).toHaveLength(0);
+  });
+});
+
+// ─── Sprint 3: Sibling grouping by business_prospect_id ──────────────────
+
+describe('groupCampaignsByProspect (Sprint 3)', () => {
+  it('groups campaigns sharing the same business_prospect_id', () => {
+    const campaigns = [
+      { id: 'c1', businessName: 'Test Biz', businessProspectId: 'bp-001', isPrimarySibling: true, engagementCycle: 1, datePaid: new Date('2025-01-01'), status: { status: 'delivered', label: 'Delivered' } } as any,
+      { id: 'c2', businessName: 'Test Biz', businessProspectId: 'bp-001', isPrimarySibling: false, engagementCycle: 1, datePaid: new Date('2025-01-02'), status: { status: 'in_production', label: "We're working on it" } } as any,
+      { id: 'c3', businessName: 'Other Biz', businessProspectId: 'bp-002', isPrimarySibling: true, engagementCycle: 1, datePaid: new Date('2025-01-03'), status: { status: 'delivered', label: 'Delivered' } } as any,
+    ];
+    const groups = groupCampaignsByProspect(campaigns);
+    expect(groups).toHaveLength(2);
+    const bp001 = groups.find((g) => g.businessProspectId === 'bp-001')!;
+    expect(bp001.campaigns).toHaveLength(2);
+    expect(bp001.primaryCampaignId).toBe('c1');
+  });
+
+  it('legacy campaigns (null prospect ID) are each their own group', () => {
+    const campaigns = [
+      { id: 'c1', businessName: 'Legacy 1', businessProspectId: null, isPrimarySibling: false, engagementCycle: 1, datePaid: new Date('2025-01-01'), status: { status: 'delivered', label: 'Delivered' } } as any,
+      { id: 'c2', businessName: 'Legacy 2', businessProspectId: null, isPrimarySibling: false, engagementCycle: 1, datePaid: new Date('2025-01-02'), status: { status: 'delivered', label: 'Delivered' } } as any,
+    ];
+    const groups = groupCampaignsByProspect(campaigns);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].campaigns).toHaveLength(1);
+    expect(groups[1].campaigns).toHaveLength(1);
+  });
+
+  it('primary sibling is first within each group', () => {
+    const campaigns = [
+      { id: 'c1', businessName: 'Test Biz', businessProspectId: 'bp-001', isPrimarySibling: false, engagementCycle: 1, datePaid: new Date('2025-01-02'), status: { status: 'delivered', label: 'Delivered' } } as any,
+      { id: 'c2', businessName: 'Test Biz', businessProspectId: 'bp-001', isPrimarySibling: true, engagementCycle: 1, datePaid: new Date('2025-01-01'), status: { status: 'delivered', label: 'Delivered' } } as any,
+    ];
+    const groups = groupCampaignsByProspect(campaigns);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].campaigns[0].id).toBe('c2'); // primary first despite older date
+    expect(groups[0].campaigns[1].id).toBe('c1');
+  });
+
+  it('groups are sorted by most recent activity first', () => {
+    const campaigns = [
+      { id: 'c1', businessName: 'Older Biz', businessProspectId: 'bp-001', isPrimarySibling: true, engagementCycle: 1, datePaid: new Date('2025-01-01'), status: { status: 'delivered', label: 'Delivered' } } as any,
+      { id: 'c2', businessName: 'Newer Biz', businessProspectId: 'bp-002', isPrimarySibling: true, engagementCycle: 1, datePaid: new Date('2025-02-01'), status: { status: 'delivered', label: 'Delivered' } } as any,
+    ];
+    const groups = groupCampaignsByProspect(campaigns);
+    expect(groups[0].businessProspectId).toBe('bp-002'); // newer first
+    expect(groups[1].businessProspectId).toBe('bp-001');
+  });
+
+  it('returns empty array for no campaigns', () => {
+    const groups = groupCampaignsByProspect([]);
+    expect(groups).toEqual([]);
+  });
+
+  it('single campaign with prospect ID forms its own group', () => {
+    const campaigns = [
+      { id: 'c1', businessName: 'Solo Biz', businessProspectId: 'bp-001', isPrimarySibling: true, engagementCycle: 1, datePaid: new Date('2025-01-01'), status: { status: 'delivered', label: 'Delivered' } } as any,
+    ];
+    const groups = groupCampaignsByProspect(campaigns);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].campaigns).toHaveLength(1);
+    expect(groups[0].primaryCampaignId).toBe('c1');
   });
 });
