@@ -20,7 +20,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError } from '../middleware/errorHandler';
-import { generateCampaignId, generateBusinessProspectId, generateStageHistoryId } from '../lib/id-generator';
+import { generateCampaignId, generateBusinessProspectId, generateStageHistoryId, generateCampaignTriageId } from '../lib/id-generator';
 import type { ArchetypeCodeWithA6, PlaybookCode, PlaybookCategory } from './triage/types';
 
 // ─── Inputs ──────────────────────────────────────────────────────────────
@@ -32,8 +32,8 @@ export interface CreateSiblingInput {
   archetype: ArchetypeCodeWithA6;
   /** For triage-driven siblings: the playbook code (sets category via playbook). */
   playbookCode?: PlaybookCode;
-  /** For manually-created repair siblings (no playbook). */
-  campaignCategory?: 'profile_repair';
+  /** For manually-created siblings (no playbook). */
+  campaignCategory?: PlaybookCategory;
   repairTrack?: 'standard' | 'escalated';
   repairIssueType?: string;
   assignedTo?: string;
@@ -242,6 +242,16 @@ export class BusinessProspectService extends BaseService {
     // 5. Log initial stage transition
     await this.logStageHistory(newId, null, initialStage, 'system', assignedTo);
 
+    // 6. For triage-driven siblings, create a pre-accepted triage result so the
+    //    checklist tab can resolve the effective playbook immediately. Without
+    //    this, the operator sees an empty checklist ("No playbook assigned yet")
+    //    even though they explicitly chose a playbook by creating the sibling.
+    //    The triage result inherits detected signals from the source campaign's
+    //    triage (the signals that triggered this alternative playbook match).
+    if (playbookCode) {
+      await this.createSiblingTriageResult(newId, sourceCampaignId, playbookCode, ctx);
+    }
+
     logger.info('Sibling campaign created', ctx, {
       sourceCampaignId,
       newCampaignId: newId,
@@ -252,6 +262,69 @@ export class BusinessProspectService extends BaseService {
     });
 
     return sibling;
+  }
+
+  /**
+   * Create a pre-accepted triage result for a triage-driven sibling campaign.
+   *
+   * The operator explicitly chose this playbook by clicking "Create Sibling"
+   * on a triage alternative — that IS the operator decision. We record it as
+   * an accepted triage result so PlaybookChecklistService.resolveEffectivePlaybook
+   * can resolve the effective playbook and the checklist tab shows the starter
+   * steps immediately.
+   *
+   * Detected signals are inherited from the source campaign's triage result
+   * (the signals that caused this alternative to match in the first place).
+   */
+  private async createSiblingTriageResult(
+    siblingCampaignId: string,
+    sourceCampaignId: string,
+    playbookCode: PlaybookCode,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const MarketingPlaybookCatalogService = (await import('./MarketingPlaybookCatalogService.js')).default;
+    const playbook = await MarketingPlaybookCatalogService.getPlaybookByCode(playbookCode, ctx);
+
+    // Inherit detected signals + source audit from the source campaign's triage
+    const sourceTriage = await this.prisma.mkt_campaign_triage_results.findUnique({
+      where: { campaign_id: sourceCampaignId },
+    }) as any;
+
+    const detectedSignals = (sourceTriage?.detected_signals as any[]) ?? [];
+    const sourceAuditId = (sourceTriage?.source_audit_id as string | null) ?? null;
+    const confidence = playbook.matchingRules?.confidence ?? 0.85;
+
+    const triageId = generateCampaignTriageId();
+    try {
+      await this.prisma.mkt_campaign_triage_results.create({
+        data: {
+          id: triageId,
+          campaign_id: siblingCampaignId,
+          recommended_playbook_id: playbook.id,
+          confidence_score: confidence,
+          triage_reasoning: `Sibling campaign created from multi-archetype triage alternative (${playbookCode}). Operator explicitly chose this playbook for the sibling.`,
+          detected_signals: detectedSignals as any,
+          is_operator_accepted: true,
+          overridden_playbook_id: null,
+          source_audit_id: sourceAuditId,
+          evaluated_at: new Date(),
+        },
+      });
+      logger.info('Sibling triage result created (pre-accepted)', ctx, {
+        siblingCampaignId,
+        playbookCode,
+        triageId,
+        inheritedSignalCount: detectedSignals.length,
+      });
+    } catch (error) {
+      // Non-fatal: the sibling campaign exists and is usable. The operator can
+      // still run triage manually from the Overview tab. Log and continue.
+      logger.warn('Failed to create sibling triage result — operator can run triage manually', ctx, {
+        siblingCampaignId,
+        playbookCode,
+        error: (error as Error).message,
+      });
+    }
   }
 
   // ─── Sibling listing ───────────────────────────────────────────────────

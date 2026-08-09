@@ -3506,7 +3506,15 @@ class MarketingOpsService extends AdminApiSingleton {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        archetype: input.archetype,
+        playbook_code: input.playbookCode,
+        campaign_category: input.campaignCategory,
+        repair_track: input.repairTrack,
+        repair_issue_type: input.repairIssueType,
+        assigned_to: input.assignedTo,
+        notes: input.notes,
+      }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => null);

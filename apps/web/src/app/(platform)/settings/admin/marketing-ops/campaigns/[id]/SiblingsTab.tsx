@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ArrowRightCircle, Repeat, Users } from 'lucide-react';
+import { RefreshCw, ArrowRightCircle, Repeat, Users, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
 import { StageBadge } from '@/components/marketing-ops/StageBadge';
@@ -50,6 +50,16 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cycling, setCycling] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    archetype: 'A5',
+    campaignCategory: 'profile_repair',
+    repairTrack: '',
+    repairIssueType: '',
+    notes: '',
+  });
 
   const fetchSiblings = useCallback(async () => {
     setLoading(true);
@@ -81,6 +91,32 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
 
   // Cycle button appears only at delivered/retainer_won stage
   const canCycle = campaign?.stage === 'delivered' || campaign?.stage === 'retainer_won';
+
+  const handleManualCreate = async () => {
+    setFormError(null);
+    if (!form.campaignCategory) {
+      setFormError('Campaign category is required');
+      return;
+    }
+    setCreating(true);
+    try {
+      await marketingOpsService.createSiblingCampaign(campaignId, {
+        archetype: form.archetype,
+        campaignCategory: form.campaignCategory,
+        repairTrack: form.repairTrack || undefined,
+        repairIssueType: form.repairIssueType || undefined,
+        notes: form.notes || undefined,
+      });
+      setShowManualForm(false);
+      setForm({ archetype: 'A5', campaignCategory: 'profile_repair', repairTrack: '', repairIssueType: '', notes: '' });
+      onRefresh();
+      fetchSiblings();
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to create sibling campaign');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -126,7 +162,110 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
             Cycle to Next Engagement
           </button>
         )}
+        <button
+          onClick={() => setShowManualForm((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 rounded hover:bg-purple-50 dark:hover:bg-purple-900/20"
+        >
+          {showManualForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+          Create Sibling Manually
+        </button>
       </div>
+
+      {/* Manual sibling creation form */}
+      {showManualForm && (
+        <div className="rounded-lg bg-white dark:bg-neutral-800 border border-purple-200 dark:border-purple-800 p-4 space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Manual Sibling Creation</p>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+              Use this when signals didn't catch a pain dimension — e.g. an explicit request from the prospect during a call.
+            </p>
+          </div>
+          {formError && (
+            <div className="text-xs text-red-700 dark:text-red-400">{formError}</div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-semibold uppercase text-gray-500 mb-1">Archetype</label>
+              <select
+                value={form.archetype}
+                onChange={(e) => setForm((f) => ({ ...f, archetype: e.target.value }))}
+                className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+              >
+                <option value="A1">A1 — Review Gap</option>
+                <option value="A2">A2 — BBB Crisis</option>
+                <option value="A3">A3 — Listing Drift</option>
+                <option value="A4">A4 — CTA Gap</option>
+                <option value="A5">A5 — Dual Triage</option>
+                <option value="A6">A6 — Product Visibility</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase text-gray-500 mb-1">Campaign Category</label>
+              <select
+                value={form.campaignCategory}
+                onChange={(e) => setForm((f) => ({ ...f, campaignCategory: e.target.value, repairTrack: '' }))}
+                className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+              >
+                <option value="profile_repair">profile_repair</option>
+                <option value="review_management">review_management</option>
+                <option value="recovery_management">recovery_management</option>
+                <option value="triage_management">triage_management</option>
+              </select>
+            </div>
+          </div>
+          {form.campaignCategory === 'profile_repair' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase text-gray-500 mb-1">Repair Track (optional)</label>
+                <select
+                  value={form.repairTrack}
+                  onChange={(e) => setForm((f) => ({ ...f, repairTrack: e.target.value }))}
+                  className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+                >
+                  <option value="">— (decide later)</option>
+                  <option value="standard">standard</option>
+                  <option value="escalated">escalated</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase text-gray-500 mb-1">Repair Issue Type (optional)</label>
+                <input
+                  type="text"
+                  value={form.repairIssueType}
+                  onChange={(e) => setForm((f) => ({ ...f, repairIssueType: e.target.value }))}
+                  placeholder="e.g. NAP drift, broken website"
+                  className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+                />
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase text-gray-500 mb-1">Notes</label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="e.g. Prospect requested review management during call on 8/8"
+              rows={2}
+              className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleManualCreate}
+              disabled={creating}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {creating ? 'Creating...' : 'Create Sibling'}
+            </button>
+            <button
+              onClick={() => setShowManualForm(false)}
+              className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Siblings list */}
       {siblings.length === 0 ? (
@@ -134,7 +273,7 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
           <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />
           <p className="text-sm text-gray-500">No sibling campaigns yet.</p>
           <p className="text-xs text-gray-400 mt-1">
-            Use the triage card above to evaluate and create sibling campaigns for additional signal matches.
+            Use the triage card (seek stage) or the "Create Sibling Manually" button above to add campaigns for this prospect.
           </p>
         </div>
       ) : (

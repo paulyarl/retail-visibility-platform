@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockCampaignsList,
   mockStageHistory,
+  mockTriageResults,
 } = vi.hoisted(() => ({
   mockCampaignsList: {
     findUnique: vi.fn(),
@@ -25,12 +26,17 @@ const {
     update: vi.fn(),
   },
   mockStageHistory: { create: vi.fn() },
+  mockTriageResults: {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+  },
 }));
 
 vi.mock('../../prisma', () => ({
   prisma: {
     mkt_campaigns_list: mockCampaignsList,
     mkt_stage_history_list: mockStageHistory,
+    mkt_campaign_triage_results: mockTriageResults,
   },
 }));
 
@@ -42,6 +48,7 @@ vi.mock('../../lib/id-generator', () => ({
   generateCampaignId: () => 'mkt-sibling-001',
   generateBusinessProspectId: () => 'bp-test001',
   generateStageHistoryId: () => 'msh-test001',
+  generateCampaignTriageId: () => 'mct-sibling-001',
 }));
 
 vi.mock('../MarketingPlaybookCatalogService', () => ({
@@ -52,6 +59,7 @@ vi.mock('../MarketingPlaybookCatalogService', () => ({
       category: 'profile_repair',
       archetype: 'A3',
       fitdDefaultFeeCents: 14900,
+      matchingRules: { any: [], all: [], none: [], dual: null, confidence: 0.85 },
     }),
   },
 }));
@@ -158,6 +166,8 @@ describe('createSiblingCampaign', () => {
       Promise.resolve({ ...data, id: 'mkt-sibling-001' }),
     );
     mockStageHistory.create.mockResolvedValue({});
+    mockTriageResults.findUnique.mockResolvedValue(null); // no source triage
+    mockTriageResults.create.mockResolvedValue({});
 
     const result = await BusinessProspectService.getInstance().createSiblingCampaign({
       sourceCampaignId: 'mkt-source-001',
@@ -182,6 +192,56 @@ describe('createSiblingCampaign', () => {
       }),
     );
     expect(result.id).toBe('mkt-sibling-001');
+  });
+
+  it('creates a pre-accepted triage result for triage-driven siblings', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
+    mockCampaignsList.findMany.mockResolvedValue([]);
+    mockCampaignsList.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...data, id: 'mkt-sibling-001' }),
+    );
+    mockStageHistory.create.mockResolvedValue({});
+    mockTriageResults.findUnique.mockResolvedValue({
+      detected_signals: [{ code: 'CP_NAP_NAME_DRIFT', label: 'NAP Name Drift', contributedToRule: true }],
+      source_audit_id: 'audit-001',
+    });
+    mockTriageResults.create.mockResolvedValue({});
+
+    await BusinessProspectService.getInstance().createSiblingCampaign({
+      sourceCampaignId: 'mkt-source-001',
+      archetype: 'A3',
+      playbookCode: 'PB-01',
+    });
+
+    // Verify a pre-accepted triage result was created for the sibling
+    expect(mockTriageResults.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          id: 'mct-sibling-001',
+          campaign_id: 'mkt-sibling-001',
+          recommended_playbook_id: 'pbk-pb01',
+          is_operator_accepted: true,
+          overridden_playbook_id: null,
+          source_audit_id: 'audit-001',
+        }),
+      }),
+    );
+  });
+
+  it('does NOT create a triage result for manually-created siblings (no playbookCode)', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
+    mockCampaignsList.findMany.mockResolvedValue([]);
+    mockCampaignsList.create.mockResolvedValue({ id: 'mkt-sibling-001' });
+    mockStageHistory.create.mockResolvedValue({});
+
+    await BusinessProspectService.getInstance().createSiblingCampaign({
+      sourceCampaignId: 'mkt-source-001',
+      archetype: 'A3',
+      campaignCategory: 'profile_repair',
+      repairTrack: 'standard',
+    });
+
+    expect(mockTriageResults.create).not.toHaveBeenCalled();
   });
 
   it('throws ConflictError if a sibling with the same (category, track) already exists', async () => {

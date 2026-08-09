@@ -625,7 +625,7 @@ const triageOverrideSchema = z.object({
 const createSiblingSchema = z.object({
   archetype: archetypeEnum,
   playbook_code: playbookCodeEnum.optional(),
-  campaign_category: z.enum(['profile_repair']).optional(),
+  campaign_category: playbookCategoryEnum.optional(),
   repair_track: z.enum(['standard', 'escalated']).optional(),
   repair_issue_type: z.string().max(255).optional(),
   assigned_to: z.string().max(255).optional(),
