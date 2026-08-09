@@ -6179,6 +6179,7 @@ model mkt_campaigns_list {
   business_prospect_id                                                            String?                              @db.VarChar(255)
   engagement_cycle                                                                Int                                  @default(1)
   is_primary_sibling                                                              Boolean                              @default(false)
+  playbook_code                                                                   String?                              @db.VarChar(20)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]
@@ -6548,7 +6549,6 @@ model mkt_deliverable_preview_tokens {
   @@index([campaign_id], map: "idx_mkt_preview_campaign")
   @@index([deliverable_id], map: "idx_mkt_preview_deliverable")
   @@index([token], map: "idx_mkt_preview_token")
-  @@index([short_code], map: "idx_mkt_preview_tokens_short_code")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

@@ -157,6 +157,7 @@ export class BusinessProspectService extends BaseService {
     let siblingCategory: PlaybookCategory;
     let siblingRepairTrack: 'standard' | 'escalated' | null = repairTrack ?? null;
     let estimatedFeeCents = 0;
+    let siblingPlaybookCode: string | null = null;
 
     if (playbookCode) {
       // Triage-driven sibling — resolve category from the playbook
@@ -164,6 +165,7 @@ export class BusinessProspectService extends BaseService {
       const playbook = await MarketingPlaybookCatalogService.getPlaybookByCode(playbookCode, ctx);
       siblingCategory = playbook.category;
       estimatedFeeCents = playbook.fitdDefaultFeeCents;
+      siblingPlaybookCode = playbook.code;
       // For profile_repair playbooks, default to standard track
       if (playbook.category === 'profile_repair' && !siblingRepairTrack) {
         siblingRepairTrack = 'standard';
@@ -173,19 +175,22 @@ export class BusinessProspectService extends BaseService {
       siblingCategory = campaignCategory!;
     }
 
-    // 3. Check for existing sibling with the same (category, repair_track)
-    const existingSiblings = await this.prisma.mkt_campaigns_list.findMany({
-      where: { business_prospect_id: prospectId, scope: 'business' },
-    });
-    const trackKey = siblingRepairTrack ?? 'none';
-    const conflict = existingSiblings.find((s) => {
-      const sTrack = (s.repair_track as string | null) ?? 'none';
-      return s.campaign_category === siblingCategory && sTrack === trackKey;
-    });
-    if (conflict) {
-      throw new ConflictError(
-        `A sibling campaign with category '${siblingCategory}' (track: ${siblingRepairTrack ?? 'none'}) already exists for this prospect`,
-      );
+    // 3. Check for an existing sibling with the same playbook_code.
+    //    Sibling uniqueness is keyed on playbook (migration 184): two
+    //    profile_repair siblings differentiated by playbook (PB-01 vs PB-03)
+    //    may coexist; only concurrent duplicates of the SAME playbook are
+    //    blocked. Manually-created siblings (no playbook_code) are exempt.
+    if (siblingPlaybookCode) {
+      const existingSiblings = await this.prisma.mkt_campaigns_list.findMany({
+        where: { business_prospect_id: prospectId, scope: 'business', playbook_code: siblingPlaybookCode } as any,
+        select: { id: true, playbook_code: true, business_name: true },
+      }) as any[];
+      if (existingSiblings.length > 0) {
+        throw new ConflictError(
+          `A sibling campaign with playbook '${siblingPlaybookCode}' already exists for this prospect` +
+          (existingSiblings[0].business_name ? ` (business: ${existingSiblings[0].business_name})` : ''),
+        );
+      }
     }
 
     // 4. Create the sibling campaign — copy business identity from source
@@ -197,6 +202,7 @@ export class BusinessProspectService extends BaseService {
         id: newId,
         scope: 'business',
         campaign_category: siblingCategory,
+        playbook_code: siblingPlaybookCode,
         repair_track: siblingRepairTrack,
         repair_issue_type: repairIssueType || null,
         business_name: source.business_name,

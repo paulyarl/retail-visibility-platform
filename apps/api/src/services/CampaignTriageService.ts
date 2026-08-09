@@ -308,16 +308,17 @@ export class CampaignTriageService extends BaseService {
 
     const playbook = this.toRow(result.playbook);
 
-    // Re-categorize the campaign + apply FITD fee.
+    // Re-categorize the campaign + apply FITD fee + stamp the effective playbook.
     // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
     // For non-profile_repair playbooks, clear repair_track (not applicable).
     const targetRepairTrack = playbook.category === 'profile_repair' ? 'standard' : null;
-    await this.assertNoSiblingCategoryConflict(campaignId, playbook.category, targetRepairTrack, ctx);
+    await this.assertNoSiblingPlaybookConflict(campaignId, playbook.code, ctx);
 
     await this.prisma.mkt_campaigns_list.update({
       where: { id: campaignId },
       data: {
         campaign_category: playbook.category,
+        playbook_code: playbook.code,
         estimated_fee_cents: playbook.fitdDefaultFeeCents,
         repair_track: targetRepairTrack,
       },
@@ -368,16 +369,18 @@ export class CampaignTriageService extends BaseService {
       throw new ConflictError('Override playbook is the same as the recommendation — use accept instead');
     }
 
-    // Re-categorize to the override playbook's category + apply its FITD fee.
+    // Re-categorize to the override playbook's category + apply its FITD fee
+    // + stamp the effective playbook.
     // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
     // For non-profile_repair playbooks, clear repair_track (not applicable).
     const overrideRepairTrack = overridePlaybook.category === 'profile_repair' ? 'standard' : null;
-    await this.assertNoSiblingCategoryConflict(campaignId, overridePlaybook.category, overrideRepairTrack, ctx);
+    await this.assertNoSiblingPlaybookConflict(campaignId, overridePlaybook.code, ctx);
 
     await this.prisma.mkt_campaigns_list.update({
       where: { id: campaignId },
       data: {
         campaign_category: overridePlaybook.category,
+        playbook_code: overridePlaybook.code,
         estimated_fee_cents: overridePlaybook.fitdDefaultFeeCents,
         repair_track: overrideRepairTrack,
       },
@@ -424,25 +427,25 @@ export class CampaignTriageService extends BaseService {
 
   /**
    * Guard against the prospect-sibling uniqueness index
-   * (idx_mkt_campaigns_prospect_sibling_unique from migration 179):
-   *   (business_prospect_id, campaign_category, COALESCE(repair_track, 'none'))
-   *   WHERE business_prospect_id IS NOT NULL AND scope = 'business'.
+   * (idx_mkt_campaigns_prospect_sibling_playbook_unique from migration 184):
+   *   (business_prospect_id, playbook_code)
+   *   WHERE business_prospect_id IS NOT NULL AND scope = 'business'
+   *     AND playbook_code IS NOT NULL.
    *
-   * acceptTriage / overrideTriage re-categorize a campaign, which can move it
-   * into a (category, repair_track) slot already occupied by another sibling
-   * in the same prospect group. Without this guard the DB throws an opaque
+   * acceptTriage / overrideTriage stamp the effective playbook on the campaign,
+   * which can collide with another sibling in the same prospect group that
+   * already has the same playbook. Without this guard the DB throws an opaque
    * unique-constraint error; we surface a clean 409 instead so the operator
-   * understands the conflict and can override to a different playbook or
-   * operate on the conflicting sibling directly.
+   * understands the conflict and can pick a different playbook or operate on
+   * the existing sibling directly.
    *
-   * Mirrors the check in BusinessProspectService.createSiblingCampaign (§3).
-   * No-op for campaigns without a business_prospect_id or non-business scope
-   * (the partial index does not apply to them).
+   * Mirrors the check in BusinessProspectService.createSiblingCampaign.
+   * No-op for campaigns without a business_prospect_id, non-business scope, or
+   * a null target playbook (the partial index does not apply to them).
    */
-  private async assertNoSiblingCategoryConflict(
+  private async assertNoSiblingPlaybookConflict(
     campaignId: string,
-    targetCategory: string,
-    targetRepairTrack: 'standard' | 'escalated' | null,
+    targetPlaybookCode: string,
     ctx?: RequestCtx,
   ): Promise<void> {
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -453,23 +456,21 @@ export class CampaignTriageService extends BaseService {
     const prospectId = campaign.business_prospect_id as string | null;
     if (!prospectId || campaign.scope !== 'business') return;
 
-    const siblings = await this.prisma.mkt_campaigns_list.findMany({
-      where: { business_prospect_id: prospectId, scope: 'business' },
-      select: { id: true, campaign_category: true, repair_track: true, business_name: true },
-    }) as any[];
-
-    const targetTrackKey = targetRepairTrack ?? 'none';
-    const conflict = siblings.find((s) => {
-      if (s.id === campaignId) return false; // self — no conflict
-      const sTrack = (s.repair_track as string | null) ?? 'none';
-      return s.campaign_category === targetCategory && sTrack === targetTrackKey;
-    });
+    const conflict = await this.prisma.mkt_campaigns_list.findFirst({
+      where: {
+        business_prospect_id: prospectId,
+        scope: 'business',
+        playbook_code: targetPlaybookCode,
+        NOT: { id: campaignId },
+      } as any,
+      select: { id: true, playbook_code: true, business_name: true },
+    }) as any;
     if (conflict) {
       throw new ConflictError(
-        `Cannot re-categorize to '${targetCategory}' (track: ${targetRepairTrack ?? 'none'}): ` +
-        `another sibling in this prospect already occupies that slot` +
+        `Cannot assign playbook '${targetPlaybookCode}': another sibling in this prospect ` +
+        `already uses that playbook` +
         (conflict.business_name ? ` (business: ${conflict.business_name})` : '') +
-        `. Use override with a different playbook, or operate on the existing sibling directly.`,
+        `. Pick a different playbook, or operate on the existing sibling directly.`,
       );
     }
   }

@@ -161,7 +161,7 @@ describe('createSiblingCampaign', () => {
 
   it('creates a sibling with copied business identity + profile_repair category', async () => {
     mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
-    mockCampaignsList.findMany.mockResolvedValue([]); // no existing siblings
+    mockCampaignsList.findMany.mockResolvedValue([]); // no existing siblings with same playbook
     mockCampaignsList.create.mockImplementation(({ data }: any) =>
       Promise.resolve({ ...data, id: 'mkt-sibling-001' }),
     );
@@ -183,6 +183,7 @@ describe('createSiblingCampaign', () => {
           is_primary_sibling: false,
           engagement_cycle: 1,
           campaign_category: 'profile_repair',
+          playbook_code: 'PB-01',
           repair_track: 'standard',
           stage: 'seek',
           business_name: 'Test Biz',
@@ -230,7 +231,6 @@ describe('createSiblingCampaign', () => {
 
   it('does NOT create a triage result for manually-created siblings (no playbookCode)', async () => {
     mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
-    mockCampaignsList.findMany.mockResolvedValue([]);
     mockCampaignsList.create.mockResolvedValue({ id: 'mkt-sibling-001' });
     mockStageHistory.create.mockResolvedValue({});
 
@@ -244,10 +244,11 @@ describe('createSiblingCampaign', () => {
     expect(mockTriageResults.create).not.toHaveBeenCalled();
   });
 
-  it('throws ConflictError if a sibling with the same (category, track) already exists', async () => {
+  it('throws ConflictError if a sibling with the same playbook already exists', async () => {
     mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
+    // Existing sibling already using PB-01 → conflict on playbook_code
     mockCampaignsList.findMany.mockResolvedValue([
-      { ...sourceCampaign, id: 'mkt-existing-sibling', campaign_category: 'profile_repair', repair_track: 'standard' },
+      { ...sourceCampaign, id: 'mkt-existing-sibling', playbook_code: 'PB-01', business_name: 'Test Biz' },
     ]);
 
     await expect(
@@ -256,7 +257,36 @@ describe('createSiblingCampaign', () => {
         archetype: 'A3',
         playbookCode: 'PB-01',
       }),
-    ).rejects.toThrow(/already exists/);
+    ).rejects.toThrow(/playbook 'PB-01'/);
+  });
+
+  it('allows coexistence of profile_repair siblings with different playbooks (PB-01 vs PB-03)', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
+    // Existing sibling using PB-01 — creating a PB-03 sibling must NOT conflict
+    mockCampaignsList.findMany.mockResolvedValue([]);
+    mockCampaignsList.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...data, id: 'mkt-sibling-pb03' }),
+    );
+    mockStageHistory.create.mockResolvedValue({});
+    mockTriageResults.findUnique.mockResolvedValue(null);
+    mockTriageResults.create.mockResolvedValue({});
+
+    const result = await BusinessProspectService.getInstance().createSiblingCampaign({
+      sourceCampaignId: 'mkt-source-001',
+      archetype: 'A4',
+      playbookCode: 'PB-03',
+    });
+
+    expect(mockCampaignsList.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          campaign_category: 'profile_repair',
+          playbook_code: 'PB-03',
+          repair_track: 'standard',
+        }),
+      }),
+    );
+    expect(result.id).toBe('mkt-sibling-pb03');
   });
 
   it('auto-initializes prospect_id on source campaign if missing', async () => {
