@@ -344,7 +344,7 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
             Multi-Diagnostic Gallery
           </p>
           <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
-            This prospect has {siblings.length} siblings. Generate a multi-gallery token to share all diagnostic reports in one link.
+            This prospect has {siblings.length} siblings. Generate a multi-gallery token to share all diagnostic reports in one link — issued with an SMS-friendly short URL (/g/…).
           </p>
         </div>
       )}

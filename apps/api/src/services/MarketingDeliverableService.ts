@@ -12,7 +12,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { generateDeliverableTemplateId, generateDeliverableId, generatePreviewTokenId, generatePreviewToken } from '../lib/id-generator';
+import { generateDeliverableTemplateId, generateDeliverableId, generatePreviewTokenId, generatePreviewToken, generateGalleryShortCode } from '../lib/id-generator';
 import { jsPDF } from 'jspdf';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -600,7 +600,7 @@ export class MarketingDeliverableService extends BaseService {
    */
   async generateCampaignToken(
     campaignId: string,
-    tokenType: 'deliverable' | 'demo_storefront' | 'diagnostic_gallery',
+    tokenType: 'deliverable' | 'demo_storefront' | 'diagnostic_gallery' | 'multi_diagnostic_gallery',
     deliverableId?: string,
     expiryDays: number = 30,
     ctx?: RequestCtx,
@@ -614,6 +614,29 @@ export class MarketingDeliverableService extends BaseService {
     }
   ): Promise<any> {
     try {
+      // Mint a unique short_code (6-char) for SMS-friendly /g/{shortCode} URLs.
+      // Retry on the vanishingly-rare unique-index collision (32^6 ≈ 1B space).
+      let shortCode: string | undefined;
+      const isGalleryToken = tokenType === 'diagnostic_gallery' || tokenType === 'multi_diagnostic_gallery';
+      if (isGalleryToken) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const candidate = generateGalleryShortCode();
+          const existing = await this.prisma.mkt_deliverable_preview_tokens.findFirst({
+            where: { short_code: candidate },
+            select: { id: true },
+          });
+          if (!existing) {
+            shortCode = candidate;
+            break;
+          }
+          logger.warn('Gallery short code collision, retrying', ctx, { candidate, attempt });
+        }
+        if (!shortCode) {
+          // Exhausted retries — fall back to no short code; long URL still works.
+          logger.error('Gallery short code generation exhausted retries', ctx, { campaignId, tokenType });
+        }
+      }
+
       const token = await this.prisma.mkt_deliverable_preview_tokens.create({
         data: {
           id: generatePreviewTokenId(),
@@ -622,6 +645,7 @@ export class MarketingDeliverableService extends BaseService {
           token_type: tokenType,
           token: generatePreviewToken(),
           expires_at: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+          ...(shortCode ? { short_code: shortCode } : {}),
           ...(galleryMeta ? {
             gallery_title: galleryMeta.galleryTitle ?? null,
             gallery_subtitle: galleryMeta.gallerySubtitle ?? null,
@@ -633,12 +657,85 @@ export class MarketingDeliverableService extends BaseService {
         },
       });
 
-      logger.info('Preview token generated', ctx, { campaignId, tokenType, deliverableId, expiresAt: token.expires_at });
+      logger.info('Preview token generated', ctx, { campaignId, tokenType, deliverableId, expiresAt: token.expires_at, shortCode: token.short_code ?? null });
       return token;
     } catch (error) {
       logger.error('Failed to generate preview token', ctx, { error: (error as Error).message, campaignId, tokenType });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * Resolve a gallery short code to its underlying token row.
+   * Used by the public /api/gallery-code/:shortCode resolution endpoint
+   * that backs the /g/[shortCode] redirect page.
+   *
+   * Returns the token + token_type so the redirect page knows whether to
+   * append ?prospect=true (multi_diagnostic_gallery) or not.
+   *
+   * Lazily backfills a short_code on legacy tokens that don't have one yet,
+   * so old tokens picked up from the long URL eventually gain a short URL.
+   */
+  async resolveShortCode(shortCode: string, ctx?: RequestCtx): Promise<{ token: string; tokenType: string } | null> {
+    const normalized = shortCode.toUpperCase();
+    const row = await this.prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: { short_code: normalized },
+      select: { id: true, token: true, token_type: true, short_code: true, expires_at: true, converted_at: true },
+    });
+    if (!row) {
+      return null;
+    }
+    // Expired or converted tokens are not resolvable via short code.
+    if (row.expires_at && new Date(row.expires_at) < new Date()) {
+      return null;
+    }
+    return { token: row.token, tokenType: row.token_type };
+  }
+
+  /**
+   * Lazily backfill a short_code on a legacy token that doesn't have one.
+   * Called when an admin fetches a token list and finds rows missing
+   * short codes. Returns the updated short_code (or null if the token
+   * is not a gallery token / backfill failed).
+   */
+  async ensureShortCode(tokenId: string, tokenType: string, ctx?: RequestCtx): Promise<string | null> {
+    const isGalleryToken = tokenType === 'diagnostic_gallery' || tokenType === 'multi_diagnostic_gallery';
+    if (!isGalleryToken) {
+      return null;
+    }
+    const existing = await this.prisma.mkt_deliverable_preview_tokens.findUnique({
+      where: { id: tokenId },
+      select: { short_code: true },
+    });
+    if (existing?.short_code) {
+      return existing.short_code;
+    }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const candidate = generateGalleryShortCode();
+      const clash = await this.prisma.mkt_deliverable_preview_tokens.findFirst({
+        where: { short_code: candidate },
+        select: { id: true },
+      });
+      if (clash) {
+        continue;
+      }
+      try {
+        await this.prisma.mkt_deliverable_preview_tokens.update({
+          where: { id: tokenId },
+          data: { short_code: candidate },
+        });
+        logger.info('Backfilled gallery short code', ctx, { tokenId, shortCode: candidate });
+        return candidate;
+      } catch (error: any) {
+        // Unique constraint violation (code 23505) — retry with a new code.
+        if (error?.code === '23505') {
+          continue;
+        }
+        throw error;
+      }
+    }
+    logger.warn('Short code backfill exhausted retries', ctx, { tokenId });
+    return null;
   }
 
   async hasLiveTokens(campaignId: string): Promise<boolean> {

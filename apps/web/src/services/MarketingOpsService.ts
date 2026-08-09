@@ -4212,6 +4212,8 @@ export interface GalleryToken {
   cta_label: string | null;
   cta_amount_cents: number | null;
   created_at: string;
+  short_code?: string | null;
+  shortUrl?: string | null;
 }
 
 export interface GalleryAnalytics {

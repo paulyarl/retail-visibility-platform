@@ -22,6 +22,7 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
   const [uploading, setUploading] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [useShortUrl, setUseShortUrl] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -210,6 +211,17 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
             <p className="text-sm text-gray-500 mt-1">
               Generate expiring tokenized URLs for the prospect to view their diagnostic gallery
             </p>
+            {galleryTokens.some((t) => t.short_code) && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={useShortUrl}
+                  onChange={(e) => setUseShortUrl(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-gray-300 dark:border-neutral-600"
+                />
+                Use short URLs (SMS-friendly /g/…)
+              </label>
+            )}
           </div>
           <button
             onClick={() => setShowGenerateModal(true)}
@@ -230,7 +242,9 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
         ) : (
           <div className="space-y-3">
             {galleryTokens.map((t) => {
-              const galleryUrl = `${window.location.origin}/preview/${t.token}`;
+              const longGalleryUrl = `${window.location.origin}/preview/${t.token}`;
+              const shortGalleryUrl = t.short_code ? `${window.location.origin}/g/${t.short_code}` : null;
+              const galleryUrl = useShortUrl && shortGalleryUrl ? shortGalleryUrl : longGalleryUrl;
               const isExpired = t.expires_at ? new Date(t.expires_at) < new Date() : false;
               const isViewed = !!t.viewed_at;
               const isConverted = !!t.converted_at;

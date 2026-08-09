@@ -106,7 +106,9 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
         return;
       }
 
-      const galleryUrl = `${window.location.origin}/preview/${activeToken.token}`;
+      const longGalleryUrl = `${window.location.origin}/preview/${activeToken.token}`;
+      const shortGalleryUrl = activeToken.short_code ? `${window.location.origin}/g/${activeToken.short_code}` : null;
+      const galleryUrl = shortGalleryUrl ?? longGalleryUrl;
       const linkText = `\n\nView your diagnostic report: ${galleryUrl}\n`;
       setMessageSnapshot((prev) => (prev ? prev + linkText : linkText.trim()));
     } catch (err) {

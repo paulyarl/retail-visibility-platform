@@ -2004,3 +2004,21 @@ export function generateGalleryAnalyticsId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `ga-${nanoid()}`;
 }
+
+// ─── Gallery Short Codes (SMS-friendly URLs) ────────────────────────────
+// Mirrors the coupon /s/{autoId} pattern. 6-char codes from a curated
+// 32-char alphabet (no 0/O/1/I) give ~1B combinations — enough that
+// collisions are vanishingly rare and the unique index will catch any
+// that do occur (caller retries on conflict).
+
+const GALLERY_SHORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const generateGalleryShortCodeNano = customAlphabet(GALLERY_SHORT_CODE_ALPHABET, 6);
+
+/**
+ * Generate a 6-char gallery short code for SMS-friendly URLs.
+ * Used in /g/{shortCode} redirects to /preview/{token}.
+ * No prefix — the short code IS the URL segment.
+ */
+export function generateGalleryShortCode(): string {
+  return generateGalleryShortCodeNano();
+}

@@ -6541,12 +6541,14 @@ model mkt_deliverable_preview_tokens {
   cta_amount_cents      Int?
   gallery_archetype     String?                @db.VarChar(10)
   metadata              Json?
+  short_code            String?                @db.VarChar(8)
   mkt_campaigns_list    mkt_campaigns_list     @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_preview_campaign")
   mkt_deliverables_list mkt_deliverables_list? @relation(fields: [deliverable_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_preview_deliverable")
 
   @@index([campaign_id], map: "idx_mkt_preview_campaign")
   @@index([deliverable_id], map: "idx_mkt_preview_deliverable")
   @@index([token], map: "idx_mkt_preview_token")
+  @@index([short_code], map: "idx_mkt_preview_tokens_short_code")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

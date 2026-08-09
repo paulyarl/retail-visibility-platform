@@ -72,6 +72,9 @@ import shopsRoutes from '../routes/shops';
 // Short code (autoId resolution for QR redirect URLs)
 import shortCodeRoutes from '../routes/short-code';
 
+// Gallery short code (6-char → preview token resolution for SMS-friendly URLs)
+import galleryCodeRoutes from '../routes/gallery-code';
+
 // Storefront
 import storefrontRoutes from '../routes/storefront';
 import storefrontFeaturedRoutes from '../routes/storefront-featured';
@@ -414,6 +417,15 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'short-code',
     authLevel: 'public',
     comment: 'Resolve 4-char autoId to tenantId for /s/[autoId] short URL redirects',
+  },
+
+  // ── Gallery Short Code (6-char → preview token resolution for SMS URLs) ──
+  {
+    path: '/api/gallery-code',
+    router: galleryCodeRoutes,
+    domain: 'gallery-code',
+    authLevel: 'public',
+    comment: 'Resolve 6-char gallery short code to preview token for /g/[shortCode] short URL redirects',
   },
 
   // ── Directory (orchestrator handles all /api/directory sub-routes) ───

@@ -86,6 +86,9 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{business}} — customers are being sent to the wrong location',
     'Quick note about {{business}}\'s listings',
     '{{business}} — your phone number doesn\'t match across directories',
+    '{{business}} — your profiles are unclaimed on {{remaining}} directories',
+    '{{business}} — listings you don\'t control are live right now',
+    'PREVIEW - your unclaimed listings across {{remaining}} platforms',
   ],
   // A4 — Conversion / CTA Gap (website)
   A4: [
@@ -102,6 +105,8 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{business}} — two gaps I found in your footprint',
     'Quick note about {{business}}\'s online presence',
     '{{business}} — listings + reviews, both need work',
+    '{{business}} — unclaimed listings and unanswered reviews',
+    'PREVIEW - your unclaimed profiles and review gaps',
   ],
   // A6 — Product Visibility Gap (discoverability)
   A6: [
@@ -134,6 +139,8 @@ const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{remaining}} more directories are reconciled and waiting. Want the list?',
     'There are {{remaining}} more platforms with the wrong info. Say the word.',
     'I\'ve corrected the other {{remaining}} listings. Should I send the diff?',
+    'The other {{remaining}} profiles are unclaimed — anyone can edit them right now. Let\'s get them claimed and repaired.',
+    'These {{remaining}} listings are sitting unmanaged. I can get them claimed and corrected today.',
   ],
   A4: [
     'The full CTA fix — booking button, click-to-call, and the {{remaining}} follow-on tweaks — is ready today.',
@@ -148,6 +155,7 @@ const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{remaining}} more sections are written and waiting. Want them?',
     'There are {{remaining}} more gaps mapped out. Say the word.',
     'I\'ve handled {{remaining}} more items across both fronts. Should I send them?',
+    'The other {{remaining}} profiles are unclaimed and unmanaged — let\'s get them claimed and repaired today.',
   ],
   A6: [
     'The full product visibility plan — photos, catalog, and the {{remaining}} sections — is ready today.',

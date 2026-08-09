@@ -4500,6 +4500,8 @@ router.get('/campaigns/:id/pay-links', async (req: any, res: Response) => {
         deliverableId: t.deliverable_id || null,
         payUrl: `${baseUrl}/marketing/pay?ptoken=${t.token}`,
         qrPayload: `${baseUrl}/marketing/pay?ptoken=${t.token}`,
+        shortCode: t.short_code || null,
+        shortUrl: t.short_code ? `${baseUrl}/g/${t.short_code}` : null,
         lifecycleStatus,
         viewedAt: t.viewed_at || null,
         paidAt: t.paid_at || null,
@@ -4731,12 +4733,15 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
 
     const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
     const galleryUrl = `${baseUrl}/preview/${token.token}`;
+    const shortCode = token.short_code as string | null;
+    const shortUrl = shortCode ? `${baseUrl}/g/${shortCode}` : null;
 
     logger.info('Gallery token generated', ctx, {
       campaignId: id,
       archetype,
       screenshotCount: campaign.mkt_files_list.length,
       expiresAt: token.expires_at,
+      shortCode,
     });
 
     return res.status(201).json({
@@ -4746,6 +4751,8 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
         token: token.token,
         tokenType: token.token_type,
         galleryUrl,
+        shortUrl,
+        shortCode,
         expiresAt: token.expires_at,
         createdAt: token.created_at,
         archetype,
@@ -4827,7 +4834,7 @@ router.post('/prospects/:prospectId/multi-gallery-token', async (req: any, res: 
     // 5. Mint the multi-gallery token (references primary sibling campaign)
     const token = await MarketingDeliverableService.generateCampaignToken(
       primarySibling.id,
-      'multi_diagnostic_gallery' as any,
+      'multi_diagnostic_gallery',
       undefined,
       parsed.expires_in_days,
       ctx,
@@ -4851,7 +4858,20 @@ router.post('/prospects/:prospectId/multi-gallery-token', async (req: any, res: 
       tokenId: token.id,
     });
 
-    res.status(201).json({ success: true, data: token });
+    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
+    const multiGalleryUrl = `${baseUrl}/preview/${token.token}?prospect=true`;
+    const shortCode = token.short_code as string | null;
+    const shortUrl = shortCode ? `${baseUrl}/g/${shortCode}` : null;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...token,
+        galleryUrl: multiGalleryUrl,
+        shortUrl,
+        shortCode,
+      },
+    });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
