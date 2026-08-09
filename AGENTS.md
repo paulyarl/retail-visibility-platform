@@ -198,5 +198,41 @@ Generalizes the token-gated "owner data collection" framework to support multipl
 - **Niche overrides**: `niche_overrides[category]` can add fields, override field labels/help, and override owner copy per business category
 - **Downstream handoff**: stubbed enqueue with manual import path (plan §7.4)
 
+## Gallery Short URLs (SMS-friendly prospect links)
+
+Mirrors the coupon `/s/{autoId}` short URL pattern for diagnostic gallery tokens. The 32-char `/preview/{token}` URL is too long for SMS outreach to phone-only prospects; the short `/g/{shortCode}` form (6 chars) makes text-message gallery links practical.
+
+### Schema (Migration 183)
+- `mkt_deliverable_preview_tokens.short_code` — nullable `VARCHAR(8)`, unique partial index `idx_mkt_preview_tokens_short_code` (WHERE NOT NULL)
+- 6-char codes from curated 32-char alphabet (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789` — no 0/O/1/I), ~1B combinations
+- Legacy tokens have `short_code = null` and keep working via the long URL; `ensureShortCode()` lazily backfills on next admin access
+
+### Backend
+- `apps/api/src/lib/id-generator.ts` — `generateGalleryShortCode()` (6-char nanoid from curated alphabet)
+- `apps/api/src/services/MarketingDeliverableService.ts`:
+  - `generateCampaignToken()` now mints a unique `short_code` (with 3-retry collision handling) for `diagnostic_gallery` + `multi_diagnostic_gallery` token types
+  - `resolveShortCode(shortCode)` — public lookup, returns `{ token, tokenType }`; expired tokens return null
+  - `ensureShortCode(tokenId, tokenType)` — lazy backfill for legacy tokens
+- `apps/api/src/routes/gallery-code.ts` — `GET /api/gallery-code/:shortCode` (public, no auth) → `{ token, tokenType, isMultiGallery }`
+- `apps/api/src/routes/routeRegistry.ts` — registers `/api/gallery-code` at `authLevel: 'public'`
+- `apps/api/src/routes/marketing-ops.ts`:
+  - Single gallery token response includes `shortUrl` + `shortCode` alongside `galleryUrl`
+  - Multi-gallery token response includes `galleryUrl` (`?prospect=true`), `shortUrl`, `shortCode`
+  - Pay-links list (`GET /campaigns/:id/pay-links`) includes `shortCode` + `shortUrl` per token (powers `listGalleryTokens`)
+
+### Frontend
+- `apps/web/src/services/GalleryShortCodeService.ts` — `resolveShortCode()` (extends `PublicApiSingleton`, `ttl: 0`)
+- `apps/web/src/app/g/[shortCode]/page.tsx` — server redirect page: resolves short code → redirects to `/preview/{token}` (or `?prospect=true` for multi-gallery)
+- `apps/web/src/services/MarketingOpsService.ts` — `GalleryToken` interface extended with `short_code?` + `shortUrl?`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/GalleryPanel.tsx` — "Use short URLs" toggle (default on); prefers `/g/{shortCode}` when available
+- `apps/web/src/components/marketing-ops/LogContactModal.tsx` — "Insert gallery link" prefers short URL for SMS-friendly message body
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/SiblingsTab.tsx` — multi-gallery hint mentions SMS-friendly short URL
+
+### Key Patterns
+- **Resolution flow**: `/g/{shortCode}` (server page) → `GET /api/gallery-code/:shortCode` → `redirect(/preview/{token}[?prospect=true])`
+- **Multi-gallery detection**: `tokenType === 'multi_diagnostic_gallery'` → append `?prospect=true` so `preview/[token]/page.tsx` renders `MultiGalleryPage`
+- **Collision handling**: 3 retries on unique-index conflict; falls back to no short code (long URL still works) if exhausted
+- **Lazy backfill**: legacy tokens without `short_code` are not broken; `ensureShortCode()` can backfill them on demand
+
 
 
