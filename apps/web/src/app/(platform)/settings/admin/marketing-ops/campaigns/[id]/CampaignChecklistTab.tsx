@@ -497,7 +497,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
                         </span>
                       )}
                       <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                        {OUTREACH_KIND_LABELS[step.outreachStatus.kind] ?? step.outreachStatus.kind}
+                        {OUTREACH_KIND_LABELS[step.outreachStatus.kind as keyof typeof OUTREACH_KIND_LABELS] ?? step.outreachStatus.kind}
                       </span>
                       {step.outreachStatus.satisfied ? (
                         step.progress?.completedAt ? (
