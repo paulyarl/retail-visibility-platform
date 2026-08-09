@@ -311,12 +311,15 @@ export class CampaignTriageService extends BaseService {
     // Re-categorize the campaign + apply FITD fee.
     // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
     // For non-profile_repair playbooks, clear repair_track (not applicable).
+    const targetRepairTrack = playbook.category === 'profile_repair' ? 'standard' : null;
+    await this.assertNoSiblingCategoryConflict(campaignId, playbook.category, targetRepairTrack, ctx);
+
     await this.prisma.mkt_campaigns_list.update({
       where: { id: campaignId },
       data: {
         campaign_category: playbook.category,
         estimated_fee_cents: playbook.fitdDefaultFeeCents,
-        repair_track: playbook.category === 'profile_repair' ? 'standard' : null,
+        repair_track: targetRepairTrack,
       },
     });
 
@@ -368,12 +371,15 @@ export class CampaignTriageService extends BaseService {
     // Re-categorize to the override playbook's category + apply its FITD fee.
     // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
     // For non-profile_repair playbooks, clear repair_track (not applicable).
+    const overrideRepairTrack = overridePlaybook.category === 'profile_repair' ? 'standard' : null;
+    await this.assertNoSiblingCategoryConflict(campaignId, overridePlaybook.category, overrideRepairTrack, ctx);
+
     await this.prisma.mkt_campaigns_list.update({
       where: { id: campaignId },
       data: {
         campaign_category: overridePlaybook.category,
         estimated_fee_cents: overridePlaybook.fitdDefaultFeeCents,
-        repair_track: overridePlaybook.category === 'profile_repair' ? 'standard' : null,
+        repair_track: overrideRepairTrack,
       },
     });
 
@@ -415,6 +421,58 @@ export class CampaignTriageService extends BaseService {
   }
 
   // ─── Mapper ────────────────────────────────────────────────────────────
+
+  /**
+   * Guard against the prospect-sibling uniqueness index
+   * (idx_mkt_campaigns_prospect_sibling_unique from migration 179):
+   *   (business_prospect_id, campaign_category, COALESCE(repair_track, 'none'))
+   *   WHERE business_prospect_id IS NOT NULL AND scope = 'business'.
+   *
+   * acceptTriage / overrideTriage re-categorize a campaign, which can move it
+   * into a (category, repair_track) slot already occupied by another sibling
+   * in the same prospect group. Without this guard the DB throws an opaque
+   * unique-constraint error; we surface a clean 409 instead so the operator
+   * understands the conflict and can override to a different playbook or
+   * operate on the conflicting sibling directly.
+   *
+   * Mirrors the check in BusinessProspectService.createSiblingCampaign (§3).
+   * No-op for campaigns without a business_prospect_id or non-business scope
+   * (the partial index does not apply to them).
+   */
+  private async assertNoSiblingCategoryConflict(
+    campaignId: string,
+    targetCategory: string,
+    targetRepairTrack: 'standard' | 'escalated' | null,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { business_prospect_id: true, scope: true },
+    }) as any;
+    if (!campaign) return; // let the downstream update raise NotFound
+    const prospectId = campaign.business_prospect_id as string | null;
+    if (!prospectId || campaign.scope !== 'business') return;
+
+    const siblings = await this.prisma.mkt_campaigns_list.findMany({
+      where: { business_prospect_id: prospectId, scope: 'business' },
+      select: { id: true, campaign_category: true, repair_track: true, business_name: true },
+    }) as any[];
+
+    const targetTrackKey = targetRepairTrack ?? 'none';
+    const conflict = siblings.find((s) => {
+      if (s.id === campaignId) return false; // self — no conflict
+      const sTrack = (s.repair_track as string | null) ?? 'none';
+      return s.campaign_category === targetCategory && sTrack === targetTrackKey;
+    });
+    if (conflict) {
+      throw new ConflictError(
+        `Cannot re-categorize to '${targetCategory}' (track: ${targetRepairTrack ?? 'none'}): ` +
+        `another sibling in this prospect already occupies that slot` +
+        (conflict.business_name ? ` (business: ${conflict.business_name})` : '') +
+        `. Use override with a different playbook, or operate on the existing sibling directly.`,
+      );
+    }
+  }
 
   private toRow(r: any): PlaybookCatalogRow {
     return {
