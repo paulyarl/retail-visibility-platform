@@ -56,14 +56,6 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   credentials: 'Credentials',
 };
 
-const OUTREACH_KIND_LABELS: Record<string, string> = {
-  generic: 'Generic',
-  opener: 'Opener',
-  follow_up: 'Follow-up',
-  pitch: 'Pitch',
-  contact_log: 'Contact Log',
-};
-
 // Stage badge colors — pre-sale blue, fulfillment teal, retainer amber/green,
 // terminal stages gray/red, tenant conversion purple.
 const STAGE_TAG_COLORS: Record<string, string> = {
@@ -313,6 +305,10 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
           setProposedTitle={setProposedTitle}
           proposedInstructions={proposedInstructions}
           setProposedInstructions={setProposedInstructions}
+          proposedStepType={proposedStepType}
+          setProposedStepType={setProposedStepType}
+          proposedActionConfig={proposedActionConfig}
+          setProposedActionConfig={setProposedActionConfig}
           rationale={rationale}
           setRationale={setRationale}
           onSubmit={handleSubmitSuggestion}
