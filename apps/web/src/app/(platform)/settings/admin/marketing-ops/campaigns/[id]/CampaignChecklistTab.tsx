@@ -43,10 +43,19 @@ interface Props {
 const STEP_TYPE_LABELS: Record<string, string> = {
   manual: 'Manual',
   url_check: 'URL Check',
+  internal_link: 'Internal Link',
   ai_prompt: 'AI Prompt',
   deliverable: 'Deliverable',
   outreach: 'Outreach',
   credentials: 'Credentials',
+};
+
+const OUTREACH_KIND_LABELS: Record<string, string> = {
+  generic: 'Generic',
+  opener: 'Opener',
+  follow_up: 'Follow-up',
+  pitch: 'Pitch',
+  contact_log: 'Contact Log',
 };
 
 // Stage badge colors — pre-sale blue, fulfillment teal, retainer amber/green,
@@ -93,6 +102,8 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
   const [suggestionStageTag, setSuggestionStageTag] = useState<ChecklistStageTag | ''>('');
   const [proposedTitle, setProposedTitle] = useState('');
   const [proposedInstructions, setProposedInstructions] = useState('');
+  const [proposedStepType, setProposedStepType] = useState<ChecklistStepType | ''>('');
+  const [proposedActionConfig, setProposedActionConfig] = useState<Record<string, any>>({});
   const [rationale, setRationale] = useState('');
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
 
@@ -121,6 +132,22 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
       setView(updated);
     } catch (err: any) {
       setError(err.message || 'Failed to update step');
+    } finally {
+      setTogglingStepId(null);
+    }
+  };
+
+  /** One-click mark-complete for bridge-detected outreach steps. */
+  const handleMarkComplete = async (step: ChecklistStepView, note: string) => {
+    setTogglingStepId(step.id);
+    try {
+      const updated = await marketingOpsService.setChecklistStepProgress(campaignId, step.id, {
+        completed: true,
+        note,
+      });
+      setView(updated);
+    } catch (err: any) {
+      setError(err.message || 'Failed to mark step complete');
     } finally {
       setTogglingStepId(null);
     }
@@ -157,6 +184,9 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
     setSuggestionStageTag(step?.stageTag ?? '');
     setProposedTitle(step?.title ?? '');
     setProposedInstructions(step?.instructions ?? '');
+    // Pre-fill step type + action config from the anchor step (for modify)
+    setProposedStepType(step?.stepType ?? '');
+    setProposedActionConfig(step?.actionConfig ? { ...step.actionConfig } : {});
     setRationale('');
     setShowSuggestionForm(true);
   };
@@ -176,6 +206,16 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
       const proposedStep: Record<string, any> = { title: proposedTitle };
       if (proposedInstructions) proposedStep.instructions = proposedInstructions;
       if (suggestionStageTag) proposedStep.stage_tag = suggestionStageTag;
+      if (proposedStepType) {
+        proposedStep.stepType = proposedStepType;
+        // Only include actionConfig if it has meaningful values
+        const configKeys = Object.keys(proposedActionConfig).filter(
+          (k) => proposedActionConfig[k] != null && proposedActionConfig[k] !== '',
+        );
+        if (configKeys.length > 0) {
+          proposedStep.actionConfig = proposedActionConfig;
+        }
+      }
       await marketingOpsService.submitChecklistSuggestion(campaignId, {
         stepId: suggestionStep?.id ?? null,
         suggestionKind,
@@ -446,6 +486,56 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
                     </div>
                   )}
 
+                  {/* Outreach step enrichment (bridge sprint) */}
+                  {step.stepType === 'outreach' && step.outreachStatus && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      {step.actionConfig?.channel && (
+                        <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-gray-300">
+                          {step.actionConfig.channel}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {OUTREACH_KIND_LABELS[step.outreachStatus.kind] ?? step.outreachStatus.kind}
+                      </span>
+                      {step.outreachStatus.satisfied ? (
+                        step.progress?.completedAt ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400">
+                            <CheckCircle2 className="w-3 h-3" /> detected
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleMarkComplete(step, `Auto-detected: ${step.outreachStatus!.kind}`)}
+                            className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            <CheckCircle2 className="w-3 h-3" /> detected — mark complete
+                          </button>
+                        )
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                          <Circle className="w-3 h-3" /> not yet
+                        </span>
+                      )}
+                      {step.outreachStatus.deepLink && (
+                        <a
+                          href={step.outreachStatus.deepLink}
+                          className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          <ExternalLink className="w-3 h-3" /> Open in Outreach Workspace
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Internal-link step enrichment (bridge sprint) */}
+                  {step.stepType === 'internal_link' && step.internalLink && (
+                    <a
+                      href={step.internalLink.resolvedUrl}
+                      className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Open →
+                    </a>
+                  )}
+
                   {/* Note + suggestion row */}
                   <div className="flex items-center gap-3 mt-2">
                     {step.progress?.note && noteStepId !== step.id && (
@@ -526,6 +616,10 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
         setProposedTitle={setProposedTitle}
         proposedInstructions={proposedInstructions}
         setProposedInstructions={setProposedInstructions}
+        proposedStepType={proposedStepType}
+        setProposedStepType={setProposedStepType}
+        proposedActionConfig={proposedActionConfig}
+        setProposedActionConfig={setProposedActionConfig}
         rationale={rationale}
         setRationale={setRationale}
         onSubmit={handleSubmitSuggestion}
@@ -551,6 +645,10 @@ interface SuggestionFormModalProps {
   setProposedTitle: (s: string) => void;
   proposedInstructions: string;
   setProposedInstructions: (s: string) => void;
+  proposedStepType: ChecklistStepType | '';
+  setProposedStepType: (t: ChecklistStepType | '') => void;
+  proposedActionConfig: Record<string, any>;
+  setProposedActionConfig: (c: Record<string, any>) => void;
   rationale: string;
   setRationale: (s: string) => void;
   onSubmit: () => void;
@@ -561,7 +659,10 @@ function SuggestionFormModal({
   show, onClose, suggestionStep, suggestionKind, suggestionPosition,
   setSuggestionKind, setSuggestionPosition, suggestionStageTag, setSuggestionStageTag,
   proposedTitle, setProposedTitle,
-  proposedInstructions, setProposedInstructions, rationale, setRationale,
+  proposedInstructions, setProposedInstructions,
+  proposedStepType, setProposedStepType,
+  proposedActionConfig, setProposedActionConfig,
+  rationale, setRationale,
   onSubmit, submitting,
 }: SuggestionFormModalProps) {
   if (!show) return null;

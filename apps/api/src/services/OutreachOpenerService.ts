@@ -422,6 +422,9 @@ export class OutreachOpenerService extends BaseService {
       model: result.model,
     });
 
+    // Fire-and-forget: auto-complete checklist outreach steps
+    this.fireBridgeAutoComplete(input.campaignId, 'opener', input.executedBy ?? 'system', ctx);
+
     return { opener, selection, extractedFields, qualityGate, resolvedPrompt };
   }
 
@@ -486,7 +489,37 @@ export class OutreachOpenerService extends BaseService {
       issuesCount: qualityGate.issues.length,
     });
 
+    // Fire-and-forget: auto-complete checklist outreach steps
+    this.fireBridgeAutoComplete(input.campaignId, 'opener', input.executedBy ?? 'system', ctx);
+
     return { opener, selection, extractedFields, qualityGate, resolvedPrompt };
+  }
+
+  // ====================
+  // BRIDGE (fire-and-forget checklist auto-complete)
+  // ====================
+
+  /**
+   * Fire-and-forget call to OutreachChecklistBridgeService to auto-complete
+   * any outreach checklist steps matching the artifact kind. Errors are
+   * swallowed (logged) — checklist auto-completion must never break the
+   * opener/follow-up flow.
+   */
+  private fireBridgeAutoComplete(
+    campaignId: string,
+    artifactKind: 'opener' | 'follow_up' | 'pitch' | 'contact_log',
+    actor: string,
+    ctx?: RequestCtx,
+  ): void {
+    import('./OutreachChecklistBridgeService')
+      .then(({ default: bridge }) => bridge.onOutreachArtifactCreated(campaignId, artifactKind, actor, ctx))
+      .catch((err) => {
+        logger.warn('fireBridgeAutoComplete failed (swallowed)', ctx, {
+          error: (err as Error).message,
+          campaignId,
+          artifactKind,
+        });
+      });
   }
 
   // ====================

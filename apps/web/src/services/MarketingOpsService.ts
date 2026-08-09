@@ -3802,6 +3802,17 @@ class MarketingOpsService extends AdminApiSingleton {
     return json.data;
   }
 
+  // ─── Outreach state (bridge sprint) ───────────────────────────────────
+
+  async getOutreachState(campaignId: string): Promise<OutreachState> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/outreach-state`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to get outreach state (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
   // ─── Checklist suggestions (operator feedback loop) ───────────────────
 
   async submitChecklistSuggestion(campaignId: string, input: ChecklistSuggestionInput): Promise<PlaybookChecklistSuggestion> {
@@ -4552,8 +4563,43 @@ export interface PlaybookCreateInput {
 
 // ─── Playbook checklist types (Operator Checklist Sprint) ────────────────
 
-export const CHECKLIST_STEP_TYPES = ['manual', 'url_check', 'ai_prompt', 'deliverable', 'outreach', 'credentials'] as const;
+export const CHECKLIST_STEP_TYPES = ['manual', 'url_check', 'internal_link', 'ai_prompt', 'deliverable', 'outreach', 'credentials'] as const;
 export type ChecklistStepType = (typeof CHECKLIST_STEP_TYPES)[number];
+
+// ─── Internal-link named target registry (bridge sprint) ────────────────
+// Must match PlaybookChecklistService.INTERNAL_LINK_TARGETS on the backend.
+
+export const INTERNAL_LINK_TARGETS = [
+  'openers_workspace',
+  'deliverables',
+  'gallery',
+  'campaign_tab',
+  'recovery_detail',
+  'intake_form',
+] as const;
+export type InternalLinkTarget = (typeof INTERNAL_LINK_TARGETS)[number];
+
+export const INTERNAL_LINK_TARGET_LABELS: Record<InternalLinkTarget, string> = {
+  openers_workspace: 'Openers Workspace',
+  deliverables: 'Deliverable Construction',
+  gallery: 'Diagnostic Gallery',
+  campaign_tab: 'Campaign Tab',
+  recovery_detail: 'Recovery Detail',
+  intake_form: 'Intake Form',
+};
+
+// ─── Outreach kind (bridge sprint) ───────────────────────────────────────
+
+export const OUTREACH_KINDS = ['generic', 'opener', 'follow_up', 'pitch', 'contact_log'] as const;
+export type OutreachKind = (typeof OUTREACH_KINDS)[number];
+
+export const OUTREACH_KIND_LABELS: Record<OutreachKind, string> = {
+  generic: 'Generic (manual only)',
+  opener: 'Opener',
+  follow_up: 'Follow-up',
+  pitch: 'Pitch',
+  contact_log: 'Contact Log',
+};
 
 export const SUGGESTION_KINDS = ['add', 'modify', 'remove'] as const;
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
@@ -4626,6 +4672,22 @@ export interface ChecklistStepView extends PlaybookChecklistStep {
     completedBy: string | null;
     note: string | null;
   } | null;
+  /** Outreach step enrichment — present when stepType='outreach' and the
+   *  bridge service detected the artifact. Null when not applicable. */
+  outreachStatus?: {
+    satisfied: boolean;
+    artifactId: string | null;
+    artifactDate: string | null;
+    deepLink: string | null;
+    kind: string;
+  } | null;
+  /** Internal-link step enrichment — present when stepType='internal_link'.
+   *  The resolvedUrl is computed by the bridge service using the campaign ID. */
+  internalLink?: {
+    target: string;
+    params: Record<string, any> | null;
+    resolvedUrl: string;
+  } | null;
 }
 
 export interface CampaignChecklistView {
@@ -4640,6 +4702,25 @@ export interface CampaignChecklistView {
   completedCount: number;
   requiredTotal: number;
   requiredCompleted: number;
+}
+
+// ─── Outreach state (bridge sprint) ──────────────────────────────────────
+
+export interface OutreachState {
+  openerCount: number;
+  followupCount: number;
+  pitchCount: number;
+  contactLogCount: number;
+  latestOpenerAt: string | null;
+  daysSinceOpener: number;
+  latestFollowupAt: string | null;
+  hasOpener: boolean;
+  hasFollowup: boolean;
+  hasPitch: boolean;
+  hasContactLog: boolean;
+  noReplyAfterOpener: boolean;
+  noReplyAfterFollowupN: boolean;
+  signals: string[];
 }
 
 export interface ChecklistSuggestionInput {

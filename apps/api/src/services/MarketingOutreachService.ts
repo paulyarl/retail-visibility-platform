@@ -162,6 +162,19 @@ export class MarketingOutreachService extends BaseService {
         outcome: input.outcome,
         followUp: !!followUpDate,
       });
+
+      // Fire-and-forget: auto-complete checklist outreach steps
+      import('./OutreachChecklistBridgeService')
+        .then(({ default: bridge }) =>
+          bridge.onOutreachArtifactCreated(input.campaignId, 'contact_log', input.contactedBy ?? 'system', ctx),
+        )
+        .catch((err) => {
+          logger.warn('Contact-log bridge auto-complete failed (swallowed)', ctx, {
+            error: (err as Error).message,
+            campaignId: input.campaignId,
+          });
+        });
+
       return log;
     } catch (error) {
       logger.error('Failed to log outreach contact', ctx, { error: (error as Error).message, campaignId: input.campaignId });

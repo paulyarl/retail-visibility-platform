@@ -16,7 +16,7 @@
 
 // ─── Signal families ─────────────────────────────────────────────────────
 
-export const SIGNAL_FAMILIES = ['RA', 'DS', 'WC', 'CP', 'VP'] as const;
+export const SIGNAL_FAMILIES = ['RA', 'DS', 'WC', 'CP', 'VP', 'OX'] as const;
 export type SignalFamily = (typeof SIGNAL_FAMILIES)[number];
 
 export const FAMILY_LABELS: Record<SignalFamily, string> = {
@@ -25,6 +25,7 @@ export const FAMILY_LABELS: Record<SignalFamily, string> = {
   WC: 'Website & Conversion',
   CP: 'Cross-Platform Consistency',
   VP: 'Content & Visual Proof',
+  OX: 'Outreach Execution',
 };
 
 // ─── Canonical 31 signal codes (TS fallback / validation set) ────────────
@@ -72,6 +73,13 @@ export const KNOWN_SIGNAL_CODES = [
   'VP_STALE_SOCIAL_ACTIVITY',
   'VP_MISSING_STOREFRONT_PHOTOS',
   'VP_MISSING_PRODUCT_PHOTOS',
+  // Outreach Execution (OX) — derived from outreach tables, display-only
+  'OX_OPENER_SENT',
+  'OX_FOLLOWUP_SENT',
+  'OX_PITCH_ASSEMBLED',
+  'OX_NO_REPLY_AFTER_OPENER',
+  'OX_NO_REPLY_AFTER_FOLLOWUP_N',
+  'OX_CONTACT_LOGGED',
 ] as const;
 
 /**
@@ -139,6 +147,17 @@ export function isVisualSignal(code: SignalCode): boolean {
   // Visual signals: VP_*, DS_PHOTO_DEFICIT. These trigger PB-06.
   if (code.startsWith('VP_')) return true;
   return code === 'DS_PHOTO_DEFICIT';
+}
+
+/**
+ * Outreach-state signals: OX_*. These are derived from outreach execution
+ * tables (openers, follow-ups, pitches, contact logs) — NOT from the audit
+ * LLM. They are DISPLAY-ONLY in the triage card's "Triggered Signals"
+ * section and do NOT feed playbook rule evaluation. The triage engine
+ * skips them when evaluating rules (see TriageEngineService).
+ */
+export function isOutreachStateSignal(code: SignalCode): boolean {
+  return code.startsWith('OX_');
 }
 
 // ─── Known-code validation ───────────────────────────────────────────────

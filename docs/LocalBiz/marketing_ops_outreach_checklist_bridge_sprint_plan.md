@@ -165,12 +165,12 @@ The frontend resolves `{campaignId}` from the current campaign context. This
 keeps step templates portable across campaigns (the playbook doesn't know
 the campaign ID — it's resolved at render time).
 
-**Migration 184a** (DDL): updates the `step_type` check constraint on
+**Migration 185a** (DDL): updates the `step_type` check constraint on
 `mkt_playbook_checklist_steps` to add `'internal_link'` to the allowed
 values. (The existing constraint likely allows any string — verify and add
 if needed.)
 
-### Migration 184: `mkt_playbook_checklist_steps.action_config` enrichment (no DDL)
+### Migration 187: `mkt_playbook_checklist_steps.action_config` enrichment (no DDL)
 
 No schema change needed — `action_config` is already `Json`. This migration
 is **data-only**: updates the existing `outreach` starter steps (from
@@ -194,7 +194,7 @@ New `action_config` shape for `outreach` steps:
 - `contact_log` — satisfied when a `mkt_outreach_log` entry exists with the matching channel
 - `generic` — legacy / unspecified; manual check-off only (current behavior)
 
-### Migration 185: Outreach-state signal registry seed (data-only)
+### Migration 187: Outreach-state signal registry seed (data-only)
 
 Seeds new signal rows in `mkt_signal_registry` under a new family **`OX`**
 (Outreach Execution). These are `detection_source='derived'` — computed by
@@ -331,7 +331,7 @@ This moves the hardcoded `HEADER_STARTERS` / `CLOSER_STARTERS` /
 catalog, editable by admins. The frontend falls back to the component-level
 defaults if the playbook has no `pitch_starters` (backward compat).
 
-### Migration 186: `mkt_playbook_catalog.pitch_starters` (DDL)
+### Migration 187: `mkt_playbook_catalog.pitch_starters` (DDL)
 
 ```sql
 ALTER TABLE mkt_playbook_catalog
@@ -598,10 +598,10 @@ steps are renumbered.
 
 | File | Change | Sprint |
 |------|--------|--------|
-| `database/migrations/184a_internal_link_step_type.sql` | DDL: add `internal_link` to `step_type` check constraint | 1 |
-| `database/migrations/184_outreach_checklist_bridge_backfill.sql` | Data-only: update starter steps with `outreach_kind` + add opener/follow-up steps | 1 |
-| `database/migrations/185_outreach_state_signal_registry.sql` | Data-only: seed `OX_*` signal rows | 1 |
-| `database/migrations/186_playbook_pitch_starters.sql` | DDL: `pitch_starters` JSONB on `mkt_playbook_catalog` + seed from frontend defaults | 2 |
+| `database/migrations/185a_internal_link_step_type.sql` | DDL: add `internal_link` to `step_type` check constraint | 1 |
+| `database/migrations/185_outreach_checklist_bridge_backfill.sql` | Data-only: update starter steps with `outreach_kind` + add opener/follow-up steps | 1 |
+| `database/migrations/186_outreach_state_signal_registry.sql` | Data-only: seed `OX_*` signal rows | 1 |
+| `database/migrations/187_playbook_pitch_starters.sql` | DDL: `pitch_starters` JSONB on `mkt_playbook_catalog` + seed from frontend defaults | 2 |
 | `apps/api/src/services/OutreachChecklistBridgeService.ts` | New — bridge service | 1 |
 | `apps/api/src/services/triage/outreach-state-extractor.ts` | New — OX signal extractor | 1 |
 | `apps/api/src/services/triage/signal-taxonomy.ts` | Add OX family + codes + predicate | 1 |
@@ -626,7 +626,7 @@ steps are renumbered.
 ## 11. Sprint phasing
 
 ### Sprint 1 — Checklist ↔ Outreach bridge + step type actions (the core gap)
-- Migration 184a (`internal_link` step type DDL)
+- Migration 185a (`internal_link` step type DDL)
 - Migration 184 (starter step backfill with `outreach_kind`)
 - Migration 185 (OX signal registry seed)
 - `OutreachChecklistBridgeService` + `OutreachStateSignalExtractor`

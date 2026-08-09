@@ -34,6 +34,7 @@ import {
 export const CHECKLIST_STEP_TYPES = [
   'manual',
   'url_check',
+  'internal_link',
   'ai_prompt',
   'deliverable',
   'outreach',
@@ -130,6 +131,22 @@ export interface CampaignChecklistStepView extends ChecklistStepRow {
     completedAt: Date | null;
     completedBy: string | null;
     note: string | null;
+  } | null;
+  /** Outreach step enrichment — present when stepType='outreach' and the
+   *  bridge service detected the artifact. Null when not applicable. */
+  outreachStatus?: {
+    satisfied: boolean;
+    artifactId: string | null;
+    artifactDate: Date | null;
+    deepLink: string | null;
+    kind: string;
+  } | null;
+  /** Internal-link step enrichment — present when stepType='internal_link'.
+   *  The resolvedUrl is computed by the bridge service using the campaign ID. */
+  internalLink?: {
+    target: string;
+    params: Record<string, any> | null;
+    resolvedUrl: string;
   } | null;
 }
 
@@ -249,6 +266,53 @@ export class PlaybookChecklistService extends BaseService {
       const url = String(config.url);
       if (!/^https?:\/\//i.test(url)) {
         throw new Error('url_check action_config.url must be a valid http(s) URL');
+      }
+    }
+    if (stepType === 'internal_link') {
+      this.validateInternalLinkConfig(config);
+    }
+  }
+
+  /**
+   * Named target registry for internal_link steps. The frontend resolves
+   * these to actual URLs at render time with the current campaign ID.
+   * Using named targets (not raw URLs) keeps step templates portable across
+   * campaigns and prevents stale links when routes change.
+   */
+  static readonly INTERNAL_LINK_TARGETS = [
+    'openers_workspace',
+    'deliverables',
+    'gallery',
+    'campaign_tab',
+    'recovery_detail',
+    'intake_form',
+  ] as const;
+  static readonly INTERNAL_LINK_TARGET_SET: ReadonlySet<string> = new Set(PlaybookChecklistService.INTERNAL_LINK_TARGETS);
+
+  private validateInternalLinkConfig(config: Record<string, any>): void {
+    const target = config.target;
+    if (!target || typeof target !== 'string') {
+      throw new Error('internal_link action_config.target is required (must be a named target string)');
+    }
+    if (!PlaybookChecklistService.INTERNAL_LINK_TARGET_SET.has(target)) {
+      throw new Error(
+        `internal_link action_config.target "${target}" is not a valid named target. ` +
+        `Must be one of: ${PlaybookChecklistService.INTERNAL_LINK_TARGETS.join(', ')}`,
+      );
+    }
+    // Reject raw URL strings in target (must use the named registry)
+    if (/^https?:\/\//i.test(target)) {
+      throw new Error('internal_link action_config.target must be a named target, not a raw URL');
+    }
+    // params is optional; if present must be a flat object of string values
+    if (config.params != null) {
+      if (typeof config.params !== 'object' || Array.isArray(config.params)) {
+        throw new Error('internal_link action_config.params must be a flat object');
+      }
+      for (const [k, v] of Object.entries(config.params)) {
+        if (typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean') {
+          throw new Error(`internal_link action_config.params.${k} must be a primitive (string/number/boolean)`);
+        }
       }
     }
   }
@@ -453,6 +517,26 @@ export class PlaybookChecklistService extends BaseService {
           : null,
       };
     });
+
+    // Enrich outreach + internal_link steps with bridge state.
+    // Lazy import to avoid circular dependency (bridge imports checklist
+    // service for step lookups).
+    const hasOutreachOrLink = stepViews.some(
+      (s) => s.stepType === 'outreach' || s.stepType === 'internal_link',
+    );
+    if (hasOutreachOrLink) {
+      try {
+        const { default: bridgeService } = await import('./OutreachChecklistBridgeService');
+        await bridgeService.enrichStepViews(campaignId, stepViews, ctx);
+      } catch (error) {
+        // Bridge enrichment is best-effort — don't fail the checklist load
+        // if the bridge service has an issue. Steps render without enrichment.
+        logger.warn('Outreach bridge enrichment failed', ctx, {
+          error: (error as Error).message,
+          campaignId,
+        });
+      }
+    }
 
     const completedCount = stepViews.filter((s) => s.progress?.completedAt != null).length;
     const requiredSteps = stepViews.filter((s) => s.isRequired);

@@ -43,6 +43,7 @@ import {
   isReviewSignal,
   isCrisisSignal,
   isVisualSignal,
+  isOutreachStateSignal,
   signalLabel,
   type SignalCode,
 } from './signal-taxonomy';
@@ -197,7 +198,10 @@ export function evaluateTriage(
   signals: SignalCode[],
   playbooks: PlaybookCatalogRow[],
 ): TriageRecommendation | null {
-  const signalSet = new Set(signals);
+  // Filter out OX_* (outreach-state) signals — they're display-only and
+  // must not influence playbook selection (they track outreach execution
+  // state, not prospect problems).
+  const signalSet = new Set(signals.filter((s) => !isOutreachStateSignal(s)));
 
   // Playbooks are expected to be pre-sorted by priority_rank ascending.
   // Sort defensively in case the caller didn't.
@@ -250,7 +254,8 @@ export function evaluateAllMatchingPlaybooks(
   signals: SignalCode[],
   playbooks: PlaybookCatalogRow[],
 ): TriageRecommendation[] {
-  const signalSet = new Set(signals);
+  // Filter out OX_* (outreach-state) signals — display-only, not prospect problems.
+  const signalSet = new Set(signals.filter((s) => !isOutreachStateSignal(s)));
   const sorted = [...playbooks].sort((a, b) => a.priorityRank - b.priorityRank);
   const matches: TriageRecommendation[] = [];
 

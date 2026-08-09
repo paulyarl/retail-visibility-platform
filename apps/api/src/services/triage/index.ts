@@ -20,12 +20,17 @@ export {
   isReviewSignal,
   isCrisisSignal,
   isVisualSignal,
+  isOutreachStateSignal,
   isKnownSignalCode,
   signalLabel,
   invalidateSignalRegistryCache,
   getSignalRegistryCache,
   setSignalRegistryCache,
 } from './signal-taxonomy';
+
+// Outreach-state signal extractor (bridge sprint)
+export { default as outreachStateExtractor, OutreachStateSignalExtractor } from './outreach-state-extractor';
+export type { OutreachState } from './outreach-state-extractor';
 
 export type {
   SignalCode,

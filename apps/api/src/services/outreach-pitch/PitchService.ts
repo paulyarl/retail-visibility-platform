@@ -150,6 +150,18 @@ export class PitchService extends BaseService {
       assembledLength: assembledText.length,
     });
 
+    // Fire-and-forget: auto-complete checklist outreach steps
+    import('../OutreachChecklistBridgeService')
+      .then(({ default: bridge }) =>
+        bridge.onOutreachArtifactCreated(input.campaignId, 'pitch', input.createdBy ?? 'system', ctx),
+      )
+      .catch((err) => {
+        logger.warn('Pitch bridge auto-complete failed (swallowed)', ctx, {
+          error: (err as Error).message,
+          campaignId: input.campaignId,
+        });
+      });
+
     return { pitch, assembledText };
   }
 

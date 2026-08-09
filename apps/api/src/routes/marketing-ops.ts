@@ -3128,6 +3128,18 @@ router.put('/:id/checklist/:stepId', async (req: any, res: Response) => {
   }
 });
 
+// ─── Outreach state (bridge sprint) ──────────────────────────────────────
+
+router.get('/:id/outreach-state', async (req: any, res: Response) => {
+  try {
+    const { default: bridgeService } = await import('../services/OutreachChecklistBridgeService');
+    const state = await bridgeService.getOutreachState(req.params.id, getCtx(req));
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ─── Suggestions (operator feedback loop) ─────────────────────────────────
 
 router.post('/:id/checklist/suggestions', async (req: any, res: Response) => {
