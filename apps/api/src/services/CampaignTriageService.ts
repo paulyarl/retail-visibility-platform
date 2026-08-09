@@ -243,17 +243,40 @@ export class CampaignTriageService extends BaseService {
    * The winner is stored via evaluateTriageForCampaign (same as today).
    * The alternatives are returned for the UI to present as sibling-creation
    * suggestions. Each alternative includes its detectedSignals.
+   *
+   * IMPORTANT: If the triage is already decided (accepted or overridden), the
+   * stored result is used as-is — evaluateTriageForCampaign is NOT called. This
+   * prevents the alternatives endpoint (a GET) from silently resetting the
+   * operator's decision. This is critical for sibling campaigns, which have a
+   * pre-accepted triage result from createSiblingCampaign; without this guard,
+   * loading the IntelligentTriageCard on a sibling would overwrite the
+   * pre-accepted PB-05 result with a fresh PB-01 evaluation + null decision.
    */
   async evaluateAllForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<MultiArchetypeTriageResult> {
-    // 1. Run the normal evaluation (stores the winner, same as today)
-    const winner = await this.evaluateTriageForCampaign(input, ctx);
-    // 2. Re-load signals + playbooks (the helper is idempotent — no side effects)
-    const { signals, playbooks } = await this.loadSignalsAndPlaybooks(input, ctx);
+    // 1. Check if the triage is already decided. If so, use the stored result
+    //    as the winner — do NOT re-evaluate (which would reset the decision).
+    const existing = await this.getTriageResult(input.campaignId, ctx);
+    const isDecided = existing != null && (existing.isOperatorAccepted === true || existing.overriddenPlaybook != null);
+
+    const winner: StoredTriageResult = isDecided
+      ? existing!
+      : await this.evaluateTriageForCampaign(input, ctx);
+
+    // 2. Load signals + playbooks for the all-matches computation.
+    //    When decided, use the stored detected_signals (not a fresh extraction)
+    //    so alternatives reflect what the operator saw at decision time.
+    const signals: SignalCode[] = isDecided
+      ? (existing!.detectedSignals.map((s) => s.code) as SignalCode[])
+      : (await this.loadSignalsAndPlaybooks(input, ctx)).signals;
+    const playbooks = await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx);
+
     // 3. Run the engine in "all matches" mode
     const allMatches = evaluateAllMatchingPlaybooks(signals, playbooks);
-    // 4. Alternatives = all matches except the winner
+
+    // 4. Alternatives = all matches except the winner's effective playbook
+    const effectiveCode = winner.overriddenPlaybook?.code ?? winner.recommendedPlaybook.code;
     const alternatives = allMatches.filter(
-      (m) => m.playbookCode !== winner.recommendedPlaybook.code,
+      (m) => m.playbookCode !== effectiveCode,
     );
     return { winner, alternatives };
   }
