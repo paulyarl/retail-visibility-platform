@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, MessageSquare, RefreshCw, Plus } from 'lucide-react';
-import type { CampaignDetail, OutreachLogEntry, ContactChannel, ContactOutcome } from '@/services/MarketingOpsService';
+import marketingOpsService, { type CampaignDetail, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
 import LogContactModal from './LogContactModal';
 
 const CHANNEL_LABELS: Record<ContactChannel, string> = {
@@ -77,10 +77,27 @@ export default function OutreachFollowUpCard({ campaign, onLogged }: OutreachFol
   const [showModal, setShowModal] = useState(false);
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [checklistSummary, setChecklistSummary] = useState<{ completed: number; total: number } | null>(null);
 
   const log = campaign.outreach_log ?? [];
   const visibleLog = showFullHistory ? log : log.slice(0, 5);
   const fuStatus = followUpStatus(campaign);
+
+  // Fetch checklist outreach step counts for the cross-link footer.
+  useEffect(() => {
+    let cancelled = false;
+    marketingOpsService.getCampaignChecklist(campaign.id)
+      .then((view) => {
+        if (cancelled) return;
+        const outreachSteps = view.steps.filter((s) => s.stepType === 'outreach');
+        if (outreachSteps.length > 0) {
+          const completed = outreachSteps.filter((s) => s.progress?.completedAt != null).length;
+          setChecklistSummary({ completed, total: outreachSteps.length });
+        }
+      })
+      .catch(() => { /* best-effort — card works without it */ });
+    return () => { cancelled = true; };
+  }, [campaign.id, campaign.updated_at]);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -209,6 +226,18 @@ export default function OutreachFollowUpCard({ campaign, onLogged }: OutreachFol
             onLogged?.();
           }}
         />
+      )}
+
+      {/* Checklist cross-link (bridge sprint) */}
+      {checklistSummary && (
+        <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
+          <a
+            href={`/settings/admin/marketing-ops/campaigns/${campaign.id}?tab=checklist`}
+            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+          >
+            Checklist: {checklistSummary.completed}/{checklistSummary.total} outreach steps complete →
+          </a>
+        </div>
       )}
     </div>
   );

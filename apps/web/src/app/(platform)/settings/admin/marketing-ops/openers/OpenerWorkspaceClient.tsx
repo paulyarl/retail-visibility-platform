@@ -81,10 +81,35 @@ export default function OpenerWorkspaceClient() {
 
   const [copied, setCopied] = useState(false);
 
+  // Checklist outreach progress badge (bridge sprint)
+  const [checklistBadge, setChecklistBadge] = useState<{ completed: number; total: number } | null>(null);
+
   const selectedCampaign = useMemo(
     () => campaigns.find((c) => c.id === selectedCampaignId) || null,
     [campaigns, selectedCampaignId],
   );
+
+  // Fetch checklist outreach step counts when a campaign is selected.
+  useEffect(() => {
+    if (!selectedCampaignId) {
+      setChecklistBadge(null);
+      return;
+    }
+    let cancelled = false;
+    marketingOpsService.getCampaignChecklist(selectedCampaignId)
+      .then((view) => {
+        if (cancelled) return;
+        const outreachSteps = view.steps.filter((s) => s.stepType === 'outreach');
+        if (outreachSteps.length > 0) {
+          const completed = outreachSteps.filter((s) => s.progress?.completedAt != null).length;
+          setChecklistBadge({ completed, total: outreachSteps.length });
+        } else {
+          setChecklistBadge(null);
+        }
+      })
+      .catch(() => setChecklistBadge(null));
+    return () => { cancelled = true; };
+  }, [selectedCampaignId]);
 
   // Filter to business-scope review-management campaigns only.
   // Openers + follow-ups are the review pipeline's outreach cycle:
@@ -320,6 +345,14 @@ export default function OpenerWorkspaceClient() {
                 No review-management campaigns found. Openers only apply to review-management campaigns with a business_analysis audit.
                 Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
               </p>
+            )}
+            {checklistBadge && (
+              <a
+                href={`/settings/admin/marketing-ops/campaigns/${selectedCampaignId}?tab=checklist`}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Checklist: {checklistBadge.completed}/{checklistBadge.total} outreach steps done →
+              </a>
             )}
           </div>
 

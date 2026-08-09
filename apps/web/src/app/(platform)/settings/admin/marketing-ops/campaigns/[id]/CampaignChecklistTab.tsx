@@ -28,10 +28,16 @@ import marketingOpsService, {
   type SuggestionKind,
   type SuggestionPosition,
   type ChecklistStageTag,
+  type ChecklistStepType,
   SUGGESTION_KINDS,
   SUGGESTION_POSITIONS,
   CHECKLIST_STAGE_TAGS,
   CHECKLIST_STAGE_TAG_LABELS,
+  CHECKLIST_STEP_TYPES,
+  INTERNAL_LINK_TARGETS,
+  INTERNAL_LINK_TARGET_LABELS,
+  OUTREACH_KINDS,
+  OUTREACH_KIND_LABELS,
 } from '@/services/MarketingOpsService';
 
 interface Props {
@@ -757,6 +763,93 @@ function SuggestionFormModal({
                   className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
                 />
               </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Step type</label>
+                <select
+                  value={proposedStepType}
+                  onChange={(e) => {
+                    const v = e.target.value as ChecklistStepType | '';
+                    setProposedStepType(v);
+                    setProposedActionConfig({});
+                  }}
+                  className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800"
+                >
+                  <option value="">manual (default)</option>
+                  {CHECKLIST_STEP_TYPES.map((t) => (
+                    <option key={t} value={t}>{STEP_TYPE_LABELS[t] ?? t}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Type-specific action config */}
+              {proposedStepType === 'url_check' && (
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">URL to check</label>
+                  <input
+                    type="url"
+                    value={proposedActionConfig.url ?? ''}
+                    onChange={(e) => setProposedActionConfig({ ...proposedActionConfig, url: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+                  />
+                </div>
+              )}
+              {proposedStepType === 'internal_link' && (
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Internal link target</label>
+                  <select
+                    value={proposedActionConfig.target ?? ''}
+                    onChange={(e) => setProposedActionConfig({ ...proposedActionConfig, target: e.target.value })}
+                    className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800"
+                  >
+                    <option value="">select target...</option>
+                    {INTERNAL_LINK_TARGETS.map((t) => (
+                      <option key={t} value={t}>{INTERNAL_LINK_TARGET_LABELS[t]}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {proposedStepType === 'outreach' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Channel</label>
+                    <select
+                      value={proposedActionConfig.channel ?? ''}
+                      onChange={(e) => setProposedActionConfig({ ...proposedActionConfig, channel: e.target.value })}
+                      className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800"
+                    >
+                      <option value="">any</option>
+                      <option value="email">email</option>
+                      <option value="phone">phone</option>
+                      <option value="sms">sms</option>
+                      <option value="dm">dm</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Outreach kind</label>
+                    <select
+                      value={proposedActionConfig.outreach_kind ?? 'generic'}
+                      onChange={(e) => setProposedActionConfig({ ...proposedActionConfig, outreach_kind: e.target.value })}
+                      className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800"
+                    >
+                      {OUTREACH_KINDS.map((k) => (
+                        <option key={k} value={k}>{OUTREACH_KIND_LABELS[k]}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+              {proposedStepType === 'credentials' && (
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Credential reference</label>
+                  <input
+                    type="text"
+                    value={proposedActionConfig.credential_ref ?? ''}
+                    onChange={(e) => setProposedActionConfig({ ...proposedActionConfig, credential_ref: e.target.value })}
+                    placeholder="e.g. gbp_admin, stripe_dashboard"
+                    className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
+                  />
+                </div>
+              )}
             </>
           )}
 

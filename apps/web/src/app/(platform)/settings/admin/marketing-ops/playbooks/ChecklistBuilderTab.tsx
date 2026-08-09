@@ -26,11 +26,16 @@ import marketingOpsService, {
   CHECKLIST_STEP_TYPES,
   CHECKLIST_STAGE_TAGS,
   CHECKLIST_STAGE_TAG_LABELS,
+  INTERNAL_LINK_TARGETS,
+  INTERNAL_LINK_TARGET_LABELS,
+  OUTREACH_KINDS,
+  OUTREACH_KIND_LABELS,
 } from '@/services/MarketingOpsService';
 
 const STEP_TYPE_COLORS: Record<ChecklistStepType, string> = {
   manual: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
   url_check: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  internal_link: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
   ai_prompt: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   deliverable: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
   outreach: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -547,15 +552,57 @@ export default function ChecklistBuilderTab({ playbooks, onError, onSuccess }: P
                     </div>
                   )}
                   {stepForm.stepType === 'outreach' && (
-                    <div>
-                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Channel</label>
-                      <select value={stepForm.actionConfig.channel ?? ''} onChange={(e) => setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, channel: e.target.value } })} className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800">
-                        <option value="">— Select —</option>
-                        <option value="email">Email</option>
-                        <option value="phone">Phone</option>
-                        <option value="sms">SMS</option>
-                        <option value="dm">DM</option>
-                      </select>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Channel</label>
+                        <select value={stepForm.actionConfig.channel ?? ''} onChange={(e) => setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, channel: e.target.value } })} className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800">
+                          <option value="">— Select —</option>
+                          <option value="email">Email</option>
+                          <option value="phone">Phone</option>
+                          <option value="sms">SMS</option>
+                          <option value="dm">DM</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Outreach Kind</label>
+                        <select value={stepForm.actionConfig.outreach_kind ?? 'generic'} onChange={(e) => setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, outreach_kind: e.target.value } })} className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800">
+                          {OUTREACH_KINDS.map((k) => (
+                            <option key={k} value={k}>{OUTREACH_KIND_LABELS[k]}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {stepForm.actionConfig.outreach_kind === 'follow_up' && (
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Min Follow-up # (null = any)</label>
+                          <input type="number" min={1} value={stepForm.actionConfig.min_followup_number ?? ''} onChange={(e) => setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, min_followup_number: e.target.value ? Number(e.target.value) : null } })} placeholder="any" className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent" />
+                        </div>
+                      )}
+                      <label className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" checked={stepForm.actionConfig.auto_complete ?? false} onChange={(e) => setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, auto_complete: e.target.checked } })} className="rounded" />
+                        Auto-complete when artifact detected
+                      </label>
+                    </div>
+                  )}
+                  {stepForm.stepType === 'internal_link' && (
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Target</label>
+                        <select value={stepForm.actionConfig.target ?? ''} onChange={(e) => setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, target: e.target.value } })} className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-white dark:bg-neutral-800">
+                          <option value="">— Select —</option>
+                          {INTERNAL_LINK_TARGETS.map((t) => (
+                            <option key={t} value={t}>{INTERNAL_LINK_TARGET_LABELS[t]}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Params (optional JSON)</label>
+                        <input type="text" value={stepForm.actionConfig.params ? JSON.stringify(stepForm.actionConfig.params) : ''} onChange={(e) => {
+                          try {
+                            const parsed = e.target.value ? JSON.parse(e.target.value) : null;
+                            setStepForm({ ...stepForm, actionConfig: { ...stepForm.actionConfig, params: parsed } });
+                          } catch { /* ignore invalid JSON while typing */ }
+                        }} placeholder='e.g. {"tab":"gallery"}' className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent" />
+                      </div>
                     </div>
                   )}
                   {stepForm.stepType === 'credentials' && (
