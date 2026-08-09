@@ -1399,12 +1399,17 @@ Steps are heterogeneous — a checklist can mix any of these:
 |------|------------------------|------------------------|
 | **Manual** | Follow the written instructions and check the box | — |
 | **URL Check** | Verify something on a live site (GBP listing, website CTA, directory profile) | **Open site** button |
+| **Internal Link** | Deep-link to an internal app page or tab (Openers Workspace, Deliverables, Diagnostic Gallery, etc.) | **Open →** button — resolves the named target to a URL with the current campaign ID |
 | **AI Prompt** | Run a specific prompt template for the campaign | **Run prompt** — jumps to the Prompts tab with the template preselected |
 | **Deliverable** | Create/send a deliverable of a given type | **Open deliverables** — jumps to the Deliverables tab |
-| **Outreach** | Send a message on a given channel and log it | **Log outreach** — jumps to the outreach logger |
+| **Outreach** | Send a message on a given channel and log it | **Log outreach** — jumps to the outreach logger. With an **outreach kind** set (opener / follow-up / pitch / contact_log), the step auto-detects when the artifact exists and can **auto-complete** when configured |
 | **Credentials** | Retrieve credentials needed for the task | Shows a **reference label** (e.g. "1Password › LocalBiz › GBP vault") with a copy button. The checklist stores *where the credentials live*, never the credentials themselves |
 
 Inline actions are conveniences, not requirements — every step can be completed by hand and checked off.
+
+**Internal Link targets** use a named registry (not raw URLs) so step templates stay portable across campaigns — the campaign ID is resolved at render time. Available targets: `openers_workspace`, `deliverables`, `gallery`, `campaign_tab`, `recovery_detail`, `intake_form`.
+
+**Outreach kind** connects an outreach step to a specific artifact type. When the bridge service detects the artifact (e.g. an opener exists for the campaign), the step shows a blue "detected" indicator. If **auto-complete** is enabled, the step is checked off automatically when the artifact is created — no manual check-off needed.
 
 ### Building a Checklist (Playbooks Page → Operator Checklist Tab)
 
@@ -1419,7 +1424,20 @@ When a campaign has an effective playbook — triage **accepted** or **overridde
 
 - **Header:** playbook chip (code, name, category), an "Overridden from PB-XX" indicator when the operator overrode the recommendation, and a progress bar (`x / y steps`, with a required-steps sub-count). The tab badge shows remaining required steps.
 - **Steps:** checkbox, order number, type badge, title, expandable instructions, and the inline action button for the step type. Checking a step records who completed it and when; an optional note captures evidence (a link, a result summary). Unchecking reopens the step while keeping the audit trail.
+- **Outreach steps** show a channel badge (email/phone/sms/dm), the outreach kind (Opener / Follow-up / Pitch / Contact Log), and a satisfaction indicator:
+  - **Detected** (green) — the artifact exists and the step is already checked off (auto-completed).
+  - **Detected — mark complete** (blue) — the artifact exists but the step hasn't been checked off yet. One-click completes it.
+  - **Not yet** (gray) — no artifact detected yet. A deep-link button jumps to the Openers Workspace with the campaign pre-selected.
+- **Internal Link steps** show an "Open →" button that deep-links to the configured target (Openers Workspace, Deliverables, Gallery, etc.) with the current campaign ID.
 - **Empty states:** no triage decision yet → "run Intelligent Triage above to assign a playbook"; playbook has no steps → deep-link to the builder tab to define them.
+
+### Cross-Links (Bridge)
+
+The checklist bridge connects outreach execution to checklist state:
+
+- **OutreachFollowUpCard** (Overview tab) shows a footer line: "Checklist: X/Y outreach steps complete →" with a link to the Checklist tab.
+- **Openers Workspace** shows a badge in the campaign selector: "Checklist: X/Y outreach steps done →" with a link to the campaign's Checklist tab.
+- When an opener, follow-up, pitch, or contact log is created, the bridge service auto-completes any outreach checklist steps with `auto_complete=true` — the operator sees the step check off without manual action.
 
 ### Soft Gate on Stage Transitions
 
@@ -1437,8 +1455,8 @@ Checklists are governed, but not rigid. Operators executing checklist-aware camp
 **From a campaign (suggest):**
 
 1. On any step in the Checklist tab, click **Suggest improvement** and choose:
-   - **Add a step** — tagged *before this step*, *after this step*, or *instead of this step (supersede)*. Fill in the proposed title, instructions, type, and config.
-   - **Change this step** — edit a pre-filled copy of the step; only your changes are submitted.
+   - **Add a step** — tagged *before this step*, *after this step*, or *instead of this step (supersede)*. Fill in the proposed title, instructions, **step type** (manual / URL check / internal link / AI prompt / deliverable / outreach / credentials), and type-specific config (URL, internal link target, channel + outreach kind, credential reference, etc.).
+   - **Change this step** — edit a pre-filled copy of the step (including step type + config); only your changes are submitted.
    - **Remove this step** — explain why it's unnecessary.
    - Or use **Suggest a step** at the bottom of the list for a general addition at the end of the playbook.
 2. **Rationale is required** — "What did you discover?" A suggestion without the *why* can't be reviewed.

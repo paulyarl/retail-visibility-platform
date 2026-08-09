@@ -120,6 +120,26 @@ Do NOT remove columns from `schema.prisma` to "fix" drift — fix the database i
 - **RLS:** New tenant-scoped tables must enable RLS and create isolation policies
 - **Triggers:** Include `updated_at` triggers for new tables
 
+### DDL-before-data ordering (letter-suffix pattern)
+
+When a migration needs to **both** update a CHECK constraint (DDL) **and** insert
+rows that reference the new constraint value (data), split them into two files:
+
+- `<N>a_<description>.sql` — DDL only (constraint updates, column adds)
+- `<N>_<description>.sql` — data only (inserts, backfills)
+
+The `a` suffix sorts before the bare number, so the DDL file is applied first.
+This avoids the failure where a data INSERT references a CHECK constraint value
+that doesn't exist yet (e.g., inserting `step_type = 'internal_link'` before the
+constraint has been updated to allow it).
+
+**Worked example (bridge sprint):**
+- `185a_mkt_checklist_internal_link_step_type.sql` — updates `chk_checklist_step_type` to allow `'internal_link'`
+- `185_mkt_outreach_checklist_bridge_backfill.sql` — backfills `outreach_kind` on existing steps + inserts new `internal_link` steps (depends on 185a)
+- `186_mkt_outreach_state_signal_registry.sql` — seeds `OX_*` signal rows (independent, data-only)
+
+Apply in order: **185a → 185 → 186**.
+
 ### Marketing Ops (`mkt_*`) namespace exception
 
 The `mkt_*` table family (migrations 141–149+) does **not** enable row level

@@ -234,5 +234,63 @@ Mirrors the coupon `/s/{autoId}` short URL pattern for diagnostic gallery tokens
 - **Collision handling**: 3 retries on unique-index conflict; falls back to no short code (long URL still works) if exhausted
 - **Lazy backfill**: legacy tokens without `short_code` are not broken; `ensureShortCode()` can backfill them on demand
 
+## Outreach Checklist Bridge (Sprint 1)
+
+Spec: `docs/LocalBiz/marketing_ops_outreach_checklist_bridge_sprint_plan.md`
+
+Bridges the campaign execution layer (Openers, Follow-Ups, Pitch Construction, Contact Log) to the planning layer (Checklist Builder). Closes the gap where `outreach` checklist steps were hollow labels with no artifact detection or auto-completion.
+
+### Migrations (apply in order)
+- `185a_mkt_checklist_internal_link_step_type.sql` — DDL: adds `internal_link` to `chk_checklist_step_type` check constraint
+- `185_mkt_outreach_checklist_bridge_backfill.sql` — Data-only: backfills `outreach_kind` + `auto_complete` on existing outreach starter steps; adds `internal_link` steps for Openers Workspace + Deliverables deep-links
+- `186_mkt_outreach_state_signal_registry.sql` — Data-only: seeds `OX_*` signal rows in `mkt_signal_registry` under new `OX` family
+
+### Backend
+- `apps/api/src/services/OutreachChecklistBridgeService.ts` — bridge service:
+  - `getOutreachState(campaignId)` — counts + derived flags from outreach tables
+  - `checkStepSatisfaction(campaignId, step)` — checks if an outreach step's artifact exists
+  - `onOutreachArtifactCreated(campaignId, kind, actor)` — auto-completes steps with `auto_complete=true` (fire-and-forget, called after opener/follow-up/pitch/contact-log creation)
+  - `resolveStepDeepLink(campaignId, step)` — resolves internal URL for outreach + internal_link steps
+  - `enrichStepViews(campaignId, stepViews)` — enriches checklist view with `outreachStatus` + `internalLink`
+- `apps/api/src/services/triage/outreach-state-extractor.ts` — derives `OX_*` signals from outreach tables (openers, follow-ups, pitches, contact logs)
+- `apps/api/src/services/triage/signal-taxonomy.ts` — `OX` family + 6 codes + `isOutreachStateSignal()` predicate
+- `apps/api/src/services/triage/TriageEngineService.ts` — `evaluateTriage` + `evaluateAllMatchingPlaybooks` filter out `OX_*` signals (display-only, don't influence playbook selection)
+- `apps/api/src/services/PlaybookChecklistService.ts`:
+  - `internal_link` added to `CHECKLIST_STEP_TYPES`
+  - `validateInternalLinkConfig` — validates named target against registry
+  - `INTERNAL_LINK_TARGETS` — named target registry: `openers_workspace | deliverables | gallery | campaign_tab | recovery_detail | intake_form`
+  - `getCampaignChecklist` enriches step views with `outreachStatus` + `internalLink` via bridge service (lazy import, best-effort)
+  - `CampaignChecklistStepView` extended with `outreachStatus?` + `internalLink?`
+- `apps/api/src/services/OutreachOpenerService.ts` — `fireBridgeAutoComplete` after execute/import (fire-and-forget)
+- `apps/api/src/services/OutreachFollowUpService.ts` — `fireBridgeAutoComplete` after execute/import
+- `apps/api/src/services/outreach-pitch/PitchService.ts` — fire-and-forget bridge call after `assemblePitch`
+- `apps/api/src/services/MarketingOutreachService.ts` — fire-and-forget bridge call after `logContact`
+- `apps/api/src/routes/marketing-ops.ts` — `GET /:id/outreach-state` endpoint
+
+### Frontend
+- `apps/web/src/services/MarketingOpsService.ts`:
+  - `CHECKLIST_STEP_TYPES` includes `internal_link`
+  - `INTERNAL_LINK_TARGETS` + `INTERNAL_LINK_TARGET_LABELS` — named target registry (mirrors backend)
+  - `OUTREACH_KINDS` + `OUTREACH_KIND_LABELS` — outreach kind enum + labels
+  - `ChecklistStepView` extended with `outreachStatus?` + `internalLink?`
+  - `OutreachState` interface + `getOutreachState(campaignId)` method
+- `apps/web/src/app/.../CampaignChecklistTab.tsx`:
+  - Outreach steps render channel badge + kind label + satisfaction indicator (detected/not yet) + deep-link button + one-click "mark complete"
+  - `internal_link` steps render "Open →" button with resolved URL
+  - `SuggestionFormModal` captures `stepType` + type-specific `actionConfig` (URL for `url_check`, target for `internal_link`, channel+kind for `outreach`, credential_ref for `credentials`)
+- `apps/web/src/app/.../ChecklistBuilderTab.tsx`:
+  - `internal_link` in step type dropdown with indigo color
+  - `internal_link` target selector + params JSON input
+  - `outreach` kind selector + auto-complete checkbox + min follow-up # input
+- `apps/web/src/components/marketing-ops/OutreachFollowUpCard.tsx` — checklist cross-link footer ("X/Y outreach steps complete →")
+- `apps/web/src/app/.../OpenerWorkspaceClient.tsx` — checklist badge in campaign selector ("Checklist: X/Y outreach steps done →")
+
+### Key Patterns
+- **OX signals are display-only**: `isOutreachStateSignal()` predicate; triage engine filters them out of rule evaluation
+- **Fire-and-forget bridge calls**: `import('./OutreachChecklistBridgeService').then(...)` pattern — checklist auto-completion never breaks the outreach flow
+- **Named target registry**: `internal_link` steps use named targets (not raw URLs) — keeps step templates portable across campaigns; `{campaignId}` resolved at render time
+- **Lazy import for circular dep avoidance**: `PlaybookChecklistService` lazy-imports `OutreachChecklistBridgeService` (bridge imports checklist service for step lookups)
+- **Best-effort enrichment**: bridge enrichment failures are logged + swallowed — checklist renders without enrichment if bridge has issues
+
 
 

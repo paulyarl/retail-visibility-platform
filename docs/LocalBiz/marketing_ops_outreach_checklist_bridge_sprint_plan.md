@@ -1,6 +1,6 @@
 # Marketing Ops — Outreach ↔ Checklist/Signal Bridge Sprint Plan
 
-**Status:** Draft for review
+**Status:** ✅ Implemented (Sprint 1) — 2026-08-09
 **Date:** 2026-08-09
 **Prerequisite sprints:** Operator Checklist (174/175), Outreach Openers (A1–A6), Pitch Construction, Playbook Catalog + Triage (PB-01..PB-07), Signal Registry
 
