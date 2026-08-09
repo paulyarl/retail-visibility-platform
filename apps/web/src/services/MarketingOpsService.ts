@@ -160,6 +160,17 @@ export interface Campaign {
   hot_prospect_deprioritized?: boolean;
   auto_followup_count?: number;
   customer_id?: string | null;
+  // ─── Multi-archetype sibling fields (migration 179) ────────────────────
+  // Surfaced on list + detail responses so list UIs can disambiguate
+  // sibling campaigns that share a business_name. businessProspectId groups
+  // siblings; isPrimarySibling marks the first-created sibling; the declared
+  // archetype (A1–A6) is resolved from the operator-accepted triage result's
+  // playbook (null when no accepted triage exists yet).
+  businessProspectId?: string | null;
+  isPrimarySibling?: boolean;
+  engagementCycle?: number;
+  archetype?: string | null;
+  archetypeLabel?: string | null;
 }
 
 export interface CampaignLineageEntry {
@@ -745,6 +756,10 @@ export interface Audit {
   mobile_friendly: boolean | null;
   audit_data: any;
   created_at: string;
+  // True when this audit was inherited from the primary sibling (non-primary
+  // siblings share the primary's business_analysis audit). Set by the backend
+  // in getCampaign; absent for audits generated on the campaign itself.
+  inherited?: boolean;
 }
 
 export interface StageHistory {

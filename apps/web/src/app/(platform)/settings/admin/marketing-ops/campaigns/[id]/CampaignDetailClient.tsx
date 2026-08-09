@@ -6,6 +6,7 @@ import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
 import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCategoryAnalysisAuditCard';
@@ -444,6 +445,14 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
                     {campaign.scope}
                   </span>
+                  {campaign.archetype && (
+                    <ArchetypeBadge archetype={campaign.archetype} showLabel />
+                  )}
+                  {campaign.isPrimarySibling === false && campaign.businessProspectId && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                      Sibling
+                    </span>
+                  )}
                   <StageBadge stage={campaign.stage} size="md" />
                   {campaign.is_hot_prospect && !campaign.hot_prospect_deprioritized && (
                     <span
@@ -874,6 +883,15 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
 
             {activeTab === 'audits' && (
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+                {(campaign.audits ?? []).some((a: Audit) => a.inherited) && (
+                  <div className="mb-4 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 p-3">
+                    <p className="text-xs text-purple-700 dark:text-purple-300">
+                      This is a non-primary sibling. The audits below are inherited from the primary
+                      sibling campaign — they share the same business prospect. Run a new analysis on
+                      this campaign to generate its own audit.
+                    </p>
+                  </div>
+                )}
                 {(campaign.audits ?? []).length === 0 ? (
                   <p className="text-center text-gray-400 py-8">No audits recorded yet.</p>
                 ) : (

@@ -481,19 +481,92 @@ export class MarketingCampaignService extends BaseService {
         parent,
         ...rest
       } = campaign as any;
+
+      let audits = mkt_audits_list ?? [];
+
+      // Sibling audit inheritance: a non-primary sibling shares the same
+      // business prospect as the primary, but the business_analysis audit
+      // (and category/city audits) live on the primary's row — the sibling's
+      // own mkt_audits_list is empty until it generates its own. Without
+      // this fallback the secondary sibling's Audits tab is blank and the
+      // operator cannot see the diagnostic that motivated the sibling. We
+      // pull the primary sibling's audits and tag each as inherited so the
+      // UI can distinguish them from audits generated on this campaign.
+      const isNonPrimarySibling =
+        rest.business_prospect_id && rest.is_primary_sibling === false;
+      if (isNonPrimarySibling && audits.length === 0) {
+        const inherited = await this.loadPrimarySiblingAudits(
+          rest.business_prospect_id,
+          rest.id,
+          ctx,
+        );
+        if (inherited.length > 0) {
+          audits = inherited.map((a: any) => ({ ...a, inherited: true }));
+        }
+      }
+
+      // Resolve the declared archetype for this campaign (from its
+      // operator-accepted triage result's playbook) so the detail header can
+      // show the A1–A6 badge. Mirrors listCampaigns' batch resolution.
+      const declaredArchetype = await this.resolveDeclaredArchetypes([rest.id], ctx);
+      const archetypeInfo = declaredArchetype.get(rest.id);
+
       return {
         ...rest,
-        audits: mkt_audits_list ?? [],
+        audits,
         files: mkt_files_list ?? [],
         stage_history: mkt_stage_history_list ?? [],
         outreach_log: mkt_outreach_log ?? [],
         parent_campaign: parent ?? null,
         children: children ?? [],
         service_category_label,
+        // Surface sibling grouping + archetype in camelCase so the detail
+        // page header can disambiguate siblings (matches listCampaigns).
+        businessProspectId: rest.business_prospect_id ?? null,
+        isPrimarySibling: rest.is_primary_sibling ?? false,
+        engagementCycle: rest.engagement_cycle ?? 1,
+        archetype: archetypeInfo?.archetype ?? null,
+        archetypeLabel: archetypeInfo?.archetypeLabel ?? null,
       };
     } catch (error) {
       logger.error('Failed to get campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Load the primary sibling's audits for inheritance by a non-primary
+   * sibling. Falls back to the earliest-created sibling if no primary is
+   * marked (legacy data). Excludes the requesting sibling's own id. The
+   * caller tags each returned audit with `inherited: true`.
+   */
+  private async loadPrimarySiblingAudits(
+    businessProspectId: string,
+    excludeCampaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<any[]> {
+    try {
+      const siblings = await this.prisma.mkt_campaigns_list.findMany({
+        where: { business_prospect_id: businessProspectId, scope: 'business' } as any,
+        select: {
+          id: true,
+          is_primary_sibling: true,
+          created_at: true,
+          mkt_audits_list: true,
+        },
+        orderBy: { created_at: 'asc' },
+      }) as any[];
+      const primary =
+        siblings.find((s) => s.is_primary_sibling === true && s.id !== excludeCampaignId) ??
+        siblings.find((s) => s.id !== excludeCampaignId);
+      return primary?.mkt_audits_list ?? [];
+    } catch (error) {
+      logger.warn('Failed to load primary sibling audits for inheritance', ctx, {
+        error: (error as Error).message,
+        businessProspectId,
+        excludeCampaignId,
+      });
+      return [];
     }
   }
 
@@ -714,16 +787,38 @@ export class MarketingCampaignService extends BaseService {
         this.prisma.mkt_campaigns_list.count({ where }),
       ]);
 
+      // Batch-resolve the declared archetype for each campaign from its
+      // operator-accepted triage result's playbook. Sibling campaigns share
+      // a business_prospect_id + business_name, so the archetype code (A1–A6)
+      // is the only signal that distinguishes them in a flat list. We resolve
+      // from the accepted triage result only (no per-campaign audit fallback)
+      // so this stays a single extra query for the whole page.
+      const archetypeByCampaign = await this.resolveDeclaredArchetypes(
+        items.map((i) => i.id),
+        ctx,
+      );
+
       // Derive the pipeline field for each campaign so the web app
       // can filter Openers/Follow-Ups (review) vs Recovery tab (recovery)
-      // without re-implementing the dispatch rule.
-      const itemsWithPipeline = items.map((item: any) => ({
-        ...item,
-        pipeline: pipelineFor(
-          (item.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT,
-          (item.repair_track as RepairTrack | null) ?? null,
-        ),
-      }));
+      // without re-implementing the dispatch rule. Also surface the sibling
+      // grouping fields (business_prospect_id, is_primary_sibling,
+      // engagement_cycle) + declared archetype so list UIs can disambiguate
+      // siblings that share a business name.
+      const itemsWithPipeline = items.map((item: any) => {
+        const declared = archetypeByCampaign.get(item.id);
+        return {
+          ...item,
+          pipeline: pipelineFor(
+            (item.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT,
+            (item.repair_track as RepairTrack | null) ?? null,
+          ),
+          businessProspectId: item.business_prospect_id ?? null,
+          isPrimarySibling: item.is_primary_sibling ?? false,
+          engagementCycle: item.engagement_cycle ?? 1,
+          archetype: declared?.archetype ?? null,
+          archetypeLabel: declared?.archetypeLabel ?? null,
+        };
+      });
 
       return {
         items: itemsWithPipeline,
@@ -736,6 +831,54 @@ export class MarketingCampaignService extends BaseService {
       logger.error('Failed to list campaigns', ctx, { error: (error as Error).message, filters });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * Batch-resolve the declared archetype (A1–A6) for a set of campaigns from
+   * their operator-accepted triage result's effective playbook. The effective
+   * playbook is the override if present, otherwise the recommendation.
+   *
+   * Returns a Map keyed by campaign_id. Campaigns with no accepted triage
+   * result (e.g. seek-stage before triage, or legacy campaigns) are absent.
+   *
+   * This mirrors the triage-precedence branch of
+   * OutreachOpenerService.resolveCampaignArchetype but skips the audit
+   * fallback (which would be an N+1 per campaign) so it is safe to call from
+   * list endpoints.
+   */
+  private async resolveDeclaredArchetypes(
+    campaignIds: string[],
+    ctx?: RequestCtx,
+  ): Promise<Map<string, { archetype: string; archetypeLabel: string }>> {
+    const result = new Map<string, { archetype: string; archetypeLabel: string }>();
+    if (campaignIds.length === 0) return result;
+    try {
+      const triageRows = await this.prisma.mkt_campaign_triage_results.findMany({
+        where: { campaign_id: { in: campaignIds } },
+        include: {
+          playbook: { select: { archetype: true, archetype_label: true } },
+          overridden_playbook: { select: { archetype: true, archetype_label: true } },
+        },
+      });
+      for (const row of triageRows as any[]) {
+        if (row.is_operator_accepted !== true) continue;
+        const pb = row.overridden_playbook ?? row.playbook;
+        if (pb?.archetype) {
+          result.set(row.campaign_id, {
+            archetype: pb.archetype,
+            archetypeLabel: pb.archetype_label ?? pb.archetype,
+          });
+        }
+      }
+    } catch (error) {
+      // Non-fatal: archetype badges are a display nicety. If triage lookup
+      // fails, the list still renders — campaigns just lack the badge.
+      logger.warn('Failed to resolve declared archetypes for campaign list', ctx, {
+        error: (error as Error).message,
+        campaignCount: campaignIds.length,
+      });
+    }
+    return result;
   }
 
   // ====================

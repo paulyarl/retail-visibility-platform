@@ -57,6 +57,7 @@ export interface SiblingSummary {
   stage: string;
   engagementCycle: number;
   isPrimarySibling: boolean;
+  businessProspectId: string | null;
   estimatedFeeCents: number;
   amountPaidCents: number;
   archetype: ArchetypeCodeWithA6 | null;
@@ -338,6 +339,17 @@ export class BusinessProspectService extends BaseService {
       orderBy: { created_at: 'asc' },
     }) as any[];
 
+    // Batch-resolve the declared archetype for each sibling from its
+    // operator-accepted triage result's effective playbook. Siblings created
+    // via triage have a pre-accepted triage result (see
+    // createSiblingTriageResult), so this resolves the A1–A6 code that
+    // disambiguates siblings sharing a business name. Manually-created
+    // siblings with no triage result resolve to null.
+    const archetypeByCampaign = await this.resolveSiblingArchetypes(
+      campaigns.map((c) => c.id),
+      ctx,
+    );
+
     // Resolve archetype for each sibling for priority ordering
     const summaries: SiblingSummary[] = campaigns.map((c) => ({
       id: c.id,
@@ -347,9 +359,10 @@ export class BusinessProspectService extends BaseService {
       stage: c.stage,
       engagementCycle: c.engagement_cycle ?? 1,
       isPrimarySibling: c.is_primary_sibling ?? false,
+      businessProspectId: (c.business_prospect_id as string | null) ?? null,
       estimatedFeeCents: c.estimated_fee_cents ?? 0,
       amountPaidCents: c.amount_paid_cents ?? 0,
-      archetype: null, // archetype is resolved at runtime — not persisted
+      archetype: archetypeByCampaign.get(c.id) ?? null,
       createdAt: c.created_at,
     }));
 
@@ -364,6 +377,45 @@ export class BusinessProspectService extends BaseService {
     });
 
     return summaries;
+  }
+
+  /**
+   * Batch-resolve the declared archetype (A1–A6) for sibling campaigns from
+   * their operator-accepted triage result's effective playbook (override if
+   * present, otherwise recommendation). Mirrors the triage-precedence branch
+   * of OutreachOpenerService.resolveCampaignArchetype without the audit
+   * fallback (kept to a single query).
+   */
+  private async resolveSiblingArchetypes(
+    campaignIds: string[],
+    ctx?: RequestCtx,
+  ): Promise<Map<string, ArchetypeCodeWithA6>> {
+    const result = new Map<string, ArchetypeCodeWithA6>();
+    if (campaignIds.length === 0) return result;
+    try {
+      const triageRows = await this.prisma.mkt_campaign_triage_results.findMany({
+        where: { campaign_id: { in: campaignIds } },
+        include: {
+          playbook: { select: { archetype: true } },
+          overridden_playbook: { select: { archetype: true } },
+        },
+      });
+      const validArchetypes: string[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
+      for (const row of triageRows as any[]) {
+        if (row.is_operator_accepted !== true) continue;
+        const pb = row.overridden_playbook ?? row.playbook;
+        const arch = pb?.archetype;
+        if (arch && validArchetypes.includes(arch)) {
+          result.set(row.campaign_id, arch as ArchetypeCodeWithA6);
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to resolve sibling archetypes', ctx, {
+        error: (error as Error).message,
+        campaignCount: campaignIds.length,
+      });
+    }
+    return result;
   }
 
   /**

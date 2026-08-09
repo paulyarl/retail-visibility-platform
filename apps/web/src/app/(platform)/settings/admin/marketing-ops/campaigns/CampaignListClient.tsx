@@ -5,6 +5,7 @@ import { RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon, Flame } from '
 import Link from 'next/link';
 import marketingOpsService, { Campaign, CampaignStage, CampaignScope } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
@@ -286,6 +287,9 @@ export default function CampaignListClient() {
                             {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 text-orange-500" />}
                             {c.business_name ?? '—'}
                           </Link>
+                          {c.archetype && (
+                            <ArchetypeBadge archetype={c.archetype} className="ml-1.5 align-middle" />
+                          )}
                           {c.display_id && (
                             <span className="ml-2 text-xs text-gray-400">{c.display_id}</span>
                           )}
@@ -353,6 +357,9 @@ export default function CampaignListClient() {
                               <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
                                 {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 flex-shrink-0 text-orange-500" />}
                                 {c.business_name ?? c.category ?? c.city}
+                                {c.archetype && (
+                                  <ArchetypeBadge archetype={c.archetype} className="ml-1 align-middle" />
+                                )}
                               </p>
                               {fuBadge && <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${fuBadge.cls}`}>{fuBadge.label}</span>}
                             </div>

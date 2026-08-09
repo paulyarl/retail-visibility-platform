@@ -18,6 +18,7 @@ import { RefreshCw, ArrowRightCircle, Repeat, Users, Plus, X } from 'lucide-reac
 import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
 import { StageBadge } from '@/components/marketing-ops/StageBadge';
+import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 
 interface SiblingsTabProps {
   campaignId: string;
@@ -35,6 +36,7 @@ interface SiblingSummary {
   engagementCycle: number;
   businessProspectId: string | null;
   estimatedFeeCents: number | null;
+  archetype: string | null;
   createdAt: string;
 }
 
@@ -299,6 +301,9 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
                     {sibling.businessName || 'Unnamed Campaign'}
                   </Link>
                   <div className="flex items-center gap-2 mt-0.5">
+                    {sibling.archetype && (
+                      <ArchetypeBadge archetype={sibling.archetype} />
+                    )}
                     <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${CATEGORY_COLORS[sibling.campaignCategory] ?? 'bg-gray-100 text-gray-700'}`}>
                       {sibling.campaignCategory.replace(/_/g, ' ')}
                     </span>
