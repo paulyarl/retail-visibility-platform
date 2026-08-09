@@ -29,8 +29,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
-  ShieldCheck, ArrowRightCircle, Building2, DollarSign, FileText, Info,
+  ShieldCheck, ArrowRightCircle, Building2, DollarSign, FileText, Info, Check,
 } from 'lucide-react';
+import Link from 'next/link';
 import marketingOpsService, {
   type TriageResult,
   type TriageSourceAudit,
@@ -83,6 +84,7 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
   const [bbbComplaints, setBbbComplaints] = useState('');
   const [showEnrichment, setShowEnrichment] = useState(false);
   const [alternatives, setAlternatives] = useState<any[] | null>(null);
+  const [siblingArchetypes, setSiblingArchetypes] = useState<Map<string, string>>(new Map());
   const [creatingSibling, setCreatingSibling] = useState<string | null>(null);
 
   const fetchTriage = useCallback(async () => {
@@ -104,7 +106,21 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
 
   useEffect(() => { fetchTriage(); }, [fetchTriage]);
 
-  // Fetch triage alternatives when triage is loaded (multi-archetype suggestions)
+  // Fetch triage alternatives + existing siblings when triage is loaded
+  // (multi-archetype suggestions). Siblings are fetched alongside so we can
+  // hide the "Create Sibling" button for alternatives that already have a
+  // sibling campaign in this prospect group — preventing duplicate clashes.
+  const fetchSiblings = useCallback(async () => {
+    try {
+      const list = await marketingOpsService.listSiblings(campaign.id);
+      const map = new Map<string, string>();
+      for (const s of list ?? []) {
+        if (s?.archetype && s?.id) map.set(s.archetype, s.id);
+      }
+      setSiblingArchetypes(map);
+    } catch { /* non-critical */ }
+  }, [campaign.id]);
+
   useEffect(() => {
     if (!triage) return;
     marketingOpsService.getTriageAlternatives(campaign.id).then((result) => {
@@ -112,7 +128,8 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
         setAlternatives(result.alternatives);
       }
     }).catch(() => { /* non-critical */ });
-  }, [campaign.id, triage]);
+    fetchSiblings();
+  }, [campaign.id, triage, fetchSiblings]);
 
   const handleCreateSibling = async (playbookCode: string, archetype: string) => {
     setCreatingSibling(playbookCode);
@@ -122,6 +139,7 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
         playbookCode,
       });
       onRefresh();
+      await fetchSiblings();
     } catch (err: any) {
       setError(err.message || 'Failed to create sibling campaign');
     } finally {
@@ -460,29 +478,43 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
                 Create sibling campaigns for additional signal matches. The winner is already selected above.
               </p>
               <div className="space-y-1.5">
-                {alternatives.map((alt: any) => (
-                  <div key={alt.playbookCode} className="flex items-center justify-between gap-2 rounded bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 px-2.5 py-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-xs font-bold text-gray-900 dark:text-white">{alt.playbookCode}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400 truncate">{alt.playbookName}</span>
-                      <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300">
-                        {alt.archetype}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleCreateSibling(alt.playbookCode, alt.archetype)}
-                      disabled={creatingSibling === alt.playbookCode}
-                      className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
-                    >
-                      {creatingSibling === alt.playbookCode ? (
-                        <RefreshCw className="w-3 h-3 animate-spin" />
+                {alternatives.map((alt: any) => {
+                  const existingSiblingId = siblingArchetypes.get(alt.archetype);
+                  return (
+                    <div key={alt.playbookCode} className="flex items-center justify-between gap-2 rounded bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 px-2.5 py-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs font-bold text-gray-900 dark:text-white">{alt.playbookCode}</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400 truncate">{alt.playbookName}</span>
+                        <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300">
+                          {alt.archetype}
+                        </span>
+                      </div>
+                      {existingSiblingId ? (
+                        <Link
+                          href={`/settings/admin/marketing-ops/campaigns/${existingSiblingId}`}
+                          className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded hover:bg-green-100 dark:hover:bg-green-900/30"
+                          title="A sibling campaign already exists for this archetype"
+                        >
+                          <Check className="w-3 h-3" />
+                          Sibling exists
+                        </Link>
                       ) : (
-                        <ArrowRightCircle className="w-3 h-3" />
+                        <button
+                          onClick={() => handleCreateSibling(alt.playbookCode, alt.archetype)}
+                          disabled={creatingSibling === alt.playbookCode}
+                          className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          {creatingSibling === alt.playbookCode ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <ArrowRightCircle className="w-3 h-3" />
+                          )}
+                          Create Sibling
+                        </button>
                       )}
-                      Create Sibling
-                    </button>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
