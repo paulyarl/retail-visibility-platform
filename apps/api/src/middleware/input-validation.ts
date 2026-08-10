@@ -21,7 +21,7 @@ const DANGEROUS_PATTERNS = [
   // XSS patterns
   /(<script|javascript:|vbscript:|onload=|onerror=|onclick=|onmouseover=)/i,
   // Path traversal
-  /(\.\.|\/etc\/passwd|\/etc\/shadow|\/proc\/|\/home\/)/i,
+  /(\.\.[\\\/]|\/etc\/passwd|\/etc\/shadow|\/proc\/|\/home\/)/i,
   // SQL line/block comments. The line-comment marker is exactly "--" followed by
   // whitespace. We use a negative lookbehind (?<!-) so that markdown horizontal
   // rules ("---\n" or longer dash runs) are NOT flagged as SQL comments, while
