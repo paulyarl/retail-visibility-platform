@@ -991,55 +991,53 @@ Do not prefix array objects with labels or identifiers.
 "phone": null,
 "website": null,
 
-```
-  "detected_signals": [],
-  "signal_count": 0,
+"detected_signals": [],
+"signal_count": 0,
 
-  "emerging_archetype": "INSUFFICIENT_EVIDENCE",
-  "growth_readiness": "insufficient_evidence",
-  "suggested_growth_playbook": "insufficient_evidence_hold",
+"emerging_archetype": "INSUFFICIENT_EVIDENCE",
+"growth_readiness": "insufficient_evidence",
+"suggested_growth_playbook": "insufficient_evidence_hold",
 
-  "foundational_presence_inventory": {
-    "score": 0,
-    "components": {
-      "any_discoverable_profile": 0,
-      "contactability": 0,
-      "category_clarity": 0,
-      "trust_signal_presence": 0
-    }
-  },
-
-  "google": {
-    "profile_status": "unable_to_verify",
-    "rating": null,
-    "review_count": null,
-    "hours_status": "unable_to_verify",
-    "photo_activity": "unable_to_verify",
-    "recent_owner_responses_observed": null
-  },
-
-  "yelp": {
-    "rating": null,
-    "review_count": null
-  },
-
-  "facebook": {
-    "rating_or_recommendation": null,
-    "review_count": null
-  },
-
-  "website_assessment": {
-    "status": "unable_to_verify",
-    "mobile_friendly": "unable_to_verify",
-    "clear_call_to_action": "unable_to_verify",
-    "issues": []
-  },
-
-  "nap_status": "unable_to_verify",
-  "observed_opportunities": [],
-  "data_confidence": "low"
+"foundational_presence_inventory": {
+"score": 0,
+"components": {
+"any_discoverable_profile": 0,
+"contactability": 0,
+"category_clarity": 0,
+"trust_signal_presence": 0
 }
-```
+},
+
+"google": {
+"profile_status": "unable_to_verify",
+"rating": null,
+"review_count": null,
+"hours_status": "unable_to_verify",
+"photo_activity": "unable_to_verify",
+"recent_owner_responses_observed": null
+},
+
+"yelp": {
+"rating": null,
+"review_count": null
+},
+
+"facebook": {
+"rating_or_recommendation": null,
+"review_count": null
+},
+
+"website_assessment": {
+"status": "unable_to_verify",
+"mobile_friendly": "unable_to_verify",
+"clear_call_to_action": "unable_to_verify",
+"issues": []
+},
+
+"nap_status": "unable_to_verify",
+"observed_opportunities": [],
+"data_confidence": "low"
+}
 
 ],
 
@@ -1092,34 +1090,32 @@ Do not prefix array objects with labels or identifiers.
 "insufficient_evidence_count": 0,
 "hidden_trust_signal_count": 0,
 
-```
 "inside_city_prospect_count": 0,
 "adjacent_city_prospect_count": 0,
 "metro_area_prospect_count": 0,
 
 "highest_opportunity_businesses": [
-  {
-    "business_name": "",
-    "city": "",
-    "location_status": "inside_city",
-    "signal_count": 0,
-    "detected_signals": [],
-    "emerging_archetype": "INSUFFICIENT_EVIDENCE",
-    "growth_readiness": "insufficient_evidence"
-  }
+{
+"business_name": "",
+"city": "",
+"location_status": "inside_city",
+"signal_count": 0,
+"detected_signals": [],
+"emerging_archetype": "INSUFFICIENT_EVIDENCE",
+"growth_readiness": "insufficient_evidence"
+}
 ],
 
 "recommended_for_business_audit": [
-  {
-    "business_name": "",
-    "city": "",
-    "location_status": "inside_city",
-    "growth_readiness": "high_readiness",
-    "suggested_growth_playbook": "",
-    "reason": ""
-  }
+{
+"business_name": "",
+"city": "",
+"location_status": "inside_city",
+"growth_readiness": "high_readiness",
+"suggested_growth_playbook": "",
+"reason": ""
+}
 ]
-```
 
 },
 
