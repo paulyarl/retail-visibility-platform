@@ -12,6 +12,7 @@ import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalys
 import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCategoryAnalysisAuditCard';
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
+import AuditImportMetadataBadge from '@/components/marketing-ops/AuditImportMetadataBadge';
 import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
 import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection';
@@ -909,7 +910,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                         <div key={audit.id} className="border border-blue-200 dark:border-blue-700 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/10">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-blue-900 dark:text-blue-300">City Pain Scan — Summary</span>
-                            <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-2">
+                              <AuditImportMetadataBadge audit={audit} />
+                              <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                            </div>
                           </div>
                           {audit.audit_data?.summary && (
                             <p className="text-sm text-gray-700 dark:text-gray-300">{audit.audit_data.summary}</p>
@@ -931,7 +935,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                         <div key={audit.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-gray-900 dark:text-white">{audit.platform}</span>
-                            <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-2">
+                              <AuditImportMetadataBadge audit={audit} />
+                              <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                             {audit.review_count != null && <DetailField label="Reviews" value={audit.review_count.toString()} />}

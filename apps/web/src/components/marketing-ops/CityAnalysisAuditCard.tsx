@@ -15,6 +15,7 @@ import {
   Building2,
 } from 'lucide-react';
 import type { Audit } from '@/services/MarketingOpsService';
+import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
 // ─── Types (mirrors regional-city-opportunity.schema.ts) ────────────────
 
@@ -391,6 +392,7 @@ export default function CityAnalysisAuditCard({ audit }: CityAnalysisAuditCardPr
           {dq.overall_confidence && (
             <Badge cls={confidenceColor(dq.overall_confidence)}>Confidence: {dq.overall_confidence}</Badge>
           )}
+          <AuditImportMetadataBadge audit={audit} />
         </div>
         <div className="flex items-center gap-1">
           <button

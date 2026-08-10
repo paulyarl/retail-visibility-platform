@@ -755,6 +755,15 @@ export interface Audit {
   has_contact_form: boolean | null;
   mobile_friendly: boolean | null;
   audit_data: any;
+  /** Free-form import metadata (model, provider, run_id, notes). Present on
+   * audits created via external import; absent on legacy/manual audits. */
+  import_metadata?: {
+    model?: string;
+    provider?: string;
+    run_id?: string;
+    notes?: string;
+    [key: string]: any;
+  } | null;
   created_at: string;
   // True when this audit was inherited from the primary sibling (non-primary
   // siblings share the primary's business_analysis audit). Set by the backend
@@ -1108,6 +1117,13 @@ export interface ExternalExecutionCreateInput {
   raw_output: string;
   source?: string;
   cost_cents?: number;
+  metadata?: {
+    model?: string;
+    provider?: string;
+    run_id?: string;
+    notes?: string;
+    [key: string]: any;
+  };
 }
 
 export interface ExternalExecutionResult {

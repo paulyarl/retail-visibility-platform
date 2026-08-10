@@ -329,6 +329,8 @@ export class MarketingPromptService extends BaseService {
     rawOutput: string;
     source?: string;
     costCents?: number;
+    /** Free-form metadata stored on the audit (model, provider, run_id, notes). */
+    metadata?: Record<string, any>;
     executedBy?: string;
   }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null }> {
     try {
@@ -397,6 +399,13 @@ export class MarketingPromptService extends BaseService {
           // and leave the scalar audit columns at their defaults.
           const ma = parsedJson.market_analysis;
           const hasMarketAnalysis = !!ma;
+          // Build import metadata: merge explicit operator-provided metadata
+          // with the execution's source/ai_provider so the audit always
+          // records which model produced it even when metadata is omitted.
+          const importMetadata: Record<string, any> = { ...(input.metadata ?? {}) };
+          if (input.source && !importMetadata.provider) {
+            importMetadata.provider = input.source;
+          }
           audit = await tx.mkt_audits_list.create({
             data: {
               id: auditId,
@@ -409,6 +418,7 @@ export class MarketingPromptService extends BaseService {
               photo_count: 0,
               mobile_friendly: undefined,
               audit_data: parsedJson,
+              import_metadata: Object.keys(importMetadata).length > 0 ? importMetadata : undefined,
             },
           });
         }

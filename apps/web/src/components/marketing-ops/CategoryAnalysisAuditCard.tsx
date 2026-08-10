@@ -5,6 +5,7 @@ import { Copy, Check, ArrowRight, Sparkles, StickyNote, Plus, Loader2, X, Inbox 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Audit } from '@/services/MarketingOpsService';
+import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
 /**
  * CategoryAnalysisAuditCard — structured renderer for market_analysis audits.
@@ -185,6 +186,7 @@ export default function CategoryAnalysisAuditCard({
           <span className="text-xs text-gray-400">
             {data.industry} · {data.location}
           </span>
+          <AuditImportMetadataBadge audit={audit} />
         </div>
         <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
       </div>

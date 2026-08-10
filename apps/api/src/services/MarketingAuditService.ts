@@ -27,6 +27,8 @@ export interface AuditInput {
   hasContactForm?: boolean;
   mobileFriendly?: boolean;
   auditData?: any;
+  /** Free-form import metadata (model, provider, run_id, notes). */
+  importMetadata?: any;
 }
 
 export class MarketingAuditService extends BaseService {
@@ -62,6 +64,7 @@ export class MarketingAuditService extends BaseService {
           has_contact_form: input.hasContactForm || false,
           mobile_friendly: input.mobileFriendly ?? null,
           audit_data: input.auditData || null,
+          import_metadata: input.importMetadata ?? null,
         },
       });
       logger.info('Marketing audit created', ctx, { auditId: id, campaignId: input.campaignId, platform: input.platform });
@@ -97,6 +100,7 @@ export class MarketingAuditService extends BaseService {
     if (input.hasContactForm !== undefined) data.has_contact_form = input.hasContactForm;
     if (input.mobileFriendly !== undefined) data.mobile_friendly = input.mobileFriendly;
     if (input.auditData !== undefined) data.audit_data = input.auditData;
+    if (input.importMetadata !== undefined) data.import_metadata = input.importMetadata;
 
     try {
       return await this.prisma.mkt_audits_list.update({ where: { id }, data });

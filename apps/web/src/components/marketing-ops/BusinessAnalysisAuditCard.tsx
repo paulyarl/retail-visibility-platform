@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw, CheckCircle2 } from 'lucide-react';
 import type { Audit } from '@/services/MarketingOpsService';
 import marketingOpsService from '@/services/MarketingOpsService';
+import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
 // ─── Helpers (shared with CityAnalysisAuditCard — duplicated for isolation) ───
 
@@ -156,6 +157,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
               {identityStatus}
             </Badge>
             <span className="text-[10px] text-gray-400">confidence: {identityConfidence}</span>
+            <AuditImportMetadataBadge audit={audit} />
           </div>
           <div className="flex items-center gap-1">
             <button onClick={handleCopySummary} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-neutral-700">

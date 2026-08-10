@@ -408,6 +408,15 @@ const externalExecutionCreateSchema = z.object({
   raw_output: z.string().min(1),
   source: z.string().max(100).optional(),
   cost_cents: z.number().int().optional(),
+  // Free-form metadata recorded on the audit so operators can tell apart
+  // which AI model produced an imported audit. Conventionally:
+  //   { model, provider, run_id, notes }
+  metadata: z.object({
+    model: z.string().max(200).optional(),
+    provider: z.string().max(100).optional(),
+    run_id: z.string().max(200).optional(),
+    notes: z.string().max(1000).optional(),
+  }).passthrough().optional(),
 });
 
 const filterFlagUpdateSchema = z.object({
@@ -1609,6 +1618,7 @@ router.post('/prompts/executions/external', async (req: any, res: Response) => {
       rawOutput: parsed.raw_output,
       source: parsed.source,
       costCents: parsed.cost_cents,
+      metadata: parsed.metadata,
       executedBy: req.user?.id,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });

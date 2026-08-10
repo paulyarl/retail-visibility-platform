@@ -149,6 +149,12 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  // Import metadata state — lets the operator record which AI model produced
+  // the imported audit so multiple model runs can be told apart on the Audits tab.
+  const [importModel, setImportModel] = useState('');
+  const [importProvider, setImportProvider] = useState('');
+  const [importRunId, setImportRunId] = useState('');
+  const [importNotes, setImportNotes] = useState('');
 
   // Template body inline-edit state
   const [editingBody, setEditingBody] = useState(false);
@@ -337,10 +343,19 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
     setImportError(null);
     setImportSuccess(null);
     try {
+      // Build metadata only from non-empty fields so the audit doesn't store
+      // empty strings. The backend also merges `source` as provider fallback.
+      const metadata: Record<string, string> = {};
+      if (importModel.trim()) metadata.model = importModel.trim();
+      if (importProvider.trim()) metadata.provider = importProvider.trim();
+      if (importRunId.trim()) metadata.run_id = importRunId.trim();
+      if (importNotes.trim()) metadata.notes = importNotes.trim();
+
       const result: ExternalExecutionResult = await marketingOpsService.createExternalExecution({
         campaign_id: selectedCampaignId,
         template_id: templateId,
         raw_output: importJson.trim(),
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       });
       setLastExecution(result.execution);
       setResultOpen(true);
@@ -349,6 +364,10 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
         (result.audit ? ` + created ${result.audit.platform} audit` : ''),
       );
       setImportJson('');
+      setImportModel('');
+      setImportProvider('');
+      setImportRunId('');
+      setImportNotes('');
       await fetchTemplate();
     } catch (err: any) {
       setImportError(err.message || 'Failed to import external result');
@@ -673,6 +692,49 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
               disabled={!selectedCampaignId}
               className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 max-h-48 overflow-y-auto"
             />
+            {/* Import metadata — records which AI model produced this audit */}
+            <div className="mt-3 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/60 dark:bg-neutral-900/40 p-3">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                Import metadata <span className="text-gray-400">(optional)</span>
+              </p>
+              <p className="text-[11px] text-gray-400 mb-2">
+                Record which model produced this result. Shown on the campaign Audits tab so you can tell apart runs from different models.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={importModel}
+                  onChange={(e) => setImportModel(e.target.value)}
+                  placeholder="Model (e.g. gpt-4-turbo, claude-3-opus)"
+                  disabled={!selectedCampaignId}
+                  className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+                <input
+                  type="text"
+                  value={importProvider}
+                  onChange={(e) => setImportProvider(e.target.value)}
+                  placeholder="Provider (e.g. openai, anthropic)"
+                  disabled={!selectedCampaignId}
+                  className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+                <input
+                  type="text"
+                  value={importRunId}
+                  onChange={(e) => setImportRunId(e.target.value)}
+                  placeholder="Run ID (optional external run ref)"
+                  disabled={!selectedCampaignId}
+                  className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+                <input
+                  type="text"
+                  value={importNotes}
+                  onChange={(e) => setImportNotes(e.target.value)}
+                  placeholder="Notes (optional)"
+                  disabled={!selectedCampaignId}
+                  className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+              </div>
+            </div>
             <button
               onClick={handleImportExternal}
               disabled={importing || !selectedCampaignId || !importJson.trim()}
