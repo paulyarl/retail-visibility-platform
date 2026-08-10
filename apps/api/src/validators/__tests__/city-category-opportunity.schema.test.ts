@@ -453,6 +453,39 @@ describe('cityCategoryOpportunitySchema — V2', () => {
       expect(result.data.prospect_discovery?.total_qualifying_prospects).toBeNull();
     }
   });
+
+  it('coerces "low" concentration to fragmented', () => {
+    const input = {
+      ...validV2Output,
+      competitive_landscape: {
+        ...validV2Output.competitive_landscape,
+        concentration: 'low',
+      },
+    };
+    const result = cityCategoryOpportunitySchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.competitive_landscape?.concentration).toBe('fragmented');
+    }
+  });
+
+  it('coerces "weak" photo_activity to stale (top_competitors + sampled_businesses)', () => {
+    const input = {
+      ...validV2Output,
+      top_competitors: validV2Output.top_competitors.map((c: any, i: number) =>
+        i === 0 ? { ...c, google: { ...c.google, photo_activity: 'weak' } } : c,
+      ),
+      sampled_businesses: validV2Output.sampled_businesses.map((b: any, i: number) =>
+        i === 1 ? { ...b, google: { ...b.google, photo_activity: 'weak' } } : b,
+      ),
+    };
+    const result = cityCategoryOpportunitySchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.top_competitors?.[0]?.google?.photo_activity).toBe('stale');
+      expect(result.data.sampled_businesses?.[1]?.google?.photo_activity).toBe('stale');
+    }
+  });
 });
 
 describe('OUTPUT_SCHEMA_REGISTRY / resolveOutputSchema — city_category_opportunity', () => {

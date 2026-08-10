@@ -70,6 +70,34 @@ function stripLlmJsonArtifacts(raw: string): string {
   }
 }
 
+/**
+ * Build a user-actionable error message from a JSON.parse failure, surfacing
+ * the parse error position and a snippet of the surrounding content so the
+ * operator can locate and fix the syntax error in pasted LLM output.
+ *
+ * V8's SyntaxError for JSON.parse includes a `message` like
+ *   "Unexpected non-whitespace character after JSON at position 2732 (line 1 column 2733)"
+ * We extract the position, show ~60 chars of context on either side, and mark
+ * the exact offset with `<HERE>`.
+ */
+function formatJsonParseError(e: unknown, raw: string): string {
+  const msg = (e as Error).message || 'Unknown parse error';
+  const posMatch = msg.match(/position (\d+)/);
+  if (!posMatch) {
+    return `raw_output is not valid JSON: ${msg}`;
+  }
+  const pos = parseInt(posMatch[1], 10);
+  const start = Math.max(0, pos - 60);
+  const end = Math.min(raw.length, pos + 60);
+  const before = raw.substring(start, pos);
+  const after = raw.substring(pos, end);
+  return (
+    `raw_output is not valid JSON: ${msg}\n` +
+    `Context near offset ${pos}:\n` +
+    `${JSON.stringify(before)}<HERE>${JSON.stringify(after)}`
+  );
+}
+
 export class MarketingPromptService extends BaseService {
   private static instance: MarketingPromptService;
 
@@ -352,7 +380,7 @@ export class MarketingPromptService extends BaseService {
       try {
         parsedJson = JSON.parse(stripLlmJsonArtifacts(input.rawOutput));
       } catch (e) {
-        throw new Error('raw_output is not valid JSON');
+        throw new Error(formatJsonParseError(e, input.rawOutput));
       }
 
       const schemaName = template.output_schema?.name ?? null;

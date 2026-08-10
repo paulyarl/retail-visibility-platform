@@ -121,7 +121,7 @@ const concentrationCoerced = z.preprocess((val) => {
       s === 'leader_dominant' ||
       s === 'dominated_by_one_leader'
     ) return 'dominated_by_one';
-    if (s === 'dispersed' || s === 'very_fragmented') return 'fragmented';
+    if (s === 'dispersed' || s === 'very_fragmented' || s === 'low' || s === 'low_concentration') return 'fragmented';
   }
   return val;
 }, z.enum([
@@ -213,7 +213,7 @@ const photoActivityCoerced = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
     if (s === 'recent_activity' || s === 'active' || s === 'current' || s === 'updated') return 'recent';
-    if (s === 'old' || s === 'outdated_photos') return 'stale';
+    if (s === 'old' || s === 'outdated_photos' || s === 'weak' || s === 'weak_activity' || s === 'limited') return 'stale';
     if (s === 'no_photos' || s === 'missing') return 'none_visible';
   }
   return val;
