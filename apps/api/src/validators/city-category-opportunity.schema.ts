@@ -256,9 +256,45 @@ const evidenceStatusEnum = z.enum([
   'insufficient_evidence',
 ]);
 const opportunityClassificationEnum = z.enum(['low', 'medium', 'high', 'very_high']);
-const tierEnum = z.enum(['tier_1', 'tier_2', 'tier_3']);
+/**
+ * Tier enum accepts both V2 values (tier_1 / tier_2 / tier_3) and V3
+ * Emerging-Discovery values (tier_foundation / tier_foundation_plus /
+ * tier_growth_ready). V3 tiers are keyed to Foundational Presence Inventory
+ * score bands rather than competitive-opportunity pain.
+ */
+const tierEnum = z.enum([
+  'tier_1',
+  'tier_2',
+  'tier_3',
+  'tier_foundation',
+  'tier_foundation_plus',
+  'tier_growth_ready',
+]);
 const estimateConfidenceEnum = z.enum(['low', 'medium', 'high']);
 const countUnitEnum = z.enum(['businesses', 'business_locations', 'listings']);
+
+/**
+ * V3 Emerging-Discovery enums.
+ *
+ * `growth_readiness` replaces `prospect_priority` in V3 output. It encodes
+ * how ready an emerging business is for a first-stage visibility engagement
+ * rather than a competitive-priority ranking.
+ *
+ * `emerging_archetype` classifies the kind of digital-visibility gap.
+ */
+const growthReadinessEnum = z.enum([
+  'high_readiness',
+  'moderate_readiness',
+  'foundation_needed',
+  'insufficient_evidence',
+]);
+const emergingArchetypeEnum = z.enum([
+  'SINGLE_PLATFORM',
+  'DIRECTORY_GHOST',
+  'MISCATEGORIZED_OR_MISLABELED',
+  'INVISIBLE_ANCHOR',
+  'INSUFFICIENT_EVIDENCE',
+]);
 
 /**
  * Tolerant coercion for clear_call_to_action.
@@ -567,7 +603,11 @@ const categoryDigitalOpportunityScoreSchema = z.object({
 
 const outreachRecommendationSchema = z.object({
   primary_angle: z.string(),
-  problem_to_reference: z.string(),
+  // V2 uses problem_to_reference; V3 uses opportunity_to_reference.
+  // At least one should be present, but both are optional at the schema
+  // level so each variant validates independently.
+  problem_to_reference: z.string().optional(),
+  opportunity_to_reference: z.string().optional(),
   suggested_service_package: z.array(z.string()).optional(),
   recommended_proof_or_demonstration: z.string(),
   suggested_call_to_action: z.string(),
@@ -612,20 +652,80 @@ const recommendedForBusinessAuditSchema = z.object({
   business_name: z.string(),
   city: z.string().nullable().optional(),
   location_status: locationStatusCoerced,
-  prospect_priority: prospectPriorityEnum,
+  // V2 uses prospect_priority; V3 uses growth_readiness + suggested_growth_playbook.
+  prospect_priority: prospectPriorityEnum.optional(),
+  growth_readiness: growthReadinessEnum.optional(),
+  suggested_growth_playbook: z.string().nullable().optional(),
   reason: z.string(),
+}).passthrough();
+
+// ---- V3 Emerging-Discovery sub-schemas ----
+
+const referenceAnchorSchema = z.object({
+  business_name: z.string(),
+  visibility_note: z.string(),
+  contrast_note: z.string(),
+}).passthrough();
+
+const foundationalPresenceBenchmarksSchema = z.object({
+  valid_business_count: coercedNumber,
+  average_score: coercedNumberNullable,
+  median_score: coercedNumberNullable,
+  lowest_score: coercedNumberNullable,
+  highest_score: coercedNumberNullable,
+  average_component_scores: z.object({
+    any_discoverable_profile: coercedNumberNullable,
+    contactability: coercedNumberNullable,
+    category_clarity: coercedNumberNullable,
+    trust_signal_presence: coercedNumberNullable,
+  }).passthrough(),
+}).passthrough();
+
+const archetypeDistributionSchema = z.object({
+  archetype: z.string(),
+  observed_count: coercedNumber,
+  sample_percentage: percentOrNumber,
+}).passthrough();
+
+const growthReadinessDistributionSchema = z.object({
+  readiness: z.string(),
+  observed_count: coercedNumber,
+  sample_percentage: percentOrNumber,
+}).passthrough();
+
+const highestOpportunityBusinessSchema = z.object({
+  business_name: z.string(),
+  city: z.string().nullable().optional(),
+  location_status: locationStatusCoerced,
+  signal_count: coercedNumber,
+  detected_signals: z.array(z.string()).optional(),
+  emerging_archetype: emergingArchetypeEnum,
+  growth_readiness: growthReadinessEnum,
 }).passthrough();
 
 const prospectDiscoverySchema = z.object({
   total_qualifying_prospects: coercedNumberNullable,
+  // V2 priority counts
   high_priority_count: coercedNumber.optional(),
   medium_priority_count: coercedNumber.optional(),
   low_priority_count: coercedNumber.optional(),
   insufficient_evidence_count: coercedNumber.optional(),
+  // V3 readiness counts
+  emerging_prospect_count: coercedNumber.optional(),
+  already_visible_reference_count: coercedNumber.optional(),
+  high_readiness_count: coercedNumber.optional(),
+  moderate_readiness_count: coercedNumber.optional(),
+  foundation_needed_count: coercedNumber.optional(),
+  hidden_trust_signal_count: coercedNumber.optional(),
+  // Shared geographic counts
   inside_city_prospect_count: coercedNumber.optional(),
   adjacent_city_prospect_count: coercedNumber.optional(),
   metro_area_prospect_count: coercedNumber.optional(),
+  // V2 list
   highest_signal_businesses: z.array(highestSignalBusinessSchema).optional(),
+  // V3 list
+  highest_opportunity_businesses: z.array(highestOpportunityBusinessSchema).optional(),
+  // Shared list (fields differ by variant — see recommendedForBusinessAuditSchema)
   recommended_for_business_audit: z.array(recommendedForBusinessAuditSchema).optional(),
 }).passthrough();
 
@@ -635,13 +735,15 @@ export const cityCategoryOpportunitySchema = z.object({
   audit_metadata: auditMetadataSchema,
   summary: z.string(),
   market_size: marketSizeSchema,
-  category_benchmarks: categoryBenchmarksSchema,
-  competitive_landscape: competitiveLandscapeSchema,
-  top_competitors: z.array(topCompetitorSchema),
+  // V2 competitive fields — optional for V3 emerging-discovery variant
+  // (V3 uses reference_anchors + foundational_presence_benchmarks instead)
+  category_benchmarks: categoryBenchmarksSchema.optional(),
+  competitive_landscape: competitiveLandscapeSchema.optional(),
+  top_competitors: z.array(topCompetitorSchema).optional(),
   sampled_businesses: z.array(sampledBusinessSchema).optional(),
   common_digital_issues: z.array(commonDigitalIssueSchema).optional(),
   opportunity_gaps: opportunityGapsSchema.optional(),
-  category_digital_opportunity_score: categoryDigitalOpportunityScoreSchema,
+  category_digital_opportunity_score: categoryDigitalOpportunityScoreSchema.optional(),
   outreach_recommendation: outreachRecommendationSchema,
   recommended_tier: tierEnum,
   tier_rationale: z.string().nullable().optional(),
@@ -650,6 +752,11 @@ export const cityCategoryOpportunitySchema = z.object({
   sources: z.array(sourceSchema).optional(),
   // V2 (prospect-discovery variant)
   prospect_discovery: prospectDiscoverySchema.optional(),
+  // V3 (emerging-discovery variant)
+  reference_anchors: z.array(referenceAnchorSchema).optional(),
+  foundational_presence_benchmarks: foundationalPresenceBenchmarksSchema.optional(),
+  archetype_distribution: z.array(archetypeDistributionSchema).optional(),
+  growth_readiness_distribution: z.array(growthReadinessDistributionSchema).optional(),
 }).passthrough();
 
 export type CityCategoryOpportunityOutput = z.infer<typeof cityCategoryOpportunitySchema>;
@@ -870,13 +977,14 @@ Return your response as JSON matching this exact schema:
   "outreach_recommendation": {
     "primary_angle": "<string>",
     "problem_to_reference": "<string>",
+    "opportunity_to_reference": "<string>",
     "suggested_service_package": ["<string>"],
     "recommended_proof_or_demonstration": "<string>",
     "suggested_call_to_action": "<string>",
     "claims_to_avoid": ["<string>"],
     "ideal_prospect_profile": "<string>"
   },
-  "recommended_tier": "tier_1|tier_2|tier_3",
+  "recommended_tier": "tier_1|tier_2|tier_3|tier_foundation|tier_foundation_plus|tier_growth_ready",
   "tier_rationale": "<string>",
   "estimated_monthly_service_fee": { "minimum": <number>, "maximum": <number>, "currency": "<string>" },
   "data_quality": {
@@ -896,6 +1004,12 @@ Return your response as JSON matching this exact schema:
     "medium_priority_count": <number>,
     "low_priority_count": <number>,
     "insufficient_evidence_count": <number>,
+    "emerging_prospect_count": <number>,
+    "already_visible_reference_count": <number>,
+    "high_readiness_count": <number>,
+    "moderate_readiness_count": <number>,
+    "foundation_needed_count": <number>,
+    "hidden_trust_signal_count": <number>,
     "inside_city_prospect_count": <number>,
     "adjacent_city_prospect_count": <number>,
     "metro_area_prospect_count": <number>,
@@ -909,17 +1023,67 @@ Return your response as JSON matching this exact schema:
         "prospect_priority": "high|medium|low|insufficient_evidence"
       }
     ],
+    "highest_opportunity_businesses": [
+      {
+        "business_name": "<string>",
+        "city": "<string>",
+        "location_status": "inside_city|adjacent_city|metro_area",
+        "signal_count": <number>,
+        "detected_signals": ["<string>"],
+        "emerging_archetype": "SINGLE_PLATFORM|DIRECTORY_GHOST|MISCATEGORIZED_OR_MISLABELED|INVISIBLE_ANCHOR|INSUFFICIENT_EVIDENCE",
+        "growth_readiness": "high_readiness|moderate_readiness|foundation_needed|insufficient_evidence"
+      }
+    ],
     "recommended_for_business_audit": [
       {
         "business_name": "<string>",
         "city": "<string>",
         "location_status": "inside_city|adjacent_city|metro_area",
-        "prospect_priority": "high",
+        "prospect_priority": "high|medium|low|insufficient_evidence",
+        "growth_readiness": "high_readiness|moderate_readiness|foundation_needed|insufficient_evidence",
+        "suggested_growth_playbook": "<string>",
         "reason": "<string>"
       }
     ]
-  }
+  },
+  "reference_anchors": [
+    {
+      "business_name": "<string>",
+      "visibility_note": "<string>",
+      "contrast_note": "<string>"
+    }
+  ],
+  "foundational_presence_benchmarks": {
+    "valid_business_count": <number>,
+    "average_score": <number|null>,
+    "median_score": <number|null>,
+    "lowest_score": <number|null>,
+    "highest_score": <number|null>,
+    "average_component_scores": {
+      "any_discoverable_profile": <number|null>,
+      "contactability": <number|null>,
+      "category_clarity": <number|null>,
+      "trust_signal_presence": <number|null>
+    }
+  },
+  "archetype_distribution": [
+    { "archetype": "<string>", "observed_count": <number>, "sample_percentage": <number> }
+  ],
+  "growth_readiness_distribution": [
+    { "readiness": "<string>", "observed_count": <number>, "sample_percentage": <number> }
+  ]
 }
+
+VARIANT NOTES:
+- V2 (competitive-visibility variant): include category_benchmarks, competitive_landscape,
+  top_competitors, category_digital_opportunity_score, and prospect_discovery with
+  prospect_priority / highest_signal_businesses. Use tier_1 / tier_2 / tier_3.
+- V3 (emerging-discovery variant): include reference_anchors, foundational_presence_benchmarks,
+  archetype_distribution, growth_readiness_distribution, and prospect_discovery with
+  growth_readiness / highest_opportunity_businesses. Use tier_foundation / tier_foundation_plus /
+  tier_growth_ready. Omit category_benchmarks, competitive_landscape, top_competitors, and
+  category_digital_opportunity_score when the sample is emerging-tier only.
+- outreach_recommendation: V2 uses problem_to_reference; V3 uses opportunity_to_reference.
 
 CRITICAL JSON RULES:
 - Every element of a JSON array MUST be a bare JSON object "{ ... }" or bare value, separated from the previous element by a comma.

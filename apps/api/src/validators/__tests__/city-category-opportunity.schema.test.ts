@@ -503,6 +503,304 @@ describe('cityCategoryOpportunitySchema — V2', () => {
   });
 });
 
+// ---- V3 (Emerging-Discovery variant) fixture ----
+
+const validV3Output = {
+  audit_metadata: {
+    audit_date: '2026-08-10',
+    requested_market: {
+      category: 'African Grocery Store',
+      city: 'Kansas City',
+      state: 'Missouri',
+      zip_codes: [],
+      search_radius_miles: null,
+    },
+    category_definition: {
+      working_definition: 'Independent specialty grocery businesses with African grocery identity.',
+      included_subcategories: ['African grocery stores', 'West African grocery stores'],
+      excluded_subcategories: ['National grocery chains', 'General international supermarkets'],
+    },
+    geographic_scope: {
+      scope_description: 'Kansas City + adjacent municipalities',
+      market_center: 'Kansas City, Missouri',
+      scope_mode: 'prospect_market',
+      explicit_radius_supplied: false,
+      search_radius_miles: null,
+      automatic_market_scope_description: 'Practical market included Kansas City, Gladstone, Raytown, Independence.',
+      businesses_inside_city_only: false,
+      adjacent_cities_included: ['Gladstone', 'Raytown', 'Independence'],
+      metro_areas_included: ['Olathe'],
+      service_area_businesses_included: false,
+    },
+    research_method: {
+      sources_reviewed: ['Google', 'RefugeKC', 'Northeast Kansas City Chamber'],
+      emerging_discovery_sources_prioritized: ['RefugeKC', 'WIC retailer listings', 'Low-review records'],
+      deduplication_method: 'Name + address + phone comparison.',
+      sampling_method: 'Ten emerging-tier businesses selected from three visible reference anchors.',
+    },
+    limitations: ['Sparse public records for emerging businesses.'],
+  },
+  summary: 'V3 emerging-discovery scan found 10 emerging businesses with average Foundational Presence score 28.2.',
+  market_size: {
+    core_city: { verified_business_count: 9, approximate_business_count: 11 },
+    prospect_universe: {
+      verified_business_count: 13,
+      approximate_business_count: 17,
+      inside_city_count: 9,
+      adjacent_city_count: 3,
+      metro_area_count: 1,
+      already_visible_count: 3,
+      emerging_count: 10,
+    },
+    count_unit: 'business_locations',
+    detailed_sample_size: 10,
+    estimate_confidence: 'medium',
+    estimation_method: 'Direct enumeration plus community directories.',
+    counts_complete: false,
+  },
+  // V3 does NOT include category_benchmarks, competitive_landscape, top_competitors,
+  // or category_digital_opportunity_score — those are V2 competitive fields.
+  reference_anchors: [
+    {
+      business_name: 'Arada Market',
+      visibility_note: 'Owned website with 4.8 stars from 36 Google reviews.',
+      contrast_note: 'Demonstrates the digital foundation missing from the emerging sample.',
+    },
+  ],
+  foundational_presence_benchmarks: {
+    valid_business_count: 10,
+    average_score: 28.2,
+    median_score: 30.0,
+    lowest_score: 9,
+    highest_score: 40,
+    average_component_scores: {
+      any_discoverable_profile: 9.1,
+      contactability: 8.0,
+      category_clarity: 9.0,
+      trust_signal_presence: 2.1,
+    },
+  },
+  archetype_distribution: [
+    { archetype: 'SINGLE_PLATFORM', observed_count: 3, sample_percentage: 30.0 },
+    { archetype: 'DIRECTORY_GHOST', observed_count: 3, sample_percentage: 30.0 },
+  ],
+  growth_readiness_distribution: [
+    { readiness: 'high_readiness', observed_count: 4, sample_percentage: 40.0 },
+    { readiness: 'moderate_readiness', observed_count: 4, sample_percentage: 40.0 },
+  ],
+  sampled_businesses: [
+    {
+      business_name: 'Aboom Tropical Market',
+      ownership_type: 'independent',
+      location_status: 'inside_city',
+      city: 'Kansas City',
+      state: 'Missouri',
+      distance_from_market_center_miles: null,
+      address: '6408 N Oak Trafficway, Kansas City, MO 64118',
+      phone: '(816) 420-0336',
+      website: null,
+      detected_signals: ['WC_MISSING_WEBSITE', 'EF_STRONG_HIDDEN_TRUST'],
+      signal_count: 2,
+      emerging_archetype: 'SINGLE_PLATFORM',
+      growth_readiness: 'high_readiness',
+      suggested_growth_playbook: 'trust_amplification',
+      foundational_presence_inventory: {
+        score: 40,
+        components: {
+          any_discoverable_profile: 10,
+          contactability: 10,
+          category_clarity: 10,
+          trust_signal_presence: 10,
+        },
+      },
+      google: {
+        profile_status: 'unable_to_verify',
+        rating: 4.5,
+        review_count: 18,
+        hours_status: 'current',
+        photo_activity: 'unable_to_verify',
+        recent_owner_responses_observed: null,
+      },
+      yelp: { rating: null, review_count: null },
+      facebook: { rating_or_recommendation: null, review_count: 3 },
+      website_assessment: {
+        status: 'none_found',
+        mobile_friendly: 'unable_to_verify',
+        clear_call_to_action: 'unable_to_verify',
+        issues: ['No owned official website was verified.'],
+      },
+      nap_status: 'consistent',
+      observed_opportunities: ['Create an owned website', 'Expand beyond directory dependence.'],
+      data_confidence: 'high',
+    },
+  ],
+  common_digital_issues: [
+    {
+      issue: 'Weak visible customer-trust footprint',
+      observed_business_count: 8,
+      valid_sample_size: 10,
+      observed_percent: 80.0,
+      severity: 'high',
+      evidence_summary: 'Eight of ten emerging businesses had no verifiable review footprint.',
+      data_confidence: 'high',
+    },
+  ],
+  opportunity_gaps: {
+    geographic: [
+      {
+        area: 'Historic Northeast Kansas City',
+        gap: 'Community-level presence stronger than mainstream digital visibility.',
+        evidence_status: 'verified',
+        evidence_summary: 'RefugeKC identifies multiple immigrant grocery businesses.',
+      },
+    ],
+    services: [
+      {
+        service: 'Foundational business-profile establishment',
+        gap: 'Several emerging prospects lack a robust mainstream digital foundation.',
+        evidence_status: 'verified',
+        evidence_summary: 'Mogadisho Market and Somali Star Shop are more visible through community directories.',
+      },
+    ],
+    digital: [
+      {
+        gap: 'Review and testimonial establishment',
+        observed_business_count: 8,
+        evidence_status: 'verified',
+        evidence_summary: 'Eight of ten emerging businesses have fewer than 15 visible reviews.',
+      },
+    ],
+  },
+  prospect_discovery: {
+    total_qualifying_prospects: 13,
+    emerging_prospect_count: 10,
+    already_visible_reference_count: 3,
+    high_readiness_count: 4,
+    moderate_readiness_count: 4,
+    foundation_needed_count: 1,
+    insufficient_evidence_count: 1,
+    hidden_trust_signal_count: 3,
+    inside_city_prospect_count: 9,
+    adjacent_city_prospect_count: 3,
+    metro_area_prospect_count: 1,
+    highest_opportunity_businesses: [
+      {
+        business_name: 'African International Market',
+        city: 'Kansas City',
+        location_status: 'inside_city',
+        signal_count: 3,
+        detected_signals: ['WC_MISSING_WEBSITE', 'CP_NAP_ADDRESS_DRIFT', 'EF_STRONG_HIDDEN_TRUST'],
+        emerging_archetype: 'MISCATEGORIZED_OR_MISLABELED',
+        growth_readiness: 'high_readiness',
+      },
+    ],
+    recommended_for_business_audit: [
+      {
+        business_name: 'African International Market',
+        city: 'Kansas City',
+        location_status: 'inside_city',
+        growth_readiness: 'high_readiness',
+        suggested_growth_playbook: 'recategorization_and_cleanup',
+        reason: 'Strong category evidence but conflicting address records and no owned website.',
+      },
+    ],
+  },
+  outreach_recommendation: {
+    primary_angle: 'Help established but thinly visible African specialty markets.',
+    opportunity_to_reference: 'The V3 scan found businesses verifiable through community directories but weakly represented in mainstream search.',
+    suggested_service_package: ['GBP optimization', 'Website build', 'Review management'],
+    recommended_proof_or_demonstration: 'Show the prospect where it is discoverable and where it is absent.',
+    suggested_call_to_action: 'Offer an individual Business Audit.',
+    claims_to_avoid: ['Claims that weak digital visibility means the business is unsuccessful.'],
+    ideal_prospect_profile: 'Verified independent African grocery business with active location but limited mainstream reviews.',
+  },
+  recommended_tier: 'tier_foundation_plus',
+  tier_rationale: 'Average Foundational Presence Inventory score is 28.2, sitting at the top of the tier_foundation_plus range.',
+  estimated_monthly_service_fee: { minimum: 500, maximum: 1000, currency: 'USD' },
+  data_quality: {
+    confidence: 'medium',
+    verified_fields: ['Kansas City market center', 'Aboom Tropical Market identity'],
+    estimated_fields: ['Complete emerging-business count'],
+    unavailable_fields: ['Direct Google profile ownership status'],
+    small_sample_warnings: ['V3 sample intentionally overrepresents thinly visible businesses.'],
+    limitations: ['V3 targets businesses with little mainstream visibility.'],
+  },
+  sources: [
+    { source_name: 'RefugeKC Groceries', source_type: 'community grocery directory', url: 'https://www.refugekc.org/groceries.html', accessed_date: '2026-08-10' },
+  ],
+};
+
+describe('cityCategoryOpportunitySchema — V3 (Emerging-Discovery variant)', () => {
+  it('accepts valid V3 JSON without V2 competitive fields', () => {
+    const result = cityCategoryOpportunitySchema.safeParse(validV3Output);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.category_benchmarks).toBeUndefined();
+      expect(result.data.competitive_landscape).toBeUndefined();
+      expect(result.data.top_competitors).toBeUndefined();
+      expect(result.data.category_digital_opportunity_score).toBeUndefined();
+      expect(result.data.recommended_tier).toBe('tier_foundation_plus');
+      expect(result.data.reference_anchors?.[0]?.business_name).toBe('Arada Market');
+      expect(result.data.foundational_presence_benchmarks?.average_score).toBe(28.2);
+      expect(result.data.archetype_distribution?.[0]?.archetype).toBe('SINGLE_PLATFORM');
+      expect(result.data.growth_readiness_distribution?.[0]?.readiness).toBe('high_readiness');
+    }
+  });
+
+  it('accepts V3 outreach_recommendation with opportunity_to_reference instead of problem_to_reference', () => {
+    const result = cityCategoryOpportunitySchema.safeParse(validV3Output);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.outreach_recommendation?.opportunity_to_reference).toBeDefined();
+      expect(result.data.outreach_recommendation?.problem_to_reference).toBeUndefined();
+    }
+  });
+
+  it('accepts V3 prospect_discovery with growth_readiness counts and highest_opportunity_businesses', () => {
+    const result = cityCategoryOpportunitySchema.safeParse(validV3Output);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.prospect_discovery?.emerging_prospect_count).toBe(10);
+      expect(result.data.prospect_discovery?.high_readiness_count).toBe(4);
+      expect(result.data.prospect_discovery?.hidden_trust_signal_count).toBe(3);
+      expect(result.data.prospect_discovery?.highest_opportunity_businesses?.[0]?.business_name).toBe('African International Market');
+      expect(result.data.prospect_discovery?.highest_opportunity_businesses?.[0]?.emerging_archetype).toBe('MISCATEGORIZED_OR_MISLABELED');
+      expect(result.data.prospect_discovery?.highest_opportunity_businesses?.[0]?.growth_readiness).toBe('high_readiness');
+    }
+  });
+
+  it('accepts V3 recommended_for_business_audit with growth_readiness instead of prospect_priority', () => {
+    const result = cityCategoryOpportunitySchema.safeParse(validV3Output);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const rec = result.data.prospect_discovery?.recommended_for_business_audit?.[0];
+      expect(rec?.growth_readiness).toBe('high_readiness');
+      expect(rec?.suggested_growth_playbook).toBe('recategorization_and_cleanup');
+      expect(rec?.prospect_priority).toBeUndefined();
+    }
+  });
+
+  it('accepts V3 tier_foundation and tier_growth_ready values', () => {
+    const tierFoundation = { ...validV3Output, recommended_tier: 'tier_foundation' };
+    const tierGrowthReady = { ...validV3Output, recommended_tier: 'tier_growth_ready' };
+    expect(cityCategoryOpportunitySchema.safeParse(tierFoundation).success).toBe(true);
+    expect(cityCategoryOpportunitySchema.safeParse(tierGrowthReady).success).toBe(true);
+  });
+
+  it('still accepts V2 output alongside V3 changes (backward compatibility)', () => {
+    const result = cityCategoryOpportunitySchema.safeParse(validV2Output);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.category_benchmarks?.google?.average_rating).toBe(4.1);
+      expect(result.data.competitive_landscape?.concentration).toBe('moderately_concentrated');
+      expect(result.data.top_competitors?.[0]?.business_name).toBe('Acme HVAC');
+      expect(result.data.category_digital_opportunity_score?.score).toBe(7);
+      expect(result.data.recommended_tier).toBe('tier_2');
+      expect(result.data.outreach_recommendation?.problem_to_reference).toBeDefined();
+    }
+  });
+});
+
 describe('OUTPUT_SCHEMA_REGISTRY / resolveOutputSchema — city_category_opportunity', () => {
   it('resolves city_category_opportunity with validator, auditPlatform, and promptSuffix', () => {
     const resolved = resolveOutputSchema(CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME);
@@ -512,6 +810,10 @@ describe('OUTPUT_SCHEMA_REGISTRY / resolveOutputSchema — city_category_opportu
     expect(resolved!.promptSuffix).toContain('core_city');
     expect(resolved!.promptSuffix).toContain('adjacent_city');
     expect(resolved!.promptSuffix).toContain('prospect_priority');
+    expect(resolved!.promptSuffix).toContain('tier_foundation_plus');
+    expect(resolved!.promptSuffix).toContain('opportunity_to_reference');
+    expect(resolved!.promptSuffix).toContain('reference_anchors');
+    expect(resolved!.promptSuffix).toContain('foundational_presence_benchmarks');
   });
 
   it('registry contains city_category_opportunity entry', () => {
