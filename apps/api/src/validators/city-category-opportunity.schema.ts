@@ -42,7 +42,18 @@ const percentOrNumber = z.preprocess((val) => {
 
 /** Coerce string-or-number values to number. */
 const coercedNumber = z.coerce.number();
-const coercedNumberNullable = z.union([z.coerce.number(), z.null()]);
+/**
+ * Coerce string-or-number to number, preserving null.
+ * `z.coerce.number()` coerces null → 0 (Number(null) === 0), so a plain
+ * `z.union([z.coerce.number(), z.null()])` would swallow nulls. We put
+ * `z.null()` first in the union so null input matches it before the
+ * numeric coercion runs, and preprocess undefined → null for the same
+ * reason.
+ */
+const coercedNumberNullable = z.preprocess((val) => {
+  if (val === null || val === undefined) return null;
+  return val;
+}, z.union([z.null(), z.coerce.number()]));
 
 /**
  * Coerce common truthy/falsy string forms to boolean.
@@ -129,10 +140,48 @@ const ownershipTypeEnum = z.enum([
   'franchise',
   'unknown',
 ]);
+/**
+ * Tolerant location_status enum.
+ *
+ * V2 (Prospect-Discovery variant) uses: inside_city, adjacent_city, metro_area.
+ * Legacy V1 output used: inside_city, outside_city_serving_city, unable_to_verify.
+ *
+ * Both sets are accepted so already-stored legacy audits and new V2 output
+ * validate. The V2 prompt instructs agents to use only the 3 new values;
+ * outside_market businesses must not appear in sampled_businesses at all.
+ */
 const locationStatusEnum = z.enum([
   'inside_city',
+  'adjacent_city',
+  'metro_area',
   'outside_city_serving_city',
   'unable_to_verify',
+]);
+
+/**
+ * Coerces legacy V1 location_status values into V2 equivalents where a
+ * sensible mapping exists, so V1-shaped agent output still validates cleanly
+ * against the V2-extended schema.
+ */
+const locationStatusCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'outside_city_serving_city') return 'metro_area';
+  }
+  return val;
+}, locationStatusEnum);
+
+const prospectPriorityEnum = z.enum([
+  'high',
+  'medium',
+  'low',
+  'insufficient_evidence',
+]);
+
+const scopeModeEnum = z.enum([
+  'city_only',
+  'explicit_radius',
+  'prospect_market',
 ]);
 
 /**
@@ -241,8 +290,17 @@ const categoryDefinitionSchema = z.object({
 
 const geographicScopeSchema = z.object({
   scope_description: z.string(),
-  businesses_inside_city_only: coercedBoolean,
-  service_area_businesses_included: coercedBoolean,
+  // V2 fields (prospect-discovery variant)
+  market_center: z.string().nullable().optional(),
+  scope_mode: scopeModeEnum.optional(),
+  explicit_radius_supplied: coercedBoolean.optional(),
+  search_radius_miles: coercedNumberNullable.optional(),
+  automatic_market_scope_description: z.string().nullable().optional(),
+  adjacent_cities_included: z.array(z.string()).optional(),
+  metro_areas_included: z.array(z.string()).optional(),
+  // Legacy V1 fields (still accepted for backward compatibility)
+  businesses_inside_city_only: coercedBoolean.optional(),
+  service_area_businesses_included: coercedBoolean.optional(),
 }).passthrough();
 
 const researchMethodSchema = z.object({
@@ -260,14 +318,40 @@ const auditMetadataSchema = z.object({
   limitations: z.array(z.string()).optional(),
 }).passthrough();
 
-const marketSizeSchema = z.object({
+/**
+ * V2 market_size: nests counts under core_city and prospect_universe.
+ *
+ * Legacy V1 output placed verified_business_count / approximate_business_count
+ * at the top level of market_size. Those flat fields are still accepted as
+ * optional so already-stored V1 audits re-validate, but V2 agents produce the
+ * nested structure per the Category Audit V2 spec.
+ */
+const coreCityMarketSizeSchema = z.object({
   verified_business_count: coercedNumberNullable,
   approximate_business_count: coercedNumberNullable,
+}).passthrough();
+
+const prospectUniverseMarketSizeSchema = z.object({
+  verified_business_count: coercedNumberNullable,
+  approximate_business_count: coercedNumberNullable,
+  inside_city_count: coercedNumberNullable.optional(),
+  adjacent_city_count: coercedNumberNullable.optional(),
+  metro_area_count: coercedNumberNullable.optional(),
+}).passthrough();
+
+const marketSizeSchema = z.object({
+  // V2 nested structure
+  core_city: coreCityMarketSizeSchema.optional(),
+  prospect_universe: prospectUniverseMarketSizeSchema.optional(),
+  // Shared / top-level fields (present in both V1 and V2)
   count_unit: countUnitEnum,
   detailed_sample_size: coercedNumber,
   estimate_confidence: estimateConfidenceEnum,
   estimation_method: z.string(),
   counts_complete: coercedBoolean.optional(),
+  // Legacy V1 flat fields (optional — V2 agents omit these)
+  verified_business_count: coercedNumberNullable.optional(),
+  approximate_business_count: coercedNumberNullable.optional(),
 }).passthrough();
 
 const googleBenchmarksSchema = z.object({
@@ -408,7 +492,14 @@ const sampledBusinessWebsiteSchema = z.object({
 const sampledBusinessSchema = z.object({
   business_name: z.string(),
   ownership_type: ownershipTypeEnum,
-  location_status: locationStatusEnum,
+  location_status: locationStatusCoerced,
+  // V2 fields (prospect-discovery variant)
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  distance_from_market_center_miles: coercedNumberNullable.optional(),
+  signal_count: coercedNumber.optional(),
+  prospect_priority: prospectPriorityEnum.optional(),
+  // Shared fields (present in both V1 and V2)
   address: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
@@ -504,6 +595,38 @@ const sourceSchema = z.object({
   accessed_date: z.string(),
 }).passthrough();
 
+// ---- V2 Prospect Discovery schema ----
+
+const highestSignalBusinessSchema = z.object({
+  business_name: z.string(),
+  city: z.string().nullable().optional(),
+  location_status: locationStatusCoerced,
+  signal_count: coercedNumber,
+  detected_signals: z.array(z.string()).optional(),
+  prospect_priority: prospectPriorityEnum,
+}).passthrough();
+
+const recommendedForBusinessAuditSchema = z.object({
+  business_name: z.string(),
+  city: z.string().nullable().optional(),
+  location_status: locationStatusCoerced,
+  prospect_priority: prospectPriorityEnum,
+  reason: z.string(),
+}).passthrough();
+
+const prospectDiscoverySchema = z.object({
+  total_qualifying_prospects: coercedNumberNullable,
+  high_priority_count: coercedNumber.optional(),
+  medium_priority_count: coercedNumber.optional(),
+  low_priority_count: coercedNumber.optional(),
+  insufficient_evidence_count: coercedNumber.optional(),
+  inside_city_prospect_count: coercedNumber.optional(),
+  adjacent_city_prospect_count: coercedNumber.optional(),
+  metro_area_prospect_count: coercedNumber.optional(),
+  highest_signal_businesses: z.array(highestSignalBusinessSchema).optional(),
+  recommended_for_business_audit: z.array(recommendedForBusinessAuditSchema).optional(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const cityCategoryOpportunitySchema = z.object({
@@ -523,6 +646,8 @@ export const cityCategoryOpportunitySchema = z.object({
   estimated_monthly_service_fee: estimatedFeeSchema.optional(),
   data_quality: dataQualitySchema,
   sources: z.array(sourceSchema).optional(),
+  // V2 (prospect-discovery variant)
+  prospect_discovery: prospectDiscoverySchema.optional(),
 }).passthrough();
 
 export type CityCategoryOpportunityOutput = z.infer<typeof cityCategoryOpportunitySchema>;
@@ -554,7 +679,14 @@ Return your response as JSON matching this exact schema:
     },
     "geographic_scope": {
       "scope_description": "<string>",
+      "market_center": "<string>",
+      "scope_mode": "city_only|explicit_radius|prospect_market",
+      "explicit_radius_supplied": <boolean>,
+      "search_radius_miles": <number|null>,
+      "automatic_market_scope_description": "<string>",
       "businesses_inside_city_only": <boolean>,
+      "adjacent_cities_included": ["<string>"],
+      "metro_areas_included": ["<string>"],
       "service_area_businesses_included": <boolean>
     },
     "research_method": {
@@ -566,8 +698,17 @@ Return your response as JSON matching this exact schema:
   },
   "summary": "<one concise paragraph>",
   "market_size": {
-    "verified_business_count": <number|null>,
-    "approximate_business_count": <number|null>,
+    "core_city": {
+      "verified_business_count": <number|null>,
+      "approximate_business_count": <number|null>
+    },
+    "prospect_universe": {
+      "verified_business_count": <number|null>,
+      "approximate_business_count": <number|null>,
+      "inside_city_count": <number|null>,
+      "adjacent_city_count": <number|null>,
+      "metro_area_count": <number|null>
+    },
     "count_unit": "businesses|business_locations|listings",
     "detailed_sample_size": <number>,
     "estimate_confidence": "low|medium|high",
@@ -659,10 +800,16 @@ Return your response as JSON matching this exact schema:
     {
       "business_name": "<string>",
       "ownership_type": "independent|local_chain|regional_chain|national_chain|franchise|unknown",
-      "location_status": "inside_city|outside_city_serving_city|unable_to_verify",
+      "location_status": "inside_city|adjacent_city|metro_area",
+      "city": "<string|null>",
+      "state": "<string|null>",
+      "distance_from_market_center_miles": <number|null>,
       "address": "<string|null>",
       "phone": "<string|null>",
       "website": "<string|null>",
+      "detected_signals": ["<string>"],
+      "signal_count": <number>,
+      "prospect_priority": "high|medium|low|insufficient_evidence",
       "google": {
         "profile_status": "claimed|unclaimed|likely_claimed|unable_to_verify",
         "rating": <number|null>,
@@ -740,7 +887,36 @@ Return your response as JSON matching this exact schema:
   },
   "sources": [
     { "source_name": "<string>", "source_type": "<string>", "url": "<string|null>", "accessed_date": "<string>" }
-  ]
+  ],
+  "prospect_discovery": {
+    "total_qualifying_prospects": <number|null>,
+    "high_priority_count": <number>,
+    "medium_priority_count": <number>,
+    "low_priority_count": <number>,
+    "insufficient_evidence_count": <number>,
+    "inside_city_prospect_count": <number>,
+    "adjacent_city_prospect_count": <number>,
+    "metro_area_prospect_count": <number>,
+    "highest_signal_businesses": [
+      {
+        "business_name": "<string>",
+        "city": "<string>",
+        "location_status": "inside_city|adjacent_city|metro_area",
+        "signal_count": <number>,
+        "detected_signals": ["<string>"],
+        "prospect_priority": "high|medium|low|insufficient_evidence"
+      }
+    ],
+    "recommended_for_business_audit": [
+      {
+        "business_name": "<string>",
+        "city": "<string>",
+        "location_status": "inside_city|adjacent_city|metro_area",
+        "prospect_priority": "high",
+        "reason": "<string>"
+      }
+    ]
+  }
 }
 
 CRITICAL JSON RULES:
