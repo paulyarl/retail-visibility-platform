@@ -469,6 +469,21 @@ describe('cityCategoryOpportunitySchema — V2', () => {
     }
   });
 
+  it('coerces "one_leader_with_moderate_challengers_and_weak_remainder" concentration to dominated_by_one', () => {
+    const input = {
+      ...validV2Output,
+      competitive_landscape: {
+        ...validV2Output.competitive_landscape,
+        concentration: 'one_leader_with_moderate_challengers_and_weak_remainder',
+      },
+    };
+    const result = cityCategoryOpportunitySchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.competitive_landscape?.concentration).toBe('dominated_by_one');
+    }
+  });
+
   it('coerces "weak" photo_activity to stale (top_competitors + sampled_businesses)', () => {
     const input = {
       ...validV2Output,

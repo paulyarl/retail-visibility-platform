@@ -115,6 +115,8 @@ const concentrationCoerced = z.preprocess((val) => {
       s === 'monopoly' ||
       s === 'single_dominant' ||
       s === 'one_dominant_leader_with_weak_fragmented_remainder' ||
+      s === 'one_leader_with_moderate_challengers_and_weak_remainder' ||
+      s === 'one_leader_with_moderate_challengers' ||
       s === 'one_dominant_leader' ||
       s === 'one_dominant' ||
       s === 'dominant_leader' ||
