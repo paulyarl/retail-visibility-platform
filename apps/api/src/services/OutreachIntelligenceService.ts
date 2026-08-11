@@ -332,7 +332,10 @@ export class OutreachIntelligenceService extends BaseService {
     const businessEmailConfidence = input.payload.business_email.source_confidence;
     const teamSignal = input.payload.team_signal.value;
     const preferredChannel = input.payload.preferred_contact_channel.value ?? null;
-    const researchDate = input.payload.research_date;
+    // Prisma's DateTime @db.Date column requires a Date object / ISO-8601
+    // DateTime — a bare "YYYY-MM-DD" string throws "premature end of input".
+    // Parse at UTC midnight so the date is stable across timezones.
+    const researchDate = new Date(`${input.payload.research_date}T00:00:00.000Z`);
     const preparedBy = input.payload.prepared_by;
 
     // 6. Upsert by campaign_id

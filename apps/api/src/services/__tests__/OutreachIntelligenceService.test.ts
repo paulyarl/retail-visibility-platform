@@ -382,6 +382,10 @@ describe('OutreachIntelligenceService.upsert', () => {
     expect(createCall.data.business_email_confidence).toBe('confirmed');
     expect(createCall.data.team_signal).toBe('sole_owner');
     expect(createCall.data.preferred_contact_channel).toBe('email');
+    // research_date must be a Date instance (Prisma DateTime @db.Date rejects
+    // bare "YYYY-MM-DD" strings with "premature end of input")
+    expect(createCall.data.research_date).toBeInstanceOf(Date);
+    expect((createCall.data.research_date as Date).toISOString()).toBe('2026-08-11T00:00:00.000Z');
   });
 
   // ── Guardrails ──────────────────────────────────────────────────────
