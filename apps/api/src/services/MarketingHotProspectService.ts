@@ -20,6 +20,7 @@ import type { RequestCtx } from '../context';
 import { NotFoundError } from '../middleware/errorHandler';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { generateMarketingAuditId, generateCampaignId } from '../lib/id-generator';
+import { addressParser } from '../lib/address-parser';
 import CampaignTriageService from './CampaignTriageService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -39,9 +40,15 @@ interface BusinessJson {
       total_reviews?: number | null;
       observable_unanswered_reviews?: number | null;
       data_status?: string;
+      displayed_name?: string | null;
+      displayed_phone?: string | null;
+      displayed_address?: string | null;
+      displayed_website?: string | null;
+      primary_category?: string | null;
     };
-    yelp?: any;
-    facebook?: any;
+    yelp?: PlatformAuditJson | any;
+    facebook?: PlatformAuditJson | any;
+    bbb?: PlatformAuditJson | any;
   };
   combined_review_metrics?: {
     observable_total_reviews?: number | null;
@@ -54,7 +61,27 @@ interface BusinessJson {
     mobile_friendly?: string | null;
     https?: boolean | null;
   };
-  nap_consistency?: { status?: string };
+  nap_consistency?: {
+    status?: string;
+    canonical_name?: string | null;
+    canonical_phone?: string | null;
+    canonical_address?: string | null;
+  };
+  audit_metadata?: {
+    matched_business?: {
+      business_name?: string | null;
+      category?: string | null;
+      phone?: string | null;
+      address?: string | null;
+      website?: string | null;
+    };
+    requested_business?: {
+      business_name?: string | null;
+      category?: string | null;
+      phone?: string | null;
+      address?: string | null;
+    };
+  };
   digital_opportunity_score?: { score?: number; classification?: string; components?: any; rationale?: string };
   high_attention?: boolean;
   high_attention_reasons?: string[];
@@ -68,6 +95,20 @@ interface BusinessJson {
   };
   negative_review_themes?: any[];
   opportunities?: any;
+}
+
+/**
+ * Common shape of per-platform entries in `audit_data.platforms` for the
+ * business_analysis audit (google/yelp/bbb/facebook). All fields optional
+ * because the audit marks unavailable platforms with `data_status:
+ * 'unavailable'` and leaves the rest null.
+ */
+interface PlatformAuditJson {
+  data_status?: string;
+  displayed_name?: string | null;
+  displayed_phone?: string | null;
+  displayed_address?: string | null;
+  displayed_website?: string | null;
 }
 
 interface TopOpportunity {
@@ -466,18 +507,96 @@ export class MarketingHotProspectService extends BaseService {
   }
 
   /**
-   * Sync Sprint 1 contact fields (phone, website_url) — null-only, never
-   * overwrite operator/GBP-enriched values.
+   * Sync contact fields (business_name, phone, website_url, address) from a
+   * business_analysis audit onto the campaign.
+   *
+   * Source priority (first non-null wins) for each field:
+   *   business_name : nap_consistency.canonical_name → matched_business.business_name → business.business_name
+   *   phone         : nap_consistency.canonical_phone → platforms.google.displayed_phone → matched_business.phone → business.business_phone
+   *   website_url   : website.url → matched_business.website → platforms.google.displayed_website
+   *   address       : nap_consistency.canonical_address → platforms.google.displayed_address → matched_business.address → business.address
+   *
+   * Overwrite policy (per the audit → campaign contact sync spec):
+   *   - If the audit's `data_quality.verified_fields` mentions the field
+   *     (by keyword: "business name", "phone", "website", "address"), the
+   *     audit-derived value OVERWRITES the existing campaign value.
+   *   - Otherwise, the audit value only fills a NULL campaign field (never
+   *     clobbers operator- or GBP-enriched values).
+   *
+   * Address is parsed from the single-line canonical string into the
+   * structured campaign fields (address_line1/city/state/zip/country) using
+   * the same address-parser middleware the frontend paste flow uses.
    */
   private async syncContactFields(campaign: any, business: BusinessJson, _ctx?: RequestCtx): Promise<void> {
+    const dq = business.data_quality ?? {};
+    const verified = new Set((dq.verified_fields ?? []).map((f) => f.toLowerCase()));
+    const isVerified = (keyword: string): boolean =>
+      Array.from(verified).some((f) => f.includes(keyword));
+
     const data: any = {};
-    if (!campaign.phone && business.business_phone) {
-      data.phone = business.business_phone;
+
+    // ── business_name ───────────────────────────────────────────────────
+    const canonicalName = business.nap_consistency?.canonical_name ?? null;
+    const matchedName = business.audit_metadata?.matched_business?.business_name ?? null;
+    const businessName = canonicalName ?? matchedName ?? business.business_name ?? null;
+    if (businessName) {
+      const canOverwrite = isVerified('business name');
+      if (canOverwrite || !campaign.business_name) {
+        data.business_name = businessName;
+      }
     }
-    if (!campaign.website_url && business.website?.url) {
-      data.website_url = business.website.url;
-      data.has_website = 'yes';
+
+    // ── phone ───────────────────────────────────────────────────────────
+    const canonicalPhone = business.nap_consistency?.canonical_phone ?? null;
+    const googlePhone = business.platforms?.google?.displayed_phone ?? null;
+    const matchedPhone = business.audit_metadata?.matched_business?.phone ?? null;
+    const scanPhone = business.business_phone ?? null;
+    const phone = canonicalPhone ?? googlePhone ?? matchedPhone ?? scanPhone ?? null;
+    if (phone) {
+      const canOverwrite = isVerified('phone');
+      if (canOverwrite || !campaign.phone) {
+        data.phone = phone;
+      }
     }
+
+    // ── website_url ─────────────────────────────────────────────────────
+    const websiteUrl = business.website?.url
+      ?? business.audit_metadata?.matched_business?.website
+      ?? business.platforms?.google?.displayed_website
+      ?? null;
+    if (websiteUrl) {
+      const canOverwrite = isVerified('website');
+      if (canOverwrite || !campaign.website_url) {
+        data.website_url = websiteUrl;
+        data.has_website = 'yes';
+      }
+    }
+
+    // ── address (parsed into structured fields) ─────────────────────────
+    const canonicalAddress = business.nap_consistency?.canonical_address ?? null;
+    const googleAddress = business.platforms?.google?.displayed_address ?? null;
+    const matchedAddress = business.audit_metadata?.matched_business?.address ?? null;
+    const scanAddress = business.address ?? null;
+    const addressStr = canonicalAddress ?? googleAddress ?? matchedAddress ?? scanAddress ?? null;
+    if (addressStr) {
+      const canOverwrite = isVerified('address');
+      // Only sync address components if we're allowed to overwrite, OR if the
+      // campaign has no address_line1 yet (fill-null). Per-component fill-null
+      // would risk creating half-populated addresses, so we treat address as
+      // an all-or-nothing unit.
+      if (canOverwrite || !campaign.address_line1) {
+        const parsed = addressParser.parse(addressStr);
+        if (parsed.address_line1) {
+          data.address_line1 = parsed.address_line1;
+          if (parsed.address_line2) data.address_line2 = parsed.address_line2;
+          if (parsed.city) data.address_city = parsed.city;
+          if (parsed.state) data.address_state = parsed.state;
+          if (parsed.postal_code) data.address_zip = parsed.postal_code;
+          if (parsed.country_code) data.address_country = parsed.country_code;
+        }
+      }
+    }
+
     if (Object.keys(data).length > 0) {
       await this.prisma.mkt_campaigns_list.update({ where: { id: campaign.id }, data });
     }
@@ -580,6 +699,7 @@ export class MarketingHotProspectService extends BaseService {
         combined_review_metrics: data.combined_review_metrics,
         website: data.website,
         nap_consistency: data.nap_consistency,
+        audit_metadata: data.audit_metadata,
         digital_opportunity_score: data.digital_opportunity_score,
         high_attention: data.high_attention,
         high_attention_reasons: data.high_attention_reasons,
@@ -603,16 +723,45 @@ export class MarketingHotProspectService extends BaseService {
       }
       void beforeKeys;
 
-      // Sync contacts (null-only)
-      const beforePhone = (campaign as any).phone;
-      const beforeWebsite = (campaign as any).website_url;
+      // Sync contacts (overwrite-if-verified, otherwise fill-null)
+      const beforeContacts = {
+        business_name: (campaign as any).business_name,
+        phone: (campaign as any).phone,
+        website_url: (campaign as any).website_url,
+        address_line1: (campaign as any).address_line1,
+        address_city: (campaign as any).address_city,
+        address_state: (campaign as any).address_state,
+        address_zip: (campaign as any).address_zip,
+        address_country: (campaign as any).address_country,
+      };
       await this.syncContactFields(campaign, business, ctx);
       const afterContacts = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaign.id },
-        select: { phone: true, website_url: true },
+        select: {
+          business_name: true,
+          phone: true,
+          website_url: true,
+          address_line1: true,
+          address_city: true,
+          address_state: true,
+          address_zip: true,
+          address_country: true,
+        },
       });
-      if (afterContacts && afterContacts.phone && !beforePhone) report.contactsSynced.push('phone');
-      if (afterContacts && afterContacts.website_url && !beforeWebsite) report.contactsSynced.push('website_url');
+      if (afterContacts) {
+        if (afterContacts.business_name && afterContacts.business_name !== beforeContacts.business_name) {
+          report.contactsSynced.push('business_name');
+        }
+        if (afterContacts.phone && afterContacts.phone !== beforeContacts.phone) {
+          report.contactsSynced.push('phone');
+        }
+        if (afterContacts.website_url && afterContacts.website_url !== beforeContacts.website_url) {
+          report.contactsSynced.push('website_url');
+        }
+        if (afterContacts.address_line1 && afterContacts.address_line1 !== beforeContacts.address_line1) {
+          report.contactsSynced.push('address');
+        }
+      }
 
       // Derive hotness (seek has no top_opportunities — pass empty collections)
       const threshold = unifiedConfig.marketingOpsHotProspectThreshold;
