@@ -85,7 +85,7 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
     try {
       const result = await marketingOpsService.getOutreachIntelligence(campaignId);
       setData(result);
-      if (result && !result.inherited) {
+      if (result && !result.inherited && result.payload) {
         // Populate form from stored payload
         const p = result.payload;
         setForm({
@@ -100,7 +100,7 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
         });
       }
     } catch (e: any) {
-      setError(e.message ?? 'Failed to load worksheet');
+      setError(e?.message ?? 'Failed to load worksheet');
     } finally {
       setLoading(false);
     }
@@ -119,9 +119,9 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
     try {
       const result = await marketingOpsService.upsertOutreachIntelligence(campaignId, form);
       setData(result);
-      setSuccess('Worksheet saved. Salutation: ' + result.recommended_salutation);
+      setSuccess('Worksheet saved. Salutation: ' + (result?.recommended_salutation ?? 'N/A'));
     } catch (e: any) {
-      setError(e.message ?? 'Failed to save worksheet');
+      setError(e?.message ?? 'Failed to save worksheet');
     } finally {
       setSaving(false);
     }
@@ -138,7 +138,7 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
       setForm(emptyInput());
       setSuccess('Worksheet deleted.');
     } catch (e: any) {
-      setError(e.message ?? 'Failed to delete worksheet');
+      setError(e?.message ?? 'Failed to delete worksheet');
     } finally {
       setDeleting(false);
     }
