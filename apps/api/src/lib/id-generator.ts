@@ -1963,6 +1963,18 @@ export function generateProspectQueueId(): string {
   return `pque-${nanoid()}`;
 }
 
+// ─── Outreach Intelligence Prep (Sprint 1) ──────────────────────────────
+// Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
+
+/**
+ * Generate outreach intelligence worksheet ID
+ * Format: moi-{nanoid} (12 chars)
+ */
+export function generateOutreachIntelligenceId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `moi-${nanoid()}`;
+}
+
 /**
  * Generate customer claim token ID (row ID for mkt_customer_claim_tokens)
  * Format: mclm-{nanoid} (13 chars)

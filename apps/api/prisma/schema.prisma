@@ -6202,6 +6202,7 @@ model mkt_campaigns_list {
   mkt_outreach_closers_list                                                       mkt_outreach_closers_list[]
   mkt_outreach_contacts_list                                                      mkt_outreach_contacts_list[]
   mkt_outreach_headers_list                                                       mkt_outreach_headers_list[]
+  mkt_outreach_intelligence                                                       mkt_outreach_intelligence?
   mkt_outreach_log                                                                mkt_outreach_log[]
   mkt_outreach_openers_list                                                       mkt_outreach_openers_list[]
   mkt_outreach_pitches_list                                                       mkt_outreach_pitches_list[]
@@ -7157,6 +7158,28 @@ model mkt_gallery_events {
   @@index([token_id], map: "idx_mkt_gallery_events_token")
   @@index([token_id, event_type, created_at(sort: Desc)], map: "idx_mkt_gallery_events_token_type_time")
   @@index([event_type], map: "idx_mkt_gallery_events_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_intelligence {
+  id                        String             @id @db.VarChar(255)
+  campaign_id               String             @unique @db.VarChar(255)
+  owner_name                String?            @db.VarChar(255)
+  owner_name_confidence     String             @default("unavailable") @db.VarChar(20)
+  business_email            String?            @db.VarChar(255)
+  business_email_confidence String             @default("unavailable") @db.VarChar(20)
+  team_signal               String             @default("unknown") @db.VarChar(20)
+  preferred_contact_channel String?            @db.VarChar(50)
+  recommended_salutation    String             @db.VarChar(255)
+  research_date             DateTime?          @db.Date
+  prepared_by               String?            @db.VarChar(255)
+  payload                   Json
+  created_at                DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime           @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([campaign_id], map: "idx_mkt_outreach_intelligence_campaign")
 }
 
 enum action {
