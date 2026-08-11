@@ -20,6 +20,11 @@
  *     PUT    /audits/:id                — update audit
  *     DELETE /audits/:id                — delete audit
  *
+ *   Outreach Intelligence (Sprint 1 — Outreach Intelligence Prep):
+ *     GET    /:campaignId/outreach-intelligence  — fetch worksheet (with sibling inheritance)
+ *     PUT    /:campaignId/outreach-intelligence  — upsert (validates + computes salutation)
+ *     DELETE /:campaignId/outreach-intelligence  — remove worksheet
+ *
  *   Files:
  *     GET    /:campaignId/files         — list files for campaign
  *     POST   /:campaignId/files         — create file metadata
@@ -170,6 +175,7 @@ import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
+import OutreachIntelligenceService from '../services/OutreachIntelligenceService';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -1345,6 +1351,110 @@ router.put('/audits/:id', async (req: any, res: Response) => {
 router.delete('/audits/:id', async (req: any, res: Response) => {
   try {
     await MarketingAuditService.deleteAudit(req.params.id, getCtx(req));
+    res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// OUTREACH INTELLIGENCE ROUTES (Sprint 1 — Outreach Intelligence Prep)
+// ====================
+// Two-segment /:campaignId/outreach-intelligence routes — safe from the
+// GET /:id catch-all (Express only matches /:id against a single segment).
+// Registered here alongside the other /:campaignId/* routes (audits, files).
+
+const confidenceEnum = z.enum(['confirmed', 'inferred_low_risk', 'unavailable']);
+const sourcedFieldSchema = z.object({
+  value: z.string().max(500).nullable(),
+  source: z.string().max(500).nullable(),
+  source_confidence: confidenceEnum,
+});
+const teamSignalFieldSchema = z.object({
+  value: z.enum(['sole_owner', 'family_team', 'small_staff', 'unknown']),
+  quoted_description: z.string().max(500).nullable(),
+  source: z.string().max(500).nullable(),
+  source_confidence: confidenceEnum,
+});
+
+const outreachIntelligenceSchema = z.object({
+  linked_audit_reference: z.string().max(255).nullish(),
+  prepared_by: z.string().max(255),
+  research_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD'),
+  owner_name: sourcedFieldSchema,
+  business_email: sourcedFieldSchema.refine(
+    (f) => !f.value || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.value),
+    'business_email must be a valid email when provided',
+  ),
+  team_signal: teamSignalFieldSchema,
+  preferred_contact_channel: sourcedFieldSchema,
+  researcher_notes: z.string().max(4000).default(''),
+}).superRefine((data, ctx) => {
+  // Guardrail: confirmed requires a source citation
+  for (const [fieldName, field] of [
+    ['owner_name', data.owner_name],
+    ['business_email', data.business_email],
+    ['preferred_contact_channel', data.preferred_contact_channel],
+  ] as const) {
+    if (field.source_confidence === 'confirmed' && (!field.source || field.source.trim().length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [fieldName, 'source'],
+        message: 'A confirmed field must include a source citation',
+      });
+    }
+    // Guardrail: unavailable requires null value
+    if (field.source_confidence === 'unavailable' && field.value != null && field.value.trim().length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [fieldName, 'value'],
+        message: 'An unavailable field must have a null value',
+      });
+    }
+  }
+  // team_signal source_confidence guardrail (same rules, value can be 'unknown')
+  const ts = data.team_signal;
+  if (ts.source_confidence === 'confirmed' && (!ts.source || ts.source.trim().length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['team_signal', 'source'],
+      message: 'A confirmed field must include a source citation',
+    });
+  }
+});
+
+// GET /:campaignId/outreach-intelligence — fetch worksheet (with sibling inheritance)
+router.get('/:campaignId/outreach-intelligence', async (req: any, res: Response) => {
+  try {
+    const result = await OutreachIntelligenceService.getForCampaign(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// PUT /:campaignId/outreach-intelligence — upsert (validates + computes salutation)
+router.put('/:campaignId/outreach-intelligence', async (req: any, res: Response) => {
+  try {
+    const parsed = outreachIntelligenceSchema.parse(req.body);
+    const result = await OutreachIntelligenceService.upsert(
+      req.params.campaignId,
+      { payload: parsed },
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// DELETE /:campaignId/outreach-intelligence — remove worksheet
+router.delete('/:campaignId/outreach-intelligence', async (req: any, res: Response) => {
+  try {
+    await OutreachIntelligenceService.delete(req.params.campaignId, getCtx(req));
     res.json({ success: true });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
