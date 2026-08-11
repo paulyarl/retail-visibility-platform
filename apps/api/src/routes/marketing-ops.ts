@@ -1439,7 +1439,7 @@ router.put('/:campaignId/outreach-intelligence', async (req: any, res: Response)
     const parsed = outreachIntelligenceSchema.parse(req.body);
     const result = await OutreachIntelligenceService.upsert(
       req.params.campaignId,
-      { payload: parsed },
+      { payload: { ...parsed, linked_audit_reference: parsed.linked_audit_reference ?? null } },
       getCtx(req),
     );
     res.json({ success: true, data: result });
