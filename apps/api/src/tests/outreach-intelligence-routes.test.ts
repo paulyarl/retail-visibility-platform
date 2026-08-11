@@ -50,10 +50,39 @@ vi.mock('../config/unifiedConfig', () => ({ unifiedConfig: {} }));
 vi.mock('../lib/platform-scope', () => ({ PLATFORM_SCOPE: 'platform' }));
 vi.mock('../audit', () => ({ audit: vi.fn().mockResolvedValue(undefined) }));
 
+// Mock errorHandler so the route's `instanceof HttpError` check works with
+// the error classes the service throws. Export real classes with statusCode.
+vi.mock('../middleware/errorHandler', () => {
+  class HttpError extends Error {
+    statusCode: number;
+    code: string;
+    constructor(statusCode: number, code: string, message: string) {
+      super(message);
+      this.name = 'HttpError';
+      this.statusCode = statusCode;
+      this.code = code;
+    }
+  }
+  class NotFoundError extends HttpError {
+    constructor(message = 'Resource not found') { super(404, 'not_found', message); this.name = 'NotFoundError'; }
+  }
+  class ConflictError extends HttpError {
+    constructor(message = 'Conflict') { super(409, 'conflict', message); this.name = 'ConflictError'; }
+  }
+  class ValidationError extends HttpError {
+    constructor(message = 'Validation error') { super(400, 'validation_error', message); this.name = 'ValidationError'; }
+  }
+  return { HttpError, NotFoundError, ConflictError, ValidationError };
+});
+
 // Stub all other service imports the router file pulls in at module load
 vi.mock('../services/MarketingCampaignService', () => ({ default: {} }));
-vi.mock('../services/MarketingOutreachService', () => ({ MarketingOutreachService: {} }));
-vi.mock('../services/MarketingHotProspectService', () => ({ MarketingHotProspectService: {} }));
+vi.mock('../services/MarketingOutreachService', () => ({
+  MarketingOutreachService: { getInstance: () => ({}) },
+}));
+vi.mock('../services/MarketingHotProspectService', () => ({
+  MarketingHotProspectService: { getInstance: () => ({}) },
+}));
 vi.mock('../services/MarketingAuditService', () => ({ default: {} }));
 vi.mock('../services/MarketingPromptService', () => ({ default: {} }));
 vi.mock('../services/MarketingExecutionService', () => ({ default: {} }));
@@ -63,9 +92,11 @@ vi.mock('../services/MarketingDeliverableService', () => ({ default: {} }));
 vi.mock('../services/MarketingBrandingService', () => ({ default: {} }));
 vi.mock('../services/MarketingCategoryToneService', () => ({ default: {} }));
 vi.mock('../services/MarketingServiceCategoryService', () => ({ default: {} }));
-vi.mock('../services/ReviewResponseService', () => ({ ReviewResponseService: {} }));
+vi.mock('../services/ReviewResponseService', () => ({
+  ReviewResponseService: { getInstance: () => ({}) },
+}));
 vi.mock('../services/OutreachOpenerService', () => ({
-  OutreachOpenerService: {},
+  OutreachOpenerService: { getInstance: () => ({}) },
   resolveCampaignArchetype: vi.fn(),
 }));
 vi.mock('../services/outreach-openers/archetype-selection', () => ({
@@ -81,6 +112,9 @@ vi.mock('../services/outreach-pitch/CloserService', () => ({ default: {} }));
 vi.mock('../services/outreach-pitch/ContactService', () => ({ default: {} }));
 vi.mock('../services/outreach-pitch/ReviewResponseDraftService', () => ({ default: {} }));
 vi.mock('../services/outreach-pitch/PitchService', () => ({ default: {} }));
+vi.mock('../services/OutreachFollowUpService', () => ({
+  OutreachFollowUpService: { getInstance: () => ({}) },
+}));
 vi.mock('../services/deliverable/OwnerVoiceService', () => ({ default: {} }));
 vi.mock('../services/deliverable/ReviewSlotService', () => ({ default: {} }));
 vi.mock('../services/deliverable/DeliverableSectionService', () => ({ default: {} }));
@@ -98,22 +132,26 @@ vi.mock('../services/MarketingProspectQueueService', () => ({ default: {} }));
 vi.mock('../services/MarketingCustomerService', () => ({ MarketingCustomerService: {} }));
 vi.mock('../services/marketing/MarketingReceiptEmailService', () => ({ MarketingReceiptEmailService: {} }));
 
+// Mock auth middleware — the router applies authenticateToken + requirePlatformAdmin
+// internally. For the 401 test, we need a controllable mock.
+const {
+  mockAuth,
+} = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+}));
+
+vi.mock('../middleware/auth', () => ({
+  authenticateToken: mockAuth,
+  requirePlatformAdmin: (_req: any, _res: any, next: any) => next(),
+}));
+
 import marketingOpsRouter from '../routes/marketing-ops';
+import { ConflictError, NotFoundError } from '../middleware/errorHandler';
 
 // ── Test app ─────────────────────────────────────────────────────────────
-// Simulate the registry-level auth middleware: if no Bearer token, return 401.
 
 const app = express();
 app.use(express.json());
-// Simple auth middleware that mirrors authenticateToken behavior for tests
-app.use((req: any, _res: any, next: any) => {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return _res.status(401).json({ success: false, error: 'unauthorized' });
-  }
-  req.user = { id: 'test-admin-001' };
-  next();
-});
 app.use('/api/admin/marketing-ops', marketingOpsRouter);
 
 const CAMPAIGN_ID = 'mcamp-test001';
@@ -157,18 +195,31 @@ const storedRow = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: authenticated admin
+  mockAuth.mockImplementation((req: any, _res: any, next: any) => {
+    req.user = { id: 'test-admin-001', role: 'platform_admin' };
+    next();
+  });
 });
 
 // ── Auth tests ───────────────────────────────────────────────────────────
 
 describe('outreach-intelligence routes — auth', () => {
   it('returns 401 when no auth token provided', async () => {
+    mockAuth.mockImplementation((_req: any, res: any, _next: any) => {
+      res.status(401).json({ success: false, error: 'unauthorized' });
+    });
+
     const res = await request(app).get(`/api/admin/marketing-ops/${CAMPAIGN_ID}/outreach-intelligence`);
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('unauthorized');
   });
 
   it('returns 401 when auth header is malformed', async () => {
+    mockAuth.mockImplementation((_req: any, res: any, _next: any) => {
+      res.status(401).json({ success: false, error: 'unauthorized' });
+    });
+
     const res = await request(app)
       .get(`/api/admin/marketing-ops/${CAMPAIGN_ID}/outreach-intelligence`)
       .set('Authorization', 'NotBearer sometoken');
@@ -368,10 +419,9 @@ describe('outreach-intelligence routes — PUT', () => {
   });
 
   it('passes through ConflictError as 409 for non-primary sibling write', async () => {
-    const conflictError = new Error('Intelligence is gathered on the primary sibling campaign.');
-    (conflictError as any).name = 'ConflictError';
-    (conflictError as any).statusCode = 409;
-    mockUpsert.mockRejectedValue(conflictError);
+    mockUpsert.mockRejectedValue(
+      new ConflictError('Intelligence is gathered on the primary sibling campaign.'),
+    );
 
     const res = await request(app)
       .put(`/api/admin/marketing-ops/mcamp-sibling/outreach-intelligence`)
@@ -399,10 +449,9 @@ describe('outreach-intelligence routes — DELETE', () => {
   });
 
   it('returns 404 when worksheet does not exist', async () => {
-    const notFoundError = new Error('Outreach Intelligence worksheet not found');
-    (notFoundError as any).name = 'NotFoundError';
-    (notFoundError as any).statusCode = 404;
-    mockDelete.mockRejectedValue(notFoundError);
+    mockDelete.mockRejectedValue(
+      new NotFoundError('Outreach Intelligence worksheet not found'),
+    );
 
     const res = await request(app)
       .delete(`/api/admin/marketing-ops/${CAMPAIGN_ID}/outreach-intelligence`)

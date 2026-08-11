@@ -27,8 +27,9 @@ import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
 import GalleryAnalyticsTab from './GalleryAnalyticsTab';
 import SiblingsTab from './SiblingsTab';
+import OutreachIntelligenceTab from './OutreachIntelligenceTab';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -324,6 +325,8 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
     { key: 'prompts', label: 'Prompts' },
     { key: 'checklist', label: 'Checklist' },
+    // Outreach Prep — business-scope campaigns only (Sprint 1).
+    ...((campaign?.scope === 'business') ? [{ key: 'outreach-prep' as Tab, label: 'Outreach Prep' }] : []),
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
     { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
     // Cascade tab is review-pipeline only (Track A yes, Track B no).
@@ -1129,6 +1132,13 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 campaignId={campaign.id}
                 currentStage={campaign.stage}
                 onGoToTriage={() => setActiveTab('overview')}
+              />
+            )}
+
+            {activeTab === 'outreach-prep' && campaign && (
+              <OutreachIntelligenceTab
+                campaignId={campaign.id}
+                campaignName={campaign.business_name}
               />
             )}
 

@@ -4070,6 +4070,52 @@ class MarketingOpsService extends AdminApiSingleton {
     const unwrapped = result.data?.data ?? result.data;
     return { alerts: unwrapped?.data ?? unwrapped ?? [], total: unwrapped?.total ?? 0, totalPages: unwrapped?.totalPages ?? 0 };
   }
+
+  // ─── Outreach Intelligence Prep (Sprint 1) ──────────────────────────────
+
+  async getOutreachIntelligence(campaignId: string): Promise<OutreachIntelligenceResult | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-intelligence`,
+      { method: 'GET' },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch outreach intelligence');
+    }
+    return result.data?.data ?? result.data ?? null;
+  }
+
+  async upsertOutreachIntelligence(
+    campaignId: string,
+    payload: OutreachIntelligenceInput,
+  ): Promise<OutreachIntelligenceResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-intelligence`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!result.success) {
+      const msg = typeof result.error === 'string'
+        ? result.error
+        : (result.error as any)?.details?.[0]?.message
+          ?? 'Failed to save outreach intelligence';
+      throw new Error(msg);
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async deleteOutreachIntelligence(campaignId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-intelligence`,
+      { method: 'DELETE' },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete outreach intelligence');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  }
 }
 
 export interface CascadeStatus {
@@ -4763,4 +4809,58 @@ export interface PlaybookChecklistSuggestion {
   reviewNote: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── Outreach Intelligence Prep (Sprint 1) ──────────────────────────────
+
+export type SourceConfidence = 'confirmed' | 'inferred_low_risk' | 'unavailable';
+export type TeamSignalValue = 'sole_owner' | 'family_team' | 'small_staff' | 'unknown';
+
+export interface SourcedField {
+  value: string | null;
+  source: string | null;
+  source_confidence: SourceConfidence;
+}
+
+export interface TeamSignalField {
+  value: TeamSignalValue;
+  quoted_description: string | null;
+  source: string | null;
+  source_confidence: SourceConfidence;
+}
+
+export interface OutreachIntelligenceInput {
+  linked_audit_reference?: string | null;
+  prepared_by: string;
+  research_date: string;
+  owner_name: SourcedField;
+  business_email: SourcedField;
+  team_signal: TeamSignalField;
+  preferred_contact_channel: SourcedField;
+  researcher_notes: string;
+}
+
+export interface OutreachIntelligencePayload extends OutreachIntelligenceInput {
+  business_name: string;
+  address: string | null;
+  recommended_salutation: string;
+}
+
+export interface OutreachIntelligenceResult {
+  id: string;
+  campaign_id: string;
+  owner_name: string | null;
+  owner_name_confidence: SourceConfidence;
+  business_email: string | null;
+  business_email_confidence: SourceConfidence;
+  team_signal: TeamSignalValue;
+  preferred_contact_channel: string | null;
+  recommended_salutation: string;
+  research_date: string | null;
+  prepared_by: string | null;
+  payload: OutreachIntelligencePayload;
+  created_at: string;
+  updated_at: string;
+  inherited?: boolean;
+  sourceCampaignId?: string;
 }
