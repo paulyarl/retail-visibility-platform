@@ -342,7 +342,7 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
               disabled={isReadOnly}
               value={form.team_signal.quoted_description ?? ''}
               onChange={(e) => updateTeamSignal({ quoted_description: e.target.value || null })}
-              placeholder="e.g. "Family-owned and operated since 1998""
+              placeholder={`e.g. "Family-owned and operated since 1998"`}
               className="w-full rounded-md border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
             />
           </div>
