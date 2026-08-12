@@ -49,6 +49,13 @@ export {
   HOOK_ANGLE_KEYS,
   getHook,
   isValidHookAngle,
+  CALL_SCRIPT_VERIFY,
+  CALL_SCRIPT_BRIDGE,
+  CALL_SCRIPT_ASK,
+  CALL_SCRIPT_ASK_DECLINE_FALLBACK,
+  CALL_SCRIPT_CLOSE,
+  CALL_SCRIPT_OBJECTIONS,
   type HookAngle,
   type HookTemplate,
+  type ObjectionRow,
 } from './hook-library';

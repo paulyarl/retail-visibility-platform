@@ -28,6 +28,9 @@
  *   Hook Suggestions (Sprint 2 — Light-Score Hook Library):
  *     GET    /:campaignId/hook-suggestions  — ranked hooks with merge fields resolved
  *
+ *   Cold Call Script (Sprint 1 — Cold Call Channel):
+ *     GET    /:campaignId/call-script       — assembled five-stage script (Verify → Hook → Bridge → Ask → Close)
+ *
  *   Files:
  *     GET    /:campaignId/files         — list files for campaign
  *     POST   /:campaignId/files         — create file metadata
@@ -180,6 +183,7 @@ import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
 import OutreachIntelligenceService from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
+import CallScriptService from '../services/CallScriptService';
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
@@ -276,7 +280,24 @@ const linkTenantSchema = z.object({
 
 // Outreach log schemas (Sprint 2)
 const contactChannelEnum = z.enum(['phone', 'email', 'website', 'social', 'in_person', 'other']);
-const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other', 'auto_follow_up_scheduled']);
+const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other', 'auto_follow_up_scheduled', 'wrong_number', 'disconnected_number']);
+
+// ─── Call details schema (Sprint 1 — Cold Call Channel) ────────────────
+const callResultEnum = z.enum(['connected', 'voicemail', 'no_answer', 'wrong_number', 'disconnected_number']);
+const callDetailsSchema = z.object({
+  call_result: callResultEnum,
+  identity_verified: z.boolean().nullable().default(null),
+  operating_status_confirmed: z.boolean().nullable().default(null),
+  angle_used: z.string().max(40).nullable().default(null),
+  hook_response_notes: z.string().max(2000).nullable().default(null),
+  objections_raised: z.array(z.string().max(120)).max(10).default([]),
+  email_obtained: z.boolean().nullable().default(null),
+  email_value: z.string().email().nullable().default(null),
+  callback_number_left: z.boolean().nullable().default(null),
+  owner_name_confirmed: z.string().max(255).nullable().default(null),
+  team_signal_confirmed: z.enum(['sole_owner', 'family_team', 'small_staff', 'unknown']).nullable().default(null),
+  preferred_channel_confirmed: z.string().max(50).nullable().default(null),
+});
 
 const outreachLogSchema = z.object({
   contact_channel: contactChannelEnum,
@@ -287,6 +308,84 @@ const outreachLogSchema = z.object({
   message_snapshot: z.string().optional(),
   message_subject: z.string().max(255).optional(),
   preview_token: z.string().max(255).optional(),
+  // Cold-call channel (Sprint 1)
+  call_details: callDetailsSchema.nullable().optional(),
+  update_worksheet: z.boolean().optional(),
+}).superRefine((data, ctx) => {
+  // Coherence validation (§5.3)
+  if (data.call_details) {
+    // call_details present ⇒ contact_channel === 'phone'
+    if (data.contact_channel !== 'phone') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'call_details requires contact_channel = "phone"',
+        path: ['call_details'],
+      });
+    }
+    const cr = data.call_details.call_result;
+    // call_result: 'connected' ⇒ outcome ∈ human-contact set
+    if (cr === 'connected' && !['reached', 'interested', 'not_interested', 'callback_scheduled', 'other'].includes(data.outcome)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'call_result "connected" requires a human-contact outcome (reached, interested, not_interested, callback_scheduled, other)',
+        path: ['outcome'],
+      });
+    }
+    // call_result: 'wrong_number' ⇒ outcome: 'wrong_number'
+    if (cr === 'wrong_number' && data.outcome !== 'wrong_number') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'call_result "wrong_number" requires outcome "wrong_number"',
+        path: ['outcome'],
+      });
+    }
+    // call_result: 'disconnected_number' ⇒ outcome: 'disconnected_number'
+    if (cr === 'disconnected_number' && data.outcome !== 'disconnected_number') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'call_result "disconnected_number" requires outcome "disconnected_number"',
+        path: ['outcome'],
+      });
+    }
+    // call_result: 'no_answer' ⇒ outcome: 'no_answer'
+    if (cr === 'no_answer' && data.outcome !== 'no_answer') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'call_result "no_answer" requires outcome "no_answer"',
+        path: ['outcome'],
+      });
+    }
+    // call_result: 'voicemail' ⇒ outcome: 'left_message'
+    if (cr === 'voicemail' && data.outcome !== 'left_message') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'call_result "voicemail" requires outcome "left_message"',
+        path: ['outcome'],
+      });
+    }
+    // email_obtained: true ⇒ email_value non-null
+    if (data.call_details.email_obtained === true && !data.call_details.email_value) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'email_obtained = true requires email_value',
+        path: ['call_details', 'email_value'],
+      });
+    }
+    // Write-back fields require call_result: 'connected'
+    const writeBackFields = [
+      data.call_details.owner_name_confirmed,
+      data.call_details.team_signal_confirmed,
+      data.call_details.preferred_channel_confirmed,
+    ];
+    const hasWriteBack = writeBackFields.some((v) => v !== null && v !== undefined);
+    if (hasWriteBack && cr !== 'connected') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Confirmation fields (owner_name_confirmed, team_signal_confirmed, preferred_channel_confirmed) require call_result "connected"',
+        path: ['call_details'],
+      });
+    }
+  }
 });
 
 const outreachEditSchema = outreachLogSchema.partial();
@@ -1016,6 +1115,8 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
       messageSubject: parsed.message_subject,
       previewToken: parsed.preview_token,
       contactedBy: req.user?.id,
+      callDetails: parsed.call_details ?? null,
+      updateWorksheet: parsed.update_worksheet ?? false,
     }, getCtx(req));
     res.status(201).json({ success: true, data: log });
   } catch (error) {
@@ -1477,6 +1578,26 @@ router.get('/:campaignId/hook-suggestions', async (req: any, res: Response) => {
   try {
     const result = await HookSuggestionService.suggestForCampaign(
       req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// COLD CALL SCRIPT ROUTES (Sprint 1 — Cold Call Channel)
+// ====================
+// Two-segment /:campaignId/call-script — safe from the GET /:id
+// catch-all (Express only matches /:id against a single segment).
+
+// GET /:campaignId/call-script?angle= — assembled five-stage script
+router.get('/:campaignId/call-script', async (req: any, res: Response) => {
+  try {
+    const result = await CallScriptService.assembleForCampaign(
+      req.params.campaignId,
+      req.query.angle as string | undefined,
       getCtx(req),
     );
     res.json({ success: true, data: result });

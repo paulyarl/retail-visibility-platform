@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Sparkles, RefreshCw, Link2 } from 'lucide-react';
-import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot } from '@/services/MarketingOpsService';
+import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
 const CHANNEL_OPTIONS: { value: ContactChannel; label: string }[] = [
@@ -21,7 +21,24 @@ const OUTCOME_OPTIONS: { value: ContactOutcome; label: string }[] = [
   { value: 'interested', label: 'Interested' },
   { value: 'not_interested', label: 'Not Interested' },
   { value: 'callback_scheduled', label: 'Callback Scheduled' },
+  { value: 'wrong_number', label: 'Wrong Number' },
+  { value: 'disconnected_number', label: 'Disconnected Number' },
   { value: 'other', label: 'Other' },
+];
+
+const CALL_RESULT_OPTIONS: { value: CallResult; label: string; outcome: ContactOutcome }[] = [
+  { value: 'connected', label: 'Connected', outcome: 'reached' },
+  { value: 'voicemail', label: 'Voicemail', outcome: 'left_message' },
+  { value: 'no_answer', label: 'No Answer', outcome: 'no_answer' },
+  { value: 'wrong_number', label: 'Wrong Number', outcome: 'wrong_number' },
+  { value: 'disconnected_number', label: 'Disconnected', outcome: 'disconnected_number' },
+];
+
+const TEAM_SIGNAL_OPTIONS = [
+  { value: 'sole_owner', label: 'Sole owner' },
+  { value: 'family_team', label: 'Family team' },
+  { value: 'small_staff', label: 'Small staff' },
+  { value: 'unknown', label: 'Unknown' },
 ];
 
 function todayISO(): string {
@@ -56,6 +73,31 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
   const [error, setError] = useState<string | null>(null);
   const [insertingLink, setInsertingLink] = useState(false);
 
+  // ─── Phone-mode call details state (Sprint 1 — Cold Call Channel) ────
+  const [callResult, setCallResult] = useState<CallResult>('connected');
+  const [identityVerified, setIdentityVerified] = useState(false);
+  const [operatingConfirmed, setOperatingConfirmed] = useState(false);
+  const [angleUsed, setAngleUsed] = useState<string>('');
+  const [hookResponseNotes, setHookResponseNotes] = useState('');
+  const [objectionsRaised, setObjectionsRaised] = useState<string[]>([]);
+  const [emailObtained, setEmailObtained] = useState(false);
+  const [emailValue, setEmailValue] = useState('');
+  const [callbackNumberLeft, setCallbackNumberLeft] = useState(false);
+  const [ownerNameConfirmed, setOwnerNameConfirmed] = useState('');
+  const [teamSignalConfirmed, setTeamSignalConfirmed] = useState<string>('');
+  const [preferredChannelConfirmed, setPreferredChannelConfirmed] = useState('');
+  const [updateWorksheet, setUpdateWorksheet] = useState(true);
+
+  const isPhoneMode = channel === 'phone';
+  const isConnected = isPhoneMode && callResult === 'connected';
+  const isDeadNumber = isPhoneMode && (callResult === 'wrong_number' || callResult === 'disconnected_number');
+  const hasWriteBackFields = isConnected && (
+    ownerNameConfirmed.trim() ||
+    teamSignalConfirmed ||
+    preferredChannelConfirmed.trim() ||
+    (emailObtained && emailValue.trim())
+  );
+
   useEffect(() => {
     let cancelled = false;
     setSnapshotLoading(true);
@@ -71,15 +113,42 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
     setSaving(true);
     setError(null);
     try {
-      await marketingOpsService.logContact(campaign.id, {
-        contact_channel: channel,
-        contact_date: contactDate,
-        outcome,
-        follow_up_date: followUpDate || undefined,
-        notes: notes || undefined,
-        message_snapshot: messageSnapshot || undefined,
-        message_subject: channel === 'email' ? (messageSubject || undefined) : undefined,
-      });
+      if (isPhoneMode) {
+        // Phone mode — send call_details via the phone-aware log endpoint
+        const callDetails: CallDetails = {
+          call_result: callResult,
+          identity_verified: isConnected ? identityVerified : null,
+          operating_status_confirmed: isConnected ? operatingConfirmed : null,
+          angle_used: angleUsed || null,
+          hook_response_notes: hookResponseNotes || null,
+          objections_raised: objectionsRaised,
+          email_obtained: isConnected ? emailObtained : null,
+          email_value: (isConnected && emailObtained && emailValue) ? emailValue.trim() : null,
+          callback_number_left: isConnected ? callbackNumberLeft : null,
+          owner_name_confirmed: isConnected && ownerNameConfirmed.trim() ? ownerNameConfirmed.trim() : null,
+          team_signal_confirmed: isConnected && teamSignalConfirmed ? (teamSignalConfirmed as any) : null,
+          preferred_channel_confirmed: isConnected && preferredChannelConfirmed.trim() ? preferredChannelConfirmed.trim() : null,
+        };
+        await marketingOpsService.logCallContact(campaign.id, {
+          contact_channel: 'phone',
+          contact_date: contactDate,
+          outcome,
+          call_details: callDetails,
+          update_worksheet: hasWriteBackFields ? updateWorksheet : false,
+          follow_up_date: followUpDate || undefined,
+          notes: notes || undefined,
+        });
+      } else {
+        await marketingOpsService.logContact(campaign.id, {
+          contact_channel: channel,
+          contact_date: contactDate,
+          outcome,
+          follow_up_date: followUpDate || undefined,
+          notes: notes || undefined,
+          message_snapshot: messageSnapshot || undefined,
+          message_subject: channel === 'email' ? (messageSubject || undefined) : undefined,
+        });
+      }
       onLogged();
     } catch (err: any) {
       setError(err.message || 'Failed to log contact');
@@ -172,6 +241,109 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
             </select>
           </label>
 
+          {/* ─── Phone-mode call details (Sprint 1 — Cold Call Channel) ─── */}
+          {isPhoneMode && (
+            <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Call result</span>
+                <select
+                  value={callResult}
+                  onChange={(e) => {
+                    const result = e.target.value as CallResult;
+                    setCallResult(result);
+                    // Auto-set outcome to match call_result
+                    const mapping = CALL_RESULT_OPTIONS.find((o) => o.value === result);
+                    if (mapping) setOutcome(mapping.outcome);
+                  }}
+                  className={inputClass}
+                >
+                  {CALL_RESULT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
+
+              {isConnected && (
+                <>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input type="checkbox" checked={identityVerified} onChange={(e) => setIdentityVerified(e.target.checked)} className="rounded" />
+                      Identity verified
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input type="checkbox" checked={operatingConfirmed} onChange={(e) => setOperatingConfirmed(e.target.checked)} className="rounded" />
+                      Operating status confirmed
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Angle used</span>
+                    <input type="text" value={angleUsed} onChange={(e) => setAngleUsed(e.target.value)} placeholder="e.g. gbp_verification" className={inputClass} />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Hook response notes</span>
+                    <textarea value={hookResponseNotes} onChange={(e) => setHookResponseNotes(e.target.value)} rows={2} placeholder="What they said to the hook" className={inputClass} />
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Email obtained?</span>
+                      <select value={emailObtained ? 'yes' : 'no'} onChange={(e) => setEmailObtained(e.target.value === 'yes')} className={inputClass}>
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                      </select>
+                    </label>
+                    {emailObtained && (
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Email value</span>
+                        <input type="email" value={emailValue} onChange={(e) => setEmailValue(e.target.value)} placeholder="owner@business.com" className={inputClass} required={emailObtained} />
+                      </label>
+                    )}
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <input type="checkbox" checked={callbackNumberLeft} onChange={(e) => setCallbackNumberLeft(e.target.checked)} className="rounded" />
+                    Callback number left (declined-email fallback)
+                  </label>
+
+                  {/* Write-back fields */}
+                  <div className="space-y-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Confirmed fields (write-back candidates)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Owner name confirmed</span>
+                        <input type="text" value={ownerNameConfirmed} onChange={(e) => setOwnerNameConfirmed(e.target.value)} placeholder="Spoken confirmation" className={inputClass} />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Team signal</span>
+                        <select value={teamSignalConfirmed} onChange={(e) => setTeamSignalConfirmed(e.target.value)} className={inputClass}>
+                          <option value="">—</option>
+                          {TEAM_SIGNAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Preferred channel confirmed</span>
+                      <input type="text" value={preferredChannelConfirmed} onChange={(e) => setPreferredChannelConfirmed(e.target.value)} placeholder="phone, email, text, …" className={inputClass} />
+                    </label>
+                  </div>
+
+                  {hasWriteBackFields && (
+                    <label className="flex items-start gap-2 rounded-md bg-blue-50 p-2 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                      <input type="checkbox" checked={updateWorksheet} onChange={(e) => setUpdateWorksheet(e.target.checked)} className="mt-0.5 rounded" />
+                      <span>Update Outreach Prep worksheet with confirmed fields. Writes to the primary sibling's worksheet as <code>confirmed</code> with source &ldquo;Phone call {contactDate}&rdquo;. Conflicting existing values are never overwritten.</span>
+                    </label>
+                  )}
+                </>
+              )}
+
+              {isDeadNumber && (
+                <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  This won't change the campaign's phone number automatically. Review it in Business Contact Details.
+                </div>
+              )}
+            </div>
+          )}
+
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Follow-up date (optional)</span>
             <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className={inputClass} />
@@ -184,22 +356,24 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
             </label>
           )}
 
-          <label className="block">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">Message sent (optional)</span>
-              <button
-                type="button"
-                onClick={handleInsertGalleryLink}
-                disabled={insertingLink}
-                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400"
-                title="Insert the active diagnostic gallery link into the message body"
-              >
-                {insertingLink ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
-                Insert Gallery Link
-              </button>
-            </div>
-            <textarea value={messageSnapshot} onChange={(e) => setMessageSnapshot(e.target.value)} rows={4} placeholder="Paste the message body you sent to the prospect" className={inputClass} />
-          </label>
+          {!isPhoneMode && (
+            <label className="block">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">Message sent (optional)</span>
+                <button
+                  type="button"
+                  onClick={handleInsertGalleryLink}
+                  disabled={insertingLink}
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400"
+                  title="Insert the active diagnostic gallery link into the message body"
+                >
+                  {insertingLink ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                  Insert Gallery Link
+                </button>
+              </div>
+              <textarea value={messageSnapshot} onChange={(e) => setMessageSnapshot(e.target.value)} rows={4} placeholder="Paste the message body you sent to the prospect" className={inputClass} />
+            </label>
+          )}
 
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Notes</span>

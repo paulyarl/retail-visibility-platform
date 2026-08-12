@@ -24,8 +24,25 @@ import { NotFoundError } from '../middleware/errorHandler';
 import { generateOutreachLogId } from '../lib/id-generator';
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
-export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled';
+export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled' | 'wrong_number' | 'disconnected_number';
 export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'retrying';
+
+export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
+
+export interface CallDetails {
+  call_result: CallResult;
+  identity_verified?: boolean | null;
+  operating_status_confirmed?: boolean | null;
+  angle_used?: string | null;
+  hook_response_notes?: string | null;
+  objections_raised?: string[];
+  email_obtained?: boolean | null;
+  email_value?: string | null;
+  callback_number_left?: boolean | null;
+  owner_name_confirmed?: string | null;
+  team_signal_confirmed?: string | null;
+  preferred_channel_confirmed?: string | null;
+}
 
 export interface LogContactInput {
   campaignId: string;
@@ -42,6 +59,8 @@ export interface LogContactInput {
   deliveryAttempts?: number;
   lastDeliveryError?: string;
   retryAfter?: string;
+  callDetails?: CallDetails | null;
+  updateWorksheet?: boolean;
 }
 
 export interface FreshSnapshot {
@@ -135,6 +154,7 @@ export class MarketingOutreachService extends BaseService {
           delivery_attempts: input.deliveryAttempts ?? 0,
           last_delivery_error: input.lastDeliveryError || null,
           retry_after: input.retryAfter ? new Date(input.retryAfter) : null,
+          call_details: (input.callDetails ?? undefined) as any,
         },
       });
 
@@ -174,6 +194,43 @@ export class MarketingOutreachService extends BaseService {
             campaignId: input.campaignId,
           });
         });
+
+      // Cold-call worksheet write-back (§5.4). When updateWorksheet is true
+      // and the call carries confirmation fields, apply them to the
+      // Outreach Intelligence worksheet (fill-and-confirm semantics).
+      // Fire-and-forget — the log row is already persisted; write-back
+      // failure must not roll back the contact log.
+      if (input.updateWorksheet && input.callDetails && input.callDetails.call_result === 'connected') {
+        import('./CallScriptService')
+          .then(({ default: callScriptService }) =>
+            callScriptService.applyCallConfirmations({
+              campaignId: input.campaignId,
+              callLogId: log.id,
+              callDate: input.contactDate,
+              contactedBy: input.contactedBy ?? null,
+              ownerNameConfirmed: input.callDetails.owner_name_confirmed ?? null,
+              teamSignalConfirmed: (input.callDetails.team_signal_confirmed as any) ?? null,
+              preferredChannelConfirmed: input.callDetails.preferred_channel_confirmed ?? null,
+              emailObtained: input.callDetails.email_obtained ?? null,
+              emailValue: input.callDetails.email_value ?? null,
+            }, ctx),
+          )
+          .then((result) => {
+            logger.info('Call confirmation write-back applied', ctx, {
+              campaignId: input.campaignId,
+              logId: log.id,
+              written: result.written,
+              conflicts: result.conflicts.length,
+            });
+          })
+          .catch((err) => {
+            logger.warn('Call confirmation write-back failed (swallowed)', ctx, {
+              error: (err as Error).message,
+              campaignId: input.campaignId,
+              logId: log.id,
+            });
+          });
+      }
 
       return log;
     } catch (error) {

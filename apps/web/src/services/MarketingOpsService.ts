@@ -193,7 +193,7 @@ export interface CampaignDetail extends Campaign {
 }
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
-export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled';
+export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled' | 'wrong_number' | 'disconnected_number';
 
 export interface OutreachLogEntry {
   id: string;
@@ -342,7 +342,8 @@ export type HookAngle =
   | 'cross_platform_expansion'
   | 'photo_content_setup'
   | 'click_to_call'
-  | 'reputation_monitoring';
+  | 'reputation_monitoring'
+  | 'zero_footprint';
 
 export interface RankedHook {
   angle: HookAngle;
@@ -367,6 +368,63 @@ export interface HookSuggestionResult {
   archetype: string;
   archetypeSource: 'triage' | 'fallback';
   suggestions: RankedHook[];
+}
+
+// ─── Cold Call Script Types (Sprint 1 — Cold Call Channel) ──────────────
+
+export interface RankedPhoneHook {
+  angle: HookAngle;
+  label: string;
+  archetypes: string[];
+  signals: string[];
+  phone_hook: string;
+  resolved_phone_hook: string;
+  rank: number;
+  matchedSignals: string[];
+}
+
+export interface CallScriptContext {
+  phone: string;
+  owner_name: string | null;
+  owner_name_confidence: string;
+  team_signal: string;
+  gallery_short_url: string | null;
+}
+
+export interface ObjectionRow {
+  objection: string;
+  response: string;
+}
+
+export interface AssembledCallScript {
+  stages: {
+    verify: string;
+    hook: { angle: HookAngle; label: string; line: string };
+    bridge: string;
+    ask: string;
+    ask_decline_fallback: string;
+    close: string;
+  };
+  hookOptions: RankedPhoneHook[];
+  objections: ObjectionRow[];
+  callContext: CallScriptContext;
+}
+
+export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
+
+export interface CallDetails {
+  call_result: CallResult;
+  identity_verified?: boolean | null;
+  operating_status_confirmed?: boolean | null;
+  angle_used?: string | null;
+  hook_response_notes?: string | null;
+  objections_raised?: string[];
+  email_obtained?: boolean | null;
+  email_value?: string | null;
+  callback_number_left?: boolean | null;
+  owner_name_confirmed?: string | null;
+  team_signal_confirmed?: string | null;
+  preferred_channel_confirmed?: string | null;
 }
 
 // ─── Outreach Follow-Up Types ───────────────────────────────────────────
@@ -4179,6 +4237,48 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch hook suggestions');
     }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Cold Call Script (Sprint 1 — Cold Call Channel) ───────────────────
+
+  async getCallScript(campaignId: string, angle?: string): Promise<AssembledCallScript> {
+    const url = angle
+      ? `${BASE_URL}/${campaignId}/call-script?angle=${encodeURIComponent(angle)}`
+      : `${BASE_URL}/${campaignId}/call-script`;
+    const result = await this.makeDefaultRequest<any>(url, { method: 'GET' });
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch call script');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async logCallContact(
+    campaignId: string,
+    payload: {
+      contact_date: string;
+      outcome: string;
+      contact_channel: 'phone';
+      call_details: CallDetails;
+      update_worksheet?: boolean;
+      follow_up_date?: string;
+      notes?: string;
+    },
+  ): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      `mkt-ops-call-log-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      const msg = typeof result.error === 'string'
+        ? result.error
+        : (result.error as any)?.details?.[0]?.message
+          ?? 'Failed to log call';
+      throw new Error(msg);
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
     return result.data?.data ?? result.data;
   }
 }

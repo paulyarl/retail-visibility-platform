@@ -64,8 +64,8 @@ const REGISTERED_SIGNALS = new Set([
 ]);
 
 describe('Hook Library catalog', () => {
-  it('has exactly 12 entries', () => {
-    expect(HOOK_LIBRARY).toHaveLength(12);
+  it('has exactly 13 entries', () => {
+    expect(HOOK_LIBRARY).toHaveLength(13);
   });
 
   it('every angle key is unique', () => {
@@ -74,7 +74,7 @@ describe('Hook Library catalog', () => {
   });
 
   it('HOOK_ANGLE_KEYS matches the library', () => {
-    expect(HOOK_ANGLE_KEYS).toHaveLength(12);
+    expect(HOOK_ANGLE_KEYS).toHaveLength(13);
     expect(HOOK_ANGLE_KEYS).toEqual(HOOK_LIBRARY.map((h) => h.angle));
   });
 
@@ -91,6 +91,22 @@ describe('Hook Library catalog', () => {
       expect(hook.shape.quantified_upside).toBeTruthy();
       expect(hook.shape.audit_offer).toBeTruthy();
       expect(hook.shape.soft_cta).toBeTruthy();
+      expect(hook.phone_hook).toBeTruthy();
+    }
+  });
+
+  it('zero_footprint is the 13th angle', () => {
+    const zf = HOOK_LIBRARY.find((h) => h.angle === 'zero_footprint');
+    expect(zf).toBeDefined();
+    expect(zf!.archetypes).toContain('A3');
+    expect(zf!.archetypes).toContain('A4');
+    expect(zf!.signals).toContain('EF_ZERO_INDEXED_PRESENCE');
+  });
+
+  it('every phone_hook contains neither {{salutation}} nor {{sender_name}}', () => {
+    for (const hook of HOOK_LIBRARY) {
+      expect(hook.phone_hook).not.toContain('{{salutation}}');
+      expect(hook.phone_hook).not.toContain('{{sender_name}}');
     }
   });
 
@@ -166,7 +182,7 @@ describe('getHook', () => {
 });
 
 describe('isValidHookAngle', () => {
-  it('returns true for all 12 catalog angles', () => {
+  it('returns true for all 13 catalog angles', () => {
     for (const angle of HOOK_ANGLE_KEYS) {
       expect(isValidHookAngle(angle)).toBe(true);
     }

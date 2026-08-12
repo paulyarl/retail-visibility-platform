@@ -1,7 +1,7 @@
 /**
  * Hook Library — Server-side starter hook catalog (Light-Score Hooks)
  *
- * Code-defined, typed catalog of 12 proven first-touch hook angles, each
+ * Code-defined, typed catalog of 13 proven first-touch hook angles, each
  * following the same five-beat shape:
  *   diagnostic hook → reassurance → bridge/quantified upside → audit offer → soft CTA
  *
@@ -13,10 +13,20 @@
  * "your shop") stay verbatim. See §13.2 of the sprint plan for the three
  * phrasing categories.
  *
+ * Each template carries both an email-channel body (`subject` + `body`)
+ * and a phone-channel spoken line (`phone_hook`) — Stage 2 of the
+ * cold-call script. The phone merge set is `{{business}}`, `{{address}}`,
+ * `{{category}}`, `{{city}}`, `{{operator_name}}` (no `{{salutation}}` —
+ * Stage 1 speaks the business name, not a greeting).
+ *
+ * The 13th angle (`zero_footprint`) covers the "no usable footprint found
+ * at all" case from the cold-call script's `EF_ZERO_INDEXED_PRESENCE` row.
+ *
  * No DB access, no async, no side effects — pure data module.
  * Mirrors `GalleryArchetypeDefaults.ts` pattern.
  *
  * See: docs/LocalBiz/marketing_ops_outreach_intelligence_prep_sprint_plan.md §11–§13
+ *      docs/LocalBiz/marketing_ops_cold_call_channel_sprint_plan.md §5.1
  *      docs/LocalBiz/operator_hook_samples.md (rendered reference output)
  */
 
@@ -36,7 +46,8 @@ export type HookAngle =
   | 'cross_platform_expansion'
   | 'photo_content_setup'
   | 'click_to_call'
-  | 'reputation_monitoring';
+  | 'reputation_monitoring'
+  | 'zero_footprint';
 
 export interface HookTemplate {
   angle: HookAngle;
@@ -57,6 +68,13 @@ export interface HookTemplate {
     audit_offer: string;
     soft_cta: string;
   };
+  /**
+   * Stage 2 spoken line for the cold-call script — merge placeholders
+   * allowed ({{category}}, {{city}}, {{business}}, {{operator_name}}).
+   * Bypasses the opener quality gate (spoken copy has no
+   * salutation/signoff/preview-attachment requirements).
+   */
+  phone_hook: string;
 }
 
 // ─── Merge placeholders ─────────────────────────────────────────────────
@@ -101,6 +119,7 @@ Want me to send over what I found?
       audit_offer: 'Quick Google Listing Audit — takes about a day, yours to keep',
       soft_cta: 'Want me to send over what I found?',
     },
+    phone_hook: 'I was looking up {{category}} in {{city}} earlier and noticed your Google listing is probably sitting around a C-minus for completeness — hours, categories, photos, that kind of thing. Most local shops are in that range, so nothing to worry about. But an incomplete listing usually means you\'re missing out on 20-30% of the "near me" searches that should be finding you first. I do quick Google Listing Audits that show exactly what\'s missing — takes about a day, yours to keep either way. Want me to send over what I found?',
   },
 
   // 2. nap_normalization
@@ -128,6 +147,7 @@ Want me to send it over?
       audit_offer: 'NAP Consistency Check — maps every mismatch, takes about a day',
       soft_cta: 'Want me to send it over?',
     },
+    phone_hook: 'Quick one — I pulled up your business across a few directories (Google, Yelp, Facebook) and noticed the name and phone number don\'t quite match everywhere. Super common, nothing broken. But it can quietly confuse Google about which listing to trust and rank — which means fewer people finding the right number to actually call you. I put together a fast NAP Consistency Check that maps out every mismatch and the fix for each. Want me to send it over?',
   },
 
   // 3. hours_sync
@@ -155,6 +175,7 @@ Want me to send it?
       audit_offer: 'Hours Accuracy Check — simple fix list, takes about a day',
       soft_cta: 'Want me to send it?',
     },
+    phone_hook: 'I noticed your posted hours aren\'t quite the same across your listings — one place says open, another\'s a little different. Most local shops have this somewhere, so don\'t sweat it. But it\'s one of the top reasons customers show up to a locked door — and leave a review about it instead of coming back. I can run a quick Hours Accuracy Check across your main listings and hand you a simple fix list. Want me to send it?',
   },
 
   // 4. website_foundation
@@ -182,6 +203,7 @@ Want me to sketch out what that could look like for you, no obligation?
       audit_offer: 'Website Foundation build — shows up, loads fast, gets people in',
       soft_cta: 'Want me to sketch out what that could look like, no obligation?',
     },
+    phone_hook: 'I went looking for your website earlier and had a hard time finding one — or if it\'s there, it\'s not showing up where customers would expect. Totally normal for a lot of great local shops. But it means a chunk of people checking you out online just stop looking the moment they can\'t find one. I do simple Website Foundation builds for shops like yours — nothing fancy, just something that shows up, loads fast, and gets people in. Want me to sketch out what that could look like, no obligation?',
   },
 
   // 5. product_category_pages
@@ -209,6 +231,7 @@ Want me to show you a sample?
       audit_offer: 'Simple category pages that capture search traffic',
       soft_cta: 'Want me to show you a sample?',
     },
+    phone_hook: 'Love what you\'ve got going — but I noticed there\'s nowhere online that actually lists what you carry. A lot of shops don\'t have this yet, so you\'re not behind. But it means you\'re leaving an easy win on the table — those exact product searches are how new customers find a shop like yours in the first place. I can put together simple category pages that capture that search traffic. Want me to show you a sample?',
   },
 
   // 6. review_acquisition
@@ -236,6 +259,7 @@ Want me to walk you through how it works?
       audit_offer: 'Compliant system for gently asking satisfied customers',
       soft_cta: 'Want me to walk you through how it works?',
     },
+    phone_hook: 'I checked your online reviews and noticed there aren\'t many up yet. Usually that just means happy customers haven\'t been asked — not that they\'re not out there. Reviews are honestly one of the fastest ways for a shop like yours to build trust with new customers fast, before they\'ve ever walked in. I\'ve got a simple, fully compliant system for gently asking satisfied customers to leave one. Want me to walk you through how it works?',
   },
 
   // 7. testimonial_amplification
@@ -263,6 +287,7 @@ Want me to show you what that'd look like?
       audit_offer: 'Testimonial Amplification packages — put praise front and center',
       soft_cta: 'Want me to show you what that\'d look like?',
     },
+    phone_hook: 'From what I found, people genuinely love your shop — good word of mouth, a few glowing mentions here and there. Problem is, none of that is showing up where new customers are looking first. That kind of trust is hard to earn and easy to waste if it\'s invisible. I put together simple Testimonial Amplification packages that take the praise you\'re already earning and put it front and center online. Want me to show you what that\'d look like?',
   },
 
   // 8. local_seo
@@ -290,6 +315,7 @@ Want me to send mine over?
       audit_offer: 'Local SEO Audit — shows what\'s holding you back',
       soft_cta: 'Want me to send mine over?',
     },
+    phone_hook: 'I did a quick search for {{category}} near me in {{city}} and your shop wasn\'t showing up on the first page. Pretty common for shops that haven\'t had any SEO work done — nothing to worry about. But it likely means you\'re missing a good chunk of nearby customers who are actively looking for exactly what you sell. I run quick Local SEO Audits that show exactly what\'s holding you back and what to fix first. Want me to send mine over?',
   },
 
   // 9. cross_platform_expansion
@@ -317,6 +343,7 @@ Want me to send the list?
       audit_offer: 'Map out which platforms matter most and get you set up',
       soft_cta: 'Want me to send the list?',
     },
+    phone_hook: 'Looked you up and found you on one platform, but not much beyond that — Yelp, Facebook, Nextdoor, that sort of thing. Totally normal starting point. But each of those is a different door customers walk through to find you — and right now a few of those doors are closed to people who\'d otherwise find you there first. I can map out exactly which platforms would matter most for a shop like yours and get you set up. Want me to send the list?',
   },
 
   // 10. photo_content_setup
@@ -344,6 +371,7 @@ Want me to send it over?
       audit_offer: 'Photo/content setup plan — what to shoot, where it goes',
       soft_cta: 'Want me to send it over?',
     },
+    phone_hook: 'Noticed your online listings are pretty light on photos — maybe none at all. Really common, but customers lean on photos hard when deciding whether to try a new shop, especially a specialty one. A few good shots of the shelves and storefront can be the difference between a scroll-past and someone deciding you\'re worth the drive. I can put together a simple photo/content setup plan — what to shoot, where it goes — that takes almost no time on your end. Want me to send it over?',
   },
 
   // 11. click_to_call
@@ -371,6 +399,7 @@ Want me to send it?
       audit_offer: 'Click-to-Call Audit — takes about a day, yours to keep',
       soft_cta: 'Want me to send it?',
     },
+    phone_hook: 'I tried calling your shop straight from your Google listing on my phone, and it wasn\'t a one-tap call — had to dig for the number. Small thing, honestly. But on mobile, that little bit of friction is often the difference between a customer calling right then and just giving up and moving on to the next result. I can do a quick Click-to-Call Audit across your listings and site to fix that. Want me to send it?',
   },
 
   // 12. reputation_monitoring
@@ -398,6 +427,35 @@ Want me to show you how it'd work for your shop?
       audit_offer: 'Reputation Monitoring setup — notified right away',
       soft_cta: 'Want me to show you how it\'d work for your shop?',
     },
+    phone_hook: 'Quick question — is anyone keeping an eye on new reviews as they come in across your listings? A lot of shop owners are heads-down running the business and miss them for weeks at a time. That\'s an easy fix, but an unanswered bad review sitting there for a month can quietly cost you customers who never even mention it — they just move on. I offer a simple Reputation Monitoring setup so you get notified right away and never miss a chance to respond. Want me to show you how it\'d work for your shop?',
+  },
+
+  // 13. zero_footprint — "no usable footprint found at all"
+  {
+    angle: 'zero_footprint',
+    label: 'Zero footprint — no online presence found',
+    archetypes: ['A3', 'A4'],
+    signals: ['WC_MISSING_WEBSITE', 'DS_MISSING_PROFILE', 'CP_MISSING_CONTACT_INFO', 'EF_ZERO_INDEXED_PRESENCE'],
+    subject: 'couldn\'t find you online at all',
+    body: `{{salutation}} I went looking for {{business}} online — Google, your own website, the usual places — and honestly couldn't find much of anything.
+
+Not a knock on what you do — a lot of great local shops just never had a reason to be online before now.
+
+But it means when someone searches for {{category}} in {{city}}, you're invisible to them — they find your competitors instead, even if you're the better choice.
+
+I can put together a quick Online Footprint Audit that shows exactly what's missing and where to start. Takes about a day, yours to keep.
+
+Want me to send it over?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Couldn\'t find you online at all',
+      reassurance: 'A lot of great local shops just never had a reason to be online.',
+      quantified_upside: 'When someone searches, you\'re invisible — they find competitors instead',
+      audit_offer: 'Online Footprint Audit — shows what\'s missing and where to start',
+      soft_cta: 'Want me to send it over?',
+    },
+    phone_hook: 'I went looking for {{business}} online — Google, your own website, the usual places — and honestly couldn\'t find much of anything. Not a knock on what you do — a lot of great local shops just never had a reason to be online before now. But it means when someone searches for {{category}} in {{city}}, you\'re invisible to them — they find your competitors instead, even if you\'re the better choice. I can put together a quick Online Footprint Audit that shows exactly what\'s missing and where to start. Want me to send it over?',
   },
 ];
 
@@ -425,3 +483,62 @@ export const HOOK_ANGLE_KEYS: readonly HookAngle[] = HOOK_LIBRARY.map((h) => h.a
 export function isValidHookAngle(s: string): s is HookAngle {
   return HOOK_BY_ANGLE.has(s as HookAngle);
 }
+
+// ─── Cold-call script fixed stages ──────────────────────────────────────
+//
+// The cold-call script has five fixed stages: Verify → Hook → Bridge →
+// Ask → Close. Only Stage 2 (the Hook) varies per angle — it comes from
+// the `phone_hook` field on each HookTemplate. Stages 1, 3, 4, and 5 are
+// code-defined constants that never change per campaign (the script's
+// core scaling claim).
+//
+// Phone merge placeholders (not the email set — no {{salutation}}):
+//   {{business}}       — campaign business_name (required for Stage 1)
+//   {{address}}        — formatted from address_line1/city/state
+//   {{category}}       — campaign service_category, lowercased
+//   {{city}}           — campaign city
+//   {{operator_name}}  — assigned operator display name
+
+export const CALL_SCRIPT_VERIFY = `Hi, is this {{business}}? … Great, am I speaking with the owner or manager?`;
+
+export const CALL_SCRIPT_BRIDGE = `The reason I'm calling — I work with {{category}} businesses in {{city}} on their online presence. I noticed something specific about yours that's costing you customers, and I wanted to walk you through it.`;
+
+export const CALL_SCRIPT_ASK = `I've put together a quick rundown of exactly what I found — the gaps, what they're costing you, and what to fix first. I can send it over today, no cost, yours to keep either way. What's the best email to send it to?`;
+
+export const CALL_SCRIPT_ASK_DECLINE_FALLBACK = `No problem — I can leave my number and you can text me if you want it later.`;
+
+export const CALL_SCRIPT_CLOSE = `Either way, the rundown is yours whenever you want it. Thanks for your time — {{operator_name}}.`;
+
+// ─── Objection table ────────────────────────────────────────────────────
+//
+// The five objection/response rows from the operator script. Code-defined,
+// never changes per campaign. Rendered as an accordion in the Call Script
+// panel.
+
+export interface ObjectionRow {
+  objection: string;
+  response: string;
+}
+
+export const CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
+  {
+    objection: 'I\'m not interested',
+    response: 'Totally fair — can I ask, is that because you\'ve already got someone handling your online presence, or because it\'s just not a priority right now?',
+  },
+  {
+    objection: 'I don\'t have time for this',
+    response: 'I hear you — this literally takes two minutes and I\'m done. The rundown I send takes me about a day to put together, and you can look at it whenever you have time. What\'s the best email?',
+  },
+  {
+    objection: 'How much does this cost?',
+    response: 'The rundown itself is free — I send it, you look at it, and if anything in it is useful, we can talk about what it would take to fix. No obligation either way. What\'s the best email?',
+  },
+  {
+    objection: 'I already have a website / SEO guy',
+    response: 'Good to hear — then the rundown will show you exactly what they\'re covering well and where the gaps still are. It\'s still free and yours to keep. What\'s the best email?',
+  },
+  {
+    objection: 'Just send me an email',
+    response: 'Will do — what\'s the best address? And if you have a minute later, I\'d love to walk you through the one or two things that stood out most.',
+  },
+];

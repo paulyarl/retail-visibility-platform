@@ -483,7 +483,15 @@ function SourcedFieldEditor({ icon, label, field, disabled, placeholder, onChang
       </div>
       {showSource && (
         <div className="pl-6">
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Source citation</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+            Source citation
+            {field.source && /^Phone call /.test(field.source) && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title="Confirmed via phone call">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                Phone
+              </span>
+            )}
+          </label>
           <input
             type="text"
             disabled={disabled}

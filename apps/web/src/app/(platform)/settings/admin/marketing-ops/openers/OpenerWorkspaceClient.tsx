@@ -13,6 +13,7 @@ import marketingOpsService, {
 } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import PitchConstructionPanel from './PitchConstructionPanel';
+import CallScriptPanel from './CallScriptPanel';
 
 const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A1: 'Review Response Gap',
@@ -48,7 +49,7 @@ export default function OpenerWorkspaceClient() {
   // state (resolution, openers, draft pitch) so the operator can assemble
   // on the pitch tab, then flip back to the opener tab to execute or import
   // a fresh opener without losing the assembled pitch.
-  const [activeTab, setActiveTab] = useState<'opener' | 'pitch'>('opener');
+  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'call'>('opener');
 
   const [resolution, setResolution] = useState<OpenerResolution | null>(null);
   const [resolving, setResolving] = useState(false);
@@ -346,6 +347,19 @@ export default function OpenerWorkspaceClient() {
             }`}
           >
             Pitch Construction
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('call')}
+            disabled={!selectedCampaign?.phone}
+            title={!selectedCampaign?.phone ? 'No phone number on campaign' : undefined}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'call'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            } ${!selectedCampaign?.phone ? 'cursor-not-allowed opacity-50' : ''}`}
+          >
+            Call Script
           </button>
         </div>
       )}
@@ -691,6 +705,17 @@ export default function OpenerWorkspaceClient() {
           campaignId={selectedCampaignId}
           openers={openers}
           archetype={resolution?.selection.archetype}
+        />
+      )}
+
+      {/* Call Script tab — five-stage cold-call script (Verify → Hook →
+          Bridge → Ask → Close) with ranked hook picker. Only renders when
+          a campaign is selected and the Call Script tab is active. The
+          tab button is disabled when the campaign has no phone number. */}
+      {selectedCampaignId && activeTab === 'call' && (
+        <CallScriptPanel
+          campaignId={selectedCampaignId}
+          campaignPhone={selectedCampaign?.phone ?? null}
         />
       )}
     </MarketingOpsPageShell>
