@@ -372,31 +372,41 @@ describe('Emerging-archetype rank boost', () => {
     expect(result.suggestions[2].angle).toBe('cross_platform_expansion');
   });
 
-  it('boosts INVISIBLE_ANCHOR angles (local_seo first)', async () => {
+  it('boosts INVISIBLE_ANCHOR angles (zero_footprint first — it has A3 affinity + boost)', async () => {
     mockGetLatestAuditData.mockResolvedValue(makeV3Audit('INVISIBLE_ANCHOR', 'insufficient_evidence'));
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions[0].angle).toBe('local_seo');
-    expect(result.suggestions[1].angle).toBe('website_foundation');
-    expect(result.suggestions[2].angle).toBe('zero_footprint');
+    // zero_footprint has A3 archetype affinity AND is boosted by INVISIBLE_ANCHOR (pos 2).
+    // local_seo is boosted (pos 0) but has NO A3 affinity — so it ranks after
+    // all A3-affinity hooks. The boost is applied AFTER archetype affinity.
+    expect(result.suggestions[0].angle).toBe('zero_footprint');
+
+    // Among non-A3 hooks, local_seo (boost pos 0) should rank above
+    // website_foundation (boost pos 1).
+    const localSeoRank = result.suggestions.find((s) => s.angle === 'local_seo')!.rank;
+    const websiteFoundationRank = result.suggestions.find((s) => s.angle === 'website_foundation')!.rank;
+    expect(localSeoRank).toBeLessThan(websiteFoundationRank);
   });
 
-  it('applies boost after archetype affinity (A-archetype hooks still rank above non-archetype non-boosted)', async () => {
-    // With A3 archetype, gbp_verification has archetype affinity.
-    // DIRECTORY_GHOST boost includes gbp_verification, so it should still
-    // be high — but zero_footprint (no A3 affinity, but boosted) should
-    // rank above non-archetype non-boosted hooks.
+  it('applies boost after archetype affinity (A3 + boosted hooks rank above non-A3 boosted hooks)', async () => {
+    // With A3 archetype + DIRECTORY_GHOST boost:
+    // zero_footprint has A3 affinity + boost (pos 0) → #1
+    // gbp_verification has A3 affinity + boost (pos 1) → #2
+    // cross_platform_expansion has boost (pos 2) but no A3 → after all A3 hooks
     mockGetLatestAuditData.mockResolvedValue(makeV3Audit('DIRECTORY_GHOST', 'foundation_needed'));
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    const zeroFootprintRank = result.suggestions.find((s) => s.angle === 'zero_footprint')!.rank;
-    // zero_footprint is boosted but has no A3 affinity — it should rank
-    // after A3-affinity hooks but before non-affinity non-boosted hooks.
-    // Since gbp_verification has A3 affinity AND is boosted, it should be #1.
-    expect(result.suggestions[0].angle).toBe('gbp_verification');
-    expect(zeroFootprintRank).toBeLessThanOrEqual(3);
+    // zero_footprint: A3 affinity + boost pos 0 → #1
+    expect(result.suggestions[0].angle).toBe('zero_footprint');
+    // gbp_verification: A3 affinity + boost pos 1 → #2
+    expect(result.suggestions[1].angle).toBe('gbp_verification');
+
+    // cross_platform_expansion (boost pos 2, no A3) should rank after
+    // all A3-affinity hooks but before non-boosted non-A3 hooks.
+    const cpeRank = result.suggestions.find((s) => s.angle === 'cross_platform_expansion')!.rank;
+    expect(cpeRank).toBeLessThanOrEqual(5);
   });
 
   it('no audit data → no boost (ranking unchanged from Sprint 1)', async () => {

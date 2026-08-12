@@ -18,7 +18,7 @@ import {
   extractEmergingArchetype,
   extractGrowthReadiness,
   type EmergingArchetype,
-} from '../emerging-angle-map';
+} from '../outreach-openers/emerging-angle-map';
 
 describe('emerging-angle-map', () => {
   // ─── Map completeness ──────────────────────────────────────────────────
