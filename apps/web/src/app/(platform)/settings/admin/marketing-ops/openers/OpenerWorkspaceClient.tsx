@@ -12,6 +12,7 @@ import marketingOpsService, {
   CloseVariant,
 } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
+import LogContactModal from '@/components/marketing-ops/LogContactModal';
 import PitchConstructionPanel from './PitchConstructionPanel';
 import CallScriptPanel from './CallScriptPanel';
 
@@ -91,6 +92,12 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
   const [pendingHookAngle, setPendingHookAngle] = useState<string | null>(null);
 
   const [copied, setCopied] = useState(false);
+
+  // Log-contact modal state — opened from the Call Script tab's "Log
+  // call outcome" button. The selected hook angle is captured so the
+  // modal's "Angle used" field is pre-filled for attribution.
+  const [logContactAngle, setLogContactAngle] = useState<string | null>(null);
+  const [showLogContactModal, setShowLogContactModal] = useState(false);
 
   // Checklist outreach progress badge (bridge sprint)
   const [checklistBadge, setChecklistBadge] = useState<{ completed: number; total: number } | null>(null);
@@ -740,6 +747,28 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
         <CallScriptPanel
           campaignId={selectedCampaignId}
           campaignPhone={selectedCampaign?.phone ?? null}
+          onLogCall={(angle) => {
+            setLogContactAngle(angle);
+            setShowLogContactModal(true);
+          }}
+        />
+      )}
+
+      {/* Log-contact modal — opened from the Call Script tab's "Log call
+          outcome" button. Pre-fills the selected hook angle so it's
+          recorded on the outreach log without retyping. */}
+      {showLogContactModal && selectedCampaign && (
+        <LogContactModal
+          campaign={selectedCampaign}
+          initialAngleUsed={logContactAngle ?? undefined}
+          onClose={() => {
+            setShowLogContactModal(false);
+            setLogContactAngle(null);
+          }}
+          onLogged={() => {
+            setShowLogContactModal(false);
+            setLogContactAngle(null);
+          }}
         />
       )}
     </MarketingOpsPageShell>

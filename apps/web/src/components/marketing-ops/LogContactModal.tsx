@@ -49,9 +49,13 @@ interface LogContactModalProps {
   campaign: Campaign;
   onClose: () => void;
   onLogged: () => void;
+  // Optional pre-fill for the phone-mode "Angle used" field. The Call
+  // Script tab passes the operator's selected hook angle so it's recorded
+  // on the outreach log without retyping.
+  initialAngleUsed?: string;
 }
 
-export default function LogContactModal({ campaign, onClose, onLogged }: LogContactModalProps) {
+export default function LogContactModal({ campaign, onClose, onLogged, initialAngleUsed }: LogContactModalProps) {
   // Pre-fill channel selector with channels the campaign actually has.
   const availableChannels: ContactChannel[] = [];
   if (campaign.phone) availableChannels.push('phone');
@@ -77,7 +81,7 @@ export default function LogContactModal({ campaign, onClose, onLogged }: LogCont
   const [callResult, setCallResult] = useState<CallResult>('connected');
   const [identityVerified, setIdentityVerified] = useState(false);
   const [operatingConfirmed, setOperatingConfirmed] = useState(false);
-  const [angleUsed, setAngleUsed] = useState<string>('');
+  const [angleUsed, setAngleUsed] = useState<string>(initialAngleUsed ?? '');
   const [hookResponseNotes, setHookResponseNotes] = useState('');
   const [objectionsRaised, setObjectionsRaised] = useState<string[]>([]);
   const [emailObtained, setEmailObtained] = useState(false);
