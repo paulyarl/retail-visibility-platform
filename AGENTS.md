@@ -234,6 +234,42 @@ Mirrors the coupon `/s/{autoId}` short URL pattern for diagnostic gallery tokens
 - **Collision handling**: 3 retries on unique-index conflict; falls back to no short code (long URL still works) if exhausted
 - **Lazy backfill**: legacy tokens without `short_code` are not broken; `ensureShortCode()` can backfill them on demand
 
+## Log Contact Modal — Per-Channel Result Options + Other Subtype
+
+Extends the "Log contact" modal so every channel has a tailored result dropdown (mirroring the Phone channel's "Call result" pattern), and the "Other" channel gains a subtype selector (DM / Text / Email / Fax-Mail).
+
+### Behavior
+- **Phone** — unchanged: "Call result" (Connected / Voicemail / No Answer / Wrong Number / Disconnected) auto-maps to `outcome`.
+- **Email** — Contact result: Replied / Sent-no-reply / Bounced / Unsubscribed / Marked as spam / Failed to send.
+- **Website** — Contact result: Form submitted / Awaiting response / Form error / No contact form / Page not found.
+- **Social** — Contact result: Replied / Sent-no-reply / Comment left / Profile not found / No DM access.
+- **In Person** — Contact result: Met owner / Met staff / Not available / Left message with staff / Refused / Closed permanently / Wrong location.
+- **Other** — Contact result: Replied / Sent-no-reply / Bad contact info / Refused / Failed to send. Plus an "Other type" subtype selector: DM / Text-SMS / Email / Fax-Mail.
+- Selecting a contact result auto-sets the `outcome` field (operator can still override after, but backend enforces the mapping).
+
+### Storage
+- Reuses the existing `mkt_outreach_log.call_details` JSON column — no migration required.
+- `call_details.call_result` is phone-only; `call_details.contact_result` is non-phone-only; `call_details.other_subtype` is `other`-channel-only. Backend Zod validation enforces these gates plus the per-channel allowed result set and the result→outcome mapping.
+
+### Backend
+- `apps/api/src/services/MarketingOutreachService.ts` — `CallDetails` extended with optional `contact_result` + `other_subtype`; new `ContactResult` + `OtherSubtype` union types.
+- `apps/api/src/routes/marketing-ops.ts`:
+  - `contactResultEnum` + `otherSubtypeEnum` Zod enums
+  - `CONTACT_RESULT_TO_OUTCOME` map (result → required outcome)
+  - `CHANNEL_CONTACT_RESULTS` map (channel → allowed result values)
+  - `callDetailsSchema` extended with optional `call_result` / `contact_result` / `other_subtype`
+  - `outreachLogSchema.superRefine` rewritten to handle both phone (`call_result` path) and non-phone (`contact_result` path) coherence checks
+
+### Frontend
+- `apps/web/src/services/MarketingOpsService.ts` — `CallDetails` + `ContactResult` + `OtherSubtype` types mirror backend; `LogContactInput` extended with optional `call_details` + `update_worksheet`.
+- `apps/web/src/components/marketing-ops/LogContactModal.tsx`:
+  - Per-channel result option arrays (`EMAIL_RESULT_OPTIONS`, `WEBSITE_RESULT_OPTIONS`, `SOCIAL_RESULT_OPTIONS`, `IN_PERSON_RESULT_OPTIONS`, `OTHER_RESULT_OPTIONS`) each with `outcome` mapping
+  - `OTHER_SUBTYPE_OPTIONS` for the Other subtype selector
+  - `contactResultOptionsForChannel(channel)` helper
+  - `contactResult` + `otherSubtype` state; `useEffect` on `channel` resets result to first option of new channel + auto-maps outcome
+  - Non-phone section renders "Contact result" dropdown + (when `other`) "Other type" dropdown
+  - Submit sends `call_details: { contact_result, other_subtype }` for non-phone channels via `logContact`
+
 ## Outreach Checklist Bridge (Sprint 1)
 
 Spec: `docs/LocalBiz/marketing_ops_outreach_checklist_bridge_sprint_plan.md`
