@@ -299,7 +299,7 @@ const callDetailsSchema = z.object({
   preferred_channel_confirmed: z.string().max(50).nullable().default(null),
 });
 
-const outreachLogSchema = z.object({
+const outreachLogBaseSchema = z.object({
   contact_channel: contactChannelEnum,
   contact_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'contact_date must be YYYY-MM-DD'),
   outcome: contactOutcomeEnum,
@@ -311,7 +311,9 @@ const outreachLogSchema = z.object({
   // Cold-call channel (Sprint 1)
   call_details: callDetailsSchema.nullable().optional(),
   update_worksheet: z.boolean().optional(),
-}).superRefine((data, ctx) => {
+});
+
+const outreachLogSchema = outreachLogBaseSchema.superRefine((data, ctx) => {
   // Coherence validation (§5.3)
   if (data.call_details) {
     // call_details present ⇒ contact_channel === 'phone'
@@ -388,7 +390,7 @@ const outreachLogSchema = z.object({
   }
 });
 
-const outreachEditSchema = outreachLogSchema.partial();
+const outreachEditSchema = outreachLogBaseSchema.partial();
 
 // Review-response pipeline schemas (Sprint 5 — Option B)
 const reviewPlatformEnum = z.enum(['google', 'yelp', 'facebook', 'other']);
