@@ -249,8 +249,11 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
 
   if (!view) return null;
 
-  // Empty state: no effective playbook (no triage decision)
-  if (!view.playbook) {
+  // Empty state: no effective playbook AND no permanent steps (no triage
+  // decision, campaign not in seek/preview_built). When permanent steps are
+  // present (seek/preview_built), we fall through to render them even
+  // without a playbook.
+  if (!view.playbook && view.steps.length === 0) {
     return (
       <div className="text-center py-12">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 mb-3">
@@ -271,6 +274,10 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
       </div>
     );
   }
+
+  // No playbook but permanent steps exist — show a lightweight banner
+  // pointing at triage, then render the permanent steps below.
+  const showNoPlaybookBanner = !view.playbook && view.steps.length > 0;
 
   // Empty state: playbook assigned but no steps defined
   if (view.steps.length === 0) {
@@ -337,7 +344,30 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
 
   return (
     <div className="space-y-4">
-      {/* Progress header */}
+      {/* No-playbook banner (permanent steps visible, triage not yet run) */}
+      {showNoPlaybookBanner && (
+        <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-blue-500" />
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                No playbook assigned yet — run triage to get the full checklist.
+              </p>
+            </div>
+            {onGoToTriage && (
+              <button
+                onClick={onGoToTriage}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Go to Triage <ArrowUpRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Progress header (only when a playbook is assigned) */}
+      {view.playbook && (
       <div className="rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4">
         <div className="flex items-start justify-between mb-3">
           <div>
@@ -368,6 +398,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
           />
         </div>
       </div>
+      )}
 
       {/* Stage filter toggle */}
       {canStageFilter && (

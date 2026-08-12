@@ -90,6 +90,67 @@ const STAGE_PIPELINE_ORDER: Record<string, number> = {
   tenant_onboarded: 9,
 };
 
+// ─── Permanent outreach-access steps ────────────────────────────────────
+//
+// Code-defined checklist steps that appear on EVERY campaign in the seek
+// and preview_built stages, regardless of playbook assignment. They give
+// operators one-click access to the Pitch Construction and Call Script
+// workspaces with the campaign already selected — without requiring a
+// separate trip to the Openers page.
+//
+// These steps use synthetic IDs prefixed with '_permanent_' so they never
+// collide with DB-generated step IDs. They are not required and not
+// auto-completing — they're navigation shortcuts, not gates.
+//
+// See: user request "Add a permanent step to the campaign checklist for
+// seek and preview_built stages to open Pitch Construction / Call Script
+// from the campaign context."
+
+const PERMANENT_STEP_IDS = {
+  pitchConstruction: '_permanent_pitch_construction',
+  callScript: '_permanent_call_script',
+} as const;
+
+const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachStatus' | 'internalLink'>[] = [
+  {
+    id: PERMANENT_STEP_IDS.pitchConstruction,
+    playbookId: '_permanent',
+    stepOrder: -2,
+    title: 'Open Pitch Construction',
+    instructions: 'Assemble the outreach pitch — header, opener, three-slot preview, closer, and contact section.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'openers_workspace', params: { tab: 'pitch' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.callScript,
+    playbookId: '_permanent',
+    stepOrder: -1,
+    title: 'Open Call Script',
+    instructions: 'Use the five-stage cold-call workspace to place a phone outreach call.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'openers_workspace', params: { tab: 'call' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+];
+
+/** Stages where the permanent outreach-access steps are visible. */
+const PERMANENT_STEP_STAGES = new Set(['seek', 'preview_built']);
+
+/** Check if a step ID is a permanent (code-defined) step. */
+function isPermanentStepId(stepId: string): boolean {
+  return stepId === PERMANENT_STEP_IDS.pitchConstruction
+    || stepId === PERMANENT_STEP_IDS.callScript;
+}
+
 export interface ChecklistStepInput {
   title: string;
   instructions?: string;
@@ -494,8 +555,37 @@ export class PlaybookChecklistService extends BaseService {
 
   async getCampaignChecklist(campaignId: string, ctx?: RequestCtx): Promise<CampaignChecklistView> {
     const playbook = await this.resolveEffectivePlaybook(campaignId, ctx);
+
+    // Load the campaign's current stage to decide whether permanent
+    // outreach-access steps should be injected.
+    let campaignStage: string | null = null;
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { stage: true },
+      });
+      campaignStage = campaign?.stage ?? null;
+    } catch {
+      // Best-effort — if the lookup fails, skip permanent steps
+    }
+
+    const showPermanent = campaignStage != null && PERMANENT_STEP_STAGES.has(campaignStage);
+
     if (!playbook) {
-      return { playbook: null, steps: [], completedCount: 0, requiredTotal: 0, requiredCompleted: 0 };
+      // No playbook assigned — but still show permanent steps if the campaign
+      // is in an early stage. This gives operators immediate access to the
+      // outreach workspaces before triage is run.
+      if (!showPermanent) {
+        return { playbook: null, steps: [], completedCount: 0, requiredTotal: 0, requiredCompleted: 0 };
+      }
+      const permanentViews = this.buildPermanentStepViews(campaignId);
+      return {
+        playbook: null,
+        steps: permanentViews,
+        completedCount: permanentViews.filter((s) => s.progress?.completedAt != null).length,
+        requiredTotal: 0,
+        requiredCompleted: 0,
+      };
     }
 
     const steps = await this.prisma.mkt_playbook_checklist_steps.findMany({
@@ -517,6 +607,12 @@ export class PlaybookChecklistService extends BaseService {
           : null,
       };
     });
+
+    // Inject permanent outreach-access steps at the top of the list for
+    // seek/preview_built campaigns.
+    if (showPermanent) {
+      stepViews.unshift(...this.buildPermanentStepViews(campaignId, progressByStep));
+    }
 
     // Enrich outreach + internal_link steps with bridge state.
     // Lazy import to avoid circular dependency (bridge imports checklist
@@ -559,6 +655,38 @@ export class PlaybookChecklistService extends BaseService {
     actor: string,
     ctx?: RequestCtx,
   ): Promise<CampaignChecklistView> {
+    // Permanent (code-defined) steps bypass playbook validation — they
+    // exist outside the playbook template system and are always available
+    // in seek/preview_built stages.
+    if (isPermanentStepId(stepId)) {
+      const progressId = generateCampaignChecklistProgressId();
+      const completedAt = completed ? new Date() : null;
+      const completedBy = completed ? actor : null;
+      try {
+        await this.prisma.mkt_campaign_checklist_progress.upsert({
+          where: { campaign_id_step_id: { campaign_id: campaignId, step_id: stepId } },
+          create: {
+            id: progressId,
+            campaign_id: campaignId,
+            step_id: stepId,
+            completed_at: completedAt,
+            completed_by: completedBy,
+            note: note ?? null,
+          },
+          update: {
+            completed_at: completedAt,
+            completed_by: completedBy,
+            ...(note !== undefined ? { note } : {}),
+          },
+        });
+        logger.info('Permanent checklist step toggled', ctx, { campaignId, stepId, completed, actor });
+        return this.getCampaignChecklist(campaignId, ctx);
+      } catch (error) {
+        logger.error('Failed to set permanent checklist step progress', ctx, { error: (error as Error).message, campaignId, stepId });
+        throw this.handleError(error, ctx);
+      }
+    }
+
     const playbook = await this.resolveEffectivePlaybook(campaignId, ctx);
     if (!playbook) {
       const err = new Error('No effective playbook for this campaign — run triage first');
@@ -979,6 +1107,28 @@ export class PlaybookChecklistService extends BaseService {
       logger.error('Failed to reject checklist suggestion', ctx, { error: (error as Error).message, suggestionId });
       throw this.handleError(error, ctx);
     }
+  }
+
+  // ─── Permanent step builder ────────────────────────────────────────────
+
+  /**
+   * Build CampaignChecklistStepView rows for the permanent outreach-access
+   * steps. If a progress map is supplied (from the campaign's progress
+   * rows), attaches any saved progress for the synthetic step IDs.
+   */
+  private buildPermanentStepViews(
+    _campaignId: string,
+    progressByStep?: Map<string, any>,
+  ): CampaignChecklistStepView[] {
+    return PERMANENT_STEPS.map((step) => {
+      const p = progressByStep?.get(step.id);
+      return {
+        ...step,
+        progress: p
+          ? { completedAt: p.completed_at, completedBy: p.completed_by, note: p.note }
+          : null,
+      };
+    });
   }
 
   // ─── Mappers ───────────────────────────────────────────────────────────
