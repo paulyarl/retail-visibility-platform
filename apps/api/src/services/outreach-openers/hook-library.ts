@@ -435,7 +435,7 @@ Want me to show you how it'd work for your shop?
     angle: 'zero_footprint',
     label: 'Zero footprint — no online presence found',
     archetypes: ['A3', 'A4'],
-    signals: ['WC_MISSING_WEBSITE', 'DS_MISSING_PROFILE', 'CP_MISSING_CONTACT_INFO', 'EF_ZERO_INDEXED_PRESENCE'],
+    signals: ['WC_MISSING_WEBSITE', 'DS_MISSING_PROFILE', 'CP_MISSING_CONTACT_INFO', 'EF_ZERO_INDEXED_PRESENCE', 'DS_ZERO_INDEXED_PRESENCE'],
     subject: 'couldn\'t find you online at all',
     body: `{{salutation}} I went looking for {{business}} online — Google, your own website, the usual places — and honestly couldn't find much of anything.
 

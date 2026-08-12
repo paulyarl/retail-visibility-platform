@@ -59,3 +59,15 @@ export {
   type HookTemplate,
   type ObjectionRow,
 } from './hook-library';
+
+export {
+  EMERGING_ANGLE_MAP,
+  isValidEmergingArchetype,
+  getEmergingAngles,
+  deriveChannelHint,
+  extractEmergingArchetype,
+  extractGrowthReadiness,
+  type EmergingArchetype,
+  type GrowthReadiness,
+  type ChannelHint,
+} from './emerging-angle-map';

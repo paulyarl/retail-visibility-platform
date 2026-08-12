@@ -1607,6 +1607,57 @@ router.get('/:campaignId/call-script', async (req: any, res: Response) => {
 });
 
 // ====================
+// DEAD-NUMBER DATA-QUALITY LOOP (Sprint 2 — §13.3)
+// ====================
+// Two-segment routes — safe from the GET /:id catch-all.
+
+// GET /:campaignId/dead-number-status — check for un-acked dead-number logs
+router.get('/:campaignId/dead-number-status', async (req: any, res: Response) => {
+  try {
+    const result = await MarketingOutreachService.hasDeadNumber(
+      req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /:campaignId/dead-number/confirm — null the phone + audit
+const deadNumberConfirmSchema = z.object({
+  log_id: z.string().min(1),
+});
+router.post('/:campaignId/dead-number/confirm', async (req: any, res: Response) => {
+  try {
+    const parsed = deadNumberConfirmSchema.parse(req.body);
+    const result = await MarketingOutreachService.confirmDeadNumber(
+      req.params.campaignId,
+      parsed.log_id,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /:campaignId/dead-number/keep — ack the log without nulling phone
+router.post('/:campaignId/dead-number/keep', async (req: any, res: Response) => {
+  try {
+    const parsed = deadNumberConfirmSchema.parse(req.body);
+    const result = await MarketingOutreachService.keepNumber(
+      req.params.campaignId,
+      parsed.log_id,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
 // FILE ROUTES
 // ====================
 

@@ -45,8 +45,16 @@ import {
   type HookTemplate,
   type ObjectionRow,
 } from './outreach-openers/hook-library';
+import {
+  getEmergingAngles,
+  extractEmergingArchetype,
+  extractGrowthReadiness,
+  deriveChannelHint,
+  type ChannelHint,
+} from './outreach-openers/emerging-angle-map';
 import type { ArchetypeCode } from './outreach-openers/archetype-selection';
 import type { DetectedSignal } from './triage/types';
+import BusinessContextService from './deliverable/BusinessContextService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -193,8 +201,30 @@ export class CallScriptService extends BaseService {
     // 5. Resolve gallery short URL
     const galleryShortUrl = await this.resolveGalleryShortUrl(campaignId, ctx);
 
-    // 6. Rank + resolve all 13 hooks
-    const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext);
+    // 5b. Extract V3 emerging archetype + channel hint (best-effort)
+    let emergingAngles: HookAngle[] = [];
+    let channelHint: ChannelHint = null;
+    try {
+      const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+      if (auditResult) {
+        const emergingArchetype = extractEmergingArchetype(auditResult.auditData, businessName);
+        if (emergingArchetype) {
+          emergingAngles = getEmergingAngles(emergingArchetype);
+        }
+        const growthReadiness = extractGrowthReadiness(auditResult.auditData, businessName);
+        channelHint = deriveChannelHint(
+          growthReadiness,
+          !!campaign.phone,
+          !!campaign.email,
+          !!campaign.website,
+        );
+      }
+    } catch {
+      // No audit data — rank without emerging boost
+    }
+
+    // 6. Rank + resolve all 13 hooks (with emerging-archetype boost)
+    const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles);
 
     // 7. Select the hook for Stage 2
     const selectedAngle: HookAngle = (angle && isValidHookAngle(angle))
@@ -233,6 +263,7 @@ export class CallScriptService extends BaseService {
         owner_name_confidence: ownerNameConfidence,
         team_signal: teamSignal,
         gallery_short_url: galleryShortUrl,
+        channel_hint: channelHint,
       },
     };
   }
@@ -479,29 +510,50 @@ export class CallScriptService extends BaseService {
   /**
    * Rank all 13 hooks for the phone channel. Same ranking logic as
    * HookSuggestionService but resolves phone_hook instead of email body.
+   * Emerging-archetype boost applied after archetype affinity, before
+   * signal-match tie-break.
    */
   private rankPhoneHooks(
     archetype: ArchetypeCode,
     signalCodes: Set<string>,
     mergeContext: PhoneMergeContext,
+    emergingAngles: HookAngle[] = [],
   ): RankedPhoneHook[] {
+    const emergingBoostPos = new Map<HookAngle, number>();
+    emergingAngles.forEach((a, idx) => emergingBoostPos.set(a, idx));
+
     return HOOK_LIBRARY.map((template, catalogIdx) => {
       const hasArchetypeAffinity = template.archetypes.includes(archetype);
       const matchedSignals = template.signals.filter((s) => signalCodes.has(s));
+      const emergingBoost = emergingBoostPos.has(template.angle)
+        ? emergingBoostPos.get(template.angle)!
+        : -1;
       return {
         template,
         hasArchetypeAffinity,
+        hasEmergingBoost: emergingBoost >= 0,
+        emergingBoost,
         signalCount: matchedSignals.length,
         catalogIdx,
         matchedSignals,
       };
     }).sort((a, b) => {
+      // 1. Archetype-affinity hooks first
       if (a.hasArchetypeAffinity !== b.hasArchetypeAffinity) {
         return a.hasArchetypeAffinity ? -1 : 1;
       }
+      // 2. Emerging-archetype boost (after affinity, before signal tie-break)
+      if (a.hasEmergingBoost !== b.hasEmergingBoost) {
+        return a.hasEmergingBoost ? -1 : 1;
+      }
+      if (a.hasEmergingBoost && b.hasEmergingBoost) {
+        return a.emergingBoost - b.emergingBoost;
+      }
+      // 3. Signal-match tie-break
       if (a.signalCount !== b.signalCount) {
         return b.signalCount - a.signalCount;
       }
+      // 4. Catalog order (deterministic)
       return a.catalogIdx - b.catalogIdx;
     }).map((entry, idx) => ({
       angle: entry.template.angle,

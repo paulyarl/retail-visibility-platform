@@ -322,10 +322,28 @@ export interface HookAngleStats {
   replyRate: number;
 }
 
+export interface ChannelStats {
+  channel: string;
+  contacts: number;
+  replies: number;
+  replyRate: number;
+  outcomeBreakdown: Record<string, number>;
+}
+
+export interface AngleChannelStats {
+  angle: string;
+  channel: string;
+  contacts: number;
+  replies: number;
+  replyRate: number;
+}
+
 export interface SplitTestStats {
   cohorts: SplitTestCohort[];
   totals: { openers: number; sent: number; replies: number; replyRate: number };
   byHookAngle: HookAngleStats[];
+  byChannel: ChannelStats[];
+  byAngleChannel: AngleChannelStats[];
 }
 
 // ─── Hook Suggestion Types (Sprint 2 — Light-Score Hook Library) ────────
@@ -389,6 +407,7 @@ export interface CallScriptContext {
   owner_name_confidence: string;
   team_signal: string;
   gallery_short_url: string | null;
+  channel_hint: 'phone_first' | null;
 }
 
 export interface ObjectionRow {
@@ -4277,6 +4296,51 @@ class MarketingOpsService extends AdminApiSingleton {
         : (result.error as any)?.details?.[0]?.message
           ?? 'Failed to log call';
       throw new Error(msg);
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Dead-Number Data-Quality Loop (Sprint 2 — §13.3) ──────────────────
+
+  async getDeadNumberStatus(campaignId: string): Promise<{
+    hasDeadNumber: boolean;
+    logs: Array<{
+      id: string;
+      contact_date: string;
+      outcome: 'wrong_number' | 'disconnected_number';
+      contact_channel: string | null;
+    }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/dead-number-status`,
+      { method: 'GET' },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to check dead-number status');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async confirmDeadNumber(campaignId: string, logId: string): Promise<{ success: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/dead-number/confirm`,
+      { method: 'POST', body: JSON.stringify({ log_id: logId }) },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to confirm dead number');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async keepNumber(campaignId: string, logId: string): Promise<{ success: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/dead-number/keep`,
+      { method: 'POST', body: JSON.stringify({ log_id: logId }) },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to acknowledge dead number');
     }
     await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
     return result.data?.data ?? result.data;

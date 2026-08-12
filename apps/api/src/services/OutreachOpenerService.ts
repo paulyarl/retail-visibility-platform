@@ -603,6 +603,8 @@ export class OutreachOpenerService extends BaseService {
     cohorts: SplitTestCohort[];
     totals: { openers: number; sent: number; replies: number; replyRate: number };
     byHookAngle: HookAngleStats[];
+    byChannel: ChannelStats[];
+    byAngleChannel: AngleChannelStats[];
   }> {
     try {
       // Fetch all openers with a close_variant set, newest first.
@@ -622,7 +624,7 @@ export class OutreachOpenerService extends BaseService {
       });
 
       if (openers.length === 0) {
-        return { cohorts: [], totals: { openers: 0, sent: 0, replies: 0, replyRate: 0 }, byHookAngle: [] };
+        return { cohorts: [], totals: { openers: 0, sent: 0, replies: 0, replyRate: 0 }, byHookAngle: [], byChannel: [], byAngleChannel: [] };
       }
 
       // Collect unique campaign IDs and map opener → campaign.
@@ -649,6 +651,7 @@ export class OutreachOpenerService extends BaseService {
         select: {
           campaign_id: true,
           outcome: true,
+          channel: true,
           contact_date: true,
         },
       });
@@ -824,6 +827,89 @@ export class OutreachOpenerService extends BaseService {
         return a.angle.localeCompare(b.angle);
       });
 
+      // ─── byChannel grouping (Sprint 2 — Phone Analytics) ──────────────
+      // Group outreach logs by channel. For each channel: total contacts,
+      // replies (outcome in REPLY_OUTCOMES), reply rate, outcome breakdown.
+      // wrong_number and disconnected_number are excluded from reply-rate
+      // calculations (they're data-quality outcomes, not human contact).
+      const channelMap = new Map<string, {
+        channel: string;
+        contacts: number;
+        replies: number;
+        outcomes: Record<string, number>;
+      }>();
+
+      for (const log of logs) {
+        const ch = log.channel ?? 'unknown';
+        const entry = channelMap.get(ch) ?? {
+          channel: ch,
+          contacts: 0,
+          replies: 0,
+          outcomes: {} as Record<string, number>,
+        };
+        entry.contacts++;
+        entry.outcomes[log.outcome] = (entry.outcomes[log.outcome] ?? 0) + 1;
+        if (OutreachOpenerService.REPLY_OUTCOMES.has(log.outcome)) {
+          entry.replies++;
+        }
+        channelMap.set(ch, entry);
+      }
+
+      const byChannel: ChannelStats[] = [...channelMap.values()].map((c) => ({
+        channel: c.channel,
+        contacts: c.contacts,
+        replies: c.replies,
+        replyRate: c.contacts > 0 ? c.replies / c.contacts : 0,
+        outcomeBreakdown: c.outcomes,
+      })).sort((a, b) => b.contacts - a.contacts);
+
+      // ─── byAngleChannel matrix (Sprint 2 — Phone Analytics) ───────────
+      // Cross-tabulate hook_angle × channel using opener→campaign→log join.
+      // For each (angle, channel) pair: contacts, replies, reply rate.
+      const angleChannelMap = new Map<string, {
+        angle: string;
+        channel: string;
+        contacts: number;
+        replies: number;
+      }>();
+
+      // Build a map from campaign_id → hook_angle (from openers)
+      const campaignAngleMap = new Map<string, string>();
+      for (const opener of openers) {
+        if (opener.hook_angle && !campaignAngleMap.has(opener.campaign_id)) {
+          campaignAngleMap.set(opener.campaign_id, opener.hook_angle);
+        }
+      }
+
+      for (const log of logs) {
+        const angle = campaignAngleMap.get(log.campaign_id);
+        if (!angle) continue;
+        const ch = log.channel ?? 'unknown';
+        const key = `${angle}|${ch}`;
+        const entry = angleChannelMap.get(key) ?? {
+          angle,
+          channel: ch,
+          contacts: 0,
+          replies: 0,
+        };
+        entry.contacts++;
+        if (OutreachOpenerService.REPLY_OUTCOMES.has(log.outcome)) {
+          entry.replies++;
+        }
+        angleChannelMap.set(key, entry);
+      }
+
+      const byAngleChannel: AngleChannelStats[] = [...angleChannelMap.values()].map((ac) => ({
+        angle: ac.angle,
+        channel: ac.channel,
+        contacts: ac.contacts,
+        replies: ac.replies,
+        replyRate: ac.contacts > 0 ? ac.replies / ac.contacts : 0,
+      })).sort((a, b) => {
+        if (a.angle !== b.angle) return a.angle.localeCompare(b.angle);
+        return a.channel.localeCompare(b.channel);
+      });
+
       return {
         cohorts,
         totals: {
@@ -833,6 +919,8 @@ export class OutreachOpenerService extends BaseService {
           replyRate: totalSent > 0 ? totalReplies / totalSent : 0,
         },
         byHookAngle,
+        byChannel,
+        byAngleChannel,
       };
     } catch (error) {
       logger.error('Failed to get split-test stats', ctx, {
@@ -885,6 +973,22 @@ export interface HookAngleStats {
   angle: string;
   openers: number;
   sent: number;
+  replies: number;
+  replyRate: number;
+}
+
+export interface ChannelStats {
+  channel: string;
+  contacts: number;
+  replies: number;
+  replyRate: number;
+  outcomeBreakdown: Record<string, number>;
+}
+
+export interface AngleChannelStats {
+  angle: string;
+  channel: string;
+  contacts: number;
   replies: number;
   replyRate: number;
 }

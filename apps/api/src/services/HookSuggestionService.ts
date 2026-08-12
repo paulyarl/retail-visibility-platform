@@ -24,8 +24,10 @@ import CampaignTriageService from './CampaignTriageService';
 import MarketingCampaignService from './MarketingCampaignService';
 import OutreachIntelligenceService, { resolveSalutation } from './OutreachIntelligenceService';
 import { HOOK_LIBRARY, type HookAngle, type HookTemplate } from './outreach-openers/hook-library';
+import { getEmergingAngles, extractEmergingArchetype } from './outreach-openers/emerging-angle-map';
 import type { ArchetypeCode } from './outreach-openers/archetype-selection';
 import type { DetectedSignal } from './triage/types';
+import BusinessContextService from './deliverable/BusinessContextService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -127,8 +129,23 @@ export class HookSuggestionService extends BaseService {
       sender_name: senderName,
     };
 
-    // 7. Rank + resolve
-    const ranked = this.rankHooks(resolved.archetype, signalCodes);
+    // 7. Extract V3 emerging archetype for rank boost (after archetype affinity,
+    //    before signal-match tie-break). Best-effort — no audit means no boost.
+    let emergingAngles: HookAngle[] = [];
+    try {
+      const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+      if (auditResult) {
+        const emergingArchetype = extractEmergingArchetype(auditResult.auditData, businessName);
+        if (emergingArchetype) {
+          emergingAngles = getEmergingAngles(emergingArchetype);
+        }
+      }
+    } catch {
+      // No audit data — rank without emerging boost
+    }
+
+    // 8. Rank + resolve
+    const ranked = this.rankHooks(resolved.archetype, signalCodes, emergingAngles);
     const suggestions: RankedHook[] = ranked.map((entry, idx) => ({
       ...entry.template,
       rank: idx + 1,
@@ -149,33 +166,51 @@ export class HookSuggestionService extends BaseService {
   // ─── Ranking ──────────────────────────────────────────────────────────
 
   /**
-   * Rank all 12 hooks: archetype-affinity first, signal-match tie-break,
-   * catalog order as the final deterministic fallback.
+   * Rank all 13 hooks: archetype-affinity first, emerging-archetype boost
+   * (ordered by list position), signal-match tie-break, catalog order as
+   * the final deterministic fallback.
    */
   private rankHooks(
     archetype: ArchetypeCode,
     signalCodes: Set<string>,
+    emergingAngles: HookAngle[] = [],
   ): { template: HookTemplate; matchedSignals: string[] }[] {
+    // Precompute emerging boost positions (lower = stronger boost)
+    const emergingBoostPos = new Map<HookAngle, number>();
+    emergingAngles.forEach((angle, idx) => emergingBoostPos.set(angle, idx));
+
     return HOOK_LIBRARY.map((template, catalogIdx) => {
       const hasArchetypeAffinity = template.archetypes.includes(archetype);
       const matchedSignals = template.signals.filter((s) => signalCodes.has(s));
+      const emergingBoost = emergingBoostPos.has(template.angle)
+        ? emergingBoostPos.get(template.angle)!
+        : -1;
       return {
         template,
         matchedSignals,
         hasArchetypeAffinity,
+        hasEmergingBoost: emergingBoost >= 0,
+        emergingBoost,
         signalCount: matchedSignals.length,
         catalogIdx,
       };
     }).sort((a, b) => {
-      // Archetype-affinity hooks first
+      // 1. Archetype-affinity hooks first
       if (a.hasArchetypeAffinity !== b.hasArchetypeAffinity) {
         return a.hasArchetypeAffinity ? -1 : 1;
       }
-      // Within the same affinity tier, more signal matches rank higher
+      // 2. Emerging-archetype boost (after affinity, before signal tie-break)
+      if (a.hasEmergingBoost !== b.hasEmergingBoost) {
+        return a.hasEmergingBoost ? -1 : 1;
+      }
+      if (a.hasEmergingBoost && b.hasEmergingBoost) {
+        return a.emergingBoost - b.emergingBoost;
+      }
+      // 3. Signal-match tie-break
       if (a.signalCount !== b.signalCount) {
         return b.signalCount - a.signalCount;
       }
-      // Final tie-break: catalog order (deterministic)
+      // 4. Catalog order (deterministic)
       return a.catalogIdx - b.catalogIdx;
     }).map((entry) => ({
       template: entry.template,

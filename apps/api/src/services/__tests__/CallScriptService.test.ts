@@ -29,6 +29,7 @@ const {
   mockPreviewTokensFindMany,
   mockEnsureShortCode,
   mockAudit,
+  mockGetLatestAuditData,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockResolveCampaignArchetype: vi.fn(),
@@ -43,6 +44,7 @@ const {
   mockPreviewTokensFindMany: vi.fn(),
   mockEnsureShortCode: vi.fn(),
   mockAudit: vi.fn(),
+  mockGetLatestAuditData: vi.fn(),
 }));
 
 vi.mock('../MarketingCampaignService', () => ({
@@ -82,6 +84,12 @@ vi.mock('../OutreachIntelligenceService', () => ({
 vi.mock('../MarketingDeliverableService', () => ({
   default: {
     ensureShortCode: mockEnsureShortCode,
+  },
+}));
+
+vi.mock('../deliverable/BusinessContextService', () => ({
+  default: {
+    getLatestAuditData: mockGetLatestAuditData,
   },
 }));
 
@@ -166,6 +174,7 @@ beforeEach(() => {
   mockCampaignsUpdate.mockResolvedValue({});
   mockEnsureShortCode.mockResolvedValue(null);
   mockAudit.mockResolvedValue({});
+  mockGetLatestAuditData.mockResolvedValue(null);
 });
 
 // ─── Assembly tests ──────────────────────────────────────────────────────
@@ -339,6 +348,101 @@ describe('CallScriptService.assembleForCampaign', () => {
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
     expect(topAngles).toContain('click_to_call');
+  });
+
+  // ─── Emerging-archetype boost + channel hint (Sprint 2) ────────────────
+
+  it('surfaces channel_hint: phone_first when foundation_needed + phone only', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        prospect_discovery: {
+          highest_opportunity_businesses: [
+            {
+              business_name: 'Tetees Market',
+              emerging_archetype: 'INVISIBLE_ANCHOR',
+              growth_readiness: 'foundation_needed',
+            },
+          ],
+        },
+      },
+      auditId: 'audit-001',
+    });
+    mockGetCampaign.mockResolvedValue(
+      makeCampaign({ phone: '317-555-0100', email: null, website: null }),
+    );
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    expect(result.callContext.channel_hint).toBe('phone_first');
+  });
+
+  it('surfaces channel_hint: null when growth_readiness is high_readiness', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        prospect_discovery: {
+          highest_opportunity_businesses: [
+            {
+              business_name: 'Tetees Market',
+              emerging_archetype: 'INVISIBLE_ANCHOR',
+              growth_readiness: 'high_readiness',
+            },
+          ],
+        },
+      },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    expect(result.callContext.channel_hint).toBeNull();
+  });
+
+  it('surfaces channel_hint: null when phone-first but has email', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        prospect_discovery: {
+          highest_opportunity_businesses: [
+            {
+              business_name: 'Tetees Market',
+              emerging_archetype: 'DIRECTORY_GHOST',
+              growth_readiness: 'insufficient_evidence',
+            },
+          ],
+        },
+      },
+      auditId: 'audit-001',
+    });
+    mockGetCampaign.mockResolvedValue(
+      makeCampaign({ phone: '317-555-0100', email: 'owner@example.com', website: null }),
+    );
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    expect(result.callContext.channel_hint).toBeNull();
+  });
+
+  it('boosts DIRECTORY_GHOST angles in phone hook ranking', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        prospect_discovery: {
+          highest_opportunity_businesses: [
+            {
+              business_name: 'Tetees Market',
+              emerging_archetype: 'DIRECTORY_GHOST',
+              growth_readiness: 'foundation_needed',
+            },
+          ],
+        },
+      },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    // zero_footprint is boosted first by DIRECTORY_GHOST
+    expect(result.hookOptions[0].angle).toBe('zero_footprint');
+    // gbp_verification is boosted second (also has A3 archetype affinity)
+    expect(result.hookOptions[1].angle).toBe('gbp_verification');
   });
 });
 

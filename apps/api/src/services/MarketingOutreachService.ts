@@ -20,7 +20,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError } from '../middleware/errorHandler';
+import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { generateOutreachLogId } from '../lib/id-generator';
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
@@ -87,6 +87,15 @@ export interface FollowUpEntry {
   next_follow_up_at: string;
   days_overdue?: number;
   assigned_to: string | null;
+}
+
+// ─── Dead-number data-quality loop types (Sprint 2 — §13.3) ─────────────
+
+export interface DeadNumberLogEntry {
+  id: string;
+  contact_date: string;
+  outcome: 'wrong_number' | 'disconnected_number';
+  contact_channel: string | null;
 }
 
 export class MarketingOutreachService extends BaseService {
@@ -429,6 +438,204 @@ export class MarketingOutreachService extends BaseService {
       return { overdue, dueToday, thisWeek };
     } catch (error) {
       logger.error('Failed to get follow-ups due', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ─── Dead-number data-quality loop (Sprint 2 — §13.3) ─────────────────
+
+  /**
+   * Check whether a campaign has an un-acknowledged dead-number outcome
+   * (wrong_number or disconnected_number) where the campaign's phone is
+   * still non-null. Used by the campaign detail banner.
+   */
+  async hasDeadNumber(campaignId: string, ctx?: RequestCtx): Promise<{
+    hasDeadNumber: boolean;
+    logs: DeadNumberLogEntry[];
+  }> {
+    try {
+      // First check if the campaign still has a phone number
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { phone: true },
+      });
+      if (!campaign || !campaign.phone) {
+        return { hasDeadNumber: false, logs: [] };
+      }
+
+      // Find un-acked wrong_number / disconnected_number logs
+      const logs = await this.prisma.mkt_outreach_log.findMany({
+        where: {
+          campaign_id: campaignId,
+          outcome: { in: ['wrong_number', 'disconnected_number'] },
+        },
+        orderBy: { contact_date: 'desc' },
+        select: {
+          id: true,
+          contact_date: true,
+          outcome: true,
+          contact_channel: true,
+          call_details: true,
+        },
+      });
+
+      // Filter to un-acked logs (call_details.ack !== true)
+      const deadLogs: DeadNumberLogEntry[] = logs
+        .filter((l) => {
+          const details = l.call_details as any;
+          return !details?.ack;
+        })
+        .map((l) => ({
+          id: l.id,
+          contact_date: l.contact_date as unknown as string,
+          outcome: l.outcome as 'wrong_number' | 'disconnected_number',
+          contact_channel: l.contact_channel,
+        }));
+
+      return {
+        hasDeadNumber: deadLogs.length > 0,
+        logs: deadLogs,
+      };
+    } catch (error) {
+      logger.error('Failed to check dead-number status', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Confirm a dead number: null out the campaign's phone and record an
+   * audit entry linking the outreach log. The operator explicitly confirms;
+   * this is never automatic.
+   */
+  async confirmDeadNumber(
+    campaignId: string,
+    logId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ success: boolean }> {
+    try {
+      // Verify the log exists and is a dead-number outcome
+      const log = await this.prisma.mkt_outreach_log.findUnique({
+        where: { id: logId },
+        select: { id: true, outcome: true, campaign_id: true },
+      });
+      if (!log || log.campaign_id !== campaignId) {
+        throw new ValidationError('log_not_found_or_mismatched');
+      }
+      if (log.outcome !== 'wrong_number' && log.outcome !== 'disconnected_number') {
+        throw new ValidationError('log_outcome_not_dead_number');
+      }
+
+      // Null out the phone
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { phone: null },
+      });
+
+      // Ack the log so the banner doesn't re-prompt
+      await this.prisma.mkt_outreach_log.update({
+        where: { id: logId },
+        data: {
+          call_details: {
+            ack: true,
+            ack_action: 'confirmed_dead',
+            ack_at: new Date().toISOString(),
+          },
+        } as any,
+      });
+
+      // Audit
+      try {
+        const { audit } = await import('../audit');
+        await audit({
+          actor: ctx?.userId ?? null,
+          actorType: 'user',
+          action: 'update',
+          payload: {
+            entity_type: 'other',
+            id: campaignId,
+            campaign_id: campaignId,
+            dead_number_confirmed: true,
+            outreach_log_id: logId,
+            outcome: log.outcome,
+            phone_nulled: true,
+          },
+        });
+      } catch {
+        // audit failures must not block
+      }
+
+      logger.info('Dead number confirmed', ctx, {
+        campaignId,
+        logId,
+        outcome: log.outcome,
+      });
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to confirm dead number', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Keep the number: acknowledge the dead-number log without nulling the
+   * phone. The operator disagrees with the dead-number assessment.
+   */
+  async keepNumber(
+    campaignId: string,
+    logId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ success: boolean }> {
+    try {
+      // Verify the log exists and belongs to this campaign
+      const log = await this.prisma.mkt_outreach_log.findUnique({
+        where: { id: logId },
+        select: { id: true, outcome: true, campaign_id: true },
+      });
+      if (!log || log.campaign_id !== campaignId) {
+        throw new ValidationError('log_not_found_or_mismatched');
+      }
+
+      // Ack the log
+      await this.prisma.mkt_outreach_log.update({
+        where: { id: logId },
+        data: {
+          call_details: {
+            ack: true,
+            ack_action: 'keep_number',
+            ack_at: new Date().toISOString(),
+          },
+        } as any,
+      });
+
+      // Audit
+      try {
+        const { audit } = await import('../audit');
+        await audit({
+          actor: ctx?.userId ?? null,
+          actorType: 'user',
+          action: 'update',
+          payload: {
+            entity_type: 'other',
+            id: campaignId,
+            campaign_id: campaignId,
+            dead_number_acked: true,
+            ack_action: 'keep_number',
+            outreach_log_id: logId,
+          },
+        });
+      } catch {
+        // audit failures must not block
+      }
+
+      logger.info('Dead number acknowledged (keep number)', ctx, {
+        campaignId,
+        logId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to ack dead number', ctx, { error: (error as Error).message });
       throw this.handleError(error, ctx);
     }
   }

@@ -22,11 +22,13 @@ const {
   mockGetTriageResult,
   mockGetCampaign,
   mockGetForCampaign,
+  mockGetLatestAuditData,
 } = vi.hoisted(() => ({
   mockResolveCampaignArchetype: vi.fn(),
   mockGetTriageResult: vi.fn(),
   mockGetCampaign: vi.fn(),
   mockGetForCampaign: vi.fn(),
+  mockGetLatestAuditData: vi.fn(),
 }));
 
 vi.mock('../OutreachOpenerService', () => ({
@@ -64,6 +66,12 @@ vi.mock('../OutreachIntelligenceService', () => ({
       return `Hi ${businessName.trim()},`;
     }
     return 'Hi there,';
+  },
+}));
+
+vi.mock('../deliverable/BusinessContextService', () => ({
+  default: {
+    getLatestAuditData: mockGetLatestAuditData,
   },
 }));
 
@@ -121,6 +129,7 @@ beforeEach(() => {
   mockGetTriageResult.mockResolvedValue(makeTriageResult([]));
   mockGetCampaign.mockResolvedValue(makeCampaign());
   mockGetForCampaign.mockResolvedValue(null); // no worksheet → inline fallback
+  mockGetLatestAuditData.mockResolvedValue(null); // no audit → no emerging boost
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────
@@ -331,5 +340,82 @@ describe('Merge resolution', () => {
       expect(hook.resolved.subject).toBeTruthy();
       expect(typeof hook.resolved.subject).toBe('string');
     }
+  });
+});
+
+// ─── Emerging-archetype boost (Sprint 2) ─────────────────────────────────
+
+describe('Emerging-archetype rank boost', () => {
+  function makeV3Audit(archetype: string, growthReadiness: string, businessName: string = 'Tetees Market') {
+    return {
+      auditData: {
+        prospect_discovery: {
+          highest_opportunity_businesses: [
+            { business_name: businessName, emerging_archetype: archetype, growth_readiness: growthReadiness },
+          ],
+        },
+      },
+      auditId: 'audit-001',
+    };
+  }
+
+  it('boosts DIRECTORY_GHOST angles (zero_footprint first) above non-boosted hooks', async () => {
+    mockGetLatestAuditData.mockResolvedValue(makeV3Audit('DIRECTORY_GHOST', 'foundation_needed'));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+
+    // zero_footprint should be ranked #1 (boosted by DIRECTORY_GHOST)
+    expect(result.suggestions[0].angle).toBe('zero_footprint');
+    // gbp_verification should be #2 (also boosted, second in the list)
+    expect(result.suggestions[1].angle).toBe('gbp_verification');
+    // cross_platform_expansion should be #3 (third in the list)
+    expect(result.suggestions[2].angle).toBe('cross_platform_expansion');
+  });
+
+  it('boosts INVISIBLE_ANCHOR angles (local_seo first)', async () => {
+    mockGetLatestAuditData.mockResolvedValue(makeV3Audit('INVISIBLE_ANCHOR', 'insufficient_evidence'));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+
+    expect(result.suggestions[0].angle).toBe('local_seo');
+    expect(result.suggestions[1].angle).toBe('website_foundation');
+    expect(result.suggestions[2].angle).toBe('zero_footprint');
+  });
+
+  it('applies boost after archetype affinity (A-archetype hooks still rank above non-archetype non-boosted)', async () => {
+    // With A3 archetype, gbp_verification has archetype affinity.
+    // DIRECTORY_GHOST boost includes gbp_verification, so it should still
+    // be high — but zero_footprint (no A3 affinity, but boosted) should
+    // rank above non-archetype non-boosted hooks.
+    mockGetLatestAuditData.mockResolvedValue(makeV3Audit('DIRECTORY_GHOST', 'foundation_needed'));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+
+    const zeroFootprintRank = result.suggestions.find((s) => s.angle === 'zero_footprint')!.rank;
+    // zero_footprint is boosted but has no A3 affinity — it should rank
+    // after A3-affinity hooks but before non-affinity non-boosted hooks.
+    // Since gbp_verification has A3 affinity AND is boosted, it should be #1.
+    expect(result.suggestions[0].angle).toBe('gbp_verification');
+    expect(zeroFootprintRank).toBeLessThanOrEqual(3);
+  });
+
+  it('no audit data → no boost (ranking unchanged from Sprint 1)', async () => {
+    mockGetLatestAuditData.mockResolvedValue(null);
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+
+    // Without boost, the ranking should match the Sprint 1 logic
+    expect(result.suggestions).toHaveLength(13);
+    // gbp_verification has A3 archetype affinity — should be #1
+    expect(result.suggestions[0].angle).toBe('gbp_verification');
+  });
+
+  it('audit lookup error → graceful degradation (no boost)', async () => {
+    mockGetLatestAuditData.mockRejectedValue(new Error('audit not found'));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+
+    expect(result.suggestions).toHaveLength(13);
+    expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
 });

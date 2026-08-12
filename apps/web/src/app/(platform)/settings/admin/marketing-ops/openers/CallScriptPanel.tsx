@@ -3,6 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { marketingOpsService, type AssembledCallScript, type HookAngle } from '@/services/MarketingOpsService';
 
+interface DeadNumberLog {
+  id: string;
+  contact_date: string;
+  outcome: 'wrong_number' | 'disconnected_number';
+  contact_channel: string | null;
+}
+
 interface CallScriptPanelProps {
   campaignId: string;
   campaignPhone: string | null;
@@ -16,6 +23,8 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const [selectedAngle, setSelectedAngle] = useState<HookAngle | null>(null);
   const [copiedStage, setCopiedStage] = useState<string | null>(null);
   const [expandedObjection, setExpandedObjection] = useState<number | null>(null);
+  const [deadNumberLogs, setDeadNumberLogs] = useState<DeadNumberLog[]>([]);
+  const [deadNumberAction, setDeadNumberAction] = useState<string | null>(null);
 
   const fetchScript = useCallback(async (angle?: string) => {
     setLoading(true);
@@ -31,13 +40,49 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
     }
   }, [campaignId]);
 
+  const fetchDeadNumberStatus = useCallback(async () => {
+    try {
+      const result = await marketingOpsService.getDeadNumberStatus(campaignId);
+      setDeadNumberLogs(result.logs);
+    } catch {
+      // Non-blocking — the banner just doesn't show
+    }
+  }, [campaignId]);
+
   useEffect(() => {
     if (!campaignPhone) {
       setLoading(false);
       return;
     }
     fetchScript();
-  }, [fetchScript, campaignPhone]);
+    fetchDeadNumberStatus();
+  }, [fetchScript, fetchDeadNumberStatus, campaignPhone]);
+
+  const handleConfirmDead = async (logId: string) => {
+    setDeadNumberAction(logId);
+    try {
+      await marketingOpsService.confirmDeadNumber(campaignId, logId);
+      setDeadNumberLogs([]);
+      // Re-fetch script (phone is now null, so it'll show the no-phone state)
+      fetchScript();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to confirm dead number');
+    } finally {
+      setDeadNumberAction(null);
+    }
+  };
+
+  const handleKeepNumber = async (logId: string) => {
+    setDeadNumberAction(logId);
+    try {
+      await marketingOpsService.keepNumber(campaignId, logId);
+      setDeadNumberLogs([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to acknowledge');
+    } finally {
+      setDeadNumberAction(null);
+    }
+  };
 
   const handleAngleChange = (angle: HookAngle) => {
     if (angle === selectedAngle) return;
@@ -95,6 +140,43 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
 
   return (
     <div className="space-y-6">
+      {/* Dead-Number Review Banner (Sprint 2 — §13.3) */}
+      {deadNumberLogs.length > 0 && (
+        <div className="rounded-lg border border-orange-300 bg-orange-50 p-4 dark:border-orange-700 dark:bg-orange-900/20">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                Possible dead number
+              </p>
+              <p className="text-sm text-orange-700 dark:text-orange-400">
+                {deadNumberLogs.length > 1 ? 'Multiple calls' : 'A call'} on{' '}
+                {new Date(deadNumberLogs[0].contact_date).toLocaleDateString()} reached{' '}
+                {deadNumberLogs[0].outcome === 'wrong_number'
+                  ? 'a wrong number'
+                  : 'a disconnected line'}
+                . Review the number below.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button
+                onClick={() => handleConfirmDead(deadNumberLogs[0].id)}
+                disabled={deadNumberAction === deadNumberLogs[0].id}
+                className="rounded bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50 dark:bg-orange-600 dark:hover:bg-orange-500"
+              >
+                {deadNumberAction === deadNumberLogs[0].id ? 'Confirming…' : 'Confirm dead'}
+              </button>
+              <button
+                onClick={() => handleKeepNumber(deadNumberLogs[0].id)}
+                disabled={deadNumberAction === deadNumberLogs[0].id}
+                className="rounded border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-800/30"
+              >
+                Keep number
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Call Context Header */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <div className="flex items-start justify-between">
@@ -109,6 +191,11 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
                 {callContext.phone}
               </button>
               {copiedStage === 'phone' && <span className="text-xs text-green-600">Copied!</span>}
+              {callContext.channel_hint === 'phone_first' && (
+                <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300" title="V3 audit flagged this prospect as phone-first (foundation_needed / insufficient_evidence with no email or social).">
+                  Phone-first
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
               <div>

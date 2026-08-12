@@ -59,8 +59,10 @@ const REGISTERED_SIGNALS = new Set([
   'WC_MISSING_PICKUP_DELIVERY',
   'VP_MISSING_STOREFRONT_PHOTOS',
   'VP_MISSING_PRODUCT_PHOTOS',
-  // EF_ZERO_INDEXED_PRESENCE is referenced but not yet registered (cold-call Sprint 2 migration 191)
+  // EF_ZERO_INDEXED_PRESENCE is the operator vocabulary alias;
+  // DS_ZERO_INDEXED_PRESENCE is the registered signal code (migration 191).
   'EF_ZERO_INDEXED_PRESENCE',
+  'DS_ZERO_INDEXED_PRESENCE',
 ]);
 
 describe('Hook Library catalog', () => {
@@ -101,6 +103,7 @@ describe('Hook Library catalog', () => {
     expect(zf!.archetypes).toContain('A3');
     expect(zf!.archetypes).toContain('A4');
     expect(zf!.signals).toContain('EF_ZERO_INDEXED_PRESENCE');
+    expect(zf!.signals).toContain('DS_ZERO_INDEXED_PRESENCE');
   });
 
   it('every phone_hook contains neither {{salutation}} nor {{sender_name}}', () => {
