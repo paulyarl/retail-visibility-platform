@@ -18,6 +18,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import type { RequestCtx } from '../context';
+import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import MarketingCampaignService from './MarketingCampaignService';
 import { resolveCampaignArchetype } from './OutreachOpenerService';
 import CampaignTriageService from './CampaignTriageService';
@@ -137,8 +138,7 @@ export class CallScriptService extends BaseService {
     ctx?: RequestCtx,
   ): Promise<AssembledCallScript> {
     // 1. Load campaign
-    const campaignService = MarketingCampaignService.getInstance();
-    const campaign = await campaignService.getCampaign(campaignId, ctx);
+    const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     if (!campaign) {
       throw new NotFoundError(`Campaign ${campaignId} not found`);
     }
@@ -371,7 +371,7 @@ export class CallScriptService extends BaseService {
       } else {
         conflicts.push({
           field: 'business_email',
-          existingValue,
+          existingValue: existingEmail,
           newValue: input.emailValue.trim(),
         });
       }
@@ -438,12 +438,14 @@ export class CallScriptService extends BaseService {
 
     // 5. Audit
     try {
-      await audit(ctx, {
-        action: 'mkt.call_confirmation_applied',
+      await audit({
+        actor: ctx?.userId ?? null,
         actorType: 'user',
-        targetType: 'campaign',
-        targetId: writeTargetCampaignId,
+        action: 'update',
         payload: {
+          entity_type: 'other',
+          id: writeTargetCampaignId,
+          campaign_id: writeTargetCampaignId,
           call_log_id: input.callLogId,
           call_date: input.callDate,
           written,
@@ -606,8 +608,7 @@ export class CallScriptService extends BaseService {
       // Lazy backfill for legacy tokens without a short code
       let shortCode = activeToken.short_code;
       if (!shortCode) {
-        const deliverableService = MarketingDeliverableService.getInstance();
-        shortCode = await deliverableService.ensureShortCode(activeToken.id, activeToken.token_type, ctx);
+        shortCode = await MarketingDeliverableService.ensureShortCode(activeToken.id, activeToken.token_type, ctx);
       }
 
       if (shortCode) {

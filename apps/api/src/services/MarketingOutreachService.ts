@@ -201,6 +201,7 @@ export class MarketingOutreachService extends BaseService {
       // Fire-and-forget — the log row is already persisted; write-back
       // failure must not roll back the contact log.
       if (input.updateWorksheet && input.callDetails && input.callDetails.call_result === 'connected') {
+        const callDetails = input.callDetails;
         import('./CallScriptService')
           .then(({ default: callScriptService }) =>
             callScriptService.applyCallConfirmations({
@@ -208,11 +209,11 @@ export class MarketingOutreachService extends BaseService {
               callLogId: log.id,
               callDate: input.contactDate,
               contactedBy: input.contactedBy ?? null,
-              ownerNameConfirmed: input.callDetails.owner_name_confirmed ?? null,
-              teamSignalConfirmed: (input.callDetails.team_signal_confirmed as any) ?? null,
-              preferredChannelConfirmed: input.callDetails.preferred_channel_confirmed ?? null,
-              emailObtained: input.callDetails.email_obtained ?? null,
-              emailValue: input.callDetails.email_value ?? null,
+              ownerNameConfirmed: callDetails.owner_name_confirmed ?? null,
+              teamSignalConfirmed: (callDetails.team_signal_confirmed as any) ?? null,
+              preferredChannelConfirmed: callDetails.preferred_channel_confirmed ?? null,
+              emailObtained: callDetails.email_obtained ?? null,
+              emailValue: callDetails.email_value ?? null,
             }, ctx),
           )
           .then((result) => {

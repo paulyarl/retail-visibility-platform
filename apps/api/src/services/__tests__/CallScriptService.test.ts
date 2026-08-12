@@ -47,7 +47,6 @@ const {
 
 vi.mock('../MarketingCampaignService', () => ({
   default: {
-    getInstance: () => ({ getCampaign: mockGetCampaign }),
     getCampaign: mockGetCampaign,
   },
 }));
@@ -61,32 +60,28 @@ vi.mock('../OutreachOpenerService', () => ({
 
 vi.mock('../CampaignTriageService', () => ({
   default: {
-    getInstance: () => ({ getTriageResult: mockGetTriageResult }),
     getTriageResult: mockGetTriageResult,
   },
 }));
 
 vi.mock('../OutreachIntelligenceService', () => ({
   default: {
-    getInstance: () => ({ getForCampaign: mockGetForCampaign }),
     getForCampaign: mockGetForCampaign,
-    resolveSalutation: (payload: any, businessName: string | null) => {
-      if (payload?.owner_name?.value) {
-        return `Hi ${payload.owner_name.value.split(' ')[0]},`;
-      }
-      if (businessName && businessName.trim().length > 0 && businessName.length <= 60) {
-        return `Hi ${businessName.trim()},`;
-      }
-      return 'Hi there,';
-    },
+  },
+  resolveSalutation: (payload: any, businessName: string | null) => {
+    if (payload?.owner_name?.value) {
+      return `Hi ${payload.owner_name.value.split(' ')[0]},`;
+    }
+    if (businessName && businessName.trim().length > 0 && businessName.length <= 60) {
+      return `Hi ${businessName.trim()},`;
+    }
+    return 'Hi there,';
   },
 }));
 
 vi.mock('../MarketingDeliverableService', () => ({
   default: {
-    getInstance: () => ({
-      ensureShortCode: mockEnsureShortCode,
-    }),
+    ensureShortCode: mockEnsureShortCode,
   },
 }));
 
@@ -589,8 +584,8 @@ describe('CallScriptService.applyCallConfirmations', () => {
 
     expect(mockAudit).toHaveBeenCalled();
     const auditCall = mockAudit.mock.calls[0];
-    expect(auditCall[1].action).toBe('mkt.call_confirmation_applied');
-    expect(auditCall[1].payload.call_log_id).toBe('log-001');
-    expect(auditCall[1].payload.written).toContain('owner_name');
+    expect(auditCall[0].action).toBe('update');
+    expect(auditCall[0].payload.call_log_id).toBe('log-001');
+    expect(auditCall[0].payload.written).toContain('owner_name');
   });
 });
