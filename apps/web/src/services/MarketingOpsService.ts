@@ -314,9 +314,59 @@ export interface SplitTestCohort {
   campaignRows: SplitTestCampaignRow[];
 }
 
+export interface HookAngleStats {
+  angle: string;
+  openers: number;
+  sent: number;
+  replies: number;
+  replyRate: number;
+}
+
 export interface SplitTestStats {
   cohorts: SplitTestCohort[];
   totals: { openers: number; sent: number; replies: number; replyRate: number };
+  byHookAngle: HookAngleStats[];
+}
+
+// ─── Hook Suggestion Types (Sprint 2 — Light-Score Hook Library) ────────
+
+export type HookAngle =
+  | 'gbp_verification'
+  | 'nap_normalization'
+  | 'hours_sync'
+  | 'website_foundation'
+  | 'product_category_pages'
+  | 'review_acquisition'
+  | 'testimonial_amplification'
+  | 'local_seo'
+  | 'cross_platform_expansion'
+  | 'photo_content_setup'
+  | 'click_to_call'
+  | 'reputation_monitoring';
+
+export interface RankedHook {
+  angle: HookAngle;
+  label: string;
+  archetypes: string[];
+  signals: string[];
+  subject: string;
+  body: string;
+  shape: {
+    score_hook: string;
+    reassurance: string;
+    quantified_upside: string;
+    audit_offer: string;
+    soft_cta: string;
+  };
+  rank: number;
+  matchedSignals: string[];
+  resolved: { subject: string; body: string };
+}
+
+export interface HookSuggestionResult {
+  archetype: string;
+  archetypeSource: 'triage' | 'fallback';
+  suggestions: RankedHook[];
 }
 
 // ─── Outreach Follow-Up Types ───────────────────────────────────────────
@@ -2720,10 +2770,12 @@ class MarketingOpsService extends AdminApiSingleton {
     openerText: string,
     closeVariant?: CloseVariant,
     operatorName?: string,
+    hookAngle?: string | null,
   ): Promise<OpenerResult> {
     const body: Record<string, any> = { campaign_id: campaignId, opener_text: openerText };
     if (closeVariant) body.close_variant = closeVariant;
     if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
+    if (hookAngle) body.hook_angle = hookAngle;
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/openers/import`,
       { method: 'POST', body: JSON.stringify(body) },
@@ -4115,6 +4167,19 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete outreach intelligence');
     }
     await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  }
+
+  // ─── Hook Suggestions (Sprint 2 — Light-Score Hook Library) ─────────────
+
+  async getHookSuggestions(campaignId: string): Promise<HookSuggestionResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/hook-suggestions`,
+      { method: 'GET' },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch hook suggestions');
+    }
+    return result.data?.data ?? result.data;
   }
 }
 

@@ -79,6 +79,11 @@ export default function OpenerWorkspaceClient() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
+  // Hook angle attribution (Sprint 2 — Light-Score Hook Library).
+  // When a hook is selected from the pitch tab's "Suggested Hooks" section,
+  // the angle is stored here and passed to importOpener for attribution.
+  const [pendingHookAngle, setPendingHookAngle] = useState<string | null>(null);
+
   const [copied, setCopied] = useState(false);
 
   // Checklist outreach progress badge (bridge sprint)
@@ -159,6 +164,24 @@ export default function OpenerWorkspaceClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Listen for hook-selected events from the Pitch Construction tab's
+  // "Suggested Hooks" section. When a hook is picked, load the resolved
+  // body into the import field and store the angle for attribution on
+  // the next importOpener call.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.body) {
+        setImportText(detail.body);
+        setPendingHookAngle(detail.angle ?? null);
+        // Switch to the opener tab so the operator sees the loaded text
+        setActiveTab('opener');
+      }
+    };
+    window.addEventListener('hook-selected', handler);
+    return () => window.removeEventListener('hook-selected', handler);
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -221,11 +244,18 @@ export default function OpenerWorkspaceClient() {
     setImportError(null);
     setImportSuccess(null);
     try {
-      const result = await marketingOpsService.importOpener(selectedCampaignId, importText.trim(), closeVariant, operatorName || undefined);
+      const result = await marketingOpsService.importOpener(
+        selectedCampaignId,
+        importText.trim(),
+        closeVariant,
+        operatorName || undefined,
+        pendingHookAngle,
+      );
       setLastResult(result);
       setResultOpen(true);
       setImportSuccess(`Imported opener ${result.opener.id}`);
       setImportText('');
+      setPendingHookAngle(null);
       // Refresh openers list
       const existing = await marketingOpsService.listOpeners(selectedCampaignId);
       setOpeners(existing);

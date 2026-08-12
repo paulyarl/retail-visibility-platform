@@ -6686,6 +6686,7 @@ model mkt_outreach_openers_list {
   followup_number                 Int?
   opener_id                       String?                     @db.VarChar(255)
   data_diff                       Json?
+  hook_angle                      String?                     @db.VarChar(40)
   mkt_campaigns_list              mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
   mkt_outreach_openers_list       mkt_outreach_openers_list?  @relation("mkt_outreach_openers_listTomkt_outreach_openers_list", fields: [opener_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_openers_opener_ref")
   other_mkt_outreach_openers_list mkt_outreach_openers_list[] @relation("mkt_outreach_openers_listTomkt_outreach_openers_list")

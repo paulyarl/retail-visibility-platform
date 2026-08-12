@@ -43,3 +43,12 @@ export {
 } from './archetype-prompts';
 
 export { runQualityGate, type QualityGateResult } from './quality-gate';
+
+export {
+  HOOK_LIBRARY,
+  HOOK_ANGLE_KEYS,
+  getHook,
+  isValidHookAngle,
+  type HookAngle,
+  type HookTemplate,
+} from './hook-library';

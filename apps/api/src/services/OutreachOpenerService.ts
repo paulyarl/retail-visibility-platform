@@ -60,6 +60,12 @@ export interface ImportOpenerInput {
   // operatorName is provided, the placeholder is substituted so the
   // stored text is ready to send.
   operatorName?: string;
+  // Hook angle attribution (Sprint 2 — Light-Score Hook Library).
+  // When the opener is imported from the hook suggestion picker, this
+  // records which angle was used so getSplitTestStats() can rank angles.
+  // Validated against HOOK_LIBRARY keys at the route layer. null/omitted
+  // for legacy imports and AI-generated openers.
+  hookAngle?: string | null;
 }
 
 export interface OpenerResult {
@@ -477,6 +483,7 @@ export class OutreachOpenerService extends BaseService {
         extracted_fields: extractedFields as any,
         executed_by: input.executedBy || null,
         operator_name: input.operatorName?.trim() || null,
+        hook_angle: input.hookAngle ?? null,
       },
     });
 
@@ -595,6 +602,7 @@ export class OutreachOpenerService extends BaseService {
   async getSplitTestStats(ctx?: RequestCtx): Promise<{
     cohorts: SplitTestCohort[];
     totals: { openers: number; sent: number; replies: number; replyRate: number };
+    byHookAngle: HookAngleStats[];
   }> {
     try {
       // Fetch all openers with a close_variant set, newest first.
@@ -609,11 +617,12 @@ export class OutreachOpenerService extends BaseService {
           source: true,
           quality_gate_passed: true,
           executed_at: true,
+          hook_angle: true,
         },
       });
 
       if (openers.length === 0) {
-        return { cohorts: [], totals: { openers: 0, sent: 0, replies: 0, replyRate: 0 } };
+        return { cohorts: [], totals: { openers: 0, sent: 0, replies: 0, replyRate: 0 }, byHookAngle: [] };
       }
 
       // Collect unique campaign IDs and map opener → campaign.
@@ -761,6 +770,60 @@ export class OutreachOpenerService extends BaseService {
       const totalReplies = cohorts.reduce((sum, c) => sum + c.replies, 0);
       const totalOpeners = cohorts.reduce((sum, c) => sum + c.openers, 0);
 
+      // ─── byHookAngle grouping (Sprint 2 — Light-Score Hook Library) ────
+      // Group openers by hook_angle (only those with a non-null angle).
+      // For each angle: count openers, sent campaigns, replies, reply rate.
+      const angleMap = new Map<string, {
+        angle: string;
+        openers: number;
+        sentCampaignIds: Set<string>;
+        repliedCampaignIds: Set<string>;
+      }>();
+
+      for (const opener of openers) {
+        const angle = opener.hook_angle;
+        if (!angle) continue;
+
+        const entry = angleMap.get(angle) ?? {
+          angle,
+          openers: 0,
+          sentCampaignIds: new Set<string>(),
+          repliedCampaignIds: new Set<string>(),
+        };
+
+        entry.openers++;
+        const campaign = campaignMap.get(opener.campaign_id);
+        const outcomes = campaignOutcomes.get(opener.campaign_id);
+        const isSent = campaign ? SENT_STAGES.has(campaign.stage) : false;
+        const replied = outcomes?.replied ?? false;
+
+        if (isSent) {
+          entry.sentCampaignIds.add(opener.campaign_id);
+          if (replied) {
+            entry.repliedCampaignIds.add(opener.campaign_id);
+          }
+        }
+
+        angleMap.set(angle, entry);
+      }
+
+      const byHookAngle: HookAngleStats[] = [...angleMap.values()].map((a) => {
+        const sent = a.sentCampaignIds.size;
+        const replies = a.repliedCampaignIds.size;
+        return {
+          angle: a.angle,
+          openers: a.openers,
+          sent,
+          replies,
+          replyRate: sent > 0 ? replies / sent : 0,
+        };
+      }).sort((a, b) => {
+        // Most sent first, then most replies, then alpha
+        if (a.sent !== b.sent) return b.sent - a.sent;
+        if (a.replies !== b.replies) return b.replies - a.replies;
+        return a.angle.localeCompare(b.angle);
+      });
+
       return {
         cohorts,
         totals: {
@@ -769,6 +832,7 @@ export class OutreachOpenerService extends BaseService {
           replies: totalReplies,
           replyRate: totalSent > 0 ? totalReplies / totalSent : 0,
         },
+        byHookAngle,
       };
     } catch (error) {
       logger.error('Failed to get split-test stats', ctx, {
@@ -815,4 +879,12 @@ export interface SplitTestCohort {
   replyRate: number;
   outcomeBreakdown: Record<string, number>;
   campaignRows: SplitTestCampaignRow[];
+}
+
+export interface HookAngleStats {
+  angle: string;
+  openers: number;
+  sent: number;
+  replies: number;
+  replyRate: number;
 }

@@ -38,6 +38,8 @@ import marketingOpsService, {
   ReviewPair,
   CloserResolution,
   OpenerArchetype,
+  RankedHook,
+  HookSuggestionResult,
 } from '@/services/MarketingOpsService';
 
 interface PitchConstructionPanelProps {
@@ -472,6 +474,12 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const [assembledPitchId, setAssembledPitchId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // ─── Hook suggestions (Sprint 2 — Light-Score Hook Library) ──────────
+  const [hookSuggestions, setHookSuggestions] = useState<RankedHook[]>([]);
+  const [hookLoading, setHookLoading] = useState(false);
+  const [hookError, setHookError] = useState<string | null>(null);
+  const [hookArchetype, setHookArchetype] = useState<string | null>(null);
+
   // ─── Fetchers ───────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     if (!campaignId) return;
@@ -507,6 +515,29 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Fetch hook suggestions on mount — ranked hooks with merge fields resolved.
+  // The operator picks one and loads it into the import field (attribution
+  // flows through importOpener with hookAngle).
+  const fetchHookSuggestions = useCallback(async () => {
+    if (!campaignId) return;
+    setHookLoading(true);
+    setHookError(null);
+    try {
+      const result = await marketingOpsService.getHookSuggestions(campaignId);
+      setHookSuggestions(result.suggestions);
+      setHookArchetype(result.archetype);
+    } catch (err: any) {
+      setHookError(err.message || 'Failed to load hook suggestions');
+      setHookSuggestions([]);
+    } finally {
+      setHookLoading(false);
+    }
+  }, [campaignId]);
+
+  useEffect(() => {
+    fetchHookSuggestions();
+  }, [fetchHookSuggestions]);
 
   // Fetch the closer resolution (default template) on mount. Previously
   // this was deferred until the collapsible panel was opened; now that the
@@ -740,6 +771,104 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   // ─── Render ─────────────────────────────────────────────────────────
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-6">
+      {/* ─── Suggested Hooks (Sprint 2 — Light-Score Hook Library) ──── */}
+      <section className="rounded-lg border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-900/10 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide flex items-center gap-2">
+            Suggested Hooks
+            {hookArchetype && (
+              <span
+                title={`Ranked by affinity to the campaign's detected archetype (${hookArchetype})`}
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              >
+                {hookArchetype}
+              </span>
+            )}
+          </h3>
+          <button
+            onClick={fetchHookSuggestions}
+            disabled={hookLoading}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${hookLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+
+        {hookError && (
+          <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 mb-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            {hookError}
+          </div>
+        )}
+
+        {hookLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 rounded-md bg-gray-100 dark:bg-neutral-800 animate-pulse" />
+            ))}
+          </div>
+        ) : hookSuggestions.length > 0 ? (
+          <details open className="group">
+            <summary className="cursor-pointer list-none text-[11px] text-gray-500 dark:text-gray-400 mb-2 select-none">
+              Ranked by archetype affinity + signal match — click a hook to load it into the import field below.
+            </summary>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+              {hookSuggestions.map((hook) => (
+                <div
+                  key={hook.angle}
+                  className="rounded-md border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-gray-400">#{hook.rank}</span>
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{hook.label}</span>
+                      {hook.matchedSignals.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {hook.matchedSignals.map((sig) => (
+                            <span
+                              key={sig}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            >
+                              {sig}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderImportText(hook.resolved.subject);
+                        // Load the body into the opener import field via a
+                        // custom event — the opener tab listens for it.
+                        window.dispatchEvent(
+                          new CustomEvent('hook-selected', {
+                            detail: { body: hook.resolved.body, angle: hook.angle },
+                          }),
+                        );
+                      }}
+                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    >
+                      <Upload className="w-3 h-3" />
+                      Use this hook
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">
+                    <span className="text-gray-400">Subject:</span> {hook.resolved.subject}
+                  </p>
+                  <pre className="text-xs text-gray-600 dark:text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                    {hook.resolved.body}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </details>
+        ) : !hookError ? (
+          <p className="text-xs text-gray-400 dark:text-gray-500">No hook suggestions available.</p>
+        ) : null}
+      </section>
+
       {/* ─── Opener selector ─────────────────────────────────────── */}
       <section>
             <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">

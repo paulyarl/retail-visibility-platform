@@ -25,6 +25,9 @@
  *     PUT    /:campaignId/outreach-intelligence  — upsert (validates + computes salutation)
  *     DELETE /:campaignId/outreach-intelligence  — remove worksheet
  *
+ *   Hook Suggestions (Sprint 2 — Light-Score Hook Library):
+ *     GET    /:campaignId/hook-suggestions  — ranked hooks with merge fields resolved
+ *
  *   Files:
  *     GET    /:campaignId/files         — list files for campaign
  *     POST   /:campaignId/files         — create file metadata
@@ -176,6 +179,8 @@ import CampaignTriageService from '../services/CampaignTriageService';
 import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
 import OutreachIntelligenceService from '../services/OutreachIntelligenceService';
+import HookSuggestionService from '../services/HookSuggestionService';
+import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -1462,6 +1467,25 @@ router.delete('/:campaignId/outreach-intelligence', async (req: any, res: Respon
 });
 
 // ====================
+// HOOK SUGGESTION ROUTES (Sprint 2 — Light-Score Hook Library)
+// ====================
+// Two-segment /:campaignId/hook-suggestions — safe from the GET /:id
+// catch-all (Express only matches /:id against a single segment).
+
+// GET /:campaignId/hook-suggestions — ranked hooks with merge fields resolved
+router.get('/:campaignId/hook-suggestions', async (req: any, res: Response) => {
+  try {
+    const result = await HookSuggestionService.suggestForCampaign(
+      req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
 // FILE ROUTES
 // ====================
 
@@ -2309,6 +2333,9 @@ const openerImportSchema = z.object({
   opener_text: z.string().min(1),
   close_variant: z.enum(['soft', 'direct_paid']).optional(),
   operator_name: z.string().max(120).optional(),
+  // Hook angle attribution (Sprint 2 — Light-Score Hook Library).
+  // Validated against HOOK_LIBRARY keys; unknown → 400.
+  hook_angle: z.enum(HOOK_ANGLE_KEYS as any as [string, ...string[]]).optional().nullable(),
 });
 
 // List openers (filter: campaignId)
@@ -2371,6 +2398,7 @@ router.post('/openers/import', async (req: any, res: Response) => {
       closeVariant: parsed.close_variant,
       executedBy: req.user?.id,
       operatorName: parsed.operator_name,
+      hookAngle: parsed.hook_angle ?? null,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });
   } catch (error) {
