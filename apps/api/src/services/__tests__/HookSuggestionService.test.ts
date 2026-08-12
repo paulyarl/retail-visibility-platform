@@ -57,13 +57,13 @@ vi.mock('../OutreachIntelligenceService', () => ({
   default: {
     getInstance: () => ({ getForCampaign: mockGetForCampaign }),
     getForCampaign: mockGetForCampaign,
-    resolveSalutation: vi.fn((payload: any, businessName: string | null) => {
-      // Inline fallback chain — mirrors the real resolveSalutation
-      if (businessName && businessName.trim().length > 0 && businessName.length <= 60) {
-        return `Hi ${businessName.trim()},`;
-      }
-      return 'Hi there,';
-    }),
+  },
+  resolveSalutation: (payload: any, businessName: string | null) => {
+    // Inline fallback chain — mirrors the real resolveSalutation
+    if (businessName && businessName.trim().length > 0 && businessName.length <= 60) {
+      return `Hi ${businessName.trim()},`;
+    }
+    return 'Hi there,';
   },
 }));
 
