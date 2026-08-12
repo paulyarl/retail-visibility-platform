@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { marketingOpsService, type AssembledCallScript, type HookAngle } from '@/services/MarketingOpsService';
+import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
+import { marketingOpsService, type AssembledCallScript, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
 
 interface DeadNumberLog {
   id: string;
@@ -9,6 +10,32 @@ interface DeadNumberLog {
   outcome: 'wrong_number' | 'disconnected_number';
   contact_channel: string | null;
 }
+
+const OUTCOME_LABELS: Record<ContactOutcome, string> = {
+  reached: 'Reached',
+  no_answer: 'No Answer',
+  left_message: 'Left Message',
+  interested: 'Interested',
+  not_interested: 'Not Interested',
+  callback_scheduled: 'Callback Scheduled',
+  other: 'Other',
+  auto_follow_up_scheduled: 'Auto Follow-Up',
+  wrong_number: 'Wrong Number',
+  disconnected_number: 'Disconnected',
+};
+
+const OUTCOME_COLORS: Record<ContactOutcome, string> = {
+  reached: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  no_answer: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  left_message: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  interested: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  not_interested: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  callback_scheduled: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  auto_follow_up_scheduled: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  wrong_number: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  disconnected_number: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+};
 
 interface CallScriptPanelProps {
   campaignId: string;
@@ -25,6 +52,8 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const [expandedObjection, setExpandedObjection] = useState<number | null>(null);
   const [deadNumberLogs, setDeadNumberLogs] = useState<DeadNumberLog[]>([]);
   const [deadNumberAction, setDeadNumberAction] = useState<string | null>(null);
+  const [recentLog, setRecentLog] = useState<OutreachLogEntry[]>([]);
+  const [showFullLog, setShowFullLog] = useState(false);
 
   const fetchScript = useCallback(async (angle?: string) => {
     setLoading(true);
@@ -49,6 +78,16 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
     }
   }, [campaignId]);
 
+  const fetchRecentLog = useCallback(async () => {
+    try {
+      const log = await marketingOpsService.listOutreach(campaignId);
+      // Most recent first
+      setRecentLog([...log].sort((a, b) => b.contact_date.localeCompare(a.contact_date)));
+    } catch {
+      // Non-blocking — the log section just doesn't show
+    }
+  }, [campaignId]);
+
   useEffect(() => {
     if (!campaignPhone) {
       setLoading(false);
@@ -56,7 +95,8 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
     }
     fetchScript();
     fetchDeadNumberStatus();
-  }, [fetchScript, fetchDeadNumberStatus, campaignPhone]);
+    fetchRecentLog();
+  }, [fetchScript, fetchDeadNumberStatus, fetchRecentLog, campaignPhone]);
 
   const handleConfirmDead = async (logId: string) => {
     setDeadNumberAction(logId);
@@ -173,6 +213,54 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
                 Keep number
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Outreach History — gives the operator context on prior
+          engagements (calls, emails) before placing the next call. */}
+      {recentLog.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Recent outreach ({recentLog.length})
+            </h3>
+            {recentLog.length > 5 && (
+              <button
+                onClick={() => setShowFullLog(!showFullLog)}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                {showFullLog ? 'Show last 5' : `Show all ${recentLog.length}`}
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {(showFullLog ? recentLog : recentLog.slice(0, 5)).map((entry) => (
+              <div key={entry.id} className="flex items-start gap-3 rounded border border-gray-100 p-2 dark:border-gray-800">
+                <div className="flex-shrink-0 mt-0.5">
+                  {entry.contact_channel === 'phone' && <Phone className="w-4 h-4 text-gray-400" />}
+                  {entry.contact_channel === 'email' && <Mail className="w-4 h-4 text-gray-400" />}
+                  {entry.contact_channel === 'website' && <Globe className="w-4 h-4 text-gray-400" />}
+                  {entry.contact_channel === 'social' && <Share2 className="w-4 h-4 text-gray-400" />}
+                  {entry.contact_channel === 'in_person' && <MapPin className="w-4 h-4 text-gray-400" />}
+                  {(entry.contact_channel === 'other' || !entry.contact_channel) && <Calendar className="w-4 h-4 text-gray-400" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                      {new Date(entry.contact_date).toLocaleDateString()}
+                    </span>
+                    <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${OUTCOME_COLORS[entry.outcome] ?? OUTCOME_COLORS.other}`}>
+                      {OUTCOME_LABELS[entry.outcome] ?? entry.outcome}
+                    </span>
+                    <span className="text-[10px] text-gray-400 uppercase">{entry.contact_channel}</span>
+                  </div>
+                  {entry.notes && (
+                    <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{entry.notes}</p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -329,7 +417,14 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
       {/* Log Call Outcome */}
       <div className="flex justify-end">
         <button
-          onClick={() => selectedAngle && onLogCall?.(selectedAngle)}
+          onClick={() => {
+            if (selectedAngle) {
+              onLogCall?.(selectedAngle);
+              // Refresh the recent log after a short delay to let the
+              // modal submission complete.
+              setTimeout(() => fetchRecentLog(), 1500);
+            }
+          }}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           Log call outcome

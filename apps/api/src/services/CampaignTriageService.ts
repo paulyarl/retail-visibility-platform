@@ -18,7 +18,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError, ConflictError } from '../middleware/errorHandler';
+import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateCampaignTriageId } from '../lib/id-generator';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { extractSignals, evaluateTriage, fallbackRecommendation, evaluateAllMatchingPlaybooks } from './triage';
@@ -122,6 +122,12 @@ export class CampaignTriageService extends BaseService {
    */
   async evaluateTriageForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<StoredTriageResult> {
     const { campaignId } = input;
+
+    // Triage is a per-business funnel (re-categorize + FITD fee + playbook).
+    // Category/city-scope campaigns are aggregate scans with no single
+    // business to triage — reject before running the engine so a stray
+    // evaluate call cannot persist a bogus recommendation + fees.
+    await this.assertBusinessScope(campaignId, ctx);
 
     // 1. Load signals + playbooks (shared with evaluateAllForCampaign)
     const { signals, playbooks, sourceAuditId } = await this.loadSignalsAndPlaybooks(input, ctx);
@@ -253,6 +259,11 @@ export class CampaignTriageService extends BaseService {
    * pre-accepted PB-05 result with a fresh PB-01 evaluation + null decision.
    */
   async evaluateAllForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<MultiArchetypeTriageResult> {
+    // Scope guard — see evaluateTriageForCampaign. Placed before the
+    // isDecided short-circuit so stale triage rows on a category/city
+    // campaign (e.g. from prior to this guard) are not surfaced either.
+    await this.assertBusinessScope(input.campaignId, ctx);
+
     // 1. Check if the triage is already decided. If so, use the stored result
     //    as the winner — do NOT re-evaluate (which would reset the decision).
     const existing = await this.getTriageResult(input.campaignId, ctx);
@@ -443,6 +454,40 @@ export class CampaignTriageService extends BaseService {
    * No-op for campaigns without a business_prospect_id, non-business scope, or
    * a null target playbook (the partial index does not apply to them).
    */
+  /**
+   * Guard against triage being run on non-business-scope campaigns.
+   * Triage re-categorizes a single business, stamps a playbook, and applies
+   * a FITD fee — none of which apply to category/city-scope aggregate scans.
+   * Without this, a category campaign with no website trivially fires
+   * WC_MISSING_WEBSITE → PB-03 fallback and surfaces a meaningless
+   * "Accept Recommendation" prompt to the operator.
+   *
+   * Returns 400 validation_error so the caller can distinguish it from a
+   * 404 (missing campaign) or 409 (sibling conflict).
+   *
+   * No-op for business-scope campaigns. Throws NotFoundError if the campaign
+   * does not exist (so callers see a 404, not a misleading scope error).
+   */
+  private async assertBusinessScope(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { scope: true },
+    }) as any;
+    if (!campaign) {
+      throw new NotFoundError('Campaign not found');
+    }
+    if (campaign.scope !== 'business') {
+      throw new ValidationError(
+        `Triage is only available for business-scope campaigns ` +
+        `(this campaign is '${campaign.scope}' scope). ` +
+        `Derive a business-scope child campaign from the scan first.`,
+      );
+    }
+  }
+
   private async assertNoSiblingPlaybookConflict(
     campaignId: string,
     targetPlaybookCode: string,

@@ -629,9 +629,12 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
             </div>
 
             {/* Intelligent Triage Card — above the tabs, only for seek-stage
-                campaigns. The triage decision is a prerequisite gate, not a
-                parallel view (Sprint 5). */}
-            {campaign.stage === 'seek' && (
+                business-scope campaigns. Triage is a per-business funnel
+                (re-categorize + FITD fee + playbook); category/city-scope
+                campaigns are aggregate scans with no single business to
+                triage, so the card must not surface there. The backend
+                evaluate path enforces the same scope guard. */}
+            {campaign.stage === 'seek' && campaign.scope === 'business' && (
               <IntelligentTriageCard campaign={campaign} onRefresh={fetchCampaign} />
             )}
 

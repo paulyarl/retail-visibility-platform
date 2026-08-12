@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Play, Copy, Upload, ChevronDown, ChevronRight, ExternalLink, ArrowRight, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { RefreshCw, Play, Copy, Upload, ChevronDown, ChevronRight, ExternalLink, ArrowRight, AlertTriangle, CheckCircle, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, {
   Campaign,
@@ -98,6 +98,10 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
   // modal's "Angle used" field is pre-filled for attribution.
   const [logContactAngle, setLogContactAngle] = useState<string | null>(null);
   const [showLogContactModal, setShowLogContactModal] = useState(false);
+
+  // Toast shown after a call/email outcome is logged — gives the operator
+  // immediate confirmation without navigating to the campaign page.
+  const [logToast, setLogToast] = useState<string | null>(null);
 
   // Checklist outreach progress badge (bridge sprint)
   const [checklistBadge, setChecklistBadge] = useState<{ completed: number; total: number } | null>(null);
@@ -768,8 +772,21 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
           onLogged={() => {
             setShowLogContactModal(false);
             setLogContactAngle(null);
+            setLogToast('Contact logged — see "Recent outreach" on the Call Script tab');
+            setTimeout(() => setLogToast(null), 4000);
           }}
         />
+      )}
+
+      {/* Log toast — auto-dismissing confirmation after a call/email
+          outcome is logged. */}
+      {logToast && (
+        <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            {logToast}
+          </div>
+        </div>
       )}
     </MarketingOpsPageShell>
   );
