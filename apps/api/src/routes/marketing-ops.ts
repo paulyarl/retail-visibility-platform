@@ -284,8 +284,64 @@ const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'inte
 
 // ─── Call details schema (Sprint 1 — Cold Call Channel) ────────────────
 const callResultEnum = z.enum(['connected', 'voicemail', 'no_answer', 'wrong_number', 'disconnected_number']);
+
+// Per-channel contact results for non-phone channels (§Log Contact — Result options).
+const contactResultEnum = z.enum([
+  // shared
+  'replied', 'sent_no_reply', 'refused', 'failed_to_send', 'bad_contact_info',
+  // email
+  'bounced', 'unsubscribed', 'marked_spam',
+  // website
+  'form_submitted', 'awaiting_response', 'form_error', 'no_contact_form', 'page_not_found',
+  // social
+  'comment_left', 'profile_not_found', 'no_dm_access',
+  // in_person
+  'met_owner', 'met_staff', 'not_available', 'left_message_with_staff', 'closed_permanently', 'wrong_location',
+]);
+
+// Subtype for the "other" channel.
+const otherSubtypeEnum = z.enum(['dm', 'text', 'email', 'fax_mail']);
+
+// Maps a contact_result → required ContactOutcome (mirrors the frontend
+// CONTACT_RESULT_OPTIONS outcome mapping).
+const CONTACT_RESULT_TO_OUTCOME: Record<string, string> = {
+  replied: 'interested',
+  sent_no_reply: 'reached',
+  refused: 'not_interested',
+  failed_to_send: 'other',
+  bad_contact_info: 'wrong_number',
+  bounced: 'wrong_number',
+  unsubscribed: 'not_interested',
+  marked_spam: 'not_interested',
+  form_submitted: 'reached',
+  awaiting_response: 'no_answer',
+  form_error: 'other',
+  no_contact_form: 'wrong_number',
+  page_not_found: 'wrong_number',
+  comment_left: 'left_message',
+  profile_not_found: 'wrong_number',
+  no_dm_access: 'other',
+  met_owner: 'reached',
+  met_staff: 'reached',
+  not_available: 'no_answer',
+  left_message_with_staff: 'left_message',
+  closed_permanently: 'disconnected_number',
+  wrong_location: 'wrong_number',
+};
+
+// Per-channel allowed contact_result values.
+const CHANNEL_CONTACT_RESULTS: Record<string, string[]> = {
+  email: ['replied', 'sent_no_reply', 'bounced', 'unsubscribed', 'marked_spam', 'failed_to_send'],
+  website: ['form_submitted', 'awaiting_response', 'form_error', 'no_contact_form', 'page_not_found'],
+  social: ['replied', 'sent_no_reply', 'comment_left', 'profile_not_found', 'no_dm_access'],
+  in_person: ['met_owner', 'met_staff', 'not_available', 'left_message_with_staff', 'refused', 'closed_permanently', 'wrong_location'],
+  other: ['replied', 'sent_no_reply', 'bad_contact_info', 'refused', 'failed_to_send'],
+};
+
 const callDetailsSchema = z.object({
-  call_result: callResultEnum,
+  call_result: callResultEnum.optional(),
+  contact_result: contactResultEnum.nullable().default(null),
+  other_subtype: otherSubtypeEnum.nullable().default(null),
   identity_verified: z.boolean().nullable().default(null),
   operating_status_confirmed: z.boolean().nullable().default(null),
   angle_used: z.string().max(40).nullable().default(null),
@@ -316,75 +372,104 @@ const outreachLogBaseSchema = z.object({
 const outreachLogSchema = outreachLogBaseSchema.superRefine((data, ctx) => {
   // Coherence validation (§5.3)
   if (data.call_details) {
-    // call_details present ⇒ contact_channel === 'phone'
-    if (data.contact_channel !== 'phone') {
+    const cd = data.call_details;
+    const isPhone = data.contact_channel === 'phone';
+
+    // ─── Channel/result field gating ───────────────────────────────────
+    // call_result is phone-only; contact_result is non-phone-only.
+    if (cd.call_result != null && !isPhone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'call_details requires contact_channel = "phone"',
-        path: ['call_details'],
+        message: 'call_result requires contact_channel = "phone"',
+        path: ['call_details', 'call_result'],
       });
     }
-    const cr = data.call_details.call_result;
-    // call_result: 'connected' ⇒ outcome ∈ human-contact set
-    if (cr === 'connected' && !['reached', 'interested', 'not_interested', 'callback_scheduled', 'other'].includes(data.outcome)) {
+    if (cd.contact_result != null && isPhone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'call_result "connected" requires a human-contact outcome (reached, interested, not_interested, callback_scheduled, other)',
-        path: ['outcome'],
+        message: 'contact_result requires a non-phone contact_channel',
+        path: ['call_details', 'contact_result'],
       });
     }
-    // call_result: 'wrong_number' ⇒ outcome: 'wrong_number'
-    if (cr === 'wrong_number' && data.outcome !== 'wrong_number') {
+    // other_subtype is only valid for the "other" channel.
+    if (cd.other_subtype != null && data.contact_channel !== 'other') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'call_result "wrong_number" requires outcome "wrong_number"',
-        path: ['outcome'],
+        message: 'other_subtype requires contact_channel = "other"',
+        path: ['call_details', 'other_subtype'],
       });
     }
-    // call_result: 'disconnected_number' ⇒ outcome: 'disconnected_number'
-    if (cr === 'disconnected_number' && data.outcome !== 'disconnected_number') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'call_result "disconnected_number" requires outcome "disconnected_number"',
-        path: ['outcome'],
-      });
+
+    // ─── Phone-mode call_result validation (existing) ──────────────────
+    if (isPhone) {
+      const cr = cd.call_result;
+      if (cr === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'call_result is required when contact_channel = "phone"',
+          path: ['call_details', 'call_result'],
+        });
+      }
+      // call_result: 'connected' ⇒ outcome ∈ human-contact set
+      if (cr === 'connected' && !['reached', 'interested', 'not_interested', 'callback_scheduled', 'other'].includes(data.outcome)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'call_result "connected" requires a human-contact outcome (reached, interested, not_interested, callback_scheduled, other)',
+          path: ['outcome'],
+        });
+      }
+      if (cr === 'wrong_number' && data.outcome !== 'wrong_number') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'call_result "wrong_number" requires outcome "wrong_number"', path: ['outcome'] });
+      }
+      if (cr === 'disconnected_number' && data.outcome !== 'disconnected_number') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'call_result "disconnected_number" requires outcome "disconnected_number"', path: ['outcome'] });
+      }
+      if (cr === 'no_answer' && data.outcome !== 'no_answer') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'call_result "no_answer" requires outcome "no_answer"', path: ['outcome'] });
+      }
+      if (cr === 'voicemail' && data.outcome !== 'left_message') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'call_result "voicemail" requires outcome "left_message"', path: ['outcome'] });
+      }
+      // Write-back fields require call_result: 'connected'
+      const writeBackFields = [cd.owner_name_confirmed, cd.team_signal_confirmed, cd.preferred_channel_confirmed];
+      const hasWriteBack = writeBackFields.some((v) => v !== null && v !== undefined && v !== '');
+      if (hasWriteBack && cr !== 'connected') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Confirmation fields (owner_name_confirmed, team_signal_confirmed, preferred_channel_confirmed) require call_result "connected"',
+          path: ['call_details'],
+        });
+      }
     }
-    // call_result: 'no_answer' ⇒ outcome: 'no_answer'
-    if (cr === 'no_answer' && data.outcome !== 'no_answer') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'call_result "no_answer" requires outcome "no_answer"',
-        path: ['outcome'],
-      });
+
+    // ─── Non-phone-mode contact_result validation ──────────────────────
+    if (!isPhone && cd.contact_result != null) {
+      const cr = cd.contact_result;
+      const allowed = CHANNEL_CONTACT_RESULTS[data.contact_channel];
+      if (allowed && !allowed.includes(cr)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `contact_result "${cr}" is not valid for contact_channel "${data.contact_channel}"`,
+          path: ['call_details', 'contact_result'],
+        });
+      }
+      // Outcome must match the contact_result mapping (auto-mapped in UI).
+      const expectedOutcome = CONTACT_RESULT_TO_OUTCOME[cr];
+      if (expectedOutcome && data.outcome !== expectedOutcome) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `contact_result "${cr}" requires outcome "${expectedOutcome}"`,
+          path: ['outcome'],
+        });
+      }
     }
-    // call_result: 'voicemail' ⇒ outcome: 'left_message'
-    if (cr === 'voicemail' && data.outcome !== 'left_message') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'call_result "voicemail" requires outcome "left_message"',
-        path: ['outcome'],
-      });
-    }
-    // email_obtained: true ⇒ email_value non-null
-    if (data.call_details.email_obtained === true && !data.call_details.email_value) {
+
+    // ─── Shared: email_obtained ⇒ email_value ──────────────────────────
+    if (cd.email_obtained === true && !cd.email_value) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'email_obtained = true requires email_value',
         path: ['call_details', 'email_value'],
-      });
-    }
-    // Write-back fields require call_result: 'connected'
-    const writeBackFields = [
-      data.call_details.owner_name_confirmed,
-      data.call_details.team_signal_confirmed,
-      data.call_details.preferred_channel_confirmed,
-    ];
-    const hasWriteBack = writeBackFields.some((v) => v !== null && v !== undefined);
-    if (hasWriteBack && cr !== 'connected') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Confirmation fields (owner_name_confirmed, team_signal_confirmed, preferred_channel_confirmed) require call_result "connected"',
-        path: ['call_details'],
       });
     }
   }

@@ -431,8 +431,43 @@ export interface AssembledCallScript {
 
 export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
 
+// Per-channel contact results for non-phone channels.
+export type ContactResult =
+  // shared
+  | 'replied'
+  | 'sent_no_reply'
+  | 'refused'
+  | 'failed_to_send'
+  | 'bad_contact_info'
+  // email
+  | 'bounced'
+  | 'unsubscribed'
+  | 'marked_spam'
+  // website
+  | 'form_submitted'
+  | 'awaiting_response'
+  | 'form_error'
+  | 'no_contact_form'
+  | 'page_not_found'
+  // social
+  | 'comment_left'
+  | 'profile_not_found'
+  | 'no_dm_access'
+  // in_person
+  | 'met_owner'
+  | 'met_staff'
+  | 'not_available'
+  | 'left_message_with_staff'
+  | 'closed_permanently'
+  | 'wrong_location';
+
+// Subtype for the "other" channel.
+export type OtherSubtype = 'dm' | 'text' | 'email' | 'fax_mail';
+
 export interface CallDetails {
-  call_result: CallResult;
+  call_result?: CallResult;
+  contact_result?: ContactResult | null;
+  other_subtype?: OtherSubtype | null;
   identity_verified?: boolean | null;
   operating_status_confirmed?: boolean | null;
   angle_used?: string | null;
@@ -865,6 +900,9 @@ export interface LogContactInput {
   message_snapshot?: string;
   message_subject?: string;
   preview_token?: string;
+  // Non-phone channels may include call_details with contact_result + other_subtype.
+  call_details?: CallDetails;
+  update_worksheet?: boolean;
 }
 
 export interface Audit {

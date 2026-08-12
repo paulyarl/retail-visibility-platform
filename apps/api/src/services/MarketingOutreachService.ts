@@ -29,8 +29,48 @@ export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'retrying';
 
 export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
 
+// Per-channel contact results for non-phone channels. Each value maps to a
+// ContactOutcome (see CONTACT_RESULT_TO_OUTCOME in routes/marketing-ops.ts).
+export type ContactResult =
+  // shared across channels
+  | 'replied'
+  | 'sent_no_reply'
+  | 'refused'
+  | 'failed_to_send'
+  | 'bad_contact_info'
+  // email
+  | 'bounced'
+  | 'unsubscribed'
+  | 'marked_spam'
+  // website
+  | 'form_submitted'
+  | 'awaiting_response'
+  | 'form_error'
+  | 'no_contact_form'
+  | 'page_not_found'
+  // social
+  | 'comment_left'
+  | 'profile_not_found'
+  | 'no_dm_access'
+  // in_person
+  | 'met_owner'
+  | 'met_staff'
+  | 'not_available'
+  | 'left_message_with_staff'
+  | 'closed_permanently'
+  | 'wrong_location';
+
+// Subtype selector for the "other" channel (§Log Contact — Other subtype).
+export type OtherSubtype = 'dm' | 'text' | 'email' | 'fax_mail';
+
 export interface CallDetails {
-  call_result: CallResult;
+  // Phone-mode field (required when contact_channel === 'phone').
+  call_result?: CallResult;
+  // Non-phone-mode field (required when contact_channel !== 'phone' and
+  // call_details is present). Drives the per-channel "Contact result" UI.
+  contact_result?: ContactResult | null;
+  // Subtype for the "other" channel (DM / Text / Email / Fax-Mail).
+  other_subtype?: OtherSubtype | null;
   identity_verified?: boolean | null;
   operating_status_confirmed?: boolean | null;
   angle_used?: string | null;

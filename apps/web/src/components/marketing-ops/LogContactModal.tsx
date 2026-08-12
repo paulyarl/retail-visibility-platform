@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Sparkles, RefreshCw, Link2 } from 'lucide-react';
-import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails } from '@/services/MarketingOpsService';
+import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails, ContactResult, OtherSubtype } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
 const CHANNEL_OPTIONS: { value: ContactChannel; label: string }[] = [
@@ -13,6 +13,69 @@ const CHANNEL_OPTIONS: { value: ContactChannel; label: string }[] = [
   { value: 'in_person', label: 'In Person' },
   { value: 'other', label: 'Other' },
 ];
+
+// ─── Per-channel contact result options (non-phone) ─────────────────────
+// Each result auto-maps to an outcome (mirrors backend CONTACT_RESULT_TO_OUTCOME).
+const EMAIL_RESULT_OPTIONS: { value: ContactResult; label: string; outcome: ContactOutcome }[] = [
+  { value: 'replied', label: 'Replied', outcome: 'interested' },
+  { value: 'sent_no_reply', label: 'Sent — no reply yet', outcome: 'reached' },
+  { value: 'bounced', label: 'Bounced', outcome: 'wrong_number' },
+  { value: 'unsubscribed', label: 'Unsubscribed', outcome: 'not_interested' },
+  { value: 'marked_spam', label: 'Marked as spam', outcome: 'not_interested' },
+  { value: 'failed_to_send', label: 'Failed to send', outcome: 'other' },
+];
+
+const WEBSITE_RESULT_OPTIONS: { value: ContactResult; label: string; outcome: ContactOutcome }[] = [
+  { value: 'form_submitted', label: 'Form submitted', outcome: 'reached' },
+  { value: 'awaiting_response', label: 'Awaiting response', outcome: 'no_answer' },
+  { value: 'form_error', label: 'Form error', outcome: 'other' },
+  { value: 'no_contact_form', label: 'No contact form', outcome: 'wrong_number' },
+  { value: 'page_not_found', label: 'Page not found', outcome: 'wrong_number' },
+];
+
+const SOCIAL_RESULT_OPTIONS: { value: ContactResult; label: string; outcome: ContactOutcome }[] = [
+  { value: 'replied', label: 'Replied', outcome: 'interested' },
+  { value: 'sent_no_reply', label: 'Sent — no reply yet', outcome: 'no_answer' },
+  { value: 'comment_left', label: 'Comment left', outcome: 'left_message' },
+  { value: 'profile_not_found', label: 'Profile not found', outcome: 'wrong_number' },
+  { value: 'no_dm_access', label: 'No DM access', outcome: 'other' },
+];
+
+const IN_PERSON_RESULT_OPTIONS: { value: ContactResult; label: string; outcome: ContactOutcome }[] = [
+  { value: 'met_owner', label: 'Met owner', outcome: 'reached' },
+  { value: 'met_staff', label: 'Met staff', outcome: 'reached' },
+  { value: 'not_available', label: 'Not available', outcome: 'no_answer' },
+  { value: 'left_message_with_staff', label: 'Left message with staff', outcome: 'left_message' },
+  { value: 'refused', label: 'Refused to talk', outcome: 'not_interested' },
+  { value: 'closed_permanently', label: 'Closed permanently', outcome: 'disconnected_number' },
+  { value: 'wrong_location', label: 'Wrong location', outcome: 'wrong_number' },
+];
+
+const OTHER_RESULT_OPTIONS: { value: ContactResult; label: string; outcome: ContactOutcome }[] = [
+  { value: 'replied', label: 'Replied', outcome: 'interested' },
+  { value: 'sent_no_reply', label: 'Sent — no reply yet', outcome: 'reached' },
+  { value: 'bad_contact_info', label: 'Bad contact info', outcome: 'wrong_number' },
+  { value: 'refused', label: 'Refused', outcome: 'not_interested' },
+  { value: 'failed_to_send', label: 'Failed to send', outcome: 'other' },
+];
+
+const OTHER_SUBTYPE_OPTIONS: { value: OtherSubtype; label: string }[] = [
+  { value: 'dm', label: 'DM' },
+  { value: 'text', label: 'Text / SMS' },
+  { value: 'email', label: 'Email' },
+  { value: 'fax_mail', label: 'Fax / Mail' },
+];
+
+function contactResultOptionsForChannel(channel: ContactChannel): { value: ContactResult; label: string; outcome: ContactOutcome }[] {
+  switch (channel) {
+    case 'email': return EMAIL_RESULT_OPTIONS;
+    case 'website': return WEBSITE_RESULT_OPTIONS;
+    case 'social': return SOCIAL_RESULT_OPTIONS;
+    case 'in_person': return IN_PERSON_RESULT_OPTIONS;
+    case 'other': return OTHER_RESULT_OPTIONS;
+    default: return [];
+  }
+}
 
 const OUTCOME_OPTIONS: { value: ContactOutcome; label: string }[] = [
   { value: 'reached', label: 'Reached' },
@@ -92,7 +155,13 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   const [preferredChannelConfirmed, setPreferredChannelConfirmed] = useState('');
   const [updateWorksheet, setUpdateWorksheet] = useState(true);
 
+  // ─── Non-phone-mode contact result + Other subtype state ─────────────
+  const contactResultOptions = contactResultOptionsForChannel(channel);
+  const [contactResult, setContactResult] = useState<ContactResult | null>(null);
+  const [otherSubtype, setOtherSubtype] = useState<OtherSubtype | null>(null);
+
   const isPhoneMode = channel === 'phone';
+  const isOtherChannel = channel === 'other';
   const isConnected = isPhoneMode && callResult === 'connected';
   const isDeadNumber = isPhoneMode && (callResult === 'wrong_number' || callResult === 'disconnected_number');
   const hasWriteBackFields = isConnected && (
@@ -101,6 +170,28 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
     preferredChannelConfirmed.trim() ||
     (emailObtained && emailValue.trim())
   );
+
+  // When the channel changes, reset the contact_result to the first option
+  // of the new channel's result list (so the dropdown always shows a valid
+  // value and the outcome auto-maps correctly).
+  useEffect(() => {
+    if (!isPhoneMode) {
+      const opts = contactResultOptionsForChannel(channel);
+      if (opts.length > 0) {
+        setContactResult(opts[0].value);
+        setOutcome(opts[0].outcome);
+      } else {
+        setContactResult(null);
+      }
+    }
+    // Reset Other subtype when leaving the "other" channel.
+    if (channel !== 'other') {
+      setOtherSubtype(null);
+    } else if (otherSubtype === null) {
+      setOtherSubtype(OTHER_SUBTYPE_OPTIONS[0].value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,6 +242,10 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
           notes: notes || undefined,
           message_snapshot: messageSnapshot || undefined,
           message_subject: channel === 'email' ? (messageSubject || undefined) : undefined,
+          call_details: {
+            contact_result: contactResult,
+            other_subtype: isOtherChannel ? otherSubtype : null,
+          },
         });
       }
       onLogged();
@@ -244,6 +339,41 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
               {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </label>
+
+          {/* ─── Non-phone-mode contact result + Other subtype ─────────── */}
+          {!isPhoneMode && contactResultOptions.length > 0 && (
+            <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Contact result</span>
+                <select
+                  value={contactResult ?? contactResultOptions[0].value}
+                  onChange={(e) => {
+                    const result = e.target.value as ContactResult;
+                    setContactResult(result);
+                    // Auto-set outcome to match contact_result (same pattern as phone Call result).
+                    const mapping = contactResultOptions.find((o) => o.value === result);
+                    if (mapping) setOutcome(mapping.outcome);
+                  }}
+                  className={inputClass}
+                >
+                  {contactResultOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
+
+              {isOtherChannel && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Other type</span>
+                  <select
+                    value={otherSubtype ?? OTHER_SUBTYPE_OPTIONS[0].value}
+                    onChange={(e) => setOtherSubtype(e.target.value as OtherSubtype)}
+                    className={inputClass}
+                  >
+                    {OTHER_SUBTYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+              )}
+            </div>
+          )}
 
           {/* ─── Phone-mode call details (Sprint 1 — Cold Call Channel) ─── */}
           {isPhoneMode && (
