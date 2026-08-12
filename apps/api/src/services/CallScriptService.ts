@@ -75,6 +75,7 @@ export interface CallContext {
   owner_name_confidence: SourceConfidence;
   team_signal: TeamSignalValue;
   gallery_short_url: string | null;
+  channel_hint: ChannelHint;
 }
 
 export interface AssembledCallScript {

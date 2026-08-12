@@ -1614,7 +1614,7 @@ router.get('/:campaignId/call-script', async (req: any, res: Response) => {
 // GET /:campaignId/dead-number-status — check for un-acked dead-number logs
 router.get('/:campaignId/dead-number-status', async (req: any, res: Response) => {
   try {
-    const result = await MarketingOutreachService.hasDeadNumber(
+    const result = await outreachService.hasDeadNumber(
       req.params.campaignId,
       getCtx(req),
     );
@@ -1631,7 +1631,7 @@ const deadNumberConfirmSchema = z.object({
 router.post('/:campaignId/dead-number/confirm', async (req: any, res: Response) => {
   try {
     const parsed = deadNumberConfirmSchema.parse(req.body);
-    const result = await MarketingOutreachService.confirmDeadNumber(
+    const result = await outreachService.confirmDeadNumber(
       req.params.campaignId,
       parsed.log_id,
       getCtx(req),
@@ -1646,7 +1646,7 @@ router.post('/:campaignId/dead-number/confirm', async (req: any, res: Response) 
 router.post('/:campaignId/dead-number/keep', async (req: any, res: Response) => {
   try {
     const parsed = deadNumberConfirmSchema.parse(req.body);
-    const result = await MarketingOutreachService.keepNumber(
+    const result = await outreachService.keepNumber(
       req.params.campaignId,
       parsed.log_id,
       getCtx(req),
