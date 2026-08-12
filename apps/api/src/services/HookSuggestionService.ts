@@ -93,7 +93,9 @@ export class HookSuggestionService extends BaseService {
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const businessName = campaign.business_name ?? null;
     const city = campaign.city ?? null;
-    const category = campaign.service_category ?? null;
+    // service_category is the operator-set field; category is the prospect-
+    // discovery field. Fall back to category when service_category is null.
+    const category = campaign.service_category ?? campaign.category ?? null;
 
     // 4. Resolve salutation — from worksheet (with sibling inheritance), or
     //    inline fallback chain against the campaign's business name.
@@ -117,8 +119,9 @@ export class HookSuggestionService extends BaseService {
       );
     }
 
-    // 5. Resolve sender name — from assigned operator or platform default
-    const senderName = this.resolveSenderName(campaign);
+    // 5. Resolve sender name — from assigned operator (look up display name)
+    //    or platform default
+    const senderName = await this.resolveSenderName(campaign, ctx);
 
     // 6. Build merge context
     const mergeContext: MergeContext = {
@@ -236,13 +239,37 @@ export class HookSuggestionService extends BaseService {
   // ─── Sender name resolution ───────────────────────────────────────────
 
   /**
-   * Resolve the sender display name. Falls back to a platform default
-   * when no operator is assigned or the field is empty.
+   * Resolve the sender display name. Looks up the assigned operator's
+   * display name from the users table. Falls back to a platform default
+   * when no operator is assigned or the lookup fails.
    */
-  private resolveSenderName(campaign: any): string {
+  private async resolveSenderName(campaign: any, ctx?: RequestCtx): Promise<string> {
     const assigned = campaign?.assigned_to;
     if (assigned && typeof assigned === 'string' && assigned.trim().length > 0) {
-      return assigned.trim();
+      // If it's already a display name (not a uid-), use it directly
+      if (!assigned.startsWith('uid-')) {
+        return assigned.trim();
+      }
+      // Look up the user's display name from the users table
+      try {
+        const user = await this.prisma.users.findUnique({
+          where: { id: assigned },
+          select: { first_name: true, last_name: true, email: true },
+        });
+        if (user) {
+          const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim()
+            || null;
+          if (displayName && displayName.length > 0) {
+            return displayName;
+          }
+          // Fall back to email local-part if no name fields
+          if (user.email) {
+            return user.email.split('@')[0];
+          }
+        }
+      } catch {
+        // User lookup failed — fall through to default
+      }
     }
     // Platform default — matches the opener workspace's operator-name prefill
     return 'your team';

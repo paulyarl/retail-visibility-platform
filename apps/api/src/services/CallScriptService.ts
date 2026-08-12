@@ -172,9 +172,12 @@ export class CallScriptService extends BaseService {
     // 3. Resolve phone merge fields
     const businessName = campaign.business_name ?? null;
     const city = campaign.city ?? null;
-    const category = campaign.service_category ? campaign.service_category.toLowerCase() : null;
+    // service_category is the operator-set field; category is the prospect-
+    // discovery field. Fall back to category when service_category is null.
+    const rawCategory = campaign.service_category ?? campaign.category ?? null;
+    const category = rawCategory ? rawCategory.toLowerCase() : null;
     const address = this.formatAddress(campaign);
-    const operatorName = this.resolveOperatorName(campaign);
+    const operatorName = await this.resolveOperatorName(campaign, ctx);
 
     const mergeContext: PhoneMergeContext = {
       business: businessName,
@@ -615,13 +618,37 @@ export class CallScriptService extends BaseService {
   }
 
   /**
-   * Resolve the operator display name — same source as the opener
-   * workspace's operator-name prefill.
+   * Resolve the operator display name — looks up the assigned operator's
+   * display name from the users table. Falls back to a platform default
+   * when no operator is assigned or the lookup fails.
    */
-  private resolveOperatorName(campaign: any): string {
+  private async resolveOperatorName(campaign: any, ctx?: RequestCtx): Promise<string> {
     const assigned = campaign?.assigned_to;
     if (assigned && typeof assigned === 'string' && assigned.trim().length > 0) {
-      return assigned.trim();
+      // If it's already a display name (not a uid-), use it directly
+      if (!assigned.startsWith('uid-')) {
+        return assigned.trim();
+      }
+      // Look up the user's display name from the users table
+      try {
+        const user = await this.prisma.users.findUnique({
+          where: { id: assigned },
+          select: { first_name: true, last_name: true, email: true },
+        });
+        if (user) {
+          const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim()
+            || null;
+          if (displayName && displayName.length > 0) {
+            return displayName;
+          }
+          // Fall back to email local-part if no name fields
+          if (user.email) {
+            return user.email.split('@')[0];
+          }
+        }
+      } catch {
+        // User lookup failed — fall through to default
+      }
     }
     return 'your team';
   }
