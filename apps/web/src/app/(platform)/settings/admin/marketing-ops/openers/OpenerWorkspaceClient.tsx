@@ -35,7 +35,12 @@ const CLOSE_VARIANT_LABELS: Record<CloseVariant, { label: string; hint: string }
   },
 };
 
-export default function OpenerWorkspaceClient() {
+interface OpenerWorkspaceClientProps {
+  initialCampaignId?: string;
+  initialTab?: string;
+}
+
+export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }: OpenerWorkspaceClientProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [openers, setOpeners] = useState<OutreachOpener[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,6 +191,25 @@ export default function OpenerWorkspaceClient() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Apply URL params (campaign + tab) after campaigns are loaded.
+  // This lets operators deep-link from the campaign checklist directly
+  // into the Pitch Construction or Call Script tab with the campaign
+  // already selected.
+  const [appliedUrlParams, setAppliedUrlParams] = useState(false);
+  useEffect(() => {
+    if (appliedUrlParams || loading || campaigns.length === 0) return;
+    if (initialCampaignId) {
+      const found = campaigns.find((c) => c.id === initialCampaignId);
+      if (found) {
+        setSelectedCampaignId(initialCampaignId);
+        if (initialTab === 'pitch' || initialTab === 'call') {
+          setActiveTab(initialTab);
+        }
+      }
+    }
+    setAppliedUrlParams(true);
+  }, [appliedUrlParams, loading, campaigns, initialCampaignId, initialTab]);
 
   // Resolve archetype + prompt when campaign is selected, close variant
   // changes, or operator name changes. The operator name is part of the
