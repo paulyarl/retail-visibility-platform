@@ -23,6 +23,8 @@ const OUTCOME_LABELS: Record<ContactOutcome, string> = {
   callback_scheduled: 'Callback Scheduled',
   other: 'Other',
   auto_follow_up_scheduled: 'Auto Follow-Up',
+  wrong_number: 'Wrong Number',
+  disconnected_number: 'Disconnected',
 };
 
 const OUTCOME_COLORS: Record<ContactOutcome, string> = {
@@ -34,6 +36,8 @@ const OUTCOME_COLORS: Record<ContactOutcome, string> = {
   callback_scheduled: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   other: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
   auto_follow_up_scheduled: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  wrong_number: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  disconnected_number: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
 };
 
 function channelIcon(channel: ContactChannel) {
