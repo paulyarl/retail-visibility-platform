@@ -102,16 +102,22 @@ export class PitchService extends BaseService {
       }
     }
 
-    // ── Validate review pairs ──
+    // ── Validate preview pairs ──
+    // The 3-slot preview generalizes beyond review responses — the wire
+    // format uses review_text (evidence) / response_text (fix), but the
+    // operator-visible content depends on the archetype (listing
+    // corrections, CTA fixes, product-visibility fixes, etc.). The
+    // validation messages use the generic "evidence"/"fix" terminology
+    // so they read correctly for every archetype.
     if (!input.reviewPairs || input.reviewPairs.length === 0) {
-      throw new Error('At least one review/response pair is required for the preview');
+      throw new Error('At least one preview pair is required for the preview');
     }
     for (const pair of input.reviewPairs) {
       if (!pair.review_text?.trim()) {
-        throw new Error('Every review pair must have review_text');
+        throw new Error('Every preview pair must have evidence text');
       }
       if (!pair.response_text?.trim()) {
-        throw new Error('Every review pair must have response_text');
+        throw new Error('Every preview pair must have fix text');
       }
     }
 

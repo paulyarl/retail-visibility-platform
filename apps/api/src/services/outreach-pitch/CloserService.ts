@@ -216,7 +216,7 @@ export class CloserService extends BaseService {
     });
 
     const closerText = result.content.trim();
-    const qualityGate = runCloserQualityGate(closerText);
+    const qualityGate = runCloserQualityGate(closerText, selection.archetype);
     const tokensUsed = result.usage?.totalTokens || 0;
     const costCents = this.estimateCostCents(tokensUsed);
 
@@ -271,7 +271,7 @@ export class CloserService extends BaseService {
       throw new Error('Closer text cannot be empty');
     }
 
-    const qualityGate = runCloserQualityGate(closerText);
+    const qualityGate = runCloserQualityGate(closerText, selection.archetype);
 
     const closer = await this.prisma.mkt_outreach_closers_list.create({
       data: {

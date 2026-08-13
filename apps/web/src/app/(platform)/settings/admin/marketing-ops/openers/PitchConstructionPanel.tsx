@@ -1195,7 +1195,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
             </button>
             {!canAssemble && (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                Select an opener and fill all 3 review/response pairs to assemble.
+                Select an opener and fill all 3 {slotConfig.evidenceLabel.toLowerCase()}/{slotConfig.fixLabel.toLowerCase()} pairs to assemble.
               </p>
             )}
             {assembleError && (

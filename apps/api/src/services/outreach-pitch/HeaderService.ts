@@ -194,7 +194,7 @@ export class HeaderService extends BaseService {
     });
 
     const headerText = result.content.trim();
-    const qualityGate = runHeaderQualityGate(headerText);
+    const qualityGate = runHeaderQualityGate(headerText, selection.archetype);
     const tokensUsed = result.usage?.totalTokens || 0;
     const costCents = this.estimateCostCents(tokensUsed);
 
@@ -243,7 +243,7 @@ export class HeaderService extends BaseService {
       throw new Error('Header text cannot be empty');
     }
 
-    const qualityGate = runHeaderQualityGate(headerText);
+    const qualityGate = runHeaderQualityGate(headerText, selection.archetype);
 
     const header = await this.prisma.mkt_outreach_headers_list.create({
       data: {
