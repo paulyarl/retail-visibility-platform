@@ -312,9 +312,41 @@ export class CloserService extends BaseService {
     const where: any = {};
     if (campaignId) where.campaign_id = campaignId;
     try {
-      return await this.prisma.mkt_outreach_closers_list.findMany({
+      const closers = await this.prisma.mkt_outreach_closers_list.findMany({
         where,
         orderBy: { executed_at: 'desc' },
+      });
+
+      // Re-evaluate the quality gate on read using the campaign's resolved
+      // archetype. The persisted `quality_gate_issues` column is a snapshot
+      // from creation time — if the gate logic has since changed (e.g. the
+      // archetype-aware itch keywords), the snapshot is stale. Re-evaluating
+      // on read auto-corrects the displayed status without a backfill script
+      // and without side effects on a GET endpoint.
+      //
+      // Group by campaign_id to resolve each campaign's archetype once,
+      // then re-run the gate for every closer in that campaign. If archetype
+      // resolution fails (no audit, triage not accepted, etc.), keep the
+      // persisted snapshot for that row.
+      const campaignIds = [...new Set(closers.map((c: any) => c.campaign_id))];
+      const archetypeCache = new Map<string, string | null>();
+      for (const cid of campaignIds) {
+        try {
+          const resolved = await resolveCampaignArchetype(cid, ctx);
+          archetypeCache.set(cid, resolved.archetype);
+        } catch {
+          archetypeCache.set(cid, null);
+        }
+      }
+      return closers.map((c: any) => {
+        const archetype = archetypeCache.get(c.campaign_id);
+        if (!archetype || !c.closer_text) return c;
+        const gate = runCloserQualityGate(c.closer_text, archetype);
+        return {
+          ...c,
+          quality_gate_passed: gate.passed,
+          quality_gate_issues: gate.issues,
+        };
       });
     } catch (error) {
       logger.error('Failed to list outreach closers', ctx, {

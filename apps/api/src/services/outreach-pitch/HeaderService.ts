@@ -276,9 +276,42 @@ export class HeaderService extends BaseService {
     const where: any = {};
     if (campaignId) where.campaign_id = campaignId;
     try {
-      return await this.prisma.mkt_outreach_headers_list.findMany({
+      const headers = await this.prisma.mkt_outreach_headers_list.findMany({
         where,
         orderBy: { executed_at: 'desc' },
+      });
+
+      // Re-evaluate the quality gate on read using the campaign's resolved
+      // archetype. The persisted `quality_gate_issues` column is a snapshot
+      // from creation time — if the gate logic has since changed (e.g. the
+      // archetype-aware signal reference + off-topic rejection for A6), the
+      // snapshot is stale. Re-evaluating on read auto-corrects the displayed
+      // status without a backfill script and without side effects on a GET
+      // endpoint.
+      //
+      // Group by campaign_id to resolve each campaign's archetype once,
+      // then re-run the gate for every header in that campaign. If archetype
+      // resolution fails (no audit, triage not accepted, etc.), keep the
+      // persisted snapshot for that row.
+      const campaignIds = [...new Set(headers.map((h: any) => h.campaign_id))];
+      const archetypeCache = new Map<string, string | null>();
+      for (const cid of campaignIds) {
+        try {
+          const resolved = await resolveCampaignArchetype(cid, ctx);
+          archetypeCache.set(cid, resolved.archetype);
+        } catch {
+          archetypeCache.set(cid, null);
+        }
+      }
+      return headers.map((h: any) => {
+        const archetype = archetypeCache.get(h.campaign_id);
+        if (!archetype || !h.header_text) return h;
+        const gate = runHeaderQualityGate(h.header_text, archetype);
+        return {
+          ...h,
+          quality_gate_passed: gate.passed,
+          quality_gate_issues: gate.issues,
+        };
       });
     } catch (error) {
       logger.error('Failed to list outreach headers', ctx, {
