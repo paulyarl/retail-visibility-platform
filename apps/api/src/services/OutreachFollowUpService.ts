@@ -129,7 +129,10 @@ export class OutreachFollowUpService extends BaseService {
     const opener = await this.prisma.mkt_outreach_openers_list.findFirst({
       where: {
         campaign_id: input.campaignId,
-        message_type: { not: 'follow_up' },
+        // Openers have message_type = NULL. `{ not: 'follow_up' }` alone
+        // excludes NULL rows (SQL three-valued logic), so the opener lookup
+        // would fail and block follow-up creation. Include NULL via OR.
+        OR: [{ message_type: null }, { message_type: { not: 'follow_up' } }],
       },
       orderBy: { executed_at: 'desc' },
     });

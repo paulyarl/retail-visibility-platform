@@ -396,25 +396,56 @@ export class OutreachOpenerService extends BaseService {
     const tokensUsed = result.usage?.totalTokens || 0;
     const costCents = this.estimateCostCents(tokensUsed);
 
-    const opener = await this.prisma.mkt_outreach_openers_list.create({
-      data: {
-        id: generateOutreachOpenerId(),
+    // One opener per campaign is enforced by a partial unique index
+    // (uq_mkt_outreach_openers_one_per_campaign WHERE message_type IS NULL).
+    // Update the existing opener in place if one already exists, so
+    // re-executing the AI opener doesn't 500 on the unique constraint.
+    const existing = await this.prisma.mkt_outreach_openers_list.findFirst({
+      where: {
         campaign_id: input.campaignId,
-        archetype: selection.archetype,
-        close_variant: closeVariant,
-        opener_text: openerText,
-        quality_gate_passed: qualityGate.passed,
-        quality_gate_issues: qualityGate.issues,
-        source: 'ai',
-        ai_provider: result.model.split('-')[0] || 'unknown',
-        ai_model: result.model,
-        tokens_used: tokensUsed,
-        cost_cents: costCents,
-        extracted_fields: extractedFields as any,
-        executed_by: input.executedBy || null,
-        operator_name: input.operatorName?.trim() || null,
+        OR: [{ message_type: null }, { message_type: { not: 'follow_up' } }],
       },
+      orderBy: { executed_at: 'desc' },
     });
+
+    const opener = existing
+      ? await this.prisma.mkt_outreach_openers_list.update({
+          where: { id: existing.id },
+          data: {
+            archetype: selection.archetype,
+            close_variant: closeVariant,
+            opener_text: openerText,
+            quality_gate_passed: qualityGate.passed,
+            quality_gate_issues: qualityGate.issues,
+            source: 'ai',
+            ai_provider: result.model.split('-')[0] || 'unknown',
+            ai_model: result.model,
+            tokens_used: tokensUsed,
+            cost_cents: costCents,
+            extracted_fields: extractedFields as any,
+            executed_by: input.executedBy || null,
+            operator_name: input.operatorName?.trim() || null,
+          },
+        })
+      : await this.prisma.mkt_outreach_openers_list.create({
+          data: {
+            id: generateOutreachOpenerId(),
+            campaign_id: input.campaignId,
+            archetype: selection.archetype,
+            close_variant: closeVariant,
+            opener_text: openerText,
+            quality_gate_passed: qualityGate.passed,
+            quality_gate_issues: qualityGate.issues,
+            source: 'ai',
+            ai_provider: result.model.split('-')[0] || 'unknown',
+            ai_model: result.model,
+            tokens_used: tokensUsed,
+            cost_cents: costCents,
+            extracted_fields: extractedFields as any,
+            executed_by: input.executedBy || null,
+            operator_name: input.operatorName?.trim() || null,
+          },
+        });
 
     logger.info('Outreach opener executed', ctx, {
       openerId: opener.id,
@@ -426,6 +457,7 @@ export class OutreachOpenerService extends BaseService {
       tokensUsed,
       costCents,
       model: result.model,
+      replaced: !!existing,
     });
 
     // Fire-and-forget: auto-complete checklist outreach steps
@@ -470,22 +502,52 @@ export class OutreachOpenerService extends BaseService {
 
     const qualityGate = runQualityGate(openerText);
 
-    const opener = await this.prisma.mkt_outreach_openers_list.create({
-      data: {
-        id: generateOutreachOpenerId(),
+    // One opener per campaign is enforced by a partial unique index
+    // (uq_mkt_outreach_openers_one_per_campaign WHERE message_type IS NULL).
+    // If an opener already exists for this campaign, update it in place
+    // instead of inserting — otherwise the operator hits a 500 unique
+    // constraint error when re-importing (e.g. because the previous import
+    // was invisible due to the listOpeners NULL-filter bug).
+    const existing = await this.prisma.mkt_outreach_openers_list.findFirst({
+      where: {
         campaign_id: input.campaignId,
-        archetype: selection.archetype,
-        close_variant: closeVariant,
-        opener_text: openerText,
-        quality_gate_passed: qualityGate.passed,
-        quality_gate_issues: qualityGate.issues,
-        source: 'external',
-        extracted_fields: extractedFields as any,
-        executed_by: input.executedBy || null,
-        operator_name: input.operatorName?.trim() || null,
-        hook_angle: input.hookAngle ?? null,
+        OR: [{ message_type: null }, { message_type: { not: 'follow_up' } }],
       },
+      orderBy: { executed_at: 'desc' },
     });
+
+    const opener = existing
+      ? await this.prisma.mkt_outreach_openers_list.update({
+          where: { id: existing.id },
+          data: {
+            archetype: selection.archetype,
+            close_variant: closeVariant,
+            opener_text: openerText,
+            quality_gate_passed: qualityGate.passed,
+            quality_gate_issues: qualityGate.issues,
+            source: 'external',
+            extracted_fields: extractedFields as any,
+            executed_by: input.executedBy || null,
+            operator_name: input.operatorName?.trim() || null,
+            hook_angle: input.hookAngle ?? null,
+          },
+        })
+      : await this.prisma.mkt_outreach_openers_list.create({
+          data: {
+            id: generateOutreachOpenerId(),
+            campaign_id: input.campaignId,
+            archetype: selection.archetype,
+            close_variant: closeVariant,
+            opener_text: openerText,
+            quality_gate_passed: qualityGate.passed,
+            quality_gate_issues: qualityGate.issues,
+            source: 'external',
+            extracted_fields: extractedFields as any,
+            executed_by: input.executedBy || null,
+            operator_name: input.operatorName?.trim() || null,
+            hook_angle: input.hookAngle ?? null,
+          },
+        });
 
     logger.info('Outreach opener imported', ctx, {
       openerId: opener.id,
@@ -494,6 +556,7 @@ export class OutreachOpenerService extends BaseService {
       closeVariant,
       qualityGatePassed: qualityGate.passed,
       issuesCount: qualityGate.issues.length,
+      replaced: !!existing,
     });
 
     // Fire-and-forget: auto-complete checklist outreach steps
@@ -534,7 +597,14 @@ export class OutreachOpenerService extends BaseService {
   // ====================
 
   async listOpeners(campaignId?: string, ctx?: RequestCtx): Promise<any[]> {
-    const where: any = { message_type: { not: 'follow_up' } };
+    // Openers have message_type = NULL; follow-ups have message_type = 'follow_up'.
+    // Prisma's `{ not: 'follow_up' }` compiles to `!= 'follow_up'`, which excludes
+    // NULL rows under SQL three-valued logic (NULL != 'follow_up' → NULL → row
+    // dropped). That made imported/AI openers invisible to this query, so the
+    // operator couldn't see the opener they just saved. The OR clause includes
+    // NULL openers, matching the migration's documented
+    // `message_type IS DISTINCT FROM 'follow_up'` filter.
+    const where: any = { OR: [{ message_type: null }, { message_type: { not: 'follow_up' } }] };
     if (campaignId) where.campaign_id = campaignId;
     try {
       return await this.prisma.mkt_outreach_openers_list.findMany({
@@ -609,7 +679,7 @@ export class OutreachOpenerService extends BaseService {
     try {
       // Fetch all openers with a close_variant set, newest first.
       const openers = await this.prisma.mkt_outreach_openers_list.findMany({
-        where: { close_variant: { not: null }, message_type: { not: 'follow_up' } },
+        where: { close_variant: { not: null }, OR: [{ message_type: null }, { message_type: { not: 'follow_up' } }] },
         orderBy: { executed_at: 'desc' },
         select: {
           id: true,
