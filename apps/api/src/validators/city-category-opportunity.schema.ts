@@ -229,14 +229,15 @@ const photoActivityCoerced = z.preprocess((val) => {
 /**
  * Tolerant coercion for nap_status.
  * Agents sometimes emit "material_inconsistencies" instead of "major_inconsistencies",
- * "minor_inconsistency" instead of "minor_variations", or "name_only_drift" instead
+ * "minor_inconsistency" instead of "minor_variations", "partial_match" when some but
+ * not all NAP fields agree (treated as minor_variations), or "name_only_drift" instead
  * of "name_drift".
  */
 const napStatusCoerced = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
     if (s === 'material_inconsistencies' || s === 'material_inconsistency' || s === 'significant_inconsistencies' || s === 'major_drift' || s === 'severe_inconsistencies') return 'major_inconsistencies';
-    if (s === 'minor_inconsistency' || s === 'minor_inconsistencies' || s === 'small_variations' || s === 'minor_drift' || s === 'slight_variations') return 'minor_variations';
+    if (s === 'minor_inconsistency' || s === 'minor_inconsistencies' || s === 'small_variations' || s === 'minor_drift' || s === 'slight_variations' || s === 'partial_match' || s === 'partial') return 'minor_variations';
     if (s === 'name_only_drift' || s === 'name_only' || s === 'name_mismatch' || s === 'name_inconsistency') return 'name_drift';
     if (s === 'unverified' || s === 'unknown' || s === 'not_verifiable') return 'unable_to_verify';
   }

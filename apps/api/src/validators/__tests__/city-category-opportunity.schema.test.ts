@@ -501,6 +501,30 @@ describe('cityCategoryOpportunitySchema — V2', () => {
       expect(result.data.sampled_businesses?.[1]?.google?.photo_activity).toBe('stale');
     }
   });
+
+  it('coerces sampled_businesses nap_status variants to canonical enum values', () => {
+    const variants: Array<[string, string]> = [
+      ['partial_match', 'minor_variations'],
+      ['partial', 'minor_variations'],
+      ['minor_inconsistency', 'minor_variations'],
+      ['material_inconsistencies', 'major_inconsistencies'],
+      ['name_only_drift', 'name_drift'],
+      ['unverified', 'unable_to_verify'],
+    ];
+    for (const [raw, expected] of variants) {
+      const input = {
+        ...validV2Output,
+        sampled_businesses: validV2Output.sampled_businesses.map((b: any, i: number) =>
+          i === 0 ? { ...b, nap_status: raw } : b,
+        ),
+      };
+      const result = cityCategoryOpportunitySchema.safeParse(input);
+      expect(result.success, `raw="${raw}" should coerce to "${expected}"`).toBe(true);
+      if (result.success) {
+        expect(result.data.sampled_businesses?.[0]?.nap_status).toBe(expected);
+      }
+    }
+  });
 });
 
 // ---- V3 (Emerging-Discovery variant) fixture ----
