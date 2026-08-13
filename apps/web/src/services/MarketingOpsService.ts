@@ -628,9 +628,34 @@ export interface ReviewResponseDraft {
   response_tokens_used: number;
 }
 
-export interface ReviewPair {
-  review_text: string;
-  response_text: string;
+// ── Structured footprint fields (A5 Multi-Signal Footprint, A3 Listing) ──
+// Mirror the backend pitch-renderer fields. When platform_name +
+// focus_attribute are present, the slot carries a structured
+// current_value → correct_value pair keyed by platform + profile URL +
+// a single focus attribute. The renderer formats these into a readable
+// before/after block; the footprint-diff endpoint exposes them for
+// completed-work reporting.
+export type FootprintFocusAttribute =
+  | 'name'
+  | 'address'
+  | 'phone'
+  | 'website'
+  | 'claim_status';
+
+export interface FootprintFields {
+  platform_name?: string;
+  profile_url?: string;
+  focus_attribute?: FootprintFocusAttribute;
+  current_value?: string;
+  correct_value?: string;
+  summary?: string;
+}
+
+export interface ReviewPair extends FootprintFields {
+  // Free-text evidence/fix. Required for non-footprint archetypes;
+  // optional when structured footprint fields are supplied instead.
+  review_text?: string;
+  response_text?: string;
   response_source: OpenerSource;
   response_ai_provider?: string | null;
   response_ai_model?: string | null;
@@ -646,6 +671,26 @@ export interface ReviewPair {
   slot_label_prefix?: string;
   section_title?: string;
   first_slot_label?: string;
+}
+
+// ── Footprint before/after diff (completed-work reporting) ──
+export interface FootprintDiffEntry {
+  slot: number;
+  slot_label: string | null;
+  platform_name: string;
+  profile_url: string | null;
+  focus_attribute: FootprintFocusAttribute;
+  focus_label: string;
+  current_value: string;
+  correct_value: string;
+  summary: string | null;
+}
+
+export interface FootprintDiff {
+  pitchId: string;
+  campaignId: string | null;
+  createdAt: string | null;
+  diffs: FootprintDiffEntry[];
 }
 
 export interface AssemblePitchInput {
@@ -3305,6 +3350,23 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get pitch');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // Footprint before/after diff — structured platform/profile/focus pairs
+  // from a persisted pitch. Used for completed-work reporting on A5/A3
+  // campaigns. Returns only the structured pairs (free-text-only pairs
+  // are omitted by the backend).
+  async getFootprintDiff(pitchId: string): Promise<FootprintDiff> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/pitches/${encodeURIComponent(pitchId)}/footprint-diff`,
+      { method: 'GET' },
+      `mkt-ops-pitch-footprint-${pitchId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get footprint diff');
     }
     return result.data?.data ?? result.data;
   }

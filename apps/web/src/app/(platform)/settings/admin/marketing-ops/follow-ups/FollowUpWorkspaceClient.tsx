@@ -269,7 +269,8 @@ export default function FollowUpWorkspaceClient() {
           <option value="">— Select a campaign —</option>
           {reviewCampaigns.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.business_name} · {c.city} · {c.stage}
+              {c.business_name ?? `${c.category} · ${c.city}`}
+              {c.archetype ? ` [${c.archetype}]` : ''} ({c.stage})
             </option>
           ))}
         </select>

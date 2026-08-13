@@ -40,6 +40,7 @@ import marketingOpsService, {
   OpenerArchetype,
   RankedHook,
   HookSuggestionResult,
+  FootprintFocusAttribute,
 } from '@/services/MarketingOpsService';
 
 interface PitchConstructionPanelProps {
@@ -221,6 +222,30 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A5: 'Multi-Signal Footprint',
   A6: 'Product Visibility Gap',
 };
+
+// ─── Structured footprint config (A5 + A3) ───────────────────────────
+// A5 (Multi-Signal Footprint) and A3 (Listing Inconsistency) present
+// each preview slot as a structured Current State → Proposed Fix pair
+// keyed by platform + profile URL + a single focus attribute (one of
+// NAP+W or Claim Status). The structured fields flow through to the
+// review_pairs JSON on the persisted pitch and are queryable via the
+// footprint-diff endpoint for before/after reporting on completed work.
+const FOOTPRINT_FOCUS_OPTIONS: { value: FootprintFocusAttribute; label: string }[] = [
+  { value: 'name', label: 'Name' },
+  { value: 'address', label: 'Address' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'website', label: 'Website' },
+  { value: 'claim_status', label: 'Claim Status' },
+];
+
+// Archetypes that render the structured footprint slot UI instead of the
+// generic two-textarea layout. A5 is the multi-signal footprint pitch;
+// A3 is listing inconsistency (same platform/profile/focus shape).
+const STRUCTURED_FOOTPRINT_ARCHETYPES: OpenerArchetype[] = ['A5', 'A3'];
+
+function usesStructuredFootprint(archetype: OpenerArchetype): boolean {
+  return STRUCTURED_FOOTPRINT_ARCHETYPES.includes(archetype);
+}
 
 interface StarterExamplesProps {
   examples: string[];
@@ -672,7 +697,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   // format (ReviewResponseDraft) is the same either way.
   const handleGenerateResponse = async (idx: number) => {
     const pair = reviewPairs[idx];
-    if (!pair.review_text.trim()) {
+    if (!pair.review_text?.trim()) {
       setPairError(`Slot ${idx + 1}: paste the ${slotConfig.evidenceLabel.toLowerCase()} first`);
       return;
     }
@@ -701,11 +726,11 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
 
   const handleImportResponse = async (idx: number) => {
     const pair = reviewPairs[idx];
-    if (!pair.review_text.trim()) {
+    if (!pair.review_text?.trim()) {
       setPairError(`Slot ${idx + 1}: paste the ${slotConfig.evidenceLabel.toLowerCase()} first`);
       return;
     }
-    if (!pair.response_text.trim()) {
+    if (!pair.response_text?.trim()) {
       setPairError(`Slot ${idx + 1}: paste the ${slotConfig.fixLabel.toLowerCase()} text first`);
       return;
     }
@@ -717,7 +742,21 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   };
 
   // ─── Assemble ───────────────────────────────────────────────────────
-  const canAssemble = !!selectedOpenerId && reviewPairs.every((p) => p.review_text.trim() && p.response_text.trim());
+  // A pair is "complete" when it has either free-text evidence+fix OR
+  // the structured footprint fields (platform_name + focus_attribute +
+  // current_value + correct_value). The structured path is used by A5
+  // and A3; other archetypes use the free-text path.
+  const structured = usesStructuredFootprint(effectiveArchetype);
+  const pairIsComplete = (p: ReviewPair): boolean => {
+    if (p.review_text?.trim() && p.response_text?.trim()) return true;
+    return !!(
+      p.platform_name?.trim() &&
+      p.focus_attribute &&
+      p.current_value?.trim() &&
+      p.correct_value?.trim()
+    );
+  };
+  const canAssemble = !!selectedOpenerId && reviewPairs.every(pairIsComplete);
 
   const handleAssemble = async () => {
     if (!canAssemble) return;
@@ -1011,44 +1050,159 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                       )}
                     </div>
                   </div>
-                  <textarea
-                    value={pair.review_text}
-                    onChange={(e) => updatePair(idx, 'review_text', e.target.value)}
-                    placeholder={slotConfig.evidencePlaceholder}
-                    rows={3}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
-                  />
-                  <textarea
-                    value={pair.response_text}
-                    onChange={(e) => updatePair(idx, 'response_text', e.target.value)}
-                    placeholder={slotConfig.fixPlaceholder}
-                    rows={3}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleGenerateResponse(idx)}
-                      disabled={pairLoading === idx || !pair.review_text.trim()}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {pairLoading === idx ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                      AI Draft
-                    </button>
-                    <button
-                      onClick={() => handleImportResponse(idx)}
-                      disabled={!pair.response_text.trim()}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-violet-600 rounded-md hover:bg-violet-700 disabled:opacity-50"
-                    >
-                      <Upload className="w-3 h-3" />
-                      Mark Imported
-                    </button>
-                    {pair.response_source === 'ai' && pair.response_ai_model && (
-                      <span className="text-xs text-gray-400">{pair.response_ai_model}</span>
-                    )}
-                    {pair.response_source === 'external' && (
-                      <span className="text-xs text-gray-400">imported</span>
-                    )}
-                  </div>
+                  {structured ? (
+                    // ── Structured footprint slot (A5 / A3) ──
+                    // Current State box: Platform name + Profile URL + the
+                    // inconsistent focus attribute. Proposed Fix box: same
+                    // platform + profile URL + the corrected focus attribute
+                    // + an optional one-line summary. The structured fields
+                    // flow through to review_pairs JSON and are queryable
+                    // via the footprint-diff endpoint for before/after
+                    // reporting on completed work.
+                    <div className="space-y-3">
+                      {/* Current state box */}
+                      <div className="rounded-md border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-900/10 p-3">
+                        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-2">
+                          Current State
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Platform name</span>
+                            <input
+                              type="text"
+                              value={pair.platform_name ?? ''}
+                              onChange={(e) => updatePair(idx, 'platform_name', e.target.value || undefined)}
+                              placeholder="e.g. Google, Yelp, Facebook"
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Profile URL</span>
+                            <input
+                              type="url"
+                              value={pair.profile_url ?? ''}
+                              onChange={(e) => updatePair(idx, 'profile_url', e.target.value || undefined)}
+                              placeholder="https://..."
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Focus Info</span>
+                            <select
+                              value={pair.focus_attribute ?? ''}
+                              onChange={(e) => updatePair(idx, 'focus_attribute', (e.target.value || undefined) as FootprintFocusAttribute | undefined)}
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="">— select —</option>
+                              {FOOTPRINT_FOCUS_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Inconsistent Info ({FOOTPRINT_FOCUS_OPTIONS.find((o) => o.value === pair.focus_attribute)?.label ?? 'focus'})</span>
+                            <input
+                              type="text"
+                              value={pair.current_value ?? ''}
+                              onChange={(e) => updatePair(idx, 'current_value', e.target.value || undefined)}
+                              placeholder="Value as it appears today"
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      {/* Proposed fix box */}
+                      <div className="rounded-md border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-900/10 p-3">
+                        <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">
+                          Proposed Fix
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Platform name</span>
+                            <input
+                              type="text"
+                              value={pair.platform_name ?? ''}
+                              onChange={(e) => updatePair(idx, 'platform_name', e.target.value || undefined)}
+                              placeholder="e.g. Google, Yelp, Facebook"
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Profile URL</span>
+                            <input
+                              type="url"
+                              value={pair.profile_url ?? ''}
+                              onChange={(e) => updatePair(idx, 'profile_url', e.target.value || undefined)}
+                              placeholder="https://..."
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Correct Info ({FOOTPRINT_FOCUS_OPTIONS.find((o) => o.value === pair.focus_attribute)?.label ?? 'focus'})</span>
+                            <input
+                              type="text"
+                              value={pair.correct_value ?? ''}
+                              onChange={(e) => updatePair(idx, 'correct_value', e.target.value || undefined)}
+                              placeholder="Corrected value to apply"
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                          <label className="block sm:col-span-2">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Summary (optional)</span>
+                            <input
+                              type="text"
+                              value={pair.summary ?? ''}
+                              onChange={(e) => updatePair(idx, 'summary', e.target.value || undefined)}
+                              placeholder="One-line summary of the fix"
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // ── Free-text slot (A1/A2/A4/A6) ──
+                    <>
+                      <textarea
+                        value={pair.review_text ?? ''}
+                        onChange={(e) => updatePair(idx, 'review_text', e.target.value)}
+                        placeholder={slotConfig.evidencePlaceholder}
+                        rows={3}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
+                      />
+                      <textarea
+                        value={pair.response_text ?? ''}
+                        onChange={(e) => updatePair(idx, 'response_text', e.target.value)}
+                        placeholder={slotConfig.fixPlaceholder}
+                        rows={3}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleGenerateResponse(idx)}
+                          disabled={pairLoading === idx || !pair.review_text?.trim()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {pairLoading === idx ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                          AI Draft
+                        </button>
+                        <button
+                          onClick={() => handleImportResponse(idx)}
+                          disabled={!pair.response_text?.trim()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-violet-600 rounded-md hover:bg-violet-700 disabled:opacity-50"
+                        >
+                          <Upload className="w-3 h-3" />
+                          Mark Imported
+                        </button>
+                        {pair.response_source === 'ai' && pair.response_ai_model && (
+                          <span className="text-xs text-gray-400">{pair.response_ai_model}</span>
+                        )}
+                        {pair.response_source === 'external' && (
+                          <span className="text-xs text-gray-400">imported</span>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
