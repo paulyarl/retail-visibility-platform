@@ -102,6 +102,11 @@ const STAGE_PIPELINE_ORDER: Record<string, number> = {
 // collide with DB-generated step IDs. They are not required and not
 // auto-completing — they're navigation shortcuts, not gates.
 //
+// Ordering: the permanent steps are injected AFTER the first DB step
+// (the "Review triage signals" step, stepOrder 1) so the workflow reads
+// naturally: Review → Pitch Construction → Call Script. Their stepOrder
+// values (2, 3) reflect this position.
+//
 // See: user request "Add a permanent step to the campaign checklist for
 // seek and preview_built stages to open Pitch Construction / Call Script
 // from the campaign context."
@@ -115,7 +120,7 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
   {
     id: PERMANENT_STEP_IDS.pitchConstruction,
     playbookId: '_permanent',
-    stepOrder: -2,
+    stepOrder: 2,
     title: 'Open Pitch Construction',
     instructions: 'Assemble the outreach pitch — header, opener, three-slot preview, closer, and contact section.',
     stepType: 'internal_link',
@@ -129,7 +134,7 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
   {
     id: PERMANENT_STEP_IDS.callScript,
     playbookId: '_permanent',
-    stepOrder: -1,
+    stepOrder: 3,
     title: 'Open Call Script',
     instructions: 'Use the five-stage cold-call workspace to place a phone outreach call.',
     stepType: 'internal_link',
@@ -608,10 +613,18 @@ export class PlaybookChecklistService extends BaseService {
       };
     });
 
-    // Inject permanent outreach-access steps at the top of the list for
-    // seek/preview_built campaigns.
+    // Inject permanent outreach-access steps AFTER the first DB step for
+    // seek/preview_built campaigns. The first DB step is the "Review
+    // triage signals" step (stepOrder 1), so the workflow reads:
+    // Review → Pitch Construction → Call Script.
     if (showPermanent) {
-      stepViews.unshift(...this.buildPermanentStepViews(campaignId, progressByStep));
+      const permanentViews = this.buildPermanentStepViews(campaignId, progressByStep);
+      if (stepViews.length === 0) {
+        stepViews.push(...permanentViews);
+      } else {
+        // Insert after the first DB step (the Review step).
+        stepViews.splice(1, 0, ...permanentViews);
+      }
     }
 
     // Enrich outreach + internal_link steps with bridge state.
