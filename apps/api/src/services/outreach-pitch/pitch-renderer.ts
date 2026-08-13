@@ -40,7 +40,31 @@
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
-export interface ReviewPair {
+// ── Structured footprint fields (A5 Multi-Signal Footprint, A3 Listing) ──
+// When present, the slot carries a structured "current state → proposed fix"
+// pair keyed by platform + profile URL + a single focus attribute (one of
+// NAP+W or Claim Status). The renderer formats these into a readable
+// before/after block instead of the free-text evidence/fix lines. Stored
+// in the review_pairs JSON column on mkt_outreach_pitches_list — queryable
+// via GET /openers/pitches/:id/footprint-diff for completed-work reporting.
+// Optional on every archetype; only A5/A3 surface them in the UI today.
+export type FootprintFocusAttribute =
+  | 'name'
+  | 'address'
+  | 'phone'
+  | 'website'
+  | 'claim_status';
+
+export interface FootprintFields {
+  platform_name?: string;        // e.g. "Google", "Yelp", "Facebook"
+  profile_url?: string;          // canonical profile URL on the platform
+  focus_attribute?: FootprintFocusAttribute; // which attribute is inconsistent
+  current_value?: string;        // the inconsistent info as it appears today
+  correct_value?: string;        // the corrected info to apply
+  summary?: string;              // optional one-line summary in the fix box
+}
+
+export interface ReviewPair extends FootprintFields {
   review_text: string;
   response_text: string;
   response_source: 'ai' | 'external';
@@ -83,6 +107,52 @@ export interface AssemblePitchInput {
 // ─── Renderer ────────────────────────────────────────────────────────────
 
 const SECTION_DIVIDER = '----------------------';
+
+// Human-readable labels for the structured footprint focus attributes.
+// Used by the renderer + the footprint-diff reporting endpoint so the
+// before/after report reads "Address" instead of "address".
+export const FOOTPRINT_FOCUS_LABELS: Record<FootprintFocusAttribute, string> = {
+  name: 'Name',
+  address: 'Address',
+  phone: 'Phone',
+  website: 'Website',
+  claim_status: 'Claim Status',
+};
+
+/**
+ * A pair is "structured" (carries the platform/profile/focus footprint
+ * fields) when it has at least a platform_name + focus_attribute. The
+ * free-text review_text/response_text may still be present as a fallback
+ * or operator note, but the structured fields drive the rendering when set.
+ */
+function isStructuredFootprint(pair: ReviewPair): boolean {
+  return !!(pair.platform_name && pair.focus_attribute);
+}
+
+/**
+ * Render a single structured footprint slot as a Current State → Proposed
+ * Fix block with platform name, profile URL, the focus attribute, the
+ * inconsistent value, the corrected value, and an optional summary line.
+ */
+function renderStructuredFootprintSlot(pair: ReviewPair, slotName: string, evidenceLabel: string, fixLabel: string): string[] {
+  const focusLabel = FOOTPRINT_FOCUS_LABELS[pair.focus_attribute!] ?? pair.focus_attribute;
+  const out: string[] = [];
+  out.push(slotName);
+  // ── Current state box ──
+  out.push(`${evidenceLabel}:`);
+  out.push(`Platform name: ${pair.platform_name}`);
+  if (pair.profile_url) out.push(`Profile URL: ${pair.profile_url}`);
+  out.push(`Inconsistent Info (${focusLabel}): ${pair.current_value ?? '(not specified)'}`);
+  // ── Proposed fix box ──
+  out.push(`${fixLabel}:`);
+  out.push(`Platform name: ${pair.platform_name}`);
+  if (pair.profile_url) out.push(`Profile URL: ${pair.profile_url}`);
+  out.push(`Correct Info (${focusLabel}): ${pair.correct_value ?? '(not specified)'}`);
+  if (pair.summary && pair.summary.trim()) {
+    out.push(`Summary: ${pair.summary.trim()}`);
+  }
+  return out;
+}
 
 /**
  * Render the full pitch text in the fixed format.
@@ -128,9 +198,13 @@ export function renderPitchText(input: PitchRenderInput): string {
   ordered.forEach((pair, idx) => {
     const slotNum = idx + 1;
     const slotName = pair.slot_label ? `${slotLabelPrefix} ${slotNum} — ${pair.slot_label}` : `${slotLabelPrefix} ${slotNum}`;
-    lines.push(slotName);
-    lines.push(`${evidenceLabel}: "${pair.review_text.trim()}"`);
-    lines.push(`${fixLabel}: "${pair.response_text.trim()}"`);
+    if (isStructuredFootprint(pair)) {
+      lines.push(...renderStructuredFootprintSlot(pair, slotName, evidenceLabel, fixLabel));
+    } else {
+      lines.push(slotName);
+      lines.push(`${evidenceLabel}: "${pair.review_text.trim()}"`);
+      lines.push(`${fixLabel}: "${pair.response_text.trim()}"`);
+    }
     if (idx < ordered.length - 1) {
       lines.push(SECTION_DIVIDER);
     }

@@ -21,7 +21,7 @@ import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { NotFoundError } from '../../middleware/errorHandler';
 import { generateOutreachPitchId } from '../../lib/id-generator';
-import { renderPitchText, type ReviewPair, type AssemblePitchInput } from './pitch-renderer';
+import { renderPitchText, type ReviewPair, type AssemblePitchInput, type FootprintFocusAttribute, FOOTPRINT_FOCUS_LABELS } from './pitch-renderer';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -109,15 +109,25 @@ export class PitchService extends BaseService {
     // corrections, CTA fixes, product-visibility fixes, etc.). The
     // validation messages use the generic "evidence"/"fix" terminology
     // so they read correctly for every archetype.
+    //
+    // Structured footprint pairs (A5/A3) carry platform_name +
+    // focus_attribute + current_value/correct_value instead of free-text
+    // review_text/response_text. A pair is valid when EITHER the free-text
+    // fields are filled OR the structured footprint fields are filled.
     if (!input.reviewPairs || input.reviewPairs.length === 0) {
       throw new Error('At least one preview pair is required for the preview');
     }
     for (const pair of input.reviewPairs) {
-      if (!pair.review_text?.trim()) {
-        throw new Error('Every preview pair must have evidence text');
-      }
-      if (!pair.response_text?.trim()) {
-        throw new Error('Every preview pair must have fix text');
+      const hasFreeText = pair.review_text?.trim() && pair.response_text?.trim();
+      const hasFootprint =
+        pair.platform_name?.trim() &&
+        pair.focus_attribute &&
+        pair.current_value?.trim() &&
+        pair.correct_value?.trim();
+      if (!hasFreeText && !hasFootprint) {
+        throw new Error(
+          'Every preview pair must have evidence+fix text or structured footprint fields (platform_name, focus_attribute, current_value, correct_value)',
+        );
       }
     }
 
@@ -202,6 +212,82 @@ export class PitchService extends BaseService {
       });
       throw this.handleError(error, ctx);
     }
+  }
+
+  // ====================
+  // FOOTPRINT DIFF (before/after reporting)
+  // ====================
+
+  /**
+   * Extract the structured footprint before/after pairs from a persisted
+   * pitch's review_pairs JSON. Used for completed-work reporting — the
+   * "before" is the current_value captured at pitch assembly time, the
+   * "after" is the correct_value the operator proposed. Only pairs that
+   * carry structured footprint fields (platform_name + focus_attribute)
+   * are included; free-text-only pairs are skipped.
+   *
+   * Returns a stable, serializable DTO (no Prisma models) so it can feed
+   * a customer-facing before/after report directly.
+   */
+  async getFootprintDiff(pitchId: string, ctx?: RequestCtx): Promise<{
+    pitchId: string;
+    campaignId: string | null;
+    createdAt: Date | null;
+    diffs: Array<{
+      slot: number;
+      slot_label: string | null;
+      platform_name: string;
+      profile_url: string | null;
+      focus_attribute: FootprintFocusAttribute;
+      focus_label: string;
+      current_value: string;
+      correct_value: string;
+      summary: string | null;
+    }>;
+  } | null> {
+    const pitch = await this.getPitch(pitchId, ctx);
+    if (!pitch) return null;
+
+    const pairs = (pitch.review_pairs as ReviewPair[] | null) ?? [];
+    const diffs: Array<{
+      slot: number;
+      slot_label: string | null;
+      platform_name: string;
+      profile_url: string | null;
+      focus_attribute: FootprintFocusAttribute;
+      focus_label: string;
+      current_value: string;
+      correct_value: string;
+      summary: string | null;
+    }> = [];
+
+    // Preserve the negative-first ordering the renderer uses so the
+    // report reads in the same order the prospect saw.
+    const negativeFirst = pairs.find((p) => p.is_negative_first);
+    const rest = pairs.filter((p) => !p.is_negative_first);
+    const ordered = negativeFirst ? [negativeFirst, ...rest] : pairs;
+
+    ordered.forEach((pair, idx) => {
+      if (!pair.platform_name || !pair.focus_attribute) return;
+      diffs.push({
+        slot: idx + 1,
+        slot_label: pair.slot_label ?? null,
+        platform_name: pair.platform_name,
+        profile_url: pair.profile_url ?? null,
+        focus_attribute: pair.focus_attribute,
+        focus_label: FOOTPRINT_FOCUS_LABELS[pair.focus_attribute] ?? pair.focus_attribute,
+        current_value: pair.current_value ?? '',
+        correct_value: pair.correct_value ?? '',
+        summary: pair.summary ?? null,
+      });
+    });
+
+    return {
+      pitchId: pitch.id,
+      campaignId: pitch.campaign_id,
+      createdAt: pitch.created_at,
+      diffs,
+    };
   }
 }
 

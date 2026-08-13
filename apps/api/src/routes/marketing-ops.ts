@@ -3116,8 +3116,10 @@ const pitchAssembleSchema = z.object({
   contact_id: z.string().nullable().optional(),
   review_pairs: z.array(
     z.object({
-      review_text: z.string().min(1),
-      response_text: z.string().min(1),
+      // Free-text evidence/fix (required for non-footprint archetypes;
+      // optional when structured footprint fields are supplied instead).
+      review_text: z.string().optional(),
+      response_text: z.string().optional(),
       response_source: z.enum(['ai', 'external']),
       response_ai_provider: z.string().nullable().optional(),
       response_ai_model: z.string().nullable().optional(),
@@ -3133,6 +3135,18 @@ const pitchAssembleSchema = z.object({
       slot_label_prefix: z.string().optional(),
       section_title: z.string().optional(),
       first_slot_label: z.string().optional(),
+      // ── Structured footprint fields (A5 Multi-Signal, A3 Listing) ──
+      // When platform_name + focus_attribute are present, the renderer
+      // emits a structured Current State → Proposed Fix block and the
+      // free-text review_text/response_text are ignored. Stored in the
+      // review_pairs JSON column; queryable via the footprint-diff
+      // endpoint for before/after reporting on completed work.
+      platform_name: z.string().optional(),
+      profile_url: z.string().optional(),
+      focus_attribute: z.enum(['name', 'address', 'phone', 'website', 'claim_status']).optional(),
+      current_value: z.string().optional(),
+      correct_value: z.string().optional(),
+      summary: z.string().optional(),
     }),
   ).min(1),
 });
@@ -3180,6 +3194,23 @@ router.get('/openers/pitches/:id', async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Pitch not found' });
     }
     res.json({ success: true, data: pitch });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Footprint before/after diff — structured platform/profile/focus pairs
+// from a persisted pitch's review_pairs JSON. Used for completed-work
+// reporting (A5 Multi-Signal Footprint, A3 Listing Inconsistency). Returns
+// only the pairs that carry structured footprint fields; free-text-only
+// pairs are omitted.
+router.get('/openers/pitches/:id/footprint-diff', async (req: any, res: Response) => {
+  try {
+    const diff = await PitchService.getFootprintDiff(req.params.id, getCtx(req));
+    if (!diff) {
+      return res.status(404).json({ success: false, error: 'Pitch not found' });
+    }
+    res.json({ success: true, data: diff });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
