@@ -104,15 +104,23 @@ const STAGE_PIPELINE_ORDER: Record<string, number> = {
 //
 // Ordering: the permanent steps are injected AFTER the first DB step
 // (the "Review triage signals" step, stepOrder 1) so the workflow reads
-// naturally: Review → Pitch Construction → Call Script. Their stepOrder
-// values (2, 3) reflect this position.
+// naturally: Review → Pitch Construction → Preview Deliverable / Approach
+// Kit → Call Script. Their stepOrder values (2, 3, 4) reflect this position.
+//
+// Dependency note: Pitch Construction gathers the data for the three preview
+// slots; the Preview Deliverable / Approach Kit step is where those slot
+// contents are presented as the deliverable — the Diagnostic Gallery tab on
+// the campaign page, where screenshots are uploaded after capture and
+// annotation. It is the natural next step from the Pitch Construction tab.
 //
 // See: user request "Add a permanent step to the campaign checklist for
 // seek and preview_built stages to open Pitch Construction / Call Script
-// from the campaign context."
+// from the campaign context." Extended to include the Preview Deliverable /
+// Approach Kit step that depends on Pitch Construction output.
 
 const PERMANENT_STEP_IDS = {
   pitchConstruction: '_permanent_pitch_construction',
+  previewDeliverable: '_permanent_preview_deliverable',
   callScript: '_permanent_call_script',
 } as const;
 
@@ -132,9 +140,23 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
     updatedAt: new Date(0),
   },
   {
-    id: PERMANENT_STEP_IDS.callScript,
+    id: PERMANENT_STEP_IDS.previewDeliverable,
     playbookId: '_permanent',
     stepOrder: 3,
+    title: 'Open Preview Deliverable / Approach Kit',
+    instructions: 'Depends on Pitch Construction — it gathers the data for the preview slots. This tab surfaces the assembled pitch as a copy/paste surface; copy it, capture and annotate screenshots of the preview slots, then upload them to the Diagnostic Gallery (the Next Steps destination on the tab) to present the slot contents as the deliverable (the approach kit).',
+    stepType: 'internal_link',
+    actionConfig: { target: 'openers_workspace', params: { tab: 'preview' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.callScript,
+    playbookId: '_permanent',
+    stepOrder: 4,
     title: 'Open Call Script',
     instructions: 'Use the five-stage cold-call workspace to place a phone outreach call.',
     stepType: 'internal_link',
@@ -153,6 +175,7 @@ const PERMANENT_STEP_STAGES = new Set(['seek', 'preview_built']);
 /** Check if a step ID is a permanent (code-defined) step. */
 function isPermanentStepId(stepId: string): boolean {
   return stepId === PERMANENT_STEP_IDS.pitchConstruction
+    || stepId === PERMANENT_STEP_IDS.previewDeliverable
     || stepId === PERMANENT_STEP_IDS.callScript;
 }
 
@@ -584,6 +607,10 @@ export class PlaybookChecklistService extends BaseService {
         return { playbook: null, steps: [], completedCount: 0, requiredTotal: 0, requiredCompleted: 0 };
       }
       const permanentViews = this.buildPermanentStepViews(campaignId);
+      // Renumber to reflect display order (permanent templates carry
+      // stepOrder 2,3,4 from their post-Review position; standalone they
+      // should read 1,2,3).
+      permanentViews.forEach((s, i) => { s.stepOrder = i + 1; });
       return {
         playbook: null,
         steps: permanentViews,
@@ -616,7 +643,7 @@ export class PlaybookChecklistService extends BaseService {
     // Inject permanent outreach-access steps AFTER the first DB step for
     // seek/preview_built campaigns. The first DB step is the "Review
     // triage signals" step (stepOrder 1), so the workflow reads:
-    // Review → Pitch Construction → Call Script.
+    // Review → Pitch Construction → Preview Deliverable / Approach Kit → Call Script.
     if (showPermanent) {
       const permanentViews = this.buildPermanentStepViews(campaignId, progressByStep);
       if (stepViews.length === 0) {
@@ -626,6 +653,13 @@ export class PlaybookChecklistService extends BaseService {
         stepViews.splice(1, 0, ...permanentViews);
       }
     }
+
+    // Renumber stepOrder to reflect the merged display order. DB steps
+    // and permanent steps carry independent order values that collide
+    // after the splice (e.g. permanent 2,3,4 vs DB 2,3 → 1,2,3,4,2,3).
+    // The array is already in the correct sequence; this just fixes the
+    // displayed numbering so it reads 1..N.
+    stepViews.forEach((s, i) => { s.stepOrder = i + 1; });
 
     // Enrich outreach + internal_link steps with bridge state.
     // Lazy import to avoid circular dependency (bridge imports checklist

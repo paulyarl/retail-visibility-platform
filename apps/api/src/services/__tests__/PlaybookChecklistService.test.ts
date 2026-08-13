@@ -381,12 +381,31 @@ describe('PlaybookChecklistService — step CRUD', () => {
 describe('PlaybookChecklistService — campaign checklist resolution', () => {
   describe('getCampaignChecklist', () => {
     it('returns empty view when no triage result exists', async () => {
+      // Default mock campaign stage is 'seek', so permanent outreach-access
+      // steps are injected even without a playbook. Use a non-permanent
+      // stage to get the truly empty view.
       mockTriage.findUnique.mockResolvedValue(null);
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'paid' });
 
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
       expect(result.playbook).toBeNull();
       expect(result.steps).toEqual([]);
+      expect(result.requiredTotal).toBe(0);
+    });
+
+    it('returns permanent steps when no triage result but campaign is in seek stage', async () => {
+      mockTriage.findUnique.mockResolvedValue(null);
+      // Default mock campaign stage is 'seek' (set in beforeEach)
+
+      const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+      expect(result.playbook).toBeNull();
+      expect(result.steps).toHaveLength(3);
+      expect(result.steps[0].title).toBe('Open Pitch Construction');
+      expect(result.steps[1].title).toBe('Open Preview Deliverable / Approach Kit');
+      expect(result.steps[2].title).toBe('Open Call Script');
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3]);
       expect(result.requiredTotal).toBe(0);
     });
 
@@ -413,7 +432,13 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
       expect(result.playbook).toMatchObject({ id: PLAYBOOK_ID, isOverride: false });
-      expect(result.steps).toHaveLength(2);
+      // 2 DB steps + 3 permanent steps injected after the first DB step
+      // (seek stage). Display order: Review(1), Pitch(2), Preview(3), Call(4), step2(5).
+      expect(result.steps).toHaveLength(5);
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5]);
+      expect(result.steps[1].title).toBe('Open Pitch Construction');
+      expect(result.steps[2].title).toBe('Open Preview Deliverable / Approach Kit');
+      expect(result.steps[3].title).toBe('Open Call Script');
       expect(result.completedCount).toBe(1);
       expect(result.requiredTotal).toBe(1);
       expect(result.requiredCompleted).toBe(1);

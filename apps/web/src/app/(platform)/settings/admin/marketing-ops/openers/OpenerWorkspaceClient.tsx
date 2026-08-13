@@ -14,6 +14,7 @@ import marketingOpsService, {
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import LogContactModal from '@/components/marketing-ops/LogContactModal';
 import PitchConstructionPanel from './PitchConstructionPanel';
+import PreviewDeliverablePanel from './PreviewDeliverablePanel';
 import CallScriptPanel from './CallScriptPanel';
 
 const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
@@ -50,12 +51,16 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
 
   // Active workspace tab. "opener" is the legacy generate/import workspace;
   // "pitch" is the pitch construction assembly UI (header + opener + 3-slot
-  // preview + closer + contact → assembled pitch). The tab bar only renders
-  // once a campaign is selected. Switching tabs preserves all in-memory
-  // state (resolution, openers, draft pitch) so the operator can assemble
-  // on the pitch tab, then flip back to the opener tab to execute or import
-  // a fresh opener without losing the assembled pitch.
-  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'call'>('opener');
+  // preview + closer + contact → assembled pitch). "preview" is the Preview
+  // Deliverable / Approach Kit tab — surfaces the assembled pitch as a
+  // copy/paste surface for producing the deliverable (screenshots uploaded
+  // to the Diagnostic Gallery). The tab bar only renders once a campaign is
+  // selected. Switching tabs preserves all in-memory state (resolution,
+  // openers, draft pitch) so the operator can assemble on the pitch tab,
+  // then flip to the preview tab to copy the assembled output, then flip
+  // back to the opener tab to execute or import a fresh opener without
+  // losing the assembled pitch.
+  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'preview' | 'call'>('opener');
 
   const [resolution, setResolution] = useState<OpenerResolution | null>(null);
   const [resolving, setResolving] = useState(false);
@@ -214,7 +219,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
       const found = campaigns.find((c) => c.id === initialCampaignId);
       if (found) {
         setSelectedCampaignId(initialCampaignId);
-        if (initialTab === 'pitch' || initialTab === 'call') {
+        if (initialTab === 'pitch' || initialTab === 'preview' || initialTab === 'call') {
           setActiveTab(initialTab);
         }
       }
@@ -382,6 +387,17 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
             }`}
           >
             Pitch Construction
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('preview')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'preview'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            Preview Deliverable
           </button>
           <button
             type="button"
@@ -741,6 +757,15 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
           openers={openers}
           archetype={resolution?.selection.archetype}
         />
+      )}
+
+      {/* Preview Deliverable tab — surfaces the assembled pitch as a
+          copy/paste surface for producing the deliverable (screenshots
+          uploaded to the Diagnostic Gallery). Depends on Pitch Construction
+          having assembled a pitch. Next Steps destination: Diagnostic Gallery
+          tab on the campaign page. */}
+      {selectedCampaignId && activeTab === 'preview' && (
+        <PreviewDeliverablePanel campaignId={selectedCampaignId} />
       )}
 
       {/* Call Script tab — five-stage cold-call script (Verify → Hook →
