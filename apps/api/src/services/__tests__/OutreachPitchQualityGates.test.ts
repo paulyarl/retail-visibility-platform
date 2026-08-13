@@ -261,6 +261,28 @@ describe('runHeaderQualityGate — archetype-aware signal reference', () => {
     expect(result.passed).toBe(false);
     expect(result.issues.some((i) => i.includes('Exclamation'))).toBe(true);
   });
+
+  it('accepts the "Preview - " prefix convention (title case, not all-caps)', () => {
+    // The header starters use "Preview - " as a prefix label. Title case
+    // passes the all-caps spam trigger; the legacy "PREVIEW - " form tripped
+    // \b[A-Z]{4,}\b. This test guards against regressing back to all-caps.
+    const result = runHeaderQualityGate(
+      'Preview - your listings across Google, Yelp, and Facebook',
+      'A3',
+    );
+    expect(result.passed).toBe(true);
+  });
+
+  it('rejects the all-caps "PREVIEW - " prefix (spam trigger)', () => {
+    // Regression guard: the all-caps form must still be rejected by the
+    // spam trigger so we don't accidentally revert the starter convention.
+    const result = runHeaderQualityGate(
+      'PREVIEW - your listings across Google, Yelp, and Facebook',
+      'A3',
+    );
+    expect(result.passed).toBe(false);
+    expect(result.issues.some((i) => i.includes('all-caps'))).toBe(true);
+  });
 });
 
 describe('runHeaderQualityGate — backward compatibility (no archetype)', () => {

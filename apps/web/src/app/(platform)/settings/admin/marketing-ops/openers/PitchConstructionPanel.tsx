@@ -67,7 +67,7 @@ interface PitchConstructionPanelProps {
 const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
   // A1 — Review Response Gap
   A1: [
-    'PREVIEW - {{shown}} of your {{total}} completed review responses',
+    'Preview - {{shown}} of your {{total}} completed review responses',
     '{{business}} — your unanswered Google reviews',
     '{{business}} — three reviews need responses',
     'Quick note about {{business}}\'s reviews',
@@ -75,7 +75,7 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
   ],
   // A2 — Negative Review Recovery (theme-led)
   A2: [
-    'PREVIEW - responses to the {{theme}} reviews on {{business}}',
+    'Preview - responses to the {{theme}} reviews on {{business}}',
     '{{business}} — your {{theme}} reviews are going unanswered',
     '{{business}} — three negative reviews, one pattern',
     'Quick note about the {{theme}} complaints on {{business}}',
@@ -83,18 +83,18 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
   ],
   // A3 — Listing Inconsistency (NAP drift)
   A3: [
-    'PREVIEW - your listings across Google, Yelp, and Facebook',
+    'Preview - your listings across Google, Yelp, and Facebook',
     '{{business}} — your address is different on Yelp',
     '{{business}} — customers are being sent to the wrong location',
     'Quick note about {{business}}\'s listings',
     '{{business}} — your phone number doesn\'t match across directories',
     '{{business}} — your profiles are unclaimed on {{remaining}} directories',
     '{{business}} — listings you don\'t control are live right now',
-    'PREVIEW - your unclaimed listings across {{remaining}} platforms',
+    'Preview - your unclaimed listings across {{remaining}} platforms',
   ],
   // A4 — Conversion / CTA Gap (website)
   A4: [
-    'PREVIEW - your website, with one fix suggested',
+    'Preview - your website, with one fix suggested',
     '{{business}} — your website has no booking button',
     '{{business}} — visitors can\'t book online',
     'Quick note about {{business}}\'s website',
@@ -102,17 +102,17 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
   ],
   // A5 — Multi-Signal Footprint (combined)
   A5: [
-    'PREVIEW - your listings and your reviews',
+    'Preview - your listings and your reviews',
     '{{business}} — wrong directions and unanswered reviews',
     '{{business}} — two gaps I found in your footprint',
     'Quick note about {{business}}\'s online presence',
     '{{business}} — listings + reviews, both need work',
     '{{business}} — unclaimed listings and unanswered reviews',
-    'PREVIEW - your unclaimed profiles and review gaps',
+    'Preview - your unclaimed profiles and review gaps',
   ],
   // A6 — Product Visibility Gap (discoverability)
   A6: [
-    'PREVIEW - what your store looks like online',
+    'Preview - what your store looks like online',
     '{{business}} — customers can\'t see what you carry',
     '{{business}} — your Google photos don\'t show the store',
     'Quick note about {{business}}\'s online presence',
