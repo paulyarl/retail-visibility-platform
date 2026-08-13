@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
@@ -30,6 +30,13 @@ import SiblingsTab from './SiblingsTab';
 import OutreachIntelligenceTab from './OutreachIntelligenceTab';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
+
+// Valid tab keys for deep-link validation (e.g. ?tab=checklist from the
+// openers workspace Next Steps). Invalid values fall back to 'overview'.
+const PIPELINE_TABS: readonly string[] = [
+  'overview', 'audits', 'files', 'deliverables', 'prompts', 'checklist',
+  'outreach-prep', 'history', 'lineage', 'cascade', 'gallery', 'siblings',
+] as const;
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -69,12 +76,28 @@ const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   city_analysis: 'City Analysis',
 };
 
-export default function CampaignDetailClient({ campaignId }: { campaignId: string }) {
+export default function CampaignDetailClient({
+  campaignId,
+  initialTab,
+  focusStage,
+}: {
+  campaignId: string;
+  // Optional deep-link target tab (e.g. "checklist" from the openers
+  // workspace Next Steps). Validated against the Tab union; invalid values
+  // fall back to 'overview'.
+  initialTab?: string;
+  // Optional pipeline stage to focus on mount (e.g. "preview_built" from
+  // the openers workspace Next Steps). Scrolls the pipeline bar into view
+  // and briefly highlights the matching stage button so the operator sees
+  // exactly which action to take next.
+  focusStage?: string;
+}) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const staffUsers = useStaffUsers();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const validInitialTab = (initialTab && (PIPELINE_TABS as readonly string[]).includes(initialTab) ? initialTab : 'overview') as Tab;
+  const [activeTab, setActiveTab] = useState<Tab>(validInitialTab);
   const [transitioning, setTransitioning] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [deliverableTemplates, setDeliverableTemplates] = useState<DeliverableTemplate[]>([]);
@@ -96,6 +119,11 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   } | null>(null);
   const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
+  // Ref to the stage pipeline bar — used by the focusStage deep-link
+  // (e.g. ?focus=preview_built from the openers workspace) to scroll the
+  // pipeline into view and briefly highlight the target stage button.
+  const pipelineRef = useRef<HTMLDivElement | null>(null);
+  const [focusedStage, setFocusedStage] = useState<CampaignStage | null>(null);
   // Sprint 5: latest city_analysis execution for SyncReportCard
   const [cityScanExecutionId, setCityScanExecutionId] = useState<string | null>(null);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
@@ -127,6 +155,24 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   useEffect(() => {
     fetchCampaign();
   }, [fetchCampaign]);
+
+  // Focus-stage deep-link (e.g. ?focus=preview_built from the openers
+  // workspace Next Steps). Once the campaign is loaded, scroll the pipeline
+  // bar into view and briefly highlight the target stage button so the
+  // operator sees exactly which action to take next. The highlight clears
+  // after 4s or on the first stage transition.
+  useEffect(() => {
+    if (!campaign || !focusStage) return;
+    const validStages = PIPELINE_STAGES as readonly string[];
+    if (!validStages.includes(focusStage)) return;
+    setFocusedStage(focusStage as CampaignStage);
+    // Scroll after the next paint so the pipeline bar is rendered.
+    const t = setTimeout(() => {
+      pipelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+    const clear = setTimeout(() => setFocusedStage(null), 4000);
+    return () => { clearTimeout(t); clearTimeout(clear); };
+  }, [campaign, focusStage]);
 
   // Sprint 5: for city-scope campaigns, find the latest execution with a
   // sync_report so the SyncReportCard can render it.
@@ -318,27 +364,37 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const formatCurrency = (cents: number | null) => cents != null ? `$${(cents / 100).toLocaleString()}` : '—';
   const formatDate = (date: string | null) => date ? new Date(date).toLocaleDateString() : '—';
 
+  // Tab order follows the operator workflow momentum:
+  //   1. Overview — campaign snapshot
+  //   2. Checklist — executive workflow driver that sequences all other actions
+  //   3. Prompts → 4. Audits → 5. Outreach Prep → 6. Diagnostic Gallery —
+  //      the active workflow run (prompt the work, audit the campaign, prep
+  //      outreach, prepare the gallery)
+  //   7. Cascade (review-pipeline only) — pipeline detail, grouped with the
+  //      workflow section
+  //   8. Stage History → 9. Derived Campaigns → 10. Siblings → 11. Files →
+  //      12. Deliverables — campaign info / artifacts
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'overview', label: 'Overview' },
-    { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
-    { key: 'files', label: 'Files', count: campaign?.files?.length },
-    { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
-    { key: 'prompts', label: 'Prompts' },
     { key: 'checklist', label: 'Checklist' },
+    { key: 'prompts', label: 'Prompts' },
+    { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
     // Outreach Prep — business-scope campaigns only (Sprint 1).
     ...((campaign?.scope === 'business') ? [{ key: 'outreach-prep' as Tab, label: 'Outreach Prep' }] : []),
-    { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
-    { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
-    // Cascade tab is review-pipeline only (Track A yes, Track B no).
-    // Recovery-pipeline campaigns use RecoveryCascadeService instead.
-    ...((campaign as any)?.pipeline === 'review' ? [{ key: 'cascade' as Tab, label: 'Cascade' }] : []),
     // Gallery tab — diagnostic gallery (screenshots + token + analytics).
     // Visible for all campaigns (operator can upload screenshots at preview_built+).
     { key: 'gallery', label: 'Diagnostic Gallery' },
+    // Cascade tab is review-pipeline only (Track A yes, Track B no).
+    // Recovery-pipeline campaigns use RecoveryCascadeService instead.
+    ...((campaign as any)?.pipeline === 'review' ? [{ key: 'cascade' as Tab, label: 'Cascade' }] : []),
+    { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
+    { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
     // Siblings tab — multi-archetype sibling campaigns (Sprint 3).
     // Visible for all campaigns (shows siblings if they exist, or a hint
     // about creating them via triage alternatives).
     { key: 'siblings', label: 'Siblings' },
+    { key: 'files', label: 'Files', count: campaign?.files?.length },
+    { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
   ];
 
   return (
@@ -587,7 +643,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
             )}
 
             {/* Stage Pipeline */}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 mb-6">
+            <div ref={pipelineRef} className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 mb-6 scroll-mt-4">
               <div className="flex items-center gap-1 overflow-x-auto">
                 {PIPELINE_STAGES.map((stage, idx) => {
                   const currentIdx = PIPELINE_STAGES.indexOf(campaign.stage);
@@ -598,6 +654,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     && campaign.stage === 'seek'
                     && contactReadiness != null
                     && !contactReadiness.complete;
+                  // Focus-stage highlight (from ?focus=preview_built deep-link).
+                  // Adds a pulsing ring so the operator sees which button to click.
+                  const isFocused = focusedStage === stage;
                   return (
                     <div key={stage} className="flex items-center flex-shrink-0">
                       <button
@@ -609,7 +668,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                             : isPast
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 cursor-pointer hover:bg-blue-200'
                             : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-neutral-600'
-                        }`}
+                        } ${isFocused ? 'ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-neutral-800 animate-pulse' : ''}`}
                       >
                         {STAGE_LABELS[stage]}
                         {showReadinessDot && (

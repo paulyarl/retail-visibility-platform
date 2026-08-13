@@ -28,7 +28,12 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  ExternalLink,
+  ArrowRight,
+  ListChecks,
+  Rocket,
 } from 'lucide-react';
+import Link from 'next/link';
 import marketingOpsService, {
   OutreachOpener,
   OutreachHeader,
@@ -1418,6 +1423,48 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
               </div>
             </section>
           )}
+
+          {/* ─── Next Steps ────────────────────────────────────────────
+              Workflow-momentum navigation. After assembling & saving a
+              pitch, the operator continues the campaign workflow by either
+              advancing the pipeline to "Preview Built" or checking off
+              outreach steps on the campaign Checklist. Both deep-links land
+              on the campaign detail page — the Checklist link opens the
+              Checklist tab directly; the Preview Built link scrolls to the
+              pipeline bar and highlights the preview_built button. */}
+          <section className="border-t border-gray-100 dark:border-neutral-700 pt-4">
+            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+              Next Steps
+            </h3>
+            <div className="space-y-2">
+              <Link
+                href={`/settings/admin/marketing-ops/campaigns/${campaignId}?focus=preview_built`}
+                className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-neutral-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700"
+              >
+                <span className="flex items-center gap-2"><Rocket className="w-4 h-4" /> Advance to Preview Built</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href={`/settings/admin/marketing-ops/campaigns/${campaignId}?tab=checklist`}
+                className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-neutral-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700"
+              >
+                <span className="flex items-center gap-2"><ListChecks className="w-4 h-4" /> Go to Checklist</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href={`/settings/admin/marketing-ops/campaigns/${campaignId}`}
+                className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-neutral-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700"
+              >
+                <span className="flex items-center gap-2"><ExternalLink className="w-4 h-4" /> Go to campaign</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            {pitches.length > 0 && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {pitches.length} pitch{pitches.length !== 1 ? 'es' : ''} assembled for this campaign.
+              </p>
+            )}
+          </section>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
+import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, ArrowRight, ListChecks, Rocket } from 'lucide-react';
+import Link from 'next/link';
 import { marketingOpsService, type AssembledCallScript, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
 
 interface DeadNumberLog {
@@ -429,6 +430,38 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
         >
           Log call outcome
         </button>
+      </div>
+
+      {/* Next Steps — workflow-momentum navigation after logging the call.
+          Mirrors the Pitch Construction tab's Next Steps so the operator
+          can advance the pipeline to "Preview Built" or jump to the
+          campaign Checklist to check off outreach steps without losing
+          context. */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Next Steps</h3>
+        <div className="space-y-2">
+          <Link
+            href={`/settings/admin/marketing-ops/campaigns/${campaignId}?focus=preview_built`}
+            className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-neutral-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700"
+          >
+            <span className="flex items-center gap-2"><Rocket className="w-4 h-4" /> Advance to Preview Built</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href={`/settings/admin/marketing-ops/campaigns/${campaignId}?tab=checklist`}
+            className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-neutral-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700"
+          >
+            <span className="flex items-center gap-2"><ListChecks className="w-4 h-4" /> Go to Checklist</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href={`/settings/admin/marketing-ops/campaigns/${campaignId}`}
+            className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-neutral-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700"
+          >
+            <span className="flex items-center gap-2"><ExternalLink className="w-4 h-4" /> Go to campaign</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
     </div>
   );

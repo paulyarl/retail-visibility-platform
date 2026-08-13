@@ -1,8 +1,15 @@
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import CampaignDetailClient from './CampaignDetailClient';
 
-export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CampaignDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string; focus?: string }>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
   return (
     <MarketingOpsPageShell
       title="Campaign Details"
@@ -14,7 +21,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         { label: 'Details' },
       ]}
     >
-      <CampaignDetailClient campaignId={id} />
+      <CampaignDetailClient campaignId={id} initialTab={query.tab} focusStage={query.focus} />
     </MarketingOpsPageShell>
   );
 }
