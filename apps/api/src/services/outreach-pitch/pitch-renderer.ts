@@ -65,8 +65,13 @@ export interface FootprintFields {
 }
 
 export interface ReviewPair extends FootprintFields {
-  review_text: string;
-  response_text: string;
+  // Free-text evidence/fix. Required for non-footprint archetypes;
+  // optional when structured footprint fields (platform_name +
+  // focus_attribute + current_value/correct_value) are supplied instead.
+  // PitchService.assemblePitch validates that at least one of the two
+  // shapes is filled per pair.
+  review_text?: string;
+  response_text?: string;
   response_source: 'ai' | 'external';
   response_ai_provider?: string | null;
   response_ai_model?: string | null;
@@ -202,8 +207,8 @@ export function renderPitchText(input: PitchRenderInput): string {
       lines.push(...renderStructuredFootprintSlot(pair, slotName, evidenceLabel, fixLabel));
     } else {
       lines.push(slotName);
-      lines.push(`${evidenceLabel}: "${pair.review_text.trim()}"`);
-      lines.push(`${fixLabel}: "${pair.response_text.trim()}"`);
+      lines.push(`${evidenceLabel}: "${(pair.review_text ?? '').trim()}"`);
+      lines.push(`${fixLabel}: "${(pair.response_text ?? '').trim()}"`);
     }
     if (idx < ordered.length - 1) {
       lines.push(SECTION_DIVIDER);
