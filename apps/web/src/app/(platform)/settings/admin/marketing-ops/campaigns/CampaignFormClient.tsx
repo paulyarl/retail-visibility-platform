@@ -37,6 +37,7 @@ interface FormState {
   campaign_category: CampaignCategory;
   repair_issue_type: string;
   scope: CampaignScope;
+  title: string;
   business_name: string;
   category: string;
   city: string;
@@ -87,6 +88,7 @@ const EMPTY_FORM: FormState = {
   campaign_category: 'review_management',
   repair_issue_type: '',
   scope: 'business',
+  title: '',
   business_name: '',
   category: '',
   city: '',
@@ -181,6 +183,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         campaign_category: (c.campaign_category as CampaignCategory) ?? 'review_management',
         repair_issue_type: (c as any).repair_issue_type ?? '',
         scope: (c.scope as CampaignScope) ?? 'business',
+        title: c.title ?? '',
         business_name: c.business_name ?? '',
         category: c.category ?? '',
         city: c.city ?? '',
@@ -339,6 +342,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           campaign_category: form.campaign_category,
           repair_issue_type: form.campaign_category === 'profile_repair' ? strOrUndef(form.repair_issue_type) : undefined,
           scope: form.scope,
+          title: strOrUndef(form.title),
           business_name: strOrUndef(form.business_name),
           category: form.category,
           city: form.city,
@@ -401,6 +405,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         const input: CampaignUpdateInput = {
           campaign_category: form.campaign_category,
           scope: form.scope,
+          title: form.title,
           business_name: form.business_name,
           category: form.category,
           city: form.city,
@@ -542,6 +547,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 className={inputClass}>
                 {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+            </FormField>
+            <FormField label="Title" className="sm:col-span-2">
+              <input type="text" value={form.title} onChange={(e) => handleChange('title', e.target.value)}
+                placeholder="Optional descriptive title (e.g. &quot;Q3 Austin restaurant review-gap test&quot;)"
+                className={inputClass} />
+              <p className="text-xs text-gray-400 mt-1">Scope-neutral label for the campaign objective. When set, it appears as the primary heading in lists and detail pages; the business name / category / city remain as the secondary line.</p>
             </FormField>
             <FormField label="Business Name" required={form.scope === 'business'}>
               <input type="text" required={form.scope === 'business'} value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}

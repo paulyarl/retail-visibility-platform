@@ -89,6 +89,7 @@ export interface Campaign {
   repair_track?: RepairTrack | null;
   repair_issue_type?: string | null;
   pipeline?: 'review' | 'recovery';
+  title: string | null;
   business_name: string | null;
   category: string;
   city: string;
@@ -176,6 +177,7 @@ export interface Campaign {
 export interface CampaignLineageEntry {
   id: string;
   business_name: string | null;
+  title?: string | null;
   scope: CampaignScope;
   stage: CampaignStage;
   created_at?: string;
@@ -865,6 +867,7 @@ export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate'
 
 export interface AddToQueueInput {
   business_name: string;
+  title?: string;
   category?: string;
   city?: string;
   state?: string;
@@ -905,6 +908,7 @@ export interface ProspectQueuePatch {
 export interface ProspectQueueEntry {
   id: string;
   business_name: string;
+  title?: string | null;
   category?: string | null;
   city?: string | null;
   state?: string | null;
@@ -1204,6 +1208,7 @@ export interface CampaignCreateInput {
   campaign_category?: CampaignCategory;
   repair_track?: RepairTrack | null;
   repair_issue_type?: string;
+  title?: string;
   business_name?: string;
   category: string;
   city: string;

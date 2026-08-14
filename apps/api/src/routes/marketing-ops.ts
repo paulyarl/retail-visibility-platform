@@ -203,6 +203,7 @@ router.use(requirePlatformAdmin);
 
 const campaignBaseSchema = z.object({
   scope: z.enum(['business', 'category', 'city']).optional(),
+  title: z.string().max(255).optional(),
   business_name: z.string().max(255).optional(),
   category: z.string().min(1).max(100),
   city: z.string().min(1).max(100),
@@ -962,9 +963,9 @@ router.get('/export', async (req: any, res: Response) => {
       limit: 10000,
     }, getCtx(req));
 
-    const headers = 'id,display_id,scope,business_name,category,city,stage,date_entered,date_paid,amount_paid_cents,retainer_status\n';
+    const headers = 'id,display_id,scope,title,business_name,category,city,stage,date_entered,date_paid,amount_paid_cents,retainer_status\n';
     const rows = result.items.map((c: any) =>
-      `${c.id},${c.display_id || ''},${c.scope},${c.business_name || ''},${c.category},${c.city},${c.stage},${c.date_entered?.toISOString() || ''},${c.date_paid?.toISOString() || ''},${c.amount_paid_cents},${c.retainer_status}`
+      `${c.id},${c.display_id || ''},${c.scope},${(c.title || '').replace(/,/g, ';')},${c.business_name || ''},${c.category},${c.city},${c.stage},${c.date_entered?.toISOString() || ''},${c.date_paid?.toISOString() || ''},${c.amount_paid_cents},${c.retainer_status}`
     ).join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
@@ -990,6 +991,7 @@ router.post('/', async (req: any, res: Response) => {
     const parsed = campaignCreateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.createCampaign({
       scope: parsed.scope,
+      title: parsed.title,
       businessName: parsed.business_name,
       category: parsed.category,
       city: parsed.city,
@@ -1038,6 +1040,7 @@ router.put('/:id', async (req: any, res: Response) => {
     const parsed = campaignUpdateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.updateCampaign(req.params.id, {
       scope: parsed.scope,
+      title: parsed.title,
       businessName: parsed.business_name,
       category: parsed.category,
       city: parsed.city,
@@ -3682,6 +3685,7 @@ router.post('/checklist-suggestions/:id/reject', async (req: any, res: Response)
 
 const prospectQueueAddSchema = z.object({
   business_name: z.string().min(1).max(255),
+  title: z.string().max(255).optional(),
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
@@ -3714,6 +3718,7 @@ router.post('/prospect-queue', async (req: any, res: Response) => {
     const parsed = prospectQueueAddSchema.parse(req.body);
     const result = await MarketingProspectQueueService.addToQueue({
       business_name: parsed.business_name,
+      title: parsed.title,
       category: parsed.category,
       city: parsed.city,
       state: parsed.state,

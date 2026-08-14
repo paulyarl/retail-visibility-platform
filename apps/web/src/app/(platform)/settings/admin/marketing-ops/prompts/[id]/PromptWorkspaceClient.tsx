@@ -530,7 +530,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
                 >
                   <option value="">— Select a campaign —</option>
                   {compatibleCampaigns.map((c) => (
-                    <option key={c.id} value={c.id}>{c.business_name ?? `${c.category} · ${c.city}`} ({c.scope}, {c.city})</option>
+                    <option key={c.id} value={c.id}>{c.title || c.business_name || `${c.category} · ${c.city}`} ({c.scope}, {c.city})</option>
                   ))}
                 </select>
                 {compatibleCampaigns.length === 0 && campaigns.length > 0 && (
@@ -803,7 +803,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {campaigns.find((c) => c.id === e.campaign_id)?.business_name ?? campaigns.find((c) => c.id === e.campaign_id)?.category ?? e.campaign_id}
+                        {campaigns.find((c) => c.id === e.campaign_id)?.title || campaigns.find((c) => c.id === e.campaign_id)?.business_name || campaigns.find((c) => c.id === e.campaign_id)?.category || e.campaign_id}
                       </span>
                       <span className="text-xs text-gray-400">{new Date(e.executed_at).toLocaleString()}</span>
                     </div>

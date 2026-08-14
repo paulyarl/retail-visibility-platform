@@ -117,6 +117,7 @@ export default function ProspectQueueClient() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     business_name: '',
+    title: '',
     category: '',
     city: '',
     state: '',
@@ -247,6 +248,7 @@ export default function ProspectQueueClient() {
   const openAddModal = () => {
     setAddForm({
       business_name: '',
+      title: '',
       category: '',
       city: '',
       state: '',
@@ -269,6 +271,7 @@ export default function ProspectQueueClient() {
     try {
       const input: AddToQueueInput = {
         business_name: businessName,
+        title: addForm.title.trim() || undefined,
         category: addForm.category.trim() || undefined,
         city: addForm.city.trim() || undefined,
         state: addForm.state.trim() || undefined,
@@ -295,7 +298,7 @@ export default function ProspectQueueClient() {
         await fetchQueue();
         if (keepOpen) {
           // "Save and New" — clear the form, show brief confirmation, keep modal open.
-          setAddForm({ business_name: '', category: '', city: '', state: '', priority: 'normal', note: '', scope: 'business' });
+          setAddForm({ business_name: '', title: '', category: '', city: '', state: '', priority: 'normal', note: '', scope: 'business' });
           setAddFeedback({ kind: 'created', message: 'Added to the queue. Add another?' });
         } else {
           // "Add to Queue" — close the modal immediately.
@@ -780,6 +783,24 @@ export default function ProspectQueueClient() {
                   className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
                   placeholder="e.g. Joe's Pizza"
                 />
+              </div>
+
+              {/* Title — optional scope-neutral descriptive label */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Title <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={addForm.title}
+                  onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
+                  disabled={addingToQueue}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  placeholder="e.g. Q3 Austin restaurant review-gap test"
+                />
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                  Scope-neutral descriptive label for the campaign objective. Forwarded to the campaign on Create.
+                </p>
               </div>
 
               {/* Campaign scope — determines what kind of campaign "Create" will build */}

@@ -501,7 +501,7 @@ export default function CampaignDetailClient({
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.business_name ?? campaign.category ?? campaign.city}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.title || campaign.business_name || campaign.category || campaign.city}</h1>
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
                     {campaign.scope}
                   </span>
@@ -535,6 +535,11 @@ export default function CampaignDetailClient({
                     </span>
                   )}
                 </div>
+                {campaign.title && (campaign.business_name || campaign.category || campaign.city) && (
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-0.5">
+                    {campaign.business_name || campaign.category || campaign.city}
+                  </p>
+                )}
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {campaign.scope} · {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
                   {campaign.display_id && ` · ${campaign.display_id}`}
@@ -546,7 +551,7 @@ export default function CampaignDetailClient({
                       href={`/settings/admin/marketing-ops/campaigns/${campaign.parent_campaign.id}`}
                       className="text-violet-600 dark:text-violet-400 hover:underline"
                     >
-                      {campaign.parent_campaign.business_name ?? campaign.parent_campaign.category ?? campaign.parent_campaign.id}
+                      {campaign.parent_campaign.title || campaign.parent_campaign.business_name || campaign.parent_campaign.category || campaign.parent_campaign.id}
                     </Link>
                     {' '}(parent · {campaign.parent_campaign.scope})
                   </p>
@@ -1237,7 +1242,7 @@ export default function CampaignDetailClient({
                       className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700"
                     >
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {campaign.parent_campaign.business_name ?? campaign.parent_campaign.category ?? campaign.parent_campaign.id}
+                        {campaign.parent_campaign.title || campaign.parent_campaign.business_name || campaign.parent_campaign.category || campaign.parent_campaign.id}
                       </span>
                       <span className="text-xs text-gray-400 uppercase">{campaign.parent_campaign.scope}</span>
                       <StageBadge stage={campaign.parent_campaign.stage} size="sm" />

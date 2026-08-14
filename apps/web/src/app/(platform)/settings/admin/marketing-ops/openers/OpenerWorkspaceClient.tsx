@@ -430,7 +430,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
               <option value="">— Select a business campaign —</option>
               {businessCampaigns.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.business_name ?? `${c.category} · ${c.city}`}
+                  {c.title || c.business_name || `${c.category} · ${c.city}`}
                   {c.archetype ? ` [${c.archetype}]` : ''} ({c.stage})
                 </option>
               ))}

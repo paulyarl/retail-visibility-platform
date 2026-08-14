@@ -163,6 +163,7 @@ export interface CampaignInput {
   campaignCategory?: CampaignCategory;
   repairTrack?: RepairTrack | null;
   repairIssueType?: string;
+  title?: string;
   businessName?: string;
   category: string;
   city: string;
@@ -203,6 +204,7 @@ export interface CampaignInput {
 export interface CampaignUpdateInput {
   scope?: CampaignScope;
   campaignCategory?: CampaignCategory;
+  title?: string;
   businessName?: string;
   category?: string;
   city?: string;
@@ -372,6 +374,7 @@ export class MarketingCampaignService extends BaseService {
           campaign_category: campaignCategory,
           repair_track: input.repairTrack || null,
           repair_issue_type: input.repairIssueType || null,
+          title: input.title || null,
           business_name: input.businessName || null,
           category: input.category,
           city: input.city,
@@ -619,6 +622,7 @@ export class MarketingCampaignService extends BaseService {
   async deriveBusinessCampaign(input: {
     parentId: string;
     businessName: string;
+    title?: string;
     rating?: number;
     reviewCount?: number;
     location?: string;
@@ -666,6 +670,7 @@ export class MarketingCampaignService extends BaseService {
       const child = await this.createCampaign({
         scope: 'business',
         businessName: input.businessName,
+        title: input.title,
         category: parent.category,
         city: parent.city,
         neighborhood: parent.neighborhood ?? undefined,
@@ -772,6 +777,7 @@ export class MarketingCampaignService extends BaseService {
     if (filters.search) {
       where.OR = [
         { business_name: { contains: filters.search, mode: 'insensitive' } },
+        { title: { contains: filters.search, mode: 'insensitive' } },
         { display_id: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
@@ -889,6 +895,7 @@ export class MarketingCampaignService extends BaseService {
     const data: any = {};
     if (input.scope !== undefined) data.scope = input.scope;
     if (input.campaignCategory !== undefined) data.campaign_category = input.campaignCategory;
+    if (input.title !== undefined) data.title = input.title || null;
     if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
     if (input.city !== undefined) data.city = input.city;

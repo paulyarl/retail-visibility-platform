@@ -43,6 +43,10 @@ export type ProspectCampaignScope = 'business' | 'category' | 'city';
 
 export interface ProspectQueueAddInput {
   business_name: string;
+  // Optional scope-neutral descriptive title (e.g. "Q3 Austin restaurant
+  // review-gap test"). Persisted on the queue entry and forwarded to the
+  // campaign when the operator creates one from the queue.
+  title?: string;
   category?: string;
   city?: string;
   state?: string;
@@ -192,6 +196,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         data: {
           id,
           business_name: businessName,
+          title: input.title ?? null,
           category,
           city,
           state,
@@ -397,6 +402,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         const campaignScope = (entry.source_scope as any) ?? 'business';
         const campaign = await MarketingCampaignService.createCampaign({
           scope: campaignScope,
+          title: entry.title ?? undefined,
           businessName: entry.business_name,
           category: entry.category ?? '',
           city: entry.city ?? '',
@@ -472,6 +478,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         const campaign = await MarketingCampaignService.deriveBusinessCampaign({
           parentId: entry.source_campaign_id,
           businessName: entry.business_name,
+          title: entry.title ?? undefined,
           rating: entry.rating != null ? Number(entry.rating) : undefined,
           reviewCount: entry.review_count ?? undefined,
           location: (snapshot.location as string) ?? undefined,

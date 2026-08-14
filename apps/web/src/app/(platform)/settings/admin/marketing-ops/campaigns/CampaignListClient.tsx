@@ -356,13 +356,18 @@ export default function CampaignListClient() {
                             <div className="flex items-start justify-between gap-2">
                               <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
                                 {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 flex-shrink-0 text-orange-500" />}
-                                {c.business_name ?? c.category ?? c.city}
+                                {c.title || c.business_name || c.category || c.city}
                                 {c.archetype && (
                                   <ArchetypeBadge archetype={c.archetype} className="ml-1 align-middle" />
                                 )}
                               </p>
                               {fuBadge && <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${fuBadge.cls}`}>{fuBadge.label}</span>}
                             </div>
+                            {c.title && (c.business_name || c.category || c.city) && (
+                              <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                                {c.business_name || c.category || c.city}
+                              </p>
+                            )}
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1"><span className="uppercase text-[10px] tracking-wider text-gray-400">{c.scope}</span> · {c.category} · {c.city}</p>
                             {(c.tone || c.retainer || c.attributes?.length) && (
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
