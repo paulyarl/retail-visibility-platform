@@ -5813,13 +5813,13 @@ const intelligenceProfileCreateSchema = z.object({
   id: z.string().max(64).optional(),
   categoryKey: z.string().min(1).max(100),
   categoryName: z.string().min(1).max(100),
-  configurationJson: z.record(z.any()),
+  configurationJson: z.record(z.string(), z.any()),
   status: z.enum(['draft', 'active', 'retired']).optional(),
 });
 
 const intelligenceProfilePublishSchema = z.object({
   categoryName: z.string().min(1).max(100).optional(),
-  configurationJson: z.record(z.any()),
+  configurationJson: z.record(z.string(), z.any()),
 });
 
 // GET /intelligence-profiles — list active profiles

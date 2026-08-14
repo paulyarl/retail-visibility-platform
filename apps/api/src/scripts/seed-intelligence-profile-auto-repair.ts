@@ -122,7 +122,7 @@ const AUTO_REPAIR_PROFILE = {
       certification_search: 'Search ASE certification registry by city/state',
       social_discovery: 'Facebook business pages for independent shops often have more activity than their websites',
       directory_long_tail: 'Search Yelp, YellowPages, and local chamber of commerce directories — many independent shops are directory-only',
-      word_of mouth_indicators: 'Facebook community groups, Nextdoor recommendations — capture as discovery_provenance source',
+      word_of_mouth_indicators: 'Facebook community groups, Nextdoor recommendations — capture as discovery_provenance source',
     },
     category_evidence_rules: {
       active_operation: 'Recent CARFAX service records OR recent GBP reviews OR recent Facebook posts indicate active operation',

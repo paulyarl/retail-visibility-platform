@@ -141,7 +141,7 @@ export class IntelligenceProfileService extends BaseService {
     try {
       const profile = await this.prisma.mkt_intelligence_profiles.findUnique({
         where: {
-          pk_mkt_intelligence_profiles: { id: profileId, version },
+          id_version: { id: profileId, version },
         },
       });
       return profile as IntelligenceProfile | null;
@@ -336,7 +336,7 @@ export class IntelligenceProfileService extends BaseService {
         // 1. Verify the draft exists
         const draft = await tx.mkt_intelligence_profiles.findUnique({
           where: {
-            pk_mkt_intelligence_profiles: { id: profileId, version },
+            id_version: { id: profileId, version },
           },
         });
         if (!draft) {
@@ -358,7 +358,7 @@ export class IntelligenceProfileService extends BaseService {
         // 3. Activate the draft
         const activated = await tx.mkt_intelligence_profiles.update({
           where: {
-            pk_mkt_intelligence_profiles: { id: profileId, version },
+            id_version: { id: profileId, version },
           },
           data: { status: 'active', updated_at: new Date() },
         });
