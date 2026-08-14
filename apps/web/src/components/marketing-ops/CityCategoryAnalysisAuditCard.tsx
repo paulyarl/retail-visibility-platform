@@ -280,6 +280,7 @@ export default function CityCategoryAnalysisAuditCard({
       const { default: service } = await import('@/services/MarketingOpsService');
       const result = await service.addToQueue({
         business_name: b.business_name,
+        title: b.business_name,
         source_kind: 'city_category_audit',
         source_campaign_id: campaignId,
         source_audit_id: audit.id,

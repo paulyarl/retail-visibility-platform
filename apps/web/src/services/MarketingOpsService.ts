@@ -868,7 +868,10 @@ export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate'
 export interface AddToQueueInput {
   // Required for business-scope entries; optional for category/city-scope.
   business_name?: string;
-  title?: string;
+  // Required — primary dedup key for the campaign-exists check (title + city +
+  // state). Prevents false positives where different businesses in the same
+  // city+category would match each other.
+  title: string;
   category?: string;
   city?: string;
   state?: string;

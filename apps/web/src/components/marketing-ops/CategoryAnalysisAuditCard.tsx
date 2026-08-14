@@ -125,6 +125,7 @@ export default function CategoryAnalysisAuditCard({
       const { default: service } = await import('@/services/MarketingOpsService');
       const result = await service.addToQueue({
         business_name: c.name,
+        title: c.name,
         source_kind: 'category_analysis',
         source_campaign_id: campaignId,
         source_audit_id: audit.id,

@@ -101,6 +101,7 @@ const thinSnapshot = (overrides: Partial<any> = {}) => ({
 const queueRow = (overrides: Partial<any> = {}) => ({
   id: 'pque-test-001',
   business_name: 'Joe Pizza',
+  title: 'Joe Pizza — Review Recovery',
   category: 'restaurant',
   city: 'Austin',
   state: 'TX',
@@ -151,6 +152,7 @@ describe('MarketingProspectQueueService', () => {
 
       const result = await MarketingProspectQueueService.addToQueue({
         business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
         source_kind: 'scan_unmatched',
         source_campaign_id: PARENT_CAMPAIGN_ID,
         business_snapshot: scanSnapshot(),
@@ -164,6 +166,7 @@ describe('MarketingProspectQueueService', () => {
           data: expect.objectContaining({
             id: 'pque-test-001',
             business_name: 'Joe Pizza',
+            title: 'Joe Pizza — Review Recovery',
             source_scope: 'city',
             detected_signals: ['RA_BBB_GRADE_SUPPRESSION', 'RA_UNANSWERED_COMPLAINTS'],
             signal_count: 2,
@@ -183,6 +186,7 @@ describe('MarketingProspectQueueService', () => {
 
       const result = await MarketingProspectQueueService.addToQueue({
         business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
         source_kind: 'scan_unmatched',
         source_campaign_id: PARENT_CAMPAIGN_ID,
         business_snapshot: scanSnapshot(),
@@ -193,11 +197,12 @@ describe('MarketingProspectQueueService', () => {
       expect(mockQueue.create).not.toHaveBeenCalled();
     });
 
-    it('returns campaign_exists when a business-scope campaign already exists (AC84)', async () => {
+    it('returns campaign_exists when a campaign already exists with the same title + city + state (AC84)', async () => {
       mockCampaigns.findFirst.mockResolvedValue({ id: 'mcamp-existing-001' });
 
       const result = await MarketingProspectQueueService.addToQueue({
         business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
         source_kind: 'scan_unmatched',
         source_campaign_id: PARENT_CAMPAIGN_ID,
         business_snapshot: scanSnapshot(),
@@ -206,6 +211,70 @@ describe('MarketingProspectQueueService', () => {
       expect(result.kind).toBe('campaign_exists');
       expect((result as any).campaignId).toBe('mcamp-existing-001');
       expect(mockQueue.create).not.toHaveBeenCalled();
+      // Verify the dedup key uses title + city + state (not scope + category).
+      const findFirstArg = mockCampaigns.findFirst.mock.calls[0][0];
+      expect(findFirstArg.where.title).toEqual({
+        equals: 'Joe Pizza — Review Recovery',
+        mode: 'insensitive',
+      });
+      expect(findFirstArg.where.city).toEqual({ equals: 'Austin', mode: 'insensitive' });
+      expect(findFirstArg.where.state).toEqual({ equals: 'TX', mode: 'insensitive' });
+      expect(findFirstArg.where.scope).toBeUndefined();
+      expect(findFirstArg.where.category).toBeUndefined();
+    });
+
+    it('does NOT return campaign_exists when the only matching campaign is the source/parent campaign (e.g. a city_category_audit that discovered the prospect)', async () => {
+      // The campaign-exists lookup must exclude source_campaign_id — otherwise
+      // a prospect discovered from a city/category-scope audit would falsely
+      // match the audit campaign itself and never get queued.
+      mockCampaigns.findFirst.mockResolvedValue(null);
+      mockQueue.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: 'pque-test-001' })),
+      );
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Homer Hills Fleet Services',
+        title: 'Homer Hills Fleet Services — Review Recovery',
+        source_kind: 'city_category_audit',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        source_audit_id: 'maud-6zjloaux',
+        business_snapshot: scanSnapshot({ business_name: 'Homer Hills Fleet Services' }),
+      });
+
+      // The findFirst where-clause must include id: { not: PARENT_CAMPAIGN_ID }
+      // and dedup on title + city + state (not scope + category).
+      const findFirstArg = mockCampaigns.findFirst.mock.calls[0][0];
+      expect(findFirstArg.where.id).toEqual({ not: PARENT_CAMPAIGN_ID });
+      expect(findFirstArg.where.title).toEqual({
+        equals: 'Homer Hills Fleet Services — Review Recovery',
+        mode: 'insensitive',
+      });
+      expect(findFirstArg.where.scope).toBeUndefined();
+      expect(findFirstArg.where.category).toBeUndefined();
+      expect(result.kind).toBe('created');
+      expect(result.created).toBe(true);
+    });
+
+    it('does NOT return campaign_exists for a different business in the same city + category (title differs)', async () => {
+      // The title-based dedup prevents false positives where different
+      // businesses in the same city+category would match each other.
+      mockCampaigns.findFirst.mockResolvedValue(null);
+      mockQueue.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: 'pque-test-001' })),
+      );
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Jane Pizza',
+        title: 'Jane Pizza — Review Recovery',
+        source_kind: 'scan_unmatched',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: scanSnapshot({ business_name: 'Jane Pizza' }),
+      });
+
+      // Even though city + category match the parent, the title differs from
+      // any existing campaign for "Joe Pizza" — so no false positive.
+      expect(result.kind).toBe('created');
+      expect(result.created).toBe(true);
     });
 
     it('throws NotFoundError when the source campaign does not exist', async () => {
@@ -214,6 +283,7 @@ describe('MarketingProspectQueueService', () => {
       await expect(
         MarketingProspectQueueService.addToQueue({
           business_name: 'Joe Pizza',
+          title: 'Joe Pizza — Review Recovery',
           source_kind: 'scan_unmatched',
           source_campaign_id: 'mcamp-missing',
           business_snapshot: scanSnapshot(),
@@ -228,6 +298,7 @@ describe('MarketingProspectQueueService', () => {
 
       await MarketingProspectQueueService.addToQueue({
         business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
         source_kind: 'scan_unmatched',
         source_campaign_id: PARENT_CAMPAIGN_ID,
         business_snapshot: scanSnapshot(),

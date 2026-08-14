@@ -45,10 +45,13 @@ export interface ProspectQueueAddInput {
   // Required for business-scope entries; optional for category/city-scope
   // entries (the triggering business may be unknown or irrelevant).
   business_name?: string;
-  // Optional scope-neutral descriptive title (e.g. "Q3 Austin restaurant
-  // review-gap test"). Persisted on the queue entry and forwarded to the
-  // campaign when the operator creates one from the queue.
-  title?: string;
+  // Required — scope-neutral descriptive title (e.g. "Homer Hills Fleet
+  // Services — Review Recovery"). Persisted on the queue entry and forwarded
+  // to the campaign when the operator creates one from the queue. Also serves
+  // as the primary dedup key for the campaign-exists check (title + city +
+  // state), which prevents false positives where different businesses in the
+  // same city+category would match each other.
+  title: string;
   category?: string;
   city?: string;
   state?: string;
@@ -180,17 +183,26 @@ class MarketingProspectQueueServiceClass extends BaseService {
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
 
-      // Campaign-exists check (AC84 rule): a campaign for the same scope +
-      // identity means the prospect is already in the pipeline — surface it.
-      // Business scope dedups on the full triple (business_name + city +
-      // category). Category/city scope campaigns are category-level, so they
-      // dedup on city + category only (the triggering business is irrelevant).
-      const campaignExistsWhere: any = { scope: resolvedScope };
-      if (resolvedScope === 'business') {
-        campaignExistsWhere.business_name = { equals: businessName, mode: 'insensitive' };
+      // Campaign-exists check (AC84 rule): a campaign for the same title +
+      // city + state means the prospect is already in the pipeline — surface
+      // it. Title is the primary identifier (required on input), and city +
+      // state disambiguate geographically. This replaces the earlier
+      // scope + city + category (+ business_name) check, which could return
+      // false positives for different businesses in the same city+category.
+      //
+      // Exclude the source/parent campaign (e.g. a city_category_audit that
+      // discovered this prospect) — it is the originator, not a campaign for
+      // this specific business, so matching it would falsely report the
+      // prospect as already in the pipeline.
+      const resolvedTitle = input.title.trim();
+      const campaignExistsWhere: any = {
+        title: { equals: resolvedTitle, mode: 'insensitive' },
+      };
+      if (input.source_campaign_id) {
+        campaignExistsWhere.id = { not: input.source_campaign_id };
       }
       Object.assign(campaignExistsWhere, insensitiveEq('city', city));
-      Object.assign(campaignExistsWhere, insensitiveEq('category', category));
+      Object.assign(campaignExistsWhere, insensitiveEq('state', state));
       const existingCampaign = await this.prisma.mkt_campaigns_list.findFirst({
         where: campaignExistsWhere,
         select: { id: true },
@@ -207,7 +219,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         data: {
           id,
           business_name: businessName || null,
-          title: input.title ?? null,
+          title: input.title.trim(),
           category,
           city,
           state,

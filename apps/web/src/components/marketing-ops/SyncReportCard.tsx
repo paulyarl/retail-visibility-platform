@@ -106,6 +106,7 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
     try {
       const result = await marketingOpsService.addToQueue({
         business_name: businessName,
+        title: businessName,
         source_kind: 'scan_unmatched',
         source_campaign_id: campaignId,
         source_execution_id: executionId,

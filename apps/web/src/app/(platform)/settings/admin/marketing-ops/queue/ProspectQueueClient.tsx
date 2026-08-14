@@ -262,6 +262,11 @@ export default function ProspectQueueClient() {
 
   const handleAddToQueue = async (keepOpen: boolean) => {
     const businessName = addForm.business_name.trim();
+    // title is required for all entries (primary dedup key).
+    if (!addForm.title.trim()) {
+      setAddFeedback({ kind: 'exists', message: 'Title is required.' });
+      return;
+    }
     // business_name is required only for business-scope entries.
     if (addForm.scope === 'business' && !businessName) {
       setAddFeedback({ kind: 'exists', message: 'Business name is required for business-scope entries.' });
@@ -272,7 +277,7 @@ export default function ProspectQueueClient() {
     try {
       const input: AddToQueueInput = {
         business_name: businessName || undefined,
-        title: addForm.title.trim() || undefined,
+        title: addForm.title.trim(),
         category: addForm.category.trim() || undefined,
         city: addForm.city.trim() || undefined,
         state: addForm.state.trim() || undefined,
@@ -811,10 +816,10 @@ export default function ProspectQueueClient() {
                 </p>
               </div>
 
-              {/* Title — optional scope-neutral descriptive label */}
+              {/* Title — required, primary dedup key for campaign-exists check */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Title <span className="text-gray-400 font-normal">(optional)</span>
+                  Title <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -822,10 +827,10 @@ export default function ProspectQueueClient() {
                   onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
                   disabled={addingToQueue}
                   className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="e.g. Q3 Austin restaurant review-gap test"
+                  placeholder="e.g. Homer Hills Fleet Services — Review Recovery"
                 />
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
-                  Scope-neutral descriptive label for the campaign objective. Forwarded to the campaign on Create.
+                  Required. Used as the primary dedup key (title + city + state) to prevent false-positive campaign collisions. Forwarded to the campaign on Create.
                 </p>
               </div>
 
@@ -946,7 +951,7 @@ export default function ProspectQueueClient() {
               </button>
               <button
                 onClick={() => handleAddToQueue(true)}
-                disabled={addingToQueue || (addForm.scope === 'business' && !addForm.business_name.trim())}
+                disabled={addingToQueue || !addForm.title.trim() || (addForm.scope === 'business' && !addForm.business_name.trim())}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 disabled:opacity-50"
                 title="Save and keep the modal open for another entry"
               >
@@ -955,7 +960,7 @@ export default function ProspectQueueClient() {
               </button>
               <button
                 onClick={() => handleAddToQueue(false)}
-                disabled={addingToQueue || (addForm.scope === 'business' && !addForm.business_name.trim())}
+                disabled={addingToQueue || !addForm.title.trim() || (addForm.scope === 'business' && !addForm.business_name.trim())}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
               >
                 {addingToQueue ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}

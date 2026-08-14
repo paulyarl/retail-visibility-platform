@@ -3687,7 +3687,10 @@ const prospectQueueAddSchema = z.object({
   // business_name is required only for business-scope entries (enforced in
   // superRefine below). Optional for category/city-scope entries.
   business_name: z.string().max(255).optional(),
-  title: z.string().max(255).optional(),
+  // Title is required — it is the primary dedup key for the campaign-exists
+  // check (title + city + state) and prevents false positives where different
+  // businesses in the same city+category would match each other.
+  title: z.string().min(1).max(255),
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
