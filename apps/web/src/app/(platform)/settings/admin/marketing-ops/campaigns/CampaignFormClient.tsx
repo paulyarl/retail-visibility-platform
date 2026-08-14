@@ -11,7 +11,7 @@ import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { addressParser } from '@/lib/address-parser';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
-const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair', 'triage_management'];
 
 const REPAIR_ISSUE_TYPES_STANDARD = ['nap_drift', 'unclaimed_profile', 'missing_category', 'missing_hours', 'platform_gap'];
@@ -82,6 +82,10 @@ interface FormState {
   coupon_code: string;
   service_category: string;
   service_category_label: string;
+  // Intelligence scope fields (Sprint 3)
+  intelligence_focus: 'emerging' | 'competitive' | '';
+  intelligence_zip_codes: string;
+  intelligence_search_radius_miles: number | '';
 }
 
 const EMPTY_FORM: FormState = {
@@ -133,6 +137,9 @@ const EMPTY_FORM: FormState = {
   coupon_code: '',
   service_category: '',
   service_category_label: '',
+  intelligence_focus: 'emerging',
+  intelligence_zip_codes: '',
+  intelligence_search_radius_miles: '',
 };
 
 export default function CampaignFormClient({ mode, campaignId }: { mode: 'create' | 'edit'; campaignId?: string }) {
@@ -548,6 +555,40 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </FormField>
+            {form.scope === 'intelligence' && (
+              <>
+                <FormField label="Focus" required className="sm:col-span-2">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_focus" value="emerging"
+                        checked={form.intelligence_focus === 'emerging'}
+                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
+                      <span className="text-sm">Emerging — discover low-visibility, hard-to-find businesses</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_focus" value="competitive"
+                        checked={form.intelligence_focus === 'competitive'}
+                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
+                      <span className="text-sm">Competitive — analyze established competitors</span>
+                    </label>
+                  </div>
+                </FormField>
+                <FormField label="ZIP Codes (optional)">
+                  <input type="text" value={form.intelligence_zip_codes}
+                    onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
+                    placeholder="e.g. 46268, 46214 (comma-separated)"
+                    className={inputClass} />
+                  <p className="text-xs text-gray-400 mt-1">Restrict discovery to specific ZIP codes. Leave empty to use city-wide search.</p>
+                </FormField>
+                <FormField label="Search Radius (miles, optional)">
+                  <input type="number" min="0" step="1" value={form.intelligence_search_radius_miles}
+                    onChange={(e) => handleChange('intelligence_search_radius_miles', e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="e.g. 15"
+                    className={inputClass} />
+                  <p className="text-xs text-gray-400 mt-1">Radius around the city center for discovery. Leave empty for city-wide.</p>
+                </FormField>
+              </>
+            )}
             <FormField label="Title" className="sm:col-span-2">
               <input type="text" value={form.title} onChange={(e) => handleChange('title', e.target.value)}
                 placeholder="Optional descriptive title (e.g. &quot;Q3 Austin restaurant review-gap test&quot;)"
