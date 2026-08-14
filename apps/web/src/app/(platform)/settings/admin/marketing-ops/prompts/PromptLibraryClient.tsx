@@ -42,6 +42,9 @@ export default function PromptLibraryClient() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
   const [presetTones, setPresetTones] = useState<string[]>([]);
+  // Sprint 3: fragments are hidden by default — they are composition building
+  // blocks, not standalone prompts. Toggle to see/manage them.
+  const [showFragments, setShowFragments] = useState(false);
 
   // S3b: deep-link from campaign detail (?campaignId=&angle=)
   const searchParams = useSearchParams();
@@ -218,6 +221,15 @@ export default function PromptLibraryClient() {
             newInputPlaceholder="Filter by tone"
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={showFragments}
+              onChange={(e) => setShowFragments(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            Show fragments
+          </label>
         </div>
 
         {error && (
@@ -237,7 +249,7 @@ export default function PromptLibraryClient() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templates.map((t) => (
+            {templates.filter((t) => showFragments || t.prompt_type !== 'fragment').map((t) => (
               <div key={t.id} className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>

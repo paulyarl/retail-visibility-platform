@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalLink, Flag, ArrowRight, AlertTriangle, Upload, Edit3, Save, X } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult, IntelligenceProfile } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 
 /**
@@ -131,6 +131,33 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
     campaigns.find((c) => c.id === selectedCampaignId) || null,
   [campaigns, selectedCampaignId]);
 
+  // Sprint 3 — §1B resolution indicator: when a business-scope seek campaign is
+  // selected, resolve the active intelligence profile for its category and show
+  // the profile badge in the Rendered Output header.
+  useEffect(() => {
+    if (!selectedCampaign || !template) {
+      setResolvedProfile(null);
+      return;
+    }
+    // Only resolve for business-scope seek prompts (the §1B amplification gate).
+    const isSeek = (template.prompt_type || '').toLowerCase() === 'seek';
+    const isBusiness = (selectedCampaign.scope || 'business').toLowerCase() === 'business';
+    if (!isSeek || !isBusiness || !selectedCampaign.category) {
+      setResolvedProfile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await marketingOpsService.resolveIntelligenceProfile(selectedCampaign.category);
+        if (!cancelled) setResolvedProfile(profile);
+      } catch {
+        if (!cancelled) setResolvedProfile(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedCampaign, template]);
+
   const compatibleCampaigns = useMemo(() => {
     if (!template?.scope) return campaigns;
     return campaigns.filter((c) => c.scope === template.scope);
@@ -143,6 +170,8 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
   const [renderError, setRenderError] = useState<string | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   const [lastExecution, setLastExecution] = useState<PromptExecution | null>(null);
+  // Intelligence profile resolution indicator (Sprint 3 — §1B)
+  const [resolvedProfile, setResolvedProfile] = useState<IntelligenceProfile | null>(null);
 
   // External import state (S2b)
   const [importJson, setImportJson] = useState('');
@@ -569,6 +598,16 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
               <div className="flex items-center gap-3">
                 {serverRendered !== null && (
                   <span className="text-xs text-green-600 dark:text-green-400 font-medium">Server-resolved</span>
+                )}
+                {resolvedProfile && (
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium" title="Category intelligence profile is active and will amplify this business audit prompt (§1B)">
+                    Category intelligence: {resolvedProfile.id} v{resolvedProfile.version}
+                  </span>
+                )}
+                {selectedCampaign && template?.prompt_type === 'seek' && selectedCampaign.scope === 'business' && !resolvedProfile && (
+                  <span className="text-xs text-gray-400" title="No active intelligence profile for this category — prompt renders without amplification">
+                    No category profile — generic resolution
+                  </span>
                 )}
                 <button
                   onClick={handleDownload}

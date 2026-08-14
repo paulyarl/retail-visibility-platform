@@ -235,6 +235,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         coupon_code: c.coupon_code ?? '',
         service_category: c.service_category ?? '',
         service_category_label: c.service_category_label ?? '',
+        intelligence_focus: ((c as any).intelligence_focus ?? 'emerging') as 'emerging' | 'competitive' | '',
+        intelligence_zip_codes: (c as any).intelligence_zip_codes ?? '',
+        intelligence_search_radius_miles: (c as any).intelligence_search_radius_miles ?? '',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
