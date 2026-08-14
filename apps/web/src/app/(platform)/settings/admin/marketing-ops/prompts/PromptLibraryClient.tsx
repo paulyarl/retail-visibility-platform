@@ -15,6 +15,7 @@ const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   retainer: 'Retainer',
   category_analysis: 'Category Analysis',
   city_analysis: 'City Analysis',
+  fragment: 'Fragment',
 };
 
 const PROMPT_TYPE_COLORS: Record<PromptType, string> = {
@@ -24,10 +25,11 @@ const PROMPT_TYPE_COLORS: Record<PromptType, string> = {
   retainer: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   category_analysis: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
   city_analysis: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
+  fragment: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
 };
 
-const ALL_TYPES: PromptType[] = ['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis'];
-const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
+const ALL_TYPES: PromptType[] = ['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis', 'fragment'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 
 export default function PromptLibraryClient() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);

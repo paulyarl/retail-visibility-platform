@@ -41,7 +41,7 @@ export type ConversionSource =
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
-export type CampaignScope = 'business' | 'category' | 'city';
+export type CampaignScope = 'business' | 'category' | 'city' | 'intelligence';
 
 export type RetainerStatus = 'not_pitched' | 'pitched' | 'won' | 'declined';
 
@@ -51,7 +51,8 @@ export type PromptType =
   | 'filter'
   | 'retainer'
   | 'category_analysis'
-  | 'city_analysis';
+  | 'city_analysis'
+  | 'fragment';
 
 export type ExecutionStatus = 'pending' | 'completed' | 'failed' | 'filtered' | 'reviewed' | 'delivered' | 'archived';
 
@@ -4680,6 +4681,53 @@ export interface GalleryDashboard {
 
 // ─── Gallery methods (added to the prototype) ────────────────────────────
 
+// ====================
+// INTELLIGENCE PROFILE + RUN TYPES (Sprint 2 — Seek Intelligence Scope)
+// ====================
+
+export type IntelligenceFocus = 'emerging' | 'competitive';
+export type IntelligenceMode = 'profile' | 'none';
+export type ProfileStatus = 'draft' | 'active' | 'retired';
+
+export interface IntelligenceProfile {
+  id: string;
+  category_key: string;
+  category_name: string;
+  version: number;
+  configuration_json: Record<string, any>;
+  status: ProfileStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntelligenceProfileWithVersions extends IntelligenceProfile {
+  versions: IntelligenceProfile[];
+}
+
+export interface IntelligenceRun {
+  id: string;
+  campaign_id: string;
+  execution_id: string | null;
+  profile_id: string | null;
+  profile_version: number | null;
+  intelligence_mode: string;
+  focus: string;
+  prompt_version: number | null;
+  prompt_body_hash: string | null;
+  candidate_count: number;
+  qualifying_count: number;
+  hold_count: number;
+  metadata: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PromptResolution {
+  profile_id: string | null;
+  profile_version: number | null;
+  intelligence_mode: IntelligenceMode;
+}
+
 interface MarketingOpsService {
   generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GalleryToken>;
   generateMultiGalleryToken(prospectId: string, expiryDays?: number): Promise<GalleryToken>;
@@ -4687,6 +4735,25 @@ interface MarketingOpsService {
   getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;
   getGalleryDashboard(daysBack?: number): Promise<GalleryDashboard>;
   uploadDiagnosticScreenshot(campaignId: string, file: File): Promise<MarketingFile>;
+  // Intelligence Profile + Run methods (Sprint 2 — Seek Intelligence Scope)
+  listIntelligenceProfiles(): Promise<IntelligenceProfile[]>;
+  listIntelligenceProfileDrafts(): Promise<IntelligenceProfile[]>;
+  getIntelligenceProfile(id: string): Promise<IntelligenceProfileWithVersions>;
+  getIntelligenceProfileVersion(id: string, version: number): Promise<IntelligenceProfile>;
+  resolveIntelligenceProfile(category: string): Promise<IntelligenceProfile | null>;
+  createIntelligenceProfile(input: {
+    categoryKey: string;
+    categoryName: string;
+    configurationJson: Record<string, any>;
+    status?: ProfileStatus;
+  }): Promise<IntelligenceProfile>;
+  publishIntelligenceProfile(id: string, input: {
+    configurationJson: Record<string, any>;
+    categoryName?: string;
+  }): Promise<IntelligenceProfile>;
+  activateIntelligenceProfileDraft(id: string, version: number): Promise<IntelligenceProfile>;
+  listIntelligenceRuns(campaignId: string): Promise<IntelligenceRun[]>;
+  getIntelligenceRun(runId: string): Promise<IntelligenceRun | null>;
 }
 
 MarketingOpsService.prototype.generateGalleryToken = async function (
@@ -4799,6 +4866,154 @@ MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
   }
   await this.invalidateCachePattern(`mkt-ops-files-${campaignId}`);
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  return result.data?.data ?? result.data;
+};
+
+// ─── Intelligence Profile Methods (Sprint 2 — Seek Intelligence Scope) ────
+
+MarketingOpsService.prototype.listIntelligenceProfiles = async function (): Promise<IntelligenceProfile[]> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles`,
+    {},
+    'mkt-ops-intel-profiles',
+    this.cacheTTL,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list intelligence profiles');
+  }
+  const data = result.data?.data ?? result.data;
+  return Array.isArray(data) ? data : (data?.items ?? []);
+};
+
+MarketingOpsService.prototype.listIntelligenceProfileDrafts = async function (): Promise<IntelligenceProfile[]> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/drafts`,
+    {},
+    'mkt-ops-intel-profile-drafts',
+    this.cacheTTL,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list intelligence profile drafts');
+  }
+  const data = result.data?.data ?? result.data;
+  return Array.isArray(data) ? data : (data?.items ?? []);
+};
+
+MarketingOpsService.prototype.getIntelligenceProfile = async function (id: string): Promise<IntelligenceProfileWithVersions> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}`,
+    {},
+    `mkt-ops-intel-profile-${id}`,
+    this.cacheTTL,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch intelligence profile');
+  }
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.getIntelligenceProfileVersion = async function (id: string, version: number): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/${version}`,
+    {},
+    `mkt-ops-intel-profile-${id}-v${version}`,
+    this.cacheTTL,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch intelligence profile version');
+  }
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.resolveIntelligenceProfile = async function (category: string): Promise<IntelligenceProfile | null> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/resolve/${encodeURIComponent(category)}`,
+    {},
+    `mkt-ops-intel-profile-resolve-${category}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve intelligence profile');
+  }
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.createIntelligenceProfile = async function (input: {
+  categoryKey: string;
+  categoryName: string;
+  configurationJson: Record<string, any>;
+  status?: ProfileStatus;
+}): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles`,
+    { method: 'POST', body: JSON.stringify(input) },
+    'mkt-ops-intel-profile-create',
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create intelligence profile');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.publishIntelligenceProfile = async function (id: string, input: {
+  configurationJson: Record<string, any>;
+  categoryName?: string;
+}): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/publish`,
+    { method: 'POST', body: JSON.stringify(input) },
+    'mkt-ops-intel-profile-publish',
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to publish intelligence profile');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.activateIntelligenceProfileDraft = async function (id: string, version: number): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/${version}/activate`,
+    { method: 'POST', body: '{}' },
+    'mkt-ops-intel-profile-activate',
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to activate intelligence profile draft');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
+  return result.data?.data ?? result.data;
+};
+
+// ─── Intelligence Run Methods ─────────────────────────────────────────────
+
+MarketingOpsService.prototype.listIntelligenceRuns = async function (campaignId: string): Promise<IntelligenceRun[]> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-runs?campaignId=${encodeURIComponent(campaignId)}`,
+    {},
+    `mkt-ops-intel-runs-${campaignId}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list intelligence runs');
+  }
+  const data = result.data?.data ?? result.data;
+  return Array.isArray(data) ? data : (data?.items ?? []);
+};
+
+MarketingOpsService.prototype.getIntelligenceRun = async function (runId: string): Promise<IntelligenceRun | null> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-runs/${runId}`,
+    {},
+    `mkt-ops-intel-run-${runId}`,
+    this.cacheTTL,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch intelligence run');
+  }
   return result.data?.data ?? result.data;
 };
 

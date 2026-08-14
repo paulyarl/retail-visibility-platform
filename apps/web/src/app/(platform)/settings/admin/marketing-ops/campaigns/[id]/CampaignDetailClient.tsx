@@ -74,6 +74,7 @@ const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   retainer: 'Retainer',
   category_analysis: 'Category Analysis',
   city_analysis: 'City Analysis',
+  fragment: 'Fragment',
 };
 
 export default function CampaignDetailClient({
