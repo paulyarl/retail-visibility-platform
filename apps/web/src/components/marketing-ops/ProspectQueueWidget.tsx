@@ -77,7 +77,7 @@ export default function ProspectQueueWidget() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                    {entry.business_name}
+                    {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
                   </span>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {entry.priority === 'high' && (

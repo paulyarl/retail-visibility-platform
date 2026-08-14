@@ -866,7 +866,8 @@ export type ProspectPriority = 'high' | 'normal';
 export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'other';
 
 export interface AddToQueueInput {
-  business_name: string;
+  // Required for business-scope entries; optional for category/city-scope.
+  business_name?: string;
   title?: string;
   category?: string;
   city?: string;
@@ -907,7 +908,7 @@ export interface ProspectQueuePatch {
 
 export interface ProspectQueueEntry {
   id: string;
-  business_name: string;
+  business_name: string | null;
   title?: string | null;
   category?: string | null;
   city?: string | null;

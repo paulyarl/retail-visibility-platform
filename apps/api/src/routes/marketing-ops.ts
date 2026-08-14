@@ -3684,7 +3684,9 @@ router.post('/checklist-suggestions/:id/reject', async (req: any, res: Response)
 // routes are single-segment literals and are matched before the catch-all.
 
 const prospectQueueAddSchema = z.object({
-  business_name: z.string().min(1).max(255),
+  // business_name is required only for business-scope entries (enforced in
+  // superRefine below). Optional for category/city-scope entries.
+  business_name: z.string().max(255).optional(),
   title: z.string().max(255).optional(),
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
@@ -3708,6 +3710,19 @@ const prospectQueueAddSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['source_campaign_id'],
       message: 'source_campaign_id is required for non-manual source kinds',
+    });
+  }
+  // business_name is required for business-scope manual entries. For
+  // audit-derived entries the scope is inherited from the parent campaign, so
+  // we can't validate here — the service enforces it after resolving scope.
+  const resolvedScope = data.source_kind === 'manual' && !data.source_campaign_id
+    ? (data.scope ?? 'business')
+    : null;
+  if (resolvedScope === 'business' && !(data.business_name && data.business_name.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['business_name'],
+      message: 'business_name is required for business-scope entries',
     });
   }
 });

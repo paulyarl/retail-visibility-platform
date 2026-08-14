@@ -42,7 +42,9 @@ export type ProspectPriority = 'high' | 'normal';
 export type ProspectCampaignScope = 'business' | 'category' | 'city';
 
 export interface ProspectQueueAddInput {
-  business_name: string;
+  // Required for business-scope entries; optional for category/city-scope
+  // entries (the triggering business may be unknown or irrelevant).
+  business_name?: string;
   // Optional scope-neutral descriptive title (e.g. "Q3 Austin restaurant
   // review-gap test"). Persisted on the queue entry and forwarded to the
   // campaign when the operator creates one from the queue.
@@ -115,11 +117,6 @@ class MarketingProspectQueueServiceClass extends BaseService {
    */
   async addToQueue(input: ProspectQueueAddInput, ctx?: RequestCtx): Promise<AddToQueueResult> {
     try {
-      const businessName = input.business_name.trim();
-      if (!businessName) {
-        throw new ConflictError('business_name is required');
-      }
-
       // Load parent campaign to inherit scope/category/city/state defaults.
       // Manual entries (added directly from the queue page) may have no parent
       // campaign — fall back to the input values directly.
@@ -143,6 +140,15 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const sourceScope = parent
         ? (parent.scope as string | null)
         : (input.scope ?? 'business');
+      const resolvedScope = sourceScope ?? 'business';
+
+      // business_name is required only for business-scope entries. For
+      // category/city-scope entries the triggering business may be unknown
+      // or irrelevant, so it is optional.
+      const businessName = (input.business_name ?? '').trim();
+      if (resolvedScope === 'business' && !businessName) {
+        throw new ConflictError('business_name is required for business-scope entries');
+      }
 
       // Denormalize signal/rating/review fields from the snapshot so the card
       // can render without unpacking business_snapshot per row.
@@ -152,18 +158,24 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const rating = extractRating(snapshot);
       const reviewCount = extractReviewCount(snapshot);
 
-      // Dedup: active queue entry for the same normalized triple.
+      // Dedup: active queue entry for the same normalized identity.
+      // Business scope dedups on the full triple (business_name + city +
+      // category). Category/city scope entries have no business_name, so they
+      // dedup on city + category only (matching a null business_name row).
+      const dedupWhere: any = { status: 'queued' };
+      if (businessName) {
+        dedupWhere.business_name = { equals: businessName, mode: 'insensitive' };
+      } else {
+        dedupWhere.business_name = null;
+      }
+      Object.assign(dedupWhere, insensitiveEq('city', city));
+      Object.assign(dedupWhere, insensitiveEq('category', category));
       const existingQueued = await this.prisma.mkt_prospect_queue.findFirst({
-        where: {
-          status: 'queued',
-          business_name: { equals: businessName, mode: 'insensitive' },
-          ...insensitiveEq('city', city),
-          ...insensitiveEq('category', category),
-        },
+        where: dedupWhere,
       });
       if (existingQueued) {
         logger.info('addToQueue: returning existing queued entry', ctx, {
-          existingId: existingQueued.id, businessName,
+          existingId: existingQueued.id, businessName: businessName || null,
         });
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
@@ -173,7 +185,6 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // Business scope dedups on the full triple (business_name + city +
       // category). Category/city scope campaigns are category-level, so they
       // dedup on city + category only (the triggering business is irrelevant).
-      const resolvedScope = sourceScope ?? 'business';
       const campaignExistsWhere: any = { scope: resolvedScope };
       if (resolvedScope === 'business') {
         campaignExistsWhere.business_name = { equals: businessName, mode: 'insensitive' };
@@ -186,7 +197,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       });
       if (existingCampaign) {
         logger.info('addToQueue: campaign already exists for prospect', ctx, {
-          campaignId: existingCampaign.id, businessName, scope: resolvedScope,
+          campaignId: existingCampaign.id, businessName: businessName || null, scope: resolvedScope,
         });
         return { kind: 'campaign_exists', campaignId: existingCampaign.id };
       }
@@ -195,7 +206,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const entry = await this.prisma.mkt_prospect_queue.create({
         data: {
           id,
-          business_name: businessName,
+          business_name: businessName || null,
           title: input.title ?? null,
           category,
           city,
@@ -219,13 +230,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       });
 
       logger.info('addToQueue: created queue entry', ctx, {
-        id, businessName, sourceKind: input.source_kind, signalCount,
+        id, businessName: businessName || null, sourceKind: input.source_kind, signalCount,
       });
       return { kind: 'created', entry, created: true };
     } catch (error) {
       logger.error('addToQueue failed', ctx, {
         error: (error as Error).message,
-        businessName: input.business_name,
+        businessName: input.business_name ?? null,
         sourceCampaignId: input.source_campaign_id,
       });
       throw this.handleError(error, ctx);
@@ -403,7 +414,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         const campaign = await MarketingCampaignService.createCampaign({
           scope: campaignScope,
           title: entry.title ?? undefined,
-          businessName: entry.business_name,
+          businessName: entry.business_name ?? undefined,
           category: entry.category ?? '',
           city: entry.city ?? '',
           assignedTo: assignee ?? undefined,
@@ -475,9 +486,15 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }
       } else {
         // category_analysis / manual (with parent) → thin path.
+        // deriveBusinessCampaign creates a business-scope child, so a
+        // business_name is required. Audit-derived entries always carry one.
+        const derivedBusinessName = entry.business_name ?? '';
+        if (!derivedBusinessName) {
+          throw new ConflictError('Cannot derive business campaign: queue entry has no business_name');
+        }
         const campaign = await MarketingCampaignService.deriveBusinessCampaign({
           parentId: entry.source_campaign_id,
-          businessName: entry.business_name,
+          businessName: derivedBusinessName,
           title: entry.title ?? undefined,
           rating: entry.rating != null ? Number(entry.rating) : undefined,
           reviewCount: entry.review_count ?? undefined,

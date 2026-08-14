@@ -6987,7 +6987,7 @@ model mkt_playbook_checklist_suggestions {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_prospect_queue {
   id                                                                              String              @id @db.VarChar(255)
-  business_name                                                                   String              @db.VarChar(255)
+  business_name                                                                   String?             @db.VarChar(255)
   category                                                                        String?             @db.VarChar(255)
   city                                                                            String?             @db.VarChar(255)
   state                                                                           String?             @db.VarChar(255)

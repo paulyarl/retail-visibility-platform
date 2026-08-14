@@ -262,15 +262,16 @@ export default function ProspectQueueClient() {
 
   const handleAddToQueue = async (keepOpen: boolean) => {
     const businessName = addForm.business_name.trim();
-    if (!businessName) {
-      setAddFeedback({ kind: 'exists', message: 'Business name is required.' });
+    // business_name is required only for business-scope entries.
+    if (addForm.scope === 'business' && !businessName) {
+      setAddFeedback({ kind: 'exists', message: 'Business name is required for business-scope entries.' });
       return;
     }
     setAddingToQueue(true);
     setAddFeedback(null);
     try {
       const input: AddToQueueInput = {
-        business_name: businessName,
+        business_name: businessName || undefined,
         title: addForm.title.trim() || undefined,
         category: addForm.category.trim() || undefined,
         city: addForm.city.trim() || undefined,
@@ -290,7 +291,7 @@ export default function ProspectQueueClient() {
         setAddFeedback({
           kind: 'exists',
           campaignId: result.campaignId,
-          message: 'A campaign already exists for this business.',
+          message: 'A campaign already exists for this prospect.',
         });
       } else if (result.kind === 'already_queued') {
         setAddFeedback({ kind: 'already', message: 'Already in the queue.' });
@@ -496,12 +497,17 @@ export default function ProspectQueueClient() {
                     const assigneeLabel = staffDisplayName(staffUsers, entry.assigned_to);
                     return (
                       <tr key={entry.id} className={`border-l-4 ${rowBorderClass(entry)} hover:bg-gray-50 dark:hover:bg-neutral-700/20`}>
-                        {/* Business */}
+                        {/* Business / Title */}
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-medium text-gray-900 dark:text-white">{entry.business_name}</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
+                            </span>
                             {entry.is_hot_prospect && <Flame className="w-3 h-3 text-orange-500 flex-shrink-0" />}
                           </div>
+                          {entry.title && entry.business_name && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{entry.business_name}</div>
+                          )}
                           <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                             <MapPin className="w-3 h-3" />
                             {[entry.city, entry.state].filter(Boolean).join(', ') || '—'}
@@ -769,40 +775,6 @@ export default function ProspectQueueClient() {
                 Capture a hot prospect discovered outside an audit. Source will be recorded as <span className="font-medium">Manual</span>.
               </p>
 
-              {/* Business name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Business name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={addForm.business_name}
-                  onChange={(e) => setAddForm((f) => ({ ...f, business_name: e.target.value }))}
-                  autoFocus
-                  disabled={addingToQueue}
-                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="e.g. Joe's Pizza"
-                />
-              </div>
-
-              {/* Title — optional scope-neutral descriptive label */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Title <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={addForm.title}
-                  onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
-                  disabled={addingToQueue}
-                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="e.g. Q3 Austin restaurant review-gap test"
-                />
-                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
-                  Scope-neutral descriptive label for the campaign objective. Forwarded to the campaign on Create.
-                </p>
-              </div>
-
               {/* Campaign scope — determines what kind of campaign "Create" will build */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -835,8 +807,45 @@ export default function ProspectQueueClient() {
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
                   {addForm.scope === 'business'
                     ? 'Create will build a business-scope campaign for this one business.'
-                    : `Create will build a ${addForm.scope}-scope campaign; this business is the entry-point prospect.`}
+                    : `Create will build a ${addForm.scope}-scope campaign; a business name is optional.`}
                 </p>
+              </div>
+
+              {/* Title — optional scope-neutral descriptive label */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Title <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={addForm.title}
+                  onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
+                  disabled={addingToQueue}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  placeholder="e.g. Q3 Austin restaurant review-gap test"
+                />
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                  Scope-neutral descriptive label for the campaign objective. Forwarded to the campaign on Create.
+                </p>
+              </div>
+
+              {/* Business name — required for business scope, optional otherwise */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Business name
+                  {addForm.scope === 'business'
+                    ? <span className="text-red-500"> *</span>
+                    : <span className="text-gray-400 font-normal"> (optional)</span>}
+                </label>
+                <input
+                  type="text"
+                  value={addForm.business_name}
+                  onChange={(e) => setAddForm((f) => ({ ...f, business_name: e.target.value }))}
+                  autoFocus={addForm.scope === 'business'}
+                  disabled={addingToQueue}
+                  className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  placeholder="e.g. Joe's Pizza"
+                />
               </div>
 
               {/* Category + City */}
@@ -937,7 +946,7 @@ export default function ProspectQueueClient() {
               </button>
               <button
                 onClick={() => handleAddToQueue(true)}
-                disabled={addingToQueue || !addForm.business_name.trim()}
+                disabled={addingToQueue || (addForm.scope === 'business' && !addForm.business_name.trim())}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 disabled:opacity-50"
                 title="Save and keep the modal open for another entry"
               >
@@ -946,7 +955,7 @@ export default function ProspectQueueClient() {
               </button>
               <button
                 onClick={() => handleAddToQueue(false)}
-                disabled={addingToQueue || !addForm.business_name.trim()}
+                disabled={addingToQueue || (addForm.scope === 'business' && !addForm.business_name.trim())}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
               >
                 {addingToQueue ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}

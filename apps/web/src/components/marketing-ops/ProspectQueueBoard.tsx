@@ -395,14 +395,14 @@ function BoardCard({
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
         {isQueued ? (
           <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
-            {entry.business_name}
+            {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
           </span>
         ) : (
           <Link
             href={entry.processed_campaign_id ? `/settings/admin/marketing-ops/campaigns/${entry.processed_campaign_id}` : '#'}
             className="font-medium text-sm text-gray-900 dark:text-white truncate hover:underline"
           >
-            {entry.business_name}
+            {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
           </Link>
         )}
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -429,6 +429,11 @@ function BoardCard({
           )}
         </div>
       </div>
+
+      {/* Secondary: business name when title is the primary heading */}
+      {entry.title && entry.business_name && (
+        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate">{entry.business_name}</div>
+      )}
 
       {/* City + category */}
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-1.5">
