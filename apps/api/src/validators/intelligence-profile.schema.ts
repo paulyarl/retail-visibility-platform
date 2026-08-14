@@ -47,9 +47,7 @@ export const intelligenceProfileSchema = z.object({
   synonyms: z.array(z.string()).optional(),
 
   // Subcategories — with descriptions
-  subcategories: z.array(
-    z.string().passthrough(),
-  ).optional(),
+  subcategories: z.array(z.string()).optional(),
 
   // Specialized sources — with capabilities and limitations
   specialized_sources: z.array(specializedSourceSchema).min(1),

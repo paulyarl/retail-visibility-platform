@@ -86,7 +86,7 @@ export class IntelligenceRunService extends BaseService {
           candidate_count: input.candidateCount || 0,
           qualifying_count: input.qualifyingCount || 0,
           hold_count: input.holdCount || 0,
-          metadata: input.metadata || null,
+          metadata: (input.metadata ?? undefined) as any,
         },
       });
       logger.info('Intelligence run created', ctx, {
