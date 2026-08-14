@@ -40,12 +40,6 @@ const ownershipTypeEnum = z.enum([
   'unknown',
 ]);
 
-// Tolerant preprocessor: lowercases + trims string input before enum validation.
-const tolerantEnum = <T extends z.ZodEnum<any>(schema: T) => z.ZodEffects<z.ZodString, z.infer<T>, unknown> => {
-  // This wrapper is not used — we use the direct preprocess below instead.
-  return schema as any;
-};
-
 // ─── Discovery Provenance ────────────────────────────────────────────────
 
 const discoveryProvenanceSchema = z.object({
