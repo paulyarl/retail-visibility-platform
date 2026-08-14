@@ -3695,6 +3695,9 @@ const prospectQueueAddSchema = z.object({
   business_snapshot: z.record(z.string(), z.any()).default({}),
   priority: z.enum(['high', 'normal']).default('normal'),
   note: z.string().max(2000).optional(),
+  // Operator-chosen campaign scope for manual entries (default 'business').
+  // Ignored for audit-derived entries (scope inherited from parent campaign).
+  scope: z.enum(['business', 'category', 'city']).optional(),
 }).superRefine((data, ctx) => {
   if (data.source_kind !== 'manual' && !data.source_campaign_id) {
     ctx.addIssue({
@@ -3723,6 +3726,7 @@ router.post('/prospect-queue', async (req: any, res: Response) => {
       priority: parsed.priority,
       note: parsed.note,
       queuedBy: req.user?.id,
+      scope: parsed.scope,
     }, getCtx(req));
 
     if (result.kind === 'campaign_exists') {

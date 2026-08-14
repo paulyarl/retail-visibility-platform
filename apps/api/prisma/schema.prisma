@@ -6184,6 +6184,7 @@ model mkt_campaigns_list {
   engagement_cycle                                                                Int                                  @default(1)
   is_primary_sibling                                                              Boolean                              @default(false)
   playbook_code                                                                   String?                              @db.VarChar(20)
+  title                                                                           String?                              @db.VarChar(255)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]
@@ -7012,6 +7013,7 @@ model mkt_prospect_queue {
   dismissed_reason                                                                String?             @db.VarChar(255)
   created_at                                                                      DateTime            @default(now()) @db.Timestamptz(6)
   updated_at                                                                      DateTime            @default(now()) @db.Timestamptz(6)
+  title                                                                           String?             @db.VarChar(255)
   mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_campaigns_list? @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list", fields: [processed_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_processed_campaign")
   mkt_campaigns_list_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_campaigns_list? @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list", fields: [source_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_source_campaign")
 

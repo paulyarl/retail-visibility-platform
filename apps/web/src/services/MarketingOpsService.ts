@@ -877,6 +877,8 @@ export interface AddToQueueInput {
   business_snapshot?: Record<string, any>;
   priority?: ProspectPriority;
   note?: string;
+  // Operator-chosen campaign scope for manual entries (default 'business').
+  scope?: CampaignScope;
 }
 
 export type AddToQueueResult =

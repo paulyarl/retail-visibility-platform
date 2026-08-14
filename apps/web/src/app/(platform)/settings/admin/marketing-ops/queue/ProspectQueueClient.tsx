@@ -8,7 +8,7 @@ import {
 import Link from 'next/link';
 import marketingOpsService, {
   ProspectQueueEntry, ProspectStatus, ProspectPriority, ProspectDismissReason,
-  AddToQueueInput, AddToQueueResult,
+  AddToQueueInput, AddToQueueResult, CampaignScope,
 } from '@/services/MarketingOpsService';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import ProspectQueueBoard from '@/components/marketing-ops/ProspectQueueBoard';
@@ -33,6 +33,18 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
 };
 
 const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'other'];
+
+const SCOPE_LABELS: Record<string, string> = {
+  business: 'Business',
+  category: 'Category',
+  city: 'City',
+};
+
+const SCOPE_BADGE_COLORS: Record<string, string> = {
+  business: 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300',
+  category: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  city: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -110,6 +122,7 @@ export default function ProspectQueueClient() {
     state: '',
     priority: 'normal' as ProspectPriority,
     note: '',
+    scope: 'business' as CampaignScope,
   });
   const [addingToQueue, setAddingToQueue] = useState(false);
   const [addFeedback, setAddFeedback] = useState<{ kind: 'created' | 'already' | 'exists'; campaignId?: string; message: string } | null>(null);
@@ -239,6 +252,7 @@ export default function ProspectQueueClient() {
       state: '',
       priority: 'normal',
       note: '',
+      scope: 'business',
     });
     setAddFeedback(null);
     setAddModalOpen(true);
@@ -261,6 +275,7 @@ export default function ProspectQueueClient() {
         source_kind: 'manual',
         priority: addForm.priority,
         note: addForm.note.trim() || undefined,
+        scope: addForm.scope,
         business_snapshot: {
           rating: null,
           review_count: null,
@@ -280,7 +295,7 @@ export default function ProspectQueueClient() {
         await fetchQueue();
         if (keepOpen) {
           // "Save and New" — clear the form, show brief confirmation, keep modal open.
-          setAddForm({ business_name: '', category: '', city: '', state: '', priority: 'normal', note: '' });
+          setAddForm({ business_name: '', category: '', city: '', state: '', priority: 'normal', note: '', scope: 'business' });
           setAddFeedback({ kind: 'created', message: 'Added to the queue. Add another?' });
         } else {
           // "Add to Queue" — close the modal immediately.
@@ -537,7 +552,17 @@ export default function ProspectQueueClient() {
 
                         {/* Source */}
                         <td className="px-3 py-2 text-xs">
-                          <span className="text-gray-600 dark:text-gray-400">{SOURCE_KIND_LABELS[entry.source_kind] ?? entry.source_kind}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-600 dark:text-gray-400">{SOURCE_KIND_LABELS[entry.source_kind] ?? entry.source_kind}</span>
+                            {entry.source_scope && entry.source_scope !== 'business' && (
+                              <span
+                                className={`rounded px-1 py-0.5 text-[9px] font-semibold ${SCOPE_BADGE_COLORS[entry.source_scope] ?? SCOPE_BADGE_COLORS.business}`}
+                                title={`Campaign scope: ${entry.source_scope}`}
+                              >
+                                {SCOPE_LABELS[entry.source_scope] ?? entry.source_scope}
+                              </span>
+                            )}
+                          </div>
                           {entry.source_campaign_id && (
                             <Link
                               href={`/settings/admin/marketing-ops/campaigns/${entry.source_campaign_id}`}
@@ -652,7 +677,7 @@ export default function ProspectQueueClient() {
                                   onClick={() => handleCreateCampaign(entry.id)}
                                   disabled={creatingId === entry.id}
                                   className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700 disabled:opacity-50"
-                                  title="Create a business-scope campaign from this prospect"
+                                  title={`Create a ${entry.source_scope ?? 'business'}-scope campaign from this prospect`}
                                 >
                                   {creatingId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                                   Create
@@ -755,6 +780,42 @@ export default function ProspectQueueClient() {
                   className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
                   placeholder="e.g. Joe's Pizza"
                 />
+              </div>
+
+              {/* Campaign scope — determines what kind of campaign "Create" will build */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Campaign scope
+                </label>
+                <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden w-full">
+                  {(['business', 'category', 'city'] as CampaignScope[]).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setAddForm((f) => ({ ...f, scope: s }))}
+                      disabled={addingToQueue}
+                      className={`flex-1 px-2 py-1.5 text-xs font-medium capitalize disabled:opacity-50 ${
+                        addForm.scope === s
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-neutral-900 dark:text-gray-300 dark:hover:bg-neutral-700'
+                      }`}
+                      title={
+                        s === 'business'
+                          ? 'One campaign focused on this single business (default)'
+                          : s === 'category'
+                            ? 'A category-level campaign; this business is the triggering prospect'
+                            : 'A city-level campaign; this business is the triggering prospect'
+                      }
+                    >
+                      {SCOPE_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                  {addForm.scope === 'business'
+                    ? 'Create will build a business-scope campaign for this one business.'
+                    : `Create will build a ${addForm.scope}-scope campaign; this business is the entry-point prospect.`}
+                </p>
               </div>
 
               {/* Category + City */}

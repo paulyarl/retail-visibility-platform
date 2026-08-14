@@ -39,6 +39,8 @@ export type ProspectSourceKind =
 export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';
 
+export type ProspectCampaignScope = 'business' | 'category' | 'city';
+
 export interface ProspectQueueAddInput {
   business_name: string;
   category?: string;
@@ -55,6 +57,10 @@ export interface ProspectQueueAddInput {
   priority?: ProspectPriority;
   note?: string;
   queuedBy?: string;
+  // Operator-chosen campaign scope for manual entries (no parent campaign).
+  // Defaults to 'business' (legacy behavior). Audit-derived entries inherit
+  // the parent campaign's scope and ignore this field.
+  scope?: ProspectCampaignScope;
 }
 
 export type AddToQueueResult =
@@ -127,7 +133,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const category = (input.category ?? parent?.category ?? null) as string | null;
       const city = (input.city ?? parent?.city ?? null) as string | null;
       const state = (input.state ?? parent?.state ?? null) as string | null;
-      const sourceScope = parent ? (parent.scope as string | null) : null;
+      // For audit-derived entries, inherit the parent campaign's scope.
+      // For manual entries (no parent), use the operator-chosen scope,
+      // defaulting to 'business' (legacy behavior).
+      const sourceScope = parent
+        ? (parent.scope as string | null)
+        : (input.scope ?? 'business');
 
       // Denormalize signal/rating/review fields from the snapshot so the card
       // can render without unpacking business_snapshot per row.
@@ -153,20 +164,25 @@ class MarketingProspectQueueServiceClass extends BaseService {
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
 
-      // Campaign-exists check (AC84 rule): a business-scope campaign for the
-      // same triple means the prospect is already in the pipeline — surface it.
+      // Campaign-exists check (AC84 rule): a campaign for the same scope +
+      // identity means the prospect is already in the pipeline — surface it.
+      // Business scope dedups on the full triple (business_name + city +
+      // category). Category/city scope campaigns are category-level, so they
+      // dedup on city + category only (the triggering business is irrelevant).
+      const resolvedScope = sourceScope ?? 'business';
+      const campaignExistsWhere: any = { scope: resolvedScope };
+      if (resolvedScope === 'business') {
+        campaignExistsWhere.business_name = { equals: businessName, mode: 'insensitive' };
+      }
+      Object.assign(campaignExistsWhere, insensitiveEq('city', city));
+      Object.assign(campaignExistsWhere, insensitiveEq('category', category));
       const existingCampaign = await this.prisma.mkt_campaigns_list.findFirst({
-        where: {
-          scope: 'business',
-          business_name: { equals: businessName, mode: 'insensitive' },
-          ...insensitiveEq('city', city),
-          ...insensitiveEq('category', category),
-        },
+        where: campaignExistsWhere,
         select: { id: true },
       });
       if (existingCampaign) {
-        logger.info('addToQueue: campaign already exists for business', ctx, {
-          campaignId: existingCampaign.id, businessName,
+        logger.info('addToQueue: campaign already exists for prospect', ctx, {
+          campaignId: existingCampaign.id, businessName, scope: resolvedScope,
         });
         return { kind: 'campaign_exists', campaignId: existingCampaign.id };
       }
@@ -373,18 +389,20 @@ class MarketingProspectQueueServiceClass extends BaseService {
       let result: { campaign: any; created: boolean };
 
       // Manual entries with no parent campaign (added directly from the queue
-      // page) create a business-scope campaign directly — there is no parent
-      // to derive category/city/tone/attributes from, so we seed from the
-      // queue entry's own fields.
+      // page) create a campaign directly — there is no parent to derive
+      // category/city/tone/attributes from, so we seed from the queue entry's
+      // own fields. The campaign scope follows the operator's choice stored
+      // on the entry (source_scope), defaulting to 'business' for legacy rows.
       if (!entry.source_campaign_id) {
+        const campaignScope = (entry.source_scope as any) ?? 'business';
         const campaign = await MarketingCampaignService.createCampaign({
-          scope: 'business',
+          scope: campaignScope,
           businessName: entry.business_name,
           category: entry.category ?? '',
           city: entry.city ?? '',
           assignedTo: assignee ?? undefined,
           notes: [
-            `Manually queued prospect (no parent campaign).`,
+            `Manually queued prospect (no parent campaign, scope=${campaignScope}).`,
             entry.city ? `City: ${entry.city}` : null,
             entry.category ? `Category: ${entry.category}` : null,
             entry.rating != null ? `Rating: ${Number(entry.rating).toFixed(1)}` : null,
