@@ -185,6 +185,7 @@ import OutreachIntelligenceService from '../services/OutreachIntelligenceService
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
 import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
+import { IntelligenceRunService } from '../services/intelligence/IntelligenceRunService';
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
@@ -5922,6 +5923,34 @@ router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
     const profile = await IntelligenceProfileService.getInstance().resolve(req.params.category, getCtx(req));
     res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// INTELLIGENCE RUNS (Sprint 2 — Seek Intelligence Scope)
+// ====================
+
+// GET /intelligence-runs?campaignId= — list runs for a campaign
+router.get('/intelligence-runs', async (req, res) => {
+  try {
+    const campaignId = z.string().parse(req.query.campaignId);
+    const runs = await IntelligenceRunService.getInstance().listRunsForCampaign(campaignId, getCtx(req));
+    res.json({ success: true, data: runs });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /intelligence-runs/:id — get single run
+router.get('/intelligence-runs/:id', async (req, res) => {
+  try {
+    const run = await IntelligenceRunService.getInstance().getRun(req.params.id, getCtx(req));
+    if (!run) {
+      return res.status(404).json({ success: false, error: 'Run not found' });
+    }
+    res.json({ success: true, data: run });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -37,6 +37,16 @@ import {
   CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME,
   CITY_CATEGORY_OPPORTUNITY_PROMPT_SUFFIX,
 } from './city-category-opportunity.schema';
+import {
+  intelligenceDiscoverySchemaWithRefinements as intelligenceDiscoverySchema,
+  INTELLIGENCE_DISCOVERY_SCHEMA_NAME,
+  INTELLIGENCE_DISCOVERY_PROMPT_SUFFIX,
+} from './intelligence-discovery.schema';
+import {
+  intelligenceProfileSchema,
+  INTELLIGENCE_PROFILE_SCHEMA_NAME,
+  INTELLIGENCE_PROFILE_PROMPT_SUFFIX,
+} from './intelligence-profile.schema';
 
 /**
  * Strip a trailing `%` and coerce to number.
@@ -172,6 +182,16 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: cityCategoryOpportunitySchema,
     auditPlatform: 'city_category_analysis',
     promptSuffix: CITY_CATEGORY_OPPORTUNITY_PROMPT_SUFFIX,
+  },
+  [INTELLIGENCE_DISCOVERY_SCHEMA_NAME]: {
+    validator: intelligenceDiscoverySchema,
+    auditPlatform: null, // intelligence discovery creates queue entries, not audits
+    promptSuffix: INTELLIGENCE_DISCOVERY_PROMPT_SUFFIX,
+  },
+  [INTELLIGENCE_PROFILE_SCHEMA_NAME]: {
+    validator: intelligenceProfileSchema,
+    auditPlatform: null, // profile establishment creates draft profiles, not audits
+    promptSuffix: INTELLIGENCE_PROFILE_PROMPT_SUFFIX,
   },
 };
 

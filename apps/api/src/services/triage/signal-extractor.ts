@@ -155,10 +155,17 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
   // array constrained to the platform's signal codes. This is the canonical
   // path — derived codes below are the legacy fallback for audits that
   // predate the signal-aware prompt contract.
+  //
+  // §S1 guardrail: INT_* (Intelligence-scope discovery signals) are excluded
+  // from triage evaluation. They are discovery signals, not audit signals,
+  // and must never flow into playbook rule evaluation. The INT family is
+  // kept strictly separate from Business-Audit signal families (RA/DS/WC/CP/VP).
   const modelEmitted = (auditData as any)?.detected_signals;
   if (Array.isArray(modelEmitted)) {
     for (const code of modelEmitted) {
       if (typeof code === 'string' && code.length > 0) {
+        // §S1: filter out INT_* codes — they are discovery signals, not audit signals.
+        if (code.startsWith('INT_')) continue;
         // Accept known + unknown codes (forward-compatible). Unknown codes
         // are validated against the registry at runtime by the engine.
         signals.add(code as SignalCode);

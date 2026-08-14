@@ -548,6 +548,35 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
+      // GAP-P8: best-effort post-import hook for intelligence_profile schema.
+      // When an operator imports an externally-generated profile via
+      // /executions/external, the validated JSON is persisted as a DRAFT
+      // profile by IntelligenceProfileService.importAsDraft(). The draft is
+      // inert — the resolver only returns active profiles, so the operator
+      // must explicitly activate it before it affects any prompts.
+      // Catches + logs errors so a persistence failure never fails the import.
+      if (schemaName === 'intelligence_profile' && resolved.auditPlatform === null) {
+        try {
+          const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+          const profile = await IntelligenceProfileService.getInstance().importAsDraft({
+            categoryKey: parsedJson.category_key,
+            categoryName: parsedJson.category_name,
+            configurationJson: parsedJson,
+          }, ctx);
+          logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
+            profileId: profile.id,
+            version: profile.version,
+            categoryKey: profile.category_key,
+            campaignId: input.campaignId,
+          });
+        } catch (profileErr) {
+          logger.error('Intelligence profile draft persistence failed (best-effort, GAP-P8)', ctx, {
+            error: (profileErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
+      }
+
       return result;
     } catch (error) {
       if (error instanceof ScopeMismatchError) {

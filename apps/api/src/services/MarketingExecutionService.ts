@@ -17,6 +17,7 @@ import MarketingCampaignService from './MarketingCampaignService';
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
+import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 
 // Re-export for backward compatibility (tests + existing imports).
 export { ScopeMismatchError, assertScopeCompatible };
@@ -127,16 +128,23 @@ export class MarketingExecutionService extends BaseService {
 
       assertScopeCompatible(template, campaign);
 
+      // Resolve the prompt with profile-aware amplification (§1B, GAP-P7).
+      // For non-seek or non-business-scope prompts, this returns the base
+      // render byte-identical (no amplification).
+      const { renderedPrompt, resolution } = await this.resolvePrompt(
+        { template, campaign, variables: input.variables },
+        ctx,
+      );
+
       const execution = await promptService.createExecution({
         campaignId: input.campaignId,
         templateId: input.templateId,
         variablesUsed: input.variables,
         executedBy: input.executedBy,
+        resolution,
       }, ctx);
 
       try {
-        const renderedPrompt = this.renderTemplate(template.body, input.variables, campaign);
-
         const result = await aiProviderFactory.generateChatCompletion({
           messages: [
             { role: 'system', content: 'You are a marketing assistant generating content for local business prospects. Follow the prompt instructions precisely.' },
@@ -203,6 +211,10 @@ export class MarketingExecutionService extends BaseService {
   /**
    * Resolve a prompt template against a campaign without executing AI.
    * Returns the fully substituted prompt string for external use.
+   *
+   * Now routes through resolvePrompt() for profile-aware amplification (§1B).
+   * When no active profile exists, the output is byte-identical to the
+   * pre-amplification render.
    */
   async renderPrompt(input: {
     templateId: string;
@@ -219,7 +231,88 @@ export class MarketingExecutionService extends BaseService {
       throw new Error(`Campaign ${input.campaignId} not found`);
     }
     assertScopeCompatible(template, campaign);
-    return this.renderTemplate(template.body, input.variables, campaign);
+    const { renderedPrompt } = await this.resolvePrompt({ template, campaign, variables: input.variables }, ctx);
+    return renderedPrompt;
+  }
+
+  /**
+   * Resolve a prompt for a campaign with profile-aware amplification (§1B, GAP-P7).
+   *
+   * This is the shared resolution seam used by both renderPrompt() and
+   * executeSingle(). It:
+   *   1. Renders the existing template body using renderTemplate() (base render).
+   *   2. If the prompt is a business-scope seek prompt AND the campaign's
+   *      category has an active intelligence profile, appends a rendered
+   *      business profile block (§1B amplification).
+   *   3. Returns the original base render byte-identical when no profile is
+   *      found (no amplification, intelligence_mode = 'none').
+   *
+   * Gates (all must be true for amplification):
+   *   - template.prompt_type === 'seek'
+   *   - campaign.scope === 'business' (case-insensitive)
+   *   - campaign.category is non-empty
+   *   - an active profile exists for campaign.category
+   *
+   * Returns { renderedPrompt, resolution } where resolution carries the
+   * profile provenance for execution/import stamping.
+   */
+  async resolvePrompt(input: {
+    template: any;
+    campaign: any;
+    variables?: Record<string, any>;
+  }, ctx?: RequestCtx): Promise<{ renderedPrompt: string; resolution: PromptResolution }> {
+    // 1. Base render — always happens first, using the existing renderTemplate().
+    const baseRendered = this.renderTemplate(input.template.body, input.variables, input.campaign);
+
+    // 2. Check amplification gates
+    const promptType = (input.template.prompt_type || '').toLowerCase();
+    const campaignScope = (input.campaign.scope || 'business').toLowerCase();
+    const category = input.campaign.category || '';
+
+    const isSeek = promptType === 'seek';
+    const isBusinessScope = campaignScope === 'business';
+    const hasCategory = category.length > 0;
+
+    if (!isSeek || !isBusinessScope || !hasCategory) {
+      // No amplification — return byte-identical base render.
+      return {
+        renderedPrompt: baseRendered,
+        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+      };
+    }
+
+    // 3. Resolve active profile for the campaign's category.
+    const profileService = IntelligenceProfileService.getInstance();
+    const profile = await profileService.resolve(category, ctx);
+
+    if (!profile) {
+      // No active profile — return byte-identical base render.
+      return {
+        renderedPrompt: baseRendered,
+        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+      };
+    }
+
+    // 4. Append the business profile block (§1B amplification).
+    const profileBlock = profileService.renderBusinessProfileBlock(profile);
+    const amplified = baseRendered + '\n' + profileBlock;
+
+    logger.info('Profile-aware prompt resolved (§1B)', ctx, {
+      campaignId: input.campaign.id,
+      category,
+      profileId: profile.id,
+      profileVersion: profile.version,
+      intelligenceMode: 'profile',
+    });
+
+    return {
+      renderedPrompt: amplified,
+      resolution: {
+        profile_id: profile.id,
+        profile_version: profile.version,
+        intelligence_mode: 'profile',
+      },
+    };
   }
 
   /**
