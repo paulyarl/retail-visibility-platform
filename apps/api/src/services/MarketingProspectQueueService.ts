@@ -34,12 +34,13 @@ export type ProspectSourceKind =
   | 'category_analysis'
   | 'city_category_audit'
   | 'scan_unmatched'
-  | 'manual';
+  | 'manual'
+  | 'intelligence_seek';
 
 export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';
 
-export type ProspectCampaignScope = 'business' | 'category' | 'city';
+export type ProspectCampaignScope = 'business' | 'category' | 'city' | 'intelligence';
 
 export interface ProspectQueueAddInput {
   // Required for business-scope entries; optional for category/city-scope

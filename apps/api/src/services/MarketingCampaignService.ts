@@ -62,7 +62,7 @@ export type ConversionSource =
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
-export type CampaignScope = 'business' | 'category' | 'city';
+export type CampaignScope = 'business' | 'category' | 'city' | 'intelligence';
 
 // Review track — existing sales-pipeline machine (unchanged).
 const REVIEW_TRANSITIONS: Record<string, string[]> = {

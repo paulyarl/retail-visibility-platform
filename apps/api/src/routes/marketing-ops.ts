@@ -184,6 +184,7 @@ import MarketingProspectQueueService from '../services/MarketingProspectQueueSer
 import OutreachIntelligenceService from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
+import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
@@ -202,7 +203,7 @@ router.use(requirePlatformAdmin);
 // ====================
 
 const campaignBaseSchema = z.object({
-  scope: z.enum(['business', 'category', 'city']).optional(),
+  scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   title: z.string().max(255).optional(),
   business_name: z.string().max(255).optional(),
   category: z.string().min(1).max(100),
@@ -561,7 +562,7 @@ const fileCreateSchema = z.object({
 const promptTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
   prompt_type: z.enum(['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis']),
-  scope: z.enum(['business', 'category', 'city']).optional(),
+  scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   category: z.string().max(100).optional(),
   tone: z.string().max(50).optional(),
   body: z.string().min(1),
@@ -627,7 +628,7 @@ const scorecardUpsertSchema = z.object({
   date: z.string().datetime(),
   category_focus: z.string().max(100).optional(),
   neighborhood_focus: z.string().max(100).optional(),
-  scope_focus: z.enum(['business', 'category', 'city']).optional(),
+  scope_focus: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   stage_focus: z.string().max(50).optional(),
   previews_built: z.number().int().optional(),
   previews_shown: z.number().int().optional(),
@@ -644,7 +645,7 @@ const scorecardUpdateSchema = z.object({
   date: z.string().datetime().optional(),
   category_focus: z.string().max(100).optional(),
   neighborhood_focus: z.string().max(100).optional(),
-  scope_focus: z.enum(['business', 'category', 'city']).optional(),
+  scope_focus: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   stage_focus: z.string().max(50).optional(),
   previews_built: z.number().int().optional(),
   previews_shown: z.number().int().optional(),
@@ -3694,7 +3695,7 @@ const prospectQueueAddSchema = z.object({
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
-  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual']),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek']),
   // source_campaign_id is required for audit-derived entries; optional for
   // manual entries added directly from the queue page (no parent campaign).
   source_campaign_id: z.string().min(1).optional(),
@@ -3706,7 +3707,7 @@ const prospectQueueAddSchema = z.object({
   note: z.string().max(2000).optional(),
   // Operator-chosen campaign scope for manual entries (default 'business').
   // Ignored for audit-derived entries (scope inherited from parent campaign).
-  scope: z.enum(['business', 'category', 'city']).optional(),
+  scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
 }).superRefine((data, ctx) => {
   if (data.source_kind !== 'manual' && !data.source_campaign_id) {
     ctx.addIssue({
@@ -5799,6 +5800,128 @@ router.get('/:id', async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
     res.json({ success: true, data: campaign });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// INTELLIGENCE PROFILES (Sprint 1 — Seek Intelligence Scope)
+// ====================
+
+const intelligenceProfileCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  categoryKey: z.string().min(1).max(100),
+  categoryName: z.string().min(1).max(100),
+  configurationJson: z.record(z.any()),
+  status: z.enum(['draft', 'active', 'retired']).optional(),
+});
+
+const intelligenceProfilePublishSchema = z.object({
+  categoryName: z.string().min(1).max(100).optional(),
+  configurationJson: z.record(z.any()),
+});
+
+// GET /intelligence-profiles — list active profiles
+router.get('/intelligence-profiles', async (req, res) => {
+  try {
+    const profiles = await IntelligenceProfileService.getInstance().listActive(getCtx(req));
+    res.json({ success: true, data: profiles });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /intelligence-profiles/drafts — list draft profiles awaiting activation
+router.get('/intelligence-profiles/drafts', async (req, res) => {
+  try {
+    const profiles = await IntelligenceProfileService.getInstance().listDrafts(getCtx(req));
+    res.json({ success: true, data: profiles });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /intelligence-profiles/:id — get profile with all versions
+router.get('/intelligence-profiles/:id', async (req, res) => {
+  try {
+    const profiles = await IntelligenceProfileService.getInstance().getProfileWithVersions(req.params.id, getCtx(req));
+    if (profiles.length === 0) {
+      return res.status(404).json({ success: false, error: 'Profile not found' });
+    }
+    res.json({ success: true, data: profiles });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /intelligence-profiles/:id/:version — get specific version
+router.get('/intelligence-profiles/:id/:version', async (req, res) => {
+  try {
+    const version = parseInt(req.params.version, 10);
+    if (isNaN(version)) {
+      return res.status(400).json({ success: false, error: 'Invalid version' });
+    }
+    const profile = await IntelligenceProfileService.getInstance().getVersion(req.params.id, version, getCtx(req));
+    if (!profile) {
+      return res.status(404).json({ success: false, error: 'Profile version not found' });
+    }
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /intelligence-profiles — create a new profile (draft by default)
+router.post('/intelligence-profiles', async (req, res) => {
+  try {
+    const parsed = intelligenceProfileCreateSchema.parse(req.body);
+    const profile = await IntelligenceProfileService.getInstance().createProfile({
+      id: parsed.id,
+      categoryKey: parsed.categoryKey,
+      categoryName: parsed.categoryName,
+      configurationJson: parsed.configurationJson,
+      status: parsed.status,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /intelligence-profiles/:id/publish — publish a new active version
+router.post('/intelligence-profiles/:id/publish', async (req, res) => {
+  try {
+    const parsed = intelligenceProfilePublishSchema.parse(req.body);
+    const profile = await IntelligenceProfileService.getInstance().publishVersion(req.params.id, {
+      categoryName: parsed.categoryName,
+      configurationJson: parsed.configurationJson,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /intelligence-profiles/:id/:version/activate — activate a draft version
+router.post('/intelligence-profiles/:id/:version/activate', async (req, res) => {
+  try {
+    const version = parseInt(req.params.version, 10);
+    if (isNaN(version)) {
+      return res.status(400).json({ success: false, error: 'Invalid version' });
+    }
+    const profile = await IntelligenceProfileService.getInstance().activateDraft(req.params.id, version, getCtx(req));
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /intelligence-profiles/resolve/:category — resolve active profile for a category
+router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
+  try {
+    const profile = await IntelligenceProfileService.getInstance().resolve(req.params.category, getCtx(req));
+    res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -11,15 +11,26 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
+import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import MarketingCampaignService from './MarketingCampaignService';
 import { unifiedConfig } from '../config/unifiedConfig';
 
-export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis';
+/**
+ * Compute a SHA-256 hash of a prompt template body for provenance stamping
+ * (GAP-P4). Stored on mkt_prompt_executions_list.template_body_hash so
+ * historical runs can be attributed to the exact prompt text that produced
+ * them, even if the template is later updated (mutated in place).
+ */
+function computeBodyHash(body: string): string {
+  return createHash('sha256').update(body).digest('hex');
+}
 
-export type PromptScope = 'business' | 'category' | 'city';
+export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis' | 'fragment';
+
+export type PromptScope = 'business' | 'category' | 'city' | 'intelligence';
 
 export interface PromptTemplateInput {
   name: string;
@@ -32,6 +43,7 @@ export interface PromptTemplateInput {
   outputSchema?: any;
   isDefault?: boolean;
   createdBy?: string;
+  fragmentKind?: string;
 }
 
 export interface PromptExecutionInput {
@@ -39,6 +51,12 @@ export interface PromptExecutionInput {
   templateId?: string;
   variablesUsed?: any;
   executedBy?: string;
+  /** Resolution metadata from resolvePrompt() — profile amplification provenance (§1B). */
+  resolution?: {
+    profile_id: string | null;
+    profile_version: number | null;
+    intelligence_mode: 'profile' | 'none';
+  };
 }
 
 /**
@@ -138,6 +156,7 @@ export class MarketingPromptService extends BaseService {
           is_active: true,
           is_default: input.isDefault || false,
           created_by: input.createdBy || null,
+          fragment_kind: input.fragmentKind || null,
         },
       });
       logger.info('Prompt template created', ctx, { templateId: id, name: input.name, type: input.promptType });
@@ -157,13 +176,14 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  async listTemplates(filters: { promptType?: PromptType; scope?: PromptScope; category?: string; tone?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
+  async listTemplates(filters: { promptType?: PromptType; scope?: PromptScope; category?: string; tone?: string; isActive?: boolean; fragmentKind?: string } = {}, ctx?: RequestCtx): Promise<any[]> {
     const where: any = {};
     if (filters.promptType) where.prompt_type = filters.promptType;
     if (filters.scope) where.scope = filters.scope;
     if (filters.category) where.category = filters.category;
     if (filters.tone) where.tone = filters.tone;
     if (filters.isActive !== undefined) where.is_active = filters.isActive;
+    if (filters.fragmentKind) where.fragment_kind = filters.fragmentKind;
     try {
       return await this.prisma.mkt_prompt_templates_list.findMany({
         where,
@@ -185,6 +205,7 @@ export class MarketingPromptService extends BaseService {
     if (input.body !== undefined) data.body = input.body;
     if (input.variables !== undefined) data.variables = input.variables;
     if (input.outputSchema !== undefined) data.output_schema = input.outputSchema;
+    if (input.fragmentKind !== undefined) data.fragment_kind = input.fragmentKind;
     if (input.isDefault !== undefined) {
       if (input.isDefault) {
         const current = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
@@ -255,6 +276,25 @@ export class MarketingPromptService extends BaseService {
   async createExecution(input: PromptExecutionInput, ctx?: RequestCtx): Promise<any> {
     const id = generatePromptExecutionId();
     try {
+      // Snapshot template provenance (GAP-P4) — stamp template_version +
+      // template_body_hash (+ optional full body) so historical runs can be
+      // attributed to the prompt text that produced them. Also stamp resolution
+      // metadata (GAP-P7 §1B) if provided by resolvePrompt().
+      let templateVersion: number | null = null;
+      let templateBodyHash: string | null = null;
+      let templateBodySnapshot: string | null = null;
+      if (input.templateId) {
+        const tpl = await this.prisma.mkt_prompt_templates_list.findUnique({
+          where: { id: input.templateId },
+          select: { version: true, body: true },
+        });
+        if (tpl) {
+          templateVersion = tpl.version;
+          templateBodyHash = computeBodyHash(tpl.body);
+          templateBodySnapshot = tpl.body;
+        }
+      }
+
       const execution = await this.prisma.mkt_prompt_executions_list.create({
         data: {
           id,
@@ -263,9 +303,18 @@ export class MarketingPromptService extends BaseService {
           variables_used: input.variablesUsed || null,
           executed_by: input.executedBy || null,
           status: 'pending',
+          template_version: templateVersion,
+          template_body_hash: templateBodyHash,
+          template_body_snapshot: templateBodySnapshot,
         },
       });
-      logger.info('Prompt execution created', ctx, { executionId: id, campaignId: input.campaignId });
+      logger.info('Prompt execution created', ctx, {
+        executionId: id,
+        campaignId: input.campaignId,
+        templateVersion,
+        templateBodyHash: templateBodyHash?.slice(0, 12),
+        resolution: input.resolution ?? null,
+      });
       return execution;
     } catch (error) {
       logger.error('Failed to create prompt execution', ctx, { error: (error as Error).message });
@@ -360,6 +409,16 @@ export class MarketingPromptService extends BaseService {
     /** Free-form metadata stored on the audit (model, provider, run_id, notes). */
     metadata?: Record<string, any>;
     executedBy?: string;
+    /** Resolution metadata from resolvePrompt() — profile amplification provenance (§1B, GAP-P7).
+     *  Accepted on the external-import path so imported results carry the same
+     *  provenance an internal run stamps automatically. */
+    resolution?: {
+      profile_id: string | null;
+      profile_version: number | null;
+      intelligence_mode: 'profile' | 'none';
+    };
+    /** Intelligence focus for intelligence-scope imports (§41 run record). */
+    focus?: 'emerging' | 'competitive';
   }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null }> {
     try {
       // 1. Load template + campaign
@@ -401,7 +460,11 @@ export class MarketingPromptService extends BaseService {
       }
 
       // 4. Transactionally create execution + audit
+      //    Snapshot template provenance (GAP-P4) — same as createExecution.
       const executionId = generatePromptExecutionId();
+      const templateVersion = template.version;
+      const templateBodyHash = computeBodyHash(template.body);
+      const templateBodySnapshot = template.body;
       const result = await this.prisma.$transaction(async (tx) => {
         const execution = await tx.mkt_prompt_executions_list.create({
           data: {
@@ -414,6 +477,9 @@ export class MarketingPromptService extends BaseService {
             filtered_output: input.rawOutput,
             ai_provider: input.source || 'external',
             cost_cents: input.costCents ?? undefined,
+            template_version: templateVersion,
+            template_body_hash: templateBodyHash,
+            template_body_snapshot: templateBodySnapshot,
           },
         });
 

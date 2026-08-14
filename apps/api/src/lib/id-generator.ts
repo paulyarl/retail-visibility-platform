@@ -2034,3 +2034,30 @@ const generateGalleryShortCodeNano = customAlphabet(GALLERY_SHORT_CODE_ALPHABET,
 export function generateGalleryShortCode(): string {
   return generateGalleryShortCodeNano();
 }
+
+// ─── Intelligence Profiles (Sprint 1 — Seek Intelligence Scope) ──────────
+// Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
+// Profile IDs are human-readable slugs (e.g. 'auto_repair_us'), not nanoid-based,
+// because they are referenced by operators and appear in resolution indicators.
+// The createProfile/importAsDraft methods accept an explicit id; this generator
+// is only used when a caller wants an auto-generated opaque ID.
+
+/**
+ * Generate intelligence profile ID (opaque fallback)
+ * Format: mip-{nanoid} (12 chars)
+ * Most profiles will use human-readable slugs (e.g. 'auto_repair_us') instead.
+ */
+export function generateIntelligenceProfileId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mip-${nanoid()}`;
+}
+
+/**
+ * Generate intelligence run ID
+ * Format: mir-{nanoid} (12 chars)
+ */
+export function generateIntelligenceRunId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mir-${nanoid()}`;
+}
+

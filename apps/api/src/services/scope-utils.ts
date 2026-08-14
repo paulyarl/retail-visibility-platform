@@ -41,6 +41,7 @@ export const SCOPE_VARIABLES: Record<string, string[]> = {
   ],
   category: ['category', 'city', 'state', 'neighborhood', 'tone', 'attributes'],
   city: ['city', 'state', 'neighborhood'],
+  intelligence: ['category', 'city', 'state', 'zip_codes', 'search_radius_miles', 'focus', 'neighborhood'],
 };
 
 /**

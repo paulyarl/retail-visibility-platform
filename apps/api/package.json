@@ -56,6 +56,8 @@
     "seed:mkt-templates:regional-json-guardrails": "tsx src/scripts/set-regional-city-opportunity-json-guardrails.ts",
     "seed:mkt-templates:business-schema": "tsx src/scripts/set-business-analysis-schema.ts",
     "seed:mkt-templates:city-category-schema": "tsx src/scripts/set-city-category-opportunity-schema.ts",
+    "seed:intelligence-fragments": "tsx src/scripts/seed-intelligence-fragments.ts",
+    "seed:intelligence-profile-auto-repair": "tsx src/scripts/seed-intelligence-profile-auto-repair.ts",
     "migrate:mkt-data": "tsx src/scripts/migrate-marketing-ops-data.ts",
     "migrate:mkt-files": "tsx src/scripts/migrate-marketing-ops-files.ts",
     "gen:openapi": "tsx src/scripts/generate-openapi.ts",
