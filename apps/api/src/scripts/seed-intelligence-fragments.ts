@@ -226,6 +226,7 @@ async function main() {
       logger.info(`Updated fragment: ${frag.id} (${frag.fragmentKind})`, undefined, { id: frag.id });
     } else {
       await service.createTemplate({
+        id: frag.id,
         name: frag.name,
         promptType: frag.promptType,
         scope: frag.scope,

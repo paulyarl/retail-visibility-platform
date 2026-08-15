@@ -44,6 +44,8 @@ export interface PromptTemplateInput {
   isDefault?: boolean;
   createdBy?: string;
   fragmentKind?: string;
+  /** Optional deterministic ID (used by seed scripts for idempotent upsert). */
+  id?: string;
 }
 
 export interface PromptExecutionInput {
@@ -175,7 +177,7 @@ export class MarketingPromptService extends BaseService {
   // ====================
 
   async createTemplate(input: PromptTemplateInput, ctx?: RequestCtx): Promise<any> {
-    const id = generatePromptTemplateId();
+    const id = input.id || generatePromptTemplateId();
     const scope = input.scope ?? (input.promptType === 'category_analysis' ? 'category' : input.promptType === 'city_analysis' ? 'city' : 'business');
     try {
       if (input.isDefault) {

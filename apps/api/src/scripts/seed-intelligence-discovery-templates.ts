@@ -76,6 +76,7 @@ async function main() {
       logger.info(`Updated discovery template: ${tmpl.id}`, undefined, { id: tmpl.id, focus: tmpl.name.includes('Emerging') ? 'emerging' : 'competitive' });
     } else {
       await service.createTemplate({
+        id: tmpl.id,
         name: tmpl.name,
         promptType: tmpl.promptType,
         scope: tmpl.scope,

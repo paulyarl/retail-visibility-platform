@@ -95,6 +95,7 @@ async function main() {
     logger.info(`Updated establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id });
   } else {
     await service.createTemplate({
+      id: ESTABLISHMENT_TEMPLATE.id,
       name: ESTABLISHMENT_TEMPLATE.name,
       promptType: ESTABLISHMENT_TEMPLATE.promptType,
       scope: ESTABLISHMENT_TEMPLATE.scope,
