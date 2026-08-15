@@ -23,7 +23,12 @@ import {
   IconAlertCircle,
   IconBrain,
   IconCircleCheck,
+  IconArrowRight,
+  IconTarget,
+  IconMessage,
+  IconListCheck,
 } from '@tabler/icons-react';
+import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, ProfileStatus } from '@/services/MarketingOpsService';
 
@@ -254,6 +259,77 @@ export default function IntelligenceProfilesClient() {
             ) : (
               activeProfiles.map((p) => renderProfileCard(p, false))
             )}
+          </div>
+
+          <Divider />
+
+          {/* Next Steps */}
+          <div>
+            <Group gap="xs" mb="xs">
+              <IconArrowRight size={18} />
+              <Text size="sm" fw={600}>Next Steps</Text>
+            </Group>
+            <Text size="xs" c="dimmed" mb="sm">
+              With {activeProfiles.length} active profile{activeProfiles.length !== 1 ? 's' : ''},
+              intelligence-scope discovery runs will use profile mode instead of generic fallback.
+              Business-scope Seek audits in these categories will resolve profile-amplified prompts (§1B).
+            </Text>
+            <Group gap="sm" grow align="flex-start">
+              <Paper
+                component={Link}
+                href="/settings/admin/marketing-ops/campaigns"
+                shadow="xs"
+                radius="md"
+                withBorder
+                p="md"
+                style={{ textDecoration: 'none', cursor: 'pointer' }}
+              >
+                <Group gap="xs" mb={4}>
+                  <IconTarget size={16} />
+                  <Text size="sm" fw={600}>Open Campaigns</Text>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Find an intelligence-scope campaign for an activated category, then open its Prompts tab
+                  to run Emerging or Competitive discovery.
+                </Text>
+              </Paper>
+              <Paper
+                component={Link}
+                href="/settings/admin/marketing-ops/prompts"
+                shadow="xs"
+                radius="md"
+                withBorder
+                p="md"
+                style={{ textDecoration: 'none', cursor: 'pointer' }}
+              >
+                <Group gap="xs" mb={4}>
+                  <IconMessage size={16} />
+                  <Text size="sm" fw={600}>Prompts Library</Text>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Open the Seek: Intelligence Discovery (Emerging or Competitive) workspace, render the
+                  composed prompt, and run it in external AI.
+                </Text>
+              </Paper>
+              <Paper
+                component={Link}
+                href="/settings/admin/marketing-ops/queue"
+                shadow="xs"
+                radius="md"
+                withBorder
+                p="md"
+                style={{ textDecoration: 'none', cursor: 'pointer' }}
+              >
+                <Group gap="xs" mb={4}>
+                  <IconListCheck size={16} />
+                  <Text size="sm" fw={600}>Prospect Queue</Text>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Review qualifying businesses routed from intelligence discovery runs. Triage into
+                  Business Seek campaigns for full audits.
+                </Text>
+              </Paper>
+            </Group>
           </div>
         </>
       )}
