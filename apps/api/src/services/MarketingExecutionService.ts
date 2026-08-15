@@ -324,6 +324,30 @@ export class MarketingExecutionService extends BaseService {
       };
     }
 
+    // ─── Intelligence Profile Establishment path (campaign-aware focus) ───
+    // The establishment template has its own body (it instructs the AI to
+    // produce a §10 profile JSON) and is excluded from the composer above.
+    // But the profile it produces is consumed downstream by Intelligence-scope
+    // seeks that are themselves focus-specific (emerging vs competitive), and
+    // the campaign is now coupled to its intelligence type. Append a focus
+    // context block so the AI tailors the profile to the campaign's focus.
+    if (isProfileEstablishment && isSeek && campaignScope === 'intelligence') {
+      const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
+      const focusBlock = this.renderEstablishmentFocusBlock(focus);
+      const withFocus = focusBlock ? baseRendered + '\n' + focusBlock : baseRendered;
+
+      logger.info('Intelligence Profile Establishment prompt resolved with focus', ctx, {
+        campaignId: input.campaign.id,
+        category,
+        focus,
+      });
+
+      return {
+        renderedPrompt: this.appendPromptSuffix(withFocus, promptSuffix),
+        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+      };
+    }
+
     // ─── Business-scope §1B amplification path ────────────────────────────
     const isBusinessScope = campaignScope === 'business';
 
@@ -377,6 +401,88 @@ export class MarketingExecutionService extends BaseService {
   private appendPromptSuffix(rendered: string, suffix: string): string {
     if (!suffix || !suffix.trim()) return rendered;
     return rendered + '\n' + suffix;
+  }
+
+  /**
+   * Render the intelligence-focus context block appended to the Intelligence
+   * Profile Establishment prompt. The establishment template produces a
+   * category-agnostic §10 profile, but the campaign is coupled to an
+   * intelligence type (emerging or competitive). This block instructs the AI
+   * to bias the profile toward the campaign's focus so the downstream
+   * Intelligence-scope seek (which loads this profile via the composer) is
+   * tuned for the right discovery posture.
+   *
+   * Returns an empty string for an unrecognized focus value (defensive — the
+   * campaign column defaults to 'emerging' and is constrained to the
+   * IntelligenceFocus union, but we never want to corrupt the establishment
+   * prompt with a malformed focus label).
+   */
+  private renderEstablishmentFocusBlock(focus: IntelligenceFocus): string {
+    if (focus === 'emerging') {
+      return `=== INTELLIGENCE FOCUS: EMERGING ===
+This profile will be used to power EMERGING discovery for this category — finding
+thin-footprint, hidden-trust, single-platform, recently-established, and
+possibly-misaligned businesses that are invisible to mainstream search.
+
+When building the profile, bias toward emerging discovery:
+- SPECIALIZED SOURCES: prioritize vertical directories, community sources, niche
+  platforms, and supplier/marketplace sources that surface businesses ABSENT
+  from mainstream indexes. Mainstream sources remain in scope but as
+  corroboration, not as the primary discovery path.
+- DISCOVERY PATTERNS: favor long-tail, vertical, and community search paths that
+  go beyond the first page of Google. Name the concrete niche search strategies
+  that find businesses mainstream search misses.
+- CATEGORY EVIDENCE RULES: include absence-handling rules that distinguish "not
+  found during discovery" from "does not exist" — emerging discovery must NEVER
+  convert absence of evidence into a negative signal.
+- PROHIBITED INFERENCE: explicitly prohibit inferring inactivity, low customer
+  volume, or poor quality from a thin digital footprint.
+- CATEGORY SIGNALS: emphasize the emerging-discovery INT_* codes —
+  INT_LOW_VISIBILITY, INT_WEAK_MAINSTREAM_INDEXING, INT_SINGLE_SOURCE,
+  INT_HIDDEN_TRUST, INT_RECENT_BUSINESS_EVIDENCE,
+  INT_POSSIBLE_CATEGORY_MISALIGNMENT, INT_VERTICAL_SOURCE_DISCOVERY.
+
+The profile's specialized_sources and discovery_patterns are the PRIMARY
+mechanism set for emerging work. Do NOT bias the profile toward competitive
+benchmarking, review-velocity comparisons, or market-leaderboard metrics —
+those are competitive-focus work.`;
+    }
+
+    if (focus === 'competitive') {
+      return `=== INTELLIGENCE FOCUS: COMPETITIVE ===
+This profile will be used to power COMPETITIVE benchmarking for this category —
+identifying the established, mainstream-visible market leaders that set the
+standard for digital presence in this category and market.
+
+When building the profile, bias toward competitive benchmarking:
+- SPECIALIZED SOURCES: mainstream sources (Google, GBP, Yelp, Facebook) are the
+  PRIMARY discovery path for competitive work — competitive benchmarks are by
+  definition mainstream-visible. The profile's vertical/community sources remain
+  available but as SECONDARY corroboration to confirm category_fit and
+  specialization, not to discover hidden leaders.
+- CATEGORY EVIDENCE RULES: define what "category-qualified leader" means for
+  THIS category — a high-visibility business only counts as a competitive
+  benchmark if it meets the profile's category_fit and specialization criteria,
+  not merely "has high reviews."
+- TERMINOLOGY / SYNONYMS: capture the full competitive set, including name
+  variants and nationality-specific labels that mainstream search may miss. A
+  competitive scan that misses those variants is incomplete.
+- PROHIBITED INFERENCE: explicitly prohibit inferring revenue, customer volume,
+  or business quality from review count, store size, or marketplace presence.
+  Competitive positioning describes digital presence and engagement patterns,
+  not business health.
+- CATEGORY SIGNALS: emphasize the established-presence INT_* codes —
+  INT_MULTISOURCE_IDENTITY, INT_ACTIVE_OPERATIONAL_EVIDENCE,
+  INT_CATEGORY_SPECIALIZATION, INT_UNDEREXPOSED_CREDENTIAL.
+
+The profile's evidence rules govern whether a high-visibility business actually
+qualifies as a category benchmark versus a generic high-visibility business that
+does not meet the profile's specialization bar. Do NOT bias the profile toward
+emerging discovery, thin-footprint, or hidden-trust work — those are
+emerging-focus work.`;
+    }
+
+    return '';
   }
 
   /**
