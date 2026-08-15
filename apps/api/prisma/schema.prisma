@@ -6188,6 +6188,7 @@ model mkt_campaigns_list {
   intelligence_focus                                                              String?                              @default("emerging") @db.VarChar(20)
   intelligence_zip_codes                                                          String?
   intelligence_search_radius_miles                                                Decimal?                             @db.Decimal(10, 2)
+  intelligence_campaign_kind                                                      String?                              @default("discovery") @db.VarChar(20)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]

@@ -177,6 +177,8 @@ export interface Campaign {
   intelligence_focus?: 'emerging' | 'competitive' | null;
   intelligence_zip_codes?: string | null;
   intelligence_search_radius_miles?: number | null;
+  // Migration 201 — discriminator for intelligence-scope campaigns
+  intelligence_campaign_kind?: 'discovery' | 'establishment' | null;
 }
 
 export interface CampaignLineageEntry {
@@ -1264,6 +1266,8 @@ export interface CampaignCreateInput {
   intelligence_focus?: 'emerging' | 'competitive';
   intelligence_zip_codes?: string;
   intelligence_search_radius_miles?: number;
+  // Migration 201 — discriminator for intelligence-scope campaigns
+  intelligence_campaign_kind?: 'discovery' | 'establishment';
 }
 
 export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
@@ -1499,6 +1503,7 @@ class MarketingOpsService extends AdminApiSingleton {
     search?: string;
     page?: number;
     limit?: number;
+    intelligenceCampaignKind?: 'discovery' | 'establishment';
   }): Promise<{ items: Campaign[]; total: number }> {
     const params = new URLSearchParams();
     if (filters?.stage) params.set('stage', filters.stage);
@@ -1513,6 +1518,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.search) params.set('search', filters.search);
     if (filters?.page) params.set('page', String(filters.page));
     if (filters?.limit) params.set('limit', String(filters.limit));
+    if (filters?.intelligenceCampaignKind) params.set('intelligence_campaign_kind', filters.intelligenceCampaignKind);
     const query = params.toString();
     const url = `${BASE_URL}${query ? `?${query}` : ''}`;
 

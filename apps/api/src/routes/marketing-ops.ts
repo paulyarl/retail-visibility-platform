@@ -250,6 +250,8 @@ const campaignBaseSchema = z.object({
   intelligence_focus: z.enum(['emerging', 'competitive']).optional(),
   intelligence_zip_codes: z.string().max(500).optional(),
   intelligence_search_radius_miles: z.number().min(0).max(500).optional(),
+  // Migration 201 — discriminator for intelligence-scope campaigns
+  intelligence_campaign_kind: z.enum(['discovery', 'establishment']).optional(),
 });
 
 const campaignCreateSchema = campaignBaseSchema.refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
@@ -943,6 +945,7 @@ router.get('/', async (req: any, res: Response) => {
       search: req.query.search,
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 50,
+      intelligenceCampaignKind: req.query.intelligence_campaign_kind,
     }, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
@@ -1034,6 +1037,7 @@ router.post('/', async (req: any, res: Response) => {
       intelligenceFocus: parsed.intelligence_focus,
       intelligenceZipCodes: parsed.intelligence_zip_codes,
       intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
+      intelligenceCampaignKind: parsed.intelligence_campaign_kind,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
   } catch (error) {
@@ -1092,6 +1096,7 @@ router.put('/:id', async (req: any, res: Response) => {
       intelligenceFocus: parsed.intelligence_focus,
       intelligenceZipCodes: parsed.intelligence_zip_codes,
       intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
+      intelligenceCampaignKind: parsed.intelligence_campaign_kind,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
   } catch (error) {

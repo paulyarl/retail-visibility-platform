@@ -126,23 +126,56 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
   // Tracks whether the deep-linked campaign has been auto-selected so we only
   // auto-render once (avoid clobbering operator edits on re-renders).
   const [autoSelected, setAutoSelected] = useState(false);
+  // Intelligence-scope cascade state (Migration 201): category → campaign
+  // picker for discovery templates. The flat dropdown is retained for non-
+  // intelligence scopes and for the establishment template.
+  const [selectedCategory, setSelectedCategory] = useState('');
+  // Per-category profile map (batch-resolved for the category list so each
+  // row can be badged with active v{version} / no-profile).
+  const [categoryProfiles, setCategoryProfiles] = useState<Record<string, IntelligenceProfile | null>>({});
 
   const selectedCampaign = useMemo(() =>
     campaigns.find((c) => c.id === selectedCampaignId) || null,
   [campaigns, selectedCampaignId]);
 
-  // Sprint 3 — §1B resolution indicator: when a business-scope seek campaign is
-  // selected, resolve the active intelligence profile for its category and show
-  // the profile badge in the Rendered Output header.
+  // ─── Intelligence-scope template classification ───────────────────────
+  // Discovery templates (Emerging/Competitive) get the category → campaign
+  // cascade. The establishment template keeps the flat dropdown (the operator
+  // selects the establishment campaign directly).
+  const isIntelligenceScope = template?.scope === 'intelligence';
+  const isSeekPrompt = (template?.prompt_type || '').toLowerCase() === 'seek';
+  const outputSchemaName = template?.output_schema?.name ?? '';
+  const isIntelligenceDiscovery = isIntelligenceScope && isSeekPrompt && outputSchemaName === 'intelligence_discovery';
+  const isIntelligenceEstablishment = isIntelligenceScope && isSeekPrompt && outputSchemaName === 'intelligence_profile';
+
+  // Derive the template's focus from its name — the body is a composition
+  // marker that gets replaced at render time, so the name is the reliable
+  // signal. Falls back to 'emerging' (matches the backend default).
+  const templateFocus: 'emerging' | 'competitive' = useMemo(() => {
+    if (!template) return 'emerging';
+    return /competitive/i.test(template.name) ? 'competitive' : 'emerging';
+  }, [template]);
+
+  // Sprint 3 — §1B resolution indicator: when a business-scope seek campaign
+  // is selected, resolve the active intelligence profile for its category and
+  // show the profile badge in the Rendered Output header. Also fires for
+  // intelligence-scope discovery campaigns (the profile is the amplification
+  // footprint for the composed prompt).
   useEffect(() => {
     if (!selectedCampaign || !template) {
       setResolvedProfile(null);
       return;
     }
-    // Only resolve for business-scope seek prompts (the §1B amplification gate).
     const isSeek = (template.prompt_type || '').toLowerCase() === 'seek';
     const isBusiness = (selectedCampaign.scope || 'business').toLowerCase() === 'business';
-    if (!isSeek || !isBusiness || !selectedCampaign.category) {
+    const isIntelligence = (selectedCampaign.scope || '').toLowerCase() === 'intelligence';
+    if (!isSeek || !selectedCampaign.category) {
+      setResolvedProfile(null);
+      return;
+    }
+    // Business-scope: §1B amplification gate. Intelligence-scope discovery:
+    // the profile is the composed prompt's category footprint.
+    if (!isBusiness && !isIntelligence) {
       setResolvedProfile(null);
       return;
     }
@@ -160,8 +193,72 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
 
   const compatibleCampaigns = useMemo(() => {
     if (!template?.scope) return campaigns;
-    return campaigns.filter((c) => c.scope === template.scope);
-  }, [campaigns, template]);
+    const scopeMatch = campaigns.filter((c) => c.scope === template.scope);
+    // Intelligence-scope refinement (Migration 201):
+    //   - Discovery templates: only discovery-kind campaigns whose focus
+    //     matches the template (emerging/competitive). Establishment
+    //     campaigns are excluded — they were vehicles for profile import,
+    //     not discovery scans.
+    //   - Establishment template: only establishment-kind campaigns (the
+    //     ones used to bootstrap a profile).
+    if (isIntelligenceDiscovery) {
+      return scopeMatch.filter((c) =>
+        (c.intelligence_campaign_kind ?? 'discovery') === 'discovery' &&
+        (c.intelligence_focus ?? 'emerging') === templateFocus,
+      );
+    }
+    if (isIntelligenceEstablishment) {
+      return scopeMatch.filter((c) =>
+        (c.intelligence_campaign_kind ?? 'discovery') === 'establishment',
+      );
+    }
+    return scopeMatch;
+  }, [campaigns, template, isIntelligenceDiscovery, isIntelligenceEstablishment, templateFocus]);
+
+  // Distinct categories among the filtered intelligence-scope campaigns —
+  // drives the first dropdown in the category → campaign cascade.
+  const intelligenceCategories = useMemo(() => {
+    if (!isIntelligenceDiscovery) return [];
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const c of compatibleCampaigns) {
+      if (c.category && !seen.has(c.category)) {
+        seen.add(c.category);
+        list.push(c.category);
+      }
+    }
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [compatibleCampaigns, isIntelligenceDiscovery]);
+
+  // Campaigns filtered to the selected category — drives the second dropdown.
+  const campaignsForCategory = useMemo(() => {
+    if (!isIntelligenceDiscovery || !selectedCategory) return compatibleCampaigns;
+    return compatibleCampaigns.filter((c) => c.category === selectedCategory);
+  }, [compatibleCampaigns, isIntelligenceDiscovery, selectedCategory]);
+
+  // Batch-resolve active profiles for every category in the cascade so each
+  // category row can be badged. Runs once when the category list changes.
+  useEffect(() => {
+    if (!isIntelligenceDiscovery || intelligenceCategories.length === 0) {
+      setCategoryProfiles({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const entries: [string, IntelligenceProfile | null][] = await Promise.all(
+        intelligenceCategories.map(async (cat) => {
+          try {
+            const p = await marketingOpsService.resolveIntelligenceProfile(cat);
+            return [cat, p] as [string, IntelligenceProfile | null];
+          } catch {
+            return [cat, null] as [string, IntelligenceProfile | null];
+          }
+        }),
+      );
+      if (!cancelled) setCategoryProfiles(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [intelligenceCategories, isIntelligenceDiscovery]);
 
   const [executing, setExecuting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -550,24 +647,100 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
             <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Execute</h2>
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Select Campaign</label>
-                <select
-                  value={selectedCampaignId}
-                  onChange={(e) => setSelectedCampaignId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Select a campaign —</option>
-                  {compatibleCampaigns.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title || c.business_name || `${c.category} · ${c.city}`} ({c.scope}, {c.city})</option>
-                  ))}
-                </select>
-                {compatibleCampaigns.length === 0 && campaigns.length > 0 && (
-                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                    No campaigns match this template&apos;s scope ({template.scope}). Create a {template.scope}-scoped campaign first.
-                  </p>
-                )}
-              </div>
+              {isIntelligenceDiscovery ? (
+                <>
+                  {/* Intelligence Discovery: category → campaign cascade */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Category</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => {
+                        setSelectedCategory(e.target.value);
+                        setSelectedCampaignId('');
+                        setServerRendered(null);
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">— Select a category —</option>
+                      {intelligenceCategories.map((cat) => {
+                        const p = categoryProfiles[cat];
+                        const badge = p ? ` · profile v${p.version} active` : ' · no profile';
+                        return <option key={cat} value={cat}>{cat}{badge}</option>;
+                      })}
+                    </select>
+                    {intelligenceCategories.length === 0 && campaigns.length > 0 && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        No {templateFocus} discovery campaigns found. Create an intelligence-scope campaign with focus=&quot;{templateFocus}&quot; first.
+                      </p>
+                    )}
+                  </div>
+                  {selectedCategory && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Campaign</label>
+                      <select
+                        value={selectedCampaignId}
+                        onChange={(e) => setSelectedCampaignId(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">— Select a campaign —</option>
+                        {campaignsForCategory.map((c) => (
+                          <option key={c.id} value={c.id}>{c.title || `${c.category} · ${c.city}`} ({c.city})</option>
+                        ))}
+                      </select>
+                      {campaignsForCategory.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                          No campaigns for {selectedCategory}. Create one in the Campaigns tab.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {/* Profile hint panel — reminds the operator to establish
+                      a profile for categories without one. */}
+                  {selectedCategory && categoryProfiles[selectedCategory] === null && (
+                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                        No active intelligence profile for <strong>{selectedCategory}</strong>. The resolved prompt will use generic fallback mode (no category-specific sources, evidence rules, or prohibited inferences).
+                        {' '}
+                        <Link href="/settings/admin/marketing-ops/prompts" className="underline font-medium">
+                          Run the Profile Establishment template
+                        </Link>{' '}
+                        to bootstrap one, then activate the draft.
+                      </p>
+                    </div>
+                  )}
+                  {selectedCategory && categoryProfiles[selectedCategory] && (
+                    <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-3">
+                      <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                        Category intelligence: <strong>{categoryProfiles[selectedCategory]!.id}</strong> v{categoryProfiles[selectedCategory]!.version} is active. The resolved prompt will be amplified with this profile&apos;s sources, evidence rules, and prohibited inferences.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Default: flat campaign dropdown (business/category/city
+                      scopes + intelligence establishment template) */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Select Campaign</label>
+                    <select
+                      value={selectedCampaignId}
+                      onChange={(e) => setSelectedCampaignId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">— Select a campaign —</option>
+                      {compatibleCampaigns.map((c) => (
+                        <option key={c.id} value={c.id}>{c.title || c.business_name || `${c.category} · ${c.city}`} ({c.scope}, {c.city})</option>
+                      ))}
+                    </select>
+                    {compatibleCampaigns.length === 0 && campaigns.length > 0 && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        No campaigns match this template&apos;s scope ({template.scope}). Create a {template.scope}-scoped campaign first.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleExecute}
@@ -604,7 +777,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
                     Category intelligence: {resolvedProfile.id} v{resolvedProfile.version}
                   </span>
                 )}
-                {selectedCampaign && template?.prompt_type === 'seek' && selectedCampaign.scope === 'business' && !resolvedProfile && (
+                {selectedCampaign && template?.prompt_type === 'seek' && (selectedCampaign.scope === 'business' || selectedCampaign.scope === 'intelligence') && !resolvedProfile && (
                   <span className="text-xs text-gray-400" title="No active intelligence profile for this category — prompt renders without amplification">
                     No category profile — generic resolution
                   </span>

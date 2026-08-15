@@ -203,6 +203,8 @@ export interface CampaignInput {
   intelligenceFocus?: 'emerging' | 'competitive';
   intelligenceZipCodes?: string;
   intelligenceSearchRadiusMiles?: number;
+  // Migration 201 — discriminator for intelligence-scope campaigns
+  intelligenceCampaignKind?: 'discovery' | 'establishment';
 }
 
 export interface CampaignUpdateInput {
@@ -256,6 +258,8 @@ export interface CampaignUpdateInput {
   intelligenceFocus?: 'emerging' | 'competitive';
   intelligenceZipCodes?: string;
   intelligenceSearchRadiusMiles?: number;
+  // Migration 201 — discriminator for intelligence-scope campaigns
+  intelligenceCampaignKind?: 'discovery' | 'establishment';
 }
 
 export interface ContactReadiness {
@@ -308,6 +312,8 @@ export interface CampaignListFilters {
   limit?: number;
   parentCampaignId?: string;
   businessProspectId?: string;
+  // Migration 201 — filter intelligence-scope campaigns by kind
+  intelligenceCampaignKind?: 'discovery' | 'establishment';
 }
 
 export interface MarkCampaignPaidInput {
@@ -427,6 +433,7 @@ export class MarketingCampaignService extends BaseService {
           intelligence_focus: input.intelligenceFocus || 'emerging',
           intelligence_zip_codes: input.intelligenceZipCodes || null,
           intelligence_search_radius_miles: (input.intelligenceSearchRadiusMiles ?? null) as any,
+          intelligence_campaign_kind: input.intelligenceCampaignKind || 'discovery',
         },
       });
 
@@ -783,6 +790,7 @@ export class MarketingCampaignService extends BaseService {
     if (filters.retainer) where.retainer = filters.retainer;
     if (filters.parentCampaignId) where.parent_campaign_id = filters.parentCampaignId;
     if (filters.businessProspectId) where.business_prospect_id = filters.businessProspectId;
+    if (filters.intelligenceCampaignKind) where.intelligence_campaign_kind = filters.intelligenceCampaignKind;
     if (filters.attributes && filters.attributes.length > 0) {
       where.attributes = { hasEvery: filters.attributes };
     }
@@ -965,6 +973,7 @@ export class MarketingCampaignService extends BaseService {
     if (input.intelligenceFocus !== undefined) data.intelligence_focus = input.intelligenceFocus || 'emerging';
     if (input.intelligenceZipCodes !== undefined) data.intelligence_zip_codes = input.intelligenceZipCodes || null;
     if (input.intelligenceSearchRadiusMiles !== undefined) data.intelligence_search_radius_miles = (input.intelligenceSearchRadiusMiles ?? null) as any;
+    if (input.intelligenceCampaignKind !== undefined) data.intelligence_campaign_kind = input.intelligenceCampaignKind || 'discovery';
 
     try {
       const updated = await this.prisma.mkt_campaigns_list.update({ where: { id }, data });

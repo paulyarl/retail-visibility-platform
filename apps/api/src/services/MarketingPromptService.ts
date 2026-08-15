@@ -617,6 +617,25 @@ export class MarketingPromptService extends BaseService {
             campaignId: input.campaignId,
           });
         }
+
+        // Migration 201: mark the campaign that received the profile import
+        // as an 'establishment' campaign so it is excluded from discovery-
+        // workspace campaign pickers. Best-effort — a failure here does not
+        // fail the import (the profile is already persisted as a draft).
+        try {
+          await this.prisma.mkt_campaigns_list.update({
+            where: { id: input.campaignId },
+            data: { intelligence_campaign_kind: 'establishment' },
+          });
+          logger.info('Campaign marked as establishment (intelligence_profile import)', ctx, {
+            campaignId: input.campaignId,
+          });
+        } catch (markErr) {
+          logger.error('Failed to mark campaign as establishment (best-effort)', ctx, {
+            error: (markErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
       }
 
       return result;
