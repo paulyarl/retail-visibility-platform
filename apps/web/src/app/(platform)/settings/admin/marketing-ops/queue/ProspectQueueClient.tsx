@@ -23,6 +23,7 @@ const SIGNAL_FAMILY_COLORS: Record<string, string> = {
   WC: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   CP: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   VP: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  INT: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
 };
 
 const SOURCE_KIND_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
   city_category_audit: 'City Category Audit',
   scan_unmatched: 'Scan Unmatched',
   manual: 'Manual',
+  intelligence_seek: 'Intelligence Seek',
 };
 
 const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'other'];
@@ -550,6 +552,48 @@ export default function ProspectQueueClient() {
                             </div>
                           ) : (
                             <span className="text-xs text-gray-400">—</span>
+                          )}
+                          {/* Intelligence discovery signals (Sprint 3) */}
+                          {entry.discovery_signals && entry.discovery_signals.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-1 max-w-[180px]">
+                              {entry.discovery_signals.slice(0, 3).map((code) => (
+                                <span
+                                  key={code}
+                                  className="inline-block rounded px-1 py-0.5 text-[9px] font-mono bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+                                  title={code}
+                                >
+                                  {code}
+                                </span>
+                              ))}
+                              {entry.discovery_signals.length > 3 && (
+                                <span className="text-[9px] text-gray-400" title={entry.discovery_signals.slice(3).join(', ')}>
+                                  +{entry.discovery_signals.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {/* Business Seek Priority badge (Sprint 3) */}
+                          {entry.business_seek_priority && entry.business_seek_priority !== 'normal' && (
+                            <div className="mt-1">
+                              <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-medium ${
+                                entry.business_seek_priority === 'hold'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                  : entry.business_seek_priority === 'high'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                              }`} title="Business Seek priority from intelligence discovery">
+                                {entry.business_seek_priority}
+                              </span>
+                            </div>
+                          )}
+                          {/* Provenance count + run link (Sprint 3) */}
+                          {entry.discovery_provenance && entry.discovery_provenance.length > 0 && (
+                            <div className="text-[9px] text-gray-400 mt-1" title={entry.discovery_provenance.map(p => `${p.source} (${p.role})`).join(', ')}>
+                              {entry.discovery_provenance.length} source{entry.discovery_provenance.length !== 1 ? 's' : ''}
+                              {entry.intelligence_run_id && (
+                                <> · <a href={`/api/admin/marketing-ops/intelligence-runs/${entry.intelligence_run_id}`} className="text-blue-500 hover:underline">run</a></>
+                              )}
+                            </div>
                           )}
                         </td>
 

@@ -945,6 +945,14 @@ export interface ProspectQueueEntry {
   repair_track?: string | null;
   is_hot_prospect?: boolean | null;
   stage_entered_at?: string | null;
+  // Intelligence scope fields (Sprint 2 — Migration 197)
+  category_fit?: string | null;
+  identity_confidence?: string | null;
+  location_status?: string | null;
+  discovery_provenance?: Array<{ source: string; role: string; evidence_types?: string[] }> | null;
+  discovery_signals?: string[] | null;
+  business_seek_priority?: string | null;
+  intelligence_run_id?: string | null;
 }
 
 export interface LogContactInput {
