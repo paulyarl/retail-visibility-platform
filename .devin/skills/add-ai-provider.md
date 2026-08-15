@@ -43,7 +43,7 @@ A minimal implementation needs to initialize itself from environment variables, 
 Add the provider to the `ProviderType` union and update the `PROVIDER_MODELS` and `PROVIDER_OPTIONS` registries with available chat and embedding models and human-readable labels.
 
 ```ts
-export type ProviderType = 'openai' | 'anthropic' | 'google' | 'mistral' | 'xai';
+export type ProviderType = 'openai' | 'anthropic' | 'google' | 'mistral' | 'vercel-gateway' | 'xai';
 
 export const PROVIDER_MODELS: Record<ProviderType, { chat: { value: string; label: string }[]; embedding: { value: string; label: string }[] }> = {
   ...
@@ -230,6 +230,7 @@ No new schema columns are needed to add a provider, only the registry and the fa
 |------|---------|
 | `apps/api/src/services/ai-providers/AiProvider.ts` | Interface, types, model registry |
 | `apps/api/src/services/ai-providers/AiProviderFactory.ts` | Provider lifecycle, caching, routing |
+| `apps/api/src/services/ai-providers/VercelGatewayProvider.ts` | Vercel AI Gateway implementation (OpenAI-compatible unified routing) |
 | `apps/api/src/services/ai-providers/OpenAiProvider.ts` | OpenAI implementation (reference) |
 | `apps/api/src/services/ai-providers/AnthropicProvider.ts` | Claude + Voyage embeddings (reference) |
 | `apps/api/src/services/ai-providers/GoogleProvider.ts` | Gemini implementation (reference) |

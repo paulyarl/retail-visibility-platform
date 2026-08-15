@@ -7,11 +7,13 @@
 
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { unifiedConfig } from '../../config/unifiedConfig';
 import type { AiProvider, ProviderType, ChatCompletionRequest, ChatCompletionResult, EmbeddingRequest, EmbeddingResult } from './AiProvider';
 import { OpenAiProvider } from './OpenAiProvider';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GoogleProvider } from './GoogleProvider';
 import { MistralProvider } from './MistralProvider';
+import { VercelGatewayProvider } from './VercelGatewayProvider';
 
 class AiProviderFactory {
   private static instance: AiProviderFactory;
@@ -22,6 +24,7 @@ class AiProviderFactory {
 
   private constructor() {
     // Initialize all providers — each checks its own env vars and only activates if keys are set
+    this.providers.set('vercel-gateway', new VercelGatewayProvider());
     this.providers.set('openai', new OpenAiProvider());
     this.providers.set('anthropic', new AnthropicProvider());
     this.providers.set('google', new GoogleProvider());
@@ -39,10 +42,25 @@ class AiProviderFactory {
    * Get the configured chat provider + model from platform settings (cached).
    */
   async getChatConfig(): Promise<{ provider: AiProvider; model: string }> {
+    if (unifiedConfig.aiGatewayEnabled) {
+      const gateway = this.providers.get('vercel-gateway');
+      if (gateway?.isAvailable()) {
+        const config = await this.getConfig();
+        const model = config.chatProvider === 'vercel-gateway'
+          ? config.chatModel
+          : unifiedConfig.aiGatewayDefaultChatModel;
+        return { provider: gateway, model };
+      }
+    }
+
     const config = await this.getConfig();
     const provider = this.providers.get(config.chatProvider);
     if (!provider || !provider.isAvailable()) {
-      // Fallback to OpenAI if the configured provider isn't available
+      // Fallback to Gateway or OpenAI if the configured provider isn't available
+      const gateway = this.providers.get('vercel-gateway');
+      if (gateway?.isAvailable()) {
+        return { provider: gateway, model: unifiedConfig.aiGatewayDefaultChatModel };
+      }
       const fallback = this.providers.get('openai');
       if (fallback?.isAvailable()) {
         return { provider: fallback, model: 'gpt-4o-mini' };
@@ -56,10 +74,25 @@ class AiProviderFactory {
    * Get the configured embedding provider + model from platform settings (cached).
    */
   async getEmbeddingConfig(): Promise<{ provider: AiProvider; model: string }> {
+    if (unifiedConfig.aiGatewayEnabled) {
+      const gateway = this.providers.get('vercel-gateway');
+      if (gateway?.isAvailable()) {
+        const config = await this.getConfig();
+        const model = config.embeddingProvider === 'vercel-gateway'
+          ? config.embeddingModel
+          : unifiedConfig.aiGatewayDefaultEmbeddingModel;
+        return { provider: gateway, model };
+      }
+    }
+
     const config = await this.getConfig();
     const provider = this.providers.get(config.embeddingProvider);
     if (!provider || !provider.isAvailable()) {
-      // Fallback to OpenAI if the configured provider isn't available
+      // Fallback to Gateway or OpenAI if the configured provider isn't available
+      const gateway = this.providers.get('vercel-gateway');
+      if (gateway?.isAvailable()) {
+        return { provider: gateway, model: unifiedConfig.aiGatewayDefaultEmbeddingModel };
+      }
       const fallback = this.providers.get('openai');
       if (fallback?.isAvailable()) {
         return { provider: fallback, model: 'text-embedding-3-small' };

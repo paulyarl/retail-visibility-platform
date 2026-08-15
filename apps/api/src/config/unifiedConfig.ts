@@ -325,6 +325,29 @@ class UnifiedConfig {
     return this.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   }
 
+  // ─── AI Gateway (Vercel) ────────────────────────────────────────────────
+
+  get aiGatewayUrl(): string {
+    return this.env.AI_GATEWAY_URL || 'https://gateway.ai.vercel.com/v1';
+  }
+
+  get aiGatewayApiKey(): string | undefined {
+    return this.env.AI_GATEWAY_API_KEY || this.env.VERCEL_AI_GATEWAY_TOKEN || this.env.AI_GATEWAY_SECRET;
+  }
+
+  get aiGatewayEnabled(): boolean {
+    const v = (this.env.AI_GATEWAY_ENABLED || '').toLowerCase();
+    return v === 'true' || v === '1';
+  }
+
+  get aiGatewayDefaultChatModel(): string {
+    return this.env.AI_GATEWAY_DEFAULT_CHAT_MODEL || 'openai/gpt-4o-mini';
+  }
+
+  get aiGatewayDefaultEmbeddingModel(): string {
+    return this.env.AI_GATEWAY_DEFAULT_EMBEDDING_MODEL || 'openai/text-embedding-3-small';
+  }
+
   // ─── Platform URL ─────────────────────────────────────────────────────
 
   get platformUrl(): string {

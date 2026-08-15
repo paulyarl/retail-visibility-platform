@@ -7,6 +7,7 @@ import { botPlatformAdminService, type BotPlatformSettings, type BotSyncEstimate
 import { clientLogger } from '@/lib/client-logger';
 
 const PROVIDER_OPTIONS = [
+  { value: 'vercel-gateway', label: 'Vercel AI Gateway' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic (Claude)' },
   { value: 'google', label: 'Google (Gemini)' },
@@ -14,6 +15,22 @@ const PROVIDER_OPTIONS = [
 ];
 
 const PROVIDER_MODELS: Record<AiProviderType, { chat: { value: string; label: string }[]; embedding: { value: string; label: string }[] }> = {
+  'vercel-gateway': {
+    chat: [
+      { value: 'openai/gpt-4o-mini', label: 'OpenAI GPT-4o-mini (Gateway)' },
+      { value: 'openai/gpt-4o', label: 'OpenAI GPT-4o (Gateway)' },
+      { value: 'anthropic/claude-3-5-sonnet', label: 'Claude 3.5 Sonnet (Gateway)' },
+      { value: 'anthropic/claude-3-5-haiku', label: 'Claude 3.5 Haiku (Gateway)' },
+      { value: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash (Gateway)' },
+      { value: 'google/gemini-1.5-pro', label: 'Gemini 1.5 Pro (Gateway)' },
+      { value: 'mistral/mistral-large-latest', label: 'Mistral Large (Gateway)' },
+    ],
+    embedding: [
+      { value: 'openai/text-embedding-3-small', label: 'OpenAI text-embedding-3-small (Gateway)' },
+      { value: 'openai/text-embedding-3-large', label: 'OpenAI text-embedding-3-large (Gateway)' },
+      { value: 'google/text-embedding-004', label: 'Google text-embedding-004 (Gateway)' },
+    ],
+  },
   openai: {
     chat: [
       { value: 'gpt-4o-mini', label: 'gpt-4o-mini ($0.15/1M in, $0.60/1M out)' },

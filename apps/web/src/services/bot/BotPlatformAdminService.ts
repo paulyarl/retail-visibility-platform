@@ -91,7 +91,7 @@ export interface BotTenantSummary {
   conversationCount: number;
 }
 
-export type AiProviderType = 'openai' | 'anthropic' | 'google' | 'mistral';
+export type AiProviderType = 'openai' | 'anthropic' | 'google' | 'mistral' | 'vercel-gateway';
 
 export interface BotPlatformSettings {
   botAiEnabled: boolean;

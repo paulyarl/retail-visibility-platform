@@ -5797,26 +5797,6 @@ router.get('/alerts', async (req: any, res: Response) => {
 });
 
 // ====================
-// CATCH-ALL: GET /:id
-// IMPORTANT: This MUST be the last GET route in this file. It matches any
-// 1-segment GET path, so any static 1-segment GET route declared after it
-// (e.g. /alerts, /category-tone-presets, /signals) would be shadowed.
-// Multi-segment /:id/... routes (e.g. /:id/review-response/pipelines) are
-// not affected by ordering relative to this route.
-// ====================
-router.get('/:id', async (req: any, res: Response) => {
-  try {
-    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
-    if (!campaign) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    res.json({ success: true, data: campaign });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// ====================
 // INTELLIGENCE PROFILES (Sprint 1 — Seek Intelligence Scope)
 // ====================
 
@@ -5961,6 +5941,26 @@ router.get('/intelligence-runs/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Run not found' });
     }
     res.json({ success: true, data: run });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// CATCH-ALL: GET /:id
+// IMPORTANT: This MUST be the last GET route in this file. It matches any
+// 1-segment GET path, so any static 1-segment GET route declared after it
+// (e.g. /alerts, /category-tone-presets, /signals) would be shadowed.
+// Multi-segment /:id/... routes (e.g. /:id/review-response/pipelines) are
+// not affected by ordering relative to this route.
+// ====================
+router.get('/:id', async (req: any, res: Response) => {
+  try {
+    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    res.json({ success: true, data: campaign });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

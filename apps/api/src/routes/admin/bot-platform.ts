@@ -68,8 +68,8 @@ const botSettingsSchema = z.object({
   botEmbeddingModel: z.string().min(1).max(50).default('text-embedding-3-small'),
   botChatModel: z.string().min(1).max(50).default('gpt-4o-mini'),
   botSyncIntervalHours: z.number().int().min(0).max(168).default(12),
-  botEmbeddingProvider: z.enum(['openai', 'anthropic', 'google', 'mistral']).default('openai'),
-  botChatProvider: z.enum(['openai', 'anthropic', 'google', 'mistral']).default('openai'),
+  botEmbeddingProvider: z.enum(['openai', 'anthropic', 'google', 'mistral', 'vercel-gateway']).default('openai'),
+  botChatProvider: z.enum(['openai', 'anthropic', 'google', 'mistral', 'vercel-gateway']).default('openai'),
 });
 
 router.put('/settings', async (req: Request, res: Response) => {
