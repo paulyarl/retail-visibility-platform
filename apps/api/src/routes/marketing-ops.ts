@@ -5838,6 +5838,18 @@ router.get('/intelligence-profiles/drafts', async (req, res) => {
   }
 });
 
+// GET /intelligence-profiles/resolve/:category — resolve active profile for a category
+// NOTE: Must be registered BEFORE /:id/:version, otherwise the literal "resolve"
+// segment is captured as :id and the category is parsed as :version (→ "Invalid version").
+router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
+  try {
+    const profile = await IntelligenceProfileService.getInstance().resolve(req.params.category, getCtx(req));
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // GET /intelligence-profiles/:id — get profile with all versions
 router.get('/intelligence-profiles/:id', async (req, res) => {
   try {
@@ -5907,16 +5919,6 @@ router.post('/intelligence-profiles/:id/:version/activate', async (req, res) => 
       return res.status(400).json({ success: false, error: 'Invalid version' });
     }
     const profile = await IntelligenceProfileService.getInstance().activateDraft(req.params.id, version, getCtx(req));
-    res.json({ success: true, data: profile });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// GET /intelligence-profiles/resolve/:category — resolve active profile for a category
-router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
-  try {
-    const profile = await IntelligenceProfileService.getInstance().resolve(req.params.category, getCtx(req));
     res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
