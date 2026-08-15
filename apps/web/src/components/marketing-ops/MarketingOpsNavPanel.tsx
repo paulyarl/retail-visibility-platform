@@ -18,6 +18,7 @@ import {
   IconShield,
   IconBook,
   IconListCheck,
+  IconBrain,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops/recovery', label: 'Recovery', icon: IconShield, emoji: '🛡️' },
   { href: '/settings/admin/marketing-ops/playbooks', label: 'Playbooks', icon: IconBook, emoji: '📚' },
   { href: '/settings/admin/marketing-ops/prompts', label: 'Prompts', icon: IconMessage, emoji: '💬' },
+  { href: '/settings/admin/marketing-ops/intelligence-profiles', label: 'Intelligence Profiles', icon: IconBrain, emoji: '🧠' },
   { href: '/settings/admin/marketing-ops/openers', label: 'Openers', icon: IconMail, emoji: '✉️' },
   { href: '/settings/admin/marketing-ops/follow-ups', label: 'Follow-Ups', icon: IconMail, emoji: '📨' },
   { href: '/settings/admin/marketing-ops/split-tests', label: 'Split Tests', icon: IconFlask, emoji: '🧪' },
