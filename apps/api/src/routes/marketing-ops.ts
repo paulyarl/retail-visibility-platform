@@ -246,6 +246,10 @@ const campaignBaseSchema = z.object({
   attributes: z.array(z.string()).optional(),
   assigned_to: z.string().optional(),
   notes: z.string().optional(),
+  // Intelligence scope fields (Sprint 3 — Migration 200)
+  intelligence_focus: z.enum(['emerging', 'competitive']).optional(),
+  intelligence_zip_codes: z.string().max(500).optional(),
+  intelligence_search_radius_miles: z.number().min(0).max(500).optional(),
 });
 
 const campaignCreateSchema = campaignBaseSchema.refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
@@ -1027,6 +1031,9 @@ router.post('/', async (req: any, res: Response) => {
       attributes: parsed.attributes,
       assignedTo: parsed.assigned_to,
       notes: parsed.notes,
+      intelligenceFocus: parsed.intelligence_focus,
+      intelligenceZipCodes: parsed.intelligence_zip_codes,
+      intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
   } catch (error) {
@@ -1082,6 +1089,9 @@ router.put('/:id', async (req: any, res: Response) => {
       amountPaidCents: parsed.amount_paid_cents,
       packageDelivered: parsed.package_delivered,
       campaignOrigin: parsed.campaign_origin,
+      intelligenceFocus: parsed.intelligence_focus,
+      intelligenceZipCodes: parsed.intelligence_zip_codes,
+      intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
   } catch (error) {

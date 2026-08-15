@@ -199,6 +199,10 @@ export interface CampaignInput {
   notes?: string;
   parentCampaignId?: string;
   businessProspectId?: string;
+  // Intelligence scope fields (Sprint 3 — Migration 200)
+  intelligenceFocus?: 'emerging' | 'competitive';
+  intelligenceZipCodes?: string;
+  intelligenceSearchRadiusMiles?: number;
 }
 
 export interface CampaignUpdateInput {
@@ -248,6 +252,10 @@ export interface CampaignUpdateInput {
   subscriptionTierId?: string;
   couponCode?: string;
   serviceCategory?: string;
+  // Intelligence scope fields (Sprint 3 — Migration 200)
+  intelligenceFocus?: 'emerging' | 'competitive';
+  intelligenceZipCodes?: string;
+  intelligenceSearchRadiusMiles?: number;
 }
 
 export interface ContactReadiness {
@@ -415,6 +423,10 @@ export class MarketingCampaignService extends BaseService {
           business_prospect_id: input.businessProspectId || null,
           stage: initialStage,
           stage_entered_at: new Date(),
+          // Intelligence scope fields (Sprint 3 — Migration 200)
+          intelligence_focus: input.intelligenceFocus || 'emerging',
+          intelligence_zip_codes: input.intelligenceZipCodes || null,
+          intelligence_search_radius_miles: (input.intelligenceSearchRadiusMiles ?? null) as any,
         },
       });
 
@@ -949,6 +961,10 @@ export class MarketingCampaignService extends BaseService {
     if (input.subscriptionTierId !== undefined) data.subscription_tier_id = input.subscriptionTierId || null;
     if (input.couponCode !== undefined) data.coupon_code = input.couponCode || null;
     if (input.serviceCategory !== undefined) data.service_category = input.serviceCategory || null;
+    // Intelligence scope fields (Sprint 3 — Migration 200)
+    if (input.intelligenceFocus !== undefined) data.intelligence_focus = input.intelligenceFocus || 'emerging';
+    if (input.intelligenceZipCodes !== undefined) data.intelligence_zip_codes = input.intelligenceZipCodes || null;
+    if (input.intelligenceSearchRadiusMiles !== undefined) data.intelligence_search_radius_miles = (input.intelligenceSearchRadiusMiles ?? null) as any;
 
     try {
       const updated = await this.prisma.mkt_campaigns_list.update({ where: { id }, data });

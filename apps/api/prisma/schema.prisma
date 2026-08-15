@@ -6185,6 +6185,9 @@ model mkt_campaigns_list {
   is_primary_sibling                                                              Boolean                              @default(false)
   playbook_code                                                                   String?                              @db.VarChar(20)
   title                                                                           String?                              @db.VarChar(255)
+  intelligence_focus                                                              String?                              @default("emerging") @db.VarChar(20)
+  intelligence_zip_codes                                                          String?
+  intelligence_search_radius_miles                                                Decimal?                             @db.Decimal(10, 2)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]

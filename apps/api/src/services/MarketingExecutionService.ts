@@ -18,6 +18,7 @@ import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
+import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 
 // Re-export for backward compatibility (tests + existing imports).
 export { ScopeMismatchError, assertScopeCompatible };
@@ -270,8 +271,36 @@ export class MarketingExecutionService extends BaseService {
     const category = input.campaign.category || '';
 
     const isSeek = promptType === 'seek';
-    const isBusinessScope = campaignScope === 'business';
     const hasCategory = category.length > 0;
+
+    // ─── Intelligence-scope composition path (Sprint 3) ───────────────────
+    // When the campaign is intelligence-scope and the template is a seek prompt,
+    // delegate to PromptComposerService which assembles base + extension +
+    // profile block + focus from the seeded fragments.
+    if (isSeek && campaignScope === 'intelligence' && hasCategory) {
+      const composer = PromptComposerService.getInstance();
+      const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
+      const composed = await composer.composeIntelligencePrompt({ category, focus }, ctx);
+
+      // Apply variable substitution on the composed body (zip_codes, radius, etc.)
+      const rendered = this.renderTemplate(composed.body, input.variables, input.campaign);
+
+      logger.info('Intelligence-scope prompt composed', ctx, {
+        campaignId: input.campaign.id,
+        category,
+        focus,
+        profileId: composed.resolution.profile_id,
+        intelligenceMode: composed.resolution.intelligence_mode,
+      });
+
+      return {
+        renderedPrompt: rendered,
+        resolution: composed.resolution,
+      };
+    }
+
+    // ─── Business-scope §1B amplification path ────────────────────────────
+    const isBusinessScope = campaignScope === 'business';
 
     if (!isSeek || !isBusinessScope || !hasCategory) {
       // No amplification — return byte-identical base render.

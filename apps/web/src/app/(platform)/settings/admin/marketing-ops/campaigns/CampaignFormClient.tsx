@@ -387,6 +387,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           assigned_to: strOrUndef(form.assigned_to),
           notes: strOrUndef(form.notes),
           service_category: strOrUndef(form.service_category),
+          intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' : undefined,
+          intelligence_zip_codes: form.scope === 'intelligence' ? strOrUndef(form.intelligence_zip_codes) : undefined,
+          intelligence_search_radius_miles: form.scope === 'intelligence' ? numOrUndef(form.intelligence_search_radius_miles) : undefined,
         };
         const created = await marketingOpsService.createCampaign(input);
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
@@ -458,6 +461,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           subscription_tier_id: form.subscription_tier_id,
           coupon_code: form.coupon_code,
           service_category: form.service_category,
+          intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' : undefined,
+          intelligence_zip_codes: form.scope === 'intelligence' ? form.intelligence_zip_codes : undefined,
+          intelligence_search_radius_miles: form.scope === 'intelligence' ? (form.intelligence_search_radius_miles === '' ? undefined : Number(form.intelligence_search_radius_miles)) : undefined,
         };
         await marketingOpsService.updateCampaign(campaignId, input);
         router.push(`/settings/admin/marketing-ops/campaigns/${campaignId}`);

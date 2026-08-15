@@ -173,6 +173,10 @@ export interface Campaign {
   engagementCycle?: number;
   archetype?: string | null;
   archetypeLabel?: string | null;
+  // Intelligence scope fields (Sprint 3 — Migration 200)
+  intelligence_focus?: 'emerging' | 'competitive' | null;
+  intelligence_zip_codes?: string | null;
+  intelligence_search_radius_miles?: number | null;
 }
 
 export interface CampaignLineageEntry {
@@ -1256,6 +1260,10 @@ export interface CampaignCreateInput {
   assigned_to?: string;
   notes?: string;
   service_category?: string;
+  // Intelligence scope fields (Sprint 3 — Migration 200)
+  intelligence_focus?: 'emerging' | 'competitive';
+  intelligence_zip_codes?: string;
+  intelligence_search_radius_miles?: number;
 }
 
 export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
