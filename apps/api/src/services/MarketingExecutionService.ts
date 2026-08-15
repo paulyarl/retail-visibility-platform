@@ -277,13 +277,24 @@ export class MarketingExecutionService extends BaseService {
     // When the campaign is intelligence-scope and the template is a seek prompt,
     // delegate to PromptComposerService which assembles base + extension +
     // profile block + focus from the seeded fragments.
-    if (isSeek && campaignScope === 'intelligence' && hasCategory) {
+    //
+    // EXCLUSION: The Intelligence Profile Establishment template has its own
+    // body (it instructs the AI to produce a §10 profile JSON) and must NOT
+    // be composed. We detect it by checking the output_schema name — if it's
+    // 'intelligence_profile', render the template body as-is.
+    const outputSchemaName = input.template.output_schema?.name || input.template.outputSchema?.name || '';
+    const isProfileEstablishment = outputSchemaName === 'intelligence_profile';
+
+    if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment) {
       const composer = PromptComposerService.getInstance();
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
       const composed = await composer.composeIntelligencePrompt({ category, focus }, ctx);
 
       // Apply variable substitution on the composed body (zip_codes, radius, etc.)
-      const rendered = this.renderTemplate(composed.body, input.variables, input.campaign);
+      // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
+      // since renderTemplate() only supports simple {{variable}} replacement.
+      const cleanedBody = this.stripHandlebarsConditionals(composed.body, input.variables);
+      const rendered = this.renderTemplate(cleanedBody, input.variables, input.campaign);
 
       logger.info('Intelligence-scope prompt composed', ctx, {
         campaignId: input.campaign.id,
@@ -353,6 +364,26 @@ export class MarketingExecutionService extends BaseService {
    * Caller-supplied `variables` (e.g. from the workspace UI) are always
    * injected regardless of scope — they are explicit user overrides.
    */
+  /**
+   * Strip unresolved {{#if variable}}...{{/if}} Handlebars-style conditional
+   * blocks from the composed prompt body. When the variable is provided and
+   * non-empty, the inner content is kept. When the variable is absent or empty,
+   * the entire block (including the inner content) is removed.
+   *
+   * This is needed because the intelligence fragment seeds use {{#if}} syntax
+   * for optional fields (zip_codes, search_radius_miles), but renderTemplate()
+   * only supports simple {{variable}} replacement.
+   */
+  private stripHandlebarsConditionals(body: string, variables: Record<string, any> | undefined): string {
+    return body.replace(
+      /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+      (_match, varName: string, inner: string) => {
+        const value = variables?.[varName];
+        return value && String(value).trim().length > 0 ? inner : '';
+      },
+    );
+  }
+
   renderTemplate(body: string, variables: Record<string, any> | undefined, campaign: any): string {
     const scope = (campaign.scope ?? 'business').toLowerCase() as keyof typeof SCOPE_VARIABLES;
     const allowed = SCOPE_VARIABLES[scope] ?? SCOPE_VARIABLES.business;
