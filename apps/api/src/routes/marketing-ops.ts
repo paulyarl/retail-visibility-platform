@@ -255,10 +255,15 @@ const campaignBaseSchema = z.object({
   intelligence_campaign_kind: z.enum(['discovery', 'establishment']).optional(),
 });
 
-const campaignCreateSchema = campaignBaseSchema.refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
-  message: 'business_name is required for business-scoped campaigns',
-  path: ['business_name'],
-});
+const campaignCreateSchema = campaignBaseSchema
+  .refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
+    message: 'business_name is required for business-scoped campaigns',
+    path: ['business_name'],
+  })
+  .refine((data) => data.scope !== 'intelligence' || (data.state && data.state.trim().length > 0), {
+    message: 'state is required for intelligence-scoped campaigns',
+    path: ['state'],
+  });
 
 const campaignUpdateSchema = campaignBaseSchema.partial().extend({
   stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
@@ -275,6 +280,9 @@ const campaignUpdateSchema = campaignBaseSchema.partial().extend({
 }).refine((data) => !data.scope || data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
   message: 'business_name is required for business-scoped campaigns',
   path: ['business_name'],
+}).refine((data) => !data.scope || data.scope !== 'intelligence' || (data.state && data.state.trim().length > 0), {
+  message: 'state is required for intelligence-scoped campaigns',
+  path: ['state'],
 });
 
 const stageTransitionSchema = z.object({

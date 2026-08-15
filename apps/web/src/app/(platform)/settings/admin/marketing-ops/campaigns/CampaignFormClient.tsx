@@ -630,11 +630,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
                 newInputPlaceholder="Enter new city" className={inputClass} />
             </FormField>
-            <FormField label="State">
-              <SuggestiveSelect value={form.state} onChange={(v) => handleChange('state', v)}
+            <FormField label="State" required={form.scope === 'intelligence'}>
+              <SuggestiveSelect required={form.scope === 'intelligence'} value={form.state} onChange={(v) => handleChange('state', v)}
                 options={vocab.states} emptyLabel="-- Select state --" newLabel="+ New state..."
                 newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
-              <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Used by category, city, and intelligence scope prompts.</p>
+              <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for other scopes.</p>
             </FormField>
             <FormField label="Neighborhood">
               <SuggestiveSelect value={form.neighborhood} onChange={(v) => handleChange('neighborhood', v)}
