@@ -40,12 +40,14 @@ const SCOPE_LABELS: Record<string, string> = {
   business: 'Business',
   category: 'Category',
   city: 'City',
+  intelligence: 'Intelligence',
 };
 
 const SCOPE_BADGE_COLORS: Record<string, string> = {
   business: 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300',
   category: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   city: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+  intelligence: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -830,7 +832,7 @@ export default function ProspectQueueClient() {
                   Campaign scope
                 </label>
                 <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden w-full">
-                  {(['business', 'category', 'city'] as CampaignScope[]).map((s) => (
+                  {(['business', 'category', 'city', 'intelligence'] as CampaignScope[]).map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -846,7 +848,9 @@ export default function ProspectQueueClient() {
                           ? 'One campaign focused on this single business (default)'
                           : s === 'category'
                             ? 'A category-level campaign; this business is the triggering prospect'
-                            : 'A city-level campaign; this business is the triggering prospect'
+                            : s === 'city'
+                              ? 'A city-level campaign; this business is the triggering prospect'
+                              : 'An intelligence-scope discovery campaign; this business is the triggering prospect'
                       }
                     >
                       {SCOPE_LABELS[s]}

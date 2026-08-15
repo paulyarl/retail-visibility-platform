@@ -16,7 +16,7 @@ const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'pai
 const CLOSED_STAGES: CampaignStage[] = ['lost', 'dead'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
-const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 
 type FollowUpFilter = '' | 'overdue' | 'due_today' | 'this_week';
 
