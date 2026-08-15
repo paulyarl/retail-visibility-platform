@@ -99,6 +99,22 @@ export default function PromptLibraryClient() {
     [activeProfiles],
   );
 
+  // Maps category_name → profile record so the badge can link to the
+  // intelligence discovery workspace with the category pre-selected.
+  const profileByCategoryName = useMemo(() => {
+    const m: Record<string, IntelligenceProfile> = {};
+    for (const p of activeProfiles) {
+      if (p.category_name) m[p.category_name] = p;
+    }
+    return m;
+  }, [activeProfiles]);
+
+  // Tracks which profile-active badge was clicked so a context banner can
+  // tell the operator which category they're scoping into. The badge
+  // switches the scope filter to 'intelligence' (not 'category') because
+  // the Intelligence Discovery templates are scope: intelligence.
+  const [profileBadgeCategory, setProfileBadgeCategory] = useState<string | null>(null);
+
   const categoryOptions = useMemo(
     () => [...new Set([...distinctValues(templates, (t) => t.category), ...profileCategoryNames])].sort((a, b) => a.localeCompare(b)),
     [templates, profileCategoryNames],
@@ -107,6 +123,20 @@ export default function PromptLibraryClient() {
     () => [...new Set([...presetTones, ...distinctValues(templates, (t) => t.tone)])].sort((a, b) => a.localeCompare(b)),
     [presetTones, templates],
   );
+
+  // Intelligence discovery template IDs — used to build deep-links from the
+  // profile-active context banner directly to the workspace with the category
+  // pre-selected. Found by output_schema name + focus (parsed from the name,
+  // matching the workspace's templateFocus logic).
+  const intelligenceDiscoveryTemplateIds = useMemo(() => {
+    const emerging = templates.find((t) =>
+      t.output_schema?.name === 'intelligence_discovery' && /emerging/i.test(t.name),
+    );
+    const competitive = templates.find((t) =>
+      t.output_schema?.name === 'intelligence_discovery' && /competitive/i.test(t.name),
+    );
+    return { emerging: emerging?.id, competitive: competitive?.id };
+  }, [templates]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this prompt template?')) return;
@@ -205,23 +235,81 @@ export default function PromptLibraryClient() {
         )}
 
         {/* Profile-active category badges — quick filter for categories with
-            activated intelligence profiles. Clicking sets the category filter. */}
+            activated intelligence profiles. Clicking switches the scope to
+            'intelligence' so the Intelligence Discovery (Emerging/Competitive)
+            and Profile Establishment templates become visible. The templates
+            themselves are category-agnostic composition markers — the category
+            is selected at workspace runtime via the category → campaign
+            cascade — so we do NOT set the category filter here. */}
         {profileCategoryNames.length > 0 && (
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Profile-active:</span>
-            {profileCategoryNames.map((cat) => (
+            {profileCategoryNames.map((cat) => {
+              const isActive = profileBadgeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setScopeFilter('intelligence');
+                    setCategoryFilter('');
+                    setProfileBadgeCategory(isActive ? null : cat);
+                  }}
+                  className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                    isActive
+                      ? 'bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700 dark:text-violet-300'
+                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-gray-400 dark:hover:border-violet-700 dark:hover:text-violet-300'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Context banner — when a profile-active badge is clicked, tell the
+            operator what they're looking at and link to the discovery
+            workspaces. The workspace has a category → campaign cascade that
+            will pre-select this category via ?category=. */}
+        {profileBadgeCategory && (
+          <div className="mb-4 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-violet-900 dark:text-violet-300">
+                    Intelligence templates for <strong>{profileBadgeCategory}</strong>
+                  </p>
+                  <p className="text-xs text-violet-700 dark:text-violet-400 mt-1">
+                    Scope switched to <code>intelligence</code>. The category profile ({profileByCategoryName[profileBadgeCategory]?.id} v{profileByCategoryName[profileBadgeCategory]?.version}) will amplify the resolved prompt.
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    {intelligenceDiscoveryTemplateIds.emerging && (
+                      <Link
+                        href={`/settings/admin/marketing-ops/prompts/${intelligenceDiscoveryTemplateIds.emerging}?category=${encodeURIComponent(profileBadgeCategory)}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300 bg-white dark:bg-neutral-800 border border-violet-300 dark:border-violet-800 rounded-lg px-2.5 py-1 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                      >
+                        Emerging workspace <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    )}
+                    {intelligenceDiscoveryTemplateIds.competitive && (
+                      <Link
+                        href={`/settings/admin/marketing-ops/prompts/${intelligenceDiscoveryTemplateIds.competitive}?category=${encodeURIComponent(profileBadgeCategory)}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300 bg-white dark:bg-neutral-800 border border-violet-300 dark:border-violet-800 rounded-lg px-2.5 py-1 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                      >
+                        Competitive workspace <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
               <button
-                key={cat}
-                onClick={() => setCategoryFilter(cat)}
-                className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
-                  categoryFilter === cat
-                    ? 'bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700 dark:text-violet-300'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-gray-400 dark:hover:border-violet-700 dark:hover:text-violet-300'
-                }`}
+                onClick={() => setProfileBadgeCategory(null)}
+                className="p-1 text-violet-400 hover:text-violet-600 dark:hover:text-violet-300"
               >
-                {cat}
+                <X className="w-3.5 h-3.5" />
               </button>
-            ))}
+            </div>
           </div>
         )}
 

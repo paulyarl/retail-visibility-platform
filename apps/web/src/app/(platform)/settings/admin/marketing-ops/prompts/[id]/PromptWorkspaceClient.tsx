@@ -115,7 +115,7 @@ function isScopeMismatchError(msg: string): boolean {
     || /out-of-scope variables for scope/i.test(msg);
 }
 
-export default function PromptWorkspaceClient({ templateId, initialCampaignId }: { templateId: string; initialCampaignId?: string }) {
+export default function PromptWorkspaceClient({ templateId, initialCampaignId, initialCategory }: { templateId: string; initialCampaignId?: string; initialCategory?: string }) {
   const [template, setTemplate] = useState<PromptTemplate | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [executions, setExecutions] = useState<PromptExecution[]>([]);
@@ -333,6 +333,19 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId }:
     setSelectedCampaignId(match.id);
     setAutoSelected(true);
   }, [autoSelected, initialCampaignId, loading, template, campaigns]);
+
+  // Deep-link: when opened from a profile-active badge (?category=), pre-select
+  // the category in the intelligence discovery cascade so the operator lands on
+  // a filtered campaign list for that category. Only fires once.
+  useEffect(() => {
+    if (autoSelected || !initialCategory || loading || !isIntelligenceDiscovery) return;
+    // Wait for the category list to be populated before attempting selection.
+    if (intelligenceCategories.length === 0) return;
+    if (intelligenceCategories.includes(initialCategory)) {
+      setSelectedCategory(initialCategory);
+    }
+    setAutoSelected(true);
+  }, [autoSelected, initialCategory, loading, isIntelligenceDiscovery, intelligenceCategories]);
 
   const extractedVariables = useMemo(() => {
     if (!template?.body) return [];
