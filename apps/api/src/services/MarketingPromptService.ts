@@ -76,13 +76,53 @@ export interface PromptExecutionInput {
  */
 function stripLlmJsonArtifacts(raw: string): string {
   try {
-    // Strip a leading identifier label immediately preceding a `{` that itself
-    // follows a `,` or `[` (i.e. an array context). Matches patterns like:
-    //   `, decline_3: {`  →  `, {`
-    //   `[ city_1: {`     →  `[ {`
-    // The label is a bare word (letters, digits, underscore) followed by `:`.
-    // We require whitespace or nothing between the comma/bracket and the label.
-    return raw.replace(/([\[,])\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*\{/g, '$1 {');
+    let text = raw;
+
+    // 1. Extract from ```json ... ``` or ``` ... ``` code fences.
+    //    LLMs often wrap JSON output in markdown code blocks.
+    const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/i);
+    if (fenceMatch) {
+      text = fenceMatch[1].trim();
+    }
+
+    // 2. If the text is not pure JSON (starts with `{` or `[`), try to extract
+    //    the outermost JSON object or array by finding the first `{` or `[`
+    //    and matching to the corresponding closing `}` or `]`.
+    const firstBrace = text.search(/[{[]/);
+    if (firstBrace > 0) {
+      const openChar = text[firstBrace];
+      const closeChar = openChar === '{' ? '}' : ']';
+      // Find the matching closing brace by counting depth
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let endIdx = -1;
+      for (let i = firstBrace; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === openChar) depth++;
+        else if (ch === closeChar) {
+          depth--;
+          if (depth === 0) { endIdx = i; break; }
+        }
+      }
+      if (endIdx > firstBrace) {
+        text = text.substring(firstBrace, endIdx + 1);
+      }
+    }
+
+    // 3. Strip a leading identifier label immediately preceding a `{` that itself
+    //    follows a `,` or `[` (i.e. an array context). Matches patterns like:
+    //    `, decline_3: {`  →  `, {`
+    //    `[ city_1: {`     →  `[ {`
+    //    The label is a bare word (letters, digits, underscore) followed by `:`.
+    //    We require whitespace or nothing between the comma/bracket and the label.
+    text = text.replace(/([\[,])\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*\{/g, '$1 {');
+
+    return text;
   } catch {
     return raw;
   }

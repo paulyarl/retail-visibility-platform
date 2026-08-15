@@ -69,7 +69,10 @@ The profile will be used to:
    INT_LOW_VISIBILITY, INT_WEAK_MAINSTREAM_INDEXING, INT_SINGLE_SOURCE, INT_HIDDEN_TRUST, INT_RECENT_BUSINESS_EVIDENCE, INT_POSSIBLE_CATEGORY_MISALIGNMENT, INT_VERTICAL_SOURCE_DISCOVERY, INT_MULTISOURCE_IDENTITY, INT_ACTIVE_OPERATIONAL_EVIDENCE, INT_CATEGORY_SPECIALIZATION, INT_UNDEREXPOSED_CREDENTIAL
 
 === EVIDENCE SAFETY ===
-Do NOT convert unavailable information into a negative signal. "Website not found during discovery" is not the same as "no website exists." Record what you found and what you could not verify as separate observations. The prohibited_inferences section is where you document inferences that must not be made from absence of evidence.`,
+Do NOT convert unavailable information into a negative signal. "Website not found during discovery" is not the same as "no website exists." Record what you found and what you could not verify as separate observations. The prohibited_inferences section is where you document inferences that must not be made from absence of evidence.
+
+=== OUTPUT REQUIREMENT ===
+Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.`,
   variables: ['category', 'city', 'state'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,

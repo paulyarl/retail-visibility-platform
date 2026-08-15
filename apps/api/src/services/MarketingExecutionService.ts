@@ -19,6 +19,7 @@ import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './sc
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
+import { resolveOutputSchema } from '../validators/market-analysis.schema';
 
 // Re-export for backward compatibility (tests + existing imports).
 export { ScopeMismatchError, assertScopeCompatible };
@@ -273,6 +274,20 @@ export class MarketingExecutionService extends BaseService {
     const isSeek = promptType === 'seek';
     const hasCategory = category.length > 0;
 
+    // Resolve the output schema's prompt suffix (e.g. JSON format instructions
+    // for intelligence_profile / intelligence_discovery). This is appended to
+    // the final rendered prompt so the external AI knows the expected output
+    // format.
+    //
+    // IMPORTANT: The suffix is only appended for intelligence-scope templates
+    // to preserve byte-identical business/category/city audit prompts (the
+    // business_analysis prompt suffix was never appended historically and
+    // enabling it now would break the no-profile regression).
+    const outputSchemaName = input.template.output_schema?.name || input.template.outputSchema?.name || '';
+    const isIntelligenceSchema = outputSchemaName === 'intelligence_profile' || outputSchemaName === 'intelligence_discovery';
+    const schemaEntry = isIntelligenceSchema ? resolveOutputSchema(outputSchemaName) : null;
+    const promptSuffix = schemaEntry?.promptSuffix ?? '';
+
     // ─── Intelligence-scope composition path (Sprint 3) ───────────────────
     // When the campaign is intelligence-scope and the template is a seek prompt,
     // delegate to PromptComposerService which assembles base + extension +
@@ -282,7 +297,6 @@ export class MarketingExecutionService extends BaseService {
     // body (it instructs the AI to produce a §10 profile JSON) and must NOT
     // be composed. We detect it by checking the output_schema name — if it's
     // 'intelligence_profile', render the template body as-is.
-    const outputSchemaName = input.template.output_schema?.name || input.template.outputSchema?.name || '';
     const isProfileEstablishment = outputSchemaName === 'intelligence_profile';
 
     if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment) {
@@ -305,7 +319,7 @@ export class MarketingExecutionService extends BaseService {
       });
 
       return {
-        renderedPrompt: rendered,
+        renderedPrompt: this.appendPromptSuffix(rendered, promptSuffix),
         resolution: composed.resolution,
       };
     }
@@ -314,9 +328,9 @@ export class MarketingExecutionService extends BaseService {
     const isBusinessScope = campaignScope === 'business';
 
     if (!isSeek || !isBusinessScope || !hasCategory) {
-      // No amplification — return byte-identical base render.
+      // No amplification — return byte-identical base render (plus suffix).
       return {
-        renderedPrompt: baseRendered,
+        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
       };
     }
@@ -326,9 +340,9 @@ export class MarketingExecutionService extends BaseService {
     const profile = await profileService.resolve(category, ctx);
 
     if (!profile) {
-      // No active profile — return byte-identical base render.
+      // No active profile — return byte-identical base render (plus suffix).
       return {
-        renderedPrompt: baseRendered,
+        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
       };
     }
@@ -346,13 +360,23 @@ export class MarketingExecutionService extends BaseService {
     });
 
     return {
-      renderedPrompt: amplified,
+      renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
       resolution: {
         profile_id: profile.id,
         profile_version: profile.version,
         intelligence_mode: 'profile',
       },
     };
+  }
+
+  /**
+   * Append a prompt suffix (e.g. JSON output format instructions from the
+   * output_schema registry) to the rendered prompt. Returns the prompt
+   * unchanged if no suffix is defined.
+   */
+  private appendPromptSuffix(rendered: string, suffix: string): string {
+    if (!suffix || !suffix.trim()) return rendered;
+    return rendered + '\n' + suffix;
   }
 
   /**
