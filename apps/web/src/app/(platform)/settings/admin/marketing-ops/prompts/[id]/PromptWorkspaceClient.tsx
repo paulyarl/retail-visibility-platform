@@ -201,19 +201,31 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     //     not discovery scans.
     //   - Establishment template: only establishment-kind campaigns (the
     //     ones used to bootstrap a profile).
+    let filtered: Campaign[];
     if (isIntelligenceDiscovery) {
-      return scopeMatch.filter((c) =>
+      filtered = scopeMatch.filter((c) =>
         (c.intelligence_campaign_kind ?? 'discovery') === 'discovery' &&
         (c.intelligence_focus ?? 'emerging') === templateFocus,
       );
-    }
-    if (isIntelligenceEstablishment) {
-      return scopeMatch.filter((c) =>
+    } else if (isIntelligenceEstablishment) {
+      filtered = scopeMatch.filter((c) =>
         (c.intelligence_campaign_kind ?? 'discovery') === 'establishment',
       );
+    } else {
+      filtered = scopeMatch;
     }
-    return scopeMatch;
-  }, [campaigns, template, isIntelligenceDiscovery, isIntelligenceEstablishment, templateFocus]);
+    // Always include the deep-linked campaign (e.g. opened from a campaign
+    // detail page via ?campaignId=) even when it doesn't match the kind/focus
+    // filter — otherwise the <select> shows the placeholder while the campaign
+    // is auto-selected in state, and the operator can't see or re-select it.
+    if (initialCampaignId) {
+      const deepLinked = campaigns.find((c) => c.id === initialCampaignId);
+      if (deepLinked && !filtered.some((c) => c.id === deepLinked.id)) {
+        filtered = [...filtered, deepLinked];
+      }
+    }
+    return filtered;
+  }, [campaigns, template, isIntelligenceDiscovery, isIntelligenceEstablishment, templateFocus, initialCampaignId]);
 
   // Distinct categories among the filtered intelligence-scope campaigns —
   // drives the first dropdown in the category → campaign cascade.

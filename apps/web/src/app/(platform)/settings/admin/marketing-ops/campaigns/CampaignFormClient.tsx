@@ -87,6 +87,8 @@ interface FormState {
   intelligence_focus: 'emerging' | 'competitive' | '';
   intelligence_zip_codes: string;
   intelligence_search_radius_miles: number | '';
+  // Migration 201 — discriminator for intelligence-scope campaigns
+  intelligence_campaign_kind: 'discovery' | 'establishment' | '';
 }
 
 const EMPTY_FORM: FormState = {
@@ -142,6 +144,7 @@ const EMPTY_FORM: FormState = {
   intelligence_focus: 'emerging',
   intelligence_zip_codes: '',
   intelligence_search_radius_miles: '',
+  intelligence_campaign_kind: 'discovery',
 };
 
 export default function CampaignFormClient({ mode, campaignId }: { mode: 'create' | 'edit'; campaignId?: string }) {
@@ -243,6 +246,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         intelligence_focus: ((c as any).intelligence_focus ?? 'emerging') as 'emerging' | 'competitive' | '',
         intelligence_zip_codes: (c as any).intelligence_zip_codes ?? '',
         intelligence_search_radius_miles: (c as any).intelligence_search_radius_miles ?? '',
+        intelligence_campaign_kind: ((c as any).intelligence_campaign_kind ?? 'discovery') as 'discovery' | 'establishment' | '',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
@@ -396,6 +400,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' : undefined,
           intelligence_zip_codes: form.scope === 'intelligence' ? strOrUndef(form.intelligence_zip_codes) : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? numOrUndef(form.intelligence_search_radius_miles) : undefined,
+          intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
         };
         const created = await marketingOpsService.createCampaign(input);
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
@@ -471,6 +476,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' : undefined,
           intelligence_zip_codes: form.scope === 'intelligence' ? form.intelligence_zip_codes : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? (form.intelligence_search_radius_miles === '' ? undefined : Number(form.intelligence_search_radius_miles)) : undefined,
+          intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
         };
         await marketingOpsService.updateCampaign(campaignId, input);
         router.push(`/settings/admin/marketing-ops/campaigns/${campaignId}`);
@@ -588,6 +594,23 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                       <span className="text-sm">Competitive — analyze established competitors</span>
                     </label>
                   </div>
+                </FormField>
+                <FormField label="Campaign Kind" required className="sm:col-span-2">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_campaign_kind" value="discovery"
+                        checked={form.intelligence_campaign_kind === 'discovery'}
+                        onChange={(e) => handleChange('intelligence_campaign_kind', e.target.value)} />
+                      <span className="text-sm">Discovery — market scanning to find prospects</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_campaign_kind" value="establishment"
+                        checked={form.intelligence_campaign_kind === 'establishment'}
+                        onChange={(e) => handleChange('intelligence_campaign_kind', e.target.value)} />
+                      <span className="text-sm">Establishment — bootstrap a category intelligence profile</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Establishment campaigns appear in the Profile Establishment prompt workspace; discovery campaigns appear in the Emerging/Competitive discovery workspaces.</p>
                 </FormField>
                 <FormField label="ZIP Codes (optional)">
                   <input type="text" value={form.intelligence_zip_codes}
