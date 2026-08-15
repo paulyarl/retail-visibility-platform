@@ -140,7 +140,7 @@ export default function CampaignListClient() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by business name, category, or city..."
+              placeholder="Search by title, business name, category, or city..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -249,7 +249,7 @@ export default function CampaignListClient() {
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Open</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Scope</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Business</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Campaign</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tone</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">City</th>
@@ -285,13 +285,18 @@ export default function CampaignListClient() {
                         <td className="px-4 py-3">
                           <Link href={`/settings/admin/marketing-ops/campaigns/${c.id}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
                             {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 text-orange-500" />}
-                            {c.business_name ?? '—'}
+                            {c.title || c.business_name || c.category || c.city || '—'}
                           </Link>
                           {c.archetype && (
                             <ArchetypeBadge archetype={c.archetype} className="ml-1.5 align-middle" />
                           )}
                           {c.display_id && (
                             <span className="ml-2 text-xs text-gray-400">{c.display_id}</span>
+                          )}
+                          {c.title && (c.business_name || c.category || c.city) && (
+                            <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              {c.business_name || `${c.category} · ${c.city}`}
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.category}</td>
