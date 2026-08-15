@@ -158,7 +158,7 @@ export default function IntelligenceProfilesClient() {
                 {' '}{prohibited?.length ?? 0} prohibited inference{prohibited?.length !== 1 ? 's' : ''}
               </Text>
             )}
-          </Group>
+          </Stack>
           <Group gap="xs" wrap="nowrap">
             <Button
               size="xs"
