@@ -147,7 +147,65 @@ untapped opportunity. Specifically seek:
    mislabeled on platforms — they operate in the category but are not tagged as such.
 
 The emerging focus builds the PROSPECT SET — businesses that need us. These are
-the businesses most likely to benefit from a Business Audit and outreach.`,
+the businesses most likely to benefit from a Business Audit and outreach.
+
+=== EMERGING × PROFILE INTEGRATION ===
+Apply each emerging-focus point above USING the Category Intelligence Profile
+that preceded this block. The profile is not category-neutral context — it is
+the concrete mechanism set for emerging discovery in THIS category. Integrate:
+
+- DEEP / LONG-TAIL SEARCH → use the profile's discovery_patterns as the concrete
+  long-tail mechanism list. For this category, long-tail search means the
+  specific vertical sources, supplier lists, community directories, social-first
+  searches, and marketplace catalog searches named in the profile — not just
+  "go deeper in Google." Execute the profile's named patterns, not a generic
+  long-tail heuristic.
+
+- THIN-FOOTPRINT / SOCIAL-ONLY / SINGLE-PLATFORM → tag with INT_LOW_VISIBILITY,
+  INT_WEAK_MAINSTREAM_INDEXING, and INT_SINGLE_SOURCE as defined in the profile's
+  signal list. The profile's evidence rules (e.g. absence_handling,
+  prospect_quality) govern how thin footprint is interpreted — absence of a
+  website or GBP is recorded as "not found," never converted into a negative
+  signal.
+
+- HIDDEN TRUST → use INT_HIDDEN_TRUST per the profile's hidden_trust evidence
+  rule. For this category, hidden trust lives in the specific community sources,
+  social recommendations, marketplace ratings, and niche directories named in
+  the profile — not in a generic "high ratings" heuristic. Surface the profile's
+  named vertical sources as the place to find hidden trust.
+
+- VERTICAL / COMMUNITY DISCOVERY → use INT_VERTICAL_SOURCE_DISCOVERY when a
+  business is materially discovered through any of the profile's specialized
+  sources (supplier lists, community/diaspora directories, SNAP data, culturally
+  specific marketplace sources). This signal is the emerging-discovery backbone
+  for categories whose businesses are systematically absent from mainstream
+  indexes — prioritize it.
+
+- POSSIBLE CATEGORY MISALIGNMENT → use INT_POSSIBLE_CATEGORY_MISALIGNMENT per the
+  profile's possible_category_misalignment rule. The profile names the specific
+  generic/misleading category labels (e.g. "Grocery Store," "International
+  Grocery," "Halal Market") that obscure specialization in THIS category —
+  recover those businesses using the profile's generic_category_handling rule,
+  not a generic "look for mislabels" heuristic.
+
+- IDENTITY CORROBORATION → for thinly indexed emerging prospects, apply the
+  profile's identity_resolution pattern and INT_MULTISOURCE_IDENTITY rule. The
+  profile names the specific independent ecosystems whose alignment establishes
+  identity for THIS category — use them as the corroboration source set.
+
+EMERGING PRIORITY: When the profile contains discovery patterns or evidence rules
+that are inherently emerging-discovery mechanisms (vertical source discovery,
+community directories, supplier lists, social-first search, marketplace catalogs,
+hidden trust, absence handling, prospect quality), treat them as the PRIMARY
+discovery path for this run — not as optional supplements to mainstream search.
+Mainstream sources remain in scope, but the emerging focus means the vertical and
+community sources in the profile lead, and mainstream sources corroborate.
+
+Do NOT compute competitive benchmarks, review-velocity comparisons, or market
+leaderboard metrics — those are competitive-focus work. Emerging focus is
+discovery-only: find the thin-footprint, hidden-trust, single-platform,
+misaligned, and recently-established businesses the profile's source set is
+designed to surface.`,
     variables: ['focus'],
     outputSchema: null,
     isDefault: false,
@@ -180,7 +238,53 @@ The competitive focus builds the BENCHMARKING SET — who leads this market. Thi
 context helps frame the emerging prospects' gaps relative to the competitive standard.
 
 Note: competitive-focus businesses are generally NOT prospects for outreach
-(they already have strong digital presence). They are context for the emerging set.`,
+(they already have strong digital presence). They are context for the emerging set.
+
+=== COMPETITIVE × PROFILE INTEGRATION ===
+Apply each competitive-focus point above USING the Category Intelligence Profile
+that preceded this block. The profile is not category-neutral context — it
+defines what "established" and "leader" concretely mean for THIS category.
+Integrate:
+
+- MARKET LEADERS / ESTABLISHED COMPETITORS → identify leaders using the profile's
+  category_fit and category_qualification evidence rules. A business only counts
+  as a competitive benchmark for THIS category if it meets the profile's
+  qualification criteria — not merely "has high reviews." Apply the profile's
+  category_specialization rule: a leader must demonstrate the coherent
+  specialization the profile defines, not just a generic high-visibility listing.
+
+- CATEGORY BENCHMARKS → use the profile's terminology and synonyms to recognize
+  the full set of competitive businesses. Leaders may operate under name variants
+  or nationality-specific labels the profile lists — a competitive scan that
+  misses those variants is incomplete. Use the profile's name_variant_search
+  pattern to surface the complete competitive set.
+
+- COMPETITIVE POSITIONING → assess positioning using the profile's evidence rules.
+  Note that the profile's prohibited_inferences still apply in competitive mode:
+  do NOT infer revenue, customer volume, or business quality from review count,
+  store size, or marketplace presence. Competitive positioning describes digital
+  presence and engagement patterns, not business health.
+
+- SOURCE USAGE → for competitive focus, mainstream sources (Google, GBP, Yelp,
+  Facebook) lead because competitive benchmarks are by definition
+  mainstream-visible. The profile's vertical sources (supplier lists, community
+  directories, SNAP) remain available but are SECONDARY for competitive work —
+  they help confirm category_fit and specialization, not discover hidden leaders.
+
+COMPETITIVE PRIORITY: When the profile contains discovery patterns or evidence
+rules that are inherently emerging-discovery mechanisms (vertical source
+discovery, community directories, supplier lists, hidden trust, absence
+handling), treat them as CORROBORATION for competitive work, not as the primary
+discovery path. Competitive focus means mainstream-visible leaders lead, and
+the profile's category-specific evidence rules govern whether a high-visibility
+business actually qualifies as a category benchmark versus a generic
+high-visibility business that does not meet the profile's specialization bar.
+
+Do NOT compute the emerging prospect set in this run — thin-footprint,
+hidden-trust, and single-platform discovery are emerging-focus work. Competitive
+focus is benchmarking-only: find the established, mainstream-visible,
+category-qualified leaders that set the standard the emerging prospects will
+later be measured against.`,
     variables: ['focus'],
     outputSchema: null,
     isDefault: false,
