@@ -167,6 +167,7 @@ export interface CampaignInput {
   businessName?: string;
   category: string;
   city: string;
+  state?: string;
   neighborhood?: string;
   contactMethod?: string;
   contactInfo?: string;
@@ -214,6 +215,7 @@ export interface CampaignUpdateInput {
   businessName?: string;
   category?: string;
   city?: string;
+  state?: string;
   neighborhood?: string;
   contactMethod?: string;
   contactInfo?: string;
@@ -392,6 +394,7 @@ export class MarketingCampaignService extends BaseService {
           business_name: input.businessName || null,
           category: input.category,
           city: input.city,
+          state: input.state || null,
           neighborhood: input.neighborhood || null,
           contact_method: input.contactMethod || null,
           contact_info: input.contactInfo || null,
@@ -692,6 +695,7 @@ export class MarketingCampaignService extends BaseService {
         title: input.title,
         category: parent.category,
         city: parent.city,
+        state: parent.state ?? undefined,
         neighborhood: parent.neighborhood ?? undefined,
         tone: parent.tone ?? undefined,
         attributes: (parent.attributes as string[]) ?? undefined,
@@ -919,6 +923,7 @@ export class MarketingCampaignService extends BaseService {
     if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
     if (input.city !== undefined) data.city = input.city;
+    if (input.state !== undefined) data.state = input.state || null;
     if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood || null;
     if (input.contactMethod !== undefined) data.contact_method = input.contactMethod || null;
     if (input.contactInfo !== undefined) data.contact_info = input.contactInfo || null;

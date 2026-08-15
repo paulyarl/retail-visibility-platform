@@ -1231,6 +1231,7 @@ export interface CampaignCreateInput {
   business_name?: string;
   category: string;
   city: string;
+  state?: string;
   neighborhood?: string;
   contact_method?: string;
   contact_info?: string;

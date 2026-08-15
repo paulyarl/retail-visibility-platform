@@ -430,6 +430,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           businessName: entry.business_name ?? undefined,
           category: entry.category ?? '',
           city: entry.city ?? '',
+          state: entry.state ?? undefined,
           assignedTo: assignee ?? undefined,
           notes: [
             `Manually queued prospect (no parent campaign, scope=${campaignScope}).`,

@@ -41,6 +41,7 @@ interface FormState {
   business_name: string;
   category: string;
   city: string;
+  state: string;
   neighborhood: string;
   contact_method: string;
   contact_info: string;
@@ -96,6 +97,7 @@ const EMPTY_FORM: FormState = {
   business_name: '',
   category: '',
   city: '',
+  state: '',
   neighborhood: '',
   contact_method: '',
   contact_info: '',
@@ -151,6 +153,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   const [vocab, setVocab] = useState({
     categories: [] as string[],
     cities: [] as string[],
+    states: [] as string[],
     neighborhoods: [] as string[],
     contactMethods: [] as string[],
     estimatedTiers: [] as string[],
@@ -169,6 +172,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         setVocab({
           categories: distinctValues(items, (c) => c.category),
           cities: distinctValues(items, (c) => c.city),
+          states: distinctValues(items, (c) => c.state),
           neighborhoods: distinctValues(items, (c) => c.neighborhood),
           contactMethods: distinctValues(items, (c) => c.contact_method),
           estimatedTiers: distinctValues(items, (c) => c.estimated_tier),
@@ -194,6 +198,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         business_name: c.business_name ?? '',
         category: c.category ?? '',
         city: c.city ?? '',
+        state: c.state ?? '',
         neighborhood: c.neighborhood ?? '',
         contact_method: c.contact_method ?? '',
         contact_info: c.contact_info ?? '',
@@ -356,6 +361,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           business_name: strOrUndef(form.business_name),
           category: form.category,
           city: form.city,
+          state: strOrUndef(form.state),
           neighborhood: strOrUndef(form.neighborhood),
           contact_method: backfilledMethod,
           contact_info: backfilledInfo,
@@ -422,6 +428,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           business_name: form.business_name,
           category: form.category,
           city: form.city,
+          state: form.state,
           neighborhood: form.neighborhood,
           contact_method: backfilledMethod,
           contact_info: backfilledInfo,
@@ -622,6 +629,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               <SuggestiveSelect required value={form.city} onChange={(v) => handleChange('city', v)}
                 options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
                 newInputPlaceholder="Enter new city" className={inputClass} />
+            </FormField>
+            <FormField label="State">
+              <SuggestiveSelect value={form.state} onChange={(v) => handleChange('state', v)}
+                options={vocab.states} emptyLabel="-- Select state --" newLabel="+ New state..."
+                newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
+              <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Used by category, city, and intelligence scope prompts.</p>
             </FormField>
             <FormField label="Neighborhood">
               <SuggestiveSelect value={form.neighborhood} onChange={(v) => handleChange('neighborhood', v)}

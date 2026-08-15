@@ -363,6 +363,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       business_name: selectedCampaign.business_name ?? '',
       category: selectedCampaign.category,
       city: selectedCampaign.city,
+      state: selectedCampaign.state ?? '',
       tone: selectedCampaign.tone || '',
       attributes: (selectedCampaign.attributes || []).join(', '),
     }));
