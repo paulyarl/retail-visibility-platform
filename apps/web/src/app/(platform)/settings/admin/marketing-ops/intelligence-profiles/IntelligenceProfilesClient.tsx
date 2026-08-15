@@ -274,11 +274,11 @@ export default function IntelligenceProfilesClient() {
               </Badge>
               <Text size="xs" c="dimmed" ff="monospace">{viewProfile.id}</Text>
             </Group>
-            <ScrollArea.Autosize maxHeight={400} type="auto">
+            <ScrollArea h={400} type="auto">
               <Code block style={{ fontSize: 11 }}>
                 {JSON.stringify(viewProfile.configuration_json, null, 2)}
               </Code>
-            </ScrollArea.Autosize>
+            </ScrollArea>
           </Stack>
         )}
       </Modal>
