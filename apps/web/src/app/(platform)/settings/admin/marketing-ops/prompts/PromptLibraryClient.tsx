@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Plus, Pencil, Trash2, Copy, FileText, Sparkles, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptType, CampaignScope } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptType, CampaignScope, IntelligenceProfile } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import { useMemo } from 'react';
 
@@ -42,6 +42,7 @@ export default function PromptLibraryClient() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
   const [presetTones, setPresetTones] = useState<string[]>([]);
+  const [activeProfiles, setActiveProfiles] = useState<IntelligenceProfile[]>([]);
   // Sprint 3: fragments are hidden by default — they are composition building
   // blocks, not standalone prompts. Toggle to see/manage them.
   const [showFragments, setShowFragments] = useState(false);
@@ -83,7 +84,25 @@ export default function PromptLibraryClient() {
       .catch(() => {});
   }, []);
 
-  const categoryOptions = useMemo(() => distinctValues(templates, (t) => t.category), [templates]);
+  useEffect(() => {
+    marketingOpsService.listIntelligenceProfiles()
+      .then(setActiveProfiles)
+      .catch(() => {});
+  }, []);
+
+  // Profile-active category names — these are categories with activated
+  // intelligence profiles. They are merged into the category dropdown so the
+  // dropdown serves as "prompt awareness" (showing which categories have
+  // profile-amplified prompts) rather than just a prompt organizer.
+  const profileCategoryNames = useMemo(
+    () => activeProfiles.map((p) => p.category_name).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+    [activeProfiles],
+  );
+
+  const categoryOptions = useMemo(
+    () => [...new Set([...distinctValues(templates, (t) => t.category), ...profileCategoryNames])].sort((a, b) => a.localeCompare(b)),
+    [templates, profileCategoryNames],
+  );
   const toneOptions = useMemo(
     () => [...new Set([...presetTones, ...distinctValues(templates, (t) => t.tone)])].sort((a, b) => a.localeCompare(b)),
     [presetTones, templates],
@@ -182,6 +201,27 @@ export default function PromptLibraryClient() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Profile-active category badges — quick filter for categories with
+            activated intelligence profiles. Clicking sets the category filter. */}
+        {profileCategoryNames.length > 0 && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Profile-active:</span>
+            {profileCategoryNames.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                  categoryFilter === cat
+                    ? 'bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700 dark:text-violet-300'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-gray-400 dark:hover:border-violet-700 dark:hover:text-violet-300'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         )}
 
