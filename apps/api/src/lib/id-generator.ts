@@ -1175,6 +1175,57 @@ export function generateDirectoryEntrySettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate a directory_listings_list ID for presence seeds.
+ * Format: dll-{tenantKey}-{nanoid8} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryListingId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dll-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a directory_presence_seeds ID.
+ * Format: dps-{tenantKey}-{nanoid8} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryPresenceSeedId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dps-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a directory_field_provenance ID.
+ * Format: dfp-{tenantKey}-{nanoid8} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryFieldProvenanceId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dfp-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a directory_claim_tokens ID.
+ * Format: dct-{tenantKey}-{nanoid12} (22 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryClaimTokenId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `dct-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a raw claim token string (stored in directory_claim_tokens.token).
+ * Format: claim-{nanoid24} (30 chars)
+ * URL-safe, single-use, not tenant-traceable (security: token alone
+ * should not reveal tenant identity)
+ */
+export function generateDirectoryClaimTokenString(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 24);
+  return `claim-${nanoid()}`;
+}
+
+/**
  * Generate a tenant_storefront_hours_settings ID.
  * Format: shs-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

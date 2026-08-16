@@ -7,7 +7,7 @@
  */
 
 export type SubscriptionTier =
-  | 'google_only' | 'starter' | 'discovery' | 'commitment' | 'ecommerce' | 'omnichannel' | 'professional' | 'storefront' | 'enterprise' | 'organization' | 'chain_starter'
+  | 'directory_presence' | 'google_only' | 'starter' | 'discovery' | 'commitment' | 'ecommerce' | 'omnichannel' | 'professional' | 'storefront' | 'enterprise' | 'organization' | 'chain_starter'
   | 'trial_google_only' | 'trial_starter' | 'trial_discovery'| 'trial_storefront' | 'trial_chain_starter' | 'trial_commitment' | 'trial_professional' | 'trial_storefront' | 'trial_ecommerce' | 'trial_omnichannel'
   | 'expired_trial';
 
@@ -35,6 +35,23 @@ export const GRACE_DURATION_DAYS = 14;
 export const TOTAL_TRIAL_DAYS = TRIAL_DURATION_DAYS + GRACE_DURATION_DAYS; // 30 days
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
+  directory_presence: {
+    name: 'Directory Presence',
+    price: 'Free / Invite-only',
+    pricePerMonth: 0,
+    maxSkus: 0,
+    maxLocations: 1,
+    description: 'Lightweight directory listing for emerging local businesses',
+    features: [
+      '1 location',
+      'Directory listing (classic layout)',
+      'Hours, map, contact, QR sections',
+      'SNAP/EBT badge when sourced',
+      'No catalog, checkout, or advanced storefront',
+      'Upgrade path to full tiers',
+    ],
+    color: 'bg-gray-100 text-gray-900',
+  },
   google_only: {
     name: 'Google-Only',
     price: '$29/month',

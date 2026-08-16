@@ -16,11 +16,12 @@ import { prisma } from '../prisma';
 import { checkTierFeatureAccess, getMinimumTierForFeature, isValidTier, getValidTierKeys } from '../services/TierService';
 import { logger } from '../logger';
 
-type SubscriptionTier = 'trial' | 'google_only' | 'discovery' | 'starter' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
+type SubscriptionTier = 'trial' | 'directory_presence' | 'google_only' | 'discovery' | 'starter' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
 
 // LEGACY: Kept for fallback only
 const VALID_TIERS: SubscriptionTier[] = [
   'trial',
+  'directory_presence',
   'google_only',
   'discovery',
   'starter',

@@ -45,7 +45,7 @@ export async function isTenantInGoodStanding(tenantId: string): Promise<{
 
     // 1. Check tier - exclude google_only (maintenance tier)
     const validTiers = [
-      'starter','discovery','storefront','commitment', 'professional', 'enterprise',
+      'directory_presence','starter','discovery','storefront','commitment', 'professional', 'enterprise',
       'chain_starter', 'chain_professional', 'chain_enterprise'
     ];
     

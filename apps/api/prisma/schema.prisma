@@ -1354,41 +1354,48 @@ model directory_listing_categories {
 }
 
 model directory_listings_list {
-  id                    String             @id
-  tenant_id             String
-  business_name         String?
-  slug                  String?
-  address               String?
-  city                  String?
-  state                 String?
-  zip_code              String?
-  phone                 String?
-  email                 String?
-  website               String?
-  latitude              Float?
-  longitude             Float?
-  primary_category      String?
-  secondary_categories  String[]
-  logo_url              String?
-  description           String?
-  business_hours        Json?
-  rating_avg            Float?             @default(0)
-  rating_count          Int?               @default(0)
-  product_count         Int?               @default(0)
-  is_featured           Boolean?           @default(false)
-  subscription_tier     String?            @default("trial")
-  use_custom_website    Boolean?           @default(false)
-  is_published          Boolean?           @default(true)
-  created_at            DateTime?          @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime?          @default(now()) @db.Timestamptz(6)
-  keywords              String[]
-  is_promoted           Boolean?           @default(false)
-  promotion_tier        String?            @db.VarChar(50)
-  promotion_started_at  DateTime?          @db.Timestamptz(6)
-  promotion_expires_at  DateTime?          @db.Timestamptz(6)
-  promotion_impressions Int?               @default(0)
-  promotion_clicks      Int?               @default(0)
-  directory_photos      directory_photos[]
+  id                       String                    @id
+  tenant_id                String
+  business_name            String?
+  slug                     String?
+  address                  String?
+  city                     String?
+  state                    String?
+  zip_code                 String?
+  phone                    String?
+  email                    String?
+  website                  String?
+  latitude                 Float?
+  longitude                Float?
+  primary_category         String?
+  secondary_categories     String[]
+  logo_url                 String?
+  description              String?
+  business_hours           Json?
+  rating_avg               Float?                    @default(0)
+  rating_count             Int?                      @default(0)
+  product_count            Int?                      @default(0)
+  is_featured              Boolean?                  @default(false)
+  subscription_tier        String?                   @default("trial")
+  use_custom_website       Boolean?                  @default(false)
+  is_published             Boolean?                  @default(true)
+  created_at               DateTime?                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?                 @default(now()) @db.Timestamptz(6)
+  keywords                 String[]
+  is_promoted              Boolean?                  @default(false)
+  promotion_tier           String?                   @db.VarChar(50)
+  promotion_started_at     DateTime?                 @db.Timestamptz(6)
+  promotion_expires_at     DateTime?                 @db.Timestamptz(6)
+  promotion_impressions    Int?                      @default(0)
+  promotion_clicks         Int?                      @default(0)
+  snap_ebt_reported        Boolean?                  @default(false)
+  snap_ebt_as_of           DateTime?                 @db.Date
+  snap_ebt_source          String?                   @db.VarChar(32)
+  snap_ebt_source_name     String?
+  listing_origin           String?                   @default("claimed") @db.VarChar(32)
+  public_disclaimer        String?
+  directory_photos         directory_photos[]
+  directory_presence_seeds directory_presence_seeds?
 
   @@index([is_published], map: "idx_directory_listings_is_published")
   @@index([keywords], map: "idx_directory_listings_keywords", type: Gin)
@@ -4960,8 +4967,11 @@ model tenants {
   digital_access_grants                                                                  digital_access_grants[]
   digital_download_pages                                                                 digital_download_pages[]
   digital_downloads                                                                      digital_downloads[]
+  directory_claim_tokens                                                                 directory_claim_tokens[]
   directory_featured_listings_list                                                       directory_featured_listings_list[]
+  directory_field_provenance                                                             directory_field_provenance[]
   directory_photos                                                                       directory_photos[]
+  directory_presence_seeds                                                               directory_presence_seeds?
   directory_settings_list                                                                directory_settings_list?
   download_access_logs                                                                   download_access_logs[]
   faq_categories                                                                         faq_categories[]
@@ -5725,6 +5735,7 @@ model tenant_directory_entry_settings {
   gallery_display_mode        String?   @default("carousel") @db.VarChar(20)
   created_at                  DateTime? @default(now()) @db.Timestamp(6)
   updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+  snap_ebt_display            Boolean?
   tenants                     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_directory_entry_tenant")
 
   @@index([tenant_id], map: "idx_directory_entry_settings_tenant")
@@ -7245,6 +7256,78 @@ model mkt_intelligence_runs {
   updated_at        DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([campaign_id, created_at(sort: Desc)], map: "idx_mkt_intel_runs_campaign")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_claim_tokens {
+  id                       String                   @id @db.VarChar(60)
+  seed_id                  String                   @db.VarChar(60)
+  tenant_id                String                   @db.VarChar(255)
+  token                    String                   @unique(map: "uq_dct_token") @db.VarChar(255)
+  expires_at               DateTime                 @db.Timestamptz(6)
+  consumed_at              DateTime?                @db.Timestamptz(6)
+  consumed_by              String?                  @db.VarChar(255)
+  single_use               Boolean                  @default(true)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_seed")
+  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_tenant")
+
+  @@index([expires_at], map: "idx_dct_expires")
+  @@index([seed_id], map: "idx_dct_seed")
+  @@index([tenant_id], map: "idx_dct_tenant")
+  @@index([token], map: "idx_dct_token")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_field_provenance {
+  id                       String                   @id @db.VarChar(60)
+  seed_id                  String                   @db.VarChar(60)
+  tenant_id                String                   @db.VarChar(255)
+  field_key                String                   @db.VarChar(50)
+  value                    String?
+  source_name              String?                  @db.VarChar(200)
+  source_url               String?
+  accessed_at              DateTime?                @db.Date
+  confidence               String                   @default("medium") @db.VarChar(10)
+  show_on_public           Boolean                  @default(false)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dfp_seed")
+  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dfp_tenant")
+
+  @@unique([seed_id, field_key], map: "idx_dfp_seed_field")
+  @@index([field_key], map: "idx_dfp_field_key")
+  @@index([seed_id], map: "idx_dfp_seed")
+  @@index([tenant_id], map: "idx_dfp_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_presence_seeds {
+  id                         String                       @id @db.VarChar(60)
+  tenant_id                  String                       @unique(map: "uq_dps_tenant") @db.VarChar(255)
+  listing_id                 String                       @unique(map: "uq_dps_listing") @db.VarChar(255)
+  category                   String                       @db.VarChar(100)
+  city                       String                       @db.VarChar(100)
+  state                      String                       @db.VarChar(50)
+  seed_batch                 String                       @db.VarChar(100)
+  status                     String                       @default("draft") @db.VarChar(20)
+  identity_confidence        String                       @default("medium") @db.VarChar(10)
+  category_fit               String                       @default("probable") @db.VarChar(20)
+  notes                      String?
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  published_at               DateTime?                    @db.Timestamptz(6)
+  invited_at                 DateTime?                    @db.Timestamptz(6)
+  claimed_at                 DateTime?                    @db.Timestamptz(6)
+  directory_claim_tokens     directory_claim_tokens[]
+  directory_field_provenance directory_field_provenance[]
+  directory_listings_list    directory_listings_list      @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
+  tenants                    tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
+
+  @@index([category], map: "idx_dps_category")
+  @@index([city, state], map: "idx_dps_city_state")
+  @@index([seed_batch], map: "idx_dps_seed_batch")
+  @@index([status], map: "idx_dps_status")
 }
 
 enum action {

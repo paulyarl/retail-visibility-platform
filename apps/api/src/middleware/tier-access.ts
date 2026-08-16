@@ -131,17 +131,18 @@ export const TIER_FEATURES = {
 // Tier hierarchy for inheritance (lower tiers inherit from higher)
 // NOTE: 'trial' is not a tier - it's a subscription status that can apply to any tier
 const TIER_HIERARCHY: Record<string, string[]> = {
-  google_only: [],
-  discovery: [],
-  starter: ['google_only'],
-  storefront: ['discovery', 'google_only'],
-  commitment: ['storefront', 'discovery', 'google_only'],
-  professional: ['starter', 'google_only'],
-  enterprise: ['professional','commitment', 'starter', 'google_only'],
-  organization: ['professional','commitment', 'starter', 'google_only'],
-  chain_starter: ['starter','commitment', 'google_only'],
-  chain_professional: ['professional','commitment', 'starter', 'google_only'],
-  chain_enterprise: ['enterprise','commitment', 'professional', 'starter', 'google_only'],
+  directory_presence: [],
+  google_only: ['directory_presence'],
+  discovery: ['directory_presence'],
+  starter: ['google_only', 'directory_presence'],
+  storefront: ['discovery', 'google_only', 'directory_presence'],
+  commitment: ['storefront', 'discovery', 'google_only', 'directory_presence'],
+  professional: ['starter', 'google_only', 'directory_presence'],
+  enterprise: ['professional','commitment', 'starter', 'google_only', 'directory_presence'],
+  organization: ['professional','commitment', 'starter', 'google_only', 'directory_presence'],
+  chain_starter: ['starter','commitment', 'google_only', 'directory_presence'],
+  chain_professional: ['professional','commitment', 'starter', 'google_only', 'directory_presence'],
+  chain_enterprise: ['enterprise','commitment', 'professional', 'starter', 'google_only', 'directory_presence'],
 };
 
 // Feature to minimum required tier mapping
@@ -236,7 +237,7 @@ export async function checkTierAccess(tier: string, feature: string): Promise<bo
     // Check FEATURE_TIER_MAP as last fallback
     const requiredTier = FEATURE_TIER_MAP[resolvedFeature] || FEATURE_TIER_MAP[feature];
     if (requiredTier) {
-      const tierOrder = ['google_only', 'discovery', 'starter', 'storefront', 'commitment', 'professional', 'ecommerce', 'enterprise', 'organization'];
+      const tierOrder = ['directory_presence', 'google_only', 'discovery', 'starter', 'storefront', 'commitment', 'professional', 'ecommerce', 'enterprise', 'organization'];
       const tierIndex = tierOrder.indexOf(tier);
       const requiredIndex = tierOrder.indexOf(requiredTier);
       return tierIndex >= requiredIndex;

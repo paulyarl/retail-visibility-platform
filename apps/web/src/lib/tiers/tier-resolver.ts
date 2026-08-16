@@ -27,7 +27,7 @@ export interface TierLimits {
 export interface TierInfo {
   id: string;
   name: string;
-  level: 'google_only' |'starter' |'discovery' | 'storefront' | 'commitment' | 'ecommerce' | 'omnichannel' | 'professional' | 'enterprise' | 'organization' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
+  level: 'directory_presence' | 'google_only' |'starter' |'discovery' | 'storefront' | 'commitment' | 'ecommerce' | 'omnichannel' | 'professional' | 'enterprise' | 'organization' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
   source: 'organization' | 'tenant';
   features: TierFeature[];
   limits: TierLimits;
@@ -70,6 +70,7 @@ export function resolveTier(
   // Helper function to map tier levels to resolver format
   const mapTierLevel = (tierId: string): TierInfo['level'] => {
     switch (tierId) {
+      case 'directory_presence': return 'directory_presence';
       case 'google_only': return 'discovery';
       case 'discovery': return 'discovery';
       case 'storefront': return 'storefront';
@@ -210,7 +211,7 @@ function getHigherTierLevel(
   level1: TierInfo['level'],
   level2: TierInfo['level']
 ): TierInfo['level'] {
-  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise', 'custom'];
+  const hierarchy: TierInfo['level'][] = ['directory_presence', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise', 'custom'];
   const index1 = hierarchy.indexOf(level1);
   const index2 = hierarchy.indexOf(level2);
   return index1 > index2 ? level1 : level2;
@@ -220,7 +221,7 @@ function getHigherTierLevel(
  * Gets available upgrade options for a tier level
  */
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
-  const allTiers: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise'];
+  const allTiers: TierInfo['level'][] = ['directory_presence', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise'];
   const currentIndex = allTiers.indexOf(currentLevel);
   return allTiers.slice(currentIndex + 1);
 }

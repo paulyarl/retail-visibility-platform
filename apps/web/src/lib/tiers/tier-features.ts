@@ -8,6 +8,17 @@
  */
 
 export const TIER_FEATURES = {
+  directory_presence: [
+    'directory_entry_enabled',
+    'directory_entry_layout_classic',
+    'directory_entry_hours_on',
+    'directory_entry_map_on',
+    'directory_entry_contact_on',
+    'directory_entry_qr_on',
+    'storefront_enabled',
+    'storefront_retail',
+    'directory_visibility_snap_ebt',
+  ],
   google_only: [
     'google_shopping',
     'google_merchant_center',
@@ -107,19 +118,20 @@ export const TIER_FEATURES = {
 // Tier hierarchy for inheritance (lower tiers inherit from higher)
 // NOTE: 'trial' is not a tier - it's a time-limited status that can apply to any tier
 export const TIER_HIERARCHY: Record<string, string[]> = {
-  google_only: [],
-  starter: ['google_only'],
-  discovery: ['google_only'],
-  storefront: ['discovery', 'google_only'],
-  commitment: ['storefront', 'discovery', 'google_only'],
-  ecommerce: ['storefront', 'discovery', 'google_only'],
-  omnichannel: ['commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
-  professional: ['omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
-  enterprise: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
-  organization: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
-  chain_starter: ['starter', 'google_only'],
-  chain_professional: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
-  chain_enterprise: ['enterprise', 'professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
+  directory_presence: [],
+  google_only: ['directory_presence'],
+  starter: ['google_only', 'directory_presence'],
+  discovery: ['google_only', 'directory_presence'],
+  storefront: ['discovery', 'google_only', 'directory_presence'],
+  commitment: ['storefront', 'discovery', 'google_only', 'directory_presence'],
+  ecommerce: ['storefront', 'discovery', 'google_only', 'directory_presence'],
+  omnichannel: ['commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  professional: ['omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  enterprise: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  organization: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  chain_starter: ['starter', 'google_only', 'directory_presence'],
+  chain_professional: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  chain_enterprise: ['enterprise', 'professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
 };
 
 // Feature to minimum required tier mapping
@@ -186,6 +198,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
 // NOTE: 'trial' is not a tier - it's a subscription status (trial, active, past_due, canceled)
 export const TIER_DISPLAY_NAMES: Record<string, string> = {
   google_only: 'Google-Only',
+  directory_presence: 'Directory Presence',
   starter: 'Starter',
   discovery: 'Discovery',
   storefront: 'Storefront',
@@ -330,6 +343,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
 // NOTE: All tiers can be trialed for 14 days before payment is required
 export const TIER_PRICING: Record<string, number> = {
   google_only: 29,
+  directory_presence: 0,
   discovery: 29,
   storefront: 59,
   commitment: 79,  // V2 pricing

@@ -7,7 +7,7 @@
  * NOTE: Trial tiers are wrappers that proxy to their base tiers for limits.
  */
 
-export type SubscriptionTier = 'google_only'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier = 'directory_presence'|'google_only'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 /**
  * Map trial tiers to their base tiers for limit proxying
@@ -38,6 +38,10 @@ export interface TierLimits {
 }
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
+  directory_presence: {
+    name: 'Directory Presence',
+    maxSkus: 0,
+  },
   google_only: {
     name: 'Google-Only',
     maxSkus: 250,

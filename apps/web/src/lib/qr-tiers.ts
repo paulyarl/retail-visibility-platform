@@ -136,6 +136,7 @@ const QR_FEATURES_DISABLED: QRCodeFeatures = {
 };
 
 export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
+  directory_presence: QR_FEATURES_STARTER,
   google_only: QR_FEATURES_DISCOVERY,
   discovery: QR_FEATURES_DISCOVERY,
   storefront: QR_FEATURES_STOREFRONT,

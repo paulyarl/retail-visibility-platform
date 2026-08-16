@@ -45,6 +45,13 @@ export function resolveDirectoryEntryOptions(
 
   const externalLinkTierAllowed = mainOn && (flexible || !!features.directory_entry_external_link);
 
+  // SNAP/EBT visibility badge — tier-gated by directory_visibility_snap_ebt feature.
+  // This is a VISIBILITY BADGE only, not a payment capability.
+  // snap_ebt_badge_enabled = tier allows the badge to show at all.
+  // snap_ebt_visible = tier allows AND merchant has not suppressed (snap_ebt_display !== false).
+  const snapEbtBadgeEnabled = mainOn && (!!features.directory_visibility_snap_ebt || flexible);
+  const snapEbtVisible = snapEbtBadgeEnabled && (merchantPrefs?.snap_ebt_display !== false);
+
   const prefs = {
     directory_entry_opt_enabled: merchantPrefs?.directory_entry_opt_enabled !== false,
     directory_entry_layout: merchantPrefs?.directory_entry_layout || 'classic',
@@ -87,6 +94,9 @@ export function resolveDirectoryEntryOptions(
     // External link — tier feature OR flexible grants availability; merchant pref gates effective state
     can_show_external_link: externalLinkTierAllowed,
     external_link_enabled: externalLinkTierAllowed && (merchantPrefs?.external_link_enabled === true),
+    // SNAP/EBT visibility badge — tier-gated availability + merchant-gated effective state
+    snap_ebt_badge_enabled: snapEbtBadgeEnabled,
+    snap_ebt_visible: snapEbtVisible,
     merchant_preferences: prefs,
   };
 }

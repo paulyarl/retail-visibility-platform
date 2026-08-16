@@ -296,6 +296,8 @@ import testGbpRoutes from '../routes/test-gbp';
 // Directory mounts (routes at other paths — not part of the /api/directory orchestrator)
 import directoryAdminRoutes from '../routes/directory-admin';
 import directorySupportRoutes from '../routes/directory-support';
+import directoryPresenceAdminRoutes from '../routes/directory-presence-admin';
+import directoryPresencePublicRoutes from '../routes/directory-presence-public';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
@@ -2016,6 +2018,20 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Support directory tools (auth in routes)',
+  },
+  {
+    path: '/api/admin/directory-presence',
+    router: directoryPresenceAdminRoutes,
+    domain: 'directory',
+    authLevel: 'admin',
+    comment: 'Admin directory presence seed management (presence-seeds/* routes)',
+  },
+  {
+    path: '/api/public/directory',
+    router: directoryPresencePublicRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public directory claim flow (claim/:token, claim/:token/accept)',
   },
 
   // ── Brand Partners (authenticated, non-tenant) ──────────────────────

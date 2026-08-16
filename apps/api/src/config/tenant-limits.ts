@@ -14,7 +14,7 @@
  * - PLATFORM_VIEWER: Read-only, cannot create tenants
  */
 
-export type TenantLimitTier = 'google_only' | 'starter'| 'discovery' | 'commitment' | 'storefront' | 'professional' | 'enterprise' | 'organization';
+export type TenantLimitTier = 'directory_presence' | 'google_only' | 'starter'| 'discovery' | 'commitment' | 'storefront' | 'professional' | 'enterprise' | 'organization';
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
 
 /**
@@ -38,6 +38,18 @@ export interface FeaturedProductsLimit {
  * Featured products limits by tier
  */
 export const FEATURED_PRODUCTS_LIMITS: Record<TenantLimitTier, FeaturedProductsLimit> = {
+  directory_presence: {
+    bestseller: 0,
+    clearance: 0,
+    featured: 0,
+    new_arrival: 0,
+    recommended: 0,
+    sale: 0,
+    seasonal: 0,
+    staff_pick: 0,
+    store_selection: 0,
+    trending: 0,
+  },
   google_only: {
     bestseller: 3,
     clearance: 3,
@@ -175,6 +187,13 @@ export const TRIAL_CONFIG = {
  * Location limits by tier (for PAID subscriptions)
  */
 export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
+  directory_presence: {
+    limit: 1,
+    displayName: '1 Location',
+    description: 'Directory presence for one location',
+    upgradeMessage: 'Upgrade to Google-Only or Discovery for more features',
+    upgradeToTier: 'google_only',
+  },
   google_only: {
     limit: 1,
     displayName: '1 Location',
@@ -327,6 +346,13 @@ export interface UserLimitConfig {
 }
 
 export const USER_LIMITS: Record<TenantLimitTier, UserLimitConfig> = {
+  directory_presence: {
+    maxUsers: 1,
+    allowInvitations: false,
+    displayName: 'Owner Only (Unclaimed)',
+    upgradeMessage: 'Claim this listing to invite team members',
+    upgradeToTier: 'google_only',
+  },
   google_only: {
     maxUsers: 1,
     allowInvitations: false,

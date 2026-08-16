@@ -32,6 +32,24 @@ export interface LandingPageFeatures {
 }
 
 export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFeatures> = {
+  directory_presence: {
+    customMarketingDescription: false,
+    imageGallery: false,
+    maxGalleryImages: 0,
+    customCta: false,
+    socialLinks: false,
+    qrCodes: true,
+    showBusinessLogo: false,
+    removePlatformBranding: false,
+    customLogo: false,
+    customColors: false,
+    customSections: false,
+    maxCustomSections: 0,
+    customTheme: false,
+    customDomain: false,
+    abTesting: false,
+    advancedAnalytics: false,
+  },
   google_only: {
     customMarketingDescription: false,
     imageGallery: false,

@@ -142,7 +142,7 @@ function needsFulfillmentMethodSelection(ctx: LinkContext): boolean {
 // ====================
 
 const TIER_ORDER: string[] = [
-  'google_only', 'starter', 'discovery', 'storefront', 'commitment',
+  'directory_presence', 'google_only', 'starter', 'discovery', 'storefront', 'commitment',
   'omnichannel', 'professional', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];
