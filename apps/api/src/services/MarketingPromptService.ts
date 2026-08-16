@@ -254,18 +254,29 @@ export class MarketingPromptService extends BaseService {
 
     const hasFocusFilter = filters.intelligenceFocus || filters.intelligenceCampaignKind;
     if (hasFocusFilter) {
-      const positiveMatch: any[] = [];
-      if (filters.intelligenceFocus) positiveMatch.push({ intelligence_focus: filters.intelligenceFocus });
-      if (filters.intelligenceCampaignKind) positiveMatch.push({ intelligence_campaign_kind: filters.intelligenceCampaignKind });
-
-      const orClauses: any[] = [{ AND: positiveMatch }];
-      if (filters.includeNullFocusKind) {
-        const nullMatch: any[] = [];
-        if (filters.intelligenceFocus) nullMatch.push({ intelligence_focus: null });
-        if (filters.intelligenceCampaignKind) nullMatch.push({ intelligence_campaign_kind: null });
-        orClauses.push({ AND: nullMatch });
+      // Per-field wildcard matching: each filtered field matches if the
+      // template's value equals the filter value OR (when includeNullFocusKind
+      // is set) the template's value is NULL. Fields are combined with AND.
+      //
+      // This lets focus-agnostic templates (e.g. the Intelligence Profile
+      // Establishment template, which has intelligence_campaign_kind=
+      // 'establishment' but intelligence_focus=NULL) match campaigns that
+      // carry a focus. The previous all-or-nothing logic required BOTH fields
+      // to match exactly or BOTH to be NULL, which hid the establishment
+      // template from establishment campaigns (the campaign always has a
+      // focus since the form requires it).
+      const andClauses: any[] = [];
+      if (filters.intelligenceFocus) {
+        const focusOptions: any[] = [{ intelligence_focus: filters.intelligenceFocus }];
+        if (filters.includeNullFocusKind) focusOptions.push({ intelligence_focus: null });
+        andClauses.push({ OR: focusOptions });
       }
-      where.OR = orClauses;
+      if (filters.intelligenceCampaignKind) {
+        const kindOptions: any[] = [{ intelligence_campaign_kind: filters.intelligenceCampaignKind }];
+        if (filters.includeNullFocusKind) kindOptions.push({ intelligence_campaign_kind: null });
+        andClauses.push({ OR: kindOptions });
+      }
+      where.AND = [...(where.AND ?? []), ...andClauses];
     }
 
     try {
