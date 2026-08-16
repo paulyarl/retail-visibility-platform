@@ -216,11 +216,14 @@ describe('IntelligenceProfileService — type-scoped activation (Migration 202)'
 
     await service.activateDraft('auto_repair_competitive', 2);
 
-    // The retirement updateMany should filter by BOTH category_key AND intelligence_focus
+    // The retirement updateMany should filter by category_key + focus +
+    // reference_city. Migration 205 adds reference_city: null to the filter
+    // so a city-agnostic draft retires only city-agnostic active profiles.
     expect(mockPrisma.mkt_intelligence_profiles.updateMany).toHaveBeenCalledWith({
       where: {
         category_key: 'auto repair',
         intelligence_focus: 'competitive',
+        reference_city: null,
         status: 'active',
       },
       data: { status: 'retired', updated_at: expect.any(Date) },
@@ -317,9 +320,11 @@ describe('IntelligenceProfileService — focus-stamped import (Migration 202)', 
       intelligenceFocus: 'competitive',
     });
 
-    // Should have searched with both category_key AND intelligence_focus
+    // Should have searched with category_key + intelligence_focus +
+    // reference_city. Migration 205 adds reference_city: null so a
+    // city-agnostic import finds the city-agnostic profile lineage.
     expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledWith({
-      where: { category_key: 'plumbing', intelligence_focus: 'competitive' },
+      where: { category_key: 'plumbing', intelligence_focus: 'competitive', reference_city: null },
       orderBy: { version: 'desc' },
     });
   });

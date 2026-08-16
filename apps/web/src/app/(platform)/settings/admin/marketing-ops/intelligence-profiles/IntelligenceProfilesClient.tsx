@@ -35,6 +35,7 @@ import {
   IconTrash,
   IconEdit,
   IconSearch,
+  IconExternalLink,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
@@ -509,6 +510,16 @@ export default function IntelligenceProfilesClient() {
                                 href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
                                 variant="light"
                                 color="blue"
+                                size="sm"
+                                title="Open campaign"
+                              >
+                                <IconExternalLink size={14} />
+                              </ActionIcon>
+                              <ActionIcon
+                                component={Link}
+                                href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                                variant="light"
+                                color="gray"
                                 size="sm"
                                 title="Edit campaign"
                               >

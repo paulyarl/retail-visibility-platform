@@ -176,8 +176,10 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     expect(resolution.intelligence_mode).toBe('profile');
-    // Business-scope §1B path calls resolve with no focus (category-only match)
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined, undefined);
+    // Business-scope §1B path calls resolve with no focus (category-only
+    // match). Migration 205 — the campaign's city is now passed as the 3rd
+    // arg so business audits resolve a city-scoped profile.
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined, 'Test City', undefined);
   });
 
   it('fulfill prompt → no amplification (gate: seek-only)', async () => {

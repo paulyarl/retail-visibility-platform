@@ -416,5 +416,45 @@ Bridges the campaign execution layer (Openers, Follow-Ups, Pitch Construction, C
 - **Lazy import for circular dep avoidance**: `PlaybookChecklistService` lazy-imports `OutreachChecklistBridgeService` (bridge imports checklist service for step lookups)
 - **Best-effort enrichment**: bridge enrichment failures are logged + swallowed — checklist renders without enrichment if bridge has issues
 
+## Intelligence Profile City Scoping (Migration 205)
+
+Closes the city-contamination gap: an intelligence profile established from a city-A establishment campaign was being applied to a city-B discovery campaign for the same `(category, focus)`, injecting city-A-specific discovery patterns, supplier names, and business examples into the city-B prompt. The discovery AI then returned city-A businesses.
+
+### Schema (Migration 205)
+- `mkt_intelligence_profiles.reference_city` — nullable `VARCHAR(100)`. NULL = city-agnostic (legacy/backfill sentinel).
+- `idx_mkt_intel_profiles_active_category_city_focus` — partial unique index on `(category_key, reference_city, intelligence_focus) WHERE status = 'active' AND reference_city IS NOT NULL` — one active profile per (category, city, focus) triple.
+- `idx_mkt_intel_profiles_active_category_focus_nullcity` — partial unique index on `(category_key, intelligence_focus) WHERE status = 'active' AND reference_city IS NULL` — preserves one-city-agnostic-profile-per-(category, focus) invariant.
+- Backfill: `reference_city` populated from the most recent establishment campaign matching each profile's category_key. Profiles whose category has no establishment campaign remain NULL (city-agnostic).
+
+### Resolution Semantics
+`IntelligenceProfileService.resolve(category, focus?, city?, ctx?)`:
+1. If `city` is provided: try exact `(category_key, reference_city, focus)` match (primary path).
+2. Fall back to city-agnostic `(category_key, reference_city=NULL, focus)` match — logged warning.
+3. Fall back to `(category_key, focus)` match ignoring city — logged warning (cross-city contamination possible).
+4. If `focus` is omitted (business-scope §1B path): city is still honored; focus filter is dropped.
+
+### Render-Time City Mismatch Guard
+`renderProfileBlock(profile, targetCity?)` and `renderBusinessProfileBlock(profile, targetCity?)`:
+- Emit a `CITY RETARGETING DIRECTIVE` when the profile's `reference_city` differs from the campaign's target city — instructs the AI to apply category-level knowledge but re-derive concrete discovery queries, supplier lists, and business examples for the target city.
+- Emit a `CITY APPLICATION DIRECTIVE` when a city-agnostic profile is applied to a city-specific campaign.
+
+### Establishment Import
+`MarketingPromptService.importExternalResult` now reads the establishment campaign's `city` and stamps it onto the imported draft via `importAsDraft({ referenceCity })`. This is the key fix: the establishment campaign's city flows end-to-end into the profile's reference_city.
+
+### Key Files
+- `apps/api/src/services/intelligence/IntelligenceProfileService.ts` — `resolve`, `createProfile`, `importAsDraft`, `activateDraft`, `publishVersion`, `renderProfileBlock`, `renderBusinessProfileBlock`, `normalizeReferenceCity`
+- `apps/api/src/services/intelligence/PromptComposerService.ts` — `composeIntelligencePrompt({ category, focus, city })`
+- `apps/api/src/services/MarketingExecutionService.ts` — passes `input.campaign.city` to composer + business-scope resolver
+- `apps/api/src/services/MarketingPromptService.ts` — stamps establishment campaign city onto imported draft
+- `apps/api/src/routes/marketing-ops.ts` — `resolve` route accepts `?city=` query; `create` route accepts `referenceCity` body field
+- `apps/web/src/services/MarketingOpsService.ts` — `resolveIntelligenceProfile(category, focus?, city?)`, `createIntelligenceProfile({ referenceCity })`, `IntelligenceProfile.reference_city`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/intelligence-profiles/IntelligenceProfilesClient.tsx` — displays reference_city badge (cyan for city-scoped, gray for city-agnostic)
+- `apps/api/src/scripts/seed-intelligence-profile-establishment-template.ts` — establishment template now instructs the AI to produce city-specific concrete examples
+
+### Tests
+- `apps/api/src/services/__tests__/IntelligenceProfileService.focus-alignment.test.ts` — 24 tests (existing focus tests updated for `reference_city: null` filter + 13 new city-scoped tests)
+- `apps/api/src/services/__tests__/PromptComposerService.test.ts` — 5 tests (city pass-through test added)
+- `apps/api/src/services/__tests__/ResolvePrompt.test.ts` — 9 tests (business-scope city pass-through assertion updated)
+
 
 
