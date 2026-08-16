@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalLink, Flag, ArrowRight, AlertTriangle, Upload, Edit3, Save, X } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult, IntelligenceProfile } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult, IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 
 /**
@@ -184,14 +184,30 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     let cancelled = false;
     (async () => {
       try {
-        const profile = await marketingOpsService.resolveIntelligenceProfile(selectedCampaign.category);
+        // Focus-aware resolution (Migration 202 — Profile Type Alignment):
+        //   - Intelligence-scope discovery: pass the campaign's focus
+        //     (falling back to the template's focus) so we resolve the
+        //     latest active profile *for that kind*, not the latest for
+        //     the category across all kinds. Without this, a Competitive
+        //     discovery campaign whose category has a newer Emerging
+        //     profile would silently pick up the Emerging profile.
+        //   - Business-scope §1B: focus is dropped (business audits are
+        //     category-aware, not focus-aware); city is still honored.
+        const focus: IntelligenceFocus | undefined = isIntelligence
+          ? (selectedCampaign.intelligence_focus ?? templateFocus)
+          : undefined;
+        const profile = await marketingOpsService.resolveIntelligenceProfile(
+          selectedCampaign.category,
+          focus,
+          selectedCampaign.city || undefined,
+        );
         if (!cancelled) setResolvedProfile(profile);
       } catch {
         if (!cancelled) setResolvedProfile(null);
       }
     })();
     return () => { cancelled = true; };
-  }, [selectedCampaign, template]);
+  }, [selectedCampaign, template, templateFocus]);
 
   const compatibleCampaigns = useMemo(() => {
     if (!template?.scope) return campaigns;
@@ -262,7 +278,13 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       const entries: [string, IntelligenceProfile | null][] = await Promise.all(
         intelligenceCategories.map(async (cat) => {
           try {
-            const p = await marketingOpsService.resolveIntelligenceProfile(cat);
+            // Pass the template's focus so each category badge reflects
+            // the latest active profile *for this kind* (emerging vs
+            // competitive), not the latest profile for the category
+            // across all kinds. Without this, a Competitive discovery
+            // template would badge every category with whichever
+            // focus has the higher version number.
+            const p = await marketingOpsService.resolveIntelligenceProfile(cat, templateFocus);
             return [cat, p] as [string, IntelligenceProfile | null];
           } catch {
             return [cat, null] as [string, IntelligenceProfile | null];
@@ -272,7 +294,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       if (!cancelled) setCategoryProfiles(Object.fromEntries(entries));
     })();
     return () => { cancelled = true; };
-  }, [intelligenceCategories, isIntelligenceDiscovery]);
+  }, [intelligenceCategories, isIntelligenceDiscovery, templateFocus]);
 
   const [executing, setExecuting] = useState(false);
   const [copied, setCopied] = useState(false);
