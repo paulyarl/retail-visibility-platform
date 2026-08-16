@@ -5983,6 +5983,40 @@ router.post('/intelligence-profiles/:id/:version/activate', async (req, res) => 
   }
 });
 
+// DELETE /intelligence-profiles/:id/:version — delete a draft version
+// Only drafts may be deleted; active/retired versions are immutable history.
+router.delete('/intelligence-profiles/:id/:version', async (req, res) => {
+  try {
+    const version = parseInt(req.params.version, 10);
+    if (isNaN(version)) {
+      return res.status(400).json({ success: false, error: 'Invalid version' });
+    }
+    const result = await IntelligenceProfileService.getInstance().deleteDraft(req.params.id, version, getCtx(req));
+    // Audit the operator-initiated draft deletion
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: PLATFORM_SCOPE,
+        actor: req.user?.id || 'unknown',
+        actorType: 'user',
+        action: 'delete',
+        payload: {
+          entity_type: 'other',
+          id: `${result.id}@${result.version}`,
+          action_description: 'operator_delete_intelligence_profile_draft',
+          profile_id: result.id,
+          profile_version: result.version,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] intelligence-profile draft delete audit failed', getCtx(req), { error: (e as Error).message });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ====================
 // INTELLIGENCE RUNS (Sprint 2 — Seek Intelligence Scope)
 // ====================

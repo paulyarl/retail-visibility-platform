@@ -70,6 +70,7 @@ export default function IntelligenceProfilesClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activating, setActivating] = useState<string | null>(null);
+  const [deletingProfileKey, setDeletingProfileKey] = useState<string | null>(null);
   const [viewProfile, setViewProfile] = useState<IntelligenceProfile | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishId, setPublishId] = useState<string | null>(null);
@@ -203,6 +204,30 @@ export default function IntelligenceProfilesClient() {
     }
   };
 
+  const handleDeleteDraft = async (profile: IntelligenceProfile) => {
+    const key = `${profile.id}:${profile.version}`;
+    setDeletingProfileKey(key);
+    try {
+      await marketingOpsService.deleteIntelligenceProfileDraft(profile.id, profile.version);
+      notifications.show({
+        title: 'Draft Deleted',
+        message: `${profile.category_name} v${profile.version} (${profile.id}) has been deleted.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      await fetchProfiles();
+    } catch (err) {
+      notifications.show({
+        title: 'Delete Failed',
+        message: (err as Error).message,
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setDeletingProfileKey(null);
+    }
+  };
+
   const handlePublish = async () => {
     if (!publishId || !publishConfig.trim()) return;
     try {
@@ -294,6 +319,31 @@ export default function IntelligenceProfilesClient() {
               >
                 Activate
               </Button>
+            )}
+            {isDraft && (
+              <Menu position="bottom-end" withinPortal>
+                <Menu.Target>
+                  <ActionIcon
+                    variant="light"
+                    color="red"
+                    size="sm"
+                    title="Delete draft"
+                    loading={deletingProfileKey === key}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Confirm deletion</Menu.Label>
+                  <Menu.Item
+                    color="red"
+                    leftSection={<IconTrash size={14} />}
+                    onClick={() => handleDeleteDraft(profile)}
+                  >
+                    Delete &ldquo;{profile.category_name} v{profile.version}&rdquo;
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
             )}
           </Group>
         </Group>

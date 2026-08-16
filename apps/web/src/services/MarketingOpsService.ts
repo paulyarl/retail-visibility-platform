@@ -4806,6 +4806,7 @@ interface MarketingOpsService {
     categoryName?: string;
   }): Promise<IntelligenceProfile>;
   activateIntelligenceProfileDraft(id: string, version: number): Promise<IntelligenceProfile>;
+  deleteIntelligenceProfileDraft(id: string, version: number): Promise<void>;
   listIntelligenceRuns(campaignId: string): Promise<IntelligenceRun[]>;
   getIntelligenceRun(runId: string): Promise<IntelligenceRun | null>;
 }
@@ -5046,6 +5047,19 @@ MarketingOpsService.prototype.activateIntelligenceProfileDraft = async function 
   }
   await this.invalidateCachePattern('mkt-ops-intel-profile');
   return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.deleteIntelligenceProfileDraft = async function (id: string, version: number): Promise<void> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/${version}`,
+    { method: 'DELETE' },
+    `mkt-ops-intel-profile-delete-${id}-${version}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete intelligence profile draft');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
 };
 
 // ─── Intelligence Run Methods ─────────────────────────────────────────────

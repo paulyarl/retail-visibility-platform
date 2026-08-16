@@ -598,6 +598,56 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   /**
+   * Delete a draft profile version (GAP-P8 — operator-driven cleanup).
+   *
+   * Only drafts may be deleted. Active and retired versions are immutable
+   * historical records (§43 — historical fidelity) and cannot be removed;
+   * attempting to delete a non-draft version throws. Deleting the last
+   * remaining version of a profile id effectively removes the profile from
+   * the admin UI (no row left to list).
+   *
+   * Drafts are inert — they have never been referenced by a run, so there
+   * are no downstream referential-integrity concerns.
+   */
+  async deleteDraft(profileId: string, version: number, ctx?: RequestCtx): Promise<{ id: string; version: number }> {
+    try {
+      const draft = await this.prisma.mkt_intelligence_profiles.findUnique({
+        where: {
+          id_version: { id: profileId, version },
+        },
+      });
+      if (!draft) {
+        throw new Error(`Profile ${profileId} v${version} not found`);
+      }
+      if (draft.status !== 'draft') {
+        throw new Error(
+          `Profile ${profileId} v${version} is not a draft (status: ${draft.status}) — only drafts can be deleted`,
+        );
+      }
+
+      await this.prisma.mkt_intelligence_profiles.delete({
+        where: {
+          id_version: { id: profileId, version },
+        },
+      });
+
+      logger.info('Intelligence profile draft deleted', ctx, {
+        profileId,
+        version,
+        categoryKey: draft.category_key,
+      });
+      return { id: profileId, version };
+    } catch (error) {
+      logger.error('IntelligenceProfileService.deleteDraft failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        version,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
    * Publish a new version from operator-supplied JSON (manual authoring path).
    * Creates a new immutable version row, flips the previous active version to
    * 'retired', marks the new one 'active'. Atomic transaction.
