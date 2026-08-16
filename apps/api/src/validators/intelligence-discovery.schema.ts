@@ -120,28 +120,63 @@ export const intelligenceDiscoverySchema = z.object({
   profile_version: z.number().nullable().optional(),
 }).passthrough();
 
-// ─── Payload normalization (reference-style qualifying_businesses) ────────
+// ─── Payload normalization (reference-style + missing qualifying_businesses) ───
 //
-// Some models emit `qualifying_businesses` as reference-style entries that
-// point back to `discovered_businesses` rather than duplicating the full
-// record, e.g.:
-//   { "business_name": "His Grace African Grocery Store",
-//     "note": "See discovered_businesses — identical record, qualifies" }
-// The schema requires full business objects, so this normalizer resolves any
-// reference-style entry by looking up its `business_name` in
-// `discovered_businesses` and substituting the full record. Extra fields on
-// the reference entry (e.g. `note`) are preserved via passthrough.
+// Two model-emission quirks are normalized here so operators don't have to
+// re-run discovery when the model gets the envelope shape slightly wrong:
 //
-// An entry is treated as reference-style when it has a `business_name` but is
-// missing the required `location_status` field (a required enum that a full
-// record always carries). Unmatched references are left untouched so the
-// validator surfaces a clear, field-level error.
+// 1. Reference-style qualifying_businesses: some models emit
+//    `qualifying_businesses` as entries that point back to
+//    `discovered_businesses` rather than duplicating the full record, e.g.:
+//      { "business_name": "His Grace African Grocery Store",
+//        "note": "See discovered_businesses — identical record, qualifies" }
+//    The schema requires full business objects, so this normalizer resolves
+//    any reference-style entry by looking up its `business_name` in
+//    `discovered_businesses` and substituting the full record. Extra fields on
+//    the reference entry (e.g. `note`) are preserved via passthrough.
+//
+//    An entry is treated as reference-style when it has a `business_name` but
+//    is missing the required `location_status` field (a required enum that a
+//    full record always carries). Unmatched references are left untouched so
+//    the validator surfaces a clear, field-level error.
+//
+// 2. Missing qualifying_businesses: some models emit only
+//    `discovered_businesses` and omit `qualifying_businesses` entirely, even
+//    though the prompt suffix requires it. Rather than reject the payload, we
+//    derive `qualifying_businesses` from `discovered_businesses` by applying
+//    the same exclusion rules the schema's refinements enforce (§31):
+//    exclude `outside_market` and the chain/franchise ownership types
+//    (`national_chain`, `national_franchise`, `regional_chain`). This mirrors
+//    exactly what the prompt tells the model to do, so a model that lists only
+//    qualifying candidates in `discovered_businesses` still imports cleanly.
+
+const EXCLUDED_OWNERSHIP_TYPES = new Set([
+  'national_chain',
+  'national_franchise',
+  'regional_chain',
+]);
+
+function isQualifyingCandidate(biz: any): boolean {
+  if (!biz || typeof biz !== 'object') return false;
+  if (biz.location_status === 'outside_market') return false;
+  if (EXCLUDED_OWNERSHIP_TYPES.has(biz.ownership_type)) return false;
+  return true;
+}
 
 export function normalizeIntelligenceDiscoveryPayload(parsed: any): any {
   if (!parsed || typeof parsed !== 'object') return parsed;
   const discovered: any[] = Array.isArray(parsed.discovered_businesses) ? parsed.discovered_businesses : [];
+  if (discovered.length === 0) return parsed;
+
+  // Case 2: qualifying_businesses missing entirely → derive from discovered.
+  if (!Array.isArray(parsed.qualifying_businesses)) {
+    return {
+      ...parsed,
+      qualifying_businesses: discovered.filter(isQualifyingCandidate),
+    };
+  }
+
   const qualifying: any[] = parsed.qualifying_businesses;
-  if (!Array.isArray(qualifying) || discovered.length === 0) return parsed;
 
   const byName = new Map<string, any>();
   for (const d of discovered) {

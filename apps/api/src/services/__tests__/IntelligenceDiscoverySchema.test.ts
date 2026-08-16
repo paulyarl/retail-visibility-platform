@@ -222,8 +222,76 @@ describe('normalizeIntelligenceDiscoveryPayload', () => {
     expect(schema.safeParse(normalized).success).toBe(false);
   });
 
-  it('is a no-op when qualifying_businesses is missing or not an array', () => {
-    const payload = { ...validDiscovery(), qualifying_businesses: undefined };
+  // ─── Missing qualifying_businesses → derive from discovered_businesses ───
+
+  it('derives qualifying_businesses from discovered_businesses when missing', () => {
+    const insideA = validCandidate({ business_name: 'Inside Biz A' });
+    const insideB = validCandidate({ business_name: 'Inside Biz B' });
+    const payload = {
+      ...validDiscovery(),
+      discovered_businesses: [insideA, insideB],
+      qualifying_businesses: undefined,
+    };
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    expect(Array.isArray(normalized.qualifying_businesses)).toBe(true);
+    expect(normalized.qualifying_businesses).toHaveLength(2);
+    // Derived entries are the full records from discovered_businesses.
+    expect(normalized.qualifying_businesses[0].business_name).toBe('Inside Biz A');
+    expect(normalized.qualifying_businesses[1].business_name).toBe('Inside Biz B');
+    // The normalized payload now passes schema validation.
+    expect(schema.safeParse(normalized).success).toBe(true);
+  });
+
+  it('deriving qualifying_businesses excludes outside_market candidates', () => {
+    const inside = validCandidate({ business_name: 'Inside Biz' });
+    const outside = validCandidate({ business_name: 'Outside Biz', location_status: 'outside_market' });
+    const payload = {
+      ...validDiscovery(),
+      discovered_businesses: [inside, outside],
+      qualifying_businesses: undefined,
+    };
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    expect(normalized.qualifying_businesses).toHaveLength(1);
+    expect(normalized.qualifying_businesses[0].business_name).toBe('Inside Biz');
+    expect(schema.safeParse(normalized).success).toBe(true);
+  });
+
+  it('deriving qualifying_businesses excludes chain/franchise ownership types', () => {
+    const independent = validCandidate({ business_name: 'Indie Biz' });
+    const national = validCandidate({ business_name: 'National Biz', ownership_type: 'national_chain' });
+    const regional = validCandidate({ business_name: 'Regional Biz', ownership_type: 'regional_chain' });
+    const payload = {
+      ...validDiscovery(),
+      discovered_businesses: [independent, national, regional],
+      qualifying_businesses: undefined,
+    };
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    expect(normalized.qualifying_businesses).toHaveLength(1);
+    expect(normalized.qualifying_businesses[0].business_name).toBe('Indie Biz');
+    expect(schema.safeParse(normalized).success).toBe(true);
+  });
+
+  it('deriving qualifying_businesses from an all-qualifying set keeps every candidate', () => {
+    // Mirrors the real-world failure: model emits only discovered_businesses,
+    // all of which are inside_city + independent/local_chain.
+    const localChain = validCandidate({ business_name: 'Saraga', ownership_type: 'local_chain' });
+    const independent = validCandidate({ business_name: 'Dreamcast', ownership_type: 'independent' });
+    const adjacent = validCandidate({ business_name: 'Redias', location_status: 'adjacent_city' });
+    const payload = {
+      ...validDiscovery(),
+      discovered_businesses: [localChain, independent, adjacent],
+      qualifying_businesses: undefined,
+      candidate_count: 3,
+      qualifying_count: 3,
+      hold_count: 0,
+    };
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    expect(normalized.qualifying_businesses).toHaveLength(3);
+    expect(schema.safeParse(normalized).success).toBe(true);
+  });
+
+  it('is a no-op when discovered_businesses is empty (cannot derive)', () => {
+    const payload = { ...validDiscovery(), discovered_businesses: [], qualifying_businesses: undefined };
     const normalized = normalizeIntelligenceDiscoveryPayload(payload);
     expect(normalized.qualifying_businesses).toBeUndefined();
   });
