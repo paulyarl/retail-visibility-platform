@@ -53,7 +53,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
     ] = await Promise.allSettled([
       // 1. Store listing data
       pool.query(
-        `SELECT 
+        `SELECT
           dll.id,
           dll.tenant_id,
           dll.business_name,
@@ -84,7 +84,13 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.updated_at,
           dll.keywords,
           t.is_demo,
-          t.demo_expires_at
+          t.demo_expires_at,
+          dll.listing_origin,
+          dll.public_disclaimer,
+          (SELECT dct.token FROM directory_claim_tokens dct
+           JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
+           WHERE dps.listing_id = dll.id AND dct.claimed_at IS NULL AND dct.expires_at > now()
+           LIMIT 1) as active_claim_token
          FROM directory_listings_list dll
          LEFT JOIN tenants t ON t.id = dll.tenant_id
          LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
@@ -376,6 +382,9 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       isPublished: listing.is_published,
       isDemo: (listing as any).is_demo || false,
       demoExpiresAt: (listing as any).demo_expires_at || null,
+      listingOrigin: (listing as any).listing_origin || null,
+      publicDisclaimer: (listing as any).public_disclaimer || null,
+      activeClaimToken: (listing as any).active_claim_token || null,
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,
       keywords: listing.keywords,

@@ -92,16 +92,20 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       where: { tenant_id: tenantId },
     });
 
-    // If published, get the actual slug from the published listing
+    // If published, get the actual slug + seed metadata from the published listing
     let actualSlug = settings.slug;
+    let listingOrigin: string | null = null;
+    let publicDisclaimer: string | null = null;
     if (settings.is_published) {
       const pool = getDirectPool();
       const publishedListing = await pool.query(
-        'SELECT slug FROM directory_listings_list WHERE tenant_id = $1 AND is_published = true LIMIT 1',
+        'SELECT slug, listing_origin, public_disclaimer FROM directory_listings_list WHERE tenant_id = $1 AND is_published = true LIMIT 1',
         [tenantId]
       );
       if (publishedListing.rows.length > 0) {
         actualSlug = publishedListing.rows[0].slug;
+        listingOrigin = publishedListing.rows[0].listing_origin;
+        publicDisclaimer = publishedListing.rows[0].public_disclaimer;
       }
     }
 
@@ -119,6 +123,8 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       updatedAt: settings.updated_at,
       isFeatured: !!activeFeatured,
       featuredUntil: activeFeatured?.featured_until,
+      listingOrigin,
+      publicDisclaimer,
       businessProfile: businessProfile ? {
         businessName: businessProfile.business_name,
         city: businessProfile.city,

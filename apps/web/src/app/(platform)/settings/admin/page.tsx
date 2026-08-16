@@ -630,6 +630,19 @@ export default function AdminDashboardPage() {
           stats: 'Layout & styling',
         },
         {
+          title: 'Directory Presence Seeds',
+          description: 'Manage unclaimed directory listings seeded from public information and mint claim tokens for business owners',
+          href: '/settings/admin/directory/presence-seeds',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          ),
+          color: 'bg-emerald-600',
+          stats: 'Seed & claim workflow',
+          badge: 'NEW',
+        },
+        {
           title: 'Catalog Management',
           description: 'Manage the platform product catalog and catalog rules',
           href: '/settings/admin/catalog',

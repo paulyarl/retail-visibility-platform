@@ -17,6 +17,8 @@ export interface DirectoryListing {
   slug?: string;
   createdAt: string;
   updatedAt: string;
+  listingOrigin?: string | null;
+  publicDisclaimer?: string | null;
   businessProfile?: {
     businessName: string;
     city?: string;

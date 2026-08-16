@@ -38,6 +38,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags, PublicCrmOptionsFlags, type FeaturedOptionsState, type DirectoryEntryOptionsState, type DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
+import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
@@ -660,6 +661,14 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     demoExpiresAt: tenantInfo?.demoExpiresAt,
   };
 
+  const unclaimedBanner = consolidatedData?.listing?.listingOrigin === 'directory_seed' ? (
+    <UnclaimedDirectoryBanner
+      businessName={listing.businessName}
+      claimToken={consolidatedData.listing.activeClaimToken}
+      publicDisclaimer={consolidatedData.listing.publicDisclaimer}
+    />
+  ) : null;
+
   switch (effectiveLayout) {
     case 'editorial':
       return (
@@ -671,6 +680,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
+          {unclaimedBanner}
           <DirectoryEntryEditorialLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}
@@ -689,6 +699,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
+          {unclaimedBanner}
           <DirectoryEntryImmersiveLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}
@@ -707,6 +718,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
+          {unclaimedBanner}
           <DirectoryEntryPremiumLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}
@@ -726,6 +738,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
+          {unclaimedBanner}
           <DirectoryEntryClassicLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}

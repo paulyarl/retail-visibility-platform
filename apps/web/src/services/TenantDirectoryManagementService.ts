@@ -23,6 +23,7 @@ export interface DirectoryEntrySettings {
   enhanced_seo?: boolean;
   external_link_enabled?: boolean;
   gallery_display_mode?: 'carousel' | 'magazine';
+  snap_ebt_display?: boolean | null;
 }
 
 export class TenantDirectoryManagementService extends TenantApiSingleton {
@@ -120,6 +121,8 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       updatedAt: result.data.updated_at,
       isFeatured: result.data.is_featured,
       featuredUntil: result.data.featured_until,
+      listingOrigin: result.data.listing_origin || null,
+      publicDisclaimer: result.data.public_disclaimer || null,
     } : null;
 
     // Invalidate directory listing cache

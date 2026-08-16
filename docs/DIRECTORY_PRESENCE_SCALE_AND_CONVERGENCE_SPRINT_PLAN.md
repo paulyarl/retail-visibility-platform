@@ -1122,3 +1122,633 @@ Operator selects niche + city
 ```
 
 The platform found the business, published its listing, converted the owner, and upgraded them to a paying customer — all from a single intelligence seek run. No external prospecting, no manual data entry, no separate dashboard per niche. The loop is closed.
+
+---
+
+# Sprint 3: Directory Seed Enrichment & Progressive Engagement
+
+**Status:** Planned — not implemented
+**Prerequisite:** Sprint 1 (Phases A–F) complete. Sprint 2 (Phases A–E) can be in flight in parallel — Sprint 3 operates on the pre-claim side of the funnel while Sprint 2 operates on the post-claim side. They converge at the claim step.
+**Branch context:** `staging`
+**Next migration numbers:** `217`–`219`
+
+## S3.1. Problem
+
+Sprint 1 builds the seek-to-seed pipeline. Sprint 2 builds the claim-to-tenant bridge. But between seed and claim, there's a gap: the listing is published with only public-source data (NAP, SNAP from retailer list, category from intelligence profile). The listing may have wrong hours, no photos, no logo, and no owner-confirmed information.
+
+Today's flow is binary: the listing is either unclaimed (operator-seeded, public-source only) or claimed (owner has full control). There's no middle ground where the owner can enrich their listing without committing to a full claim and account creation.
+
+The user's insight is that the directory opens many doors — not just the claim door. The operator can call the business to verify information, complete the listing based on that call, and then send a token-gated self-serve link so the owner can upload photos and correct hours without creating an account. Each step enriches the listing and deepens engagement without requiring commitment. The owner discovers the platform's value through the enrichment experience before being asked to claim.
+
+This sprint builds the progressive engagement funnel: **verify → enrich → claim → upgrade**. Each step is optional, adds value, and lowers the friction of the next.
+
+## S3.2. Non-Goals
+
+- Do not build a new form system — reuse the existing intake portal infrastructure (`mkt_intake_definitions`, `IntakeFormRenderer`, `IntakeDefinitionService`, write-behind adapters)
+- Do not require an account for enrichment — the self-serve upload link is token-gated, not auth-gated (same pattern as the recovery intake portal)
+- Do not replace the claim flow — enrichment is a pre-claim step that optionally leads to claim
+- Do not build a separate outreach tracking system for directory seeds — lightweight status tracking on the seed itself is sufficient (directory seed volume is lower than marketing campaign volume)
+- Do not edit `schema.prisma` directly (per repo convention)
+
+## S3.3. Product contract
+
+### S3.3.1. Operator verification workflow
+
+After a seed is published, the operator can:
+
+1. **Mark outreach status** on the seed: `unverified` → `outreach_attempted` → `verified_by_call` → `verified_by_email` → `owner_self_served`
+2. **Log outreach attempts**: date, method (call/email/in-person), result, notes
+3. **Update listing fields** based on verification: corrected hours, confirmed phone, verified address, owner-confirmed SNAP status
+4. **Add provenance rows** with source `owner_verified_call` or `owner_verified_email` (new provenance sources alongside existing `snap_retailer_list`, `owner_confirmed`, `ops_photo`)
+5. **Generate an enrichment token** and send it to the owner via email or SMS
+
+The operator verification step is tracked on the seed itself — no separate outreach table needed. The audit log captures each status change.
+
+### S3.3.2. Token-gated self-serve enrichment
+
+The owner receives a link (email or SMS) containing an enrichment token. The link opens a public, token-gated form — **no account required**. The form is rendered by the existing `IntakeFormRenderer` using a new intake definition kind: `directory_presence_enrichment`.
+
+The form asks for:
+
+| Field | Type | Write-behind target |
+|---|---|---|
+| Business hours | `hours_grid` | `directory_listings_list.hours` + `directory_field_provenance` (field_key: `hours`, source: `owner_self_serve`) |
+| Logo or storefront photo | `attachments` | `photo_assets` + `directory_listings_list.logo_url` / `photo_url` + `directory_field_provenance` (field_key: `logo`, source: `owner_self_serve`) |
+| Phone correction | `phone` | `directory_listings_list.phone` + `directory_field_provenance` (field_key: `phone`, source: `owner_self_serve`) |
+| Website | `url` | `directory_listings_list.website` + `directory_field_provenance` (field_key: `website`, source: `owner_self_serve`) |
+| SNAP/EBT confirmation | `checkbox` | `directory_listings_list.snap_ebt_reported` + `snap_ebt_source: 'owner_confirmed'` + `snap_ebt_as_of: now()` + `directory_field_provenance` (field_key: `snap_ebt`, source: `owner_confirmed`) |
+| Business description | `textarea` | `directory_listings_list.description` + `directory_field_provenance` (field_key: `description`, source: `owner_self_serve`) |
+| Owner name (optional) | `text` | `directory_presence_seeds.owner_name` (new column) — not published, used for claim verification |
+
+The form supports **niche overrides** via `mkt_intake_definitions.niche_overrides` — e.g., the African grocery enrichment form can show culturally relevant category options, while a beauty supply form shows different ones.
+
+### S3.3.3. Progressive engagement states
+
+The seed progresses through enrichment states:
+
+```
+unverified (published, public-source data only)
+  → outreach_attempted (operator called/emailed, no response yet)
+    → verified_by_call (operator spoke with owner, confirmed/corrected info)
+      → enrichment_sent (operator sent self-serve upload link)
+        → enriched (owner submitted photos/hours via token-gated form)
+          → claim_eligible (listing is complete enough to invite claim)
+            → claimed (Sprint 2 flow takes over)
+```
+
+Each state transition is operator-initiated (except `enriched`, which is owner-initiated via the form submission). The operator can skip states — e.g., go straight from `unverified` to `enrichment_sent` if the listing data is already good enough.
+
+### S3.3.4. Post-enrichment claim CTA
+
+After the owner submits the enrichment form, the success page shows:
+
+> "Your listing is updated! [Business Name] now has your hours, photos, and SNAP status on the [City] [Category] directory. Would you like to claim this listing to get a dashboard where you can manage everything in one place?"
+
+This is the soft claim CTA — the owner has just experienced the platform's value (their listing is now richer) and is offered the next step (claim → dashboard → upgrade) without pressure. The owner can decline and the listing stays enriched.
+
+### S3.3.5. Directory page multi-path engagement
+
+The public directory listing page (`/directory/[slug]`) shows different CTAs depending on the viewer and seed state:
+
+| Viewer | Seed state | CTA shown |
+|---|---|---|
+| Anyone | unclaimed, unverified | "Is this your business? Contact us to claim it" |
+| Anyone | unclaimed, enriched | "Is this your business? Claim this listing" |
+| Owner with enrichment token | any unclaimed | Enrichment form (token-gated) |
+| Owner who just enriched | any unclaimed | "Your listing is updated! Claim it to get a dashboard" |
+| Another business owner | any | "Get listed on this directory" (lead gen — creates a prospect queue entry) |
+| Anyone | claimed | Normal directory view (owner-managed) |
+
+The "Get listed" CTA is a lead gen path: a business owner visiting the directory sees other businesses listed and wants their own listing. This creates a prospect queue entry (source_kind: `directory_lead_gen`) that the operator can review and potentially seed — feeding the Sprint 1 loop from the directory's own traffic.
+
+## S3.4. Start-of-phase preflight
+
+Hard rule: every implementation phase ends with `pnpm checkapi` and `pnpm checkweb`. Zero new TS errors.
+
+### S3.4.1. Singleton strategy
+
+| Surface | Base | Why |
+|---|---|---|
+| Enrichment intake definition | `mkt_intake_definitions` row (data, not code) | Registry-driven — no new code for the form itself |
+| Enrichment token | New `directory_enrichment_tokens` table (mirrors `directory_claim_tokens`) | Token-gated, no auth |
+| Write-behind adapters | Extend `writeBehindAdapters.ts` with directory-specific adapters | Writes to `directory_listings_list` + `directory_field_provenance` |
+| Operator verification UI | Extend admin presence seeds page | Same page, new status/actions |
+| Enrichment form | Reuse `IntakeFormRenderer` + `IntakePageClient` | No new form component |
+| Post-enrichment CTA | New component on enrichment success page | Soft claim CTA |
+
+### S3.4.2. Skills to read before starting
+
+| Skill | Applied |
+|---|---|
+| `capability-deployment-flow.md` | Enrichment doesn't change capabilities — but the post-enrichment claim CTA connects to Sprint 2 |
+| `manual-sql-migration-policy.md` | SQL-first; `prisma db pull` after apply |
+| `tenant-scoped-id-generation.md` | New token ID prefix: `det-` (directory enrichment token) |
+| `verify-capability-deployment.md` | Phase E verification |
+| `end-of-phase-sprint-checklist.md` | Phase-end checklist |
+
+**AGENTS.md reference (Intake Portal Generalization)**
+
+The existing intake portal infrastructure is documented in AGENTS.md:
+- `mkt_intake_definitions` table — declarative `form_schema`, `field_mappings`, `owner_copy`, `niche_overrides` in JSONB
+- `IntakeDefinitionService` — loads + caches definitions, builds dynamic Zod schemas from `form_schema`, resolves niche overrides
+- `writeBehindAdapters.ts` — maps evidence_payload to existing backend domain models
+- `DisputeIntakeService.submitRegistryIntake` — kind-aware idempotency, dynamic Zod validation, write-behind adapters
+- `recovery-intake-public.ts` — dispatches to `submitRegistryIntake` for registry kinds; `GET /options` for dynamic option sources
+- `IntakeFormRenderer` — generic, registry-driven form renderer (text, url, email, phone, textarea, select, radio, multiselect, checkbox, chips, hours_grid, attachments, number, date, object/nested)
+- `IntakePageClient` — detects `context.definition` and renders `IntakeFormRenderer` instead of hardcoded form fields
+
+This sprint adds a new intake kind (`directory_presence_enrichment`) and new write-behind adapters (`directory_listing_write`, `directory_provenance_write`). No new form rendering code.
+
+**Skills to update after implementation (mandatory)**
+
+- `tenant-scoped-id-generation.md` — add `det-` prefix for directory enrichment tokens
+- `capability-deployment-flow.md` — note the enrichment flow as a pre-claim engagement path
+
+**New skill to create at phase end**
+
+- `.devin/skills/directory-seed-enrichment-flow.md` — reusable workflow: operator verification → enrichment token → owner self-serve upload → post-enrichment claim CTA. Covers the intake definition kind, write-behind adapters, progressive engagement states, and the multi-path directory page CTAs.
+
+### S3.4.3. ID planning
+
+New ID generator:
+- Directory enrichment token: `det-{tk}-{nanoid12}` (mirrors `dct-` claim token pattern)
+
+Existing ID generators reused:
+- Field provenance: `dfp-{tk}-{nanoid8}` (existing)
+
+### S3.4.4. Navigation & pages
+
+| Route | Audience | Notes |
+|---|---|---|
+| `/settings/admin/directory/presence-seeds` | platform admin | **Modified:** outreach status, enrichment token generation, verification logging |
+| `/directory/enrich/[token]` | public (token-gated) | **New:** enrichment form (reuses `IntakePageClient` pattern) |
+| `/directory/[slug]` | public | **Modified:** multi-path CTAs based on seed state + viewer |
+| `/directory/claim/[token]` | public (claimant) | **Unchanged:** Sprint 2's claim flow |
+
+No new sidebar links — enrichment is operator-initiated from the admin seeds page.
+
+### S3.4.5. Backend routes
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| PATCH | `/api/admin/directory/presence-seeds/:id/outreach` | admin | Update outreach status + log outreach attempt |
+| POST | `/api/admin/directory/presence-seeds/:id/enrichment-token` | admin | Generate enrichment token + return link |
+| GET | `/api/public/directory/enrich/:token` | public (token) | Resolve enrichment token → seed context + intake definition |
+| POST | `/api/public/directory/enrich/:token/submit` | public (token) | Submit enrichment form (dispatches to `submitRegistryIntake`) |
+| POST | `/api/public/directory/enrich/:token/attachments` | public (token) | Multipart photo upload (mirrors recovery intake attachments) |
+| GET | `/api/public/directory/enrich/:token/options` | public (token) | Dynamic option sources (mirrors recovery intake options) |
+| POST | `/api/public/directory/lead-gen` | public | "Get listed" CTA → creates prospect queue entry (source_kind: `directory_lead_gen`) |
+
+**Services to modify**
+
+- `DirectoryPresenceSeedService.ts` — add `updateOutreachStatus`, `generateEnrichmentToken`, enrichment token resolution
+- `DisputeIntakeService.ts` (or new `DirectoryEnrichmentIntakeService`) — extend `submitRegistryIntake` for directory enrichment kind
+- `writeBehindAdapters.ts` — add `directory_listing_write`, `directory_provenance_write`, `directory_snap_ebt_write` adapters
+- `recovery-intake-public.ts` (or new `directory-enrichment-public.ts`) — token-gated public routes for enrichment
+- Frontend admin seeds page — outreach status UI, enrichment token generation
+- Frontend `IntakePageClient` (or new `DirectoryEnrichmentClient`) — render enrichment form via `IntakeFormRenderer`
+- Frontend directory listing page — multi-path CTAs
+
+### S3.4.6. Database
+
+| File | Contents |
+|---|---|
+| `217_directory_enrichment_tokens.sql` | `directory_enrichment_tokens` table (mirrors `directory_claim_tokens` structure); FK to `directory_presence_seeds`; token string unique index; expires_at index |
+| `218_directory_seed_outreach.sql` | Add `outreach_status`, `outreach_notes`, `owner_name`, `owner_email`, `owner_phone` columns to `directory_presence_seeds`; CHECK constraint on `outreach_status` values |
+| `219_directory_presence_enrichment_intake.sql` | Data-only: insert `directory_presence_enrichment` intake definition into `mkt_intake_definitions` with form_schema, field_mappings, owner_copy, niche_overrides for African grocery (initial niche) |
+
+After apply (human): staging `prisma db pull && prisma generate`, then same SQL on production.
+
+### S3.4.7. Frontend
+
+| Component | Type | States |
+|---|---|---|
+| `SeedOutreachPanel` | client | unverified / outreach_attempted / verified / enrichment_sent / enriched — with action buttons per state |
+| `DirectoryEnrichmentClient` | client | loading / valid / expired / submitted / error — reuses `IntakeFormRenderer` |
+| `DirectoryEnrichmentSuccess` | client | shows updated listing summary + soft claim CTA |
+| `DirectoryListingCtas` | client | multi-path CTAs based on seed state + viewer context |
+| `DirectoryLeadGenForm` | client | "Get listed" form → creates prospect queue entry |
+
+React Query keys: `['directory-enrichment-token', token]`, `['directory-seed-outreach', seedId]`.
+
+### S3.4.8. Preflight summary block
+
+```
+Phase/Sprint: Directory Seed Enrichment & Progressive Engagement — operator verification + token-gated self-serve upload + multi-path directory CTAs
+Design doc: docs/DIRECTORY_PRESENCE_SCALE_AND_CONVERGENCE_SPRINT_PLAN.md (Sprint 3)
+
+New services: updateOutreachStatus, generateEnrichmentToken on DirectoryPresenceSeedService;
+              directory_listing_write / directory_provenance_write / directory_snap_ebt_write adapters;
+              DirectoryEnrichmentIntakeService (or extend DisputeIntakeService)
+New entities: directory_enrichment_tokens; directory_presence_seeds.outreach_status/notes/owner_name/email/phone;
+              mkt_intake_definitions row: directory_presence_enrichment
+New ID generators needed: det- (directory enrichment token)
+New pages/routes: /directory/enrich/[token] (public, token-gated); modified /directory/[slug] (multi-path CTAs);
+                  modified /settings/admin/directory/presence-seeds (outreach panel)
+New sidebar links: none
+New settings cards: SeedOutreachPanel on admin seeds page
+New migration: 217–219
+New background jobs: none
+New capability features: none (enrichment is pre-claim, no capability changes)
+Skills to read before starting: manual-sql-migration-policy, tenant-scoped-id-generation,
+              verify-capability-deployment, end-of-phase-sprint-checklist
+              + AGENTS.md Intake Portal Generalization section
+Skills to update after completion:
+  - tenant-scoped-id-generation.md (add det- prefix)
+  - capability-deployment-flow.md (enrichment as pre-claim engagement path)
+New skill to create: .devin/skills/directory-seed-enrichment-flow.md
+Insights to capture: the intake portal infrastructure (mkt_intake_definitions + IntakeFormRenderer + write-behind adapters)
+      is reusable beyond marketing campaigns — directory seed enrichment is the second use case;
+      the progressive engagement funnel (verify → enrich → claim → upgrade) lowers claim friction by letting owners
+      experience platform value before committing to an account;
+      the directory page itself is a lead gen surface (Get listed CTA) that feeds the Sprint 1 seek loop
+```
+
+## S3.5. Implementation phases
+
+### Phase A — Enrichment tokens + intake definition (217, 219)
+
+- Migration 217: `directory_enrichment_tokens` table (mirrors `directory_claim_tokens`):
+  - `id VARCHAR(60)` (det- prefix)
+  - `seed_id VARCHAR(60)` FK to `directory_presence_seeds`
+  - `tenant_id VARCHAR(255)` FK to `tenants`
+  - `token VARCHAR(255)` UNIQUE
+  - `expires_at TIMESTAMPTZ`
+  - `consumed_at TIMESTAMPTZ NULL`
+  - `single_use BOOLEAN DEFAULT false` (enrichment tokens are multi-use — owner can submit multiple times)
+  - `created_at TIMESTAMPTZ DEFAULT now()`
+- Migration 219: insert `directory_presence_enrichment` intake definition into `mkt_intake_definitions`:
+  - `intake_kind: 'directory_presence_enrichment'`
+  - `label: 'Directory Listing Enrichment'`
+  - `driver: 'registry'`
+  - `form_schema`: hours_grid, attachments (logo/photo), phone, url (website), checkbox (SNAP confirmation), textarea (description), text (owner_name)
+  - `field_mappings`: map each form field to its write-behind adapter
+  - `owner_copy`: "Thank you for updating your listing. Your information will appear on the [City] [Category] directory."
+  - `niche_overrides`: initial override for African grocery (category-specific labels)
+- Implement `generateEnrichmentToken(seedId, ctx)` on `DirectoryPresenceSeedService`:
+  - Create token row (multi-use, 90-day expiry)
+  - Return `{ token, expiresAt }`
+- Implement enrichment token resolution (GET `/api/public/directory/enrich/:token`):
+  - Resolve token → seed → listing context
+  - Load intake definition for `directory_presence_enrichment`
+  - Return `{ seedId, tenantId, businessName, category, city, intakeDefinition }`
+- Tests: token generation, token resolution, expired token, consumed token (multi-use so not blocked), intake definition loads correctly
+
+### Phase B — Write-behind adapters + form submission (218)
+
+- Migration 218: add `outreach_status`, `outreach_notes`, `owner_name`, `owner_email`, `owner_phone` to `directory_presence_seeds`
+- Implement write-behind adapters in `writeBehindAdapters.ts`:
+  - `directory_listing_write`: writes form field values to `directory_listings_list` (hours, phone, website, description, logo_url)
+  - `directory_provenance_write`: creates `directory_field_provenance` rows for each written field (source: `owner_self_serve`, show_on_public: true)
+  - `directory_snap_ebt_write`: updates `snap_ebt_reported`, `snap_ebt_source: 'owner_confirmed'`, `snap_ebt_as_of: now()`, `snap_ebt_source_name: owner_name`
+- Implement enrichment form submission (POST `/api/public/directory/enrich/:token/submit`):
+  - Validate token (not expired, not consumed if single_use)
+  - Load intake definition → build Zod schema from `form_schema`
+  - Validate submitted data against schema
+  - Run write-behind adapters for each field
+  - Update seed: `outreach_status = 'enriched'`, `owner_name`/`owner_email`/`owner_phone` from form
+  - Mark token consumed (if single_use) or record submission (if multi-use)
+  - Return success with updated listing summary
+- Implement attachment upload (POST `/api/public/directory/enrich/:token/attachments`):
+  - Multipart upload (mirrors recovery intake attachments)
+  - Store in `photo_assets` linked to the tenant
+  - Update `directory_listings_list.logo_url` or `photo_url`
+  - Create provenance row (field_key: `logo`/`photo`, source: `owner_self_serve`)
+- Tests: form submission writes to listing + provenance; SNAP confirmation updates snap fields; photo upload creates photo_asset + updates listing; niche override labels render correctly
+
+### Phase C — Operator verification UI
+
+- Extend admin presence seeds page with `SeedOutreachPanel`:
+  - Shows current `outreach_status` with color-coded badge
+  - Action buttons per state:
+    - `unverified` → "Log outreach call" (opens form: method, result, notes)
+    - `outreach_attempted` → "Log follow-up" / "Mark verified"
+    - `verified_by_call` → "Send enrichment link" (generates token + shows link to copy/email/SMS)
+    - `enrichment_sent` → "View enrichment status" (shows whether owner has submitted)
+    - `enriched` → "Invite to claim" (generates claim token — Sprint 2 flow)
+  - Outreach log: expandable history of outreach attempts (date, method, result, notes)
+  - Owner contact info: shows `owner_name`, `owner_email`, `owner_phone` if captured
+- Backend: `PATCH /api/admin/directory/presence-seeds/:id/outreach`:
+  - Accept `{ status, method, result, notes, ownerName, ownerEmail, ownerPhone }`
+  - Update seed columns
+  - Audit log the status change
+- Tests: status transitions; outreach log rendering; enrichment token generation from UI
+
+### Phase D — Enrichment form + post-enrichment CTA
+
+- New page: `/directory/enrich/[token]` (public, token-gated):
+  - `DirectoryEnrichmentClient`:
+    - Loading: resolve token → seed context + intake definition
+    - Valid: render `IntakeFormRenderer` with the definition
+    - Expired: show expired message with "request a new link" CTA
+    - Submitted: show `DirectoryEnrichmentSuccess` with updated listing summary + soft claim CTA
+    - Error: show error with retry
+- `DirectoryEnrichmentSuccess`:
+  - "Your listing is updated! [Business Name] now has your hours, photos, and SNAP status on the [City] [Category] directory."
+  - Show before/after summary of what was updated
+  - Soft claim CTA: "Would you like to claim this listing to get a dashboard where you can manage everything in one place?"
+    - "Claim this listing" → links to `/directory/claim/[claimToken]` (if a claim token exists for this seed)
+    - "No thanks, just keep my listing updated" → links back to `/directory/[slug]`
+- Tests: form renders from intake definition; submission writes data; success page shows summary + claim CTA; expired token shows correct message
+
+### Phase E — Directory page multi-path CTAs
+
+- Modify directory listing page (`/directory/[slug]` or `DirectoryEntryClassicLayout`):
+  - Add `DirectoryListingCtas` component that renders different CTAs based on:
+    - Seed state (unverified / enriched / claimed)
+    - Viewer context (has enrichment token? is authenticated? is the owner?)
+  - CTAs:
+    - Unclaimed, unverified: "Is this your business? Contact us to claim it" → links to a contact form or `/directory/claim/request`
+    - Unclaimed, enriched: "Is this your business? Claim this listing" → links to claim flow
+    - Claimed: no CTA (normal directory view)
+    - "Get listed on this directory" (always shown for non-owners): → `DirectoryLeadGenForm`
+- `DirectoryLeadGenForm`:
+  - Simple form: business name, category, city, phone/email
+  - On submit: creates a prospect queue entry (source_kind: `directory_lead_gen`, scope: `business`)
+  - Success: "Thanks! We'll review your business and reach out about getting you listed."
+  - Backend: `POST /api/public/directory/lead-gen` → `MarketingProspectQueueService.addToQueue` with `source_kind: 'directory_lead_gen'`
+- Tests: CTAs render correctly per state; lead gen form creates prospect queue entry; lead gen prospect appears in operator queue
+
+### Phase F — Verify + skills
+
+- `pnpm checkapi` + `pnpm checkweb` clean
+- End-to-end: seed published → operator logs outreach call → operator sends enrichment link → owner opens link → owner uploads photos/hours/SNAP → listing updates on directory → owner sees claim CTA → owner claims (Sprint 2 flow)
+- Enrichment form renders from intake definition (no hardcoded fields)
+- Write-behind adapters update listing + provenance correctly
+- Niche overrides render category-specific labels
+- Directory page shows correct CTAs per seed state
+- Lead gen form creates prospect queue entry visible to operator
+- Multi-use enrichment token allows multiple submissions
+- End-of-phase checklist
+- Create `.devin/skills/directory-seed-enrichment-flow.md`
+- Update `tenant-scoped-id-generation.md` (add `det-` prefix)
+- Update `capability-deployment-flow.md` (enrichment as pre-claim path)
+
+## S3.6. Schema sketch
+
+### `directory_enrichment_tokens` (217)
+
+```sql
+CREATE TABLE IF NOT EXISTS directory_enrichment_tokens (
+  id          VARCHAR(60) PRIMARY KEY,
+  seed_id     VARCHAR(60) NOT NULL REFERENCES directory_presence_seeds(id) ON DELETE CASCADE,
+  tenant_id   VARCHAR(255) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  token       VARCHAR(255) NOT NULL UNIQUE,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ NULL,
+  single_use  BOOLEAN NOT NULL DEFAULT FALSE,  -- enrichment is multi-use
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_det_expires ON directory_enrichment_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_det_seed ON directory_enrichment_tokens (seed_id);
+CREATE INDEX IF NOT EXISTS idx_det_token ON directory_enrichment_tokens (token);
+```
+
+### `directory_presence_seeds` additions (218)
+
+| Column | Type | Notes |
+|---|---|---|
+| `outreach_status` | VARCHAR(20) DEFAULT 'unverified' | `unverified` / `outreach_attempted` / `verified_by_call` / `verified_by_email` / `enrichment_sent` / `enriched` |
+| `outreach_notes` | TEXT NULL | Operator notes from verification calls |
+| `owner_name` | VARCHAR(255) NULL | Captured during verification or enrichment |
+| `owner_email` | VARCHAR(255) NULL | For sending enrichment/claim links |
+| `owner_phone` | VARCHAR(40) NULL | For SMS enrichment/claim links |
+
+```sql
+ALTER TABLE directory_presence_seeds
+  ADD COLUMN IF NOT EXISTS outreach_status VARCHAR(20) NOT NULL DEFAULT 'unverified',
+  ADD COLUMN IF NOT EXISTS outreach_notes TEXT NULL,
+  ADD COLUMN IF NOT EXISTS owner_name VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS owner_email VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(40) NULL;
+
+ALTER TABLE directory_presence_seeds
+  DROP CONSTRAINT IF EXISTS chk_dps_outreach_status;
+ALTER TABLE directory_presence_seeds
+  ADD CONSTRAINT chk_dps_outreach_status
+  CHECK (outreach_status IN ('unverified', 'outreach_attempted', 'verified_by_call',
+    'verified_by_email', 'enrichment_sent', 'enriched'));
+```
+
+### `mkt_intake_definitions` row (219 — data only)
+
+```sql
+INSERT INTO mkt_intake_definitions (intake_kind, label, description, driver, form_schema, field_mappings, owner_copy, niche_overrides, is_active, is_draft)
+VALUES (
+  'directory_presence_enrichment',
+  'Directory Listing Enrichment',
+  'Token-gated self-serve form for business owners to enrich their unclaimed directory listing.',
+  'registry',
+  '[...]'::jsonb,  -- form_schema: hours_grid, attachments, phone, url, checkbox, textarea, text
+  '[...]'::jsonb,  -- field_mappings: each field → write-behind adapter name
+  '{"title": "Update Your Listing", "body": "Thank you for updating your listing. Your information will appear on the directory."}'::jsonb,
+  '{}'::jsonb,     -- niche_overrides: populated per category (African grocery initial)
+  true,
+  false
+)
+ON CONFLICT (intake_kind) DO NOTHING;
+```
+
+## S3.7. Write-behind adapter detail
+
+### `directory_listing_write`
+
+```ts
+// writeBehindAdapters.ts
+directory_listing_write: async (value: any, adapterCtx: AdapterContext) => {
+  // adapterCtx.tenantId is the seed's tenant (directory_seed standing mode)
+  // value is the form field value (e.g., phone number, website URL, description)
+  // The field_key is passed via the field_mapping configuration
+  const { fieldKey } = value;  // from field_mappings
+
+  await prisma.$executeRaw`
+    UPDATE directory_listings_list
+    SET ${fieldKey} = ${value.value}, updated_at = now()
+    WHERE tenant_id = ${adapterCtx.tenantId}
+  `;
+},
+```
+
+### `directory_provenance_write`
+
+```ts
+directory_provenance_write: async (value: any, adapterCtx: AdapterContext) => {
+  const provenanceId = generateDirectoryFieldProvenanceId(adapterCtx.tenantId);
+  const seed = await prisma.$queryRaw<any[]>`
+    SELECT id FROM directory_presence_seeds WHERE tenant_id = ${adapterCtx.tenantId} LIMIT 1
+  `;
+
+  await prisma.$executeRaw`
+    INSERT INTO directory_field_provenance (
+      id, seed_id, tenant_id, field_key, value,
+      source_name, accessed_at, confidence, show_on_public,
+      created_at, updated_at
+    ) VALUES (
+      ${provenanceId},
+      ${seed[0].id},
+      ${adapterCtx.tenantId},
+      ${value.fieldKey},
+      ${value.value},
+      'Owner self-serve',
+      now(),
+      'high',
+      true,
+      now(), now()
+    )
+    ON CONFLICT (seed_id, field_key) DO UPDATE
+    SET value = EXCLUDED.value, source_name = EXCLUDED.source_name,
+        accessed_at = EXCLUDED.accessed_at, updated_at = now()
+  `;
+},
+```
+
+### `directory_snap_ebt_write`
+
+```ts
+directory_snap_ebt_write: async (value: any, adapterCtx: AdapterContext) => {
+  if (!value) return;  // checkbox unchecked → no change
+
+  await prisma.$executeRaw`
+    UPDATE directory_listings_list
+    SET snap_ebt_reported = true,
+        snap_ebt_source = 'owner_confirmed',
+        snap_ebt_as_of = now(),
+        snap_ebt_source_name = 'Owner self-serve',
+        updated_at = now()
+    WHERE tenant_id = ${adapterCtx.tenantId}
+  `;
+},
+```
+
+## S3.8. Progressive engagement state machine
+
+```
+                    ┌─────────────┐
+                    │  unverified  │ (published, public-source data only)
+                    └──────┬──────┘
+                           │ operator logs outreach call
+                           ▼
+                    ┌──────────────────┐
+                    │ outreach_attempted │
+                    └──────┬───────────┘
+                           │ operator reaches owner, verifies info
+                           ▼
+                    ┌─────────────────┐
+                    │ verified_by_call │ (operator updates listing fields)
+                    └──────┬──────────┘
+                           │ operator generates enrichment token + sends link
+                           ▼
+                    ┌─────────────────┐
+                    │ enrichment_sent  │
+                    └──────┬──────────┘
+                           │ owner submits enrichment form
+                           ▼
+                    ┌──────────┐
+                    │ enriched  │ (listing has owner-submitted photos/hours/SNAP)
+                    └──────┬───┘
+                           │ operator generates claim token + sends invite
+                           ▼
+                    ┌──────────────────┐
+                    │ claim_eligible     │ (Sprint 2 claim flow takes over)
+                    └──────┬───────────┘
+                           │ owner accepts claim
+                           ▼
+                    ┌──────────┐
+                    │  claimed  │ (Sprint 2: promoted to tenant → dashboard → upgrade)
+                    └──────────┘
+```
+
+**Shortcut paths (operator can skip states):**
+- `unverified` → `enrichment_sent` (skip call if listing data is already good)
+- `unverified` → `claim_eligible` (skip enrichment if owner is ready to claim immediately)
+- `enriched` → `claimed` (owner claims directly from enrichment success page)
+
+## S3.9. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Enrichment form submission fails mid-write | Wrap write-behind adapters in a transaction; evidence_payload on the intake row is the system of record if adapters fail |
+| Owner submits enrichment but never claims | The listing is still enriched — value is captured regardless of claim conversion; the enriched listing is a better directory page and a stronger claim CTA |
+| Multi-use enrichment token is shared publicly | Token is tied to a specific seed; sharing it only lets someone else enrich that listing (low risk); operator can revoke by consuming the token |
+| Lead gen form is abused for spam prospects | Rate-limit by IP; prospect queue entries from `directory_lead_gen` are reviewed by operator before seeding (same hold-list discipline as intelligence seek) |
+| Niche overrides are wrong for a new category | Intake definition is versioned and editable; operator can update `niche_overrides` per category without code changes |
+| Write-behind adapter writes to wrong listing | Adapter is tenant-scoped via `adapterCtx.tenantId`; the enrichment token resolves to one seed → one tenant → one listing |
+
+## S3.10. Acceptance
+
+- [ ] Operator can log outreach calls and update outreach status on a seed
+- [ ] Operator can generate an enrichment token and send it to the owner
+- [ ] Owner can open the enrichment link without creating an account
+- [ ] Enrichment form renders from the `directory_presence_enrichment` intake definition (no hardcoded fields)
+- [ ] Owner can submit hours, photos, phone, website, SNAP confirmation, and description
+- [ ] Write-behind adapters update `directory_listings_list` + `directory_field_provenance` correctly
+- [ ] SNAP confirmation sets `snap_ebt_source: 'owner_confirmed'` with today's date
+- [ ] Niche overrides render category-specific labels (African grocery initial)
+- [ ] Post-enrichment success page shows updated listing summary + soft claim CTA
+- [ ] Directory listing page shows correct CTAs per seed state
+- [ ] "Get listed" CTA creates a prospect queue entry visible to the operator
+- [ ] Multi-use enrichment token allows multiple submissions
+- [ ] `pnpm checkapi` and `pnpm checkweb` clean
+- [ ] Skills updated / new directory-seed-enrichment-flow skill written
+
+## S3.11. The complete three-sprint loop (end state)
+
+```
+Operator selects niche + city
+  → Intelligence profile resolves seek prompt
+    → Intelligence run executes (external agent discovers businesses)
+      → City-category opportunity output (sampled businesses + scores + signals)
+        → Prospects queued (category_fit + identity_confidence + discovery_signals + provenance)
+          → Operator reviews (hold-list filtered, eligibility checked)
+            ├─ High digital-opportunity + pain → createCampaignFromQueue → marketing outreach
+            └─ Thin footprint + stable identity → createSeedFromQueue → directory seed
+                                                                    ↓
+                                                              Publish batch
+                                                                    ↓
+                                                    ┌─ Sprint 3: Progressive engagement ─┐
+                                                    │                                     │
+                                                    │  Operator calls to verify           │
+                                                    │    → Updates listing fields         │
+                                                    │    → Adds provenance (owner_verified)│
+                                                    │                                     │
+                                                    │  Operator sends enrichment link     │
+                                                    │    → Owner uploads photos/hours     │
+                                                    │    → No account needed              │
+                                                    │    → Listing enriches on directory  │
+                                                    │                                     │
+                                                    │  Owner sees claim CTA               │
+                                                    │    → "Your listing is updated!      │
+                                                    │       Claim it to get a dashboard"  │
+                                                    └──────────────┬──────────────────────┘
+                                                                   ↓
+                                                    ┌─ Sprint 2: Claim-to-tenant bridge ─┐
+                                                    │                                     │
+                                                    │  Owner accepts claim                │
+                                                    │    → Customer promoted to user      │
+                                                    │    → OWNER role on tenant           │
+                                                    │    → Routed to /t/[tenantId]/dashboard│
+                                                    │                                     │
+                                                    │  Dashboard: welcome banner          │
+                                                    │    → Filtered nav (no walls)        │
+                                                    │    → Task checklist                 │
+                                                    │    → Upgrade card                   │
+                                                    │                                     │
+                                                    │  Owner upgrades to paid tier        │
+                                                    │    → Stripe checkout                │
+                                                    │    → Capabilities refresh           │
+                                                    │    → Full dashboard: inventory,     │
+                                                    │      orders, checkout, CRM          │
+                                                    └──────────────┬──────────────────────┘
+                                                                   ↓
+                                                    ┌─ Directory page: lead gen ─────────┐
+                                                    │                                     │
+                                                    │  Another business owner visits      │
+                                                    │    → Sees enriched listings         │
+                                                    │    → "Get listed" CTA               │
+                                                    │    → Prospect queue entry created   │
+                                                    │    → Feeds back into Sprint 1 seek  │
+                                                    └─────────────────────────────────────┘
+```
+
+The platform finds businesses, publishes their listings, verifies and enriches them with owner help, converts owners to tenants, upgrades them to paying customers, and uses the directory's own traffic to find the next batch of businesses. Three sprints, one self-contained ecosystem, zero external prospecting. The directory opens many doors — and every door leads back into the platform.

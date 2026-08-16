@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useDirectoryListing } from '@/hooks/directory/useDirectoryListing';
 import DirectoryCategorySelectorAdapter from './DirectoryCategorySelectorAdapter';
 import DirectoryListingPreview from './DirectoryListingPreview';
@@ -234,6 +235,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         enhanced_seo: rawSettings.enhanced_seo,
         gallery_display_mode: rawSettings.gallery_display_mode || 'carousel',
         external_link_enabled: rawSettings.external_link_enabled,
+        snap_ebt_display: rawSettings.snap_ebt_display,
       });
 
       // Invalidate frontend capability cache so public endpoints pick up changes
@@ -284,6 +286,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     rawSettings.storefront_social_media,
     rawSettings.enhanced_seo,
     rawSettings.external_link_enabled,
+    rawSettings.snap_ebt_display,
   ].filter(Boolean).length;
 
   return (
@@ -312,6 +315,25 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
         }`}>
           {saveMessage}
+        </div>
+      )}
+
+      {/* Seed/Claim Awareness Banner */}
+      {listing.listingOrigin === 'directory_seed' && (
+        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+            Listed from Public Information
+          </h4>
+          <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+            This listing was created from public directory data (address, phone, and category).
+            Review the details below and update any information that needs correction.
+            Your listing is already published and visible to shoppers.
+          </p>
+          {listing.publicDisclaimer && (
+            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
+              {listing.publicDisclaimer}
+            </p>
+          )}
         </div>
       )}
 
@@ -394,9 +416,12 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                                   {meta.description}
                                 </span>
                                 {!isAllowed && (
-                                  <span className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                    {meta.isPremium ? 'Upgrade for Premium' : 'Not included in your plan'}
-                                  </span>
+                                  <Link
+                                    href={`/t/${tenantId}/settings/tiers`}
+                                    className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                                  >
+                                    {meta.isPremium ? 'Upgrade for Premium →' : 'Not included in your plan →'}
+                                  </Link>
                                 )}
                               </div>
                             </button>
@@ -724,6 +749,31 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                             checked={!!rawSettings.external_link_enabled}
                             disabled={!capState?.canShowExternalLink}
                             onChange={(e) => toggleRaw('external_link_enabled', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* SNAP/EBT Badge */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">SNAP/EBT Badge</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {capState?.snapEbtBadgeEnabled
+                              ? 'Show SNAP/EBT accepted indicator on your listing'
+                              : (
+                                <Link href={`/t/${tenantId}/settings/tiers`} className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium">
+                                  Not included in your plan — upgrade to enable →
+                                </Link>
+                              )}
+                          </p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.snapEbtBadgeEnabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.snap_ebt_display}
+                            disabled={!capState?.snapEbtBadgeEnabled}
+                            onChange={(e) => toggleRaw('snap_ebt_display', e.target.checked)}
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
