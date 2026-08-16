@@ -255,18 +255,26 @@ export default function IntelligenceDiscoveryAuditCard({
             Category definition
           </summary>
           <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">{data.category_definition}</p>
-          {data.geographic_classification_notes && (
-            <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-              <span className="font-semibold">Geographic notes: </span>
-              {data.geographic_classification_notes}
-            </p>
-          )}
-          {data.ownership_exclusion_notes && (
-            <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-              <span className="font-semibold">Ownership exclusions: </span>
-              {data.ownership_exclusion_notes}
-            </p>
-          )}
+        </details>
+      )}
+
+      {/* Geographic classification notes (collapsible) */}
+      {data.geographic_classification_notes && (
+        <details className="mb-3 rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 p-3">
+          <summary className="text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+            Geographic classification notes
+          </summary>
+          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">{data.geographic_classification_notes}</p>
+        </details>
+      )}
+
+      {/* Ownership exclusion notes (collapsible) */}
+      {data.ownership_exclusion_notes && (
+        <details className="mb-3 rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 p-3">
+          <summary className="text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+            Ownership exclusion notes
+          </summary>
+          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">{data.ownership_exclusion_notes}</p>
         </details>
       )}
 
