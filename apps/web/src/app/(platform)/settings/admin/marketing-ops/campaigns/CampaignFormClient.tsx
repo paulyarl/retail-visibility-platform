@@ -163,6 +163,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     tones: [] as string[],
   });
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  // Tracks whether the operator has manually typed in the Title field. While
+  // false, intelligence-scope campaigns auto-derive the title from Category,
+  // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
+  // first keystroke in the Title field flips this to true and stops auto-fill.
+  const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -248,6 +253,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         intelligence_search_radius_miles: (c as any).intelligence_search_radius_miles ?? '',
         intelligence_campaign_kind: ((c as any).intelligence_campaign_kind ?? 'discovery') as 'discovery' | 'establishment' | '',
       });
+      // Preserve an existing campaign's title — don't auto-overwrite it on
+      // edit. Only auto-derive when the operator starts from a blank title.
+      setTitleManuallyEdited(Boolean(c.title && c.title.trim()));
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
     } finally {
@@ -258,6 +266,26 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   useEffect(() => {
     fetchCampaign();
   }, [fetchCampaign]);
+
+  // Live auto-fill for intelligence-scope campaign titles. A single category
+  // can have up to four intelligence campaigns (Establish Emerging, Establish
+  // Competitive, Discovery Emerging, Discovery Competitive), so deriving the
+  // title from Category + Kind + Focus + City + State removes repetitive
+  // typing. Format: "African Grocery Store - Discovery - Emerging - Indianapolis, IN".
+  // Stops auto-filling once the operator manually edits the Title field.
+  useEffect(() => {
+    if (form.scope !== 'intelligence') return;
+    if (titleManuallyEdited) return;
+    const cap = (v: string) => v ? v.charAt(0).toUpperCase() + v.slice(1) : '';
+    const kindLabel = cap(form.intelligence_campaign_kind);
+    const focusLabel = cap(form.intelligence_focus);
+    const headParts = [form.category, kindLabel, focusLabel].map((s) => (s ?? '').trim()).filter(Boolean);
+    const locParts = [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean);
+    const parts = [...headParts];
+    if (locParts.length > 0) parts.push(locParts.join(', '));
+    const derived = parts.join(' - ');
+    setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
+  }, [form.scope, form.category, form.intelligence_campaign_kind, form.intelligence_focus, form.city, form.state, titleManuallyEdited]);
 
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -629,10 +657,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               </>
             )}
             <FormField label="Title" className="sm:col-span-2">
-              <input type="text" value={form.title} onChange={(e) => handleChange('title', e.target.value)}
+              <input type="text" value={form.title} onChange={(e) => { setTitleManuallyEdited(true); handleChange('title', e.target.value); }}
                 placeholder="Optional descriptive title (e.g. &quot;Q3 Austin restaurant review-gap test&quot;)"
                 className={inputClass} />
-              <p className="text-xs text-gray-400 mt-1">Scope-neutral label for the campaign objective. When set, it appears as the primary heading in lists and detail pages; the business name / category / city remain as the secondary line.</p>
+              {form.scope === 'intelligence' ? (
+                <p className="text-xs text-gray-400 mt-1">Auto-generated from Category, Kind, Focus, City, and State (e.g. &quot;African Grocery Store - Discovery - Emerging - Indianapolis, IN&quot;). Edit to customize — once you type, the auto-fill stops.</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Scope-neutral label for the campaign objective. When set, it appears as the primary heading in lists and detail pages; the business name / category / city remain as the secondary line.</p>
+              )}
             </FormField>
             <FormField label="Business Name" required={form.scope === 'business'}>
               <input type="text" required={form.scope === 'business'} value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
