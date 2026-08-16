@@ -463,7 +463,7 @@ export default function IntelligenceProfilesClient() {
               </Paper>
             ) : (
               <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
-                <Table striped highlightOnHover horizontalSpacing="sm" verticalSpacing="xs" fontSize="xs">
+                <Table striped highlightOnHover horizontalSpacing="sm" verticalSpacing="xs" style={{ fontSize: 'var(--mantine-font-size-xs)' }}>
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>Title</Table.Th>
