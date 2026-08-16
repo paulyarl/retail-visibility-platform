@@ -117,7 +117,7 @@ export default function IntelligenceDiscoveryAuditCard({
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [expandedProvenance, setExpandedProvenance] = useState<Set<number>>(new Set());
-  const [showNotes, setShowNotes] = useState(false);
+  const [showNotes, setShowNotes] = useState<number | null>(null);
   const router = useRouter();
 
   // Sort qualifying businesses: recommended first, then by priority, holds last
@@ -353,7 +353,7 @@ export default function IntelligenceDiscoveryAuditCard({
                     {biz.notes && (
                       <div className="mt-1.5">
                         <button
-                          onClick={() => setShowNotes((v) => v === idx ? false : idx)}
+                          onClick={() => setShowNotes((v) => v === idx ? null : idx)}
                           className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           {showNotes === idx ? 'Hide note' : 'Show note'}
