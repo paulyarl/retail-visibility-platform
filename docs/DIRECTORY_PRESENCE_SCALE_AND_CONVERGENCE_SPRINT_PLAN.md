@@ -1752,3 +1752,431 @@ Operator selects niche + city
 ```
 
 The platform finds businesses, publishes their listings, verifies and enriches them with owner help, converts owners to tenants, upgrades them to paying customers, and uses the directory's own traffic to find the next batch of businesses. Three sprints, one self-contained ecosystem, zero external prospecting. The directory opens many doors — and every door leads back into the platform.
+
+---
+
+# Cross-Cutting: Token Identity Verification
+
+**Status:** Planned — not implemented
+**Prerequisite:** Must be implemented as part of Sprint 2 (claim tokens) and Sprint 3 (enrichment tokens). This is not a separate sprint — it is a security layer that modifies both.
+**Branch context:** `staging`
+**Migration numbers:** Integrated into Sprint 2 (214) and Sprint 3 (217) migrations
+
+## C1. Problem
+
+Both the claim token (Sprint 2 / existing) and the enrichment token (Sprint 3) are bare URL tokens. Anyone who obtains the URL can:
+
+- **Claim token**: Claim the business as their own, get an OWNER role, and take control of that business's public identity on the platform. This is business identity theft.
+- **Enrichment token**: Upload wrong hours, inappropriate photos, or false SNAP confirmation to a listing they don't own. Lower risk (correctable, no identity bound) but still an abuse vector.
+
+The current `DirectoryClaimService.acceptClaim` checks only:
+- Token is valid and not expired
+- Token is not consumed (single_use)
+- Seed status is not already 'claimed'
+
+It does **not** verify that the claimant is the actual business owner. The `userId` parameter is any authenticated user — customer or platform. There is no proof-of-ownership step.
+
+Tokens can leak via:
+- URL guessing (unlikely with nanoid, but not impossible)
+- Email forwarding (owner forwards the link to someone else)
+- Shared inbox (multiple employees see the email)
+- Browser history on a shared computer
+- Screenshots or social media posts
+
+## C2. Solution: Bound tokens + OTP verification
+
+### C2.1. Claim tokens become identity-bound
+
+When the operator generates a claim token (via `inviteSeed` or the Sprint 3 enrichment → claim handoff), the token is bound to a specific email or phone number captured during the Sprint 3 verification step.
+
+**Schema change** (integrated into migration 214):
+
+```sql
+ALTER TABLE directory_claim_tokens
+  ADD COLUMN IF NOT EXISTS bound_email VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS bound_phone VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS verification_required BOOLEAN NOT NULL DEFAULT TRUE;
+```
+
+- `bound_email` / `bound_phone`: the contact info the operator captured during verification (Sprint 3 `owner_email` / `owner_phone`). At least one must be set if `verification_required` is true.
+- `verification_required`: defaults to true. Set to false only when the operator manually overrides (e.g., in-person verification where the operator hands the owner a device and watches them claim).
+
+### C2.2. Claim flow requires OTP
+
+The claim accept endpoint changes from a single-step to a two-step flow:
+
+**Step 1: Initiate claim** (`POST /api/public/directory/claim/:token/initiate`)
+- Validates token (not expired, not consumed)
+- If `verification_required` is true:
+  - Sends an OTP to the bound email or phone (6-digit code, 10-minute expiry)
+  - Returns `{ verificationRequired: true, sentTo: maskedEmailOrPhone }`
+- If `verification_required` is false:
+  - Proceeds directly to step 2 (operator-verified, no OTP needed)
+  - Returns `{ verificationRequired: false }`
+
+**Step 2: Accept claim** (`POST /api/public/directory/claim/:token/accept`)
+- If `verification_required` is true:
+  - Requires `otpCode` in the request body
+  - Validates the OTP against the bound email/phone
+  - If OTP is invalid or expired → 403 `invalid_otp`
+  - If OTP is valid → proceeds with the existing claim logic (consume token, flip org_standing_mode, promote customer to user, create OWNER role)
+- If `verification_required` is false:
+  - Proceeds with the existing claim logic (no OTP needed)
+
+**OTP storage**: Use a lightweight `directory_claim_otps` table (or Redis if available):
+
+```sql
+CREATE TABLE IF NOT EXISTS directory_claim_otps (
+  id           VARCHAR(60) PRIMARY KEY,
+  token_id     VARCHAR(60) NOT NULL REFERENCES directory_claim_tokens(id) ON DELETE CASCADE,
+  code_hash    VARCHAR(255) NOT NULL,  -- bcrypt hash of the 6-digit code
+  delivery_method VARCHAR(10) NOT NULL,  -- 'email' or 'sms'
+  delivery_target VARCHAR(255) NOT NULL,  -- the email or phone (masked in responses)
+  expires_at   TIMESTAMPTZ NOT NULL,
+  consumed_at  TIMESTAMPTZ NULL,
+  attempts     INT NOT NULL DEFAULT 0,  -- track failed attempts
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dco_token ON directory_claim_otps (token_id);
+CREATE INDEX IF NOT EXISTS idx_dco_expires ON directory_claim_otps (expires_at);
+```
+
+- Max 3 attempts per OTP; after 3 failures, the OTP is invalidated and a new one must be initiated
+- 10-minute expiry
+- Code is bcrypt-hashed (never stored in plaintext)
+- One active OTP per token at a time (initiating a new one invalidates the previous)
+
+### C2.3. Enrichment tokens get optional binding
+
+Enrichment tokens are lower risk (additive, not identity-binding), but should still be protected when possible.
+
+**Schema change** (integrated into migration 217):
+
+```sql
+ALTER TABLE directory_enrichment_tokens
+  ADD COLUMN IF NOT EXISTS bound_email VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS bound_phone VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS verification_required BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS submission_review_required BOOLEAN NOT NULL DEFAULT TRUE;
+```
+
+- `bound_email` / `bound_phone`: if the operator has the owner's contact info, the enrichment token is bound to it. If not, the token is unbound.
+- `verification_required`: defaults to false for enrichment (lower risk). Set to true if the operator wants OTP for enrichment.
+- `submission_review_required`: defaults to true. If the enrichment token is unbound (no owner contact info), submissions go to a `pending_review` state rather than going live immediately. The operator reviews and approves before the listing updates. If the token is bound and verified, submissions can go live immediately (set `submission_review_required` to false).
+
+**Enrichment submission flow**:
+
+- If `verification_required` is true → same OTP flow as claim (initiate → submit with OTP)
+- If `verification_required` is false but `submission_review_required` is true:
+  - Submission is stored in `evidence_payload` on the intake row
+  - Write-behind adapters do NOT run immediately
+  - Seed `outreach_status` stays at `enrichment_sent` (not `enriched`)
+  - Operator sees a "Pending enrichment review" notification
+  - Operator reviews the submission → approves → write-behind adapters run → listing updates → seed status → `enriched`
+  - Operator rejects → submission discarded → owner notified
+- If both are false (operator-verified, in-person enrichment) → submissions go live immediately
+
+### C2.4. Operator verification is the trust anchor
+
+The identity verification layer depends on the operator capturing the owner's contact info during the Sprint 3 verification step. The trust chain is:
+
+```
+Operator calls the business (Sprint 3 Phase C)
+  → Operator speaks with someone at the business
+    → Operator confirms they're the owner (operator judgment)
+      → Operator captures owner_email or owner_phone
+        → Operator generates claim token (bound to that email/phone)
+          → Claim token requires OTP sent to that email/phone
+            → Only the person who controls that email/phone can claim
+```
+
+If the operator doesn't have contact info (no answer, or owner isn't ready to claim):
+- Claim token is generated without binding (`verification_required: false`, `bound_email: null`)
+- But `submission_review_required` is true for enrichment, and the claim itself requires **operator manual approval** as a fallback
+
+**Operator manual approval claim path** (when no bound email/phone):
+
+```
+Owner finds claim link (via directory page CTA, not operator invite)
+  → Owner initiates claim
+    → System sees: no bound email/phone, verification_required: false
+      → BUT: operator_approval_required: true (new flag, defaults to true when no bound contact)
+        → Claim is held in 'pending_approval' state
+          → Operator gets notification: "Someone is trying to claim [Business Name]"
+            → Operator reviews: does this person seem legitimate?
+              ├─ Approve → claim proceeds (promote to user, OWNER role)
+              └─ Reject → claim denied, token consumed, owner notified
+```
+
+This covers the case where someone finds the claim link on the directory page (not via operator invite) and tries to claim. The operator acts as the trust gatekeeper.
+
+### C2.5. Three claim paths
+
+After this security layer, there are three claim paths with different trust levels:
+
+| Path | How the owner gets the link | Verification | Trust level |
+|---|---|---|---|
+| **Operator-invited (verified)** | Operator calls business, captures email/phone, sends bound claim token | OTP to bound email/phone | High — operator verified the contact info |
+| **Operator-invited (unverified)** | Operator sends claim token without bound contact (no answer on call) | Operator manual approval | Medium — operator reviews the claimant |
+| **Self-discovered** | Owner finds "Claim this listing" CTA on the directory page | Operator manual approval + proof of ownership | Low → Medium — operator reviews + may ask for proof |
+
+**Proof of ownership** (for self-discovered claims): the operator can ask the claimant to verify one of:
+- They receive a call/text at the business's listed phone number
+- They can send an email from the business's website domain
+- They have a business license or utility bill matching the listing address
+- They are listed as the business owner on a public registry (state filing, GBP, etc.)
+
+This is a manual step — the operator reviews the proof and approves or rejects. It's not automated, but it's the safety net for self-discovered claims.
+
+## C3. Schema changes summary
+
+### `directory_claim_tokens` additions (in migration 214)
+
+| Column | Type | Notes |
+|---|---|---|
+| `bound_email` | VARCHAR(255) NULL | Email the OTP is sent to; set during operator verification |
+| `bound_phone` | VARCHAR(40) NULL | Phone the OTP is sent to; set during operator verification |
+| `verification_required` | BOOLEAN DEFAULT TRUE | If true, OTP is required before claim is accepted |
+| `operator_approval_required` | BOOLEAN DEFAULT FALSE | If true (set when no bound contact), claim is held for operator approval |
+
+### `directory_claim_otps` (new table, in migration 214)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | VARCHAR(60) PK | |
+| `token_id` | VARCHAR(60) FK → `directory_claim_tokens` | |
+| `code_hash` | VARCHAR(255) | bcrypt hash of 6-digit code |
+| `delivery_method` | VARCHAR(10) | `email` or `sms` |
+| `delivery_target` | VARCHAR(255) | The email or phone (masked in API responses) |
+| `expires_at` | TIMESTAMPTZ | 10-minute expiry |
+| `consumed_at` | TIMESTAMPTZ NULL | Set when OTP is used |
+| `attempts` | INT DEFAULT 0 | Max 3 before invalidation |
+| `created_at` | TIMESTAMPTZ DEFAULT now() | |
+
+### `directory_enrichment_tokens` additions (in migration 217)
+
+| Column | Type | Notes |
+|---|---|---|
+| `bound_email` | VARCHAR(255) NULL | Optional — if set, OTP may be required |
+| `bound_phone` | VARCHAR(40) NULL | Optional — if set, OTP may be required |
+| `verification_required` | BOOLEAN DEFAULT FALSE | Lower bar for enrichment (additive, not identity-binding) |
+| `submission_review_required` | BOOLEAN DEFAULT TRUE | If true, submissions are held for operator review before going live |
+
+### `directory_presence_seeds` additions (in migration 218, already planned)
+
+The `owner_email` and `owner_phone` columns from Sprint 3 Phase B are the source of the bound email/phone for claim tokens. When the operator generates a claim token via `inviteSeed`, the token is automatically bound to the seed's `owner_email` or `owner_phone` if either is set.
+
+## C4. Modified claim flow
+
+### C4.1. `DirectoryClaimService` changes
+
+```ts
+// New method: initiate claim (sends OTP if verification required)
+async initiateClaim(
+  token: string,
+  ctx?: ClaimAuditCtx
+): Promise<{
+  verificationRequired: boolean;
+  sentTo?: string;  // masked email/phone
+  operatorApprovalRequired?: boolean;
+}> {
+  // 1. Load token + seed
+  // 2. Check not expired, not consumed
+  // 3. If verification_required && (bound_email || bound_phone):
+  //    - Generate 6-digit OTP, bcrypt hash, store in directory_claim_otps
+  //    - Send OTP via email or SMS
+  //    - Return { verificationRequired: true, sentTo: mask(bound_email || bound_phone) }
+  // 4. If !verification_required && operator_approval_required:
+  //    - Return { verificationRequired: false, operatorApprovalRequired: true }
+  // 5. If !verification_required && !operator_approval_required:
+  //    - Return { verificationRequired: false }
+}
+
+// Modified method: accept claim (now requires OTP if verification was required)
+async acceptClaim(
+  token: string,
+  userId: string,
+  otpCode?: string,  // NEW parameter
+  ctx?: ClaimAuditCtx
+): Promise<ClaimResult> {
+  // 1. Load token + seed (existing checks: not expired, not consumed, not claimed)
+  // 2. If verification_required:
+  //    - Require otpCode in request
+  //    - Load active OTP for this token (not consumed, not expired, attempts < 3)
+  //    - bcrypt.compare(otpCode, otp.code_hash)
+  //    - If match: consume OTP, proceed
+  //    - If no match: increment attempts, return { success: false, message: 'invalid_otp' }
+  //    - If attempts >= 3: invalidate OTP, return { success: false, message: 'otp_max_attempts' }
+  // 3. If operator_approval_required:
+  //    - Create a 'pending_approval' claim record (new status on seed or separate table)
+  //    - Notify operator
+  //    - Return { success: false, message: 'pending_operator_approval' } (not an error — it's a pending state)
+  //    - Operator approves separately via admin endpoint
+  // 4. If neither: proceed with existing claim logic (consume token, flip mode, promote, OWNER role)
+}
+```
+
+### C4.2. Route changes
+
+```ts
+// NEW: POST /api/public/directory/claim/:token/initiate
+router.post('/claim/:token/initiate', async (req, res) => {
+  const { token } = req.params;
+  const result = await DirectoryClaimService.initiateClaim(token, { ... });
+  res.json({ success: true, ...result });
+});
+
+// MODIFIED: POST /api/public/directory/claim/:token/accept
+router.post('/claim/:token/accept', async (req, res) => {
+  const { token } = req.params;
+  const { otpCode } = req.body;  // NEW
+  const userId = (req as any).user?.id || (req as any).customer?.id;
+  if (!userId) return res.status(401).json({ error: 'authentication_required' });
+  const result = await DirectoryClaimService.acceptClaim(token, userId, otpCode, { ... });
+  // ... existing status mapping + new: 'invalid_otp' → 403, 'otp_max_attempts' → 429,
+  //     'pending_operator_approval' → 202 (accepted but pending)
+});
+
+// NEW: POST /api/admin/directory/claims/:claimId/approve (admin)
+router.post('/claims/:claimId/approve', requirePlatformAdmin, async (req, res) => {
+  // Operator reviews pending claim → approves → claim proceeds (promote + OWNER)
+});
+
+// NEW: POST /api/admin/directory/claims/:claimId/reject (admin)
+router.post('/claims/:claimId/reject', requirePlatformAdmin, async (req, res) => {
+  // Operator rejects → claim denied, token consumed, owner notified
+});
+```
+
+### C4.3. Frontend changes
+
+`DirectoryClaimClient.tsx` gets a new state machine:
+
+```
+loading → valid → initiating (sending OTP) → otp_sent (enter code) → accepting → success
+                                                              ↓
+                                                         invalid_otp (retry, max 3)
+                                                              ↓
+                                                         otp_max_attempts (re-initiate)
+
+valid → accepting (no OTP needed) → success
+                            ↓
+                      pending_approval (waiting for operator)
+```
+
+New UI states:
+- **OTP entry**: 6-digit code input + "Verify" button + "Resend code" link
+- **Pending approval**: "Your claim request has been submitted. Our team will review it and contact you within 1-2 business days."
+- **Invalid OTP**: "Incorrect code. You have X attempts remaining."
+- **Max attempts**: "Too many attempts. Please request a new code."
+
+## C5. Modified enrichment flow
+
+### C5.1. Enrichment submission with review
+
+When `submission_review_required` is true (default for unbound tokens):
+
+```ts
+// POST /api/public/directory/enrich/:token/submit
+async submitEnrichment(token: string, data: any, ctx?: RequestCtx) {
+  // 1. Validate token
+  // 2. If verification_required: validate OTP (same as claim)
+  // 3. Validate data against intake definition Zod schema
+  // 4. Store evidence_payload on the intake row (always — system of record)
+  // 5. If submission_review_required:
+  //    - Do NOT run write-behind adapters
+  //    - Set seed outreach_status to 'enrichment_pending_review' (new status)
+  //    - Notify operator: "Enrichment submission pending review for [Business Name]"
+  //    - Return { success: true, status: 'pending_review' }
+  // 6. If !submission_review_required:
+  //    - Run write-behind adapters immediately
+  //    - Set seed outreach_status to 'enriched'
+  //    - Return { success: true, status: 'enriched' }
+}
+```
+
+### C5.2. Operator review of enrichment submissions
+
+New admin endpoint + UI:
+
+```ts
+// GET /api/admin/directory/enrichment-reviews — list pending submissions
+// POST /api/admin/directory/enrichment-reviews/:id/approve — run write-behind adapters, update listing
+// POST /api/admin/directory/enrichment-reviews/:id/reject — discard submission, notify owner
+```
+
+Admin UI: a "Pending Enrichment Reviews" panel on the seeds page showing submitted data with approve/reject buttons.
+
+## C6. Trust levels summary
+
+| Token type | Bound? | OTP? | Review? | Trust level | Can go live immediately? |
+|---|---|---|---|---|---|
+| Claim (operator-verified) | Yes (email/phone) | Yes | No | High | Yes (after OTP) |
+| Claim (operator-invited, unverified) | No | No | Yes (operator approval) | Medium | No (operator approves) |
+| Claim (self-discovered) | No | No | Yes (operator approval + proof) | Low | No (operator approves) |
+| Enrichment (bound + verified) | Yes | Yes | No | High | Yes (after OTP) |
+| Enrichment (unbound) | No | No | Yes (operator review) | Medium | No (operator reviews) |
+| Enrichment (operator-verified, in-person) | No | No | No (operator override) | High | Yes (operator trusts) |
+
+## C7. Implementation integration
+
+This security layer is integrated into Sprint 2 and Sprint 3, not implemented separately:
+
+| Change | Sprint | Phase | Migration |
+|---|---|---|---|
+| `directory_claim_tokens` bound columns + `directory_claim_otps` table | Sprint 2 | Phase A (214) | 214 |
+| `DirectoryClaimService.initiateClaim` + modified `acceptClaim` | Sprint 2 | Phase A | — |
+| Claim route changes (initiate endpoint, OTP in accept) | Sprint 2 | Phase A | — |
+| Frontend OTP entry + pending approval states | Sprint 2 | Phase B | — |
+| Operator claim approval admin endpoint + UI | Sprint 2 | Phase D | — |
+| `directory_enrichment_tokens` bound + review columns | Sprint 3 | Phase A (217) | 217 |
+| Enrichment submission review flow | Sprint 3 | Phase B | — |
+| Operator enrichment review admin endpoint + UI | Sprint 3 | Phase C | — |
+| `directory_presence_seeds.outreach_status` gains `enrichment_pending_review` | Sprint 3 | Phase B (218) | 218 |
+
+## C8. Risks
+
+| Risk | Mitigation |
+|---|---|
+| OTP delivery fails (email bounces, SMS undeliverable) | Fallback to operator manual approval; operator can re-verify contact info and re-generate token |
+| Operator is the bottleneck for manual approvals | Notifications + simple approve/reject UI; SLA target 1-2 business days; auto-approve after 7 days if no response (configurable) |
+| Bound email is wrong (operator mistyped) | Operator can re-generate token with corrected email; old token is invalidated |
+| Attacker intercepts OTP (email compromise) | Out of scope for this layer — email security is the owner's responsibility; the OTP raises the bar significantly vs. bare URL token |
+| Self-discovered claims overwhelm operator with approvals | Rate-limit claim initiations by IP; require proof of ownership for self-discovered claims; operator can disable self-discovered claims per seed |
+| Enrichment review backlog grows | Auto-approve low-risk fields (hours, phone) after 3 days; only hold photos and SNAP confirmation for manual review |
+
+## C9. Acceptance
+
+- [ ] Claim token generated with bound email/phone requires OTP before accepting
+- [ ] Claim token generated without bound contact requires operator manual approval
+- [ ] OTP is 6-digit, 10-minute expiry, max 3 attempts, bcrypt-hashed in storage
+- [ ] OTP delivery target is masked in API responses (e.g., `j***@gmail.com`, `***-***-1234`)
+- [ ] Operator can approve/reject pending claims from admin UI
+- [ ] Operator can approve/reject pending enrichment submissions from admin UI
+- [ ] Enrichment submissions from unbound tokens go to `pending_review` state, not live
+- [ ] Enrichment submissions from bound + verified tokens can go live immediately
+- [ ] Self-discovered claims (from directory page CTA) require operator approval + proof of ownership
+- [ ] `pnpm checkapi` and `pnpm checkweb` clean
+
+## C10. The trust chain (end state)
+
+```
+Operator calls business (Sprint 3 verification)
+  → Confirms owner identity (operator judgment — the trust anchor)
+    → Captures owner email/phone
+      → Generates claim token bound to that email/phone
+        → Owner receives token link via email/SMS
+          → Owner initiates claim → OTP sent to same email/phone
+            → Only the person who controls that inbox/phone can enter the OTP
+              → Claim accepted → OWNER role → dashboard → upgrade
+
+If no contact info captured:
+  → Claim token is unbound
+    → Claim is held for operator manual approval
+      → Operator reviews claimant (proof of ownership if self-discovered)
+        → Approve → claim proceeds
+        → Reject → claim denied
+```
+
+The operator's verification call is the trust anchor. The OTP proves the claimant controls the contact info the operator verified. The operator approval is the fallback when no contact info is available. No one can claim a business they don't own without either controlling the owner's email/phone or fooling the operator during manual review.
