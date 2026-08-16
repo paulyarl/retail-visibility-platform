@@ -229,10 +229,11 @@ class DirectoryPresenceSeedService {
     // Create the tenant (unclaimed directory seed)
     await prisma.$executeRaw`
       INSERT INTO tenants (
-        id, subscription_tier, subscription_status, org_standing_mode,
+        id, name, subscription_tier, subscription_status, org_standing_mode,
         directory_visible, service_level, location_status, created_at, updated_at
       ) VALUES (
         ${tenantId},
+        ${input.businessName},
         'directory_presence',
         'trial',
         'directory_seed',
