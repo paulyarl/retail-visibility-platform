@@ -181,7 +181,7 @@ import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
-import OutreachIntelligenceService from '../services/OutreachIntelligenceService';
+import OutreachIntelligenceService, { UpsertInput } from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
 import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
@@ -1663,7 +1663,7 @@ router.put('/:campaignId/outreach-intelligence', async (req: any, res: Response)
     const parsed = outreachIntelligenceSchema.parse(req.body);
     const result = await OutreachIntelligenceService.upsert(
       req.params.campaignId,
-      { payload: { ...parsed, linked_audit_reference: parsed.linked_audit_reference ?? null } },
+      { payload: { ...parsed, linked_audit_reference: parsed.linked_audit_reference ?? null } as UpsertInput['payload'] },
       getCtx(req),
     );
     res.json({ success: true, data: result });
@@ -3411,7 +3411,7 @@ router.post('/signals', async (req: any, res: Response) => {
       label: parsed.label,
       description: parsed.description,
       detectionSource: parsed.detection_source,
-      derivedRule: parsed.derived_rule,
+      derivedRule: parsed.derived_rule as { field: string; op: string; threshold: number | boolean } | null | undefined,
       isActive: parsed.is_active,
     }, getCtx(req));
     res.status(201).json({ success: true, data: signal });
@@ -3431,7 +3431,7 @@ router.put('/signals/:id', async (req: any, res: Response) => {
       label: parsed.label,
       description: parsed.description,
       detectionSource: parsed.detection_source,
-      derivedRule: parsed.derived_rule,
+      derivedRule: parsed.derived_rule as { field: string; op: string; threshold: number | boolean } | null | undefined,
       isActive: parsed.is_active,
     }, getCtx(req));
     res.json({ success: true, data: signal });

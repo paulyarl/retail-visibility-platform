@@ -12,7 +12,7 @@ import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError } from '../middleware/errorHandler';
+import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId } from '../lib/id-generator';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
@@ -1014,8 +1014,22 @@ export class MarketingCampaignService extends BaseService {
       }
 
       const fromStage = campaign.stage as string;
+      const scope = (campaign.scope as CampaignScope) ?? 'business';
       const category = (campaign.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT;
       const repairTrack = (campaign.repair_track as RepairTrack | null) ?? null;
+
+      // Scope guard: only business-scope campaigns move through the sales
+      // pipeline (seek → preview_built → shown → paid → … or the recovery
+      // pipeline). Category/city/intelligence-scope campaigns are aggregate
+      // scans that discover businesses and spawn business-scope children —
+      // they must not advance through pipeline stages. Tenant onboarding
+      // (linkTenant) is a separate flow and is not blocked here.
+      if (scope !== 'business') {
+        throw new ValidationError(
+          `Stage transitions are only allowed for business-scope campaigns. This campaign has scope "${scope}". Use the Non-Business Campaigns table to manage aggregate-scope campaigns.`,
+        );
+      }
+
       if (!this.isValidTransition(fromStage, toStage, category, repairTrack)) {
         throw new Error(`Invalid stage transition: ${fromStage} → ${toStage}`);
       }

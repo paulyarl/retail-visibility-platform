@@ -5,7 +5,7 @@ export default function IntelligenceProfilesPage() {
   return (
     <MarketingOpsPageShell
       title="Intelligence Profiles"
-      subtitle="Manage category intelligence profiles — review drafts, activate, and retire profiles"
+      subtitle="Manage category intelligence profiles and non-business campaigns (category, city, intelligence scope)"
       breadcrumbs={[
         { label: 'Settings', href: '/settings' },
         { label: 'Admin' },

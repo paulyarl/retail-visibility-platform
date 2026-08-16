@@ -245,6 +245,15 @@ export default function CampaignDetailClient({
   };
 
   const handleTransition = async (toStage: CampaignStage) => {
+    // Scope guard: only business-scope campaigns may advance through pipeline
+    // stages. Category/city/intelligence-scope campaigns are aggregate scans
+    // and must not move through the sales pipeline. The backend enforces the
+    // same guard (returns 400 validation_error); this client-side check
+    // prevents the round-trip and surfaces an immediate message.
+    if (campaign?.scope && campaign.scope !== 'business') {
+      setError(`Stage transitions are only allowed for business-scope campaigns. This campaign has scope "${campaign.scope}". Manage it from the Non-Business Campaigns table on the Intelligence Profiles page.`);
+      return;
+    }
     // Soft stage-gate: seek → preview_built with incomplete contact data
     // prompts the operator to enrich or proceed. Cancel aborts the transition.
     if (campaign?.stage === 'seek' && toStage === 'preview_built') {
@@ -648,49 +657,71 @@ export default function CampaignDetailClient({
               </div>
             )}
 
-            {/* Stage Pipeline */}
+            {/* Stage Pipeline — business-scope campaigns only.
+                Non-business scopes (category/city/intelligence) are aggregate
+                scans that don't move through the sales pipeline. Show an
+                informational banner instead of the pipeline buttons. */}
             <div ref={pipelineRef} className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 mb-6 scroll-mt-4">
-              <div className="flex items-center gap-1 overflow-x-auto">
-                {PIPELINE_STAGES.map((stage, idx) => {
-                  const currentIdx = PIPELINE_STAGES.indexOf(campaign.stage);
-                  const isPast = idx < currentIdx;
-                  const isCurrent = idx === currentIdx;
-                  // Warning dot on preview_built when contact readiness is incomplete.
-                  const showReadinessDot = stage === 'preview_built'
-                    && campaign.stage === 'seek'
-                    && contactReadiness != null
-                    && !contactReadiness.complete;
-                  // Focus-stage highlight (from ?focus=preview_built deep-link).
-                  // Adds a pulsing ring so the operator sees which button to click.
-                  const isFocused = focusedStage === stage;
-                  return (
-                    <div key={stage} className="flex items-center flex-shrink-0">
-                      <button
-                        onClick={() => handleTransition(stage)}
-                        disabled={transitioning || isCurrent || readinessChecking}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors relative ${
-                          isCurrent
-                            ? 'bg-blue-600 text-white'
-                            : isPast
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 cursor-pointer hover:bg-blue-200'
-                            : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-neutral-600'
-                        } ${isFocused ? 'ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-neutral-800 animate-pulse' : ''}`}
-                      >
-                        {STAGE_LABELS[stage]}
-                        {showReadinessDot && (
-                          <span
-                            title="Contact data incomplete — stage-gate will prompt"
-                            className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-1 ring-white dark:ring-neutral-800"
-                          />
+              {campaign.scope === 'business' ? (
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {PIPELINE_STAGES.map((stage, idx) => {
+                    const currentIdx = PIPELINE_STAGES.indexOf(campaign.stage);
+                    const isPast = idx < currentIdx;
+                    const isCurrent = idx === currentIdx;
+                    // Warning dot on preview_built when contact readiness is incomplete.
+                    const showReadinessDot = stage === 'preview_built'
+                      && campaign.stage === 'seek'
+                      && contactReadiness != null
+                      && !contactReadiness.complete;
+                    // Focus-stage highlight (from ?focus=preview_built deep-link).
+                    // Adds a pulsing ring so the operator sees which button to click.
+                    const isFocused = focusedStage === stage;
+                    return (
+                      <div key={stage} className="flex items-center flex-shrink-0">
+                        <button
+                          onClick={() => handleTransition(stage)}
+                          disabled={transitioning || isCurrent || readinessChecking}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors relative ${
+                            isCurrent
+                              ? 'bg-blue-600 text-white'
+                              : isPast
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 cursor-pointer hover:bg-blue-200'
+                              : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-neutral-600'
+                          } ${isFocused ? 'ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-neutral-800 animate-pulse' : ''}`}
+                        >
+                          {STAGE_LABELS[stage]}
+                          {showReadinessDot && (
+                            <span
+                              title="Contact data incomplete — stage-gate will prompt"
+                              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-1 ring-white dark:ring-neutral-800"
+                            />
+                          )}
+                        </button>
+                        {idx < PIPELINE_STAGES.length - 1 && (
+                          <ChevronRight className="w-4 h-4 text-gray-300 dark:text-neutral-600 mx-0.5" />
                         )}
-                      </button>
-                      {idx < PIPELINE_STAGES.length - 1 && (
-                        <ChevronRight className="w-4 h-4 text-gray-300 dark:text-neutral-600 mx-0.5" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300 uppercase">
+                    {campaign.scope} scope
+                  </span>
+                  <span>
+                    Aggregate-scope campaigns don&apos;t move through the sales pipeline.
+                    Manage this campaign from the{' '}
+                    <Link
+                      href="/settings/admin/marketing-ops/intelligence-profiles"
+                      className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                    >
+                      Non-Business Campaigns
+                    </Link>{' '}
+                    table.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Intelligent Triage Card — above the tabs, only for seek-stage

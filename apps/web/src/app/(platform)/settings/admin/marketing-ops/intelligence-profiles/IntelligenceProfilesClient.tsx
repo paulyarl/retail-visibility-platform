@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Paper,
   Text,
@@ -15,6 +15,11 @@ import {
   Loader,
   Modal,
   Textarea,
+  Table,
+  Select,
+  TextInput,
+  ActionIcon,
+  Menu,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -27,10 +32,14 @@ import {
   IconTarget,
   IconMessage,
   IconListCheck,
+  IconTrash,
+  IconEdit,
+  IconSearch,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
-import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus } from '@/services/MarketingOpsService';
+import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus, Campaign, CampaignScope } from '@/services/MarketingOpsService';
+import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 
 const STATUS_COLORS: Record<ProfileStatus, string> = {
   draft: 'orange',
@@ -65,6 +74,17 @@ export default function IntelligenceProfilesClient() {
   const [publishId, setPublishId] = useState<string | null>(null);
   const [publishConfig, setPublishConfig] = useState('');
 
+  // Non-business campaigns (category/city/intelligence scope) — managed here
+  // instead of the sales-pipeline Kanban, since they don't move through stages.
+  const [nonBusinessCampaigns, setNonBusinessCampaigns] = useState<Campaign[]>([]);
+  const [nbLoading, setNbLoading] = useState(false);
+  const [nbError, setNbError] = useState<string | null>(null);
+  const [nbScopeFilter, setNbScopeFilter] = useState<CampaignScope | ''>('');
+  const [nbCategoryFilter, setNbCategoryFilter] = useState('');
+  const [nbCityFilter, setNbCityFilter] = useState('');
+  const [nbSearch, setNbSearch] = useState('');
+  const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
+
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -85,6 +105,79 @@ export default function IntelligenceProfilesClient() {
   useEffect(() => {
     fetchProfiles();
   }, [fetchProfiles]);
+
+  const fetchNonBusinessCampaigns = useCallback(async () => {
+    setNbLoading(true);
+    setNbError(null);
+    try {
+      // Fetch campaigns for each non-business scope and merge. The backend
+      // listCampaigns endpoint filters by a single scope at a time, so we
+      // issue three parallel requests and concat the results.
+      const scopes: CampaignScope[] = ['category', 'city', 'intelligence'];
+      const results = await Promise.all(
+        scopes.map((scope) =>
+          marketingOpsService.listCampaigns({ scope, limit: 200 }),
+        ),
+      );
+      setNonBusinessCampaigns(results.flatMap((r) => r.items));
+    } catch (err) {
+      setNbError((err as Error).message || 'Failed to load non-business campaigns');
+    } finally {
+      setNbLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNonBusinessCampaigns();
+  }, [fetchNonBusinessCampaigns]);
+
+  const handleDeleteCampaign = async (id: string, label: string) => {
+    setDeletingCampaignId(id);
+    try {
+      await marketingOpsService.deleteCampaign(id);
+      notifications.show({
+        title: 'Campaign Deleted',
+        message: `"${label}" has been deleted.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      await fetchNonBusinessCampaigns();
+    } catch (err) {
+      notifications.show({
+        title: 'Delete Failed',
+        message: (err as Error).message,
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setDeletingCampaignId(null);
+    }
+  };
+
+  // Filtered + sorted non-business campaigns for the table.
+  const filteredNonBusinessCampaigns = useMemo(() => {
+    return nonBusinessCampaigns.filter((c) => {
+      if (nbScopeFilter && c.scope !== nbScopeFilter) return false;
+      if (nbCategoryFilter && c.category !== nbCategoryFilter) return false;
+      if (nbCityFilter && c.city !== nbCityFilter) return false;
+      if (nbSearch) {
+        const q = nbSearch.toLowerCase();
+        const haystack = [c.title, c.business_name, c.category, c.city, c.display_id]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [nonBusinessCampaigns, nbScopeFilter, nbCategoryFilter, nbCityFilter, nbSearch]);
+
+  const nbCategoryOptions = useMemo(
+    () => [...new Set(nonBusinessCampaigns.map((c) => c.category).filter(Boolean))].sort(),
+    [nonBusinessCampaigns],
+  );
+  const nbCityOptions = useMemo(
+    () => [...new Set(nonBusinessCampaigns.map((c) => c.city).filter(Boolean))].sort(),
+    [nonBusinessCampaigns],
+  );
 
   const handleActivate = async (id: string, version: number) => {
     setActivating(`${id}:${version}`);
@@ -274,6 +367,179 @@ export default function IntelligenceProfilesClient() {
               </Paper>
             ) : (
               activeProfiles.map((p) => renderProfileCard(p, false))
+            )}
+          </div>
+
+          <Divider />
+
+          {/* Non-Business Campaigns — aggregate-scope campaigns (category,
+              city, intelligence) that don't move through the sales pipeline.
+              Managed here with edit/delete since they're excluded from the
+              campaigns Kanban (which is business-scope only). */}
+          <div>
+            <Group justify="space-between" mb="xs">
+              <Group gap="xs">
+                <IconListCheck size={18} />
+                <Text size="sm" fw={600}>Non-Business Campaigns</Text>
+                <Badge size="sm" variant="light" color="gray">{filteredNonBusinessCampaigns.length}</Badge>
+              </Group>
+              <Button
+                variant="subtle"
+                size="xs"
+                leftSection={<IconRefresh size={14} />}
+                onClick={fetchNonBusinessCampaigns}
+                loading={nbLoading}
+              >
+                Refresh
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed" mb="sm">
+              Aggregate-scope campaigns (category, city, intelligence) don&apos;t move through the
+              sales pipeline. Use this table to edit or delete them. Business-scope campaigns
+              are tracked on the{' '}
+              <Link href="/settings/admin/marketing-ops/campaigns" style={{ color: 'var(--mantine-color-blue-6)' }}>
+                Campaigns Kanban
+              </Link>.
+            </Text>
+
+            {nbError && (
+              <Alert color="red" icon={<IconAlertCircle size={16} />} mb="sm">
+                {nbError}
+              </Alert>
+            )}
+
+            {/* Filters */}
+            <Group gap="xs" mb="sm" grow>
+              <TextInput
+                placeholder="Search title, category, city…"
+                value={nbSearch}
+                onChange={(e) => setNbSearch(e.target.value)}
+                leftSection={<IconSearch size={14} />}
+                size="xs"
+              />
+              <Select
+                placeholder="All scopes"
+                value={nbScopeFilter || ''}
+                onChange={(v) => setNbScopeFilter((v as CampaignScope | '') || '')}
+                data={[
+                  { value: 'category', label: 'Category' },
+                  { value: 'city', label: 'City' },
+                  { value: 'intelligence', label: 'Intelligence' },
+                ]}
+                clearable
+                size="xs"
+              />
+              <Select
+                placeholder="All categories"
+                value={nbCategoryFilter || ''}
+                onChange={(v) => setNbCategoryFilter(v || '')}
+                data={nbCategoryOptions.map((c) => ({ value: c, label: c }))}
+                clearable
+                searchable
+                size="xs"
+              />
+              <Select
+                placeholder="All cities"
+                value={nbCityFilter || ''}
+                onChange={(v) => setNbCityFilter(v || '')}
+                data={nbCityOptions.map((c) => ({ value: c, label: c }))}
+                clearable
+                searchable
+                size="xs"
+              />
+            </Group>
+
+            {nbLoading ? (
+              <Group justify="center" py={20}>
+                <Loader size="sm" />
+              </Group>
+            ) : filteredNonBusinessCampaigns.length === 0 ? (
+              <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
+                <Text size="xs" c="dimmed">
+                  {nonBusinessCampaigns.length === 0
+                    ? 'No non-business campaigns found.'
+                    : 'No campaigns match the current filters.'}
+                </Text>
+              </Paper>
+            ) : (
+              <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+                <Table striped highlightOnHover horizontalSpacing="sm" verticalSpacing="xs" fontSize="xs">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Title</Table.Th>
+                      <Table.Th>Scope</Table.Th>
+                      <Table.Th>Category</Table.Th>
+                      <Table.Th>City</Table.Th>
+                      <Table.Th>Stage</Table.Th>
+                      <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {filteredNonBusinessCampaigns.map((c) => {
+                      const label = c.title || c.business_name || c.category || c.city || c.id;
+                      return (
+                        <Table.Tr key={c.id}>
+                          <Table.Td>
+                            <Group gap="xs" wrap="nowrap">
+                              <Text size="xs" fw={500} lineClamp={1}>{label}</Text>
+                              {c.display_id && (
+                                <Text size="10px" c="dimmed" ff="monospace">{c.display_id}</Text>
+                              )}
+                            </Group>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge size="xs" variant="light" color="gray">{c.scope}</Badge>
+                          </Table.Td>
+                          <Table.Td>{c.category || '—'}</Table.Td>
+                          <Table.Td>{c.city || '—'}{c.neighborhood ? ` (${c.neighborhood})` : ''}</Table.Td>
+                          <Table.Td>
+                            <Badge size="xs" variant="light" color="blue">
+                              {STAGE_LABELS[c.stage] ?? c.stage}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>
+                            <Group gap="xs" justify="flex-end" wrap="nowrap">
+                              <ActionIcon
+                                component={Link}
+                                href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                                variant="light"
+                                color="blue"
+                                size="sm"
+                                title="Edit campaign"
+                              >
+                                <IconEdit size={14} />
+                              </ActionIcon>
+                              <Menu position="bottom-end" withinPortal>
+                                <Menu.Target>
+                                  <ActionIcon
+                                    variant="light"
+                                    color="red"
+                                    size="sm"
+                                    title="Delete campaign"
+                                    loading={deletingCampaignId === c.id}
+                                  >
+                                    <IconTrash size={14} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  <Menu.Label>Confirm deletion</Menu.Label>
+                                  <Menu.Item
+                                    color="red"
+                                    leftSection={<IconTrash size={14} />}
+                                    onClick={() => handleDeleteCampaign(c.id, label)}
+                                  >
+                                    Delete &ldquo;{label}&rdquo;
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </Paper>
             )}
           </div>
 

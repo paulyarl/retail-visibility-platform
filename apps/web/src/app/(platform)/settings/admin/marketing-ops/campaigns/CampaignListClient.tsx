@@ -5,15 +5,23 @@ import { RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon, Flame } from '
 import Link from 'next/link';
 import marketingOpsService, { Campaign, CampaignStage, CampaignScope } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import { pipelineForCampaign } from '@/components/marketing-ops/prospectQueueStageMaps';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+/** Recovery pipeline column order (excludes dead — shown behind "Show closed"). */
+const RECOVERY_PIPELINE_STAGES: string[] = [
+  'audit_identified', 'framework_preview_generated', 'outreach_dispatched',
+  'awaiting_owner_intake', 'intake_submitted', 'final_resolution_drafted',
+  'owner_approved', 'resolved_and_closed', 'dead',
+];
 /** Terminal stages collapsed behind "Show closed" by default. Mirrors the
  *  queue board's CLOSED_STAGES behavior, scoped to the review pipeline stages
  *  that appear on the campaigns page. */
 const CLOSED_STAGES: CampaignStage[] = ['lost', 'dead'];
+const RECOVERY_CLOSED_STAGES: string[] = ['dead', 'resolved_and_closed'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
@@ -48,10 +56,13 @@ export default function CampaignListClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'kanban'>('table');
+  const [kanbanPipeline, setKanbanPipeline] = useState<'review' | 'recovery'>('review');
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<CampaignStage | ''>('');
   const [scopeFilter, setScopeFilter] = useState<CampaignScope | ''>('');
   const [toneFilter, setToneFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
   const [retainerFilter, setRetainerFilter] = useState<'Fast' | 'Medium' | 'Slow' | ''>('');
   const [attributeFilter, setAttributeFilter] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('');
@@ -74,6 +85,8 @@ export default function CampaignListClient() {
         stage: stageFilter || undefined,
         scope: scopeFilter || undefined,
         tone: toneFilter || undefined,
+        category: categoryFilter || undefined,
+        city: cityFilter || undefined,
         retainer: retainerFilter || undefined,
         attributes: attributeFilter ? [attributeFilter] : undefined,
         limit: 200,
@@ -84,7 +97,7 @@ export default function CampaignListClient() {
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, scopeFilter, toneFilter, retainerFilter, attributeFilter]);
+  }, [search, stageFilter, scopeFilter, toneFilter, categoryFilter, cityFilter, retainerFilter, attributeFilter]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -96,6 +109,14 @@ export default function CampaignListClient() {
     () => [...new Set([...presetTones, ...distinctValues(campaigns, (c) => c.tone)])].sort((a, b) => a.localeCompare(b)),
     [presetTones, campaigns],
   );
+  const categoryOptions = useMemo(
+    () => distinctValues(campaigns, (c) => c.category),
+    [campaigns],
+  );
+  const cityOptions = useMemo(
+    () => distinctValues(campaigns, (c) => c.city),
+    [campaigns],
+  );
 
   const campaignsByStage = (stage: CampaignStage) => campaigns.filter((c) => c.stage === stage);
   const filteredCampaigns = useMemo(
@@ -103,6 +124,28 @@ export default function CampaignListClient() {
       .filter((c) => showClosed || !CLOSED_STAGES.includes(c.stage)),
     [campaigns, followUpFilter, showClosed],
   );
+
+  // Kanban view: business-scope campaigns only, split by the selected pipeline
+  // (review vs recovery). Non-business scopes (category/city/intelligence) are
+  // aggregate scans that don't move through the sales pipeline — they're
+  // managed from the Non-Business Campaigns table on the Intelligence Profiles
+  // page. Recovery campaigns use a separate set of stages (audit_identified,
+  // outreach_dispatched, …) so the Kanban columns switch with the pipeline
+  // toggle.
+  const kanbanCampaigns = useMemo(
+    () => campaigns.filter((c) => {
+      if (c.scope !== 'business') return false;
+      if (!matchesFollowUpFilter(c, followUpFilter)) return false;
+      const pipeline = pipelineForCampaign(c.campaign_category, c.repair_track);
+      if (pipeline !== kanbanPipeline) return false;
+      const closedStages = kanbanPipeline === 'recovery' ? RECOVERY_CLOSED_STAGES : CLOSED_STAGES;
+      if (!showClosed && closedStages.includes(c.stage)) return false;
+      return true;
+    }),
+    [campaigns, followUpFilter, showClosed, kanbanPipeline],
+  );
+  const kanbanColumns = kanbanPipeline === 'recovery' ? RECOVERY_PIPELINE_STAGES : PIPELINE_STAGES;
+  const kanbanClosedStages = kanbanPipeline === 'recovery' ? RECOVERY_CLOSED_STAGES : CLOSED_STAGES;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
@@ -171,6 +214,24 @@ export default function CampaignListClient() {
             emptyLabel="All Tones"
             newLabel="+ Tone..."
             newInputPlaceholder="Filter by tone"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <SuggestiveSelect
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            options={categoryOptions}
+            emptyLabel="All Categories"
+            newLabel="+ Category..."
+            newInputPlaceholder="Filter by category"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <SuggestiveSelect
+            value={cityFilter}
+            onChange={setCityFilter}
+            options={cityOptions}
+            emptyLabel="All Cities"
+            newLabel="+ City..."
+            newInputPlaceholder="Filter by city"
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
@@ -334,66 +395,98 @@ export default function CampaignListClient() {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto pb-4">
-            <div className="flex gap-4 min-w-max">
-              {PIPELINE_STAGES.filter((stage) => showClosed || !CLOSED_STAGES.includes(stage)).map((stage) => {
-                const items = filteredCampaigns.filter((c) => c.stage === stage);
-                return (
-                  <div key={stage} className="w-72 flex-shrink-0">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{STAGE_LABELS[stage]}</h3>
-                      <span className="text-xs font-medium text-gray-400">{items.length}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {items.length === 0 ? (
-                        <div className="rounded-lg border-2 border-dashed border-gray-200 dark:border-neutral-700 p-4 text-center text-xs text-gray-400">
-                          Empty
-                        </div>
-                      ) : (
-                        items.map((c) => {
-                          const fuBadge = followUpBadge(c);
-                          return (
-                          <Link
-                            key={c.id}
-                            href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
-                            className="block bg-white dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-neutral-700 p-3 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                                {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 flex-shrink-0 text-orange-500" />}
-                                {c.title || c.business_name || c.category || c.city}
-                                {c.archetype && (
-                                  <ArchetypeBadge archetype={c.archetype} className="ml-1 align-middle" />
-                                )}
-                              </p>
-                              {fuBadge && <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${fuBadge.cls}`}>{fuBadge.label}</span>}
-                            </div>
-                            {c.title && (c.business_name || c.category || c.city) && (
-                              <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
-                                {c.business_name || c.category || c.city}
-                              </p>
-                            )}
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1"><span className="uppercase text-[10px] tracking-wider text-gray-400">{c.scope}</span> · {c.category} · {c.city}</p>
-                            {(c.tone || c.retainer || c.attributes?.length) && (
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                {c.tone}{c.tone && c.retainer ? ' · ' : ''}{c.retainer}
-                                {c.attributes?.length ? ` · ${c.attributes.join(', ')}` : ''}
-                              </p>
-                            )}
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-gray-400">{staffDisplayName(staffUsers, c.assigned_to) ?? 'Unassigned'}</span>
-                              {c.estimated_fee_cents != null && (
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</span>
+          <div>
+            {/* Pipeline toggle — Review vs Recovery. The Kanban shows
+                business-scope campaigns only; the pipeline toggle switches
+                between the review (seek → paid → delivered) and recovery
+                (audit_identified → resolved_and_closed) column sets. */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
+                <button
+                  onClick={() => setKanbanPipeline('review')}
+                  className={`px-3 py-1.5 text-xs font-medium ${kanbanPipeline === 'review' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 dark:bg-neutral-800 dark:text-gray-200'}`}
+                >
+                  Review Pipeline
+                </button>
+                <button
+                  onClick={() => setKanbanPipeline('recovery')}
+                  className={`px-3 py-1.5 text-xs font-medium ${kanbanPipeline === 'recovery' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 dark:bg-neutral-800 dark:text-gray-200'}`}
+                >
+                  Recovery Pipeline
+                </button>
+              </div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Business-scope only · {kanbanCampaigns.length} campaign{kanbanCampaigns.length !== 1 ? 's' : ''}
+                {' · '}
+                <Link
+                  href="/settings/admin/marketing-ops/intelligence-profiles"
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Non-business campaigns →
+                </Link>
+              </span>
+            </div>
+            <div className="overflow-x-auto pb-4">
+              <div className="flex gap-4 min-w-max">
+                {kanbanColumns.filter((stage) => showClosed || !kanbanClosedStages.includes(stage)).map((stage) => {
+                  const items = kanbanCampaigns.filter((c) => c.stage === stage);
+                  return (
+                    <div key={stage} className="w-72 flex-shrink-0">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{STAGE_LABELS[stage]}</h3>
+                        <span className="text-xs font-medium text-gray-400">{items.length}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {items.length === 0 ? (
+                          <div className="rounded-lg border-2 border-dashed border-gray-200 dark:border-neutral-700 p-4 text-center text-xs text-gray-400">
+                            Empty
+                          </div>
+                        ) : (
+                          items.map((c) => {
+                            const fuBadge = followUpBadge(c);
+                            return (
+                            <Link
+                              key={c.id}
+                              href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                              className="block bg-white dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-neutral-700 p-3 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                  {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 flex-shrink-0 text-orange-500" />}
+                                  {c.title || c.business_name || c.category || c.city}
+                                  {c.archetype && (
+                                    <ArchetypeBadge archetype={c.archetype} className="ml-1 align-middle" />
+                                  )}
+                                </p>
+                                {fuBadge && <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${fuBadge.cls}`}>{fuBadge.label}</span>}
+                              </div>
+                              {c.title && (c.business_name || c.category || c.city) && (
+                                <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                                  {c.business_name || c.category || c.city}
+                                </p>
                               )}
-                            </div>
-                          </Link>
-                          );
-                        })
-                      )}
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1"><span className="uppercase text-[10px] tracking-wider text-gray-400">{c.scope}</span> · {c.category} · {c.city}</p>
+                              {(c.tone || c.retainer || c.attributes?.length) && (
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                  {c.tone}{c.tone && c.retainer ? ' · ' : ''}{c.retainer}
+                                  {c.attributes?.length ? ` · ${c.attributes.join(', ')}` : ''}
+                                </p>
+                              )}
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="text-xs text-gray-400">{staffDisplayName(staffUsers, c.assigned_to) ?? 'Unassigned'}</span>
+                                {c.estimated_fee_cents != null && (
+                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</span>
+                                )}
+                              </div>
+                            </Link>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
