@@ -137,6 +137,65 @@ function stripLlmJsonArtifacts(raw: string): string {
 }
 
 /**
+ * Extract all top-level JSON objects/arrays from a raw text string as
+ * separate substrings (not yet parsed). Used when an external agent's
+ * raw_output contains multiple JSON payloads — e.g. a chained prompt that
+ * emits a competitive audit followed by a category intelligence profile —
+ * and we need to find the one matching the expected output schema.
+ *
+ * Handles markdown code fences (```json ... ```): fenced block contents are
+ * collected and scanned alongside any unfenced JSON. Returns candidates in
+ * order of appearance.
+ */
+function extractJsonCandidates(raw: string): string[] {
+  const candidates: string[] = [];
+  let text = raw;
+
+  // Collect all ```json ... ``` fenced blocks; use their contents as the
+  // search text. If no fences are present, scan the raw text directly.
+  const fenceGlobal = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/gi;
+  const fenceMatches = [...text.matchAll(fenceGlobal)];
+  if (fenceMatches.length > 0) {
+    text = fenceMatches.map((m) => m[1]).join('\n');
+  }
+
+  // Scan for top-level { or [ and extract each balanced block.
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '{' || ch === '[') {
+      const openChar = ch;
+      const closeChar = openChar === '{' ? '}' : ']';
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let endIdx = -1;
+      for (let j = i; j < text.length; j++) {
+        const c = text[j];
+        if (escape) { escape = false; continue; }
+        if (c === '\\' && inString) { escape = true; continue; }
+        if (c === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (c === openChar) depth++;
+        else if (c === closeChar) {
+          depth--;
+          if (depth === 0) { endIdx = j; break; }
+        }
+      }
+      if (endIdx > i) {
+        candidates.push(text.substring(i, endIdx + 1));
+        i = endIdx + 1;
+      } else {
+        i++; // unbalanced opener; skip
+      }
+    } else {
+      i++;
+    }
+  }
+  return candidates;
+}
+
+/**
  * Build a user-actionable error message from a JSON.parse failure, surfacing
  * the parse error position and a snippet of the surrounding content so the
  * operator can locate and fix the syntax error in pasted LLM output.
@@ -552,14 +611,13 @@ export class MarketingPromptService extends BaseService {
       // 2. Scope check (S0b)
       assertScopeCompatible(template, campaign);
 
-      // 3. Parse + validate JSON against the template's output_schema
-      let parsedJson: any;
-      try {
-        parsedJson = JSON.parse(stripLlmJsonArtifacts(input.rawOutput));
-      } catch (e) {
-        throw new Error(formatJsonParseError(e, input.rawOutput));
-      }
-
+      // 3. Parse + validate JSON against the template's output_schema.
+      //    The raw_output may contain multiple JSON objects when an external
+      //    agent runs a chained prompt (e.g. a competitive audit followed by
+      //    a category intelligence profile). Extract all top-level JSON
+      //    candidates and use the first one that validates against the
+      //    expected schema, so the operator doesn't have to manually isolate
+      //    the schema-matching payload from a multi-step agent transcript.
       const schemaName = template.output_schema?.name ?? null;
       const resolved = resolveOutputSchema(schemaName);
       if (!resolved) {
@@ -569,21 +627,57 @@ export class MarketingPromptService extends BaseService {
         );
       }
 
-      // Normalize intelligence_discovery payloads before validation: some
-      // models emit `qualifying_businesses` as reference-style entries
-      // ({business_name, note}) pointing back at discovered_businesses rather
-      // than full duplicate records. Resolve those references into full records
-      // so the schema accepts the payload without forcing operators to re-run.
-      if (schemaName === INTELLIGENCE_DISCOVERY_SCHEMA_NAME) {
-        parsedJson = normalizeIntelligenceDiscoveryPayload(parsedJson);
+      const candidates = extractJsonCandidates(input.rawOutput);
+      let parsedJson: any | null = null;
+      let firstValidationIssues: string | null = null;
+
+      for (const candidate of candidates) {
+        let candidateJson: any;
+        try {
+          candidateJson = JSON.parse(stripLlmJsonArtifacts(candidate));
+        } catch {
+          continue; // skip unparseable candidates
+        }
+
+        // Normalize intelligence_discovery payloads before validation: some
+        // models emit `qualifying_businesses` as reference-style entries
+        // ({business_name, note}) pointing back at discovered_businesses rather
+        // than full duplicate records. Resolve those references into full records
+        // so the schema accepts the payload without forcing operators to re-run.
+        if (schemaName === INTELLIGENCE_DISCOVERY_SCHEMA_NAME) {
+          candidateJson = normalizeIntelligenceDiscoveryPayload(candidateJson);
+        }
+
+        const candidateResult = resolved.validator.safeParse(candidateJson);
+        if (candidateResult.success) {
+          parsedJson = candidateJson;
+          break;
+        }
+        // Preserve the first candidate's validation issues for error reporting
+        // if no candidate matches (keeps the original error behavior for the
+        // common single-JSON case).
+        if (!firstValidationIssues) {
+          firstValidationIssues = candidateResult.error.issues
+            .map((i) => `${i.path.join('.')}: ${i.message}`)
+            .join('; ');
+        }
       }
 
-      const validationResult = resolved.validator.safeParse(parsedJson);
-      if (!validationResult.success) {
-        const issues = validationResult.error.issues
-          .map((i) => `${i.path.join('.')}: ${i.message}`)
-          .join('; ');
-        throw new Error(`External result does not match the "${schemaName}" output schema: ${issues}`);
+      if (!parsedJson) {
+        // No candidate validated. If we found at least one JSON object, report
+        // the first candidate's schema issues. If no JSON was found at all,
+        // fall back to the legacy single-parse path to surface a parse error.
+        if (firstValidationIssues) {
+          throw new Error(`External result does not match the "${schemaName}" output schema: ${firstValidationIssues}`);
+        }
+        try {
+          JSON.parse(stripLlmJsonArtifacts(input.rawOutput));
+        } catch (e) {
+          throw new Error(formatJsonParseError(e, input.rawOutput));
+        }
+        throw new Error(
+          `External result does not match the "${schemaName}" output schema: no valid JSON found in raw_output`,
+        );
       }
 
       // 4. Transactionally create execution + audit
