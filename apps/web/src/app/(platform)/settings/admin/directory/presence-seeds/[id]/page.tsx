@@ -19,7 +19,30 @@ import {
   Globe,
   ShieldCheck,
   FileText,
+  Pencil,
+  Save,
+  X,
+  Plus,
+  Trash2,
 } from 'lucide-react';
+
+const PROVENANCE_FIELD_KEYS = [
+  'name',
+  'address',
+  'phone',
+  'snap_ebt',
+  'hours',
+  'specialty_line',
+] as const;
+
+interface EditProvenanceRow {
+  fieldKey: string;
+  value: string;
+  sourceName: string;
+  sourceUrl: string;
+  confidence: 'high' | 'medium' | 'low';
+  showOnPublic: boolean;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +72,17 @@ export default function PresenceSeedDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+
+  // Edit mode state
+  const [editing, setEditing] = useState(false);
+  const [savingFields, setSavingFields] = useState(false);
+  const [editPhone, setEditPhone] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editSnapReported, setEditSnapReported] = useState(false);
+  const [editSnapAsOf, setEditSnapAsOf] = useState('');
+  const [editSnapSource, setEditSnapSource] = useState('');
+  const [editSnapSourceName, setEditSnapSourceName] = useState('');
+  const [editProvenance, setEditProvenance] = useState<EditProvenanceRow[]>([]);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -110,6 +144,114 @@ export default function PresenceSeedDetailPage() {
   const canInvite =
     (status === 'published' || status === 'invited') &&
     !claimTokens.some((t) => !t.consumedAt);
+  const canEdit = status !== 'claimed';
+
+  const startEditing = () => {
+    setEditPhone(listing?.phone ?? '');
+    setEditWebsite(listing?.website ?? '');
+    setEditSnapReported(!!listing?.snap_ebt_reported);
+    const asOf = listing?.snap_ebt_as_of
+      ? new Date(listing.snap_ebt_as_of).toISOString().slice(0, 10)
+      : '';
+    setEditSnapAsOf(asOf);
+    setEditSnapSource(listing?.snap_ebt_source ?? '');
+    setEditSnapSourceName(listing?.snap_ebt_source_name ?? '');
+    setEditProvenance(
+      provenance.map((p) => ({
+        fieldKey: p.fieldKey,
+        value: p.value ?? '',
+        sourceName: p.sourceName ?? '',
+        sourceUrl: p.sourceUrl ?? '',
+        confidence: (p.confidence ?? 'medium') as 'high' | 'medium' | 'low',
+        showOnPublic: !!p.showOnPublic,
+      })),
+    );
+    setActionError(null);
+    setActionSuccess(null);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setActionError(null);
+  };
+
+  const addEditProvenanceRow = () =>
+    setEditProvenance((rows) => [
+      ...rows,
+      {
+        fieldKey: 'hours',
+        value: '',
+        sourceName: '',
+        sourceUrl: '',
+        confidence: 'medium',
+        showOnPublic: true,
+      },
+    ]);
+  const removeEditProvenanceRow = (idx: number) =>
+    setEditProvenance((rows) => rows.filter((_, i) => i !== idx));
+  const updateEditProvenanceRow = (
+    idx: number,
+    patch: Partial<EditProvenanceRow>,
+  ) =>
+    setEditProvenance((rows) =>
+      rows.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
+    );
+
+  const handleSaveFields = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setSavingFields(true);
+      const fields: any = {
+        phone: editPhone.trim() || undefined,
+        website: editWebsite.trim() || undefined,
+      };
+      if (editSnapReported !== !!listing?.snap_ebt_reported) {
+        fields.snapEbtReported = editSnapReported;
+      }
+      if (editSnapReported) {
+        if (editSnapAsOf) {
+          const d = new Date(`${editSnapAsOf}T00:00:00.000Z`);
+          fields.snapEbtAsOf = Number.isNaN(d.getTime()) ? null : d;
+        } else {
+          fields.snapEbtAsOf = null;
+        }
+        fields.snapEbtSource = editSnapSource.trim() || null;
+        fields.snapEbtSourceName = editSnapSourceName.trim() || null;
+      } else {
+        fields.snapEbtAsOf = null;
+        fields.snapEbtSource = null;
+        fields.snapEbtSourceName = null;
+      }
+
+      const provenanceUpdates = editProvenance
+        .filter((row) => row.fieldKey && (row.value || row.sourceName))
+        .map((row) => ({
+          fieldKey: row.fieldKey,
+          value: row.value.trim() || undefined,
+          sourceName: row.sourceName.trim() || undefined,
+          sourceUrl: row.sourceUrl.trim() || undefined,
+          confidence: row.confidence,
+          showOnPublic: row.showOnPublic,
+        }));
+
+      await directoryPresenceAdminService.updateFields(
+        seedId,
+        fields,
+        provenanceUpdates,
+      );
+      setActionSuccess('Fields updated.');
+      setEditing(false);
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to update fields',
+      );
+    } finally {
+      setSavingFields(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -221,6 +363,31 @@ export default function PresenceSeedDetailPage() {
           >
             <ExternalLink className="w-4 h-4" /> View Public Listing
           </Link>
+        )}
+        {canEdit && !editing && (
+          <button
+            onClick={startEditing}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+          >
+            <Pencil className="w-4 h-4" /> Edit Fields
+          </button>
+        )}
+        {editing && (
+          <>
+            <button
+              onClick={handleSaveFields}
+              disabled={savingFields}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> {savingFields ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={cancelEditing}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            >
+              <X className="w-4 h-4" /> Cancel
+            </button>
+          </>
         )}
       </div>
 
@@ -473,12 +640,199 @@ export default function PresenceSeedDetailPage() {
         )}
       </section>
 
-      {/* Edit fields link */}
-      <div className="text-sm text-gray-500">
-        <FileText className="inline w-4 h-4 mr-1" />
-        Field updates (phone, website, SNAP, hours, provenance) are available
-        via the admin API.
-      </div>
+      {/* Edit panel */}
+      {editing && (
+        <section className="bg-white border border-blue-200 rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">Edit Sourced Fields</h2>
+          <p className="text-xs text-gray-500">
+            Updates write to the listing and upsert provenance rows. Once a seed
+            is claimed, the owner manages these fields.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={editWebsite}
+                onChange={(e) => setEditWebsite(e.target.value)}
+                placeholder="https://"
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={editSnapReported}
+                  onChange={(e) => setEditSnapReported(e.target.checked)}
+                />
+                SNAP/EBT reported
+              </label>
+            </div>
+            {editSnapReported && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">As of</label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    value={editSnapAsOf}
+                    onChange={(e) => setEditSnapAsOf(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <input
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    value={editSnapSource}
+                    onChange={(e) => setEditSnapSource(e.target.value)}
+                    placeholder="snap_retailer_list"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Source name</label>
+                  <input
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    value={editSnapSourceName}
+                    onChange={(e) => setEditSnapSourceName(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              Never infer SNAP/EBT from category labels. Only mark reported when
+              sourced from the SNAP retailer list, owner confirmation, or an
+              in-store photo reviewed by ops.
+            </p>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">Provenance rows</h3>
+              <button
+                type="button"
+                onClick={addEditProvenanceRow}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <Plus className="w-4 h-4" /> Add row
+              </button>
+            </div>
+            <div className="space-y-3">
+              {editProvenance.map((row, idx) => (
+                <div
+                  key={idx}
+                  className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-3"
+                >
+                  <div className="md:col-span-3">
+                    <label className="block text-xs text-gray-500 mb-1">Field</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                      value={row.fieldKey}
+                      onChange={(e) =>
+                        updateEditProvenanceRow(idx, { fieldKey: e.target.value })
+                      }
+                    >
+                      {PROVENANCE_FIELD_KEYS.map((k) => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-xs text-gray-500 mb-1">Value</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                      value={row.value}
+                      onChange={(e) =>
+                        updateEditProvenanceRow(idx, { value: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Source name</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                      value={row.sourceName}
+                      onChange={(e) =>
+                        updateEditProvenanceRow(idx, { sourceName: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Source URL</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                      value={row.sourceUrl}
+                      onChange={(e) =>
+                        updateEditProvenanceRow(idx, { sourceUrl: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-xs text-gray-500 mb-1">Confidence</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                      value={row.confidence}
+                      onChange={(e) =>
+                        updateEditProvenanceRow(idx, {
+                          confidence: e.target.value as 'high' | 'medium' | 'low',
+                        })
+                      }
+                    >
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-1 flex items-center justify-between gap-2">
+                    <label className="inline-flex items-center gap-1 text-xs text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={row.showOnPublic}
+                        onChange={(e) =>
+                          updateEditProvenanceRow(idx, {
+                            showOnPublic: e.target.checked,
+                          })
+                        }
+                      />
+                      Public
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeEditProvenanceRow(idx)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Remove row"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {editProvenance.length === 0 && (
+                <p className="text-sm text-gray-500">No provenance rows.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!editing && (
+        <div className="text-sm text-gray-500">
+          <FileText className="inline w-4 h-4 mr-1" />
+          Use “Edit Fields” above to update phone, website, SNAP/EBT, and
+          provenance. Once claimed, the owner manages these fields.
+        </div>
+      )}
     </div>
   );
 }
