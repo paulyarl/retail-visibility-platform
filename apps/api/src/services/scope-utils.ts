@@ -37,11 +37,11 @@ export const SCOPE_VARIABLES: Record<string, string[]> = {
     'business_name', 'category', 'city', 'state', 'neighborhood', 'contact_method',
     'contact_info', 'unaddressed_reviews', 'last_review_date', 'gbp_claimed',
     'has_website', 'nap_consistent', 'pain_score', 'estimated_tier', 'notes',
-    'tone', 'attributes',
+    'tone', 'attributes', 'business_origin',
   ],
-  category: ['category', 'city', 'state', 'neighborhood', 'tone', 'attributes'],
+  category: ['category', 'city', 'state', 'neighborhood', 'tone', 'attributes', 'business_origin'],
   city: ['city', 'state', 'neighborhood'],
-  intelligence: ['category', 'city', 'state', 'zip_codes', 'search_radius_miles', 'focus', 'neighborhood'],
+  intelligence: ['category', 'city', 'state', 'zip_codes', 'search_radius_miles', 'focus', 'neighborhood', 'business_origin'],
 };
 
 /**

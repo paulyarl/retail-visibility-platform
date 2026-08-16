@@ -63,6 +63,7 @@ Owner voice profile:
 
 Business context:
 - Category: {{business_category}}
+- Origin: {{business_origin}}
 - Location: {{business_city}}, {{business_state}}
 - Phone: {{business_phone}}
 - Website: {{business_website}}
@@ -83,7 +84,7 @@ Output the response only — no preamble, no explanation.`;
 
 // ─── Recovery Playbook ───────────────────────────────────────────────────
 
-const RECOVERY_PLAYBOOK_PROMPT = `You are writing a recovery playbook for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const RECOVERY_PLAYBOOK_PROMPT = `You are writing a recovery playbook for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 The playbook gives the owner ready-to-use response templates for each recurring
 negative theme in their reviews. These are templates the owner can adapt — not
@@ -112,7 +113,7 @@ Output as structured text with clear section breaks between themes.`;
 
 // ─── Listing Corrections ─────────────────────────────────────────────────
 
-const LISTING_CORRECTIONS_PROMPT = `You are preparing listing correction recommendations for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const LISTING_CORRECTIONS_PROMPT = `You are preparing listing correction recommendations for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 NAP consistency audit found these variations across platforms:
 {{nap_variations}}
@@ -139,7 +140,7 @@ Output as structured text with clear section breaks.`;
 
 // ─── CTA/Website Fixes ───────────────────────────────────────────────────
 
-const CTA_FIXES_PROMPT = `You are preparing website CTA recommendations for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const CTA_FIXES_PROMPT = `You are preparing website CTA recommendations for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Website: {{website_url}}
 
@@ -180,6 +181,7 @@ export interface OwnerVoiceFields {
 export interface BusinessContextFields {
   businessName: string;
   businessCategory: string;
+  businessOrigin: string | null;
   city: string | null;
   state: string | null;
   phone: string | null;
@@ -201,6 +203,7 @@ export function buildDeliverableReviewResponsePrompt(
     .replace('{{voice_signoff_style}}', voice.signoffStyle ?? 'first_name')
     .replace('{{voice_signature}}', voice.signature ?? '')
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{business_phone}}', ctx.phone ?? 'N/A')
@@ -220,6 +223,7 @@ export function buildRecoveryPlaybookPrompt(
   return RECOVERY_PLAYBOOK_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{voice_person}}', voice.person ?? 'first_person')
@@ -242,6 +246,7 @@ export function buildListingCorrectionsPrompt(
   return LISTING_CORRECTIONS_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{nap_variations}}', napVariations)
@@ -259,6 +264,7 @@ export function buildCtaFixesPrompt(
   return CTA_FIXES_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{website_url}}', ctx.websiteUrl ?? 'N/A')
@@ -268,7 +274,7 @@ export function buildCtaFixesPrompt(
 
 // ─── Mobile Catalog Preview (A6 — Product Visibility) ────────────────────
 
-const MOBILE_CATALOG_PROMPT = `You are preparing a mobile product-category website mockup for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const MOBILE_CATALOG_PROMPT = `You are preparing a mobile product-category website mockup for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 This business currently has no way for customers to browse products online before visiting. The goal is a lightweight, mobile-first catalog structure that shows what products are carried — not a full e-commerce store.
 
@@ -295,7 +301,7 @@ Output as structured text.`;
 
 // ─── GBP Photo Optimization (A6 — Product Visibility) ────────────────────
 
-const GBP_PHOTO_OPTIMIZATION_PROMPT = `You are preparing a Google Business Profile photo optimization plan for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const GBP_PHOTO_OPTIMIZATION_PROMPT = `You are preparing a Google Business Profile photo optimization plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current GBP photo audit:
 - Total photos: {{photo_count}}
@@ -322,7 +328,7 @@ Output as structured text.`;
 
 // ─── Availability Inquiry Flow (A6 — Product Visibility) ─────────────────
 
-const AVAILABILITY_INQUIRY_FLOW_PROMPT = `You are designing an availability-inquiry flow for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const AVAILABILITY_INQUIRY_FLOW_PROMPT = `You are designing an availability-inquiry flow for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current contact methods:
 {{contact_methods}}
@@ -353,7 +359,7 @@ Output as structured text.`;
 
 // ─── Fulfillment Pathway (A6 — Product Visibility) ───────────────────────
 
-const FULFILLMENT_PATHWAY_PROMPT = `You are preparing a pickup/delivery pathway setup plan for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const FULFILLMENT_PATHWAY_PROMPT = `You are preparing a pickup/delivery pathway setup plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current fulfillment status:
 {{fulfillment_status}}
@@ -386,7 +392,7 @@ Output as structured text.`;
 
 // ─── Hours Sync Plan (A6 — Product Visibility) ───────────────────────────
 
-const HOURS_SYNC_PLAN_PROMPT = `You are preparing an hours + holiday-hours synchronization plan for {{business_name}}, a {{business_category}} in {{business_city}}, {{business_state}}.
+const HOURS_SYNC_PLAN_PROMPT = `You are preparing an hours + holiday-hours synchronization plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current hours status:
 - GBP regular hours: {{regular_hours_status}}
@@ -440,6 +446,7 @@ export function buildMobileCatalogPrompt(
   return MOBILE_CATALOG_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{product_categories}}', productCategories || 'Not specified — infer from business category (e.g., for a grocery store: Produce, Grains & Rice, Spices & Seasonings, Sauces & Condiments, Frozen Foods, Beverages, Household Goods)');
@@ -454,6 +461,7 @@ export function buildGbpPhotoOptimizationPrompt(
   return GBP_PHOTO_OPTIMIZATION_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{photo_count}}', String(photoCount ?? 'Unknown'))
@@ -468,6 +476,7 @@ export function buildAvailabilityInquiryFlowPrompt(
   return AVAILABILITY_INQUIRY_FLOW_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{contact_methods}}', contactMethods || 'Phone only (click-to-call from GBP)');
@@ -480,6 +489,7 @@ export function buildFulfillmentPathwayPrompt(
   return FULFILLMENT_PATHWAY_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{fulfillment_status}}', fulfillmentStatus || 'No pickup or delivery options currently offered');
@@ -494,6 +504,7 @@ export function buildHoursSyncPlanPrompt(
   return HOURS_SYNC_PLAN_PROMPT
     .replace('{{business_name}}', ctx.businessName)
     .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{regular_hours_status}}', regularHoursStatus || 'Not assessed')

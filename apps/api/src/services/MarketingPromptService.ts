@@ -14,6 +14,7 @@ import type { RequestCtx } from '../context';
 import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { normalizeIntelligenceDiscoveryPayload, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import MarketingCampaignService from './MarketingCampaignService';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -555,6 +556,15 @@ export class MarketingPromptService extends BaseService {
           `Template "${template.name}" does not declare a recognized output_schema (got "${schemaName ?? 'none'}"). ` +
           `Cannot validate external result. Add an output_schema to the template first.`,
         );
+      }
+
+      // Normalize intelligence_discovery payloads before validation: some
+      // models emit `qualifying_businesses` as reference-style entries
+      // ({business_name, note}) pointing back at discovered_businesses rather
+      // than full duplicate records. Resolve those references into full records
+      // so the schema accepts the payload without forcing operators to re-run.
+      if (schemaName === INTELLIGENCE_DISCOVERY_SCHEMA_NAME) {
+        parsedJson = normalizeIntelligenceDiscoveryPayload(parsedJson);
       }
 
       const validationResult = resolved.validator.safeParse(parsedJson);

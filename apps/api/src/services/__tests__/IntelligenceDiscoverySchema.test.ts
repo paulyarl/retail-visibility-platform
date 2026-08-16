@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   intelligenceDiscoverySchemaWithRefinements as schema,
+  normalizeIntelligenceDiscoveryPayload,
   INTELLIGENCE_DISCOVERY_SCHEMA_NAME,
 } from '../../validators/intelligence-discovery.schema';
 
@@ -148,5 +149,87 @@ describe('intelligence_discovery schema', () => {
     });
     const result = schema.safeParse(data);
     expect(result.success).toBe(true);
+  });
+
+  // ─── Tolerant null handling for address/phone (model emits null for unknown) ───
+
+  it('accepts null address and phone on discovered_businesses', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({ address: null, phone: null })],
+      qualifying_businesses: [validCandidate({ address: null, phone: null })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts omitted address and phone (backward compat)', () => {
+    const candidate = validCandidate();
+    delete (candidate as any).address;
+    delete (candidate as any).phone;
+    const data = validDiscovery({
+      discovered_businesses: [candidate],
+      qualifying_businesses: [candidate],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+});
+
+// ─── normalizeIntelligenceDiscoveryPayload: reference-style qualifying_businesses ───
+
+describe('normalizeIntelligenceDiscoveryPayload', () => {
+  it('resolves reference-style qualifying entries from discovered_businesses by name', () => {
+    const full = validCandidate({ business_name: 'His Grace African Grocery' });
+    const payload = validDiscovery({
+      discovered_businesses: [full],
+      qualifying_businesses: [
+        { business_name: 'His Grace African Grocery', note: 'See discovered_businesses — identical record' },
+      ],
+    });
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    const q = normalized.qualifying_businesses[0];
+    // Full record fields are now present...
+    expect(q.location_status).toBe('inside_city');
+    expect(q.category).toBe('Auto Repair');
+    expect(q.business_seek_recommended).toBe(true);
+    // ...and the reference-only `note` field is preserved.
+    expect(q.note).toBe('See discovered_businesses — identical record');
+    // The normalized payload now passes schema validation.
+    expect(schema.safeParse(normalized).success).toBe(true);
+  });
+
+  it('leaves full qualifying records untouched', () => {
+    const full = validCandidate();
+    const payload = validDiscovery({
+      discovered_businesses: [full],
+      qualifying_businesses: [full],
+    });
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    expect(normalized.qualifying_businesses[0]).toEqual(full);
+  });
+
+  it('leaves unmatched references in place so validation surfaces a clear error', () => {
+    const payload = validDiscovery({
+      discovered_businesses: [validCandidate({ business_name: 'Known Biz' })],
+      qualifying_businesses: [
+        { business_name: 'Unknown Biz', note: 'no match' },
+      ],
+    });
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    // Unmatched reference is unchanged → validation fails with field-level issues.
+    expect(normalized.qualifying_businesses[0].business_name).toBe('Unknown Biz');
+    expect(normalized.qualifying_businesses[0].location_status).toBeUndefined();
+    expect(schema.safeParse(normalized).success).toBe(false);
+  });
+
+  it('is a no-op when qualifying_businesses is missing or not an array', () => {
+    const payload = { ...validDiscovery(), qualifying_businesses: undefined };
+    const normalized = normalizeIntelligenceDiscoveryPayload(payload);
+    expect(normalized.qualifying_businesses).toBeUndefined();
+  });
+
+  it('is a no-op for non-object input', () => {
+    expect(normalizeIntelligenceDiscoveryPayload(null)).toBeNull();
+    expect(normalizeIntelligenceDiscoveryPayload('string')).toBe('string');
   });
 });

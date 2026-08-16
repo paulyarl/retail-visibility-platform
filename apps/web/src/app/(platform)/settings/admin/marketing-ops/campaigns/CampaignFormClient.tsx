@@ -89,6 +89,9 @@ interface FormState {
   intelligence_search_radius_miles: number | '';
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligence_campaign_kind: 'discovery' | 'establishment' | '';
+  // Migration 204 — diaspora / heritage-origin categorization
+  business_origin_country: string;
+  business_origin_region: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -145,6 +148,8 @@ const EMPTY_FORM: FormState = {
   intelligence_zip_codes: '',
   intelligence_search_radius_miles: '',
   intelligence_campaign_kind: 'discovery',
+  business_origin_country: '',
+  business_origin_region: '',
 };
 
 export default function CampaignFormClient({ mode, campaignId }: { mode: 'create' | 'edit'; campaignId?: string }) {
@@ -161,6 +166,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     contactMethods: [] as string[],
     estimatedTiers: [] as string[],
     tones: [] as string[],
+    originCountries: [] as string[],
+    originRegions: [] as string[],
   });
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   // Tracks whether the operator has manually typed in the Title field. While
@@ -185,6 +192,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           contactMethods: distinctValues(items, (c) => c.contact_method),
           estimatedTiers: distinctValues(items, (c) => c.estimated_tier),
           tones: mergedTones,
+          originCountries: distinctValues(items, (c) => (c as any).business_origin_country),
+          originRegions: distinctValues(items, (c) => (c as any).business_origin_region),
         });
       })
       .catch(() => {});
@@ -252,6 +261,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         intelligence_zip_codes: (c as any).intelligence_zip_codes ?? '',
         intelligence_search_radius_miles: (c as any).intelligence_search_radius_miles ?? '',
         intelligence_campaign_kind: ((c as any).intelligence_campaign_kind ?? 'discovery') as 'discovery' | 'establishment' | '',
+        business_origin_country: (c as any).business_origin_country ?? '',
+        business_origin_region: (c as any).business_origin_region ?? '',
       });
       // Preserve an existing campaign's title — don't auto-overwrite it on
       // edit. Only auto-derive when the operator starts from a blank title.
@@ -429,6 +440,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_zip_codes: form.scope === 'intelligence' ? strOrUndef(form.intelligence_zip_codes) : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? numOrUndef(form.intelligence_search_radius_miles) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
+          business_origin_country: strOrUndef(form.business_origin_country),
+          business_origin_region: strOrUndef(form.business_origin_region),
         };
         const created = await marketingOpsService.createCampaign(input);
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
@@ -505,6 +518,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_zip_codes: form.scope === 'intelligence' ? form.intelligence_zip_codes : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? (form.intelligence_search_radius_miles === '' ? undefined : Number(form.intelligence_search_radius_miles)) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
+          business_origin_country: form.business_origin_country,
+          business_origin_region: form.business_origin_region,
         };
         await marketingOpsService.updateCampaign(campaignId, input);
         router.push(`/settings/admin/marketing-ops/campaigns/${campaignId}`);
@@ -674,6 +689,18 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               <SuggestiveSelect required value={form.category} onChange={(v) => handleChange('category', v)}
                 options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
                 newInputPlaceholder="Enter new category" className={inputClass} />
+            </FormField>
+            <FormField label="Origin Country">
+              <SuggestiveSelect value={form.business_origin_country} onChange={(v) => handleChange('business_origin_country', v)}
+                options={vocab.originCountries} emptyLabel="-- None --" newLabel="+ New country..."
+                newInputPlaceholder="e.g. Gambia, Nigeria, India" className={inputClass} />
+              <p className="text-xs text-gray-400 mt-1">Heritage country of origin for diaspora niches (e.g. African Grocery Store). Feeds deliverable prompts + niche overrides. Leave blank for non-diaspora categories.</p>
+            </FormField>
+            <FormField label="Origin Region">
+              <SuggestiveSelect value={form.business_origin_region} onChange={(v) => handleChange('business_origin_region', v)}
+                options={vocab.originRegions} emptyLabel="-- None --" newLabel="+ New region..."
+                newInputPlaceholder="e.g. West Africa, South Asia" className={inputClass} />
+              <p className="text-xs text-gray-400 mt-1">Broader region when a single country is too narrow (e.g. West Africa spans Gambia, Senegal, Nigeria).</p>
             </FormField>
             <FormField label="Tone">
               <SuggestiveSelect value={form.tone} onChange={(v) => handleChange('tone', v)}

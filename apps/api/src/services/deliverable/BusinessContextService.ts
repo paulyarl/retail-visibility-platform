@@ -49,6 +49,8 @@ export class BusinessContextService extends BaseService {
       const context: BusinessContextFields = {
         businessName: campaign.business_name ?? 'your business',
         businessCategory: campaign.category ?? 'local business',
+        businessOrigin: [campaign.business_origin_country, campaign.business_origin_region]
+          .filter(Boolean).join(', ') || null,
         city: campaign.city ?? null,
         state: campaign.state ?? null,
         phone: campaign.phone ?? null,

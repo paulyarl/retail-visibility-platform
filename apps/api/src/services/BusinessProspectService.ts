@@ -234,6 +234,8 @@ export class BusinessProspectService extends BaseService {
         pain_score: source.pain_score,
         tone: source.tone,
         attributes: source.attributes as any,
+        business_origin_country: (source as any).business_origin_country ?? null,
+        business_origin_region: (source as any).business_origin_region ?? null,
         assigned_to: assignedTo || source.assigned_to,
         notes: notes || null,
         parent_campaign_id: source.parent_campaign_id,

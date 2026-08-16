@@ -253,6 +253,9 @@ const campaignBaseSchema = z.object({
   intelligence_search_radius_miles: z.number().min(0).max(500).optional(),
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligence_campaign_kind: z.enum(['discovery', 'establishment']).optional(),
+  // Migration 204 — diaspora / heritage-origin categorization
+  business_origin_country: z.string().max(100).optional(),
+  business_origin_region: z.string().max(100).optional(),
 });
 
 const campaignCreateSchema = campaignBaseSchema
@@ -1050,6 +1053,8 @@ router.post('/', async (req: any, res: Response) => {
       intelligenceZipCodes: parsed.intelligence_zip_codes,
       intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
       intelligenceCampaignKind: parsed.intelligence_campaign_kind,
+      businessOriginCountry: parsed.business_origin_country,
+      businessOriginRegion: parsed.business_origin_region,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
   } catch (error) {
@@ -1110,6 +1115,8 @@ router.put('/:id', async (req: any, res: Response) => {
       intelligenceZipCodes: parsed.intelligence_zip_codes,
       intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
       intelligenceCampaignKind: parsed.intelligence_campaign_kind,
+      businessOriginCountry: parsed.business_origin_country,
+      businessOriginRegion: parsed.business_origin_region,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
   } catch (error) {

@@ -550,6 +550,8 @@ emerging-focus work.`;
       notes: campaign.notes || '',
       tone: campaign.tone || '',
       attributes: (campaign.attributes || []).join(', '),
+      business_origin: [campaign.business_origin_country, campaign.business_origin_region]
+        .filter(Boolean).join(', '),
     };
 
     const allVars: Record<string, string> = {};

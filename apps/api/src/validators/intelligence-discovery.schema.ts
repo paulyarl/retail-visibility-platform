@@ -57,8 +57,10 @@ const discoveredBusinessSchema = z.object({
   category: z.string(),
   city: z.string(),
   state: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
+  // address/phone are nullable (not just optional) to match website/gbp_url:
+  // models reasonably emit `null` for "unknown" rather than omitting the key.
+  address: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
   gbp_url: z.string().nullable().optional(),
 
@@ -117,6 +119,53 @@ export const intelligenceDiscoverySchema = z.object({
   profile_id: z.string().nullable().optional(),
   profile_version: z.number().nullable().optional(),
 }).passthrough();
+
+// ─── Payload normalization (reference-style qualifying_businesses) ────────
+//
+// Some models emit `qualifying_businesses` as reference-style entries that
+// point back to `discovered_businesses` rather than duplicating the full
+// record, e.g.:
+//   { "business_name": "His Grace African Grocery Store",
+//     "note": "See discovered_businesses — identical record, qualifies" }
+// The schema requires full business objects, so this normalizer resolves any
+// reference-style entry by looking up its `business_name` in
+// `discovered_businesses` and substituting the full record. Extra fields on
+// the reference entry (e.g. `note`) are preserved via passthrough.
+//
+// An entry is treated as reference-style when it has a `business_name` but is
+// missing the required `location_status` field (a required enum that a full
+// record always carries). Unmatched references are left untouched so the
+// validator surfaces a clear, field-level error.
+
+export function normalizeIntelligenceDiscoveryPayload(parsed: any): any {
+  if (!parsed || typeof parsed !== 'object') return parsed;
+  const discovered: any[] = Array.isArray(parsed.discovered_businesses) ? parsed.discovered_businesses : [];
+  const qualifying: any[] = parsed.qualifying_businesses;
+  if (!Array.isArray(qualifying) || discovered.length === 0) return parsed;
+
+  const byName = new Map<string, any>();
+  for (const d of discovered) {
+    if (d && typeof d.business_name === 'string') {
+      // First occurrence wins; duplicates are rare and would be ambiguous anyway.
+      if (!byName.has(d.business_name)) byName.set(d.business_name, d);
+    }
+  }
+
+  const resolved = qualifying.map((q) => {
+    if (!q || typeof q !== 'object') return q;
+    // Full records already carry location_status → leave as-is.
+    if (q.location_status !== undefined) return q;
+    const name = typeof q.business_name === 'string' ? q.business_name : undefined;
+    if (!name) return q;
+    const full = byName.get(name);
+    if (!full) return q;
+    // Merge: start from the full record, then overlay any extra keys from the
+    // reference entry (e.g. `note`) so provenance of the reference is retained.
+    return { ...full, ...q };
+  });
+
+  return { ...parsed, qualifying_businesses: resolved };
+}
 
 // ─── Cross-field refinements (hold conditions) ───────────────────────────
 
@@ -193,7 +242,7 @@ Return a single JSON object with this structure:
       "review_count": <number or null>
     }
   ],
-  "qualifying_businesses": [<same structure — excludes outside_market, national_chain, national_franchise, regional_chain>],
+  "qualifying_businesses": [<FULL duplicate records — same structure as discovered_businesses, excludes outside_market, national_chain, national_franchise, regional_chain. Do NOT emit references like {"business_name": "...", "note": "see discovered_businesses"} — repeat the complete record for each qualifying business>],
   "candidate_count": <number>,
   "qualifying_count": <number>,
   "hold_count": <number>,
@@ -206,6 +255,7 @@ Return a single JSON object with this structure:
 
 Rules:
 - discovered_businesses is the full set found; qualifying_businesses excludes outside_market, national_chain, national_franchise, and regional_chain.
+- qualifying_businesses MUST contain full duplicate records (every field), NOT references or summaries. Each entry must be a complete business object identical in shape to its discovered_businesses counterpart.
 - discovery_signals MUST use INT_* codes only. Do NOT use RA/DS/WC/CP/VP signal codes.
 - If identity_confidence is "low", business_seek_priority MUST be "hold".
 - If category_fit is "insufficient", business_seek_priority MUST be "hold" OR business_seek_recommended MUST be false.

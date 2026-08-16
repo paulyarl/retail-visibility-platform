@@ -6189,6 +6189,8 @@ model mkt_campaigns_list {
   intelligence_zip_codes                                                          String?
   intelligence_search_radius_miles                                                Decimal?                             @db.Decimal(10, 2)
   intelligence_campaign_kind                                                      String?                              @default("discovery") @db.VarChar(20)
+  business_origin_country                                                         String?                              @db.VarChar(100)
+  business_origin_region                                                          String?                              @db.VarChar(100)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]
