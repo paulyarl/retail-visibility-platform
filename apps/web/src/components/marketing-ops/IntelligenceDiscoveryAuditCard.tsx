@@ -116,15 +116,20 @@ export default function IntelligenceDiscoveryAuditCard({
   const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'exists' | 'already'>>({});
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'qualifying' | 'hold'>('all');
   const [expandedProvenance, setExpandedProvenance] = useState<Set<number>>(new Set());
   const [showNotes, setShowNotes] = useState<number | null>(null);
   const router = useRouter();
 
-  // Sort qualifying businesses: recommended first, then by priority, holds last
+  // Sort all discovered businesses: recommended first, then by priority, holds last.
+  // `discovered_businesses` is the superset (includes qualifying + hold/low candidates);
+  // `qualifying_businesses` is the recommended subset. We render the superset so
+  // operators can see every candidate the discovery pass surfaced, not just the
+  // ones that passed qualification filters.
   const sortedBusinesses = useMemo(() => {
     if (!data) return [];
     const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2, hold: 3 };
-    return [...data.qualifying_businesses].sort((a, b) => {
+    return [...data.discovered_businesses].sort((a, b) => {
       const aRec = a.business_seek_recommended ? 0 : 1;
       const bRec = b.business_seek_recommended ? 0 : 1;
       if (aRec !== bRec) return aRec - bRec;
@@ -134,7 +139,13 @@ export default function IntelligenceDiscoveryAuditCard({
 
   if (!data) return null;
 
-  const visibleBusinesses = showAll ? sortedBusinesses : sortedBusinesses.slice(0, 8);
+  const filteredBusinesses = useMemo(() => {
+    if (filter === 'qualifying') return sortedBusinesses.filter((b) => b.business_seek_recommended);
+    if (filter === 'hold') return sortedBusinesses.filter((b) => b.business_seek_priority === 'hold');
+    return sortedBusinesses;
+  }, [sortedBusinesses, filter]);
+
+  const visibleBusinesses = showAll ? filteredBusinesses : filteredBusinesses.slice(0, 8);
 
   const handleDerive = async (biz: DiscoveredBusiness) => {
     const idx = sortedBusinesses.indexOf(biz);
@@ -259,13 +270,39 @@ export default function IntelligenceDiscoveryAuditCard({
         </details>
       )}
 
-      {/* Qualifying businesses list */}
+      {/* Discovered businesses list */}
       <div className="mb-3">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Qualifying businesses ({data.qualifying_count})
-        </p>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Discovered businesses ({data.discovered_businesses.length})
+            <span className="ml-1.5 text-gray-400 font-normal">
+              · {data.qualifying_count} qualifying · {data.hold_count} on hold
+            </span>
+          </p>
+          {/* Filter toggle */}
+          <div className="inline-flex rounded-md border border-gray-200 dark:border-neutral-700 overflow-hidden text-[10px]">
+            {(['all', 'qualifying', 'hold'] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => { setFilter(opt); setShowAll(false); }}
+                className={`px-2 py-0.5 capitalize transition-colors ${
+                  filter === opt
+                    ? 'bg-cyan-600 text-white'
+                    : 'bg-white dark:bg-neutral-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-700'
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="space-y-2">
-          {visibleBusinesses.map((biz, i) => {
+          {visibleBusinesses.length === 0 && (
+            <p className="text-xs text-gray-400 italic py-2">
+              No businesses match this filter.
+            </p>
+          )}
+          {visibleBusinesses.map((biz) => {
             const idx = sortedBusinesses.indexOf(biz);
             const isHold = biz.business_seek_priority === 'hold';
             const isLowConfidence = biz.identity_confidence === 'low';
@@ -431,12 +468,12 @@ export default function IntelligenceDiscoveryAuditCard({
             );
           })}
         </div>
-        {sortedBusinesses.length > 8 && (
+        {filteredBusinesses.length > 8 && (
           <button
             onClick={() => setShowAll((v) => !v)}
             className="mt-2 text-xs text-cyan-600 dark:text-cyan-400 hover:underline"
           >
-            {showAll ? 'Show fewer' : `Show all ${sortedBusinesses.length} businesses`}
+            {showAll ? 'Show fewer' : `Show all ${filteredBusinesses.length} businesses`}
           </button>
         )}
       </div>
