@@ -234,6 +234,52 @@ Mirrors the coupon `/s/{autoId}` short URL pattern for diagnostic gallery tokens
 - **Collision handling**: 3 retries on unique-index conflict; falls back to no short code (long URL still works) if exhausted
 - **Lazy backfill**: legacy tokens without `short_code` are not broken; `ensureShortCode()` can backfill them on demand
 
+## Intelligence Campaign Prompts — Focus + Kind Awareness
+
+Makes prompt templates focus- and kind-aware so the campaign workspace Prompts tab surfaces only the templates matching the campaign's intelligence type. Previously focus was inferred from the template NAME (regex `/competitive/i`) and kind was inferred from `output_schema.name` — both were artifacts, not queryable data.
+
+### Schema (Migration 203)
+- `mkt_prompt_templates_list.intelligence_focus` — nullable `VARCHAR(20)` (`'emerging'` | `'competitive'`); NULL for non-intelligence templates + composition fragments
+- `mkt_prompt_templates_list.intelligence_campaign_kind` — nullable `VARCHAR(20)` (`'discovery'` | `'establishment'`); NULL for non-intelligence templates + fragments
+- Index `idx_mkt_prompt_templates_intelligence` on `(intelligence_focus, intelligence_campaign_kind, is_active)`
+- Backfill sets the 3 known seeded templates: emerging discovery, competitive discovery, establishment
+
+### Backend
+- `apps/api/src/services/MarketingPromptService.ts`:
+  - `PromptTemplateInput` gains `intelligenceFocus` + `intelligenceCampaignKind` (nullable)
+  - `createTemplate` / `updateTemplate` persist both fields
+  - `listTemplates` accepts `intelligenceFocus`, `intelligenceCampaignKind`, and `includeNullFocusKind` filters — when `includeNullFocusKind` is set, returns templates matching the focus+kind OR templates with NULL focus/kind (legacy fallback)
+  - `cloneTemplate` copies both fields
+  - `clearDefaultForType` includes focus+kind in the default-uniqueness key (so emerging + competitive can each have their own default)
+- `apps/api/src/routes/marketing-ops.ts`:
+  - `promptTemplateCreateSchema` accepts `intelligence_focus` + `intelligence_campaign_kind` (nullable enums)
+  - `GET /prompts/templates` accepts `intelligence_focus`, `intelligence_campaign_kind`, `include_null_focus_kind` query params
+  - `POST` / `PUT /prompts/templates/:id` pass the new fields through
+- Seed scripts updated to set the new fields:
+  - `apps/api/src/scripts/seed-intelligence-discovery-templates.ts` — sets `intelligenceFocus` + `intelligenceCampaignKind: 'discovery'` on both templates
+  - `apps/api/src/scripts/seed-intelligence-profile-establishment-template.ts` — sets `intelligenceCampaignKind: 'establishment'`
+  - `apps/api/src/scripts/seed-intelligence-fragments.ts` — unchanged (fragments identified by `fragment_kind`, focus/kind stay NULL)
+
+### Frontend
+- `apps/web/src/services/MarketingOpsService.ts`:
+  - `IntelligenceCampaignKind` type added (next to existing `IntelligenceFocus`)
+  - `PromptTemplate` + `PromptTemplateCreateInput` gain `intelligence_focus?` + `intelligence_campaign_kind?`
+  - `listPromptTemplates` accepts + passes the new filters
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx` — Prompts tab:
+  - For intelligence-scope campaigns, passes `intelligence_focus` + `intelligence_campaign_kind` + `include_null_focus_kind: true` so only matching templates (plus legacy untyped ones) are fetched
+  - Header text shows the active focus + kind when intelligence-scope
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/prompts/PromptLibraryClient.tsx`:
+  - `PromptTemplateModal` shows Focus + Kind selectors only when `scope = 'intelligence'`; clears them when scope leaves intelligence
+  - `intelligenceDiscoveryTemplateIds` memo uses stored fields with name-based fallback for legacy templates
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/prompts/[id]/PromptWorkspaceClient.tsx`:
+  - `templateFocus` reads `template.intelligence_focus` first, falls back to name regex for legacy templates
+  - `isIntelligenceDiscovery` / `isIntelligenceEstablishment` read `template.intelligence_campaign_kind` first, fall back to `output_schema.name`
+
+### Key Patterns
+- **Match + fallback**: the campaign Prompts tab query uses `(focus AND kind match) OR (focus AND kind are NULL)` so legacy/untyped templates remain visible alongside focus-matched ones
+- **Backward compatibility**: all focus/kind inference sites retain a name-based or output_schema-based fallback so templates that haven't been re-seeded still work
+- **Fragments excluded**: composition fragments (`prompt_type = 'fragment'`) keep NULL focus/kind — they're identified by `fragment_kind` and assembled by `PromptComposerService`
+
 ## Log Contact Modal — Per-Channel Result Options + Other Subtype
 
 Extends the "Log contact" modal so every channel has a tailored result dropdown (mirroring the Phone channel's "Call result" pattern), and the "Other" channel gains a subtype selector (DM / Text / Email / Fax-Mail).
