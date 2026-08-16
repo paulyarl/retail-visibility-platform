@@ -302,7 +302,11 @@ export class MarketingExecutionService extends BaseService {
     if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment) {
       const composer = PromptComposerService.getInstance();
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
-      const composed = await composer.composeIntelligencePrompt({ category, focus }, ctx);
+      // Pass the campaign's city so the composer resolves a city-scoped
+      // profile (Migration 205) and emits a city retargeting directive
+      // when the resolved profile's reference city differs.
+      const city = input.campaign.city || null;
+      const composed = await composer.composeIntelligencePrompt({ category, focus, city }, ctx);
 
       // Apply variable substitution on the composed body (zip_codes, radius, etc.)
       // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
@@ -359,11 +363,14 @@ export class MarketingExecutionService extends BaseService {
       };
     }
 
-    // 3. Resolve active profile for the campaign's category.
+    // 3. Resolve active profile for the campaign's (category, city).
     //    Business-scope §1B path — no focus (category-only match). Business
-    //    audits are category-aware, not focus-aware.
+    //    audits are category-aware, not focus-aware. City is honored
+    //    (Migration 205) so a business audit in Zionsville does not load an
+    //    Indianapolis-biased profile block.
     const profileService = IntelligenceProfileService.getInstance();
-    const profile = await profileService.resolve(category, undefined, ctx);
+    const businessCity = input.campaign.city || null;
+    const profile = await profileService.resolve(category, undefined, businessCity, ctx);
 
     if (!profile) {
       // No active profile — return byte-identical base render (plus suffix).
@@ -373,15 +380,19 @@ export class MarketingExecutionService extends BaseService {
       };
     }
 
-    // 4. Append the business profile block (§1B amplification).
-    const profileBlock = profileService.renderBusinessProfileBlock(profile);
+    // 4. Append the business profile block (§1B amplification). Pass the
+    //    campaign's city so the block can emit a retargeting directive when
+    //    the profile's reference city differs.
+    const profileBlock = profileService.renderBusinessProfileBlock(profile, businessCity);
     const amplified = baseRendered + '\n' + profileBlock;
 
     logger.info('Profile-aware prompt resolved (§1B)', ctx, {
       campaignId: input.campaign.id,
       category,
+      city: businessCity ?? 'none',
       profileId: profile.id,
       profileVersion: profile.version,
+      profileReferenceCity: (profile as any).reference_city ?? null,
       intelligenceMode: 'profile',
     });
 

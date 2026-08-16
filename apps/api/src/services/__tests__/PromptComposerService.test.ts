@@ -87,8 +87,9 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
     expect(result.resolution.profile_version).toBe(1);
     expect(result.focus).toBe('emerging');
 
-    // Migration 202 — focus is passed through to the resolver
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('Auto Repair', 'emerging', undefined);
+    // Migration 202 — focus is passed through to the resolver.
+    // Migration 205 — city is passed through (undefined when not provided).
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('Auto Repair', 'emerging', undefined, undefined);
   });
 
   it('composes with competitive focus + active profile', async () => {
@@ -118,8 +119,37 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
     expect(result.resolution.profile_version).toBe(2);
     expect(result.focus).toBe('competitive');
 
-    // Migration 202 — focus is passed through to the resolver
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('Plumbing', 'competitive', undefined);
+    // Migration 202 — focus is passed through to the resolver.
+    // Migration 205 — city is passed through (undefined when not provided).
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('Plumbing', 'competitive', undefined, undefined);
+  });
+
+  it('Migration 205 — passes city through to the resolver and renderProfileBlock', async () => {
+    mockProfileService.resolve.mockResolvedValueOnce({
+      id: 'african_grocery_zionsville',
+      version: 1,
+      category_key: 'african grocery store',
+      category_name: 'African Grocery Store',
+      intelligence_focus: 'competitive',
+      reference_city: 'zionsville',
+      status: 'active',
+      configuration_json: {},
+    });
+
+    const result = await service.composeIntelligencePrompt({
+      category: 'African Grocery Store',
+      focus: 'competitive',
+      city: 'Zionsville',
+    });
+
+    expect(result.resolution.profile_id).toBe('african_grocery_zionsville');
+    // City is passed to resolve
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('African Grocery Store', 'competitive', 'Zionsville', undefined);
+    // City is passed to renderProfileBlock so it can emit a retargeting directive
+    expect(mockProfileService.renderProfileBlock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'african_grocery_zionsville' }),
+      'Zionsville',
+    );
   });
 
   it('composes with null profile → generic fallback + intelligence_mode none', async () => {

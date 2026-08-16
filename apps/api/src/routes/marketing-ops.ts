@@ -5859,6 +5859,7 @@ const intelligenceProfileCreateSchema = z.object({
   configurationJson: z.record(z.string(), z.any()),
   status: z.enum(['draft', 'active', 'retired']).optional(),
   intelligenceFocus: z.enum(['emerging', 'competitive']).default('emerging'),
+  referenceCity: z.string().max(100).nullable().optional(),
 });
 
 const intelligenceProfilePublishSchema = z.object({
@@ -5886,15 +5887,17 @@ router.get('/intelligence-profiles/drafts', async (req, res) => {
   }
 });
 
-// GET /intelligence-profiles/resolve/:category?focus=emerging|competitive
+// GET /intelligence-profiles/resolve/:category?focus=emerging|competitive&city=...
 // NOTE: Must be registered BEFORE /:id/:version, otherwise the literal "resolve"
 // segment is captured as :id and the category is parsed as :version (→ "Invalid version").
 router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
     const focus = req.query.focus as 'emerging' | 'competitive' | undefined;
+    const city = typeof req.query.city === 'string' ? req.query.city : undefined;
     const profile = await IntelligenceProfileService.getInstance().resolve(
       req.params.category,
       focus,
+      city,
       getCtx(req),
     );
     res.json({ success: true, data: profile });
@@ -5944,6 +5947,7 @@ router.post('/intelligence-profiles', async (req, res) => {
       configurationJson: parsed.configurationJson,
       status: parsed.status,
       intelligenceFocus: parsed.intelligenceFocus,
+      referenceCity: parsed.referenceCity,
     }, getCtx(req));
     res.status(201).json({ success: true, data: profile });
   } catch (error) {

@@ -53,6 +53,7 @@ export interface IntelligenceProfile {
   category_name: string;
   version: number;
   intelligence_focus: IntelligenceFocus;
+  reference_city: string | null;
   configuration_json: any;
   status: IntelligenceProfileStatus;
   created_at: Date;
@@ -95,6 +96,17 @@ export function normalizeCategoryKey(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * Normalize a city string for exact-match lookup against reference_city.
+ * Case/whitespace-insensitive. Empty/whitespace input returns null so the
+ * resolver treats it as "no city requested" (legacy/business-scope path).
+ */
+export function normalizeReferenceCity(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const trimmed = s.trim().toLowerCase().replace(/\s+/g, ' ');
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────
 
 export class IntelligenceProfileService extends BaseService {
@@ -118,28 +130,90 @@ export class IntelligenceProfileService extends BaseService {
   /**
    * Resolve the active profile for a category.
    *
+   * City-aware resolution (Migration 205 — Profile City Scoping):
+   *   - If `city` is provided, first try an exact
+   *     (category_key, reference_city, focus) match. This is the primary
+   *     path for intelligence-scope discovery: a Zionsville discovery
+   *     campaign resolves to the Zionsville-established profile, not the
+   *     Indianapolis one.
+   *   - If no city-specific profile exists, fall back to a city-agnostic
+   *     profile (reference_city IS NULL) for the same (category, focus).
+   *     This preserves backward compatibility for categories that only have
+   *     a city-agnostic profile, and for legacy profiles we could not
+   *     backfill. The fallback is logged so operators can detect when a
+   *     discovery campaign is running on a city-agnostic (possibly
+   *     city-contaminated) profile.
+   *   - If no city-agnostic profile exists either, fall back to a
+   *     category+focus match ignoring city (legacy pre-Migration-205
+   *     behavior) and log a warning. This is the last-resort path that
+   *     surfaces cross-city contamination — it exists only so a missing
+   *     city-scoped profile does not silently produce generic fallback
+   *     when a category+focus profile exists.
+   *
    * Focus-aware resolution (Migration 202 — Profile Type Alignment):
-   *   - If `focus` is provided, first try an exact (category_key, focus) match.
-   *   - If no focus-specific profile exists, fall back to a category-only
-   *     match (legacy single-profile behavior) and log a warning so operators
-   *     can detect when a campaign is running on a mismatched-type profile.
-   *   - If `focus` is omitted (business-scope §1B path), do a category-only
-   *     match — business audits are category-aware, not focus-aware.
+   *   - If `focus` is provided, the focus filter is applied at every layer.
+   *   - If `focus` is omitted (business-scope §1B path), the focus filter
+   *     is dropped — business audits are category-aware, not focus-aware.
+   *     City is still honored when provided so a business audit in
+   *     Zionsville does not load an Indianapolis-biased profile block.
    *
-   * Normalized exact match on category_key; active version only.
-   * Returns null on miss → caller uses generic fallback (intelligence_mode: 'none').
-   *
-   * Unchanged by GAP-P8 — the resolver only returns active profiles, so both
-   * consumers pick up newly activated profiles for free.
+   * Normalized exact match on category_key + reference_city; active version
+   * only. Returns null on miss → caller uses generic fallback
+   * (intelligence_mode: 'none').
    */
   async resolve(
     category: string,
     focus?: IntelligenceFocus,
+    city?: string | null,
     ctx?: RequestCtx,
   ): Promise<IntelligenceProfile | null> {
     const key = normalizeCategoryKey(category);
+    const normalizedCity = normalizeReferenceCity(city);
     try {
-      // 1. Focus-specific exact match (intelligence-scope discovery path)
+      // 1. City-specific exact match (primary intelligence-scope path)
+      if (normalizedCity) {
+        const cityWhere: any = {
+          category_key: key,
+          reference_city: normalizedCity,
+          status: 'active',
+        };
+        if (focus) cityWhere.intelligence_focus = focus;
+        const exact = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: cityWhere,
+          orderBy: { version: 'desc' },
+        });
+        if (exact) return exact as IntelligenceProfile;
+
+        // 2. City-agnostic fallback for the same (category, focus)
+        const agnosticWhere: any = {
+          category_key: key,
+          reference_city: null,
+          status: 'active',
+        };
+        if (focus) agnosticWhere.intelligence_focus = focus;
+        const agnostic = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: agnosticWhere,
+          orderBy: { version: 'desc' },
+        });
+        if (agnostic) {
+          logger.warn(
+            'Intelligence profile resolved via city-agnostic fallback — city contamination possible',
+            ctx,
+            {
+              categoryKey: key,
+              requestedCity: normalizedCity,
+              resolvedCity: null,
+              focus: focus ?? 'none',
+              profileId: (agnostic as any).id,
+            },
+          );
+          return agnostic as IntelligenceProfile;
+        }
+      }
+
+      // 3. Focus-specific match ignoring city (legacy / pre-Migration-205
+      //    behavior). Reached when city is omitted, or when no city-specific
+      //    AND no city-agnostic profile exists for the requested (city, focus).
       if (focus) {
         const exact = await this.prisma.mkt_intelligence_profiles.findFirst({
           where: {
@@ -149,9 +223,38 @@ export class IntelligenceProfileService extends BaseService {
           },
           orderBy: { version: 'desc' },
         });
-        if (exact) return exact as IntelligenceProfile;
+        if (exact) {
+          // If a city was requested but we landed here, the resolved profile
+          // may be scoped to a different city — surface the mismatch.
+          if (normalizedCity && (exact as any).reference_city && (exact as any).reference_city !== normalizedCity) {
+            logger.warn(
+              'Intelligence profile resolved via category+focus fallback — cross-city contamination likely',
+              ctx,
+              {
+                categoryKey: key,
+                requestedCity: normalizedCity,
+                resolvedCity: (exact as any).reference_city,
+                focus,
+                profileId: (exact as any).id,
+              },
+            );
+          } else if (normalizedCity) {
+            logger.warn(
+              'Intelligence profile resolved via focus fallback — type mismatch possible',
+              ctx,
+              {
+                categoryKey: key,
+                requestedCity: normalizedCity,
+                requestedFocus: focus,
+                resolvedFocus: (exact as any).intelligence_focus,
+                profileId: (exact as any).id,
+              },
+            );
+          }
+          return exact as IntelligenceProfile;
+        }
 
-        // 2. Fallback: category-only match (legacy / pre-Migration-202 behavior)
+        // 4. Fallback: category-only match (legacy / pre-Migration-202 behavior)
         const fallback = await this.prisma.mkt_intelligence_profiles.findFirst({
           where: { category_key: key, status: 'active' },
           orderBy: { version: 'desc' },
@@ -171,7 +274,16 @@ export class IntelligenceProfileService extends BaseService {
         return fallback as IntelligenceProfile | null;
       }
 
-      // 3. No focus requested (business-scope §1B path) — category-only match
+      // 5. No focus requested (business-scope §1B path) — category-only match.
+      //    If a city was requested, prefer a city-specific profile; otherwise
+      //    any active profile for the category.
+      if (normalizedCity) {
+        const cityProfile = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: { category_key: key, reference_city: normalizedCity, status: 'active' },
+          orderBy: { version: 'desc' },
+        });
+        if (cityProfile) return cityProfile as IntelligenceProfile;
+      }
       const profile = await this.prisma.mkt_intelligence_profiles.findFirst({
         where: { category_key: key, status: 'active' },
         orderBy: { version: 'desc' },
@@ -183,6 +295,7 @@ export class IntelligenceProfileService extends BaseService {
         error: (error as Error).message,
         categoryKey: key,
         focus: focus ?? 'none',
+        city: normalizedCity ?? 'none',
       });
       throw this.handleError(error, ctx);
     }
@@ -281,11 +394,13 @@ export class IntelligenceProfileService extends BaseService {
     configurationJson: IntelligenceProfileConfiguration;
     status?: IntelligenceProfileStatus;
     intelligenceFocus?: IntelligenceFocus;
+    referenceCity?: string | null;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const id = input.id || generateIntelligenceProfileId();
     const categoryKey = normalizeCategoryKey(input.categoryKey);
     const status = input.status ?? 'draft';
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
+    const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
     try {
       const profile = await this.prisma.mkt_intelligence_profiles.create({
         data: {
@@ -294,6 +409,7 @@ export class IntelligenceProfileService extends BaseService {
           category_name: input.categoryName,
           version: 1,
           intelligence_focus: intelligenceFocus,
+          reference_city: referenceCity,
           configuration_json: input.configurationJson as any,
           status,
         },
@@ -303,6 +419,7 @@ export class IntelligenceProfileService extends BaseService {
         categoryKey,
         status,
         intelligenceFocus,
+        referenceCity,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -333,9 +450,11 @@ export class IntelligenceProfileService extends BaseService {
     configurationJson: IntelligenceProfileConfiguration;
     existingProfileId?: string;
     intelligenceFocus?: IntelligenceFocus;
+    referenceCity?: string | null;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const categoryKey = normalizeCategoryKey(input.categoryKey);
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
+    const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
     try {
       // Determine the profile id + next version number
       let profileId = input.existingProfileId;
@@ -352,9 +471,21 @@ export class IntelligenceProfileService extends BaseService {
           nextVersion = existing[0].version + 1;
         }
       } else {
-        // Check if a profile with this category_key + focus already exists
+        // Check if a profile with this (category_key, reference_city, focus)
+        // already exists. City is part of the identity tuple so an
+        // Indianapolis-established profile and a Zionsville-established
+        // profile for the same (category, focus) get distinct profile ids.
+        const findWhere: any = {
+          category_key: categoryKey,
+          intelligence_focus: intelligenceFocus,
+        };
+        if (referenceCity) {
+          findWhere.reference_city = referenceCity;
+        } else {
+          findWhere.reference_city = null;
+        }
         const existingByKey = await this.prisma.mkt_intelligence_profiles.findFirst({
-          where: { category_key: categoryKey, intelligence_focus: intelligenceFocus },
+          where: findWhere,
           orderBy: { version: 'desc' },
         });
         if (existingByKey) {
@@ -372,6 +503,7 @@ export class IntelligenceProfileService extends BaseService {
           category_name: input.categoryName,
           version: nextVersion,
           intelligence_focus: intelligenceFocus,
+          reference_city: referenceCity,
           configuration_json: input.configurationJson as any,
           status: 'draft',
         },
@@ -381,6 +513,7 @@ export class IntelligenceProfileService extends BaseService {
         categoryKey,
         version: nextVersion,
         intelligenceFocus,
+        referenceCity,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -414,16 +547,27 @@ export class IntelligenceProfileService extends BaseService {
           throw new Error(`Profile ${profileId} v${version} is not a draft (status: ${draft.status})`);
         }
 
-        // 2. Retire any existing active version for this category_key + focus.
+        // 2. Retire any existing active version for this
+        //    (category_key, reference_city, focus) triple.
         //    Type-scoped (Migration 202): activating a competitive draft retires
         //    only the prior active competitive profile — the active emerging
         //    profile for the same category is untouched.
+        //    City-scoped (Migration 205): activating a Zionsville draft retires
+        //    only the prior active Zionsville profile — the active Indianapolis
+        //    profile for the same (category, focus) is untouched. NULL
+        //    reference_city is treated as a distinct scope (city-agnostic).
+        const retireWhere: any = {
+          category_key: draft.category_key,
+          intelligence_focus: draft.intelligence_focus,
+          status: 'active',
+        };
+        if (draft.reference_city) {
+          retireWhere.reference_city = draft.reference_city;
+        } else {
+          retireWhere.reference_city = null;
+        }
         await tx.mkt_intelligence_profiles.updateMany({
-          where: {
-            category_key: draft.category_key,
-            intelligence_focus: draft.intelligence_focus,
-            status: 'active',
-          },
+          where: retireWhere,
           data: { status: 'retired', updated_at: new Date() },
         });
 
@@ -485,8 +629,9 @@ export class IntelligenceProfileService extends BaseService {
           data: { status: 'retired', updated_at: new Date() },
         });
 
-        // 3. Create the new active version — carry the focus from the
-        //    latest version so all versions of a profile id share the same focus.
+        // 3. Create the new active version — carry the focus + reference_city
+        //    from the latest version so all versions of a profile id share the
+        //    same focus and city scope.
         const created = await tx.mkt_intelligence_profiles.create({
           data: {
             id: profileId,
@@ -494,6 +639,7 @@ export class IntelligenceProfileService extends BaseService {
             category_name: input.categoryName ?? latest.category_name,
             version: nextVersion,
             intelligence_focus: latest.intelligence_focus,
+            reference_city: latest.reference_city,
             configuration_json: input.configurationJson as any,
             status: 'active',
           },
@@ -525,14 +671,61 @@ export class IntelligenceProfileService extends BaseService {
    * with capabilities/limitations, discovery patterns, category evidence
    * rules, prohibited inferences, and category signals.
    */
-  renderProfileBlock(profile: IntelligenceProfile): string {
+  renderProfileBlock(profile: IntelligenceProfile, targetCity?: string | null): string {
     const config = profile.configuration_json as IntelligenceProfileConfiguration;
     const lines: string[] = [];
+    const normalizedTarget = normalizeReferenceCity(targetCity);
+    const profileCity = normalizeReferenceCity(profile.reference_city);
 
     lines.push('');
     lines.push('=== CATEGORY INTELLIGENCE PROFILE ===');
     lines.push(`Category: ${profile.category_name}`);
     lines.push(`Profile: ${profile.id} v${profile.version}`);
+    if (profileCity) {
+      lines.push(`Reference city (profile established for): ${profileCity}`);
+    } else {
+      lines.push('Reference city: city-agnostic (no reference market recorded)');
+    }
+    if (normalizedTarget) {
+      lines.push(`Target city (this discovery campaign): ${normalizedTarget}`);
+      if (profileCity && profileCity !== normalizedTarget) {
+        // Render-time city mismatch guard (Migration 205). The profile was
+        // established for a different city than the one this discovery
+        // campaign is targeting. The configuration_json may contain
+        // reference-city-specific supplier names, business examples, and
+        // discovery patterns that, if followed literally, would surface
+        // businesses in the reference city rather than the target city.
+        // Emit an explicit directive so the AI re-targets the profile's
+        // concrete examples to the target city instead of copying them.
+        lines.push('');
+        lines.push('--- CITY RETARGETING DIRECTIVE ---');
+        lines.push(`This profile was established for ${profileCity}, but this discovery`);
+        lines.push(`campaign targets ${normalizedTarget}. The specialized sources,`);
+        lines.push('discovery patterns, supplier names, business examples, and community');
+        lines.push(`references below were drawn from the ${profileCity} market. Apply the`);
+        lines.push(`profile's CATEGORY-LEVEL knowledge (terminology, evidence rules,`);
+        lines.push('prohibited inferences, signal definitions, source TYPES and their');
+        lines.push('capability/limitation contracts) to the target city, but do NOT');
+        lines.push(`import ${profileCity}-specific business names, supplier retailer lists,`);
+        lines.push(`or ${profileCity}-specific search strings as-is. Re-derive concrete`);
+        lines.push(`discovery queries, supplier retailer lists, and community sources for`);
+        lines.push(`${normalizedTarget}. Exclude businesses located in ${profileCity} from`);
+        lines.push(`the qualifying set unless they also serve the ${normalizedTarget} market.`);
+        lines.push('Classify every discovered business by location relative to the TARGET');
+        lines.push(`city (${normalizedTarget}), not the profile's reference city.`);
+      } else if (!profileCity) {
+        // City-agnostic profile applied to a city-specific campaign. The
+        // configuration_json may still contain incidental city references
+        // from whatever market the establishment campaign happened to use.
+        lines.push('');
+        lines.push('--- CITY APPLICATION DIRECTIVE ---');
+        lines.push('This profile is city-agnostic (no reference market recorded). Apply');
+        lines.push(`its category-level knowledge to ${normalizedTarget}. If the profile`);
+        lines.push('body contains any concrete city names, supplier retailer lists, or');
+        lines.push('business examples, treat them as illustrative of the category, not as');
+        lines.push(`discovery targets. Re-derive concrete discovery queries for ${normalizedTarget}.`);
+      }
+    }
     lines.push('');
 
     if (config.terminology && Object.keys(config.terminology).length > 0) {
@@ -603,14 +796,29 @@ export class IntelligenceProfileService extends BaseService {
    * category evidence rules, prohibited inferences, and category signals.
    * Excludes discovery patterns (not relevant for business audits).
    */
-  renderBusinessProfileBlock(profile: IntelligenceProfile): string {
+  renderBusinessProfileBlock(profile: IntelligenceProfile, targetCity?: string | null): string {
     const config = profile.configuration_json as IntelligenceProfileConfiguration;
     const lines: string[] = [];
+    const normalizedTarget = normalizeReferenceCity(targetCity);
+    const profileCity = normalizeReferenceCity(profile.reference_city);
 
     lines.push('');
     lines.push('=== CATEGORY INTELLIGENCE (BUSINESS AUDIT AMPLIFICATION) ===');
     lines.push(`Category: ${profile.category_name}`);
     lines.push(`Profile: ${profile.id} v${profile.version}`);
+    if (profileCity) {
+      lines.push(`Reference city (profile established for): ${profileCity}`);
+    }
+    if (normalizedTarget && profileCity && profileCity !== normalizedTarget) {
+      lines.push(`Target city (this business audit): ${normalizedTarget}`);
+      lines.push('');
+      lines.push('--- CITY RETARGETING DIRECTIVE ---');
+      lines.push(`This profile was established for ${profileCity}, but this business audit`);
+      lines.push(`targets a business in ${normalizedTarget}. Apply the category-level`);
+      lines.push('evidence rules, terminology, and signal definitions, but do NOT import');
+      lines.push(`${profileCity}-specific supplier names or business examples as evidence`);
+      lines.push(`about the ${normalizedTarget} business under audit.`);
+    }
     lines.push('');
 
     if (config.terminology && Object.keys(config.terminology).length > 0) {

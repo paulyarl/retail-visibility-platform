@@ -85,6 +85,7 @@ export class PromptComposerService extends BaseService {
   async composeIntelligencePrompt(input: {
     category: string;
     focus: IntelligenceFocus;
+    city?: string | null;
   }, ctx?: RequestCtx): Promise<ComposedPrompt> {
     const promptService = MarketingPromptService.getInstance();
     const profileService = IntelligenceProfileService.getInstance();
@@ -108,15 +109,21 @@ export class PromptComposerService extends BaseService {
       throw new Error(`Focus fragment not found for focus="${input.focus}". Run: pnpm seed:intelligence-fragments`);
     }
 
-    // 2. Resolve active profile for the category (focus-aware — Migration 202)
-    const profile = await profileService.resolve(input.category, input.focus, ctx);
+    // 2. Resolve active profile for the (category, focus, city) triple.
+    //    City-aware resolution (Migration 205): a Zionsville discovery
+    //    campaign resolves to the Zionsville-established profile, not the
+    //    Indianapolis one. Falls back to city-agnostic / category+focus
+    //    profiles with logged warnings when no city-specific profile exists.
+    const profile = await profileService.resolve(input.category, input.focus, input.city, ctx);
 
     // 3. Build the profile block or generic fallback
     let profileSection: string;
     let resolution: PromptResolution;
 
     if (profile) {
-      profileSection = profileService.renderProfileBlock(profile);
+      // Pass the campaign's target city so renderProfileBlock can emit a
+      // city retargeting directive when the profile's reference city differs.
+      profileSection = profileService.renderProfileBlock(profile, input.city);
       resolution = {
         profile_id: profile.id,
         profile_version: profile.version,
@@ -140,9 +147,11 @@ export class PromptComposerService extends BaseService {
     logger.info('Intelligence prompt composed', ctx, {
       category: input.category,
       focus: input.focus,
+      city: input.city ?? 'none',
       intelligenceMode: resolution.intelligence_mode,
       profileId: resolution.profile_id,
       profileVersion: resolution.profile_version,
+      profileReferenceCity: (profile as any)?.reference_city ?? null,
     });
 
     return { body, resolution, focus: input.focus };

@@ -783,22 +783,30 @@ export class MarketingPromptService extends BaseService {
           // campaign's intelligence_focus so the imported draft is born with
           // the correct type lineage. This is the key ghost-bug fix: the
           // operator's campaign focus choice flows end-to-end into the profile.
+          // Migration 205 — Profile City Scoping: also read the establishment
+          // campaign's city so the draft is scoped to the correct reference
+          // market. Without this, a Zionsville establishment campaign would
+          // produce a profile that later resolves for an Indianapolis
+          // discovery campaign (cross-city contamination).
           const campaign = await this.prisma.mkt_campaigns_list.findUnique({
             where: { id: input.campaignId },
-            select: { intelligence_focus: true },
+            select: { intelligence_focus: true, city: true },
           });
           const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive';
+          const referenceCity = campaign?.city || null;
           const profile = await IntelligenceProfileService.getInstance().importAsDraft({
             categoryKey: parsedJson.category_key,
             categoryName: parsedJson.category_name,
             configurationJson: parsedJson,
             intelligenceFocus: focus,
+            referenceCity,
           }, ctx);
           logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
             profileId: profile.id,
             version: profile.version,
             categoryKey: profile.category_key,
             intelligenceFocus: focus,
+            referenceCity,
             campaignId: input.campaignId,
           });
         } catch (profileErr) {

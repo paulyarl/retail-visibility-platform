@@ -38,6 +38,24 @@ The profile will be used to:
 1. Guide Intelligence-scope discovery audits (finding qualifying businesses)
 2. Amplify Business-scope audit prompts with category-specific evidence rules
 
+=== CITY SCOPING ===
+This profile is scoped to the reference market named above ({{city}}). The
+specialized sources, discovery patterns, supplier retailer lists, community
+networks, and business examples you produce should be concrete and actionable
+for THIS city — name the actual suppliers, diaspora organizations, commercial
+corridors, and community directories that operate in {{city}} and its metro
+area. Do NOT produce a city-agnostic profile: the operator will run a separate
+establishment campaign for each city they want a profile for, because a
+profile established for one city's market is not safe to apply to a different
+city's discovery campaign (the supplier lists, community sources, and business
+examples will not match).
+
+When naming sources, prefer concrete {{city}}-specific examples over generic
+descriptions. For example, instead of "African-food supplier retailer lists",
+name the actual supplier(s) serving {{city}} and the retailers they list.
+Instead of "community directories", name the actual diaspora organizations
+and international-business networks active in {{city}}.
+
 === PROFILE SECTIONS ===
 
 1. TERMINOLOGY — Define the key terms used in this category. What do practitioners call their work? What terms would a customer use? What industry-specific vocabulary matters?

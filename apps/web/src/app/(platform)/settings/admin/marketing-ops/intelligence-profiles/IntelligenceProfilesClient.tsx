@@ -256,6 +256,11 @@ export default function IntelligenceProfilesClient() {
               <Badge size="xs" variant="dot" color={FOCUS_COLORS[profile.intelligence_focus]}>
                 {FOCUS_LABELS[profile.intelligence_focus]}
               </Badge>
+              {profile.reference_city ? (
+                <Badge size="xs" variant="dot" color="cyan">{profile.reference_city}</Badge>
+              ) : (
+                <Badge size="xs" variant="dot" color="gray">city-agnostic</Badge>
+              )}
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
