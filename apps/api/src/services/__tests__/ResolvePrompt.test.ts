@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Use vi.hoisted so mock instances are stable across factory + test code
 const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService } = vi.hoisted(() => {
   const mockProfileService = {
-    resolve: vi.fn(async (_category: string) => null),
+    resolve: vi.fn(async (_category: string, _focus?: string) => null),
     renderBusinessProfileBlock: vi.fn((profile: any) => `\nPROFILE_BLOCK:${profile.id}:v${profile.version}`),
   };
   const mockPromptService = {
@@ -176,7 +176,8 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     expect(resolution.intelligence_mode).toBe('profile');
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined);
+    // Business-scope §1B path calls resolve with no focus (category-only match)
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined, undefined);
   });
 
   it('fulfill prompt → no amplification (gate: seek-only)', async () => {

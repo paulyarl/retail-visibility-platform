@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Use vi.hoisted so mock instances are stable across factory + test code
 const { mockProfileService, mockPromptService } = vi.hoisted(() => {
   const mockProfileService = {
-    resolve: vi.fn(async (_category: string) => null),
+    resolve: vi.fn(async (_category: string, _focus?: string) => null),
     renderProfileBlock: vi.fn((profile: any) => `PROFILE_BLOCK:${profile.id}:v${profile.version}`),
   };
   const mockPromptService = {
@@ -66,6 +66,7 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
       version: 1,
       category_key: 'auto repair',
       category_name: 'Auto Repair',
+      intelligence_focus: 'emerging',
       status: 'active',
       configuration_json: {},
     });
@@ -85,6 +86,9 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
     expect(result.resolution.profile_id).toBe('auto_repair_us');
     expect(result.resolution.profile_version).toBe(1);
     expect(result.focus).toBe('emerging');
+
+    // Migration 202 — focus is passed through to the resolver
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('Auto Repair', 'emerging', undefined);
   });
 
   it('composes with competitive focus + active profile', async () => {
@@ -93,6 +97,7 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
       version: 2,
       category_key: 'plumbing',
       category_name: 'Plumbing',
+      intelligence_focus: 'competitive',
       status: 'active',
       configuration_json: {},
     });
@@ -112,6 +117,9 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
     expect(result.resolution.profile_id).toBe('plumbing_us');
     expect(result.resolution.profile_version).toBe(2);
     expect(result.focus).toBe('competitive');
+
+    // Migration 202 — focus is passed through to the resolver
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('Plumbing', 'competitive', undefined);
   });
 
   it('composes with null profile → generic fallback + intelligence_mode none', async () => {

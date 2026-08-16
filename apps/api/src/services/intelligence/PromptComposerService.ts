@@ -30,9 +30,16 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { MarketingPromptService } from '../MarketingPromptService';
-import { IntelligenceProfileService, type IntelligenceProfile, type PromptResolution } from './IntelligenceProfileService';
+import {
+  IntelligenceProfileService,
+  type IntelligenceProfile,
+  type PromptResolution,
+  type IntelligenceFocus,
+} from './IntelligenceProfileService';
 
-export type IntelligenceFocus = 'emerging' | 'competitive';
+// Re-export IntelligenceFocus for backward compatibility — the type now
+// originates in IntelligenceProfileService to avoid a circular import.
+export type { IntelligenceFocus };
 
 export interface ComposedPrompt {
   body: string;
@@ -101,8 +108,8 @@ export class PromptComposerService extends BaseService {
       throw new Error(`Focus fragment not found for focus="${input.focus}". Run: pnpm seed:intelligence-fragments`);
     }
 
-    // 2. Resolve active profile for the category
-    const profile = await profileService.resolve(input.category, ctx);
+    // 2. Resolve active profile for the category (focus-aware — Migration 202)
+    const profile = await profileService.resolve(input.category, input.focus, ctx);
 
     // 3. Build the profile block or generic fallback
     let profileSection: string;

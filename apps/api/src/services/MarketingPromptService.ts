@@ -600,15 +600,26 @@ export class MarketingPromptService extends BaseService {
       if (schemaName === 'intelligence_profile' && resolved.auditPlatform === null) {
         try {
           const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+          // Migration 202 — Profile Type Alignment: read the establishment
+          // campaign's intelligence_focus so the imported draft is born with
+          // the correct type lineage. This is the key ghost-bug fix: the
+          // operator's campaign focus choice flows end-to-end into the profile.
+          const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+            where: { id: input.campaignId },
+            select: { intelligence_focus: true },
+          });
+          const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive';
           const profile = await IntelligenceProfileService.getInstance().importAsDraft({
             categoryKey: parsedJson.category_key,
             categoryName: parsedJson.category_name,
             configurationJson: parsedJson,
+            intelligenceFocus: focus,
           }, ctx);
           logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
             profileId: profile.id,
             version: profile.version,
             categoryKey: profile.category_key,
+            intelligenceFocus: focus,
             campaignId: input.campaignId,
           });
         } catch (profileErr) {

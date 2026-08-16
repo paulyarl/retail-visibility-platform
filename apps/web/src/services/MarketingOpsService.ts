@@ -4717,6 +4717,7 @@ export interface IntelligenceProfile {
   category_key: string;
   category_name: string;
   version: number;
+  intelligence_focus: IntelligenceFocus;
   configuration_json: Record<string, any>;
   status: ProfileStatus;
   created_at: string;
@@ -4763,12 +4764,13 @@ interface MarketingOpsService {
   listIntelligenceProfileDrafts(): Promise<IntelligenceProfile[]>;
   getIntelligenceProfile(id: string): Promise<IntelligenceProfileWithVersions>;
   getIntelligenceProfileVersion(id: string, version: number): Promise<IntelligenceProfile>;
-  resolveIntelligenceProfile(category: string): Promise<IntelligenceProfile | null>;
+  resolveIntelligenceProfile(category: string, focus?: IntelligenceFocus): Promise<IntelligenceProfile | null>;
   createIntelligenceProfile(input: {
     categoryKey: string;
     categoryName: string;
     configurationJson: Record<string, any>;
     status?: ProfileStatus;
+    intelligenceFocus?: IntelligenceFocus;
   }): Promise<IntelligenceProfile>;
   publishIntelligenceProfile(id: string, input: {
     configurationJson: Record<string, any>;
@@ -4948,11 +4950,12 @@ MarketingOpsService.prototype.getIntelligenceProfileVersion = async function (id
   return result.data?.data ?? result.data;
 };
 
-MarketingOpsService.prototype.resolveIntelligenceProfile = async function (category: string): Promise<IntelligenceProfile | null> {
+MarketingOpsService.prototype.resolveIntelligenceProfile = async function (category: string, focus?: IntelligenceFocus): Promise<IntelligenceProfile | null> {
+  const focusQuery = focus ? `?focus=${encodeURIComponent(focus)}` : '';
   const result = await this.makeDefaultRequest<any>(
-    `${BASE_URL}/intelligence-profiles/resolve/${encodeURIComponent(category)}`,
+    `${BASE_URL}/intelligence-profiles/resolve/${encodeURIComponent(category)}${focusQuery}`,
     {},
-    `mkt-ops-intel-profile-resolve-${category}`,
+    `mkt-ops-intel-profile-resolve-${category}-${focus ?? 'any'}`,
     0,
   );
   if (!result.success) {
@@ -4966,6 +4969,7 @@ MarketingOpsService.prototype.createIntelligenceProfile = async function (input:
   categoryName: string;
   configurationJson: Record<string, any>;
   status?: ProfileStatus;
+  intelligenceFocus?: IntelligenceFocus;
 }): Promise<IntelligenceProfile> {
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/intelligence-profiles`,

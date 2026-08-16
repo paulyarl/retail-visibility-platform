@@ -36,11 +36,23 @@ import { generateIntelligenceProfileId } from '../../lib/id-generator';
 
 export type IntelligenceProfileStatus = 'draft' | 'active' | 'retired';
 
+/**
+ * Intelligence focus type — defined here (not in PromptComposerService) to
+ * avoid a circular import. PromptComposerService imports from this module,
+ * so the type must originate here. PromptComposerService re-exports it for
+ * backward compatibility.
+ *
+ * 'emerging' — discover low-visibility, hard-to-find businesses
+ * 'competitive' — benchmark established, mainstream-visible market leaders
+ */
+export type IntelligenceFocus = 'emerging' | 'competitive';
+
 export interface IntelligenceProfile {
   id: string;
   category_key: string;
   category_name: string;
   version: number;
+  intelligence_focus: IntelligenceFocus;
   configuration_json: any;
   status: IntelligenceProfileStatus;
   created_at: Date;
@@ -105,20 +117,63 @@ export class IntelligenceProfileService extends BaseService {
 
   /**
    * Resolve the active profile for a category.
+   *
+   * Focus-aware resolution (Migration 202 — Profile Type Alignment):
+   *   - If `focus` is provided, first try an exact (category_key, focus) match.
+   *   - If no focus-specific profile exists, fall back to a category-only
+   *     match (legacy single-profile behavior) and log a warning so operators
+   *     can detect when a campaign is running on a mismatched-type profile.
+   *   - If `focus` is omitted (business-scope §1B path), do a category-only
+   *     match — business audits are category-aware, not focus-aware.
+   *
    * Normalized exact match on category_key; active version only.
    * Returns null on miss → caller uses generic fallback (intelligence_mode: 'none').
    *
    * Unchanged by GAP-P8 — the resolver only returns active profiles, so both
    * consumers pick up newly activated profiles for free.
    */
-  async resolve(category: string, ctx?: RequestCtx): Promise<IntelligenceProfile | null> {
+  async resolve(
+    category: string,
+    focus?: IntelligenceFocus,
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile | null> {
     const key = normalizeCategoryKey(category);
     try {
+      // 1. Focus-specific exact match (intelligence-scope discovery path)
+      if (focus) {
+        const exact = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: {
+            category_key: key,
+            intelligence_focus: focus,
+            status: 'active',
+          },
+          orderBy: { version: 'desc' },
+        });
+        if (exact) return exact as IntelligenceProfile;
+
+        // 2. Fallback: category-only match (legacy / pre-Migration-202 behavior)
+        const fallback = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: { category_key: key, status: 'active' },
+          orderBy: { version: 'desc' },
+        });
+        if (fallback) {
+          logger.warn(
+            'Intelligence profile resolved via focus fallback — type mismatch possible',
+            ctx,
+            {
+              categoryKey: key,
+              requestedFocus: focus,
+              resolvedFocus: (fallback as any).intelligence_focus,
+              profileId: (fallback as any).id,
+            },
+          );
+        }
+        return fallback as IntelligenceProfile | null;
+      }
+
+      // 3. No focus requested (business-scope §1B path) — category-only match
       const profile = await this.prisma.mkt_intelligence_profiles.findFirst({
-        where: {
-          category_key: key,
-          status: 'active',
-        },
+        where: { category_key: key, status: 'active' },
         orderBy: { version: 'desc' },
       });
       if (!profile) return null;
@@ -127,6 +182,7 @@ export class IntelligenceProfileService extends BaseService {
       logger.error('IntelligenceProfileService.resolve failed', ctx, {
         error: (error as Error).message,
         categoryKey: key,
+        focus: focus ?? 'none',
       });
       throw this.handleError(error, ctx);
     }
@@ -224,10 +280,12 @@ export class IntelligenceProfileService extends BaseService {
     categoryName: string;
     configurationJson: IntelligenceProfileConfiguration;
     status?: IntelligenceProfileStatus;
+    intelligenceFocus?: IntelligenceFocus;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const id = input.id || generateIntelligenceProfileId();
     const categoryKey = normalizeCategoryKey(input.categoryKey);
     const status = input.status ?? 'draft';
+    const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     try {
       const profile = await this.prisma.mkt_intelligence_profiles.create({
         data: {
@@ -235,6 +293,7 @@ export class IntelligenceProfileService extends BaseService {
           category_key: categoryKey,
           category_name: input.categoryName,
           version: 1,
+          intelligence_focus: intelligenceFocus,
           configuration_json: input.configurationJson as any,
           status,
         },
@@ -243,6 +302,7 @@ export class IntelligenceProfileService extends BaseService {
         profileId: id,
         categoryKey,
         status,
+        intelligenceFocus,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -262,14 +322,20 @@ export class IntelligenceProfileService extends BaseService {
    *
    * If a profile with the same id already exists, creates a new version number.
    * If no profile with the category_key exists, creates a new profile (version 1).
+   *
+   * The intelligenceFocus is read from the establishment campaign at import
+   * time (Migration 202 — Profile Type Alignment) so the draft is born with
+   * the correct type lineage. All versions of a profile id share the same focus.
    */
   async importAsDraft(input: {
     categoryKey: string;
     categoryName: string;
     configurationJson: IntelligenceProfileConfiguration;
     existingProfileId?: string;
+    intelligenceFocus?: IntelligenceFocus;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const categoryKey = normalizeCategoryKey(input.categoryKey);
+    const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     try {
       // Determine the profile id + next version number
       let profileId = input.existingProfileId;
@@ -286,9 +352,9 @@ export class IntelligenceProfileService extends BaseService {
           nextVersion = existing[0].version + 1;
         }
       } else {
-        // Check if a profile with this category_key already exists
+        // Check if a profile with this category_key + focus already exists
         const existingByKey = await this.prisma.mkt_intelligence_profiles.findFirst({
-          where: { category_key: categoryKey },
+          where: { category_key: categoryKey, intelligence_focus: intelligenceFocus },
           orderBy: { version: 'desc' },
         });
         if (existingByKey) {
@@ -305,6 +371,7 @@ export class IntelligenceProfileService extends BaseService {
           category_key: categoryKey,
           category_name: input.categoryName,
           version: nextVersion,
+          intelligence_focus: intelligenceFocus,
           configuration_json: input.configurationJson as any,
           status: 'draft',
         },
@@ -313,6 +380,7 @@ export class IntelligenceProfileService extends BaseService {
         profileId,
         categoryKey,
         version: nextVersion,
+        intelligenceFocus,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -346,10 +414,14 @@ export class IntelligenceProfileService extends BaseService {
           throw new Error(`Profile ${profileId} v${version} is not a draft (status: ${draft.status})`);
         }
 
-        // 2. Retire any existing active version for this category_key
+        // 2. Retire any existing active version for this category_key + focus.
+        //    Type-scoped (Migration 202): activating a competitive draft retires
+        //    only the prior active competitive profile — the active emerging
+        //    profile for the same category is untouched.
         await tx.mkt_intelligence_profiles.updateMany({
           where: {
             category_key: draft.category_key,
+            intelligence_focus: draft.intelligence_focus,
             status: 'active',
           },
           data: { status: 'retired', updated_at: new Date() },
@@ -413,13 +485,15 @@ export class IntelligenceProfileService extends BaseService {
           data: { status: 'retired', updated_at: new Date() },
         });
 
-        // 3. Create the new active version
+        // 3. Create the new active version — carry the focus from the
+        //    latest version so all versions of a profile id share the same focus.
         const created = await tx.mkt_intelligence_profiles.create({
           data: {
             id: profileId,
             category_key: latest.category_key,
             category_name: input.categoryName ?? latest.category_name,
             version: nextVersion,
+            intelligence_focus: latest.intelligence_focus,
             configuration_json: input.configurationJson as any,
             status: 'active',
           },

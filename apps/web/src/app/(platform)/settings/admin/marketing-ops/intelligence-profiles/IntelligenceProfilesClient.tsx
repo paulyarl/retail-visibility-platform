@@ -30,7 +30,7 @@ import {
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
-import type { IntelligenceProfile, ProfileStatus } from '@/services/MarketingOpsService';
+import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus } from '@/services/MarketingOpsService';
 
 const STATUS_COLORS: Record<ProfileStatus, string> = {
   draft: 'orange',
@@ -42,6 +42,16 @@ const STATUS_LABELS: Record<ProfileStatus, string> = {
   draft: 'Draft',
   active: 'Active',
   retired: 'Retired',
+};
+
+const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
+  emerging: 'blue',
+  competitive: 'violet',
+};
+
+const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
+  emerging: 'Emerging',
+  competitive: 'Competitive',
 };
 
 export default function IntelligenceProfilesClient() {
@@ -150,6 +160,9 @@ export default function IntelligenceProfilesClient() {
               <Badge size="xs" variant="light" color={STATUS_COLORS[profile.status]}>
                 {STATUS_LABELS[profile.status]}
               </Badge>
+              <Badge size="xs" variant="dot" color={FOCUS_COLORS[profile.intelligence_focus]}>
+                {FOCUS_LABELS[profile.intelligence_focus]}
+              </Badge>
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
@@ -228,7 +241,8 @@ export default function IntelligenceProfilesClient() {
             </Group>
             <Text size="xs" c="dimmed" mb="sm">
               Drafts are inert — they don&apos;t affect any prompts until explicitly activated.
-              Activating a draft retires the previously active version for the same category.
+              Activating a draft retires the previously active version for the same category
+              <strong> and focus type</strong>.
             </Text>
             {draftProfiles.length === 0 ? (
               <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
@@ -250,7 +264,9 @@ export default function IntelligenceProfilesClient() {
             </Group>
             <Text size="xs" c="dimmed" mb="sm">
               Active profiles are used by resolvePrompt() for business-scope §1B amplification
-              and by PromptComposerService for intelligence-scope discovery runs.
+              and by PromptComposerService for intelligence-scope discovery runs. Each category
+              can have one active Emerging and one active Competitive profile — discovery
+              campaigns auto-align to the profile matching their focus.
             </Text>
             {activeProfiles.length === 0 ? (
               <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
@@ -338,7 +354,7 @@ export default function IntelligenceProfilesClient() {
       <Modal
         opened={!!viewProfile}
         onClose={() => setViewProfile(null)}
-        title={viewProfile ? `${viewProfile.category_name} v${viewProfile.version}` : ''}
+        title={viewProfile ? `${viewProfile.category_name} v${viewProfile.version} — ${FOCUS_LABELS[viewProfile.intelligence_focus]}` : ''}
         size="xl"
         styles={{ body: { maxHeight: '70vh' } }}
       >
@@ -347,6 +363,9 @@ export default function IntelligenceProfilesClient() {
             <Group gap="xs">
               <Badge size="sm" variant="light" color={STATUS_COLORS[viewProfile.status]}>
                 {STATUS_LABELS[viewProfile.status]}
+              </Badge>
+              <Badge size="sm" variant="dot" color={FOCUS_COLORS[viewProfile.intelligence_focus]}>
+                {FOCUS_LABELS[viewProfile.intelligence_focus]}
               </Badge>
               <Text size="xs" c="dimmed" ff="monospace">{viewProfile.id}</Text>
             </Group>

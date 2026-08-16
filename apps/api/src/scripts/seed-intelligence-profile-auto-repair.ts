@@ -173,12 +173,15 @@ async function main() {
   // Seed as ACTIVE — this is the hand-seeded PoC reference profile.
   // The establishment loop (GAP-P8) seeds as DRAFT; the hand-seed is the
   // known-good reference that the establishment template validates against.
+  // intelligenceFocus: 'emerging' — the auto repair profile is emerging-biased
+  // (CARFAX vertical discovery, hidden-trust signals). Explicit per Migration 202.
   const profile = await service.createProfile({
     id: AUTO_REPAIR_PROFILE.id,
     categoryKey: AUTO_REPAIR_PROFILE.categoryKey,
     categoryName: AUTO_REPAIR_PROFILE.categoryName,
     configurationJson: AUTO_REPAIR_PROFILE.configurationJson,
     status: 'active',
+    intelligenceFocus: 'emerging',
   });
 
   logger.info('auto_repair_us v1 profile seeded', undefined, {

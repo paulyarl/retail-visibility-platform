@@ -5822,6 +5822,7 @@ const intelligenceProfileCreateSchema = z.object({
   categoryName: z.string().min(1).max(100),
   configurationJson: z.record(z.string(), z.any()),
   status: z.enum(['draft', 'active', 'retired']).optional(),
+  intelligenceFocus: z.enum(['emerging', 'competitive']).default('emerging'),
 });
 
 const intelligenceProfilePublishSchema = z.object({
@@ -5849,12 +5850,17 @@ router.get('/intelligence-profiles/drafts', async (req, res) => {
   }
 });
 
-// GET /intelligence-profiles/resolve/:category — resolve active profile for a category
+// GET /intelligence-profiles/resolve/:category?focus=emerging|competitive
 // NOTE: Must be registered BEFORE /:id/:version, otherwise the literal "resolve"
 // segment is captured as :id and the category is parsed as :version (→ "Invalid version").
 router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
-    const profile = await IntelligenceProfileService.getInstance().resolve(req.params.category, getCtx(req));
+    const focus = req.query.focus as 'emerging' | 'competitive' | undefined;
+    const profile = await IntelligenceProfileService.getInstance().resolve(
+      req.params.category,
+      focus,
+      getCtx(req),
+    );
     res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
@@ -5901,6 +5907,7 @@ router.post('/intelligence-profiles', async (req, res) => {
       categoryName: parsed.categoryName,
       configurationJson: parsed.configurationJson,
       status: parsed.status,
+      intelligenceFocus: parsed.intelligenceFocus,
     }, getCtx(req));
     res.status(201).json({ success: true, data: profile });
   } catch (error) {

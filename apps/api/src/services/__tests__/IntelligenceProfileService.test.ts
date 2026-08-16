@@ -21,6 +21,7 @@ const sampleProfile: IntelligenceProfile = {
   category_key: 'auto repair',
   category_name: 'Auto Repair',
   version: 1,
+  intelligence_focus: 'emerging',
   status: 'active',
   created_at: new Date(),
   updated_at: new Date(),
