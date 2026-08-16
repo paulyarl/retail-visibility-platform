@@ -44,6 +44,57 @@ interface EditProvenanceRow {
   showOnPublic: boolean;
 }
 
+const DAYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+
+interface DayHours {
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+const EMPTY_HOURS: Record<string, DayHours> = DAYS.reduce((acc, day) => {
+  acc[day] = { open: '09:00', close: '18:00', closed: true };
+  return acc;
+}, {} as Record<string, DayHours>);
+
+function parseHours(raw: any): Record<string, DayHours> {
+  if (!raw || typeof raw !== 'object') return { ...EMPTY_HOURS };
+  const result: Record<string, DayHours> = { ...EMPTY_HOURS };
+  for (const day of DAYS) {
+    const d = raw[day];
+    if (d && typeof d === 'object') {
+      result[day] = {
+        open: d.open ?? '09:00',
+        close: d.close ?? '18:00',
+        closed: d.closed ?? false,
+      };
+    }
+  }
+  return result;
+}
+
+function formatHoursForDisplay(raw: any): string {
+  const hours = parseHours(raw);
+  const parts: string[] = [];
+  for (const day of DAYS) {
+    const h = hours[day];
+    if (h.closed) {
+      parts.push(`${day[0].toUpperCase()}${day.slice(1)}: Closed`);
+    } else {
+      parts.push(`${day[0].toUpperCase()}${day.slice(1)}: ${h.open}–${h.close}`);
+    }
+  }
+  return parts.join(' · ');
+}
+
 export const dynamic = 'force-dynamic';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -83,6 +134,11 @@ export default function PresenceSeedDetailPage() {
   const [editSnapSource, setEditSnapSource] = useState('');
   const [editSnapSourceName, setEditSnapSourceName] = useState('');
   const [editProvenance, setEditProvenance] = useState<EditProvenanceRow[]>([]);
+  const [editHours, setEditHours] = useState<Record<string, DayHours>>({
+    ...EMPTY_HOURS,
+  });
+  const [editHoursSource, setEditHoursSource] = useState('');
+  const [editHoursSourceUrl, setEditHoursSourceUrl] = useState('');
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -166,6 +222,10 @@ export default function PresenceSeedDetailPage() {
         showOnPublic: !!p.showOnPublic,
       })),
     );
+    setEditHours(parseHours(listing?.business_hours));
+    const hoursProv = provenance.find((p) => p.fieldKey === 'hours');
+    setEditHoursSource(hoursProv?.sourceName ?? '');
+    setEditHoursSourceUrl(hoursProv?.sourceUrl ?? '');
     setActionError(null);
     setActionSuccess(null);
     setEditing(true);
@@ -207,6 +267,18 @@ export default function PresenceSeedDetailPage() {
         phone: editPhone.trim() || undefined,
         website: editWebsite.trim() || undefined,
       };
+
+      // Business hours — only include if any day is not closed
+      const hasHours = DAYS.some((day) => !editHours[day].closed);
+      if (hasHours) {
+        const hoursObj: Record<string, DayHours> = {};
+        for (const day of DAYS) {
+          hoursObj[day] = editHours[day];
+        }
+        fields.businessHours = hoursObj;
+      } else {
+        fields.businessHours = null;
+      }
       if (editSnapReported !== !!listing?.snap_ebt_reported) {
         fields.snapEbtReported = editSnapReported;
       }
@@ -235,6 +307,24 @@ export default function PresenceSeedDetailPage() {
           confidence: row.confidence,
           showOnPublic: row.showOnPublic,
         }));
+
+      // Add/replace hours provenance if hours are set and a source is provided
+      if (hasHours && (editHoursSource.trim() || editHoursSourceUrl.trim())) {
+        // Remove any existing hours row from the list (we replace it)
+        const filtered = provenanceUpdates.filter(
+          (p) => p.fieldKey !== 'hours',
+        );
+        filtered.push({
+          fieldKey: 'hours',
+          value: undefined,
+          sourceName: editHoursSource.trim() || undefined,
+          sourceUrl: editHoursSourceUrl.trim() || undefined,
+          confidence: 'high',
+          showOnPublic: true,
+        });
+        provenanceUpdates.length = 0;
+        provenanceUpdates.push(...filtered);
+      }
 
       await directoryPresenceAdminService.updateFields(
         seedId,
@@ -448,6 +538,18 @@ export default function PresenceSeedDetailPage() {
                 </dd>
               </div>
             )}
+            <div>
+              <dt className="text-gray-500">Hours</dt>
+              <dd className="text-gray-900 text-xs">
+                {listing?.business_hours ? (
+                  <span>{formatHoursForDisplay(listing.business_hours)}</span>
+                ) : (
+                  <span className="text-gray-400">
+                    Not sourced — omitted from public listing
+                  </span>
+                )}
+              </dd>
+            </div>
             <div className="flex gap-2">
               <ShieldCheck className="w-4 h-4 text-gray-400 mt-0.5" />
               <div>
@@ -715,6 +817,95 @@ export default function PresenceSeedDetailPage() {
               sourced from the SNAP retailer list, owner confirmation, or an
               in-store photo reviewed by ops.
             </p>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Business hours</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Only set hours when sourced. Unsourced hours are omitted from the
+              public listing per the directory presence contract.
+            </p>
+            <div className="space-y-2">
+              {DAYS.map((day) => {
+                const h = editHours[day];
+                return (
+                  <div
+                    key={day}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
+                  >
+                    <div className="md:col-span-3">
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={!h.closed}
+                          onChange={(e) =>
+                            setEditHours((prev) => ({
+                              ...prev,
+                              [day]: { ...prev[day], closed: !e.target.checked },
+                            }))
+                          }
+                        />
+                        <span className="capitalize">{day}</span>
+                      </label>
+                    </div>
+                    {!h.closed && (
+                      <>
+                        <div className="md:col-span-4">
+                          <input
+                            type="time"
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                            value={h.open}
+                            onChange={(e) =>
+                              setEditHours((prev) => ({
+                                ...prev,
+                                [day]: { ...prev[day], open: e.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="md:col-span-1 text-center text-xs text-gray-400">to</div>
+                        <div className="md:col-span-4">
+                          <input
+                            type="time"
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                            value={h.close}
+                            onChange={(e) =>
+                              setEditHours((prev) => ({
+                                ...prev,
+                                [day]: { ...prev[day], close: e.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
+                    {h.closed && (
+                      <div className="md:col-span-9 text-sm text-gray-400">Closed</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Hours source name</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  value={editHoursSource}
+                  onChange={(e) => setEditHoursSource(e.target.value)}
+                  placeholder="Google Maps, owner confirmation, etc."
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Hours source URL</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                  value={editHoursSourceUrl}
+                  onChange={(e) => setEditHoursSourceUrl(e.target.value)}
+                  placeholder="https://"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="border-t border-gray-100 pt-4">
