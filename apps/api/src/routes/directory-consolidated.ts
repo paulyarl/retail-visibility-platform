@@ -89,7 +89,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.public_disclaimer,
           (SELECT dct.token FROM directory_claim_tokens dct
            JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
-           WHERE dps.listing_id = dll.id AND dct.claimed_at IS NULL AND dct.expires_at > now()
+           WHERE dps.listing_id = dll.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
            LIMIT 1) as active_claim_token
          FROM directory_listings_list dll
          LEFT JOIN tenants t ON t.id = dll.tenant_id
