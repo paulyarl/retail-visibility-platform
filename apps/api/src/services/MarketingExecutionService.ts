@@ -360,8 +360,10 @@ export class MarketingExecutionService extends BaseService {
     }
 
     // 3. Resolve active profile for the campaign's category.
+    //    Business-scope §1B path — no focus (category-only match). Business
+    //    audits are category-aware, not focus-aware.
     const profileService = IntelligenceProfileService.getInstance();
-    const profile = await profileService.resolve(category, ctx);
+    const profile = await profileService.resolve(category, undefined, ctx);
 
     if (!profile) {
       // No active profile — return byte-identical base render (plus suffix).
