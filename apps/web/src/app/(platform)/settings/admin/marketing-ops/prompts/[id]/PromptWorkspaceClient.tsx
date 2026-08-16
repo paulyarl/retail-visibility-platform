@@ -145,14 +145,16 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
   const isIntelligenceScope = template?.scope === 'intelligence';
   const isSeekPrompt = (template?.prompt_type || '').toLowerCase() === 'seek';
   const outputSchemaName = template?.output_schema?.name ?? '';
-  const isIntelligenceDiscovery = isIntelligenceScope && isSeekPrompt && outputSchemaName === 'intelligence_discovery';
-  const isIntelligenceEstablishment = isIntelligenceScope && isSeekPrompt && outputSchemaName === 'intelligence_profile';
+  const templateKind = template?.intelligence_campaign_kind ?? null;
+  const isIntelligenceDiscovery = isIntelligenceScope && isSeekPrompt && (templateKind === 'discovery' || (!templateKind && outputSchemaName === 'intelligence_discovery'));
+  const isIntelligenceEstablishment = isIntelligenceScope && isSeekPrompt && (templateKind === 'establishment' || (!templateKind && outputSchemaName === 'intelligence_profile'));
 
-  // Derive the template's focus from its name — the body is a composition
-  // marker that gets replaced at render time, so the name is the reliable
-  // signal. Falls back to 'emerging' (matches the backend default).
+  // Template focus is now a stored column (Migration 203). Falls back to a
+  // name-based heuristic for legacy templates that haven't been re-seeded,
+  // then to 'emerging' (matches the backend default).
   const templateFocus: 'emerging' | 'competitive' = useMemo(() => {
     if (!template) return 'emerging';
+    if (template.intelligence_focus) return template.intelligence_focus;
     return /competitive/i.test(template.name) ? 'competitive' : 'emerging';
   }, [template]);
 

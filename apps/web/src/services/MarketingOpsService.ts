@@ -1045,6 +1045,8 @@ export interface PromptTemplate {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  intelligence_focus?: IntelligenceFocus | null;
+  intelligence_campaign_kind?: IntelligenceCampaignKind | null;
 }
 
 export interface PromptExecution {
@@ -1346,6 +1348,8 @@ export interface PromptTemplateCreateInput {
   variables?: any;
   output_schema?: { name: string; description?: string; schema?: any } | null;
   is_default?: boolean;
+  intelligence_focus?: IntelligenceFocus | null;
+  intelligence_campaign_kind?: IntelligenceCampaignKind | null;
 }
 
 export interface ExecutionCreateInput {
@@ -2084,6 +2088,9 @@ class MarketingOpsService extends AdminApiSingleton {
     category?: string;
     tone?: string;
     is_active?: boolean;
+    intelligence_focus?: IntelligenceFocus;
+    intelligence_campaign_kind?: IntelligenceCampaignKind;
+    include_null_focus_kind?: boolean;
   }): Promise<PromptTemplate[]> {
     const params = new URLSearchParams();
     if (filters?.prompt_type) params.set('prompt_type', filters.prompt_type);
@@ -2091,6 +2098,9 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.category) params.set('category', filters.category);
     if (filters?.tone) params.set('tone', filters.tone);
     if (filters?.is_active !== undefined) params.set('is_active', String(filters.is_active));
+    if (filters?.intelligence_focus) params.set('intelligence_focus', filters.intelligence_focus);
+    if (filters?.intelligence_campaign_kind) params.set('intelligence_campaign_kind', filters.intelligence_campaign_kind);
+    if (filters?.include_null_focus_kind) params.set('include_null_focus_kind', 'true');
     const query = params.toString();
     const url = `${BASE_URL}/prompts/templates${query ? `?${query}` : ''}`;
 
@@ -4709,6 +4719,7 @@ export interface GalleryDashboard {
 // ====================
 
 export type IntelligenceFocus = 'emerging' | 'competitive';
+export type IntelligenceCampaignKind = 'discovery' | 'establishment';
 export type IntelligenceMode = 'profile' | 'none';
 export type ProfileStatus = 'draft' | 'active' | 'retired';
 

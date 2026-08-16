@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Plus, Pencil, Trash2, Copy, FileText, Sparkles, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptType, CampaignScope, IntelligenceProfile } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptType, CampaignScope, IntelligenceProfile, IntelligenceFocus, IntelligenceCampaignKind } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import { useMemo } from 'react';
 
@@ -126,14 +126,20 @@ export default function PromptLibraryClient() {
 
   // Intelligence discovery template IDs — used to build deep-links from the
   // profile-active context banner directly to the workspace with the category
-  // pre-selected. Found by output_schema name + focus (parsed from the name,
-  // matching the workspace's templateFocus logic).
+  // pre-selected. Resolved from the stored intelligence_focus + kind columns
+  // (Migration 203), with a name-based fallback for legacy templates that
+  // haven't been re-seeded.
   const intelligenceDiscoveryTemplateIds = useMemo(() => {
+    const isDiscovery = (t: PromptTemplate) =>
+      t.intelligence_campaign_kind === 'discovery' ||
+      (!t.intelligence_campaign_kind && t.output_schema?.name === 'intelligence_discovery');
     const emerging = templates.find((t) =>
-      t.output_schema?.name === 'intelligence_discovery' && /emerging/i.test(t.name),
+      isDiscovery(t) &&
+      (t.intelligence_focus === 'emerging' || (!t.intelligence_focus && /emerging/i.test(t.name))),
     );
     const competitive = templates.find((t) =>
-      t.output_schema?.name === 'intelligence_discovery' && /competitive/i.test(t.name),
+      isDiscovery(t) &&
+      (t.intelligence_focus === 'competitive' || (!t.intelligence_focus && /competitive/i.test(t.name))),
     );
     return { emerging: emerging?.id, competitive: competitive?.id };
   }, [templates]);
@@ -462,6 +468,8 @@ function PromptTemplateModal({ template, categoryOptions, toneOptions, prefillAn
   const [scope, setScope] = useState<CampaignScope>(template?.scope ?? 'business');
   const [category, setCategory] = useState(template?.category ?? '');
   const [tone, setTone] = useState(template?.tone ?? '');
+  const [intelligenceFocus, setIntelligenceFocus] = useState<IntelligenceFocus | ''>(template?.intelligence_focus ?? '');
+  const [intelligenceCampaignKind, setIntelligenceCampaignKind] = useState<IntelligenceCampaignKind | ''>(template?.intelligence_campaign_kind ?? '');
   const [body, setBody] = useState(template?.body ?? (prefillAngle
     ? `You are a local business outreach specialist. Use the following market analysis outreach angle to craft a personalized cold outreach message.
 
@@ -485,6 +493,15 @@ Format the output as plain text, ready to paste into an email or DM.`
     else if (!template) setScope('business');
   }, [promptType, template]);
 
+  // Clear focus/kind when scope leaves intelligence so non-intelligence
+  // templates don't carry stale intelligence metadata.
+  useEffect(() => {
+    if (scope !== 'intelligence') {
+      setIntelligenceFocus('');
+      setIntelligenceCampaignKind('');
+    }
+  }, [scope]);
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
@@ -497,6 +514,13 @@ Format the output as plain text, ready to paste into an email or DM.`
         tone: tone || undefined,
         body,
         is_default: isDefault,
+        ...(scope === 'intelligence' ? {
+          intelligence_focus: intelligenceFocus || null,
+          intelligence_campaign_kind: intelligenceCampaignKind || null,
+        } : {
+          intelligence_focus: null,
+          intelligence_campaign_kind: null,
+        }),
       };
       if (template) {
         await marketingOpsService.updatePromptTemplate(template.id, input);
@@ -555,6 +579,28 @@ Format the output as plain text, ready to paste into an email or DM.`
                 newInputPlaceholder="Enter new tone"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+            {scope === 'intelligence' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Intelligence Focus</label>
+                  <select value={intelligenceFocus} onChange={(e) => setIntelligenceFocus(e.target.value as IntelligenceFocus | '')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">— None —</option>
+                    <option value="emerging">emerging</option>
+                    <option value="competitive">competitive</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Intelligence Campaign Kind</label>
+                  <select value={intelligenceCampaignKind} onChange={(e) => setIntelligenceCampaignKind(e.target.value as IntelligenceCampaignKind | '')}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">— None —</option>
+                    <option value="discovery">discovery</option>
+                    <option value="establishment">establishment</option>
+                  </select>
+                </div>
+              </>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Prompt Body</label>

@@ -42,6 +42,8 @@ Focus: EMERGING — discover low-visibility, hard-to-find businesses.
       description: 'Intelligence Discovery — emerging focus. Validates discovered candidates with category fit, identity confidence, location status, discovery signals, and Business Seek recommendations.',
     },
     isDefault: false,
+    intelligenceFocus: 'emerging' as const,
+    intelligenceCampaignKind: 'discovery' as const,
   },
   {
     id: 'mpt-seed-intel-discovery-competitive-001',
@@ -58,6 +60,8 @@ Focus: COMPETITIVE — analyze established competitors.
       description: 'Intelligence Discovery — competitive focus. Validates discovered competitors with category fit, identity confidence, location status, discovery signals, and Business Seek recommendations.',
     },
     isDefault: false,
+    intelligenceFocus: 'competitive' as const,
+    intelligenceCampaignKind: 'discovery' as const,
   },
 ];
 
@@ -72,8 +76,10 @@ async function main() {
         body: tmpl.body,
         variables: tmpl.variables,
         outputSchema: tmpl.outputSchema,
+        intelligenceFocus: tmpl.intelligenceFocus,
+        intelligenceCampaignKind: tmpl.intelligenceCampaignKind,
       });
-      logger.info(`Updated discovery template: ${tmpl.id}`, undefined, { id: tmpl.id, focus: tmpl.name.includes('Emerging') ? 'emerging' : 'competitive' });
+      logger.info(`Updated discovery template: ${tmpl.id}`, undefined, { id: tmpl.id, focus: tmpl.intelligenceFocus });
     } else {
       await service.createTemplate({
         id: tmpl.id,
@@ -84,8 +90,10 @@ async function main() {
         variables: tmpl.variables,
         outputSchema: tmpl.outputSchema,
         isDefault: tmpl.isDefault,
+        intelligenceFocus: tmpl.intelligenceFocus,
+        intelligenceCampaignKind: tmpl.intelligenceCampaignKind,
       } as any);
-      logger.info(`Created discovery template: ${tmpl.id}`, undefined, { id: tmpl.id, focus: tmpl.name.includes('Emerging') ? 'emerging' : 'competitive' });
+      logger.info(`Created discovery template: ${tmpl.id}`, undefined, { id: tmpl.id, focus: tmpl.intelligenceFocus });
     }
   }
 

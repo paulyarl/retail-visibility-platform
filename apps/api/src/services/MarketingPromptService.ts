@@ -32,6 +32,9 @@ export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_
 
 export type PromptScope = 'business' | 'category' | 'city' | 'intelligence';
 
+export type IntelligenceFocus = 'emerging' | 'competitive';
+export type IntelligenceCampaignKind = 'discovery' | 'establishment';
+
 export interface PromptTemplateInput {
   name: string;
   promptType: PromptType;
@@ -44,6 +47,8 @@ export interface PromptTemplateInput {
   isDefault?: boolean;
   createdBy?: string;
   fragmentKind?: string;
+  intelligenceFocus?: IntelligenceFocus | null;
+  intelligenceCampaignKind?: IntelligenceCampaignKind | null;
   /** Optional deterministic ID (used by seed scripts for idempotent upsert). */
   id?: string;
 }
@@ -181,7 +186,7 @@ export class MarketingPromptService extends BaseService {
     const scope = input.scope ?? (input.promptType === 'category_analysis' ? 'category' : input.promptType === 'city_analysis' ? 'city' : 'business');
     try {
       if (input.isDefault) {
-        await this.clearDefaultForType(input.promptType, scope, input.category, input.tone);
+        await this.clearDefaultForType(input.promptType, scope, input.category, input.tone, input.intelligenceFocus, input.intelligenceCampaignKind);
       }
       const template = await this.prisma.mkt_prompt_templates_list.create({
         data: {
@@ -199,6 +204,8 @@ export class MarketingPromptService extends BaseService {
           is_default: input.isDefault || false,
           created_by: input.createdBy || null,
           fragment_kind: input.fragmentKind || null,
+          intelligence_focus: input.intelligenceFocus ?? null,
+          intelligence_campaign_kind: input.intelligenceCampaignKind ?? null,
         },
       });
       logger.info('Prompt template created', ctx, { templateId: id, name: input.name, type: input.promptType });
@@ -218,7 +225,24 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  async listTemplates(filters: { promptType?: PromptType; scope?: PromptScope; category?: string; tone?: string; isActive?: boolean; fragmentKind?: string } = {}, ctx?: RequestCtx): Promise<any[]> {
+  async listTemplates(filters: {
+    promptType?: PromptType;
+    scope?: PromptScope;
+    category?: string;
+    tone?: string;
+    isActive?: boolean;
+    fragmentKind?: string;
+    intelligenceFocus?: IntelligenceFocus;
+    intelligenceCampaignKind?: IntelligenceCampaignKind;
+    /**
+     * When set, returns templates whose intelligence_focus /
+     * intelligence_campaign_kind match the provided values OR are NULL
+     * (legacy/untyped templates). Used by the campaign Prompts tab so a
+     * focus+kind campaign sees its matching templates plus any untyped
+     * ones, without hiding legacy rows.
+     */
+    includeNullFocusKind?: boolean;
+  } = {}, ctx?: RequestCtx): Promise<any[]> {
     const where: any = {};
     if (filters.promptType) where.prompt_type = filters.promptType;
     if (filters.scope) where.scope = filters.scope;
@@ -226,6 +250,23 @@ export class MarketingPromptService extends BaseService {
     if (filters.tone) where.tone = filters.tone;
     if (filters.isActive !== undefined) where.is_active = filters.isActive;
     if (filters.fragmentKind) where.fragment_kind = filters.fragmentKind;
+
+    const hasFocusFilter = filters.intelligenceFocus || filters.intelligenceCampaignKind;
+    if (hasFocusFilter) {
+      const positiveMatch: any[] = [];
+      if (filters.intelligenceFocus) positiveMatch.push({ intelligence_focus: filters.intelligenceFocus });
+      if (filters.intelligenceCampaignKind) positiveMatch.push({ intelligence_campaign_kind: filters.intelligenceCampaignKind });
+
+      const orClauses: any[] = [{ AND: positiveMatch }];
+      if (filters.includeNullFocusKind) {
+        const nullMatch: any[] = [];
+        if (filters.intelligenceFocus) nullMatch.push({ intelligence_focus: null });
+        if (filters.intelligenceCampaignKind) nullMatch.push({ intelligence_campaign_kind: null });
+        orClauses.push({ AND: nullMatch });
+      }
+      where.OR = orClauses;
+    }
+
     try {
       return await this.prisma.mkt_prompt_templates_list.findMany({
         where,
@@ -248,13 +289,24 @@ export class MarketingPromptService extends BaseService {
     if (input.variables !== undefined) data.variables = input.variables;
     if (input.outputSchema !== undefined) data.output_schema = input.outputSchema;
     if (input.fragmentKind !== undefined) data.fragment_kind = input.fragmentKind;
+    if (input.intelligenceFocus !== undefined) data.intelligence_focus = input.intelligenceFocus;
+    if (input.intelligenceCampaignKind !== undefined) data.intelligence_campaign_kind = input.intelligenceCampaignKind;
     if (input.isDefault !== undefined) {
       if (input.isDefault) {
         const current = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
         if (current) {
           const targetScope = (input.scope ?? current.scope) as PromptScope;
           const targetPromptType = (input.promptType ?? current.prompt_type) as PromptType;
-          await this.clearDefaultForType(targetPromptType, targetScope, input.category ?? current.category, input.tone ?? current.tone);
+          const targetFocus = (input.intelligenceFocus ?? current.intelligence_focus) as IntelligenceFocus | null;
+          const targetKind = (input.intelligenceCampaignKind ?? current.intelligence_campaign_kind) as IntelligenceCampaignKind | null;
+          await this.clearDefaultForType(
+            targetPromptType,
+            targetScope,
+            input.category ?? current.category,
+            input.tone ?? current.tone,
+            targetFocus ?? undefined,
+            targetKind ?? undefined,
+          );
         }
       }
       data.is_default = input.isDefault;
@@ -295,10 +347,20 @@ export class MarketingPromptService extends BaseService {
       outputSchema: original.output_schema,
       isDefault: false,
       createdBy: overrides.createdBy,
+      fragmentKind: original.fragment_kind ?? undefined,
+      intelligenceFocus: (original.intelligence_focus as IntelligenceFocus | null) ?? undefined,
+      intelligenceCampaignKind: (original.intelligence_campaign_kind as IntelligenceCampaignKind | null) ?? undefined,
     }, ctx);
   }
 
-  private async clearDefaultForType(promptType: string, scope: PromptScope, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
+  private async clearDefaultForType(
+    promptType: string,
+    scope: PromptScope,
+    category: string | null | undefined,
+    tone: string | null | undefined,
+    intelligenceFocus?: IntelligenceFocus | null,
+    intelligenceCampaignKind?: IntelligenceCampaignKind | null,
+  ): Promise<void> {
     await this.prisma.mkt_prompt_templates_list.updateMany({
       where: {
         prompt_type: promptType,
@@ -306,6 +368,8 @@ export class MarketingPromptService extends BaseService {
         is_default: true,
         ...(category ? { category } : {}),
         ...(tone ? { tone } : {}),
+        ...(intelligenceFocus ? { intelligence_focus: intelligenceFocus } : {}),
+        ...(intelligenceCampaignKind ? { intelligence_campaign_kind: intelligenceCampaignKind } : {}),
       },
       data: { is_default: false },
     });

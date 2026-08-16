@@ -6452,12 +6452,15 @@ model mkt_prompt_templates_list {
   scope                      String                       @default("business") @db.VarChar(20)
   output_schema              Json?
   fragment_kind              String?                      @db.VarChar(60)
+  intelligence_focus         String?                      @db.VarChar(20)
+  intelligence_campaign_kind String?                      @db.VarChar(20)
   mkt_prompt_executions_list mkt_prompt_executions_list[]
 
   @@index([category, is_active], map: "idx_mkt_prompt_templates_category")
   @@index([prompt_type, is_active], map: "idx_mkt_prompt_templates_type")
   @@index([prompt_type, category, tone, is_active], map: "idx_mkt_prompt_templates_tone")
   @@index([scope], map: "idx_mkt_prompt_templates_scope")
+  @@index([intelligence_focus, intelligence_campaign_kind, is_active], map: "idx_mkt_prompt_templates_intelligence")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

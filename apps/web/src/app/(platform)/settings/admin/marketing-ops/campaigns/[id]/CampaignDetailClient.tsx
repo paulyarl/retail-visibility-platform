@@ -215,12 +215,23 @@ export default function CampaignDetailClient({
 
   // Prompts tab: fetch scope-matching prompt templates. Stage filtering is
   // applied client-side via STAGE_PROMPT_TYPES so the operator sees only
-  // stage-relevant prompts for this campaign.
+  // stage-relevant prompts for this campaign. Intelligence-scope campaigns
+  // additionally filter by focus + kind (Migration 203) with a NULL fallback
+  // so legacy/untyped templates remain visible.
   useEffect(() => {
     if (activeTab !== 'prompts' || !campaign) return;
     setPromptsLoading(true);
+    const isIntelligence = campaign.scope === 'intelligence';
+    const focus = campaign.intelligence_focus ?? undefined;
+    const kind = campaign.intelligence_campaign_kind ?? undefined;
     marketingOpsService
-      .listPromptTemplates({ scope: campaign.scope, is_active: true })
+      .listPromptTemplates({
+        scope: campaign.scope,
+        is_active: true,
+        ...(isIntelligence && focus ? { intelligence_focus: focus } : {}),
+        ...(isIntelligence && kind ? { intelligence_campaign_kind: kind } : {}),
+        ...(isIntelligence && (focus || kind) ? { include_null_focus_kind: true } : {}),
+      })
       .then(setPromptTemplates)
       .catch(() => setPromptTemplates([]))
       .finally(() => setPromptsLoading(false));
@@ -1156,8 +1167,14 @@ export default function CampaignDetailClient({
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Compatible Prompts</h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Filtered by scope <span className="font-medium uppercase">{campaign.scope}</span> and stage{' '}
-                      <span className="font-medium">{campaign.stage}</span>. Opening a workspace pre-selects this campaign.
+                      Filtered by scope <span className="font-medium uppercase">{campaign.scope}</span>
+                      {campaign.scope === 'intelligence' && (campaign.intelligence_focus || campaign.intelligence_campaign_kind) && (
+                        <>
+                          {' '}· focus <span className="font-medium">{campaign.intelligence_focus ?? '—'}</span>
+                          {' '}· kind <span className="font-medium">{campaign.intelligence_campaign_kind ?? '—'}</span>
+                        </>
+                      )}
+                      {' '}and stage <span className="font-medium">{campaign.stage}</span>. Opening a workspace pre-selects this campaign.
                     </p>
                   </div>
                   <Link

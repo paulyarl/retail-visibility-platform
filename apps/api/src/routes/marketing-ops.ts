@@ -585,6 +585,8 @@ const promptTemplateCreateSchema = z.object({
   variables: z.any().optional(),
   output_schema: z.any().optional(),
   is_default: z.boolean().optional(),
+  intelligence_focus: z.enum(['emerging', 'competitive']).nullable().optional(),
+  intelligence_campaign_kind: z.enum(['discovery', 'establishment']).nullable().optional(),
 });
 
 const promptTemplateUpdateSchema = promptTemplateCreateSchema.partial();
@@ -1909,11 +1911,16 @@ router.delete('/files/:id', async (req: any, res: Response) => {
 
 router.get('/prompts/templates', async (req: any, res: Response) => {
   try {
+    const intelligenceFocus = req.query.intelligence_focus as string | undefined;
+    const intelligenceCampaignKind = req.query.intelligence_campaign_kind as string | undefined;
     const templates = await MarketingPromptService.listTemplates({
       promptType: req.query.prompt_type,
       scope: req.query.scope,
       category: req.query.category,
       isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
+      intelligenceFocus: (intelligenceFocus === 'emerging' || intelligenceFocus === 'competitive') ? intelligenceFocus : undefined,
+      intelligenceCampaignKind: (intelligenceCampaignKind === 'discovery' || intelligenceCampaignKind === 'establishment') ? intelligenceCampaignKind : undefined,
+      includeNullFocusKind: req.query.include_null_focus_kind === 'true',
     }, getCtx(req));
     res.json({ success: true, data: templates });
   } catch (error) {
@@ -1935,6 +1942,8 @@ router.post('/prompts/templates', async (req: any, res: Response) => {
       outputSchema: parsed.output_schema,
       isDefault: parsed.is_default,
       createdBy: req.user?.id,
+      intelligenceFocus: parsed.intelligence_focus,
+      intelligenceCampaignKind: parsed.intelligence_campaign_kind,
     }, getCtx(req));
     res.status(201).json({ success: true, data: template });
   } catch (error) {
@@ -1958,6 +1967,8 @@ router.put('/prompts/templates/:id', async (req: any, res: Response) => {
       variables: parsed.variables,
       outputSchema: parsed.output_schema,
       isDefault: parsed.is_default,
+      intelligenceFocus: parsed.intelligence_focus,
+      intelligenceCampaignKind: parsed.intelligence_campaign_kind,
     }, getCtx(req));
     res.json({ success: true, data: template });
   } catch (error) {

@@ -79,6 +79,7 @@ Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. 
     description: 'Category Intelligence Profile — §10 structure with terminology, specialized sources (capabilities + limitations), discovery patterns, evidence rules, prohibited inferences, and category signals.',
   },
   isDefault: false,
+  intelligenceCampaignKind: 'establishment' as const,
 };
 
 async function main() {
@@ -91,6 +92,7 @@ async function main() {
       body: ESTABLISHMENT_TEMPLATE.body,
       variables: ESTABLISHMENT_TEMPLATE.variables,
       outputSchema: ESTABLISHMENT_TEMPLATE.outputSchema,
+      intelligenceCampaignKind: ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
     });
     logger.info(`Updated establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id });
   } else {
@@ -103,6 +105,7 @@ async function main() {
       variables: ESTABLISHMENT_TEMPLATE.variables,
       outputSchema: ESTABLISHMENT_TEMPLATE.outputSchema,
       isDefault: ESTABLISHMENT_TEMPLATE.isDefault,
+      intelligenceCampaignKind: ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
     });
     logger.info(`Created establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id });
   }
