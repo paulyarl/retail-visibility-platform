@@ -3753,6 +3753,16 @@ const prospectQueueAddSchema = z.object({
   // Operator-chosen campaign scope for manual entries (default 'business').
   // Ignored for audit-derived entries (scope inherited from parent campaign).
   scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
+  // ─── Intelligence discovery fields (Sprint §5.10) ───────────────────
+  // Populated when source_kind = 'intelligence_seek'. Stored on the
+  // dedicated intelligence columns for denormalized queue rendering.
+  category_fit: z.enum(['verified', 'probable', 'insufficient']).optional(),
+  identity_confidence: z.enum(['high', 'medium', 'low']).optional(),
+  location_status: z.enum(['inside_city', 'adjacent_city', 'metro_area', 'outside_market']).optional(),
+  discovery_provenance: z.array(z.record(z.string(), z.any())).optional(),
+  discovery_signals: z.array(z.string()).optional(),
+  business_seek_priority: z.enum(['high', 'medium', 'low', 'hold']).optional(),
+  intelligence_run_id: z.string().max(64).optional(),
 }).superRefine((data, ctx) => {
   if (data.source_kind !== 'manual' && !data.source_campaign_id) {
     ctx.addIssue({
@@ -3796,6 +3806,14 @@ router.post('/prospect-queue', async (req: any, res: Response) => {
       note: parsed.note,
       queuedBy: req.user?.id,
       scope: parsed.scope,
+      // Intelligence discovery fields (Sprint §5.10)
+      category_fit: parsed.category_fit,
+      identity_confidence: parsed.identity_confidence,
+      location_status: parsed.location_status,
+      discovery_provenance: parsed.discovery_provenance,
+      discovery_signals: parsed.discovery_signals,
+      business_seek_priority: parsed.business_seek_priority,
+      intelligence_run_id: parsed.intelligence_run_id,
     }, getCtx(req));
 
     if (result.kind === 'campaign_exists') {

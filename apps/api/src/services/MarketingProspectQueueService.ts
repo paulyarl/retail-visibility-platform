@@ -71,6 +71,17 @@ export interface ProspectQueueAddInput {
   // Defaults to 'business' (legacy behavior). Audit-derived entries inherit
   // the parent campaign's scope and ignore this field.
   scope?: ProspectCampaignScope;
+  // ─── Intelligence discovery fields (Sprint §5.10) ───────────────────
+  // Populated when source_kind = 'intelligence_seek'. Stored on the dedicated
+  // intelligence columns so the queue can render discovery assessment without
+  // unpacking business_snapshot.
+  category_fit?: 'verified' | 'probable' | 'insufficient';
+  identity_confidence?: 'high' | 'medium' | 'low';
+  location_status?: 'inside_city' | 'adjacent_city' | 'metro_area' | 'outside_market';
+  discovery_provenance?: Record<string, any>[];
+  discovery_signals?: string[];
+  business_seek_priority?: 'high' | 'medium' | 'low' | 'hold';
+  intelligence_run_id?: string;
 }
 
 export type AddToQueueResult =
@@ -239,6 +250,16 @@ class MarketingProspectQueueServiceClass extends BaseService {
           priority: input.priority ?? 'normal',
           note: input.note ?? null,
           queued_by: input.queuedBy ?? null,
+          // Intelligence discovery columns (Sprint §5.10). Populated when
+          // source_kind = 'intelligence_seek'; null/undefined for other
+          // source kinds (the columns are nullable).
+          category_fit: input.category_fit ?? null,
+          identity_confidence: input.identity_confidence ?? null,
+          location_status: input.location_status ?? null,
+          discovery_provenance: (input.discovery_provenance as any) ?? undefined,
+          discovery_signals: (input.discovery_signals as any) ?? undefined,
+          business_seek_priority: input.business_seek_priority ?? null,
+          intelligence_run_id: input.intelligence_run_id ?? null,
         },
       });
 

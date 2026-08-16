@@ -280,6 +280,48 @@ Makes prompt templates focus- and kind-aware so the campaign workspace Prompts t
 - **Backward compatibility**: all focus/kind inference sites retain a name-based or output_schema-based fallback so templates that haven't been re-seeded still work
 - **Fragments excluded**: composition fragments (`prompt_type = 'fragment'`) keep NULL focus/kind — they're identified by `fragment_kind` and assembled by `PromptComposerService`
 
+## Business Origin (Diaspora / Heritage Categorization)
+
+Captures the international country/region of origin for diaspora-niche campaigns (e.g. "African Grocery Store" → country: Gambia, region: West Africa). The continent-level qualifier in the `category` field is too coarse for prompt composition, niche overrides, and outreach targeting — a Gambian, Ethiopian, and Nigerian grocery store serve very different diaspora communities.
+
+### Schema (Migration 204)
+- `mkt_campaigns_list.business_origin_country` — nullable `VARCHAR(100)`, free-text country name (not ISO code, since prompt-facing)
+- `mkt_campaigns_list.business_origin_region` — nullable `VARCHAR(100)`, free-text region (absorbs the multi-country case, e.g. "West Africa" spans Gambia, Senegal, Nigeria)
+- Both nullable; no backfill required. Legacy campaigns have NULL and keep working.
+
+### Backend
+- `apps/api/src/routes/marketing-ops.ts`:
+  - `campaignBaseSchema` accepts `business_origin_country` + `business_origin_region` (optional strings, max 100)
+  - POST + PUT handlers pass `businessOriginCountry` / `businessOriginRegion` through to the service
+- `apps/api/src/services/MarketingCampaignService.ts`:
+  - `CampaignInput` + `CampaignUpdateInput` gain `businessOriginCountry?` + `businessOriginRegion?`
+  - `createCampaign` writes both fields (null when absent)
+  - `updateCampaign` writes both fields when present in the input (`!== undefined` guard)
+- `apps/api/src/services/BusinessProspectService.ts` — `createSiblingCampaign` copies both origin fields from the source campaign (origin travels with the business identity, like `tone` + `attributes`)
+- `apps/api/src/services/scope-utils.ts` — `business_origin` added to `business`, `category`, and `intelligence` scope variable lists (origin is niche-level context, not business-name-specific)
+- `apps/api/src/services/MarketingExecutionService.ts` — `renderTemplate` candidate map builds `business_origin` as `country, region` joined string (empty when both null)
+- `apps/api/src/services/deliverable/prompts.ts`:
+  - `BusinessContextFields` gains `businessOrigin: string | null`
+  - All 9 deliverable prompt templates (review response, recovery playbook, listing corrections, CTA fixes, mobile catalog, GBP photo, availability inquiry, fulfillment pathway, hours sync) inject `{{business_origin}}` (fallback: `'unspecified'`)
+- `apps/api/src/services/deliverable/BusinessContextService.ts` — `getBusinessContext` populates `businessOrigin` from `[country, region].filter(Boolean).join(', ')`
+
+### Frontend
+- `apps/web/src/services/MarketingOpsService.ts`:
+  - `Campaign` interface gains `business_origin_country?` + `business_origin_region?`
+  - `CampaignCreateInput` gains both fields
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/CampaignFormClient.tsx`:
+  - `FormState` + `EMPTY_FORM` include both fields (default `''`)
+  - `fetchCampaign` loads both fields
+  - Create submit sends `strOrUndef(form.business_origin_country)` + `strOrUndef(form.business_origin_region)`
+  - Edit submit sends raw values (so cleared state persists)
+  - Two `SuggestiveSelect` fields ("Origin Country" + "Origin Region") placed after the Category field, with vocabulary sourced from existing campaign records via `distinctValues`
+  - Helper text explains the diaspora-niche use case + that non-diaspora categories should leave them blank
+
+### Key Patterns
+- **Country name, not ISO code**: these fields are prompt-facing (interpolated into deliverable prompts as `{{business_origin}}`), not join keys. "Gambia" reads naturally in a prompt; "GM" does not.
+- **Region absorbs multi-country**: most grocery stores are regional rather than single-country. A single region field ("West Africa") handles the case where a store serves multiple country communities without requiring an array.
+- **Scope placement**: `business_origin` is in `business`, `category`, and `intelligence` scope variable lists — origin is niche-level context tied to the category, not the specific business name, so category-scope and intelligence-scope prompts can reference it too.
+
 ## Log Contact Modal — Per-Channel Result Options + Other Subtype
 
 Extends the "Log contact" modal so every channel has a tailored result dropdown (mirroring the Phone channel's "Call result" pattern), and the "Other" channel gains a subtype selector (DM / Text / Email / Fax-Mail).

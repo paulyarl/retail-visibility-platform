@@ -870,7 +870,7 @@ export interface DeriveAllUnmatchedResult {
 
 // ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
 
-export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual';
+export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek';
 export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';
 export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'other';
@@ -896,6 +896,16 @@ export interface AddToQueueInput {
   note?: string;
   // Operator-chosen campaign scope for manual entries (default 'business').
   scope?: CampaignScope;
+  // ─── Intelligence discovery fields (Sprint §5.10) ───────────────────
+  // Populated when source_kind = 'intelligence_seek'. Stored on the
+  // dedicated intelligence columns for denormalized queue rendering.
+  category_fit?: 'verified' | 'probable' | 'insufficient';
+  identity_confidence?: 'high' | 'medium' | 'low';
+  location_status?: 'inside_city' | 'adjacent_city' | 'metro_area' | 'outside_market';
+  discovery_provenance?: Record<string, any>[];
+  discovery_signals?: string[];
+  business_seek_priority?: 'high' | 'medium' | 'low' | 'hold';
+  intelligence_run_id?: string;
 }
 
 export type AddToQueueResult =

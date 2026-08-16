@@ -12,6 +12,7 @@ import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalys
 import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCategoryAnalysisAuditCard';
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
+import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import AuditImportMetadataBadge from '@/components/marketing-ops/AuditImportMetadataBadge';
 import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
@@ -1019,6 +1020,8 @@ export default function CampaignDetailClient({
                         <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} />
                       ) : audit.platform === 'city_analysis' && audit.audit_data ? (
                         <CityAnalysisAuditCard key={audit.id} audit={audit} />
+                      ) : audit.platform === 'intelligence_discovery' && audit.audit_data ? (
+                        <IntelligenceDiscoveryAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'city_analysis_summary' ? (
                         <div key={audit.id} className="border border-blue-200 dark:border-blue-700 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/10">
                           <div className="flex items-center justify-between mb-2">

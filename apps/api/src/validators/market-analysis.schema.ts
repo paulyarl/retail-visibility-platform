@@ -185,7 +185,12 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
   },
   [INTELLIGENCE_DISCOVERY_SCHEMA_NAME]: {
     validator: intelligenceDiscoverySchema,
-    auditPlatform: null, // intelligence discovery creates queue entries, not audits
+    // Intelligence discovery imports land in mkt_audits_list so the campaign's
+    // Audits tab can render the discovered businesses and the operator can
+    // spawn business-scope child campaigns from them. The full validated
+    // discovery payload is stored in audit_data; scalar audit columns are left
+    // at their defaults (discovery output has no GBP metrics).
+    auditPlatform: 'intelligence_discovery',
     promptSuffix: INTELLIGENCE_DISCOVERY_PROMPT_SUFFIX,
   },
   [INTELLIGENCE_PROFILE_SCHEMA_NAME]: {
