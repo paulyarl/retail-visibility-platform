@@ -38,7 +38,7 @@ export default function PlaceCard({
   currentUrl,
 }: PlaceCardProps) {
   const fullAddress = [address, city, state, zipCode].filter(Boolean).join(', ');
-  const claimHref = claimToken ? `/directory/claim/${claimToken}` : '/directory';
+  const claimHref = claimToken ? `/place/claim/${claimToken}` : '/directory';
 
   return (
     <div className="min-h-screen bg-gray-50">

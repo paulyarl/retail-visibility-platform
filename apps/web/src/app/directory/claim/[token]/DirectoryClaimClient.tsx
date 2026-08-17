@@ -287,12 +287,12 @@ export default function DirectoryClaimClient() {
                 Create a free account or sign in to claim this listing.
               </Text>
               <Group>
-                <Button component={Link} href={`/register?redirect=${encodeURIComponent(`/directory/claim/${token}`)}`} size="md">
+                <Button component={Link} href={`/register?redirect=${encodeURIComponent(`/place/claim/${token}`)}`} size="md">
                   Create Account
                 </Button>
                 <Button
                   component={Link}
-                  href={`/login?redirect=${encodeURIComponent(`/directory/claim/${token}`)}`}
+                  href={`/login?redirect=${encodeURIComponent(`/place/claim/${token}`)}`}
                   variant="light"
                   size="md"
                 >

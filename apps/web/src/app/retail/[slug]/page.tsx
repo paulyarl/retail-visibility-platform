@@ -179,7 +179,7 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
   const showsContact = dirEntryOpts?.contactEnabled ?? true;
   const showsQr = dirEntryOpts?.qrEnabled ?? true;
 
-  const claimHref = previewToken ? `/directory/claim/${previewToken}` : '/directory';
+  const claimHref = previewToken ? `/place/claim/${previewToken}` : '/directory';
 
   return (
     <>

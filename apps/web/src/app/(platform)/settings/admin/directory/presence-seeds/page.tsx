@@ -105,14 +105,14 @@ export default function DirectoryPresenceSeedsPage() {
           <p className="text-sm font-medium text-blue-900 mb-1">Claim Link</p>
           <p className="text-sm text-blue-700 break-all font-mono">
             {typeof window !== 'undefined'
-              ? `${window.location.origin}/directory/claim/${inviteToken.token}`
-              : `/directory/claim/${inviteToken.token}`}
+              ? `${window.location.origin}/place/claim/${inviteToken.token}`
+              : `/place/claim/${inviteToken.token}`}
           </p>
           <button
             className="mt-2 text-xs text-blue-600 underline"
             onClick={() => {
               if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                const link = `${window.location.origin}/directory/claim/${inviteToken.token}`;
+                const link = `${window.location.origin}/place/claim/${inviteToken.token}`;
                 navigator.clipboard.writeText(link);
               }
             }}

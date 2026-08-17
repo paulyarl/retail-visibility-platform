@@ -81,7 +81,7 @@ export default function PlaceEntryEditorialLayout({
 
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
   const hasClaimToken = !!claimToken;
-  const claimHref = hasClaimToken ? `/directory/claim/${claimToken}` : '#claim-inquiry';
+  const claimHref = hasClaimToken ? `/place/claim/${claimToken}` : '#claim-inquiry';
   const disclaimer = publicDisclaimer ||
     `${listing.businessName} is listed from public information (address and phone). This is not a claimed profile and may be incomplete.`;
 

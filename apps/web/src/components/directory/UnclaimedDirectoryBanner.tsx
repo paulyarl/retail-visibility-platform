@@ -23,7 +23,7 @@ export default function UnclaimedDirectoryBanner({
   publicDisclaimer,
 }: UnclaimedDirectoryBannerProps) {
   const claimHref = claimToken
-    ? `/directory/claim/${claimToken}`
+    ? `/place/claim/${claimToken}`
     : '/directory';
 
   return (
