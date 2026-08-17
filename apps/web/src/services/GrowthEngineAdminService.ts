@@ -54,6 +54,26 @@ export interface Recommendation {
   priority: 'high' | 'medium' | 'low';
 }
 
+export interface DemandSignal {
+  type: 'zero_result' | 'underserved' | 'lead_gen';
+  category: string | null;
+  city: string | null;
+  searchCount: number;
+  listingCount: number;
+  description: string;
+}
+
+export interface NextSeekTarget {
+  category: string;
+  city: string;
+  score: number;
+  zeroResultSearches: number;
+  leadGenSubmissions: number;
+  underservedSearches: number;
+  currentListings: number;
+  reason: string;
+}
+
 class GrowthEngineAdminService extends AdminApiSingleton {
   private static instance: GrowthEngineAdminService;
   private constructor() { super('growth-engine-admin'); }
@@ -123,6 +143,29 @@ class GrowthEngineAdminService extends AdminApiSingleton {
     );
     const data = result.data?.data ?? result.data;
     return data?.recommendations ?? [];
+  }
+
+  async getDemandSignals(dateRange?: { startDate?: string; endDate?: string }): Promise<DemandSignal[]> {
+    const qs = new URLSearchParams();
+    if (dateRange?.startDate) qs.set('startDate', dateRange.startDate);
+    if (dateRange?.endDate) qs.set('endDate', dateRange.endDate);
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/growth-engine/demand-signals?${qs.toString()}`,
+      { method: 'GET' },
+      undefined, 0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.signals ?? [];
+  }
+
+  async getNextSeekTargets(): Promise<NextSeekTarget[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/growth-engine/next-seek-targets`,
+      { method: 'GET' },
+      undefined, 0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.targets ?? [];
   }
 }
 

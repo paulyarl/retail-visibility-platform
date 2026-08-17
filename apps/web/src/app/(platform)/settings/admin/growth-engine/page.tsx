@@ -8,6 +8,8 @@ import growthEngineAdminService, {
   CityBreakdown,
   TimeSeriesPoint,
   Recommendation,
+  DemandSignal,
+  NextSeekTarget,
 } from '@/services/GrowthEngineAdminService';
 
 export default function GrowthEngineDashboard() {
@@ -16,6 +18,8 @@ export default function GrowthEngineDashboard() {
   const [cities, setCities] = useState<CityBreakdown[]>([]);
   const [series, setSeries] = useState<TimeSeriesPoint[]>([]);
   const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [demandSignals, setDemandSignals] = useState<DemandSignal[]>([]);
+  const [seekTargets, setSeekTargets] = useState<NextSeekTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,18 +27,22 @@ export default function GrowthEngineDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [f, n, c, s, r] = await Promise.all([
+      const [f, n, c, s, r, ds, st] = await Promise.all([
         growthEngineAdminService.getFunnel(),
         growthEngineAdminService.getByNiche(),
         growthEngineAdminService.getByCity(),
         growthEngineAdminService.getTimeSeries(),
         growthEngineAdminService.getRecommendations(),
+        growthEngineAdminService.getDemandSignals(),
+        growthEngineAdminService.getNextSeekTargets(),
       ]);
       setFunnel(f?.stages ?? []);
       setNiches(n);
       setCities(c);
       setSeries(s);
       setRecs(r);
+      setDemandSignals(ds);
+      setSeekTargets(st);
     } catch (err: any) {
       setError(err?.message || 'failed_to_load');
     } finally {
@@ -125,6 +133,65 @@ export default function GrowthEngineDashboard() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">{rec.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Next Seek Targets (Sprint 7 — self-reinforcing loop) */}
+      {seekTargets.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Next Seek Targets (Demand-Driven)</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Prioritized by demand signals: zero-result searches, lead gen submissions, and underserved areas.
+          </p>
+          <div className="space-y-3">
+            {seekTargets.map((t, i) => (
+              <div key={i} className="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">#{i + 1}</span>
+                    <span className="font-medium text-gray-900">{t.category}</span>
+                    <span className="text-gray-400">in</span>
+                    <span className="font-medium text-gray-900">{t.city}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{t.reason}</p>
+                  <div className="flex gap-3 mt-2 text-xs">
+                    <span className="text-gray-600">Score: <strong className="text-blue-600">{t.score}</strong></span>
+                    <span className="text-gray-600">Listings: {t.currentListings}</span>
+                  </div>
+                </div>
+                <Link
+                  href={`/settings/admin/directory/batches?category=${encodeURIComponent(t.category)}&city=${encodeURIComponent(t.city)}`}
+                  className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap"
+                >
+                  Launch Seek
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Demand Signals (Sprint 7) */}
+      {demandSignals.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Demand Signals</h2>
+          <div className="space-y-2">
+            {demandSignals.map((sig, i) => (
+              <div key={i} className="flex items-center gap-3 border-b border-gray-100 pb-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
+                  sig.type === 'zero_result' ? 'bg-red-50 text-red-700' :
+                  sig.type === 'underserved' ? 'bg-orange-50 text-orange-700' :
+                  'bg-green-50 text-green-700'
+                }`}>
+                  {sig.type === 'zero_result' ? 'Zero Results' :
+                   sig.type === 'underserved' ? 'Underserved' :
+                   'Lead Gen'}
+                </span>
+                <span className="text-sm text-gray-900 flex-1">{sig.description}</span>
+                <span className="text-xs text-gray-500">{sig.searchCount} searches</span>
               </div>
             ))}
           </div>

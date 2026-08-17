@@ -110,4 +110,30 @@ router.post('/aggregate', requirePlatformAdmin, async (req: Request, res: Respon
   }
 });
 
+/** GET /api/admin/growth-engine/demand-signals — demand signals from search + lead gen */
+router.get('/demand-signals', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await GrowthEngineAnalyticsService.getDemandSignals(parseDateRange(req));
+    res.json({ success: true, signals: result });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/growth-engine/demand-signals] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/growth-engine/next-seek-targets — prioritized next seek recommendations */
+router.get('/next-seek-targets', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await GrowthEngineAnalyticsService.getNextSeekTargets();
+    res.json({ success: true, targets: result });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/growth-engine/next-seek-targets] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;

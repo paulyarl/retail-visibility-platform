@@ -7449,6 +7449,24 @@ model growth_engine_daily_metrics {
   @@index([metric_date], map: "idx_gedm_date")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_search_demand_log {
+  id                Int      @id @default(autoincrement())
+  search_query      String   @db.VarChar(255)
+  resolved_category String?  @db.VarChar(100)
+  resolved_city     String?  @db.VarChar(100)
+  result_count      Int      @default(0)
+  searched_at       DateTime @default(now()) @db.Timestamptz(6)
+  ip_hash           String?  @db.VarChar(64)
+  user_agent_hash   String?  @db.VarChar(64)
+
+  @@index([resolved_category, resolved_city], map: "idx_dsdl_category_city")
+  @@index([ip_hash, search_query, searched_at], map: "idx_dsdl_dedup")
+  @@index([search_query], map: "idx_dsdl_query")
+  @@index([result_count], map: "idx_dsdl_result_count")
+  @@index([searched_at(sort: Desc)], map: "idx_dsdl_searched_at")
+}
+
 enum action {
   create
   update

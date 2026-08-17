@@ -15,8 +15,10 @@
 
 import { Router, Request, Response } from 'express';
 import DirectoryClaimService from '../services/DirectoryClaimService';
+import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -711,6 +713,38 @@ ${urls.join('\n')}
     res.send(xml);
   } catch (error) {
     logger.error('[GET /api/public/directory/places-sitemap.xml] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/public/directory/search-demand — log a search demand event (public, no auth) */
+router.post('/search-demand', async (req: Request, res: Response) => {
+  try {
+    const { searchQuery, resolvedCategory, resolvedCity, resultCount } = req.body || {};
+    if (!searchQuery || typeof searchQuery !== 'string') {
+      return res.status(400).json({ error: 'search_query_required' });
+    }
+
+    // Hash IP for dedup (not for tracking)
+    const ip = req.ip || '';
+    const ipHash = ip ? crypto.createHash('sha256').update(ip).digest('hex').slice(0, 32) : null;
+    const userAgent = req.get('User-Agent') || '';
+    const userAgentHash = userAgent ? crypto.createHash('sha256').update(userAgent).digest('hex').slice(0, 32) : null;
+
+    await GrowthEngineAnalyticsService.logSearchDemand({
+      searchQuery: searchQuery.slice(0, 255),
+      resolvedCategory: resolvedCategory || null,
+      resolvedCity: resolvedCity || null,
+      resultCount: typeof resultCount === 'number' ? resultCount : 0,
+      ipHash,
+      userAgentHash,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[POST /api/public/directory/search-demand] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

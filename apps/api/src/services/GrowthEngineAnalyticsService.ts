@@ -70,6 +70,26 @@ export interface Recommendation {
   priority: 'high' | 'medium' | 'low';
 }
 
+export interface DemandSignal {
+  type: 'zero_result' | 'underserved' | 'lead_gen';
+  category: string | null;
+  city: string | null;
+  searchCount: number;
+  listingCount: number;
+  description: string;
+}
+
+export interface NextSeekTarget {
+  category: string;
+  city: string;
+  score: number;
+  zeroResultSearches: number;
+  leadGenSubmissions: number;
+  underservedSearches: number;
+  currentListings: number;
+  reason: string;
+}
+
 class GrowthEngineAnalyticsService {
   /**
    * Get the overall funnel metrics for a date range.
@@ -276,6 +296,217 @@ class GrowthEngineAnalyticsService {
     recs.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return recs.slice(0, 10);
+  }
+
+  /**
+   * Log a search demand event from the public directory search.
+   * Deduplicates by ip_hash + query + day (one event per user per query per day).
+   */
+  async logSearchDemand(input: {
+    searchQuery: string;
+    resolvedCategory?: string | null;
+    resolvedCity?: string | null;
+    resultCount: number;
+    ipHash?: string | null;
+    userAgentHash?: string | null;
+  }): Promise<{ logged: boolean; deduplicated: boolean }> {
+    const pool = getDirectPool();
+
+    // Check for existing event from same ip+query+day
+    if (input.ipHash) {
+      const existing = await pool.query(
+        `SELECT id FROM directory_search_demand_log
+         WHERE ip_hash = $1 AND search_query = $2 AND DATE(searched_at) = DATE(now())
+         LIMIT 1`,
+        [input.ipHash, input.searchQuery],
+      );
+      if (existing.rows[0]) {
+        return { logged: false, deduplicated: true };
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO directory_search_demand_log
+        (search_query, resolved_category, resolved_city, result_count, ip_hash, user_agent_hash, searched_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())`,
+      [
+        input.searchQuery,
+        input.resolvedCategory || null,
+        input.resolvedCity || null,
+        input.resultCount,
+        input.ipHash || null,
+        input.userAgentHash || null,
+      ],
+    );
+
+    return { logged: true, deduplicated: false };
+  }
+
+  /**
+   * Get demand signals — zero-result searches, underserved areas, lead gen demand.
+   */
+  async getDemandSignals(dateRange?: { startDate?: string; endDate?: string }): Promise<DemandSignal[]> {
+    const pool = getDirectPool();
+    const { startDate, endDate } = this.resolveDateRange(dateRange);
+
+    // Zero-result searches (grouped by category+city)
+    const zeroResult = await pool.query(
+      `SELECT
+         resolved_category, resolved_city,
+         COUNT(*) AS search_count
+       FROM directory_search_demand_log
+       WHERE result_count = 0
+         AND searched_at >= $1 AND searched_at <= $2
+         AND resolved_category IS NOT NULL
+       GROUP BY resolved_category, resolved_city
+       ORDER BY search_count DESC
+       LIMIT 10`,
+      [startDate, endDate],
+    );
+
+    // Underserved searches (< 5 listings but > 10 searches)
+    const underserved = await pool.query(
+      `SELECT
+         d.resolved_category, d.resolved_city,
+         COUNT(*) AS search_count,
+         COALESCE(s.listing_count, 0) AS listing_count
+       FROM directory_search_demand_log d
+       LEFT JOIN (
+         SELECT category, city, COUNT(*) AS listing_count
+         FROM directory_presence_seeds WHERE status = 'published'
+         GROUP BY category, city
+       ) s ON LOWER(s.category) = LOWER(d.resolved_category) AND LOWER(s.city) = LOWER(d.resolved_city)
+       WHERE d.result_count < 5
+         AND d.searched_at >= $1 AND d.searched_at <= $2
+         AND d.resolved_category IS NOT NULL
+       GROUP BY d.resolved_category, d.resolved_city, s.listing_count
+       HAVING COUNT(*) > 5
+       ORDER BY search_count DESC
+       LIMIT 10`,
+      [startDate, endDate],
+    );
+
+    // Lead gen demand (directory_lead_gen prospects grouped by category+city)
+    const leadGen = await pool.query(
+      `SELECT
+         category, city, COUNT(*) AS submission_count
+       FROM mkt_prospect_queue
+       WHERE source_kind = 'directory_lead_gen'
+         AND created_at >= $1 AND created_at <= $2
+       GROUP BY category, city
+       ORDER BY submission_count DESC
+       LIMIT 10`,
+      [startDate, endDate],
+    );
+
+    const signals: DemandSignal[] = [];
+
+    for (const r of zeroResult.rows) {
+      signals.push({
+        type: 'zero_result',
+        category: r.resolved_category,
+        city: r.resolved_city,
+        searchCount: parseInt(r.search_count) || 0,
+        listingCount: 0,
+        description: `${r.search_count} zero-result searches for "${r.resolved_category}" in ${r.resolved_city || 'unknown city'}`,
+      });
+    }
+
+    for (const r of underserved.rows) {
+      signals.push({
+        type: 'underserved',
+        category: r.resolved_category,
+        city: r.resolved_city,
+        searchCount: parseInt(r.search_count) || 0,
+        listingCount: parseInt(r.listing_count) || 0,
+        description: `${r.search_count} searches, only ${r.listing_count} listings for "${r.resolved_category}" in ${r.resolved_city || 'unknown city'}`,
+      });
+    }
+
+    for (const r of leadGen.rows) {
+      signals.push({
+        type: 'lead_gen',
+        category: r.category,
+        city: r.city,
+        searchCount: parseInt(r.submission_count) || 0,
+        listingCount: 0,
+        description: `${r.submission_count} "Get listed" submissions for ${r.category || 'unknown'} in ${r.city || 'unknown city'}`,
+      });
+    }
+
+    return signals;
+  }
+
+  /**
+   * Get prioritized next seek targets — combines all demand signals into a scored list.
+   * Score = (zero_result_searches * 3) + (lead_gen_submissions * 5) + (underserved_searches * 2)
+   */
+  async getNextSeekTargets(): Promise<NextSeekTarget[]> {
+    const pool = getDirectPool();
+    const { startDate, endDate } = this.resolveDateRange();
+
+    // Aggregate all demand signals by category+city
+    const result = await pool.query(
+      `WITH zero_results AS (
+         SELECT resolved_category AS category, resolved_city AS city,
+                COUNT(*) AS zero_result_searches
+         FROM directory_search_demand_log
+         WHERE result_count = 0 AND resolved_category IS NOT NULL
+           AND searched_at >= $1 AND searched_at <= $2
+         GROUP BY resolved_category, resolved_city
+       ),
+       underserved AS (
+         SELECT resolved_category AS category, resolved_city AS city,
+                COUNT(*) AS underserved_searches
+         FROM directory_search_demand_log
+         WHERE result_count < 5 AND resolved_category IS NOT NULL
+           AND searched_at >= $1 AND searched_at <= $2
+         GROUP BY resolved_category, resolved_city
+       ),
+       lead_gen AS (
+         SELECT category, city, COUNT(*) AS lead_gen_submissions
+         FROM mkt_prospect_queue
+         WHERE source_kind = 'directory_lead_gen'
+           AND created_at >= $1 AND created_at <= $2
+         GROUP BY category, city
+       ),
+       listings AS (
+         SELECT category, city, COUNT(*) AS listing_count
+         FROM directory_presence_seeds WHERE status = 'published'
+         GROUP BY category, city
+       )
+       SELECT
+         COALESCE(z.category, u.category, l.category) AS category,
+         COALESCE(z.city, u.city, l.city) AS city,
+         COALESCE(z.zero_result_searches, 0) AS zero_result_searches,
+         COALESCE(u.underserved_searches, 0) AS underserved_searches,
+         COALESCE(l.lead_gen_submissions, 0) AS lead_gen_submissions,
+         COALESCE(li.listing_count, 0) AS current_listings,
+         (COALESCE(z.zero_result_searches, 0) * 3 +
+          COALESCE(l.lead_gen_submissions, 0) * 5 +
+          COALESCE(u.underserved_searches, 0) * 2) AS score
+       FROM zero_results z
+       FULL OUTER JOIN underserved u ON LOWER(z.category) = LOWER(u.category) AND LOWER(z.city) = LOWER(u.city)
+       FULL OUTER JOIN lead_gen l ON LOWER(COALESCE(z.category, u.category)) = LOWER(l.category)
+         AND LOWER(COALESCE(z.city, u.city)) = LOWER(l.city)
+       LEFT JOIN listings li ON LOWER(COALESCE(z.category, u.category, l.category)) = LOWER(li.category)
+         AND LOWER(COALESCE(z.city, u.city, l.city)) = LOWER(li.city)
+       WHERE COALESCE(z.zero_result_searches, 0) + COALESCE(u.underserved_searches, 0) + COALESCE(l.lead_gen_submissions, 0) > 0
+       ORDER BY score DESC
+       LIMIT 10`,
+      [startDate, endDate],
+    );
+
+    return result.rows.map((r: any) => ({
+      category: r.category,
+      city: r.city,
+      score: parseInt(r.score) || 0,
+      zeroResultSearches: parseInt(r.zero_result_searches) || 0,
+      leadGenSubmissions: parseInt(r.lead_gen_submissions) || 0,
+      underservedSearches: parseInt(r.underserved_searches) || 0,
+      currentListings: parseInt(r.current_listings) || 0,
+      reason: `${parseInt(r.zero_result_searches) || 0} zero-result searches, ${parseInt(r.lead_gen_submissions) || 0} lead gen submissions, ${parseInt(r.current_listings) || 0} existing listings`,
+    }));
   }
 
   /**

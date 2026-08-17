@@ -60,6 +60,19 @@ class PlacesSearchService extends PublicApiSingleton {
       return null;
     }
   }
+
+  async logSearchDemand(input: { searchQuery: string; resolvedCategory?: string; resolvedCity?: string; resultCount: number }): Promise<void> {
+    try {
+      await this.makeDefaultRequest<any>(
+        `/api/public/directory/search-demand`,
+        { method: 'POST', body: JSON.stringify(input) },
+        undefined,
+        0,
+      );
+    } catch {
+      // Best-effort — silently fail
+    }
+  }
 }
 
 const searchService = PlacesSearchService.getInstance();
@@ -84,6 +97,20 @@ export default function PlacesSearchClient() {
     const data = await searchService.search({ q, category, city, snapEbt, sort, page });
     setResults(data);
     setLoading(false);
+
+    // Log search demand for zero-result or low-result searches (Sprint 7)
+    if (data && data.total < 5 && q) {
+      try {
+        await searchService.logSearchDemand({
+          searchQuery: q,
+          resolvedCategory: category || undefined,
+          resolvedCity: city || undefined,
+          resultCount: data.total,
+        });
+      } catch {
+        // Silently fail — demand logging is best-effort
+      }
+    }
   }, [q, category, city, snapEbt, sort, page]);
 
   useEffect(() => { doSearch(); }, [doSearch]);
