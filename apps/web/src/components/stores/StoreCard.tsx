@@ -62,6 +62,7 @@ export interface StoreData {
   distance?: number;
   isDemo?: boolean;
   demoExpiresAt?: string | null;
+  listingOrigin?: string | null;
 }
 
 export type ViewMode = 'grid' | 'list' | 'map';
@@ -110,9 +111,13 @@ export function StoreCard({
   const remainingCategories = categories.length - maxCategories;
 
   // Determine link destination
-  const linkHref = linkType === LinkType.Storefront 
+  // Directory presence seeds (unclaimed listings) live at /place/{slug};
+  // subscribed platform tenants live at /directory/{slug}.
+  const linkHref = linkType === LinkType.Storefront
     ? `/shops/${store.slug || store.tenantId}`
-    : `/directory/${store.slug || store.tenantId}`;
+    : store.listingOrigin === 'directory_seed'
+      ? `/place/${store.slug || store.tenantId}`
+      : `/directory/${store.slug || store.tenantId}`;
 
   // console.log(`linkType: ${linkType}`);
   // console.log(`linkHref: ${linkHref}`);

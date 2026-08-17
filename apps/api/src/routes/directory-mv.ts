@@ -178,6 +178,7 @@ router.get('/search', async (req: Request, res: Response) => {
             COALESCE(real_counts.product_count, 0) as product_count,
             dll.is_featured,
             dll.subscription_tier,
+            dll.listing_origin,
             COALESCE(mec.is_enabled, false) as can_use_external_link,
             dll.created_at,
             dll.updated_at,
@@ -237,6 +238,7 @@ router.get('/search', async (req: Request, res: Response) => {
           COALESCE(real_counts.product_count, 0) as product_count,
           dll.is_featured,
           dll.subscription_tier,
+          dll.listing_origin,
           COALESCE(mec.is_enabled, false) as can_use_external_link,
           dll.created_at,
           dll.updated_at,
@@ -315,6 +317,7 @@ router.get('/search', async (req: Request, res: Response) => {
         directoryPublished: row.directory_published || false, // Add directory publish status
         isDemo: row.is_demo || false,
         demoExpiresAt: row.demo_expires_at || null,
+        listingOrigin: row.listing_origin || null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         distance: row.distance_km ? Math.round(row.distance_km * 10) / 10 : null, // Distance in km, rounded to 1 decimal
@@ -562,6 +565,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         dll.is_featured as is_featured,
         dll.subscription_tier,
         dll.subscription_tier as subscription_tier,
+        dll.listing_origin,
         COALESCE(mec.is_enabled, false) as can_use_external_link,
         dll.created_at,
         dll.created_at as created_at,
@@ -648,6 +652,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         directoryPublished: row.directory_published || false,
         isDemo: row.is_demo || false,
         demoExpiresAt: row.demo_expires_at || null,
+        listingOrigin: row.listing_origin || null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };

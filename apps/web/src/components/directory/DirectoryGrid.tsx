@@ -33,6 +33,7 @@ interface DirectoryListing {
   businessHours?: any;
   isDemo?: boolean;
   demoExpiresAt?: string | null;
+  listingOrigin?: string | null;
 }
 
 interface Pagination {
@@ -78,6 +79,7 @@ function transformListing(listing: DirectoryListing): StoreData {
     businessHours: listing.businessHours,
     isDemo: listing.isDemo,
     demoExpiresAt: listing.demoExpiresAt,
+    listingOrigin: listing.listingOrigin,
   };
 }
 

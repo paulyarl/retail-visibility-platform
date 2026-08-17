@@ -12,6 +12,7 @@ import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
 export interface DirectoryClaimSummary {
   seedId: string;
+  slug: string;
   businessName: string;
   category: string;
   city: string;

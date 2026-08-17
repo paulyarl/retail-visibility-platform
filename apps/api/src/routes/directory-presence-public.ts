@@ -33,6 +33,7 @@ router.get('/claim/:token', async (req: Request, res: Response) => {
       success: true,
       summary: {
         seedId: summary.seedId,
+        slug: summary.slug,
         businessName: summary.businessName,
         category: summary.category,
         city: summary.city,

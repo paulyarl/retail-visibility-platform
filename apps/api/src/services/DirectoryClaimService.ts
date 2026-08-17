@@ -24,6 +24,7 @@ interface ClaimAuditCtx {
 export interface ClaimTokenSummary {
   seedId: string;
   tenantId: string;
+  slug: string;
   businessName: string;
   category: string;
   city: string;
@@ -60,6 +61,7 @@ class DirectoryClaimService {
         dps.category,
         dps.city,
         dps.state,
+        dl.slug,
         dl.business_name,
         dl.address,
         dl.phone,
@@ -80,6 +82,7 @@ class DirectoryClaimService {
     return {
       seedId: r.seed_id,
       tenantId: r.tenant_id,
+      slug: r.slug,
       businessName: r.business_name,
       category: r.category,
       city: r.city,

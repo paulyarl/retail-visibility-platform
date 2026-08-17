@@ -134,6 +134,10 @@ export interface DirectoryConsolidated {
       lng: number;
     };
     businessHours?: any;
+    primaryCategory?: string;
+    listingOrigin?: string | null;
+    publicDisclaimer?: string | null;
+    activeClaimToken?: string | null;
   };
   storeTypes: any[];
   categoryCounts: any[];

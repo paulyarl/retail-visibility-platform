@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import React from 'react';
 import { permanentRedirect } from 'next/navigation';
-import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { directoryService } from '@/services/DirectorySingletonService';
 
 interface LayoutProps {
@@ -13,24 +12,23 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
 
   try {
-    const item = await publicDirectoryService.getDirectoryItem(slug);
+    const data = await directoryService.getDirectoryConsolidated(slug);
+    const listing = data?.listing;
 
-    if (!item) {
-      return {
-        title: 'Store Not Found',
-      };
+    if (!listing) {
+      return { title: 'Place Not Found' };
     }
 
-    const businessName = item.businessName || item.name || 'Local Business';
+    const businessName = listing.businessName || 'Local Business';
     const description =
-      item.description ||
-      `Visit ${businessName} on VisibleShelf to browse products, hours, and contact information.`;
+      listing.publicDisclaimer ||
+      `${businessName} is listed on VisibleShelf from public information (address and phone). Claim this listing to verify and update details.`;
     const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
-    const image = item.logoUrl || item.bannerUrl || `${baseUrl}/favicon.ico`;
+    const image = listing.logoUrl || `${baseUrl}/favicon.ico`;
 
     return {
       metadataBase: new URL(baseUrl),
-      title: `${businessName} - VisibleShelf Directory`,
+      title: `${businessName} - VisibleShelf Place`,
       description,
       openGraph: {
         title: businessName,
@@ -46,25 +44,23 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       },
     };
   } catch {
-    return {
-      title: 'Store Directory',
-    };
+    return { title: 'VisibleShelf Place' };
   }
 }
 
-export default async function DirectorySlugLayout({ params, children }: LayoutProps) {
+export default async function PlaceSlugLayout({ params, children }: LayoutProps) {
   const { slug } = await params;
 
-  // Directory presence seeds (unclaimed listings seeded from public information)
-  // live at /place/{slug}. /directory/{slug} is the canonical path for subscribed
-  // platform tenants with storefront-oriented layouts. Redirect seeds away so
-  // there is a single canonical URL per listing.
+  // Redirect non-seed listings to their canonical storefront-oriented path.
+  // /place/{slug} is reserved for directory presence seeds (unclaimed listings
+  // seeded from public information). Subscribed platform tenants live at
+  // /directory/{slug}.
   try {
     const data = await directoryService.getDirectoryConsolidated(slug);
     const listing = data?.listing;
 
-    if (listing && listing.listingOrigin === 'directory_seed') {
-      permanentRedirect(`/place/${listing.slug || slug}`);
+    if (listing && listing.listingOrigin !== 'directory_seed') {
+      permanentRedirect(`/directory/${listing.slug || slug}`);
     }
   } catch {
     // If the lookup fails, fall through to the page which handles not-found.
