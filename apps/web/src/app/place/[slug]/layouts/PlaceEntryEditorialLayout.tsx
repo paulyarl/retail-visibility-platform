@@ -177,11 +177,11 @@ export default function PlaceEntryEditorialLayout({
           </section>
         </div>
 
-        {/* Balanced content grid — map on left, NAP data on right */}
+        {/* Balanced content grid — map on left (wider), NAP data on right */}
         <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left — Map (visually prominent for a place listing) */}
-            <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left — Map (wider, shows business location and surrounding area) */}
+            <div className="lg:col-span-7 space-y-8">
               {showsMap && listing.address && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
@@ -191,7 +191,7 @@ export default function PlaceEntryEditorialLayout({
             </div>
 
             {/* Right — Contact + Hours */}
-            <div className="space-y-8">
+            <div className="lg:col-span-5 space-y-8">
               {showsContact && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
