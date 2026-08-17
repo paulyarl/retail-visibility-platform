@@ -482,7 +482,7 @@ class DirectoryPresenceSeedService {
       params.push(fields.website);
     }
     if (fields.businessHours !== undefined) {
-      setClauses.push('business_hours = $' + (params.length + 1));
+      setClauses.push('business_hours = $' + (params.length + 1) + '::jsonb');
       params.push(JSON.stringify(fields.businessHours));
     }
 
