@@ -35,7 +35,8 @@ export type ProspectSourceKind =
   | 'city_category_audit'
   | 'scan_unmatched'
   | 'manual'
-  | 'intelligence_seek';
+  | 'intelligence_seek'
+  | 'directory_lead_gen';
 
 export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';

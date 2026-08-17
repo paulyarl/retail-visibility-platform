@@ -199,6 +199,8 @@ export default function PresenceSeedDetailPage() {
   const [statusDraft, setStatusDraft] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
   const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null);
+  const [generatingEnrichmentToken, setGeneratingEnrichmentToken] = useState(false);
+  const [enrichmentTokenLink, setEnrichmentTokenLink] = useState<string | null>(null);
 
   const handleStatusChange = async () => {
     if (!statusDraft || statusDraft === status) return;
@@ -233,6 +235,41 @@ export default function PresenceSeedDetailPage() {
       );
     } finally {
       setRevokingTokenId(null);
+    }
+  };
+
+  const handleOutreachStatusChange = async (newStatus: string) => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await directoryPresenceAdminService.updateOutreach(seedId, { status: newStatus });
+      setActionSuccess(`Outreach status changed to "${newStatus}".`);
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to update outreach status',
+      );
+    }
+  };
+
+  const handleGenerateEnrichmentToken = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    setEnrichmentTokenLink(null);
+    try {
+      setGeneratingEnrichmentToken(true);
+      const result = await directoryPresenceAdminService.generateEnrichmentToken(seedId);
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const link = `${origin}/directory/enrich/${result.token}`;
+      setEnrichmentTokenLink(link);
+      setActionSuccess('Enrichment token generated. Copy the link and send it to the owner.');
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to generate enrichment token',
+      );
+    } finally {
+      setGeneratingEnrichmentToken(false);
     }
   };
 
@@ -896,6 +933,105 @@ export default function PresenceSeedDetailPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      {/* Outreach & Enrichment */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Outreach & Enrichment</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Outreach Status
+            </label>
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+              seed?.outreachStatus === 'enriched' ? 'bg-green-50 text-green-700 border border-green-200' :
+              seed?.outreachStatus === 'enrichment_sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+              seed?.outreachStatus === 'verified_by_call' || seed?.outreachStatus === 'verified_by_email' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+              seed?.outreachStatus === 'outreach_attempted' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+              'bg-gray-50 text-gray-700 border border-gray-200'
+            }`}>
+              {seed?.outreachStatus || 'unverified'}
+            </span>
+          </div>
+          {seed?.ownerName && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Owner Name
+              </label>
+              <p className="text-sm text-gray-900">{seed.ownerName}</p>
+            </div>
+          )}
+          {seed?.ownerEmail && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Owner Email
+              </label>
+              <p className="text-sm text-gray-900">{seed.ownerEmail}</p>
+            </div>
+          )}
+          {seed?.ownerPhone && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Owner Phone
+              </label>
+              <p className="text-sm text-gray-900">{seed.ownerPhone}</p>
+            </div>
+          )}
+        </div>
+
+        {seed?.outreachNotes && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Outreach Notes
+            </label>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{seed.outreachNotes}</p>
+          </div>
+        )}
+
+        {/* Quick status actions */}
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+          <button
+            onClick={() => handleOutreachStatusChange('outreach_attempted')}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+          >
+            Log Outreach Attempt
+          </button>
+          <button
+            onClick={() => handleOutreachStatusChange('verified_by_call')}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
+          >
+            Mark Verified (Call)
+          </button>
+          <button
+            onClick={handleGenerateEnrichmentToken}
+            disabled={generatingEnrichmentToken}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50"
+          >
+            {generatingEnrichmentToken ? 'Generating...' : 'Send Enrichment Link'}
+          </button>
+        </div>
+
+        {enrichmentTokenLink && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs font-medium text-blue-900 mb-1">Enrichment Link (copy and send to owner):</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs text-blue-700 bg-white px-2 py-1 rounded border border-blue-200 break-all">
+                {enrichmentTokenLink}
+              </code>
+              <button
+                onClick={() => {
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(enrichmentTokenLink);
+                  }
+                }}
+                className="px-2 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Copy
+              </button>
+            </div>
           </div>
         )}
       </section>

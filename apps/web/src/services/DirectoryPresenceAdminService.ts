@@ -233,6 +233,39 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       0,
     );
   }
+
+  /** PATCH /api/admin/directory-presence/presence-seeds/:id/outreach */
+  async updateOutreach(
+    id: string,
+    input: {
+      status: string;
+      notes?: string | null;
+      ownerName?: string | null;
+      ownerEmail?: string | null;
+      ownerPhone?: string | null;
+    },
+  ): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/outreach`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/enrichment-token */
+  async generateEnrichmentToken(
+    id: string,
+  ): Promise<{ token: string; tokenId: string; expiresAt: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/enrichment-token`,
+      { method: 'POST', body: JSON.stringify({}) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data as { token: string; tokenId: string; expiresAt: string };
+  }
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();

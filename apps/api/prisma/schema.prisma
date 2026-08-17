@@ -4970,6 +4970,7 @@ model tenants {
   digital_download_pages                                                                 digital_download_pages[]
   digital_downloads                                                                      digital_downloads[]
   directory_claim_tokens                                                                 directory_claim_tokens[]
+  directory_enrichment_tokens                                                            directory_enrichment_tokens[]
   directory_featured_listings_list                                                       directory_featured_listings_list[]
   directory_field_provenance                                                             directory_field_provenance[]
   directory_photos                                                                       directory_photos[]
@@ -7306,31 +7307,56 @@ model directory_field_provenance {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_presence_seeds {
-  id                         String                       @id @db.VarChar(60)
-  tenant_id                  String                       @unique(map: "uq_dps_tenant") @db.VarChar(255)
-  listing_id                 String                       @unique(map: "uq_dps_listing") @db.VarChar(255)
-  category                   String                       @db.VarChar(100)
-  city                       String                       @db.VarChar(100)
-  state                      String                       @db.VarChar(50)
-  seed_batch                 String                       @db.VarChar(100)
-  status                     String                       @default("draft") @db.VarChar(20)
-  identity_confidence        String                       @default("medium") @db.VarChar(10)
-  category_fit               String                       @default("probable") @db.VarChar(20)
-  notes                      String?
-  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
-  published_at               DateTime?                    @db.Timestamptz(6)
-  invited_at                 DateTime?                    @db.Timestamptz(6)
-  claimed_at                 DateTime?                    @db.Timestamptz(6)
-  directory_claim_tokens     directory_claim_tokens[]
-  directory_field_provenance directory_field_provenance[]
-  directory_listings_list    directory_listings_list      @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
-  tenants                    tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
+  id                          String                        @id @db.VarChar(60)
+  tenant_id                   String                        @unique(map: "uq_dps_tenant") @db.VarChar(255)
+  listing_id                  String                        @unique(map: "uq_dps_listing") @db.VarChar(255)
+  category                    String                        @db.VarChar(100)
+  city                        String                        @db.VarChar(100)
+  state                       String                        @db.VarChar(50)
+  seed_batch                  String                        @db.VarChar(100)
+  status                      String                        @default("draft") @db.VarChar(20)
+  identity_confidence         String                        @default("medium") @db.VarChar(10)
+  category_fit                String                        @default("probable") @db.VarChar(20)
+  notes                       String?
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  published_at                DateTime?                     @db.Timestamptz(6)
+  invited_at                  DateTime?                     @db.Timestamptz(6)
+  claimed_at                  DateTime?                     @db.Timestamptz(6)
+  outreach_status             String                        @default("unverified") @db.VarChar(20)
+  outreach_notes              String?
+  owner_name                  String?                       @db.VarChar(255)
+  owner_email                 String?                       @db.VarChar(255)
+  owner_phone                 String?                       @db.VarChar(40)
+  directory_claim_tokens      directory_claim_tokens[]
+  directory_enrichment_tokens directory_enrichment_tokens[]
+  directory_field_provenance  directory_field_provenance[]
+  directory_listings_list     directory_listings_list       @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
+  tenants                     tenants                       @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
 
   @@index([category], map: "idx_dps_category")
   @@index([city, state], map: "idx_dps_city_state")
   @@index([seed_batch], map: "idx_dps_seed_batch")
   @@index([status], map: "idx_dps_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_enrichment_tokens {
+  id                       String                   @id @db.VarChar(60)
+  seed_id                  String                   @db.VarChar(60)
+  tenant_id                String                   @db.VarChar(255)
+  token                    String                   @unique @db.VarChar(255)
+  expires_at               DateTime                 @db.Timestamptz(6)
+  consumed_at              DateTime?                @db.Timestamptz(6)
+  single_use               Boolean                  @default(false)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expires_at], map: "idx_det_expires")
+  @@index([seed_id], map: "idx_det_seed")
+  @@index([tenant_id], map: "idx_det_tenant")
+  @@index([token], map: "idx_det_token")
 }
 
 enum action {

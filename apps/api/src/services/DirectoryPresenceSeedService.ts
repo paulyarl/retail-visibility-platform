@@ -22,6 +22,8 @@ import {
   generateDirectoryFieldProvenanceId,
   generateDirectoryClaimTokenId,
   generateDirectoryClaimTokenString,
+  generateDirectoryEnrichmentTokenId,
+  generateDirectoryEnrichmentTokenString,
   generateTenantId,
 } from '../lib/id-generator';
 /** Audit context for seed/claim operations */
@@ -677,6 +679,194 @@ class DirectoryPresenceSeedService {
       payload: { seedId, tokenId, revokedBy },
     });
     logger.info('DirectoryPresenceSeedService.revokeToken', undefined, { seedId, tokenId });
+  }
+
+  // ============================
+  // Enrichment tokens (Sprint 3)
+  // ============================
+
+  /**
+   * Generate a multi-use enrichment token for a seed.
+   * The token is sent to the business owner via email/SMS so they can
+   * self-serve enrich their listing without creating an account.
+   *
+   * 90-day expiry. Multi-use (single_use = false) so the owner can submit
+   * multiple times as they gather photos/info.
+   */
+  async generateEnrichmentToken(
+    seedId: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ tokenId: string; token: string; expiresAt: Date } | { error: string }> {
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seedRows[0]) {
+      return { error: 'seed_not_found' };
+    }
+    const tenantId = seedRows[0].tenant_id;
+    const tokenId = generateDirectoryEnrichmentTokenId(tenantId);
+    const token = generateDirectoryEnrichmentTokenString();
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+
+    await prisma.$executeRaw`
+      INSERT INTO directory_enrichment_tokens (id, seed_id, tenant_id, token, expires_at, single_use, created_at)
+      VALUES (${tokenId}, ${seedId}, ${tenantId}, ${token}, ${expiresAt}, false, now())
+    `;
+
+    // Update seed outreach status to enrichment_sent
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET outreach_status = 'enrichment_sent', updated_at = now()
+      WHERE id = ${seedId}
+    `;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.generate_enrichment_token',
+      payload: { seedId, tenantId, tokenId },
+    });
+
+    logger.info('DirectoryPresenceSeedService.generateEnrichmentToken', undefined, {
+      seedId,
+      tenantId,
+      tokenId,
+    });
+
+    return { tokenId, token, expiresAt };
+  }
+
+  /**
+   * Resolve an enrichment token to its seed context + intake definition.
+   * Public, no auth — the token itself is the gate.
+   */
+  async resolveEnrichmentToken(
+    token: string,
+  ): Promise<{
+    seedId: string;
+    tenantId: string;
+    slug: string;
+    businessName: string;
+    category: string;
+    city: string;
+    state: string;
+    isExpired: boolean;
+  } | null> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        det.id AS token_id,
+        det.seed_id,
+        det.tenant_id,
+        det.expires_at,
+        det.consumed_at,
+        dps.category,
+        dps.city,
+        dps.state,
+        dl.slug,
+        dl.business_name
+      FROM directory_enrichment_tokens det
+      JOIN directory_presence_seeds dps ON dps.id = det.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE det.token = ${token}
+      LIMIT 1
+    `;
+    if (!rows[0]) return null;
+    const r = rows[0];
+    const now = new Date();
+    const expiresAt = new Date(r.expires_at);
+    return {
+      seedId: r.seed_id,
+      tenantId: r.tenant_id,
+      slug: r.slug,
+      businessName: r.business_name,
+      category: r.category,
+      city: r.city,
+      state: r.state,
+      isExpired: now > expiresAt,
+    };
+  }
+
+  // ============================
+  // Outreach status (Sprint 3)
+  // ============================
+
+  /**
+   * Update the outreach status and optionally log an outreach attempt.
+   * Also captures owner contact info if provided.
+   */
+  async updateOutreachStatus(
+    seedId: string,
+    input: {
+      status: string;
+      notes?: string | null;
+      ownerName?: string | null;
+      ownerEmail?: string | null;
+      ownerPhone?: string | null;
+    },
+    ctx?: SeedAuditCtx,
+  ): Promise<{ success: boolean; error?: string }> {
+    const validStatuses = [
+      'unverified',
+      'outreach_attempted',
+      'verified_by_call',
+      'verified_by_email',
+      'enrichment_sent',
+      'enriched',
+    ];
+    if (!validStatuses.includes(input.status)) {
+      return { success: false, error: 'invalid_status' };
+    }
+
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT 1 FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seedRows[0]) {
+      return { success: false, error: 'seed_not_found' };
+    }
+
+    // Build dynamic update for outreach columns
+    const sets: string[] = [`outreach_status = $1`, `updated_at = now()`];
+    const params: any[] = [input.status];
+    let paramIdx = 2;
+
+    if (input.notes !== undefined) {
+      sets.push(`outreach_notes = $${paramIdx++}`);
+      params.push(input.notes);
+    }
+    if (input.ownerName !== undefined) {
+      sets.push(`owner_name = $${paramIdx++}`);
+      params.push(input.ownerName);
+    }
+    if (input.ownerEmail !== undefined) {
+      sets.push(`owner_email = $${paramIdx++}`);
+      params.push(input.ownerEmail);
+    }
+    if (input.ownerPhone !== undefined) {
+      sets.push(`owner_phone = $${paramIdx++}`);
+      params.push(input.ownerPhone);
+    }
+
+    params.push(seedId);
+    const seedParamIdx = paramIdx++;
+
+    await prisma.$executeRawUnsafe(
+      `UPDATE directory_presence_seeds SET ${sets.join(', ')} WHERE id = $${seedParamIdx}`,
+      ...params,
+    );
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.update_outreach',
+      payload: { seedId, status: input.status },
+    });
+
+    logger.info('DirectoryPresenceSeedService.updateOutreachStatus', undefined, {
+      seedId,
+      status: input.status,
+    });
+
+    return { success: true };
   }
 }
 

@@ -32,6 +32,7 @@ export interface AdapterContext {
 export type WriteBehindAdapter = (
   value: any,
   adapterCtx: AdapterContext,
+  config?: Record<string, any>,
 ) => Promise<void>;
 
 // ====================
@@ -454,6 +455,154 @@ const adapters: Record<string, WriteBehindAdapter> = {
       });
     }
   },
+
+  // ─── directory_listing_write ──────────────────────────────────────
+  // Writes a form field value to a column on directory_listings_list
+  // for the seed's tenant. config.target_column specifies the column.
+  directory_listing_write: async (value: any, adapterCtx: AdapterContext, config?: Record<string, any>) => {
+    if (!adapterCtx.tenantId) {
+      logger.warn('directory_listing_write skipped — no tenantId', adapterCtx.ctx);
+      return;
+    }
+    const targetColumn = config?.target_column;
+    if (!targetColumn) {
+      logger.warn('directory_listing_write skipped — no target_column in config', adapterCtx.ctx);
+      return;
+    }
+
+    // Allowlist of writable columns to prevent SQL injection
+    const allowedColumns = new Set([
+      'hours',
+      'phone',
+      'website',
+      'description',
+      'logo_url',
+      'photo_url',
+    ]);
+    if (!allowedColumns.has(targetColumn)) {
+      logger.warn('directory_listing_write skipped — disallowed column', adapterCtx.ctx, { targetColumn });
+      return;
+    }
+
+    const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+    await prisma.$executeRawUnsafe(
+      `UPDATE directory_listings_list SET ${targetColumn} = $1, updated_at = now() WHERE tenant_id = $2`,
+      serialized,
+      adapterCtx.tenantId,
+    );
+  },
+
+  // ─── directory_provenance_write ───────────────────────────────────
+  // Creates a directory_field_provenance row for the written field.
+  // config.target_column = field_key, config.source = source_name.
+  directory_provenance_write: async (value: any, adapterCtx: AdapterContext, config?: Record<string, any>) => {
+    if (!adapterCtx.tenantId) return;
+    const fieldKey = config?.target_column;
+    const source = config?.source || 'owner_self_serve';
+    if (!fieldKey) return;
+
+    const { generateDirectoryFieldProvenanceId } = await import('../../lib/id-generator.js');
+    const provenanceId = generateDirectoryFieldProvenanceId(adapterCtx.tenantId);
+
+    // Find the seed for this tenant
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT id FROM directory_presence_seeds WHERE tenant_id = ${adapterCtx.tenantId} LIMIT 1
+    `;
+    if (!seedRows[0]) return;
+    const seedId = seedRows[0].id;
+
+    const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+    // Upsert provenance (unique on [seed_id, field_key])
+    await prisma.$executeRaw`
+      INSERT INTO directory_field_provenance (
+        id, seed_id, tenant_id, field_key, value,
+        source_name, accessed_at, confidence, show_on_public,
+        created_at, updated_at
+      ) VALUES (
+        ${provenanceId},
+        ${seedId},
+        ${adapterCtx.tenantId},
+        ${fieldKey},
+        ${serialized},
+        ${source},
+        now(),
+        'high',
+        true,
+        now(), now()
+      )
+      ON CONFLICT (seed_id, field_key) DO UPDATE
+      SET value = EXCLUDED.value,
+          source_name = EXCLUDED.source_name,
+          accessed_at = EXCLUDED.accessed_at,
+          confidence = EXCLUDED.confidence,
+          show_on_public = EXCLUDED.show_on_public,
+          updated_at = now()
+    `;
+  },
+
+  // ─── directory_snap_ebt_write ─────────────────────────────────────
+  // Updates snap_ebt_reported + snap_ebt_source on the listing.
+  directory_snap_ebt_write: async (value: any, adapterCtx: AdapterContext) => {
+    if (!adapterCtx.tenantId) return;
+    const snapEbtReported = !!value;
+
+    await prisma.$executeRaw`
+      UPDATE directory_listings_list
+      SET snap_ebt_reported = ${snapEbtReported},
+          snap_ebt_source = 'owner_confirmed',
+          snap_ebt_as_of = now(),
+          updated_at = now()
+      WHERE tenant_id = ${adapterCtx.tenantId}
+    `;
+
+    // Also write a provenance row
+    const { generateDirectoryFieldProvenanceId } = await import('../../lib/id-generator.js');
+    const provenanceId = generateDirectoryFieldProvenanceId(adapterCtx.tenantId);
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT id FROM directory_presence_seeds WHERE tenant_id = ${adapterCtx.tenantId} LIMIT 1
+    `;
+    if (!seedRows[0]) return;
+    const seedId = seedRows[0].id;
+
+    await prisma.$executeRaw`
+      INSERT INTO directory_field_provenance (
+        id, seed_id, tenant_id, field_key, value,
+        source_name, accessed_at, confidence, show_on_public,
+        created_at, updated_at
+      ) VALUES (
+        ${provenanceId},
+        ${seedId},
+        ${adapterCtx.tenantId},
+        'snap_ebt',
+        ${snapEbtReported ? 'true' : 'false'},
+        'owner_confirmed',
+        now(),
+        'high',
+        true,
+        now(), now()
+      )
+      ON CONFLICT (seed_id, field_key) DO UPDATE
+      SET value = EXCLUDED.value,
+          source_name = EXCLUDED.source_name,
+          accessed_at = EXCLUDED.accessed_at,
+          updated_at = now()
+    `;
+  },
+
+  // ─── directory_seed_owner_write ───────────────────────────────────
+  // Captures the owner name on the seed row (not published).
+  directory_seed_owner_write: async (value: any, adapterCtx: AdapterContext) => {
+    if (!adapterCtx.tenantId) return;
+    const ownerName = typeof value === 'string' ? value : String(value || '');
+
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET owner_name = ${ownerName}, updated_at = now()
+      WHERE tenant_id = ${adapterCtx.tenantId}
+    `;
+  },
 };
 
 // ====================
@@ -486,7 +635,7 @@ export async function executeFieldMappings(
     if (value === undefined || value === null) continue;
 
     try {
-      await adapter(value, adapterCtx);
+      await adapter(value, adapterCtx, mapping.config);
     } catch (error) {
       // Best-effort — adapter failures don't block the intake
       logger.error('Write-behind adapter threw', adapterCtx.ctx, {

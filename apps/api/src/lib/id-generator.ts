@@ -1226,6 +1226,26 @@ export function generateDirectoryClaimTokenString(): string {
 }
 
 /**
+ * Generate a directory_enrichment_tokens ID.
+ * Format: det-{tenantKey}-{nanoid12}
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryEnrichmentTokenId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `det-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a raw enrichment token string (stored in directory_enrichment_tokens.token).
+ * Format: enrich-{nanoid24} (31 chars)
+ * URL-safe, multi-use, not tenant-traceable
+ */
+export function generateDirectoryEnrichmentTokenString(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 24);
+  return `enrich-${nanoid()}`;
+}
+
+/**
  * Generate a tenant_storefront_hours_settings ID.
  * Format: shs-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

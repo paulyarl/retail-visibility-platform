@@ -299,6 +299,7 @@ import directorySupportRoutes from '../routes/directory-support';
 import directoryPresenceAdminRoutes from '../routes/directory-presence-admin';
 import directoryPresencePublicRoutes from '../routes/directory-presence-public';
 import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade';
+import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-public';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
@@ -2033,6 +2034,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public directory claim flow (claim/:token, claim/:token/accept)',
+  },
+  {
+    path: '/api/public/directory',
+    router: directoryEnrichmentPublicRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public directory enrichment (enrich/:token, lead-gen)',
   },
   {
     path: '/api/tenant',

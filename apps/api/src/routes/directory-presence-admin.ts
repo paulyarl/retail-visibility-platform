@@ -330,4 +330,72 @@ router.post('/presence-seeds/:id/tokens/:tokenId/revoke', requirePlatformAdmin, 
   }
 });
 
+/** PATCH /api/admin/directory/presence-seeds/:id/outreach — update outreach status + owner info */
+const outreachSchema = z.object({
+  status: z.enum(['unverified', 'outreach_attempted', 'verified_by_call', 'verified_by_email', 'enrichment_sent', 'enriched']),
+  notes: z.string().nullable().optional(),
+  ownerName: z.string().nullable().optional(),
+  ownerEmail: z.string().nullable().optional(),
+  ownerPhone: z.string().nullable().optional(),
+});
+
+router.patch('/presence-seeds/:id/outreach', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = outreachSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.updateOutreachStatus(id, validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        seed_not_found: 404,
+        invalid_status: 400,
+      };
+      return res.status(statusMap[result.error || ''] || 400).json({ error: result.error });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[PATCH /api/admin/directory/presence-seeds/:id/outreach] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/enrichment-token — generate enrichment token */
+router.post('/presence-seeds/:id/enrichment-token', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await DirectoryPresenceSeedService.generateEnrichmentToken(id, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if ('error' in result) {
+      const statusMap: Record<string, number> = {
+        seed_not_found: 404,
+      };
+      return res.status(statusMap[result.error] || 400).json({ error: result.error });
+    }
+
+    res.json({ success: true, token: result.token, tokenId: result.tokenId, expiresAt: result.expiresAt });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/enrichment-token] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;
