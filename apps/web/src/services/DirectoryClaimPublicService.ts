@@ -32,6 +32,12 @@ export interface DirectoryClaimAcceptResult {
   seedId?: string;
   message?: string;
   error?: string;
+  /** Platform user tokens — set when a customer is promoted to platform user */
+  userTokens?: { accessToken: string; refreshToken: string };
+  /** True when the promoted user has no password (OAuth-only customer) */
+  requiresPasswordSetup?: boolean;
+  /** The platform user ID that was created or linked */
+  platformUserId?: string;
 }
 
 export class DirectoryClaimPublicService extends PublicApiSingleton {

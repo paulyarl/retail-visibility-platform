@@ -97,9 +97,22 @@ router.get('/presence-seeds', requirePlatformStaff, async (req: Request, res: Re
     const seedBatch = req.query.seedBatch as string | undefined;
     const status = req.query.status as string | undefined;
     const city = req.query.city as string | undefined;
+    const state = req.query.state as string | undefined;
     const category = req.query.category as string | undefined;
+    const identityConfidence = req.query.identityConfidence as string | undefined;
+    const categoryFit = req.query.categoryFit as string | undefined;
+    const hasClaimToken = req.query.hasClaimToken as string | undefined;
 
-    const seeds = await DirectoryPresenceSeedService.listSeeds({ seedBatch, status, city, category });
+    const seeds = await DirectoryPresenceSeedService.listSeeds({
+      seedBatch,
+      status,
+      city,
+      state,
+      category,
+      identityConfidence,
+      categoryFit,
+      hasClaimToken,
+    });
     res.json({ success: true, seeds });
   } catch (error) {
     logger.error('[GET /api/admin/directory/presence-seeds] Error:', undefined, {

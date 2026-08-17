@@ -13,6 +13,10 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
+import { generateUserId, generateUserTenantId, generateTenantKey } from '../lib/id-generator';
+import { authService } from '../auth/auth.service';
+import { user_role } from '@prisma/client';
+
 /** Audit context for claim operations */
 interface ClaimAuditCtx {
   actorType?: 'user' | 'system' | 'integration' | 'customer';
@@ -43,6 +47,12 @@ export interface ClaimResult {
   tenantId: string;
   seedId: string;
   message: string;
+  /** Platform user tokens — set when a customer is promoted to a platform user */
+  userTokens?: { accessToken: string; refreshToken: string };
+  /** True when the promoted user has no password (OAuth-only customer) */
+  requiresPasswordSetup?: boolean;
+  /** The platform user ID that was created or linked */
+  platformUserId?: string;
 }
 
 class DirectoryClaimService {
@@ -101,12 +111,24 @@ class DirectoryClaimService {
    * Accept a claim token. Binds the claiming user to the tenant.
    * Converts org_standing_mode from 'directory_seed' to 'independent'.
    *
-   * The caller must provide the authenticated user ID (from customer auth
-   * or platform auth, depending on the flow being used).
+   * If the caller is a customer (not yet a platform user), they are promoted:
+   *   - A platform `users` row is created (or existing one reused by email)
+   *   - `customers.linked_user_id` is set
+   *   - A `user_tenants` OWNER row is created
+   *   - Platform JWT tokens are returned so the frontend can transition auth
+   *
+   * If the caller is already a platform user, only the `user_tenants` OWNER
+   * row is created (idempotent — skips if one already exists).
+   *
+   * @param token     The claim token string
+   * @param userId    The authenticated user's ID (customer or platform)
+   * @param isCustomer  True if the caller authenticated via customer JWT
+   * @param ctx       Audit context
    */
   async acceptClaim(
     token: string,
     userId: string,
+    isCustomer: boolean,
     ctx?: ClaimAuditCtx
   ): Promise<ClaimResult> {
     const rows = await prisma.$queryRaw<any[]>`
@@ -165,17 +187,42 @@ class DirectoryClaimService {
       WHERE id = ${r.seed_id}
     `;
 
+    // --- Customer-to-user promotion bridge ---
+    let platformUserId: string | undefined;
+    let userTokens: { accessToken: string; refreshToken: string } | undefined;
+    let requiresPasswordSetup = false;
+
+    if (isCustomer) {
+      const promotion = await this.promoteCustomerToUser(userId, r.tenant_id, r.seed_id, ctx);
+      platformUserId = promotion.platformUserId;
+      userTokens = promotion.userTokens;
+      requiresPasswordSetup = promotion.requiresPasswordSetup;
+    } else {
+      // Already a platform user — just create the user_tenants OWNER row
+      platformUserId = userId;
+      await this.ensureOwnerMembership(userId, r.tenant_id);
+    }
+
     audit({
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'directory_claim.accept',
-      payload: { seedId: r.seed_id, tenantId: r.tenant_id, tokenId: r.token_id, userId },
+      payload: {
+        seedId: r.seed_id,
+        tenantId: r.tenant_id,
+        tokenId: r.token_id,
+        userId,
+        platformUserId,
+        promoted: isCustomer,
+      },
     });
 
     logger.info('DirectoryClaimService.acceptClaim', undefined, {
       seedId: r.seed_id,
       tenantId: r.tenant_id,
       userId,
+      platformUserId,
+      promoted: isCustomer,
     });
 
     return {
@@ -183,7 +230,153 @@ class DirectoryClaimService {
       tenantId: r.tenant_id,
       seedId: r.seed_id,
       message: 'claimed',
+      userTokens,
+      requiresPasswordSetup,
+      platformUserId,
     };
+  }
+
+  /**
+   * Promote a customer to a platform user and create an OWNER membership.
+   *
+   * - If the customer already has `linked_user_id`, reuse that user.
+   * - Else if a `users` row with the same email exists, link to it.
+   * - Else create a new `users` row (copying password_hash so the same
+   *   password works; if the customer is OAuth-only with no password_hash,
+   *   sets `requiresPasswordSetup = true`).
+   *
+   * Always creates (or ensures) a `user_tenants` OWNER row for the tenant.
+   * Returns platform JWT tokens so the frontend can transition to platform auth.
+   */
+  private async promoteCustomerToUser(
+    customerId: string,
+    tenantId: string,
+    seedId: string,
+    ctx?: ClaimAuditCtx
+  ): Promise<{
+    platformUserId: string;
+    userTokens: { accessToken: string; refreshToken: string };
+    requiresPasswordSetup: boolean;
+  }> {
+    // Load customer
+    const customerRows = await prisma.$queryRaw<any[]>`
+      SELECT id, email, first_name, last_name, password_hash, email_verified, linked_user_id
+      FROM customers WHERE id = ${customerId} LIMIT 1
+    `;
+    if (!customerRows[0]) {
+      throw new Error('customer_not_found');
+    }
+    const customer = customerRows[0];
+    const emailLower = (customer.email as string).toLowerCase();
+
+    let platformUserId: string;
+    let requiresPasswordSetup = false;
+
+    // 1. If customer already has linked_user_id, reuse it
+    if (customer.linked_user_id) {
+      platformUserId = customer.linked_user_id;
+    } else {
+      // 2. Check if a platform user with the same email already exists
+      const existingUser = await prisma.$queryRaw<any[]>`
+        SELECT id FROM users WHERE email = ${emailLower} LIMIT 1
+      `;
+      if (existingUser[0]) {
+        platformUserId = existingUser[0].id;
+        // Link the customer to the existing user
+        await prisma.$executeRaw`
+          UPDATE customers SET linked_user_id = ${platformUserId}, updated_at = now()
+          WHERE id = ${customerId}
+        `;
+      } else {
+        // 3. Create a new platform user
+        platformUserId = generateUserId();
+        const hasPassword = !!customer.password_hash;
+        requiresPasswordSetup = !hasPassword;
+
+        await prisma.$executeRaw`
+          INSERT INTO users (
+            id, email, password_hash, first_name, last_name,
+            role, email_verified, is_active,
+            onboarding_completed, onboarding_step, onboarding_data,
+            created_at, updated_at
+          ) VALUES (
+            ${platformUserId},
+            ${emailLower},
+            ${customer.password_hash || ''},
+            ${customer.first_name || null},
+            ${customer.last_name || null},
+            ${user_role.USER}::"user_role",
+            ${customer.email_verified ?? false},
+            true,
+            false,
+            'directory_claim_welcome',
+            ${JSON.stringify({ claimedViaDirectory: true, seedId, tenantId })}::jsonb,
+            now(), now()
+          )
+        `;
+
+        // Link the customer to the new user
+        await prisma.$executeRaw`
+          UPDATE customers SET linked_user_id = ${platformUserId}, updated_at = now()
+          WHERE id = ${customerId}
+        `;
+
+        audit({
+          actor: ctx?.actorId,
+          actorType: ctx?.actorType,
+          action: 'directory_claim.promote_customer_to_user',
+          payload: { customerId, platformUserId, tenantId, seedId, requiresPasswordSetup: !hasPassword },
+        });
+      }
+    }
+
+    // Create OWNER membership (idempotent)
+    await this.ensureOwnerMembership(platformUserId, tenantId);
+
+    // Generate platform JWT tokens
+    const tenantIds = await this.getUserTenantIds(platformUserId);
+    const payload = {
+      id: platformUserId,
+      userId: platformUserId,
+      email: emailLower,
+      role: user_role.USER,
+      tenantIds,
+      first_name: customer.first_name || null,
+      last_name: customer.last_name || null,
+    };
+
+    const accessToken = authService.generateAccessToken(payload);
+    const refreshToken = authService.generateRefreshToken(payload);
+
+    return { platformUserId, userTokens: { accessToken, refreshToken }, requiresPasswordSetup };
+  }
+
+  /**
+   * Create a user_tenants OWNER row if one doesn't already exist.
+   * Idempotent — safe to call multiple times.
+   */
+  private async ensureOwnerMembership(userId: string, tenantId: string): Promise<void> {
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT 1 FROM user_tenants WHERE user_id = ${userId} AND tenant_id = ${tenantId} LIMIT 1
+    `;
+    if (existing[0]) return;
+
+    const utid = generateUserTenantId(userId, tenantId);
+    await prisma.$executeRaw`
+      INSERT INTO user_tenants (id, user_id, tenant_id, role, created_at, updated_at)
+      VALUES (${utid}, ${userId}, ${tenantId}, 'OWNER'::"user_tenant_role", now(), now())
+      ON CONFLICT (user_id, tenant_id) DO NOTHING
+    `;
+  }
+
+  /**
+   * Get all tenant IDs for a platform user.
+   */
+  private async getUserTenantIds(userId: string): Promise<string[]> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id FROM user_tenants WHERE user_id = ${userId}
+    `;
+    return rows.map((r) => r.tenant_id);
   }
 }
 

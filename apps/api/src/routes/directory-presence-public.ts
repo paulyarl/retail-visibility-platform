@@ -71,17 +71,17 @@ router.post('/claim/:token/accept', async (req: Request, res: Response) => {
     // Auth: the caller must be authenticated. We accept both customer JWT
     // and platform user auth. The middleware that sets req.user or
     // req.customer should have run before this route.
-    const userId =
-      (req as any).user?.id ||
-      (req as any).customer?.id ||
-      null;
+    const platformUser = (req as any).user;
+    const customer = (req as any).customer;
+    const userId = platformUser?.id || customer?.id || null;
+    const isCustomer = !platformUser && !!customer;
 
     if (!userId) {
       return res.status(401).json({ error: 'authentication_required' });
     }
 
-    const result = await DirectoryClaimService.acceptClaim(token, userId, {
-      actorType: 'customer',
+    const result = await DirectoryClaimService.acceptClaim(token, userId, isCustomer, {
+      actorType: isCustomer ? 'customer' : 'user',
       actorId: userId,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
@@ -103,6 +103,9 @@ router.post('/claim/:token/accept', async (req: Request, res: Response) => {
       tenantId: result.tenantId,
       seedId: result.seedId,
       message: 'claimed',
+      userTokens: result.userTokens,
+      requiresPasswordSetup: result.requiresPasswordSetup,
+      platformUserId: result.platformUserId,
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/claim/:token/accept] Error:', undefined, {

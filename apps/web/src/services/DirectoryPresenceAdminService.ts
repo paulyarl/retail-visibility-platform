@@ -115,13 +115,21 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     seedBatch?: string;
     status?: string;
     city?: string;
+    state?: string;
     category?: string;
+    identityConfidence?: string;
+    categoryFit?: string;
+    hasClaimToken?: string;
   }): Promise<DirectoryPresenceSeedSummary[]> {
     const params = new URLSearchParams();
     if (filters?.seedBatch) params.set('seedBatch', filters.seedBatch);
     if (filters?.status) params.set('status', filters.status);
     if (filters?.city) params.set('city', filters.city);
+    if (filters?.state) params.set('state', filters.state);
     if (filters?.category) params.set('category', filters.category);
+    if (filters?.identityConfidence) params.set('identityConfidence', filters.identityConfidence);
+    if (filters?.categoryFit) params.set('categoryFit', filters.categoryFit);
+    if (filters?.hasClaimToken) params.set('hasClaimToken', filters.hasClaimToken);
     const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds${qs ? `?${qs}` : ''}`,

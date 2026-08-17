@@ -31,6 +31,7 @@ import directoryClaimPublicService, {
   DirectoryClaimSummary,
 } from '@/services/DirectoryClaimPublicService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'success';
 
@@ -44,6 +45,11 @@ export default function DirectoryClaimClient() {
   const [summary, setSummary] = useState<DirectoryClaimSummary | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [claimResult, setClaimResult] = useState<{
+    tenantId?: string;
+    requiresPasswordSetup?: boolean;
+    userTokens?: { accessToken: string; refreshToken: string };
+  } | null>(null);
 
   const loadSummary = useCallback(async () => {
     if (!token) {
@@ -80,6 +86,21 @@ export default function DirectoryClaimClient() {
       const result = await directoryClaimPublicService.acceptClaim(token);
       if (result.success) {
         await refreshCustomer();
+
+        // Store platform tokens if the customer was promoted to a platform user.
+        // The platform auth uses Auth0 cookies, so these tokens are stored for
+        // potential future use (e.g., a bridge endpoint). The primary flow is
+        // to redirect to Auth0 login, which will recognize the new platform
+        // user by email.
+        if (result.userTokens) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('platform_access_token', result.userTokens.accessToken);
+            localStorage.setItem('platform_refresh_token', result.userTokens.refreshToken);
+          }
+        }
+
+        // Stash the claim result for the success state
+        setClaimResult(result);
         setState('success');
       } else {
         setError(result.error || 'claim_failed');
@@ -171,6 +192,14 @@ export default function DirectoryClaimClient() {
   }
 
   if (state === 'success') {
+    const tenantId = claimResult?.tenantId;
+    const dashboardHref = tenantId
+      ? `/t/${tenantId}/dashboard?welcome=true`
+      : '/account';
+    const loginRedirect = tenantId
+      ? `/login?redirect=${encodeURIComponent(`/t/${tenantId}/dashboard?welcome=true`)}`
+      : '/login';
+
     return (
       <Container size="sm" className="py-12">
         <Card withBorder shadow="sm" padding="xl" radius="md">
@@ -181,11 +210,20 @@ export default function DirectoryClaimClient() {
             <Title order={3}>Listing Claimed!</Title>
             <Text>
               You now own the directory listing for{' '}
-              <strong>{summary?.businessName}</strong>. You can update your hours, phone number, and
-              add a photo from your account dashboard.
+              <strong>{summary?.businessName}</strong>. Your business owner
+              account has been created.
             </Text>
+
+            {claimResult?.requiresPasswordSetup && (
+              <Alert color="orange" variant="light" icon={<IconAlertCircle size={16} />} w="100%">
+                Your account was created from your customer profile. You&apos;ll
+                need to set a password or use social login to access your
+                dashboard for the first time.
+              </Alert>
+            )}
+
             <Group>
-              <Button component={Link} href="/account" leftSection={<IconCheck size={16} />}>
+              <Button component={Link} href={loginRedirect} leftSection={<IconCheck size={16} />}>
                 Go to Dashboard
               </Button>
               <Button
@@ -197,6 +235,11 @@ export default function DirectoryClaimClient() {
                 Back to Directory
               </Button>
             </Group>
+
+            <Text size="xs" c="dimmed" ta="center">
+              You&apos;ll sign in with the same email ({summary?.businessName ? 'your account email' : ''}).
+              Your dashboard is at <strong>{tenantId ? `/t/${tenantId}/dashboard` : 'your account'}</strong>.
+            </Text>
           </Stack>
         </Card>
       </Container>

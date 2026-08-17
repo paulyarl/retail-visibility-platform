@@ -6,7 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   DirectoryPresenceSeedSummary,
 } from '@/services/DirectoryPresenceAdminService';
-import { List, Plus, Send, CheckCircle, Eye, MapPin, Tag, Clock } from 'lucide-react';
+import { List, Plus, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +24,12 @@ export default function DirectoryPresenceSeedsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterBatch, setFilterBatch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterState, setFilterState] = useState('');
+  const [filterConfidence, setFilterConfidence] = useState('');
+  const [filterCategoryFit, setFilterCategoryFit] = useState('');
+  const [filterClaimToken, setFilterClaimToken] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<{ seedId: string; token: string } | null>(null);
@@ -34,6 +40,12 @@ export default function DirectoryPresenceSeedsPage() {
       const data = await directoryPresenceAdminService.listSeeds({
         seedBatch: filterBatch || undefined,
         status: filterStatus || undefined,
+        category: filterCategory || undefined,
+        city: filterCity || undefined,
+        state: filterState || undefined,
+        identityConfidence: filterConfidence || undefined,
+        categoryFit: filterCategoryFit || undefined,
+        hasClaimToken: filterClaimToken || undefined,
       });
       setSeeds(data);
     } catch (err) {
@@ -41,7 +53,16 @@ export default function DirectoryPresenceSeedsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterBatch, filterStatus]);
+  }, [
+    filterBatch,
+    filterStatus,
+    filterCategory,
+    filterCity,
+    filterState,
+    filterConfidence,
+    filterCategoryFit,
+    filterClaimToken,
+  ]);
 
   useEffect(() => {
     fetchSeeds();
@@ -123,38 +144,116 @@ export default function DirectoryPresenceSeedsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-4 items-end">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Seed Batch</label>
-          <input
-            type="text"
-            value={filterBatch}
-            onChange={(e) => setFilterBatch(e.target.value)}
-            placeholder="e.g. indianapolis-african-grocery-2026"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-72"
-          />
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Seed Batch</label>
+            <input
+              type="text"
+              value={filterBatch}
+              onChange={(e) => setFilterBatch(e.target.value)}
+              placeholder="e.g. indianapolis-african-grocery-2026"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            >
+              <option value="">All</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="invited">Invited</option>
+              <option value="claimed">Claimed</option>
+              <option value="suppressed">Suppressed</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <input
+              type="text"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              placeholder="e.g. African Grocery"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <input
+              type="text"
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+              placeholder="e.g. Indianapolis"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <input
+              type="text"
+              value={filterState}
+              onChange={(e) => setFilterState(e.target.value)}
+              placeholder="e.g. IN"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Identity Confidence</label>
+            <select
+              value={filterConfidence}
+              onChange={(e) => setFilterConfidence(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            >
+              <option value="">All</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category Fit</label>
+            <select
+              value={filterCategoryFit}
+              onChange={(e) => setFilterCategoryFit(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            >
+              <option value="">All</option>
+              <option value="verified">Verified</option>
+              <option value="probable">Probable</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Claim Token</label>
+            <select
+              value={filterClaimToken}
+              onChange={(e) => setFilterClaimToken(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            >
+              <option value="">All</option>
+              <option value="yes">Has active token</option>
+              <option value="no">No active token</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={fetchSeeds}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
           >
-            <option value="">All</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="invited">Invited</option>
-            <option value="claimed">Claimed</option>
-            <option value="suppressed">Suppressed</option>
-          </select>
+            Filter
+          </button>
+          <Link
+            href="/place"
+            target="_blank"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            title="Open the public directory presence page in a new tab"
+          >
+            <ExternalLink className="w-4 h-4" /> View Public Directory
+          </Link>
         </div>
-        <button
-          onClick={fetchSeeds}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          Filter
-        </button>
       </div>
 
       {/* Seeds table */}

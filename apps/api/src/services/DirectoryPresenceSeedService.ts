@@ -89,13 +89,21 @@ export interface SeedSummary {
 
 class DirectoryPresenceSeedService {
   /**
-   * List all presence seeds, optionally filtered by seed_batch, status, city, or category.
+   * List all presence seeds, optionally filtered by seed_batch, status, city,
+   * state, category, identity_confidence, category_fit, or claim-token state.
+   *
+   * `hasClaimToken` accepts 'yes' (only seeds with an active, unconsumed token)
+   * or 'no' (only seeds without one). Any other value is ignored.
    */
   async listSeeds(filters?: {
     seedBatch?: string;
     status?: string;
     city?: string;
+    state?: string;
     category?: string;
+    identityConfidence?: string;
+    categoryFit?: string;
+    hasClaimToken?: string;
   }): Promise<SeedSummary[]> {
     const conditions: string[] = [];
     const params: any[] = [];
@@ -110,12 +118,35 @@ class DirectoryPresenceSeedService {
       params.push(filters.status);
     }
     if (filters?.city) {
-      conditions.push(`dps.city = $${paramIdx++}`);
-      params.push(filters.city);
+      // Case-insensitive contains match so operators can type a partial city name.
+      conditions.push(`dps.city ILIKE $${paramIdx++}`);
+      params.push(`%${filters.city}%`);
+    }
+    if (filters?.state) {
+      conditions.push(`dps.state ILIKE $${paramIdx++}`);
+      params.push(`%${filters.state}%`);
     }
     if (filters?.category) {
-      conditions.push(`dps.category = $${paramIdx++}`);
-      params.push(filters.category);
+      // Case-insensitive contains match so a partial category like "grocer" works.
+      conditions.push(`dps.category ILIKE $${paramIdx++}`);
+      params.push(`%${filters.category}%`);
+    }
+    if (filters?.identityConfidence) {
+      conditions.push(`dps.identity_confidence = $${paramIdx++}`);
+      params.push(filters.identityConfidence);
+    }
+    if (filters?.categoryFit) {
+      conditions.push(`dps.category_fit = $${paramIdx++}`);
+      params.push(filters.categoryFit);
+    }
+    if (filters?.hasClaimToken === 'yes') {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL)`,
+      );
+    } else if (filters?.hasClaimToken === 'no') {
+      conditions.push(
+        `NOT EXISTS (SELECT 1 FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL)`,
+      );
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

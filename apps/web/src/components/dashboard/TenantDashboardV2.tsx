@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useQuery, useQueries } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import {
   ShoppingCart,
   Package,
