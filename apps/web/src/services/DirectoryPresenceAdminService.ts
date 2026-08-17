@@ -9,6 +9,8 @@
  *   - POST   /api/admin/directory-presence/presence-seeds/:id/publish
  *   - POST   /api/admin/directory-presence/presence-seeds/:id/invite
  *   - PATCH  /api/admin/directory-presence/presence-seeds/:id/fields
+ *   - PATCH  /api/admin/directory-presence/presence-seeds/:id/status
+ *   - POST   /api/admin/directory-presence/presence-seeds/:id/tokens/:tokenId/revoke
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
@@ -51,6 +53,7 @@ export interface DirectoryPresenceSeedDetail {
   }>;
   claimTokens: Array<{
     id: string;
+    token: string;
     expiresAt: string;
     consumedAt: string | null;
     consumedBy: string | null;
@@ -200,6 +203,24 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/fields`,
       { method: 'PATCH', body: JSON.stringify({ ...fields, provenanceUpdates }) },
+      undefined,
+      0,
+    );
+  }
+
+  async updateStatus(id: string, status: string): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/status`,
+      { method: 'PATCH', body: JSON.stringify({ status }) },
+      undefined,
+      0,
+    );
+  }
+
+  async revokeToken(id: string, tokenId: string): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/tokens/${encodeURIComponent(tokenId)}/revoke`,
+      { method: 'POST', body: JSON.stringify({}) },
       undefined,
       0,
     );

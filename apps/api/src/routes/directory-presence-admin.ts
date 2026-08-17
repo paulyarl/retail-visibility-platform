@@ -7,6 +7,8 @@
  *   POST   /api/admin/directory/presence-seeds/:id/publish — publish listing
  *   POST   /api/admin/directory/presence-seeds/:id/invite — mint claim token
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
+ *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
+ *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
  *
  * All routes require PLATFORM_ADMIN or PLATFORM_SUPPORT auth.
  */
@@ -83,6 +85,10 @@ const updateFieldsSchema = z.object({
     confidence: z.enum(['high', 'medium', 'low']).optional(),
     showOnPublic: z.boolean().optional(),
   })).optional(),
+});
+
+const updateStatusSchema = z.object({
+  status: z.enum(['draft', 'published', 'invited', 'claimed', 'suppressed']),
 });
 
 /** GET /api/admin/directory/presence-seeds — list seeds */
@@ -258,6 +264,53 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     logger.error('[PATCH /api/admin/directory/presence-seeds/:id/fields] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** PATCH /api/admin/directory/presence-seeds/:id/status — change seed status */
+router.patch('/presence-seeds/:id/status', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = updateStatusSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    await DirectoryPresenceSeedService.updateStatus(id, validation.data.status, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    if (error?.message === 'invalid_status') return res.status(400).json({ error: 'invalid_status' });
+    logger.error('[PATCH /api/admin/directory/presence-seeds/:id/status] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke a claim token */
+router.post('/presence-seeds/:id/tokens/:tokenId/revoke', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id, tokenId } = req.params;
+    await DirectoryPresenceSeedService.revokeToken(id, tokenId, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === 'token_not_found') return res.status(404).json({ error: 'token_not_found' });
+    if (error?.message === 'token_already_consumed') return res.status(409).json({ error: 'token_already_consumed' });
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

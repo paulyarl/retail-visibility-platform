@@ -190,7 +190,7 @@ class DirectoryPresenceSeedService {
       SELECT * FROM directory_field_provenance WHERE seed_id = ${seedId} ORDER BY field_key
     `;
     const tokens = await prisma.$queryRaw<any[]>`
-      SELECT id, expires_at, consumed_at, consumed_by, created_at
+      SELECT id, token, expires_at, consumed_at, consumed_by, created_at
       FROM directory_claim_tokens WHERE seed_id = ${seedId} ORDER BY created_at DESC
     `;
 
@@ -209,6 +209,7 @@ class DirectoryPresenceSeedService {
       })),
       claimTokens: tokens.map((t) => ({
         id: t.id,
+        token: t.token,
         expiresAt: new Date(t.expires_at),
         consumedAt: t.consumed_at ? new Date(t.consumed_at) : null,
         consumedBy: t.consumed_by,
@@ -434,7 +435,7 @@ class DirectoryPresenceSeedService {
       phone?: string;
       website?: string;
       businessHours?: any;
-      primaryCategory?: string;
+      primaryCategory?: string | null;
       secondaryCategories?: string[];
     },
     provenanceUpdates?: Array<{
@@ -552,6 +553,99 @@ class DirectoryPresenceSeedService {
       payload: { seedId, tenantId, fields: Object.keys(fields) },
     });
     logger.info('DirectoryPresenceSeedService.updateFields', undefined, { seedId });
+  }
+
+  /**
+   * Directly set a seed's status. Operators use this to correct a misclassified
+   * seed (e.g. flip a published seed to suppressed, or reset an invited seed
+   * back to published after revoking its token).
+   *
+   * Allowed transitions: any -> any of {draft, published, invited, claimed, suppressed}.
+   * Setting status to 'claimed' is allowed but does NOT consume tokens or flip
+   * org_standing_mode — that only happens via DirectoryClaimService.acceptClaim.
+   */
+  async updateStatus(seedId: string, newStatus: string, ctx?: SeedAuditCtx): Promise<void> {
+    const allowed = ['draft', 'published', 'invited', 'claimed', 'suppressed'];
+    if (!allowed.includes(newStatus)) {
+      throw new Error('invalid_status');
+    }
+
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+
+    const prevStatus = seed[0].status;
+
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET status = ${newStatus}, updated_at = now()
+      WHERE id = ${seedId}
+    `;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.update_status',
+      payload: { seedId, tenantId: seed[0].tenant_id, prevStatus, newStatus },
+    });
+    logger.info('DirectoryPresenceSeedService.updateStatus', undefined, {
+      seedId,
+      prevStatus,
+      newStatus,
+    });
+  }
+
+  /**
+   * Revoke a claim token. Marks the token as consumed (preserving audit trail)
+   * with consumed_by = 'platform:revoked'. If the seed was in 'invited' status
+   * and no other active tokens remain, flips the seed back to 'published' so
+   * the operator doesn't have to manually reset the status.
+   */
+  async revokeToken(seedId: string, tokenId: string, ctx?: SeedAuditCtx): Promise<void> {
+    const token = await prisma.$queryRaw<any[]>`
+      SELECT id, seed_id, consumed_at
+      FROM directory_claim_tokens
+      WHERE id = ${tokenId} AND seed_id = ${seedId}
+      LIMIT 1
+    `;
+    if (!token[0]) throw new Error('token_not_found');
+    if (token[0].consumed_at) throw new Error('token_already_consumed');
+
+    const revokedBy = ctx?.actorId ? `platform:revoked:${ctx.actorId}` : 'platform:revoked';
+
+    await prisma.$executeRaw`
+      UPDATE directory_claim_tokens
+      SET consumed_at = now(), consumed_by = ${revokedBy}
+      WHERE id = ${tokenId}
+    `;
+
+    // If the seed is 'invited' and no other active tokens remain, flip back to 'published'.
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (seed[0]?.status === 'invited') {
+      const active = await prisma.$queryRaw<any[]>`
+        SELECT 1 FROM directory_claim_tokens
+        WHERE seed_id = ${seedId} AND consumed_at IS NULL
+        LIMIT 1
+      `;
+      if (!active[0]) {
+        await prisma.$executeRaw`
+          UPDATE directory_presence_seeds
+          SET status = 'published', updated_at = now()
+          WHERE id = ${seedId}
+        `;
+      }
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.revoke_token',
+      payload: { seedId, tokenId, revokedBy },
+    });
+    logger.info('DirectoryPresenceSeedService.revokeToken', undefined, { seedId, tokenId });
   }
 }
 

@@ -25,6 +25,7 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  Ban,
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 
@@ -192,6 +193,46 @@ export default function PresenceSeedDetailPage() {
       setActionError(
         err instanceof Error ? err.message : 'Failed to generate invite',
       );
+    }
+  };
+
+  const [statusDraft, setStatusDraft] = useState('');
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null);
+
+  const handleStatusChange = async () => {
+    if (!statusDraft || statusDraft === status) return;
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setSavingStatus(true);
+      await directoryPresenceAdminService.updateStatus(seedId, statusDraft);
+      setActionSuccess(`Status changed to "${statusDraft}".`);
+      setStatusDraft('');
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to change status',
+      );
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleRevokeToken = async (tokenId: string) => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setRevokingTokenId(tokenId);
+      await directoryPresenceAdminService.revokeToken(seedId, tokenId);
+      setActionSuccess('Claim token revoked.');
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to revoke token',
+      );
+    } finally {
+      setRevokingTokenId(null);
     }
   };
 
@@ -496,6 +537,30 @@ export default function PresenceSeedDetailPage() {
             <Sparkles className="w-4 h-4" /> Customize Retail Preview
           </Link>
         )}
+        {/* Status changer */}
+        <div className="inline-flex items-center gap-2">
+          <select
+            value={statusDraft || status}
+            onChange={(e) => setStatusDraft(e.target.value)}
+            disabled={savingStatus}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+            title="Change seed status"
+          >
+            <option value="draft">draft</option>
+            <option value="published">published</option>
+            <option value="invited">invited</option>
+            <option value="claimed">claimed</option>
+            <option value="suppressed">suppressed</option>
+          </select>
+          <button
+            onClick={handleStatusChange}
+            disabled={savingStatus || !statusDraft || statusDraft === status}
+            className="inline-flex items-center gap-1 px-3 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+            title="Apply status change"
+          >
+            {savingStatus ? 'Saving...' : 'Set Status'}
+          </button>
+        </div>
         {canEdit && !editing && (
           <button
             onClick={startEditing}
@@ -747,37 +812,88 @@ export default function PresenceSeedDetailPage() {
               <thead>
                 <tr className="border-b border-gray-200 text-left text-gray-600">
                   <th className="py-2 px-3 font-medium">Token ID</th>
+                  <th className="py-2 px-3 font-medium">Claim Link</th>
                   <th className="py-2 px-3 font-medium">Expires</th>
                   <th className="py-2 px-3 font-medium">Consumed</th>
                   <th className="py-2 px-3 font-medium">Consumed by</th>
                   <th className="py-2 px-3 font-medium">Created</th>
+                  <th className="py-2 px-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {claimTokens.map((t) => (
-                  <tr key={t.id} className="border-b border-gray-100">
-                    <td className="py-2 px-3 font-mono text-xs text-gray-700">
-                      {t.id}
-                    </td>
-                    <td className="py-2 px-3 text-gray-700">
-                      <Clock className="inline w-3 h-3 mr-1 text-gray-400" />
-                      {formatDate(t.expiresAt)}
-                    </td>
-                    <td className="py-2 px-3 text-gray-700">
-                      {t.consumedAt ? (
-                        formatDate(t.consumedAt)
-                      ) : (
-                        <span className="text-amber-600">Active</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-3 text-gray-700">
-                      {t.consumedBy || '—'}
-                    </td>
-                    <td className="py-2 px-3 text-gray-700">
-                      {formatDate(t.createdAt)}
-                    </td>
-                  </tr>
-                ))}
+                {claimTokens.map((t) => {
+                  const isActive = !t.consumedAt;
+                  const claimUrl =
+                    typeof window !== 'undefined' && t.token
+                      ? `${window.location.origin}/place/claim/${t.token}`
+                      : t.token
+                        ? `/place/claim/${t.token}`
+                        : '';
+                  return (
+                    <tr key={t.id} className="border-b border-gray-100">
+                      <td className="py-2 px-3 font-mono text-xs text-gray-700">
+                        {t.id}
+                      </td>
+                      <td className="py-2 px-3 text-gray-700">
+                        {isActive && t.token ? (
+                          <div className="space-y-1">
+                            <p className="text-xs text-blue-700 break-all font-mono">
+                              {claimUrl}
+                            </p>
+                            <button
+                              className="text-xs text-blue-600 underline"
+                              onClick={() => {
+                                if (
+                                  typeof navigator !== 'undefined' &&
+                                  navigator.clipboard &&
+                                  typeof window !== 'undefined'
+                                ) {
+                                  navigator.clipboard.writeText(
+                                    `${window.location.origin}/place/claim/${t.token}`,
+                                  );
+                                }
+                              }}
+                            >
+                              Copy link
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-gray-700">
+                        <Clock className="inline w-3 h-3 mr-1 text-gray-400" />
+                        {formatDate(t.expiresAt)}
+                      </td>
+                      <td className="py-2 px-3 text-gray-700">
+                        {t.consumedAt ? (
+                          formatDate(t.consumedAt)
+                        ) : (
+                          <span className="text-amber-600">Active</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-gray-700">
+                        {t.consumedBy || '—'}
+                      </td>
+                      <td className="py-2 px-3 text-gray-700">
+                        {formatDate(t.createdAt)}
+                      </td>
+                      <td className="py-2 px-3">
+                        {isActive && (
+                          <button
+                            onClick={() => handleRevokeToken(t.id)}
+                            disabled={revokingTokenId === t.id}
+                            className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                            title="Revoke this claim token"
+                          >
+                            <Ban className="w-4 h-4" />
+                            {revokingTokenId === t.id ? 'Revoking...' : 'Revoke'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
