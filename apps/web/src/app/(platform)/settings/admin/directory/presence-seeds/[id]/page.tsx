@@ -447,7 +447,7 @@ export default function PresenceSeedDetailPage() {
         )}
         {listing?.slug && (
           <Link
-            href={`/directory/${listing.slug}`}
+            href={`/place/${listing.slug}`}
             target="_blank"
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
