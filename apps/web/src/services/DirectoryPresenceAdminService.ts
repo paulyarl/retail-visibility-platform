@@ -184,6 +184,8 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       phone?: string;
       website?: string;
       businessHours?: any;
+      primaryCategory?: string | null;
+      secondaryCategories?: string[];
     },
     provenanceUpdates?: Array<{
       fieldKey: string;

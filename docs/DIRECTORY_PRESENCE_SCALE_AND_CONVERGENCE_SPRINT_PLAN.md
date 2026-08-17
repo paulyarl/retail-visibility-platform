@@ -2180,3 +2180,972 @@ If no contact info captured:
 ```
 
 The operator's verification call is the trust anchor. The OTP proves the claimant controls the contact info the operator verified. The operator approval is the fallback when no contact info is available. No one can claim a business they don't own without either controlling the owner's email/phone or fooling the operator during manual review.
+
+---
+
+# Scale Phase: Category & Service Reuse Architecture
+
+Before the scale sprints (4–7), it's critical to document the category and service reuse architecture. The platform already has two business category systems for tenant scope, and the directory presence effort reuses both rather than inventing new categories.
+
+## Existing category systems (do not duplicate)
+
+### 1. GBP Categories (`/t/[tenantId]/settings/gbp-category`)
+
+- **Canonical table:** `platform_categories` (has `id`, `name`, `slug`, `google_category_id`, `parent_id`, `level`, `icon_emoji`, `sort_order`, `is_active`, `is_featured`)
+- **Tenant storage:** `tenants.gbp_primary_category_id` + `tenants.gbp_primary_category_name` + `tenants.gbp_secondary_categories` (JSONB)
+- **Junction table:** `tenant_gbp_categories` (`tenant_id`, `gbp_category_id`, `category_type` = 'primary' | 'secondary')
+- **Search:** `GET /api/gbp/categories?query=` (searches `platform_categories`)
+- **Popular:** `GET /api/gbp/categories/popular`
+- **Component:** `CategorySelectorMulti` (shared, reusable)
+- **Hierarchy:** `platform_categories.parent_id` + `level` — supports parent/child categories with breadcrumb paths
+
+### 2. Directory Categories (`/t/[tenantId]/settings/directory`)
+
+- **Canonical table:** `platform_categories` (same table as GBP — the platform has ONE category source)
+- **Tenant storage:** `directory_settings_list.primary_category` (free-form string, matches `platform_categories.name`) + `directory_settings_list.secondary_categories` (TEXT[])
+- **Listing storage:** `directory_listings_list.primary_category` (free-form string, synced from settings) + `directory_listings_list.secondary_categories` (TEXT[])
+- **Junction table:** `directory_listing_categories` (`listing_id`, `category_id`, `is_primary`) — for materialized view support
+- **Browse:** `GET /api/directory/categories` (all categories from `platform_categories`) + `GET /api/directory/mv/categories` (categories with store counts from materialized view)
+- **Search:** `GET /api/directory/categories/search?q=`
+- **Component:** `DirectoryCategorySelectorAdapter` → `CategorySelectorMulti` (adapts directory category format to the shared selector)
+
+### How directory presence reuses these
+
+The presence seed system already uses the directory category pattern:
+
+- `directory_presence_seeds.category` is a free-form string (e.g., "African Grocery Store") that matches `platform_categories.name`
+- `directory_listings_list.primary_category` is set from the seed's category (same free-form string)
+- The `/place` category pages join `directory_presence_seeds` against `platform_categories` by name to get proper slugs, hierarchy, icons, and metadata
+- The seed creation UI should use `DirectoryCategorySelectorAdapter` for category selection (same component as tenant directory settings)
+- The `/place` browse pages use the same `platform_categories` slugs as the existing `/directory/categories` pages
+
+**Key principle:** `platform_categories` is the ONE canonical category source. GBP and Directory are two views of the same categories. Directory Presence is a third view of the same categories. No new category tables, no new category systems, no new category enums.
+
+## Services to reuse (do not duplicate)
+
+| Service | Reuse for | Why |
+|---|---|---|
+| `platform_categories` table | Category source for all presence seeds, browse pages, and search | Single canonical source with hierarchy, slugs, and Google category IDs |
+| `DirectoryCategorySelectorAdapter` | Seed creation UI category selection | Already built, already works, already used by tenant directory settings |
+| `CategorySelectorMulti` | Shared category selector component | Already supports search, hierarchy, primary/secondary selection |
+| `GET /api/directory/categories/search` | Category search in seed creation | Already exists, searches `platform_categories` |
+| `GET /api/directory/mv/categories` | Category browse with counts | Already exists, materialized view with store counts |
+| `DirectoryPresenceSeedService` | Seed CRUD, publish, invite | Sprint 1 built this; Sprints 4–7 extend it, don't replace it |
+| `MarketingProspectQueueService` | Prospect queue for all source kinds | Already supports `intelligence_seek`, `directory_lead_gen`, and other source kinds |
+| `IntelligenceProfileService` | Category-specific discovery profiles | Already supports multiple categories, cities, and focus modes |
+| `IntelligenceRunService` | Run tracking with profile version fidelity | Already records immutable run history |
+| `PromptComposerService` | Fragment-based prompt assembly | Already category-agnostic with per-category profile blocks |
+| `SubscriptionBillingService` | Tier upgrades | Sprint 2 reuses this for claim → upgrade |
+| `audit()` helper | All audit logging | Object form: `audit({ actor, actorType, action, payload })` |
+| `getDirectPool()` | Direct SQL queries in routes | Already used by directory-consolidated and directory-optimized routes |
+| `PoweredByFooter` | Public page footer | Already used on directory pages |
+| `DirectoryMapGoogle` | Map view | Already used on directory category pages; Sprint 5 reuses for `/place` map |
+| `trackBehaviorClient` | Page view tracking | Already used on directory pages; Sprint 6 reuses for growth engine analytics |
+
+**Key principle:** Before creating a new service, check if an existing one already does the job. The platform has been built to be flexible — extend existing services with new methods rather than creating parallel services.
+
+---
+
+# Sprint 4: Multi-City Seek & Batch Seed Operations
+
+**Status:** Planned — not implemented
+**Prerequisite:** Sprint 1 (Phases A–F) complete. Sprint 2 and Sprint 3 can be in flight in parallel — Sprint 4 operates on the seek-to-seed pipeline, not the claim or enrichment flows.
+**Branch context:** `staging`
+**Next migration numbers:** `220`–`221`
+
+## S4.1. Problem
+
+Sprint 1 built the seek → prospect → seed pipeline for a single niche in a single city (Indianapolis African grocery). The intelligence profile infrastructure supports multiple categories and cities, and the prospect queue supports intelligence seek prospects. But the actual execution path is single-city per run:
+
+- `IntelligenceRunService.createRun` is tied to one `campaign_id`, and campaigns have a single `city` field
+- `city-category-opportunity.schema.ts` validates single-city, single-category output
+- There is no batch seek operation — running the same niche across 5 cities requires 5 separate campaigns, 5 separate runs, 5 separate operator review sessions
+- There is no batch seed creation — each prospect must be converted to a seed individually
+- There is no bulk publish or bulk invite — each seed must be published and invited individually
+
+Scaling to 10 niches across 10 cities means 100 separate seek runs and thousands of individual seed operations. The operator workflow doesn't scale.
+
+## S4.2. Non-Goals
+
+- Do not change the intelligence profile system — it already supports multiple categories and cities
+- Do not change the prospect queue — it already supports intelligence seek prospects with the right fields
+- Do not change the prompt composition system — it's fragment-based and category-agnostic
+- Do not build a new campaign system — reuse the existing campaign model with a batch wrapper
+- Do not edit `schema.prisma` directly (per repo convention)
+
+## S4.3. Product contract
+
+### S4.3.1. Multi-city seek execution
+
+The operator can initiate a **batch seek** that runs the same intelligence profile across multiple cities in one operation:
+
+1. Operator selects a niche (intelligence profile) and a list of cities
+2. The system creates one campaign per city (all linked by a shared `batch_id`)
+3. Each campaign gets its own intelligence run (same profile, same prompt, different city)
+4. Results flow into the prospect queue as normal, tagged with the `batch_id`
+5. The operator reviews prospects per city or across the entire batch
+
+The batch seek is a coordination layer — it doesn't change how individual seeks work. It creates N campaigns, N runs, and queues the results with a shared batch identifier for filtering.
+
+### S4.3.2. Batch seed creation
+
+The operator can select multiple prospects from the queue and convert them to seeds in one operation:
+
+1. Operator filters the queue by batch_id, category, city, or business_seek_priority
+2. Operator selects N prospects (checkbox or "select all filtered")
+3. Operator clicks "Create Seeds" → the system calls `createSeedFromQueue` for each prospect
+4. Seeds are created atomically per prospect (one failure doesn't block others)
+5. Results are shown as a batch summary: X created, Y skipped (duplicate, insufficient fit), Z failed (error)
+6. Each created seed gets the same `seed_batch` identifier for tracking
+
+### S4.3.3. Bulk publish and bulk invite
+
+After batch seed creation, the operator can:
+
+1. Filter seeds by `seed_batch`
+2. Select multiple seeds
+3. Click "Publish All" → publishes each selected seed's listing
+4. Click "Invite All" → mints a claim token for each selected seed
+5. Batch operations show progress and per-seed results
+
+Bulk invite is particularly important for scale — the operator doesn't want to click "invite" 50 times.
+
+### S4.3.4. Batch tracking and dashboard
+
+A new **Batch Operations** view shows:
+
+- All seek batches with: niche, cities, total prospects, seeds created, seeds published, seeds claimed, seeds upgraded
+- All seed batches with: city, category, total seeds, published count, claimed count, upgraded count
+- Progress bars for each batch: what percentage of seeds are published, claimed, upgraded
+- Filters by batch_id, niche, city, date range
+
+This gives the operator a single view of the entire growth engine's output at scale.
+
+## S4.4. Start-of-phase preflight
+
+### S4.4.1. Singleton strategy
+
+| Surface | Base | Why |
+|---|---|---|
+| Batch seek coordination | New `BatchSeekService` | Coordinates N campaigns + N runs across cities |
+| Batch seed creation | Extend `DirectoryPresenceSeedService` with `createSeedsFromBatch` | Reuses `createSeedFromQueue` per prospect |
+| Bulk publish/invite | Extend `DirectoryPresenceSeedService` with `publishBatch` / `inviteBatch` | Reuses existing publish/invite per seed |
+| Batch tracking | New `BatchOperationsService` | Aggregates across batches for the dashboard |
+| Batch operations UI | New admin page at `/settings/admin/directory/batches` | Operator-facing batch dashboard |
+
+### S4.4.2. Skills to read before starting
+
+| Skill | Applied |
+|---|---|
+| `capability-deployment-flow.md` | Batch seed creation uses the same capability pipeline as Sprint 1 |
+| `manual-sql-migration-policy.md` | SQL-first; `prisma db pull` after apply |
+| `tenant-scoped-id-generation.md` | No new ID generators (reuses existing seed/listing/token IDs) |
+| `end-of-phase-sprint-checklist.md` | Phase-end checklist |
+
+**New skill to create at phase end**
+
+- `.devin/skills/batch-seek-and-seed-operations.md` — reusable workflow: multi-city seek execution, batch seed creation, bulk publish/invite, batch tracking dashboard
+
+### S4.4.3. Database
+
+| File | Contents |
+|---|---|
+| `220_seek_batch_tracking.sql` | `mkt_seek_batches` table: `id`, `batch_id` (human-readable), `profile_id`, `profile_version`, `niche_category`, `cities` (TEXT[]), `campaign_ids` (TEXT[]), `status` (draft/running/completed/failed), `created_at`, `completed_at`, `created_by` |
+| `221_seed_batch_metrics.sql` | Add `seek_batch_id` to `directory_presence_seeds` (nullable FK to `mkt_seek_batches`); add `seed_batch_status` view or materialized view for batch metrics (or compute in service layer) |
+
+After apply (human): staging `prisma db pull && prisma generate`, then same SQL on production.
+
+### S4.4.4. Backend routes
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/admin/marketing-ops/seek-batches` | admin | Create + launch a multi-city seek batch |
+| GET | `/api/admin/marketing-ops/seek-batches` | admin | List seek batches with metrics |
+| GET | `/api/admin/marketing-ops/seek-batches/:id` | admin | Batch detail with per-city breakdown |
+| POST | `/api/admin/directory-presence/presence-seeds/batch-create` | admin | Create seeds from multiple queue entries |
+| POST | `/api/admin/directory-presence/presence-seeds/batch-publish` | admin | Publish multiple seeds |
+| POST | `/api/admin/directory-presence/presence-seeds/batch-invite` | admin | Invite (mint claim tokens) for multiple seeds |
+| GET | `/api/admin/directory-presence/seed-batches` | admin | List seed batches with metrics |
+
+### S4.4.5. Frontend
+
+| Component | Type | States |
+|---|---|---|
+| `BatchSeekLauncher` | client | select niche → select cities → launch → progress |
+| `BatchOperationsDashboard` | client | seek batches list + seed batches list with metrics |
+| `BatchSeekDetail` | client | per-city breakdown of a seek batch |
+| `QueueBatchActions` | client | select multiple prospects → "Create Seeds" button |
+| `SeedBatchActions` | client | select multiple seeds → "Publish All" / "Invite All" buttons |
+
+### S4.4.6. Preflight summary block
+
+```
+Phase/Sprint: Multi-City Seek & Batch Seed Operations — batch seek across cities, batch seed creation, bulk publish/invite
+Design doc: docs/DIRECTORY_PRESENCE_SCALE_AND_CONVERGENCE_SPRINT_PLAN.md (Sprint 4)
+
+New services: BatchSeekService (multi-city seek coordination);
+              BatchOperationsService (batch tracking + metrics);
+              createSeedsFromBatch / publishBatch / inviteBatch on DirectoryPresenceSeedService
+New entities: mkt_seek_batches; directory_presence_seeds.seek_batch_id
+New ID generators needed: none (reuses existing IDs; batch_id is human-readable slug)
+New pages/routes: /settings/admin/directory/batches (batch dashboard);
+                  modified /settings/admin/marketing-ops/queue (batch seed creation);
+                  modified /settings/admin/directory/presence-seeds (bulk publish/invite)
+New sidebar links: "Batches" under Directory admin
+New settings cards: none
+New migration: 220–221
+New background jobs: none (seek execution is synchronous or external-agent-driven)
+New capability features: none
+Skills to read before starting: capability-deployment-flow, manual-sql-migration-policy,
+              tenant-scoped-id-generation, end-of-phase-sprint-checklist
+New skill to create: .devin/skills/batch-seek-and-seed-operations.md
+Insights to capture: the intelligence profile system already supports multiple categories and cities,
+      but the execution path is single-city per run; the batch seek is a coordination layer that
+      creates N campaigns + N runs with a shared batch_id; batch seed creation reuses the
+      Sprint 1 createSeedFromQueue method per prospect; bulk publish/invite reuses existing
+      per-seed operations with a batch wrapper
+```
+
+## S4.5. Implementation phases
+
+### Phase A — Seek batch tracking (220)
+
+- Migration 220: `mkt_seek_batches` table
+- Implement `BatchSeekService`:
+  - `createBatch(input)`: creates a batch record with niche + cities list
+  - `launchBatch(batchId)`: creates one campaign per city, initiates intelligence runs (or queues them for external agent execution), links campaigns to batch
+  - `getBatchStatus(batchId)`: aggregates per-city progress (prospects queued, seeds created, etc.)
+  - `listBatches(filters)`: lists batches with summary metrics
+- Backend routes: POST + GET seek-batches
+- Tests: batch creation, per-city campaign creation, batch status aggregation
+
+### Phase B — Batch seed creation (221)
+
+- Migration 221: add `seek_batch_id` to `directory_presence_seeds`
+- Implement `DirectoryPresenceSeedService.createSeedsFromBatch(queueEntryIds[], ctx)`:
+  - Calls `createSeedFromQueue` for each entry (from Sprint 1 Phase A)
+  - Collects results: created, skipped (with reason), failed (with error)
+  - All seeds in the batch get the same `seed_batch` value (e.g., `african-grocery-columbus-2026-08`)
+  - Returns batch summary
+- Backend route: POST batch-create
+- Frontend: `QueueBatchActions` — multi-select on the prospect queue + "Create Seeds" button
+- Tests: batch creation with mixed results (some succeed, some skip duplicates, some fail); idempotency
+
+### Phase C — Bulk publish and bulk invite
+
+- Implement `DirectoryPresenceSeedService.publishBatch(seedIds[], ctx)`:
+  - Calls `publishSeed` for each seed
+  - Collects results: published, already published, failed
+  - Returns batch summary
+- Implement `DirectoryPresenceSeedService.inviteBatch(seedIds[], expiresInDays, ctx)`:
+  - Calls `inviteSeed` for each seed
+  - Collects results: invited, already invited, failed
+  - Returns batch summary with claim links
+- Backend routes: POST batch-publish, POST batch-invite
+- Frontend: `SeedBatchActions` — multi-select on the seeds page + "Publish All" / "Invite All" buttons
+- Tests: bulk publish with mixed states; bulk invite with mixed states; partial failure handling
+
+### Phase D — Batch operations dashboard
+
+- Implement `BatchOperationsService`:
+  - `listSeekBatches(filters)`: seek batches with per-city metrics
+  - `listSeedBatches(filters)`: seed batches with metrics (total, published, claimed, upgraded)
+  - `getSeekBatchDetail(batchId)`: per-city breakdown
+- Backend routes: GET seek-batches, GET seek-batches/:id, GET seed-batches
+- Frontend: `BatchOperationsDashboard` at `/settings/admin/directory/batches`
+  - Two tabs: "Seek Batches" and "Seed Batches"
+  - Seek batches: niche, cities, campaigns, prospects queued, seeds created, status
+  - Seed batches: batch name, city, category, total seeds, published, claimed, upgraded, progress bar
+  - Click a batch → detail view with per-city or per-seed breakdown
+- Tests: dashboard renders with real batch data; metrics are accurate
+
+### Phase E — Verify + skills
+
+- `pnpm checkapi` + `pnpm checkweb` clean
+- End-to-end: operator launches a 3-city seek batch → 3 campaigns created → prospects queued → operator selects 10 prospects → creates seeds in batch → bulk publishes → bulk invites → batch dashboard shows progress
+- Batch dashboard metrics match actual counts
+- Partial failures don't block the rest of the batch
+- End-of-phase checklist
+- Create `.devin/skills/batch-seek-and-seed-operations.md`
+
+## S4.6. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Multi-city seek overwhelms the external agent | Limit batch size (max 10 cities per batch); queue cities sequentially if needed |
+| Batch seed creation creates duplicate seeds | `createSeedFromQueue` already has duplicate detection (Sprint 1); batch wrapper collects skips |
+| Bulk publish fails mid-batch | Per-seed publish is independent; partial results are reported; operator can retry failures |
+| Batch dashboard is slow with many batches | Paginate; cache metrics; use materialized view if needed (migration 221 can add one) |
+| Operator launches a batch but forgets to review prospects | Batch dashboard shows "prospects queued" count with a link to the filtered queue; notification on batch completion |
+
+## S4.7. Acceptance
+
+- [ ] Operator can launch a multi-city seek batch (select niche + cities)
+- [ ] Batch creates one campaign per city with a shared batch_id
+- [ ] Operator can select multiple prospects and create seeds in batch
+- [ ] Operator can bulk publish and bulk invite selected seeds
+- [ ] Batch operations dashboard shows seek batches and seed batches with metrics
+- [ ] Partial failures don't block the rest of the batch
+- [ ] `pnpm checkapi` and `pnpm checkweb` clean
+- [ ] Skills updated / new batch-seek-and-seed-operations skill written
+
+---
+
+# Sprint 5: Directory Browse at Scale + SEO Infrastructure
+
+**Status:** Planned — not implemented
+**Prerequisite:** Sprint 4 (Phases A–E) complete. The category pages from the in-flight work (just shipped) work for a small number of listings. This sprint makes them work at scale.
+**Branch context:** `staging`
+**Next migration numbers:** `222`–`223`
+
+## S5.1. Problem
+
+The `/place` category pages just shipped work for a small directory (10 listings in one category, one city). At scale (hundreds of listings across multiple categories and cities), the browse experience breaks down:
+
+- No search across all presence listings
+- No city landing pages (a user looking for "African grocery in Columbus" has no entry point)
+- No map view for geographic browsing
+- No pagination (a category with 200 listings loads all at once)
+- No sorting (by name, by city, by SNAP status, by date added)
+- No SEO infrastructure — search engines can't discover presence listings efficiently
+- No structured data (JSON-LD) for rich search results
+
+The directory is the platform's public face. At scale, it needs to be both user-browseable and search-engine-discoverable.
+
+## S5.2. Non-Goals
+
+- Do not build a new search engine — use PostgreSQL full-text search or trigram similarity
+- Do not build a separate map application — use the existing Google Maps integration
+- Do not change the individual listing page (`/place/[slug]`) — that's Sprint 1's scope
+- Do not edit `schema.prisma` directly (per repo convention)
+
+## S5.3. Product contract
+
+### S5.3.1. Search across presence listings
+
+A search bar on the `/place` index page (and a dedicated `/place/search` page) that searches across all published presence listings by:
+
+- Business name (exact + fuzzy)
+- Category
+- City
+- State
+- SNAP/EBT status
+
+Results are shown as cards (same `PlaceCard` component from the category page) with filters for category, city, and SNAP status.
+
+### S5.3.2. City landing pages
+
+New route: `/place/city/[citySlug]`
+
+Shows all published presence listings in a city, grouped by category. This is the entry point for a user who knows the city but wants to browse all categories.
+
+- City header: "Places in [City], [State]"
+- Category breakdown chips (same pattern as the index page but scoped to one city)
+- Listings grouped by category, with category headers
+- "Browse all categories" link back to `/place`
+
+### S5.3.3. Map view
+
+A map view on the `/place` index and category pages that shows all published presence listings as pins. Clicking a pin shows a mini-card with business name, address, and a link to the listing page.
+
+- Reuses the existing `DirectoryMapGoogle` component (already used on the directory category pages)
+- Filters apply (category, city, search)
+- Cluster pins at high zoom levels (Google Maps marker clustering)
+
+### S5.3.4. Pagination and sorting
+
+Category and city pages get:
+
+- Pagination (24 per page, with page numbers and prev/next)
+- Sort options: Name (A-Z), City, Recently Added, SNAP/EBT first
+- URL-based state (query params) so pages are shareable and SEO-crawlable
+
+### S5.3.5. SEO infrastructure
+
+**Sitemap generation:**
+- New route: `GET /api/public/directory/places-sitemap.xml`
+- Generates a sitemap with all published presence listing URLs (`/place/[slug]`)
+- Includes category pages (`/place/category/[slug]`) and city pages (`/place/city/[slug]`)
+- Updates daily or on-demand
+
+**Structured data (JSON-LD):**
+- Each `/place/[slug]` page includes `LocalBusiness` JSON-LD structured data
+- Fields: name, address, telephone, geo, url, description
+- Helps Google rich results understand the listing
+
+**Category and city page metadata:**
+- Dynamic `<title>` and `<meta description>` per category and city
+- Already partially done (the category page has `generateMetadata`)
+- City pages get the same treatment
+
+## S5.4. Start-of-phase preflight
+
+### S5.4.1. Singleton strategy
+
+| Surface | Base | Why |
+|---|---|---|
+| Search | Extend `PlacesBrowsePublicService` with `searchPlaces` | New method on existing service |
+| City pages | Extend `PlacesBrowsePublicService` with `getPlacesByCity` | New method on existing service |
+| Map data | Extend `PlacesBrowsePublicService` with `getPlacesForMap` | Returns lightweight geo data |
+| Sitemap | New `PlacesSitemapService` | Generates XML sitemap |
+| Structured data | New `PlaceJsonLd` component | Renders JSON-LD on listing pages |
+
+### S5.4.2. Database
+
+| File | Contents |
+|---|---|
+| `222_directory_places_search_index.sql` | Add a `tsvector` column or expression index on `directory_listings_list` for full-text search across `business_name`, `city`, `state`, `primary_category`; or use trigram (`pg_trgm`) similarity index on `business_name` |
+| `223_directory_places_sitemap_log.sql` | `directory_places_sitemap_log` table: `id`, `generated_at`, `url_count`, `file_path` (if cached to disk) or `etag` (if cached in DB) |
+
+### S5.4.3. Backend routes
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/public/directory/places/search?q=...&category=...&city=...&snapEbt=...` | public | Search across presence listings |
+| GET | `/api/public/directory/places/city/:citySlug` | public | All presence listings in a city, grouped by category |
+| GET | `/api/public/directory/places-map?category=...&city=...` | public | Lightweight geo data for map pins |
+| GET | `/api/public/directory/places-sitemap.xml` | public | XML sitemap for all presence pages |
+
+### S5.4.4. Frontend
+
+| Component | Type | States |
+|---|---|---|
+| `PlacesSearchBar` | client | search input + filters |
+| `PlacesSearchResults` | client | results grid + filters + pagination |
+| `PlaceCityPage` | client | city landing page with category breakdown |
+| `PlacesMapView` | client | Google Maps with pins + mini-cards |
+| `PlaceJsonLd` | server component | JSON-LD structured data on listing pages |
+
+New routes:
+| Route | Purpose |
+|---|---|
+| `/place/search` | Search page |
+| `/place/city/[citySlug]` | City landing page |
+
+### S5.4.5. Preflight summary block
+
+```
+Phase/Sprint: Directory Browse at Scale + SEO Infrastructure — search, city pages, map view, pagination, sitemaps, structured data
+Design doc: docs/DIRECTORY_PRESENCE_SCALE_AND_CONVERGENCE_SPRINT_PLAN.md (Sprint 5)
+
+New services: PlacesSitemapService; searchPlaces / getPlacesByCity / getPlacesForMap on PlacesBrowsePublicService
+New entities: tsvector/trigram index on directory_listings_list; directory_places_sitemap_log
+New ID generators needed: none
+New pages/routes: /place/search; /place/city/[citySlug]; /api/public/directory/places-sitemap.xml
+New sidebar links: none (public pages)
+New settings cards: none
+New migration: 222–223
+New background jobs: sitemap regeneration (daily or on-demand)
+New capability features: none
+Skills to read before starting: manual-sql-migration-policy, end-of-phase-sprint-checklist
+New skill to create: .devin/skills/directory-places-seo.md
+Insights to capture: the directory is the platform's public face; at scale it needs search, city pages,
+      map view, pagination, and SEO infrastructure; the existing Google Maps integration can be reused;
+      PostgreSQL full-text search or trigram similarity is sufficient (no need for a separate search engine);
+      JSON-LD structured data helps Google rich results discover presence listings
+```
+
+## S5.5. Implementation phases
+
+### Phase A — Search + city pages (222)
+
+- Migration 222: search index (tsvector or trigram) on `directory_listings_list`
+- Backend: `GET /api/public/directory/places/search` — full-text search with filters
+- Backend: `GET /api/public/directory/places/city/:citySlug` — listings by city grouped by category
+- Frontend: `PlacesSearchBar` + `PlacesSearchResults` on `/place/search`
+- Frontend: `PlaceCityPage` at `/place/city/[citySlug]`
+- Tests: search by business name, category, city; city page shows all categories in that city
+
+### Phase B — Map view + pagination + sorting
+
+- Backend: `GET /api/public/directory/places-map` — lightweight geo data (id, name, lat, lng, slug, category)
+- Frontend: `PlacesMapView` with Google Maps + marker clustering
+- Frontend: pagination on category and city pages (24 per page)
+- Frontend: sort dropdown (Name, City, Recently Added, SNAP/EBT first)
+- Tests: map renders pins; pagination works; sorting changes order
+
+### Phase C — SEO infrastructure (223)
+
+- Migration 223: sitemap log table
+- Backend: `GET /api/public/directory/places-sitemap.xml` — generates XML sitemap
+- Frontend: `PlaceJsonLd` component on `/place/[slug]` pages — `LocalBusiness` structured data
+- Frontend: dynamic metadata on city pages (already done on category pages)
+- Tests: sitemap XML is valid; JSON-LD is valid; all published listings appear in sitemap
+
+### Phase D — Verify + skills
+
+- `pnpm checkapi` + `pnpm checkweb` clean
+- End-to-end: search for "African" → results show; click a city → city page shows all categories; map view shows pins; sitemap is valid XML; listing page has JSON-LD
+- End-of-phase checklist
+- Create `.devin/skills/directory-places-seo.md`
+
+## S5.6. Acceptance
+
+- [ ] Search bar on `/place` searches across all published presence listings
+- [ ] City landing pages at `/place/city/[citySlug]` show all listings in a city grouped by category
+- [ ] Map view shows pins for all listings with filters applied
+- [ ] Category and city pages paginate (24 per page)
+- [ ] Sort options work (Name, City, Recently Added, SNAP/EBT first)
+- [ ] Sitemap at `/api/public/directory/places-sitemap.xml` includes all published listings
+- [ ] Listing pages include `LocalBusiness` JSON-LD structured data
+- [ ] `pnpm checkapi` and `pnpm checkweb` clean
+- [ ] Skills updated / new directory-places-seo skill written
+
+---
+
+# Sprint 6: Growth Engine Analytics
+
+**Status:** Planned — not implemented
+**Prerequisite:** Sprint 4 (Phases A–E) complete. The batch operations dashboard (Sprint 4 Phase D) provides per-batch metrics. This sprint builds the end-to-end growth loop analytics on top of that.
+**Branch context:** `staging`
+**Next migration numbers:** `224`–`225`
+
+## S6.1. Problem
+
+The platform's growth engine is a multi-step funnel: seek → prospect → seed → publish → claim → upgrade. Today there is no end-to-end tracking of this funnel. The operator can see individual pieces (prospect queue count, seed count, claim count) but cannot answer:
+
+- What percentage of seek prospects become seeds?
+- What percentage of published seeds get claimed?
+- What percentage of claimed seeds upgrade to a paid tier?
+- Which niches have the highest claim rates?
+- Which cities have the highest upgrade rates?
+- How long does it take from seed to claim on average?
+- Which seek batches are performing best?
+
+Without these metrics, the operator is flying blind. They can't prioritize which niches to expand, which cities to focus on, or which parts of the funnel need optimization.
+
+## S6.2. Non-Goals
+
+- Do not build a real-time analytics engine — daily aggregation is sufficient
+- Do not build a separate analytics database — use PostgreSQL views or materialized views
+- Do not track individual user behavior (no cookies, no tracking pixels) — aggregate funnel metrics only
+- Do not edit `schema.prisma` directly (per repo convention)
+
+## S6.3. Product contract
+
+### S6.3.1. Growth loop funnel
+
+A dashboard at `/settings/admin/growth-engine` showing the end-to-end funnel:
+
+```
+Seeks Run → Prospects Queued → Seeds Created → Seeds Published → Seeds Claimed → Seeds Upgraded
+   N              N                    N                N                N               N
+   ↓              ↓                    ↓                ↓                ↓               ↓
+  runs      queue entries        seed rows      published seeds    claimed seeds   upgraded tenants
+```
+
+Each stage shows:
+- Count for the selected time range
+- Conversion rate from the previous stage
+- Conversion rate from the first stage (overall)
+- Average time to transition (where measurable: seed → publish, publish → claim, claim → upgrade)
+
+### S6.3.2. Per-niche breakdown
+
+A table showing each niche (category) with:
+- Total seeks, prospects, seeds, published, claimed, upgraded
+- Claim rate (claimed / published)
+- Upgrade rate (upgraded / claimed)
+- Best performing city for that niche
+- Worst performing city for that niche
+
+This helps the operator decide which niches to expand and which to deprioritize.
+
+### S6.3.3. Per-city breakdown
+
+A table showing each city with:
+- Total niches, prospects, seeds, published, claimed, upgraded
+- Claim rate
+- Upgrade rate
+- Best performing niche for that city
+
+This helps the operator decide which cities to focus on.
+
+### S6.3.4. Time series
+
+A chart showing the funnel over time (weekly or monthly):
+- New seeds created per week
+- New claims per week
+- New upgrades per week
+- Cumulative seeds, claims, upgrades
+
+This shows whether the growth engine is accelerating or decelerating.
+
+### S6.3.5. Directory traffic analytics
+
+Track page views on:
+- `/place` (index)
+- `/place/category/[slug]` (category pages)
+- `/place/city/[slug]` (city pages)
+- `/place/[slug]` (individual listing pages)
+
+This is done via the existing `trackBehaviorClient` utility (already used on directory pages). The analytics dashboard shows:
+- Total page views per day/week
+- Top viewed categories
+- Top viewed cities
+- Top viewed listings
+- Claim CTA click-through rate (views → claim page visits)
+
+### S6.3.6. "Next expansion" recommendations
+
+Based on the growth engine data, the system recommends:
+- **Niches to expand**: categories with high claim rates but low city coverage → expand to more cities
+- **Cities to expand**: cities with high claim rates but low niche coverage → add more niches
+- **Niches to deprioritize**: categories with low claim rates across multiple cities
+- **Demand signals**: categories/cities with high directory page views but few listings → high demand, low supply
+
+These are computed from the analytics data and shown as actionable cards on the dashboard.
+
+## S6.4. Start-of-phase preflight
+
+### S6.4.1. Singleton strategy
+
+| Surface | Base | Why |
+|---|---|---|
+| Funnel metrics | New `GrowthEngineAnalyticsService` | Aggregates across seek batches, seeds, claims, upgrades |
+| Time series | Extend `GrowthEngineAnalyticsService` | Same service, different query |
+| Directory traffic | Extend `GrowthEngineAnalyticsService` | Uses existing behavior tracking data |
+| Recommendations | Extend `GrowthEngineAnalyticsService` | Computed from the same data |
+| Dashboard UI | New admin page at `/settings/admin/growth-engine` | Operator-facing analytics dashboard |
+
+### S6.4.2. Database
+
+| File | Contents |
+|---|---|
+| `224_growth_engine_daily_metrics.sql` | `growth_engine_daily_metrics` table: `date`, `category`, `city`, `seeks_run`, `prospects_queued`, `seeds_created`, `seeds_published`, `seeds_claimed`, `seeds_upgraded`, `directory_views`, `claim_cta_clicks`. Populated by a daily aggregation job. |
+| `225_growth_engine_mv.sql` | Materialized view `mv_growth_engine_funnel` for the funnel dashboard (aggregates across all dates with filters). Refresh daily or on-demand. |
+
+### S6.4.3. Backend routes
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/admin/growth-engine/funnel` | admin | Funnel metrics (seeks → prospects → seeds → published → claimed → upgraded) |
+| GET | `/api/admin/growth-engine/by-niche` | admin | Per-niche breakdown |
+| GET | `/api/admin/growth-engine/by-city` | admin | Per-city breakdown |
+| GET | `/api/admin/growth-engine/time-series` | admin | Time series chart data |
+| GET | `/api/admin/growth-engine/directory-traffic` | admin | Directory page view analytics |
+| GET | `/api/admin/growth-engine/recommendations` | admin | "Next expansion" recommendations |
+
+### S6.4.4. Frontend
+
+| Component | Type | States |
+|---|---|---|
+| `GrowthEngineDashboard` | client | funnel + niche + city + time series + traffic + recommendations |
+| `GrowthFunnelChart` | client | horizontal funnel visualization |
+| `GrowthTimeSeriesChart` | client | line chart (seeds, claims, upgrades over time) |
+| `GrowthNicheTable` | client | per-niche breakdown table |
+| `GrowthCityTable` | client | per-city breakdown table |
+| `GrowthRecommendations` | client | actionable recommendation cards |
+
+### S6.4.5. Preflight summary block
+
+```
+Phase/Sprint: Growth Engine Analytics — end-to-end funnel tracking, per-niche/city breakdowns, time series, directory traffic, expansion recommendations
+Design doc: docs/DIRECTORY_PRESENCE_SCALE_AND_CONVERGENCE_SPRINT_PLAN.md (Sprint 6)
+
+New services: GrowthEngineAnalyticsService (funnel metrics, time series, traffic, recommendations)
+New entities: growth_engine_daily_metrics; mv_growth_engine_funnel
+New ID generators needed: none
+New pages/routes: /settings/admin/growth-engine (dashboard);
+                  /api/admin/growth-engine/* (6 analytics endpoints)
+New sidebar links: "Growth Engine" under admin
+New settings cards: none
+New migration: 224–225
+New background jobs: daily metrics aggregation (runs nightly, populates growth_engine_daily_metrics)
+New capability features: none
+Skills to read before starting: manual-sql-migration-policy, end-of-phase-sprint-checklist
+New skill to create: .devin/skills/growth-engine-analytics.md
+Insights to capture: the growth engine is a multi-step funnel (seek → prospect → seed → publish → claim → upgrade);
+      without end-to-end tracking the operator can't prioritize which niches to expand or which cities to focus on;
+      per-niche and per-city breakdowns reveal which parts of the funnel need optimization;
+      directory traffic analytics show demand signals (high views, low listings = expand there);
+      the "next expansion" recommendations turn data into actionable operator decisions
+```
+
+## S6.5. Implementation phases
+
+### Phase A — Daily metrics aggregation (224)
+
+- Migration 224: `growth_engine_daily_metrics` table
+- Implement daily aggregation job (runs nightly):
+  - Count seeks run per category/city (from `mkt_intelligence_runs` + `mkt_seek_batches`)
+  - Count prospects queued per category/city (from `marketing_prospect_queue`)
+  - Count seeds created per category/city (from `directory_presence_seeds`)
+  - Count seeds published per category/city (from `directory_presence_seeds` where `status = 'published'`)
+  - Count seeds claimed per category/city (from `directory_presence_seeds` where `status = 'claimed'`)
+  - Count seeds upgraded per category/city (from `tenants` where `subscription_tier != 'directory_presence'` and `org_standing_mode = 'independent'` and was previously `directory_seed`)
+  - Count directory views per category/city (from behavior tracking data)
+- Tests: aggregation job produces correct counts; idempotent (re-running for same date overwrites)
+
+### Phase B — Funnel dashboard + materialized view (225)
+
+- Migration 225: `mv_growth_engine_funnel` materialized view
+- Implement `GrowthEngineAnalyticsService`:
+  - `getFunnel(dateRange)`: aggregates across all niches/cities for the funnel
+  - `getByNiche(dateRange)`: per-category breakdown
+  - `getByCity(dateRange)`: per-city breakdown
+  - `getTimeSeries(dateRange, granularity)`: weekly or monthly time series
+- Backend routes: GET funnel, GET by-niche, GET by-city, GET time-series
+- Frontend: `GrowthEngineDashboard` with funnel chart, niche table, city table, time series chart
+- Tests: funnel metrics match raw counts; niche/city breakdowns are accurate; time series renders
+
+### Phase C — Directory traffic + recommendations
+
+- Implement `GrowthEngineAnalyticsService.getDirectoryTraffic(dateRange)`:
+  - Aggregates page views from behavior tracking data
+  - Top categories, top cities, top listings by views
+  - Claim CTA click-through rate
+- Implement `GrowthEngineAnalyticsService.getRecommendations()`:
+  - High claim rate + low city coverage → "Expand [niche] to more cities"
+  - High claim rate + low niche coverage → "Add more niches in [city]"
+  - Low claim rate across cities → "Deprioritize [niche]"
+  - High directory views + few listings → "High demand for [category] in [city] — run a seek"
+- Backend routes: GET directory-traffic, GET recommendations
+- Frontend: directory traffic section + recommendation cards on the dashboard
+- Tests: traffic metrics match behavior tracking data; recommendations are logically consistent
+
+### Phase D — Verify + skills
+
+- `pnpm checkapi` + `pnpm checkweb` clean
+- End-to-end: dashboard shows funnel from seeks to upgrades; niche table shows per-category metrics; city table shows per-city metrics; time series chart renders; recommendations appear
+- Daily aggregation job runs without error
+- End-of-phase checklist
+- Create `.devin/skills/growth-engine-analytics.md`
+
+## S6.6. Acceptance
+
+- [ ] Growth engine dashboard shows the end-to-end funnel (seeks → prospects → seeds → published → claimed → upgraded)
+- [ ] Per-niche breakdown shows claim rate and upgrade rate per category
+- [ ] Per-city breakdown shows claim rate and upgrade rate per city
+- [ ] Time series chart shows seeds, claims, upgrades over time
+- [ ] Directory traffic analytics show top viewed categories, cities, and listings
+- [ ] "Next expansion" recommendations are actionable and logically consistent
+- [ ] Daily aggregation job runs nightly and populates metrics
+- [ ] `pnpm checkapi` and `pnpm checkweb` clean
+- [ ] Skills updated / new growth-engine-analytics skill written
+
+---
+
+# Sprint 7: Self-Reinforcing Loop (Directory → Seek)
+
+**Status:** Planned — not implemented
+**Prerequisite:** Sprint 5 (SEO + browse at scale) and Sprint 6 (analytics) complete. This sprint closes the outer loop — the directory's own traffic and lead gen data feed back into the seek pipeline.
+**Branch context:** `staging`
+**Next migration numbers:** `226`
+
+## S7.1. Problem
+
+The growth engine is a one-way pipeline today: the operator runs seeks → prospects → seeds → publish → claim → upgrade. The directory's own traffic is a passive observer — people visit the directory, browse listings, and leave.
+
+But the directory generates two valuable signals that should feed back into the seek pipeline:
+
+1. **Search demand**: people search for "[category] in [city]" on the directory. If there are no listings for that search, that's a demand signal — the platform should run a seek for that category+city.
+
+2. **Lead gen submissions**: the "Get listed" CTA from Sprint 3 creates prospect queue entries from business owners who found the directory on their own. These are self-identified prospects — the highest quality prospects in the pipeline because the business owner themselves raised their hand.
+
+Today, neither signal feeds back into the seek pipeline automatically. The operator has to manually notice search demand and lead gen submissions and decide to act on them.
+
+This sprint closes the loop: the directory's own traffic and lead gen data become inputs to the seek pipeline, making the growth engine self-reinforcing.
+
+## S7.2. Non-Goals
+
+- Do not build an automated seek execution system — the operator still decides whether to act on a recommendation
+- Do not replace the operator's judgment — recommendations are suggestions, not automatic actions
+- Do not build a recommendation engine that uses ML — simple rules-based recommendations from analytics data
+- Do not edit `schema.prisma` directly (per repo convention)
+
+## S7.3. Product contract
+
+### S7.3.1. Search demand tracking
+
+When a user searches on `/place/search` and gets zero results (or very few results), the system logs a "search demand" event:
+
+- Search query (e.g., "halal butcher")
+- Category (if resolved from the query)
+- City (if detected from the query or user's location)
+- Result count (0 = no listings, 5 = some but underserved)
+- Timestamp
+
+These events are aggregated daily. A category+city with repeated zero-result searches becomes a "demand signal" — the platform should run a seek there.
+
+### S7.3.2. Lead gen prospect workflow
+
+The "Get listed" CTA from Sprint 3 creates prospect queue entries with `source_kind: 'directory_lead_gen'`. This sprint builds the operator workflow for converting those leads into seeds:
+
+- Lead gen prospects appear in the prospect queue with a special badge ("Self-identified")
+- Lead gen prospects are prioritized over seek-discovered prospects (the business owner raised their hand)
+- Operator reviews the lead gen prospect → if legitimate, creates a seed directly (no need for a seek)
+- The seed is published and the owner is invited to claim (they already want to be listed)
+
+This is the fastest path from discovery to claim: the owner finds the directory, submits their business, the operator seeds it, and the owner claims it.
+
+### S7.3.3. Demand-driven seek recommendations
+
+The growth engine dashboard (Sprint 6) gains a "Demand Signals" section:
+
+- **Zero-result searches**: top category+city combinations with zero-result searches in the last 30 days
+- **Underserved searches**: top category+city combinations with < 5 listings but > 10 searches
+- **Lead gen demand**: categories/cities with the most "Get listed" submissions
+- **Geographic demand**: cities with high directory traffic but few presence listings
+
+Each demand signal has a "Run Seek" button that pre-fills the seek batch launcher (Sprint 4) with the recommended category+city.
+
+### S7.3.4. Auto-suggestion for next seek targets
+
+Based on all available signals (search demand, lead gen, directory traffic, claim rates), the system computes a prioritized list of "next seek targets":
+
+```
+Priority 1: [Category] in [City] — 15 zero-result searches, 3 lead gen submissions, 0 listings
+Priority 2: [Category] in [City] — 8 zero-result searches, 0 lead gen, 2 listings (underserved)
+Priority 3: [Category] in [City] — 0 searches, 5 lead gen submissions, 0 listings
+...
+```
+
+The operator can click "Launch Seek" on any recommendation to start a seek batch for that target.
+
+## S7.4. Start-of-phase preflight
+
+### S7.4.1. Singleton strategy
+
+| Surface | Base | Why |
+|---|---|---|
+| Search demand tracking | Extend `GrowthEngineAnalyticsService` with `logSearchDemand` + `getSearchDemand` | New metrics on existing service |
+| Lead gen workflow | Extend `MarketingProspectQueueService` (already supports `directory_lead_gen` source) | Sprint 3 defined the source kind; this sprint builds the operator workflow |
+| Demand signals | Extend `GrowthEngineAnalyticsService` with `getDemandSignals` | Computed from search demand + lead gen + traffic |
+| Next seek targets | Extend `GrowthEngineAnalyticsService` with `getNextSeekTargets` | Prioritized recommendations |
+
+### S7.4.2. Database
+
+| File | Contents |
+|---|---|
+| `226_directory_search_demand.sql` | `directory_search_demand_log` table: `id`, `search_query`, `resolved_category`, `resolved_city`, `result_count`, `searched_at`, `ip_hash` (for dedup, not for tracking) |
+
+### S7.4.3. Backend routes
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/public/directory/search-demand` | public (no auth) | Log a search demand event (zero-result or low-result searches) |
+| GET | `/api/admin/growth-engine/demand-signals` | admin | Demand signals (zero-result searches, underserved, lead gen) |
+| GET | `/api/admin/growth-engine/next-seek-targets` | admin | Prioritized next seek recommendations |
+
+### S7.4.4. Frontend
+
+| Component | Type | States |
+|---|---|---|
+| `DemandSignalsPanel` | client | zero-result searches + underserved + lead gen demand |
+| `NextSeekTargets` | client | prioritized recommendation list with "Launch Seek" buttons |
+| `LeadGenBadge` | client | badge on prospect queue entries from `directory_lead_gen` |
+
+### S7.4.5. Preflight summary block
+
+```
+Phase/Sprint: Self-Reinforcing Loop (Directory → Seek) — search demand tracking, lead gen workflow, demand-driven seek recommendations
+Design doc: docs/DIRECTORY_PRESENCE_SCALE_AND_CONVERGENCE_SPRINT_PLAN.md (Sprint 7)
+
+New services: logSearchDemand / getSearchDemand / getDemandSignals / getNextSeekTargets on GrowthEngineAnalyticsService
+New entities: directory_search_demand_log
+New ID generators needed: none
+New pages/routes: POST /api/public/directory/search-demand (public);
+                  GET /api/admin/growth-engine/demand-signals (admin);
+                  GET /api/admin/growth-engine/next-seek-targets (admin)
+New sidebar links: none (extends Sprint 6 dashboard)
+New settings cards: DemandSignalsPanel + NextSeekTargets on growth engine dashboard
+New migration: 226
+New background jobs: daily search demand aggregation (extends Sprint 6 daily job)
+New capability features: none
+Skills to read before starting: manual-sql-migration-policy, end-of-phase-sprint-checklist
+New skill to create: .devin/skills/self-reinforcing-seek-loop.md
+Insights to capture: the directory's own traffic is a discovery source; zero-result searches are demand signals;
+      lead gen submissions are the highest quality prospects (self-identified); the loop closes when directory
+      demand feeds back into seek targets; the operator still decides whether to act on recommendations
+```
+
+## S7.5. Implementation phases
+
+### Phase A — Search demand tracking (226)
+
+- Migration 226: `directory_search_demand_log` table
+- Backend: `POST /api/public/directory/search-demand` — logs a search event (query, resolved category/city, result count)
+- Frontend: `PlacesSearchResults` calls the search demand endpoint when results are 0 or < 5
+- IP hash for dedup (not for tracking) — prevents one user from inflating demand by searching repeatedly
+- Tests: search demand is logged; dedup by ip_hash + query + day
+
+### Phase B — Lead gen prospect workflow
+
+- Frontend: `LeadGenBadge` on prospect queue entries with `source_kind: 'directory_lead_gen'`
+- Sort prospect queue to show lead gen prospects first (they're self-identified)
+- Operator can create a seed directly from a lead gen prospect (no seek needed — the owner wants to be listed)
+- Tests: lead gen prospects appear with badge; seed creation from lead gen prospect works
+
+### Phase C — Demand signals + next seek targets
+
+- Implement `GrowthEngineAnalyticsService.getDemandSignals(dateRange)`:
+  - Zero-result searches: top category+city with 0 results, sorted by search count
+  - Underserved searches: top category+city with < 5 listings but > 10 searches
+  - Lead gen demand: categories/cities with most "Get listed" submissions
+- Implement `GrowthEngineAnalyticsService.getNextSeekTargets()`:
+  - Score each category+city: (zero_result_searches * 3) + (lead_gen_submissions * 5) + (underserved_searches * 2)
+  - Sort by score descending
+  - Return top 10 with scores and "Launch Seek" buttons
+- Backend routes: GET demand-signals, GET next-seek-targets
+- Frontend: `DemandSignalsPanel` + `NextSeekTargets` on the growth engine dashboard
+- "Launch Seek" button pre-fills the Sprint 4 batch seek launcher with the recommended category+city
+- Tests: demand signals are accurate; next seek targets are sorted by score; "Launch Seek" pre-fills correctly
+
+### Phase D — Verify + skills
+
+- `pnpm checkapi` + `pnpm checkweb` clean
+- End-to-end: user searches for "halal butcher in Columbus" → 0 results → demand logged → demand signal appears on dashboard → operator clicks "Launch Seek" → seek batch created for halal butcher in Columbus
+- Lead gen: business owner submits "Get listed" → prospect appears in queue with badge → operator creates seed → owner invited to claim
+- End-of-phase checklist
+- Create `.devin/skills/self-reinforcing-seek-loop.md`
+
+## S7.6. Acceptance
+
+- [ ] Zero-result searches on `/place/search` are logged as demand events
+- [ ] Demand signals panel shows top zero-result, underserved, and lead gen demand
+- [ ] Next seek targets are prioritized by a score combining all signals
+- [ ] "Launch Seek" button pre-fills the batch seek launcher with the recommended target
+- [ ] Lead gen prospects appear in the queue with a "Self-identified" badge
+- [ ] Operator can create a seed directly from a lead gen prospect
+- [ ] `pnpm checkapi` and `pnpm checkweb` clean
+- [ ] Skills updated / new self-reinforcing-seek-loop skill written
+
+## S7.7. The self-reinforcing loop (end state after all 7 sprints)
+
+```
+                        ┌─────────────────────────────────────────────────┐
+                        │                                                   │
+                        ▼                                                   │
+  Operator launches seek batch (Sprint 4)                                   │
+    → Intelligence runs execute across N cities                             │
+      → Prospects queued (Sprint 1)                                         │
+        → Operator reviews + qualifies                                      │
+          ├─ Marketing campaign (Sprint 1)                                  │
+          └─ Directory seed (Sprint 1)                                      │
+                ↓                                                           │
+          Publish batch (Sprint 4)                                          │
+                ↓                                                           │
+          Operator verifies + enriches (Sprint 3)                           │
+                ↓                                                           │
+          Owner claims (Sprint 2 + Cross-Cutting security)                  │
+                ↓                                                           │
+          Promoted to tenant → dashboard → upgrade (Sprint 2)               │
+                ↓                                                           │
+          Paying platform tenant                                            │
+                                                                        │
+  Directory browse at scale (Sprint 5)                                      │
+    → Users search /place/search                                            │
+      → Zero-result searches logged as demand (Sprint 7)                    │
+        → Demand signals on growth engine dashboard (Sprint 6 + 7)          │
+          → "Next seek targets" recommendations (Sprint 7)                  │
+            → Operator launches next seek batch ─────────────────────────┘
+                                                                        │
+  Business owner visits directory (Sprint 5)                                │
+    → "Get listed" CTA (Sprint 3)                                           │
+      → Lead gen prospect in queue (Sprint 7)                               │
+        → Operator creates seed                                             │
+          → Owner claims → upgrades ───────────────────────────────────────┘
+```
+
+The platform finds businesses, publishes their listings, converts owners to tenants, upgrades them to paying customers, and uses the directory's own traffic to find the next batch of businesses. The loop is self-reinforcing. Seven sprints, one self-contained ecosystem, zero external prospecting. The directory opens many doors — and every door leads back into the platform, which leads back into the directory, which opens more doors.

@@ -26,6 +26,7 @@ import {
   Trash2,
   Sparkles,
 } from 'lucide-react';
+import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 
 const PROVENANCE_FIELD_KEYS = [
   'name',
@@ -140,6 +141,8 @@ export default function PresenceSeedDetailPage() {
   });
   const [editHoursSource, setEditHoursSource] = useState('');
   const [editHoursSourceUrl, setEditHoursSourceUrl] = useState('');
+  const [editPrimaryCategory, setEditPrimaryCategory] = useState('');
+  const [editSecondaryCategories, setEditSecondaryCategories] = useState<string[]>([]);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -206,6 +209,10 @@ export default function PresenceSeedDetailPage() {
   const startEditing = () => {
     setEditPhone(listing?.phone ?? '');
     setEditWebsite(listing?.website ?? '');
+    setEditPrimaryCategory(seed?.category ?? listing?.primary_category ?? '');
+    setEditSecondaryCategories(
+      Array.isArray(listing?.secondary_categories) ? listing.secondary_categories : [],
+    );
     setEditSnapReported(!!listing?.snap_ebt_reported);
     const asOf = listing?.snap_ebt_as_of
       ? new Date(listing.snap_ebt_as_of).toISOString().slice(0, 10)
@@ -267,6 +274,8 @@ export default function PresenceSeedDetailPage() {
       const fields: any = {
         phone: editPhone.trim() || undefined,
         website: editWebsite.trim() || undefined,
+        primaryCategory: editPrimaryCategory.trim() || null,
+        secondaryCategories: editSecondaryCategories,
       };
 
       // Business hours — only include if any day is not closed
@@ -802,6 +811,21 @@ export default function PresenceSeedDetailPage() {
                 placeholder="https://"
               />
             </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Categories</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Select from the platform category list (same categories used by the
+              tenant directory and GBP settings). The primary category drives the
+              /place browse page grouping.
+            </p>
+            <DirectoryCategorySelectorAdapter
+              primary={editPrimaryCategory}
+              secondary={editSecondaryCategories}
+              onPrimaryChange={setEditPrimaryCategory}
+              onSecondaryChange={setEditSecondaryCategories}
+            />
           </div>
 
           <div className="border-t border-gray-100 pt-4">

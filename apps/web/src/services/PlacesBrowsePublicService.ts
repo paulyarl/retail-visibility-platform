@@ -11,6 +11,10 @@ import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 export interface PlaceCategory {
   category: string;
   slug: string;
+  categoryId: string | null;
+  iconEmoji: string | null;
+  parentId: string | null;
+  level: number | null;
   placeCount: number;
   cities: { city: string; state: string; placeCount: number }[];
 }
@@ -33,6 +37,8 @@ export interface PlaceListing {
   snapEbtSource: string | null;
   publicDisclaimer: string | null;
   category: string;
+  categorySlug: string;
+  iconEmoji: string | null;
   claimToken: string | null;
 }
 

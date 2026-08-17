@@ -115,13 +115,12 @@ router.post('/claim/:token/accept', async (req: Request, res: Response) => {
 // ====================
 // Public presence browse endpoints (for /place category pages)
 // ====================
-
-/**
- * Build a slug from a category name (mirrors the frontend slugify logic).
- */
-function categorySlugFromName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
-}
+// Reuses platform_categories as the canonical category source (same system
+// as the tenant directory settings at /t/[tenantId]/settings/directory and
+// the GBP category settings at /t/[tenantId]/settings/gbp-category).
+// directory_presence_seeds.category is a free-form string that matches
+// platform_categories.name; we join to get proper slugs, hierarchy, and
+// metadata rather than deriving slugs from the free-form string.
 
 /** GET /api/public/directory/places — categories with published presence listings */
 router.get('/places', async (req: Request, res: Response) => {
@@ -130,15 +129,21 @@ router.get('/places', async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT
          dps.category,
+         pc.slug AS category_slug,
+         pc.id AS category_id,
+         pc.icon_emoji,
+         pc.parent_id,
+         pc.level,
          dps.city,
          dps.state,
          COUNT(*) as place_count
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
        WHERE dps.status = 'published'
          AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
-       GROUP BY dps.category, dps.city, dps.state
+       GROUP BY dps.category, pc.slug, pc.id, pc.icon_emoji, pc.parent_id, pc.level, dps.city, dps.state
        ORDER BY dps.category ASC, dps.city ASC`,
       [],
     );
@@ -147,16 +152,25 @@ router.get('/places', async (req: Request, res: Response) => {
     const categoryMap: Record<string, {
       category: string;
       slug: string;
+      categoryId: string | null;
+      iconEmoji: string | null;
+      parentId: string | null;
+      level: number | null;
       placeCount: number;
       cities: { city: string; state: string; placeCount: number }[];
     }> = {};
 
     for (const row of result.rows) {
-      const slug = categorySlugFromName(row.category);
+      // Use platform_categories slug if available, otherwise fall back to name-based slug
+      const slug = row.category_slug || row.category.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
       if (!categoryMap[slug]) {
         categoryMap[slug] = {
           category: row.category,
           slug,
+          categoryId: row.category_id || null,
+          iconEmoji: row.icon_emoji || null,
+          parentId: row.parent_id || null,
+          level: row.level !== null ? parseInt(row.level) : null,
           placeCount: 0,
           cities: [],
         };
@@ -197,11 +211,14 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
     // Build query with optional city filter
     let cityClause = '';
     const params: any[] = [];
+    let paramIdx = 1;
     if (city) {
-      cityClause = `AND dps.city = $1`;
+      cityClause = `AND dps.city = $${paramIdx}`;
       params.push(city);
+      paramIdx++;
     }
 
+    // Match by platform_categories.slug (preferred) or by name-based slug fallback
     const result = await pool.query(
       `SELECT
          dll.id,
@@ -223,17 +240,22 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
          dps.category,
          dps.city as seed_city,
          dps.state as seed_state,
+         pc.slug AS category_slug,
+         pc.id AS category_id,
+         pc.icon_emoji,
          (SELECT dct.token FROM directory_claim_tokens dct
           WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
           LIMIT 1) as active_claim_token
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
        WHERE dps.status = 'published'
          AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
          AND (
-           LOWER(REPLACE(REPLACE(LOWER(dps.category), '[^a-z0-9 ]', ''), ' ', '-')) = LOWER($${params.length + 1})
-           OR LOWER(dps.category) = LOWER(REPLACE(REPLACE(LOWER($${params.length + 1}), '-', ' '), '  ', ' '))
+           pc.slug = $${paramIdx}
+           OR LOWER(REPLACE(REPLACE(LOWER(dps.category), '[^a-z0-9 ]', ''), ' ', '-')) = LOWER($${paramIdx})
+           OR LOWER(dps.category) = LOWER(REPLACE(REPLACE(LOWER($${paramIdx}), '-', ' '), '  ', ' '))
          )
          ${cityClause}
        ORDER BY dll.business_name ASC`,
@@ -258,6 +280,8 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
       snapEbtSource: row.snap_ebt_source,
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
+      categorySlug: row.category_slug || decodedSlug,
+      iconEmoji: row.icon_emoji || null,
       claimToken: row.active_claim_token,
     }));
 

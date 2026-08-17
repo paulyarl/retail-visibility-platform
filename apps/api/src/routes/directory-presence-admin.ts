@@ -72,6 +72,8 @@ const updateFieldsSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   businessHours: z.any().optional(),
+  primaryCategory: z.string().nullable().optional(),
+  secondaryCategories: z.array(z.string()).optional(),
   provenanceUpdates: z.array(z.object({
     fieldKey: z.string(),
     value: z.string().optional(),
@@ -233,6 +235,8 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
         phone: data.phone,
         website: data.website,
         businessHours: data.businessHours,
+        primaryCategory: data.primaryCategory,
+        secondaryCategories: data.secondaryCategories,
       },
       data.provenanceUpdates?.map((p) => ({
         fieldKey: p.fieldKey,

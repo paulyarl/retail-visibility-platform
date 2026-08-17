@@ -434,6 +434,8 @@ class DirectoryPresenceSeedService {
       phone?: string;
       website?: string;
       businessHours?: any;
+      primaryCategory?: string;
+      secondaryCategories?: string[];
     },
     provenanceUpdates?: Array<{
       fieldKey: string;
@@ -485,12 +487,29 @@ class DirectoryPresenceSeedService {
       setClauses.push('business_hours = $' + (params.length + 1) + '::jsonb');
       params.push(JSON.stringify(fields.businessHours));
     }
+    if (fields.primaryCategory !== undefined) {
+      setClauses.push('primary_category = $' + (params.length + 1));
+      params.push(fields.primaryCategory || null);
+    }
+    if (fields.secondaryCategories !== undefined) {
+      setClauses.push('secondary_categories = $' + (params.length + 1) + '::text[]');
+      params.push(fields.secondaryCategories || []);
+    }
 
     params.push(listingId);
     await prisma.$executeRawUnsafe(
       `UPDATE directory_listings_list SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       ...params
     );
+
+    // If primary category changed, also update the seed's category column so
+    // the /place browse pages and seed list reflect the new category.
+    if (fields.primaryCategory !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds SET category = ${fields.primaryCategory || null}, updated_at = now()
+        WHERE id = ${seedId}
+      `;
+    }
 
     // Upsert provenance rows
     if (provenanceUpdates) {
