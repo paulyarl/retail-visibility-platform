@@ -300,6 +300,7 @@ import directoryPresenceAdminRoutes from '../routes/directory-presence-admin';
 import directoryPresencePublicRoutes from '../routes/directory-presence-public';
 import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade';
 import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-public';
+import growthEngineAdminRoutes from '../routes/growth-engine-admin';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
@@ -2027,6 +2028,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'admin',
     comment: 'Admin directory presence seed management (presence-seeds/* routes)',
+  },
+  {
+    path: '/api/admin/growth-engine',
+    router: growthEngineAdminRoutes,
+    domain: 'directory',
+    authLevel: 'admin',
+    comment: 'Admin growth engine analytics (funnel, niche, city, time series, recommendations)',
   },
   {
     path: '/api/public/directory',

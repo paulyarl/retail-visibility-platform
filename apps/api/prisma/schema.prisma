@@ -7427,6 +7427,28 @@ model directory_places_sitemap_log {
   @@index([generated_at(sort: Desc)], map: "idx_dpsl_generated_at")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model growth_engine_daily_metrics {
+  id               Int      @id @default(autoincrement())
+  metric_date      DateTime @db.Date
+  category         String   @default("__all__") @db.VarChar(100)
+  city             String   @default("__all__") @db.VarChar(100)
+  seeks_run        Int      @default(0)
+  prospects_queued Int      @default(0)
+  seeds_created    Int      @default(0)
+  seeds_published  Int      @default(0)
+  seeds_claimed    Int      @default(0)
+  seeds_upgraded   Int      @default(0)
+  directory_views  Int      @default(0)
+  claim_cta_clicks Int      @default(0)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([metric_date, category, city], map: "idx_gedm_date_cat_city")
+  @@index([category], map: "idx_gedm_category")
+  @@index([city], map: "idx_gedm_city")
+  @@index([metric_date], map: "idx_gedm_date")
+}
+
 enum action {
   create
   update
