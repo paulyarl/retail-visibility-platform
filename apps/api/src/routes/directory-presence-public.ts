@@ -347,4 +347,374 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
   }
 });
 
+// ====================
+// Search, city pages, map data, sitemap (Sprint 5)
+// ====================
+
+/** GET /api/public/directory/places/search — full-text search across presence listings */
+router.get('/places/search', async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || '').trim();
+    const category = req.query.category as string | undefined;
+    const city = req.query.city as string | undefined;
+    const snapEbt = req.query.snapEbt === 'true';
+    const sort = (req.query.sort as string) || 'name';
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const perPage = Math.min(48, Math.max(1, parseInt(req.query.perPage as string) || 24));
+    const offset = (page - 1) * perPage;
+
+    const pool = getDirectPool();
+
+    // Build query with optional full-text search
+    let whereClause = `WHERE dps.status = 'published' AND dll.is_published = true AND dll.listing_origin = 'directory_seed'`;
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (q) {
+      whereClause += ` AND (
+        to_tsvector('english', coalesce(dll.business_name,'') || ' ' || coalesce(dll.city,'') || ' ' || coalesce(dll.state,'') || ' ' || coalesce(dll.slug,'')) @@ plainto_tsquery('english', $${paramIdx})
+        OR dll.business_name ILIKE '%' || $${paramIdx} || '%'
+        OR similarity(dll.business_name, $${paramIdx}) > 0.3
+      )`;
+      params.push(q);
+      paramIdx++;
+    }
+    if (category) {
+      whereClause += ` AND LOWER(dps.category) = LOWER($${paramIdx})`;
+      params.push(category);
+      paramIdx++;
+    }
+    if (city) {
+      whereClause += ` AND LOWER(dps.city) = LOWER($${paramIdx})`;
+      params.push(city);
+      paramIdx++;
+    }
+    if (snapEbt) {
+      whereClause += ` AND dll.snap_ebt_reported = true`;
+    }
+
+    let orderBy = 'dll.business_name ASC';
+    if (sort === 'city') orderBy = 'dll.city ASC, dll.business_name ASC';
+    if (sort === 'recent') orderBy = 'dps.published_at DESC';
+    if (sort === 'snap') orderBy = 'dll.snap_ebt_reported DESC, dll.business_name ASC';
+
+    // Count total
+    const countQuery = `SELECT COUNT(*) as total
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dll ON dll.id = dps.listing_id
+      ${whereClause}`;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total) || 0;
+
+    // Fetch page
+    const dataQuery = `SELECT
+        dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
+        dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
+        dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
+        dll.public_disclaimer,
+        dps.category, dps.city as seed_city, dps.state as seed_state,
+        pc.slug AS category_slug, pc.icon_emoji
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dll ON dll.id = dps.listing_id
+      LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
+      ${whereClause}
+      ORDER BY ${orderBy}
+      LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    params.push(perPage, offset);
+
+    const result = await pool.query(dataQuery, params);
+
+    const places = result.rows.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug,
+      address: row.address,
+      city: row.city || row.seed_city,
+      state: row.state || row.seed_state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      logoUrl: row.logo_url,
+      description: row.description,
+      snapEbtReported: row.snap_ebt_reported,
+      snapEbtSource: row.snap_ebt_source,
+      publicDisclaimer: row.public_disclaimer,
+      category: row.category,
+      categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
+      iconEmoji: row.icon_emoji || null,
+    }));
+
+    res.json({
+      success: true,
+      query: q,
+      places,
+      count: places.length,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/places/search] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/places/city/:citySlug — all presence listings in a city, grouped by category */
+router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
+  try {
+    const { citySlug } = req.params;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const perPage = Math.min(48, Math.max(1, parseInt(req.query.perPage as string) || 24));
+    const offset = (page - 1) * perPage;
+    const sort = (req.query.sort as string) || 'name';
+
+    const pool = getDirectPool();
+    const decodedSlug = decodeURIComponent(citySlug);
+    const cityName = decodedSlug.replace(/-/g, ' ');
+
+    let orderBy = 'dll.business_name ASC';
+    if (sort === 'recent') orderBy = 'dps.published_at DESC';
+    if (sort === 'snap') orderBy = 'dll.snap_ebt_reported DESC, dll.business_name ASC';
+
+    // Count total
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as total
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       WHERE dps.status = 'published' AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'
+         AND LOWER(dps.city) = LOWER($1)`,
+      [cityName],
+    );
+    const total = parseInt(countResult.rows[0].total) || 0;
+
+    const result = await pool.query(
+      `SELECT
+         dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
+         dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
+         dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
+         dll.public_disclaimer,
+         dps.category, dps.city as seed_city, dps.state as seed_state,
+         pc.slug AS category_slug, pc.id AS category_id, pc.icon_emoji
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
+       WHERE dps.status = 'published' AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'
+         AND LOWER(dps.city) = LOWER($1)
+       ORDER BY ${orderBy}
+       LIMIT $2 OFFSET $3`,
+      [cityName, perPage, offset],
+    );
+
+    const places = result.rows.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug,
+      address: row.address,
+      city: row.city || row.seed_city,
+      state: row.state || row.seed_state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      logoUrl: row.logo_url,
+      description: row.description,
+      snapEbtReported: row.snap_ebt_reported,
+      snapEbtSource: row.snap_ebt_source,
+      publicDisclaimer: row.public_disclaimer,
+      category: row.category,
+      categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
+      iconEmoji: row.icon_emoji || null,
+    }));
+
+    // Group by category
+    const categoryMap: Record<string, { category: string; slug: string; iconEmoji: string | null; places: any[] }> = {};
+    for (const p of places) {
+      if (!categoryMap[p.category]) {
+        categoryMap[p.category] = { category: p.category, slug: p.categorySlug, iconEmoji: p.iconEmoji, places: [] };
+      }
+      categoryMap[p.category].places.push(p);
+    }
+
+    res.json({
+      success: true,
+      city: cityName,
+      citySlug: decodedSlug,
+      categories: Object.values(categoryMap),
+      places,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/places/city/:citySlug] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/places-map — lightweight geo data for map pins */
+router.get('/places-map', async (req: Request, res: Response) => {
+  try {
+    const category = req.query.category as string | undefined;
+    const city = req.query.city as string | undefined;
+    const pool = getDirectPool();
+
+    let whereClause = `WHERE dps.status = 'published' AND dll.is_published = true AND dll.listing_origin = 'directory_seed' AND dll.latitude IS NOT NULL AND dll.longitude IS NOT NULL`;
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (category) {
+      whereClause += ` AND LOWER(dps.category) = LOWER($${paramIdx})`;
+      params.push(category);
+      paramIdx++;
+    }
+    if (city) {
+      whereClause += ` AND LOWER(dps.city) = LOWER($${paramIdx})`;
+      params.push(city);
+      paramIdx++;
+    }
+
+    const result = await pool.query(
+      `SELECT
+         dll.id, dll.business_name, dll.slug, dll.latitude, dll.longitude,
+         dll.address, dll.city, dll.state, dll.snap_ebt_reported,
+         dps.category,
+         pc.slug AS category_slug
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
+       ${whereClause}
+       LIMIT 500`,
+      params,
+    );
+
+    const pins = result.rows.map((row: any) => ({
+      id: row.id,
+      businessName: row.business_name,
+      slug: row.slug,
+      lat: parseFloat(row.latitude),
+      lng: parseFloat(row.longitude),
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      snapEbt: row.snap_ebt_reported,
+      category: row.category,
+      categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
+    }));
+
+    res.json({ success: true, pins, count: pins.length });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/places-map] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/places-sitemap.xml — XML sitemap for all presence pages */
+router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
+  try {
+    const pool = getDirectPool();
+    const baseUrl = (req as any).protocol + '://' + req.get('host');
+
+    // Fetch all published presence listing slugs
+    const listingsResult = await pool.query(
+      `SELECT dll.slug, dll.updated_at
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       WHERE dps.status = 'published' AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'`,
+    );
+
+    // Fetch all categories with published listings
+    const categoriesResult = await pool.query(
+      `SELECT DISTINCT pc.slug AS category_slug
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
+       WHERE dps.status = 'published' AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed' AND pc.slug IS NOT NULL`,
+    );
+
+    // Fetch all cities with published listings
+    const citiesResult = await pool.query(
+      `SELECT DISTINCT LOWER(dps.city) AS city_slug
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       WHERE dps.status = 'published' AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'`,
+    );
+
+    const urls: string[] = [];
+
+    // Index page
+    urls.push(`  <url>
+    <loc>${baseUrl}/place</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>`);
+
+    // Category pages
+    for (const row of categoriesResult.rows) {
+      urls.push(`  <url>
+    <loc>${baseUrl}/place/category/${encodeURIComponent(row.category_slug)}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`);
+    }
+
+    // City pages
+    for (const row of citiesResult.rows) {
+      const citySlug = (row.city_slug as string).replace(/\s+/g, '-');
+      urls.push(`  <url>
+    <loc>${baseUrl}/place/city/${encodeURIComponent(citySlug)}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`);
+    }
+
+    // Individual listing pages
+    for (const row of listingsResult.rows) {
+      const lastmod = new Date(row.updated_at).toISOString().split('T')[0];
+      urls.push(`  <url>
+    <loc>${baseUrl}/place/${encodeURIComponent(row.slug)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`);
+    }
+
+    // Log sitemap generation
+    const totalUrls = 1 + categoriesResult.rows.length + citiesResult.rows.length + listingsResult.rows.length;
+    await pool.query(
+      'INSERT INTO directory_places_sitemap_log (generated_at, url_count) VALUES (now(), $1)',
+      [totalUrls],
+    );
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>`;
+
+    res.set('Content-Type', 'application/xml');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(xml);
+  } catch (error) {
+    logger.error('[GET /api/public/directory/places-sitemap.xml] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;

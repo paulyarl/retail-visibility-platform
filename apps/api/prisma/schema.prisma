@@ -1401,6 +1401,7 @@ model directory_listings_list {
 
   @@index([is_published], map: "idx_directory_listings_is_published")
   @@index([keywords], map: "idx_directory_listings_keywords", type: Gin)
+  @@index([business_name(ops: raw("gin_trgm_ops"))], map: "idx_dll_business_name_trgm", type: Gin)
 }
 
 model directory_mv_refresh_log {
@@ -6206,6 +6207,7 @@ model mkt_campaigns_list {
   intelligence_campaign_kind                                                      String?                              @default("discovery") @db.VarChar(20)
   business_origin_country                                                         String?                              @db.VarChar(100)
   business_origin_region                                                          String?                              @db.VarChar(100)
+  seek_batch_id                                                                   String?                              @db.VarChar(60)
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]
@@ -6215,6 +6217,7 @@ model mkt_campaigns_list {
   parent                                                                          mkt_campaigns_list?                  @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list", fields: [parent_campaign_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_parent")
   mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list                       mkt_campaigns_list[]                 @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list")
   tenants_mkt_campaigns_list_tenant_idTotenants                                   tenants?                             @relation("mkt_campaigns_list_tenant_idTotenants", fields: [tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_tenant")
+  mkt_seek_batches                                                                mkt_seek_batches?                    @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
   mkt_deliverable_preview_tokens                                                  mkt_deliverable_preview_tokens[]
   mkt_deliverable_review_slot                                                     mkt_deliverable_review_slot[]
   mkt_deliverable_section                                                         mkt_deliverable_section[]
@@ -6252,6 +6255,7 @@ model mkt_campaigns_list {
   @@index([campaign_category], map: "idx_mkt_campaigns_campaign_category")
   @@index([campaign_category, repair_track], map: "idx_mkt_campaigns_repair_track")
   @@index([customer_id], map: "idx_mkt_campaigns_customer")
+  @@index([seek_batch_id], map: "idx_mcl_seek_batch")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -7049,12 +7053,15 @@ model mkt_prospect_queue {
   discovery_signals                                                               Json?               @default("[]")
   business_seek_priority                                                          String?             @db.VarChar(20)
   intelligence_run_id                                                             String?             @db.VarChar(64)
+  seek_batch_id                                                                   String?             @db.VarChar(60)
   mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_campaigns_list? @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list", fields: [processed_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_processed_campaign")
   mkt_campaigns_list_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_campaigns_list? @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list", fields: [source_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_source_campaign")
+  mkt_seek_batches                                                                mkt_seek_batches?   @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
 
   @@index([assigned_to], map: "idx_mkt_prospect_queue_assigned")
   @@index([processed_campaign_id], map: "idx_mkt_prospect_queue_processed_campaign")
   @@index([status, priority(sort: Desc), signal_count(sort: Desc), created_at], map: "idx_mkt_prospect_queue_status_sort")
+  @@index([seek_batch_id], map: "idx_mpq_seek_batch")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -7333,9 +7340,11 @@ model directory_presence_seeds {
   owner_name                  String?                       @db.VarChar(255)
   owner_email                 String?                       @db.VarChar(255)
   owner_phone                 String?                       @db.VarChar(40)
+  seek_batch_id               String?                       @db.VarChar(60)
   directory_claim_tokens      directory_claim_tokens[]
   directory_enrichment_tokens directory_enrichment_tokens[]
   directory_field_provenance  directory_field_provenance[]
+  mkt_seek_batches            mkt_seek_batches?             @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
   directory_listings_list     directory_listings_list       @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
   tenants                     tenants                       @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
 
@@ -7343,6 +7352,7 @@ model directory_presence_seeds {
   @@index([city, state], map: "idx_dps_city_state")
   @@index([seed_batch], map: "idx_dps_seed_batch")
   @@index([status], map: "idx_dps_status")
+  @@index([seek_batch_id], map: "idx_dps_seek_batch")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -7383,6 +7393,38 @@ model directory_claim_otps {
 
   @@index([expires_at], map: "idx_dco_expires")
   @@index([token_id], map: "idx_dco_token")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_seek_batches {
+  id                       String                     @id @db.VarChar(60)
+  batch_slug               String                     @unique @db.VarChar(100)
+  profile_id               String?                    @db.VarChar(64)
+  profile_version          Int?
+  niche_category           String                     @db.VarChar(100)
+  cities                   String[]                   @default([])
+  campaign_ids             String[]                   @default([])
+  status                   String                     @default("draft") @db.VarChar(20)
+  created_by               String?                    @db.VarChar(255)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  completed_at             DateTime?                  @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds[]
+  mkt_campaigns_list       mkt_campaigns_list[]
+  mkt_prospect_queue       mkt_prospect_queue[]
+
+  @@index([profile_id], map: "idx_msb_profile")
+  @@index([batch_slug], map: "idx_msb_slug")
+  @@index([status], map: "idx_msb_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_places_sitemap_log {
+  id           Int      @id @default(autoincrement())
+  generated_at DateTime @default(now()) @db.Timestamptz(6)
+  url_count    Int
+  etag         String?  @db.VarChar(64)
+
+  @@index([generated_at(sort: Desc)], map: "idx_dpsl_generated_at")
 }
 
 enum action {

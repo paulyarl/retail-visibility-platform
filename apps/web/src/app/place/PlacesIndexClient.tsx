@@ -96,6 +96,18 @@ export default function PlacesIndexClient() {
             places near you. Is this your business? Claim your listing to verify and
             update details.
           </p>
+
+          {/* Search bar */}
+          <div className="mt-6 flex gap-2 max-w-xl">
+            <Link
+              href="/place/search"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-neutral-100 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors"
+            >
+              <MapPin className="w-4 h-4" />
+              Search places...
+            </Link>
+          </div>
+
           <div className="mt-4 flex items-center gap-4 text-sm text-neutral-500 dark:text-neutral-400">
             <span className="inline-flex items-center gap-1">
               <Store className="w-4 h-4" />
