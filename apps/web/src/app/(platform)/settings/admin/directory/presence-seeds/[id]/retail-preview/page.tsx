@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Sparkles, ExternalLink } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
-import { directoryPresenceAdminService } from '@/services/DirectoryPresenceAdminService';
+import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 
 interface RetailPreviewAdminPageProps {
   params: Promise<{ id: string }>;
@@ -44,7 +44,7 @@ export default function RetailPreviewAdminPage({ params }: RetailPreviewAdminPag
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const detail = await directoryPresenceAdminService.getSeedDetail(seedId);
+        const detail = await directoryPresenceAdminService.getSeed(seedId);
         if (detail) {
           setSeed(detail.seed);
           setListing(detail.listing);
