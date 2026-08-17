@@ -68,34 +68,6 @@ export default function PlaceEntryEditorialLayout({
 }: PlaceEntryEditorialLayoutProps) {
   useQrScanTracking(tenantId, 'directory');
 
-  // ── Verbose debug logging for sidebar conditional variables ──
-  console.log('[PlaceEntryEditorialLayout] DEBUG', {
-    tenantId,
-    listingSlug: listing?.slug,
-    hasListing: !!listing,
-    hasBusinessHours: !!businessHours,
-    businessHoursValue: businessHours,
-    hoursStatus,
-    hasTenantInfo: !!tenantInfo,
-    optFlags,
-    showsHours,
-    showsMap,
-    showsLocation,
-    isRetailStore,
-    fullAddress,
-    listingAddress: listing?.address,
-    listingPhone: listing?.phone,
-    listingEmail: listing?.email,
-    // Evaluate each sidebar gate condition
-    contactGate: optFlags?.showContact !== false,
-    contactGateReason: optFlags ? `optFlags.showContact=${optFlags.showContact}` : 'optFlags is null',
-    hoursGate: showsHours && optFlags?.showHoursStatus !== false && !!businessHours,
-    hoursGateReason: `showsHours=${showsHours}, optFlags?.showHoursStatus=${optFlags?.showHoursStatus}, hasBusinessHours=${!!businessHours}`,
-    mapGate: showsMap && optFlags?.showInteractiveMaps !== false && !!listing?.address,
-    mapGateReason: `showsMap=${showsMap}, optFlags?.showInteractiveMaps=${optFlags?.showInteractiveMaps}, hasAddress=${!!listing?.address}`,
-    heroBadgeGate: showsHours && optFlags?.showHoursStatus !== false,
-  });
-
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
   const claimHref = claimToken ? `/directory/claim/${claimToken}` : '/directory';
   const disclaimer = publicDisclaimer ||
@@ -146,8 +118,8 @@ export default function PlaceEntryEditorialLayout({
                 >
                   <Info className="w-5 h-5" /> Claim this listing
                 </Link>
-                {showsHours && optFlags?.showHoursStatus !== false && (
-                  <HoursStatusBadge status={hoursStatus} size="lg" animate={optFlags?.showAnimatedHours !== false} />
+                {showsHours && hoursStatus && (
+                  <HoursStatusBadge status={hoursStatus} size="lg" animate={true} />
                 )}
               </div>
             </div>
@@ -181,20 +153,18 @@ export default function PlaceEntryEditorialLayout({
             {/* Sidebar — NAP+ data (always shown for seeds; NAP+hours are public information) */}
             <div className="lg:col-span-4 space-y-8">
               {/* Contact Card */}
-              {optFlags?.showContact !== false && (
-                <div className="bg-neutral-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
-                  <ContactInformationCollapsible
-                    tenant={listing}
-                    fullAddress={showsLocation ? fullAddress : ''}
-                    initialExpanded={true}
-                    isRetailStore={true}
-                  />
-                </div>
-              )}
+              <div className="bg-neutral-50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
+                <ContactInformationCollapsible
+                  tenant={listing}
+                  fullAddress={showsLocation ? fullAddress : ''}
+                  initialExpanded={true}
+                  isRetailStore={true}
+                />
+              </div>
 
               {/* Hours */}
-              {showsHours && optFlags?.showHoursStatus !== false && businessHours && (
+              {showsHours && businessHours && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
                   <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
@@ -202,7 +172,7 @@ export default function PlaceEntryEditorialLayout({
               )}
 
               {/* Map */}
-              {showsMap && optFlags?.showInteractiveMaps !== false && listing.address && (
+              {showsMap && listing.address && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
                   <GoogleMapEmbed address={listing.address} />
@@ -219,7 +189,7 @@ export default function PlaceEntryEditorialLayout({
                   size={160}
                   showDownload={true}
                   pageType="directory"
-                  capabilityFlags={optFlags}
+                  capabilityFlags={null}
                 />
               </div>
             </div>
@@ -227,7 +197,7 @@ export default function PlaceEntryEditorialLayout({
         </div>
 
         <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Places" />
-        {optFlags?.showRecentlyViewed !== false && <LastViewed />}
+        <LastViewed />
         <PoweredByFooter />
       </div>
     </>

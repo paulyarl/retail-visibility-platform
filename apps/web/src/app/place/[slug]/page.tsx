@@ -153,35 +153,13 @@ export default function PlacePage({ params }: PlacePageProps) {
     listing.zipCode,
   ].filter(Boolean).join(', ');
 
-  const showsHours = optFlags?.showHoursDisplay ?? true;
-  const showsMap = optFlags?.showMapDisplay ?? true;
-  const showsLocation = optFlags?.showLocationDisplay ?? true;
-
-  // ── Verbose debug logging ──
-  console.log('[PlacePage] DEBUG — values passed to layout', {
-    tenantId,
-    listingSlug: listing.slug,
-    listingOrigin: listing.listingOrigin,
-    listingAddress: listing.address,
-    listingPhone: listing.phone,
-    listingEmail: listing.email,
-    hasBusinessHours: !!businessHours,
-    businessHoursValue: businessHours,
-    hoursStatus,
-    hasTenantInfo: !!tenantInfo,
-    tenantInfoValue: tenantInfo,
-    optFlags,
-    optFlagsIsNull: optFlags === null,
-    showsHours,
-    showsMap,
-    showsLocation,
-    isRetailStore,
-    storefrontCapData: storefrontCap.data,
-    fullAddress,
-    slugForRelated,
-    claimToken: listing.activeClaimToken,
-    publicDisclaimer: listing.publicDisclaimer,
-  });
+  // For directory presence seeds, NAP+hours+map are public information by
+  // definition. The storefront merchant preferences (optFlags) don't apply to
+  // unclaimed seed listings — they default to false and suppress all sidebar
+  // sections. Override to always show NAP+hours+map when the data exists.
+  const showsHours = true;
+  const showsMap = true;
+  const showsLocation = true;
 
   return (
     <PlaceEntryEditorialLayout
