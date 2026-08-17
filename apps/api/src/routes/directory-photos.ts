@@ -24,23 +24,40 @@ const supabase = createClient(
 
 const r = Router();
 
-// Helper function to resolve listing identifier (tenant ID or slug) to tenant record
+// Helper function to resolve listing identifier (tenant ID, listing ID, or slug) to tenant record
 async function resolveListing(identifier: string) {
-  // Check if identifier is a tenant ID (starts with 'tid-') or slug
-  const isTenantId = identifier.startsWith('tid-');
-
-  let whereCondition;
-  if (isTenantId) {
-    whereCondition = { id: identifier };
-  } else {
-    whereCondition = { slug: identifier };
+  // Check if identifier is a tenant ID (starts with 'tid-')
+  if (identifier.startsWith('tid-')) {
+    return prisma.tenants.findUnique({ where: { id: identifier } });
   }
 
- // console.log(`[resolveListing] Looking for tenant ID: "${identifier}"`);
-  const listing = await prisma.tenants.findUnique({ where: whereCondition });
-//  console.log(`[resolveListing] Found tenant:`, listing ? { id: listing.id, slug: listing.slug, name: listing.name } : 'NOT FOUND');
+  // Check if identifier is a directory listing ID (starts with 'dll-')
+  if (identifier.startsWith('dll-')) {
+    const dirListing = await prisma.directory_listings_list.findUnique({
+      where: { id: identifier },
+      select: { tenant_id: true },
+    });
+    if (dirListing) {
+      return prisma.tenants.findUnique({ where: { id: dirListing.tenant_id } });
+    }
+    return null;
+  }
 
-  return listing;
+  // Fall back to slug lookup on tenants table
+  const tenant = await prisma.tenants.findFirst({ where: { slug: identifier } });
+  if (tenant) return tenant;
+
+  // Final fallback: check directory_listings_list.slug (seed tenants have
+  // tenants.slug = null; the slug lives on the directory listing row)
+  const dirListing = await prisma.directory_listings_list.findFirst({
+    where: { slug: identifier },
+    select: { tenant_id: true },
+  });
+  if (dirListing) {
+    return prisma.tenants.findUnique({ where: { id: dirListing.tenant_id } });
+  }
+
+  return null;
 }
 
 r.post("/:listingId/photos", upload.single("file"), async (req, res) => {

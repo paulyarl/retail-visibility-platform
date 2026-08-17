@@ -117,6 +117,7 @@ router.get('/search', async (req, res) => {
         dll.is_featured as "isFeatured",
         dll.subscription_tier as "subscriptionTier",
         dll.use_custom_website as "useCustomWebsite",
+        dll.listing_origin as "listingOrigin",
         COALESCE(mec.is_enabled, false) as "canUseExternalLink"
     `;
 

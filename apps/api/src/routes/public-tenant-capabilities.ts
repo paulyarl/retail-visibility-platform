@@ -32,12 +32,28 @@ export async function resolveTenantIdentifier(identifier: string): Promise<{ id:
   });
   if (byId) return byId;
 
-  // Fall back to slug lookup
+  // Fall back to slug lookup on tenants table
   const tenant = await prisma.tenants.findFirst({
     where: { slug: identifier },
     select: { id: true, slug: true },
   });
-  return tenant;
+  if (tenant) return tenant;
+
+  // Final fallback: check directory_listings_list.slug (seed tenants have
+  // tenants.slug = null; the slug lives on the directory listing row)
+  const dirListing = await prisma.directory_listings_list.findFirst({
+    where: { slug: identifier },
+    select: { tenant_id: true, slug: true },
+  });
+  if (dirListing) {
+    const seedTenant = await prisma.tenants.findUnique({
+      where: { id: dirListing.tenant_id },
+      select: { id: true, slug: true },
+    });
+    if (seedTenant) return seedTenant;
+  }
+
+  return null;
 }
 
 /**

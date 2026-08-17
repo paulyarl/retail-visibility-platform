@@ -260,6 +260,42 @@ export class UniversalIdentifierCache extends UniversalSingleton {
         };
       }
 
+      // Final fallback: check directory_listings_list.slug (seed tenants have
+      // tenants.slug = null; the slug lives on the directory listing row)
+      const dirListing = await prisma.directory_listings_list.findFirst({
+        where: { slug: identifier },
+        select: { tenant_id: true },
+      });
+      if (dirListing) {
+        const seedTenant = await prisma.tenants.findUnique({
+          where: { id: dirListing.tenant_id },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            subscription_status: true,
+            subscription_tier: true,
+            trial_ends_at: true,
+            location_status: true,
+            metadata: true
+          }
+        });
+        if (seedTenant) {
+          return {
+            id: seedTenant.id,
+            slug: seedTenant.slug,
+            name: seedTenant.name,
+            subscriptionStatus: seedTenant.subscription_status || 'unknown',
+            subscriptionTier: seedTenant.subscription_tier,
+            trialEndsAt: seedTenant.trial_ends_at?.toISOString() || null,
+            locationStatus: seedTenant.location_status,
+            statusInfo: seedTenant.location_status ? getLocationStatusInfo(seedTenant.location_status as any) : undefined,
+            metadata: seedTenant.metadata,
+            type: 'slug' as const
+          };
+        }
+      }
+
       console.log(`[Cache DB LOOKUP] Not found: ${identifier}`);
       return null;
     } catch (error) {
