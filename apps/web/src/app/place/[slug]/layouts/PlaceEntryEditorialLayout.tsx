@@ -118,7 +118,7 @@ export default function PlaceEntryEditorialLayout({
                 >
                   <Info className="w-5 h-5" /> Claim this listing
                 </Link>
-                {showsHours && optFlags?.showHoursStatus !== false && isRetailStore && (
+                {showsHours && optFlags?.showHoursStatus !== false && (
                   <HoursStatusBadge status={hoursStatus} size="lg" animate={optFlags?.showAnimatedHours !== false} />
                 )}
               </div>
@@ -150,7 +150,7 @@ export default function PlaceEntryEditorialLayout({
               </section>
             </div>
 
-            {/* Sidebar — NAP+ data */}
+            {/* Sidebar — NAP+ data (always shown for seeds; NAP+hours are public information) */}
             <div className="lg:col-span-4 space-y-8">
               {/* Contact Card */}
               {optFlags?.showContact !== false && (
@@ -160,21 +160,21 @@ export default function PlaceEntryEditorialLayout({
                     tenant={listing}
                     fullAddress={showsLocation ? fullAddress : ''}
                     initialExpanded={true}
-                    isRetailStore={isRetailStore}
+                    isRetailStore={true}
                   />
                 </div>
               )}
 
               {/* Hours */}
-              {showsHours && optFlags?.showHoursStatus !== false && businessHours && isRetailStore && (
+              {showsHours && optFlags?.showHoursStatus !== false && businessHours && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
-                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={isRetailStore} />
+                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
                 </div>
               )}
 
               {/* Map */}
-              {showsMap && optFlags?.showInteractiveMaps !== false && listing.address && isRetailStore && (
+              {showsMap && optFlags?.showInteractiveMaps !== false && listing.address && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
                   <GoogleMapEmbed address={listing.address} />
