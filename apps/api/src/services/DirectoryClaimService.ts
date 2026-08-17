@@ -16,6 +16,8 @@ import { audit } from '../audit';
 import { generateUserId, generateUserTenantId, generateTenantKey } from '../lib/id-generator';
 import { authService } from '../auth/auth.service';
 import { user_role } from '@prisma/client';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 /** Audit context for claim operations */
 interface ClaimAuditCtx {
@@ -53,6 +55,13 @@ export interface ClaimResult {
   requiresPasswordSetup?: boolean;
   /** The platform user ID that was created or linked */
   platformUserId?: string;
+}
+
+export interface InitiateClaimResult {
+  verificationRequired: boolean;
+  sentTo?: string;
+  operatorApprovalRequired?: boolean;
+  error?: string;
 }
 
 class DirectoryClaimService {
@@ -108,6 +117,155 @@ class DirectoryClaimService {
   }
 
   /**
+   * Initiate a claim. If the token is bound to an email/phone and
+   * verification_required is true, an OTP is generated and sent.
+   * If the token is unbound and operator_approval_required is true,
+   * the claim will be held for operator manual approval.
+   *
+   * Returns verification requirements so the frontend can show the
+   * appropriate UI (OTP entry or pending approval message).
+   */
+  async initiateClaim(
+    token: string,
+    ctx?: ClaimAuditCtx,
+  ): Promise<InitiateClaimResult> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        dct.id AS token_id,
+        dct.bound_email,
+        dct.bound_phone,
+        dct.verification_required,
+        dct.operator_approval_required,
+        dct.expires_at,
+        dct.consumed_at,
+        dct.single_use,
+        dps.status AS seed_status,
+        dps.id AS seed_id,
+        dps.tenant_id
+      FROM directory_claim_tokens dct
+      JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
+      WHERE dct.token = ${token}
+      LIMIT 1
+    `;
+
+    if (!rows[0]) {
+      return { verificationRequired: false, error: 'invalid_token' };
+    }
+
+    const r = rows[0];
+    const now = new Date();
+    const expiresAt = new Date(r.expires_at);
+
+    if (r.consumed_at && r.single_use) {
+      return { verificationRequired: false, error: 'already_claimed' };
+    }
+    if (now > expiresAt) {
+      return { verificationRequired: false, error: 'token_expired' };
+    }
+    if (r.seed_status === 'claimed') {
+      return { verificationRequired: false, error: 'already_claimed' };
+    }
+
+    // If verification required, generate + send OTP
+    if (r.verification_required && (r.bound_email || r.bound_phone)) {
+      const otpCode = crypto.randomInt(100000, 999999).toString();
+      const codeHash = await bcrypt.hash(otpCode, 10);
+      const otpId = `dco-${generateTenantKey(r.tenant_id)}-${crypto.randomBytes(6).toString('hex')}`;
+      const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Invalidate any previous active OTPs for this token
+      await prisma.$executeRaw`
+        UPDATE directory_claim_otps
+        SET consumed_at = now()
+        WHERE token_id = ${r.token_id} AND consumed_at IS NULL
+      `;
+
+      // Insert new OTP
+      const deliveryMethod = r.bound_email ? 'email' : 'sms';
+      const deliveryTarget = r.bound_email || r.bound_phone;
+
+      await prisma.$executeRaw`
+        INSERT INTO directory_claim_otps (
+          id, token_id, code_hash, delivery_method, delivery_target,
+          expires_at, consumed_at, attempts, created_at
+        ) VALUES (
+          ${otpId},
+          ${r.token_id},
+          ${codeHash},
+          ${deliveryMethod},
+          ${deliveryTarget},
+          ${otpExpiresAt},
+          NULL,
+          0,
+          now()
+        )
+      `;
+
+      // Send OTP via email (SMS not yet integrated — log for now)
+      if (deliveryMethod === 'email') {
+        try {
+          const { emailService } = await import('../services/email-service.js');
+          await emailService.sendEmail({
+            to: deliveryTarget,
+            subject: 'Your Directory Claim Verification Code',
+            text: `Your verification code is: ${otpCode}. It expires in 10 minutes.`,
+            html: `<p>Your verification code is: <strong>${otpCode}</strong></p><p>It expires in 10 minutes.</p>`,
+          } as any);
+        } catch (err) {
+          logger.error('DirectoryClaimService.initiateClaim — email send failed', undefined, {
+            error: (err as Error).message,
+          });
+          // Don't fail the initiation — the OTP is stored, operator can resend
+        }
+      } else {
+        // SMS not yet integrated — log the code for development
+        logger.info('DirectoryClaimService.initiateClaim — SMS OTP (not yet integrated)', undefined, {
+          seedId: r.seed_id,
+          deliveryTarget: this.maskTarget(deliveryTarget),
+        });
+      }
+
+      audit({
+        actor: ctx?.actorId,
+        actorType: ctx?.actorType,
+        action: 'directory_claim.initiate_otp',
+        payload: { seedId: r.seed_id, tenantId: r.tenant_id, tokenId: r.token_id, deliveryMethod },
+      });
+
+      return {
+        verificationRequired: true,
+        sentTo: this.maskTarget(deliveryTarget),
+      };
+    }
+
+    // No verification required — check if operator approval is needed
+    if (r.operator_approval_required) {
+      return {
+        verificationRequired: false,
+        operatorApprovalRequired: true,
+      };
+    }
+
+    // No verification, no approval — direct claim
+    return { verificationRequired: false };
+  }
+
+  /**
+   * Mask an email or phone for display in API responses.
+   * Email: j***@gmail.com
+   * Phone: ***-***-1234
+   */
+  private maskTarget(target: string): string {
+    if (target.includes('@')) {
+      const [local, domain] = target.split('@');
+      return `${local[0]}***@${domain}`;
+    }
+    // Phone — show last 4 digits
+    const digits = target.replace(/\D/g, '');
+    return `***-***-${digits.slice(-4)}`;
+  }
+
+  /**
    * Accept a claim token. Binds the claiming user to the tenant.
    * Converts org_standing_mode from 'directory_seed' to 'independent'.
    *
@@ -129,7 +287,8 @@ class DirectoryClaimService {
     token: string,
     userId: string,
     isCustomer: boolean,
-    ctx?: ClaimAuditCtx
+    ctx?: ClaimAuditCtx,
+    otpCode?: string,
   ): Promise<ClaimResult> {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
@@ -139,6 +298,10 @@ class DirectoryClaimService {
         dct.expires_at,
         dct.consumed_at,
         dct.single_use,
+        dct.verification_required,
+        dct.operator_approval_required,
+        dct.bound_email,
+        dct.bound_phone,
         dps.status AS seed_status
       FROM directory_claim_tokens dct
       JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
@@ -164,6 +327,74 @@ class DirectoryClaimService {
 
     if (r.seed_status === 'claimed') {
       return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'already_claimed' };
+    }
+
+    // OTP verification (if verification_required)
+    if (r.verification_required && (r.bound_email || r.bound_phone)) {
+      if (!otpCode) {
+        return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'otp_required' };
+      }
+
+      // Load the active OTP for this token
+      const otpRows = await prisma.$queryRaw<any[]>`
+        SELECT id, code_hash, expires_at, consumed_at, attempts
+        FROM directory_claim_otps
+        WHERE token_id = ${r.token_id} AND consumed_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+
+      if (!otpRows[0]) {
+        return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'otp_not_found' };
+      }
+
+      const otp = otpRows[0];
+      const otpExpiresAt = new Date(otp.expires_at);
+
+      if (now > otpExpiresAt) {
+        return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'otp_expired' };
+      }
+
+      if (otp.attempts >= 3) {
+        // Invalidate the OTP
+        await prisma.$executeRaw`
+          UPDATE directory_claim_otps SET consumed_at = now() WHERE id = ${otp.id}
+        `;
+        return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'otp_max_attempts' };
+      }
+
+      const codeMatches = await bcrypt.compare(otpCode, otp.code_hash);
+      if (!codeMatches) {
+        // Increment attempts
+        await prisma.$executeRaw`
+          UPDATE directory_claim_otps SET attempts = attempts + 1 WHERE id = ${otp.id}
+        `;
+        const remaining = 3 - (otp.attempts + 1);
+        return {
+          success: false,
+          tenantId: r.tenant_id,
+          seedId: r.seed_id,
+          message: remaining > 0 ? 'invalid_otp' : 'otp_max_attempts',
+        };
+      }
+
+      // OTP valid — consume it
+      await prisma.$executeRaw`
+        UPDATE directory_claim_otps SET consumed_at = now() WHERE id = ${otp.id}
+      `;
+    }
+
+    // Operator approval required (unbound token)
+    if (r.operator_approval_required && !r.verification_required) {
+      // Create a pending claim record — the operator will approve/reject
+      // For now, we return a pending state. The actual approval flow
+      // will be handled by admin endpoints.
+      return {
+        success: false,
+        tenantId: r.tenant_id,
+        seedId: r.seed_id,
+        message: 'pending_operator_approval',
+      };
     }
 
     // Consume the token

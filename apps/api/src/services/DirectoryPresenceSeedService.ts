@@ -415,7 +415,7 @@ class DirectoryPresenceSeedService {
    */
   async inviteSeed(seedId: string, expiresInDays: number = 90, ctx?: SeedAuditCtx): Promise<{ token: string; expiresAt: Date }> {
     const seed = await prisma.$queryRaw<any[]>`
-      SELECT tenant_id, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      SELECT tenant_id, status, owner_email, owner_phone FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
     if (!seed[0]) throw new Error('seed_not_found');
     if (seed[0].status === 'claimed') throw new Error('seed_already_claimed');
@@ -425,9 +425,16 @@ class DirectoryPresenceSeedService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+    // Bind token to owner contact info if available (Sprint 3 verification)
+    const boundEmail = seed[0].owner_email || null;
+    const boundPhone = seed[0].owner_phone || null;
+    const verificationRequired = !!(boundEmail || boundPhone);
+    const operatorApprovalRequired = !verificationRequired;
+
     await prisma.$executeRaw`
       INSERT INTO directory_claim_tokens (
-        id, seed_id, tenant_id, token, expires_at, single_use, created_at
+        id, seed_id, tenant_id, token, expires_at, single_use, created_at,
+        bound_email, bound_phone, verification_required, operator_approval_required
       ) VALUES (
         ${tokenId},
         ${seedId},
@@ -435,7 +442,11 @@ class DirectoryPresenceSeedService {
         ${token},
         ${expiresAt},
         true,
-        now()
+        now(),
+        ${boundEmail},
+        ${boundPhone},
+        ${verificationRequired},
+        ${operatorApprovalRequired}
       )
     `;
 
@@ -448,9 +459,9 @@ class DirectoryPresenceSeedService {
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'directory_presence_seed.invite',
-      payload: { seedId, tenantId: seed[0].tenant_id, tokenId },
+      payload: { seedId, tenantId: seed[0].tenant_id, tokenId, verificationRequired, operatorApprovalRequired },
     });
-    logger.info('DirectoryPresenceSeedService.inviteSeed', undefined, { seedId, tokenId });
+    logger.info('DirectoryPresenceSeedService.inviteSeed', undefined, { seedId, tokenId, verificationRequired });
 
     return { token, expiresAt };
   }
@@ -751,6 +762,10 @@ class DirectoryPresenceSeedService {
     city: string;
     state: string;
     isExpired: boolean;
+    verificationRequired: boolean;
+    submissionReviewRequired: boolean;
+    boundEmail: string | null;
+    boundPhone: string | null;
   } | null> {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
@@ -759,6 +774,10 @@ class DirectoryPresenceSeedService {
         det.tenant_id,
         det.expires_at,
         det.consumed_at,
+        det.verification_required,
+        det.submission_review_required,
+        det.bound_email,
+        det.bound_phone,
         dps.category,
         dps.city,
         dps.state,
@@ -783,6 +802,10 @@ class DirectoryPresenceSeedService {
       city: r.city,
       state: r.state,
       isExpired: now > expiresAt,
+      verificationRequired: !!r.verification_required,
+      submissionReviewRequired: !!r.submission_review_required,
+      boundEmail: r.bound_email || null,
+      boundPhone: r.bound_phone || null,
     };
   }
 
@@ -811,6 +834,7 @@ class DirectoryPresenceSeedService {
       'verified_by_call',
       'verified_by_email',
       'enrichment_sent',
+      'enrichment_pending_review',
       'enriched',
     ];
     if (!validStatuses.includes(input.status)) {

@@ -7264,17 +7264,22 @@ model mkt_intelligence_runs {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_claim_tokens {
-  id                       String                   @id @db.VarChar(60)
-  seed_id                  String                   @db.VarChar(60)
-  tenant_id                String                   @db.VarChar(255)
-  token                    String                   @unique(map: "uq_dct_token") @db.VarChar(255)
-  expires_at               DateTime                 @db.Timestamptz(6)
-  consumed_at              DateTime?                @db.Timestamptz(6)
-  consumed_by              String?                  @db.VarChar(255)
-  single_use               Boolean                  @default(true)
-  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
-  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_seed")
-  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_tenant")
+  id                         String                   @id @db.VarChar(60)
+  seed_id                    String                   @db.VarChar(60)
+  tenant_id                  String                   @db.VarChar(255)
+  token                      String                   @unique(map: "uq_dct_token") @db.VarChar(255)
+  expires_at                 DateTime                 @db.Timestamptz(6)
+  consumed_at                DateTime?                @db.Timestamptz(6)
+  consumed_by                String?                  @db.VarChar(255)
+  single_use                 Boolean                  @default(true)
+  created_at                 DateTime                 @default(now()) @db.Timestamptz(6)
+  bound_email                String?                  @db.VarChar(255)
+  bound_phone                String?                  @db.VarChar(40)
+  verification_required      Boolean                  @default(true)
+  operator_approval_required Boolean                  @default(false)
+  directory_claim_otps       directory_claim_otps[]
+  directory_presence_seeds   directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_seed")
+  tenants                    tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_tenant")
 
   @@index([expires_at], map: "idx_dct_expires")
   @@index([seed_id], map: "idx_dct_seed")
@@ -7342,21 +7347,42 @@ model directory_presence_seeds {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_enrichment_tokens {
-  id                       String                   @id @db.VarChar(60)
-  seed_id                  String                   @db.VarChar(60)
-  tenant_id                String                   @db.VarChar(255)
-  token                    String                   @unique @db.VarChar(255)
-  expires_at               DateTime                 @db.Timestamptz(6)
-  consumed_at              DateTime?                @db.Timestamptz(6)
-  single_use               Boolean                  @default(false)
-  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
-  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                         String                   @id @db.VarChar(60)
+  seed_id                    String                   @db.VarChar(60)
+  tenant_id                  String                   @db.VarChar(255)
+  token                      String                   @unique @db.VarChar(255)
+  expires_at                 DateTime                 @db.Timestamptz(6)
+  consumed_at                DateTime?                @db.Timestamptz(6)
+  single_use                 Boolean                  @default(false)
+  created_at                 DateTime                 @default(now()) @db.Timestamptz(6)
+  bound_email                String?                  @db.VarChar(255)
+  bound_phone                String?                  @db.VarChar(40)
+  verification_required      Boolean                  @default(false)
+  submission_review_required Boolean                  @default(true)
+  directory_presence_seeds   directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants                    tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([expires_at], map: "idx_det_expires")
   @@index([seed_id], map: "idx_det_seed")
   @@index([tenant_id], map: "idx_det_tenant")
   @@index([token], map: "idx_det_token")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_claim_otps {
+  id                     String                 @id @db.VarChar(60)
+  token_id               String                 @db.VarChar(60)
+  code_hash              String                 @db.VarChar(255)
+  delivery_method        String                 @db.VarChar(10)
+  delivery_target        String                 @db.VarChar(255)
+  expires_at             DateTime               @db.Timestamptz(6)
+  consumed_at            DateTime?              @db.Timestamptz(6)
+  attempts               Int                    @default(0)
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  directory_claim_tokens directory_claim_tokens @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expires_at], map: "idx_dco_expires")
+  @@index([token_id], map: "idx_dco_token")
 }
 
 enum action {

@@ -104,7 +104,65 @@ router.post('/enrich/:token/submit', async (req: Request, res: Response) => {
     const validated = parseResult.data as any;
     const evidencePayload = validated.evidencePayload || {};
 
-    // Run write-behind adapters
+    const ownerName = evidencePayload.owner_name || null;
+    const ownerEmail = validated.ownerEmail || null;
+    const ownerPhone = validated.ownerPhone || null;
+
+    // If submission_review_required is true, hold the submission for operator review
+    if (tokenContext.submissionReviewRequired) {
+      // Store the evidence payload on the seed's outreach_notes for operator review
+      // (lightweight — no separate review table for now)
+      const reviewPayload = JSON.stringify({
+        evidencePayload,
+        ownerEmail,
+        ownerPhone,
+        submittedAt: new Date().toISOString(),
+      });
+
+      await DirectoryPresenceSeedService.updateOutreachStatus(
+        tokenContext.seedId,
+        {
+          status: 'enrichment_pending_review',
+          notes: reviewPayload,
+          ownerName,
+          ownerEmail,
+          ownerPhone,
+        },
+      );
+
+      // Mark token consumed
+      await prisma.$executeRaw`
+        UPDATE directory_enrichment_tokens
+        SET consumed_at = now()
+        WHERE token = ${token} AND consumed_at IS NULL
+      `;
+
+      audit({
+        actorType: 'customer',
+        action: 'directory_enrichment.submit_pending_review',
+        payload: {
+          seedId: tokenContext.seedId,
+          tenantId: tokenContext.tenantId,
+          fields: Object.keys(evidencePayload),
+        },
+      });
+
+      logger.info('Directory enrichment submitted (pending review)', undefined, {
+        seedId: tokenContext.seedId,
+        tenantId: tokenContext.tenantId,
+      });
+
+      return res.json({
+        success: true,
+        status: 'pending_review',
+        seedId: tokenContext.seedId,
+        tenantId: tokenContext.tenantId,
+        businessName: tokenContext.businessName,
+        slug: tokenContext.slug,
+      });
+    }
+
+    // No review required — run write-behind adapters immediately
     await executeFieldMappings(
       definition.field_mappings,
       evidencePayload,
@@ -116,10 +174,6 @@ router.post('/enrich/:token/submit', async (req: Request, res: Response) => {
     );
 
     // Update seed: outreach_status = 'enriched', owner info if provided
-    const ownerName = evidencePayload.owner_name || null;
-    const ownerEmail = validated.ownerEmail || null;
-    const ownerPhone = validated.ownerPhone || null;
-
     await DirectoryPresenceSeedService.updateOutreachStatus(
       tokenContext.seedId,
       {
@@ -154,6 +208,7 @@ router.post('/enrich/:token/submit', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
+      status: 'enriched',
       seedId: tokenContext.seedId,
       tenantId: tokenContext.tenantId,
       businessName: tokenContext.businessName,

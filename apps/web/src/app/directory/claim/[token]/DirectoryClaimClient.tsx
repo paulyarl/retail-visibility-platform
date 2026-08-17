@@ -17,6 +17,8 @@ import {
   Loader,
   Badge,
   Divider,
+  TextInput,
+  PinInput,
 } from '@mantine/core';
 import {
   IconCheck,
@@ -26,6 +28,7 @@ import {
   IconClock,
   IconArrowLeft,
   IconShoppingCart,
+  IconShieldCheck,
 } from '@tabler/icons-react';
 import directoryClaimPublicService, {
   DirectoryClaimSummary,
@@ -33,7 +36,7 @@ import directoryClaimPublicService, {
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'success';
+type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'success' | 'otp_sent' | 'pending_approval';
 
 export default function DirectoryClaimClient() {
   const params = useParams();
@@ -44,7 +47,10 @@ export default function DirectoryClaimClient() {
   const [state, setState] = useState<PageState>('loading');
   const [summary, setSummary] = useState<DirectoryClaimSummary | null>(null);
   const [accepting, setAccepting] = useState(false);
+  const [initiating, setInitiating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [claimResult, setClaimResult] = useState<{
     tenantId?: string;
     requiresPasswordSetup?: boolean;
@@ -79,19 +85,37 @@ export default function DirectoryClaimClient() {
     loadSummary();
   }, [loadSummary]);
 
-  const handleAccept = async () => {
+  const handleInitiate = async () => {
+    setInitiating(true);
+    setError(null);
+    try {
+      const result = await directoryClaimPublicService.initiateClaim(token);
+      if (result.error) {
+        setError(result.error);
+      } else if (result.verificationRequired) {
+        setSentTo(result.sentTo || null);
+        setState('otp_sent');
+      } else if (result.operatorApprovalRequired) {
+        setState('pending_approval');
+      } else {
+        // No verification required — proceed directly to accept
+        await handleAccept();
+      }
+    } catch (err: any) {
+      setError(err?.message || 'initiate_failed');
+    } finally {
+      setInitiating(false);
+    }
+  };
+
+  const handleAccept = async (code?: string) => {
     setAccepting(true);
     setError(null);
     try {
-      const result = await directoryClaimPublicService.acceptClaim(token);
+      const result = await directoryClaimPublicService.acceptClaim(token, code);
       if (result.success) {
         await refreshCustomer();
 
-        // Store platform tokens if the customer was promoted to a platform user.
-        // The platform auth uses Auth0 cookies, so these tokens are stored for
-        // potential future use (e.g., a bridge endpoint). The primary flow is
-        // to redirect to Auth0 login, which will recognize the new platform
-        // user by email.
         if (result.userTokens) {
           if (typeof window !== 'undefined') {
             localStorage.setItem('platform_access_token', result.userTokens.accessToken);
@@ -99,16 +123,47 @@ export default function DirectoryClaimClient() {
           }
         }
 
-        // Stash the claim result for the success state
         setClaimResult(result);
         setState('success');
       } else {
         setError(result.error || 'claim_failed');
+        if (result.error === 'otp_max_attempts') {
+          // Reset to valid state so user can re-initiate
+          setOtpCode('');
+          setState('valid');
+        }
       }
     } catch (err: any) {
       setError(err?.message || 'claim_failed');
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const handleOtpSubmit = async () => {
+    if (otpCode.length !== 6) {
+      setError('Please enter the 6-digit code.');
+      return;
+    }
+    await handleAccept(otpCode);
+  };
+
+  const handleResendOtp = async () => {
+    setInitiating(true);
+    setError(null);
+    setOtpCode('');
+    try {
+      const result = await directoryClaimPublicService.initiateClaim(token);
+      if (result.error) {
+        setError(result.error);
+      } else if (result.verificationRequired) {
+        setSentTo(result.sentTo || null);
+        setError(null);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'resend_failed');
+    } finally {
+      setInitiating(false);
     }
   };
 
@@ -181,6 +236,92 @@ export default function DirectoryClaimClient() {
             <Text c="dimmed">
               This listing has already been claimed by its owner. If this is your business and you
               did not claim it, please contact support.
+            </Text>
+            <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
+              Back to Directory
+            </Button>
+          </Stack>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (state === 'otp_sent') {
+    return (
+      <Container size="sm" className="py-12">
+        <Card withBorder shadow="sm" padding="xl" radius="md">
+          <Stack align="center" gap="md" ta="center">
+            <ThemeIcon size={56} radius="xl" color="blue">
+              <IconShieldCheck size={28} />
+            </ThemeIcon>
+            <Title order={3}>Verify Your Identity</Title>
+            <Text c="dimmed">
+              We sent a 6-digit verification code
+              {sentTo ? ` to ${sentTo}` : ''}. Enter it below to complete your claim
+              for <strong>{summary?.businessName}</strong>.
+            </Text>
+
+            <Stack align="center" gap="md" w="100%">
+              <PinInput
+                length={6}
+                value={otpCode}
+                onChange={setOtpCode}
+                size="lg"
+                gap="xs"
+                type="number"
+                autoFocus
+              />
+
+              {error && (
+                <Alert color="red" variant="light" w="100%">
+                  {error === 'invalid_otp'
+                    ? 'Incorrect code. Please try again.'
+                    : error === 'otp_expired'
+                      ? 'This code has expired. Please request a new one.'
+                      : error === 'otp_max_attempts'
+                        ? 'Too many attempts. Please request a new code.'
+                        : error}
+                </Alert>
+              )}
+
+              <Button
+                size="md"
+                loading={accepting}
+                onClick={handleOtpSubmit}
+                leftSection={<IconCheck size={18} />}
+                disabled={otpCode.length !== 6}
+              >
+                Verify &amp; Claim
+              </Button>
+
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={handleResendOtp}
+                loading={initiating}
+              >
+                Resend code
+              </Button>
+            </Stack>
+          </Stack>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (state === 'pending_approval') {
+    return (
+      <Container size="sm" className="py-12">
+        <Card withBorder shadow="sm" padding="xl" radius="md">
+          <Stack align="center" gap="md" ta="center">
+            <ThemeIcon size={56} radius="xl" color="orange">
+              <IconClock size={28} />
+            </ThemeIcon>
+            <Title order={3}>Claim Submitted for Review</Title>
+            <Text c="dimmed">
+              Your claim request for <strong>{summary?.businessName}</strong> has been
+              submitted. Our team will review it and contact you within 1-2 business days
+              to verify ownership.
             </Text>
             <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
               Back to Directory
@@ -317,8 +458,8 @@ export default function DirectoryClaimClient() {
               )}
               <Button
                 size="md"
-                loading={accepting}
-                onClick={handleAccept}
+                loading={initiating || accepting}
+                onClick={handleInitiate}
                 leftSection={<IconCheck size={18} />}
               >
                 Claim This Listing

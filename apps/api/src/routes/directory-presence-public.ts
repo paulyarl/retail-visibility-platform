@@ -60,6 +60,43 @@ router.get('/claim/:token', async (req: Request, res: Response) => {
   }
 });
 
+/** POST /api/public/directory/claim/:token/initiate — initiate claim (sends OTP if required) */
+router.post('/claim/:token/initiate', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'token_required' });
+    }
+
+    const result = await DirectoryClaimService.initiateClaim(token, {
+      actorType: 'customer',
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+
+    if (result.error) {
+      const statusMap: Record<string, number> = {
+        invalid_token: 404,
+        token_expired: 410,
+        already_claimed: 409,
+      };
+      return res.status(statusMap[result.error] || 400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      verificationRequired: result.verificationRequired,
+      sentTo: result.sentTo,
+      operatorApprovalRequired: result.operatorApprovalRequired,
+    });
+  } catch (error) {
+    logger.error('[POST /api/public/directory/claim/:token/initiate] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** POST /api/public/directory/claim/:token/accept — bind owner (requires auth) */
 router.post('/claim/:token/accept', async (req: Request, res: Response) => {
   try {
@@ -80,18 +117,26 @@ router.post('/claim/:token/accept', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'authentication_required' });
     }
 
+    const { otpCode } = req.body || {};
+
     const result = await DirectoryClaimService.acceptClaim(token, userId, isCustomer, {
       actorType: isCustomer ? 'customer' : 'user',
       actorId: userId,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-    } as any);
+    } as any, otpCode);
 
     if (!result.success) {
       const statusMap: Record<string, number> = {
         invalid_token: 404,
         token_expired: 410,
         already_claimed: 409,
+        otp_required: 400,
+        otp_not_found: 400,
+        otp_expired: 410,
+        invalid_otp: 403,
+        otp_max_attempts: 429,
+        pending_operator_approval: 202,
       };
       return res.status(statusMap[result.message] || 400).json({
         error: result.message,

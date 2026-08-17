@@ -332,7 +332,7 @@ router.post('/presence-seeds/:id/tokens/:tokenId/revoke', requirePlatformAdmin, 
 
 /** PATCH /api/admin/directory/presence-seeds/:id/outreach — update outreach status + owner info */
 const outreachSchema = z.object({
-  status: z.enum(['unverified', 'outreach_attempted', 'verified_by_call', 'verified_by_email', 'enrichment_sent', 'enriched']),
+  status: z.enum(['unverified', 'outreach_attempted', 'verified_by_call', 'verified_by_email', 'enrichment_sent', 'enrichment_pending_review', 'enriched']),
   notes: z.string().nullable().optional(),
   ownerName: z.string().nullable().optional(),
   ownerEmail: z.string().nullable().optional(),

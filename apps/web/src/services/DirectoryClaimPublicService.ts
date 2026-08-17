@@ -40,6 +40,14 @@ export interface DirectoryClaimAcceptResult {
   platformUserId?: string;
 }
 
+export interface DirectoryClaimInitiateResult {
+  success: boolean;
+  verificationRequired?: boolean;
+  sentTo?: string;
+  operatorApprovalRequired?: boolean;
+  error?: string;
+}
+
 export class DirectoryClaimPublicService extends PublicApiSingleton {
   private static instance: DirectoryClaimPublicService;
 
@@ -72,12 +80,32 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     }
   }
 
+  /** POST /api/public/directory/claim/:token/initiate — initiate claim (sends OTP if required) */
+  async initiateClaim(token: string): Promise<DirectoryClaimInitiateResult> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/claim/${encodeURIComponent(token)}/initiate`,
+        { method: 'POST', body: JSON.stringify({}) },
+        undefined,
+        0,
+      );
+      if (!result.success) {
+        const error = typeof result.error === 'string' ? result.error : 'unknown';
+        return { success: false, error };
+      }
+      const data = result.data?.data ?? result.data;
+      return (data as any) ?? { success: false, error: 'unknown' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'unknown' };
+    }
+  }
+
   /** POST /api/public/directory/claim/:token/accept — bind owner (requires auth) */
-  async acceptClaim(token: string): Promise<DirectoryClaimAcceptResult> {
+  async acceptClaim(token: string, otpCode?: string): Promise<DirectoryClaimAcceptResult> {
     try {
       const result = await this.makeDefaultRequest<any>(
         `/api/public/directory/claim/${encodeURIComponent(token)}/accept`,
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify({ otpCode }) },
         undefined,
         0,
       );
