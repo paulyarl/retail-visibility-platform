@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, ShieldCheck } from 'lucide-react';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
@@ -13,6 +13,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
@@ -79,7 +80,8 @@ export default function PlaceEntryEditorialLayout({
   useQrScanTracking(tenantId, 'directory');
 
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
-  const claimHref = claimToken ? `/directory/claim/${claimToken}` : '/directory';
+  const hasClaimToken = !!claimToken;
+  const claimHref = hasClaimToken ? `/directory/claim/${claimToken}` : '#claim-inquiry';
   const disclaimer = publicDisclaimer ||
     `${listing.businessName} is listed from public information (address and phone). This is not a claimed profile and may be incomplete.`;
 
@@ -122,12 +124,21 @@ export default function PlaceEntryEditorialLayout({
                 {disclaimer}
               </p>
               <div className="flex flex-wrap items-center gap-4">
-                <Link
-                  href={claimHref}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold"
-                >
-                  <Info className="w-5 h-5" /> Claim this listing
-                </Link>
+                {hasClaimToken ? (
+                  <Link
+                    href={claimHref}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold"
+                  >
+                    <ShieldCheck className="w-5 h-5" /> Claim this listing
+                  </Link>
+                ) : (
+                  <a
+                    href={claimHref}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold"
+                  >
+                    <Info className="w-5 h-5" /> Are you the owner?
+                  </a>
+                )}
                 {showsHours && hoursStatus && (
                   <HoursStatusBadge status={hoursStatus} size="lg" animate={true} />
                 )}
@@ -152,12 +163,21 @@ export default function PlaceEntryEditorialLayout({
                 </p>
               </div>
               <div className="flex flex-col items-center lg:items-end gap-3">
-                <Link
-                  href={claimHref}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
-                >
-                  <Info className="w-5 h-5" /> Claim this listing
-                </Link>
+                {hasClaimToken ? (
+                  <Link
+                    href={claimHref}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
+                  >
+                    <ShieldCheck className="w-5 h-5" /> Claim this listing
+                  </Link>
+                ) : (
+                  <a
+                    href={claimHref}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
+                  >
+                    <Info className="w-5 h-5" /> Are you the owner?
+                  </a>
+                )}
                 {showsQr && (
                   <div className="flex flex-col items-center">
                     <TenantQRCode
@@ -180,7 +200,7 @@ export default function PlaceEntryEditorialLayout({
         {/* Balanced content grid — map on left (wider), NAP data on right */}
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left — Map (wider, shows business location and surrounding area) */}
+            {/* Left — Location + Contact stacked */}
             <div className="lg:col-span-7 space-y-8">
               {showsMap && listing.address && (
                 <div className="bg-neutral-50 rounded-xl p-6">
@@ -188,10 +208,7 @@ export default function PlaceEntryEditorialLayout({
                   <GoogleMapEmbed address={listing.address} />
                 </div>
               )}
-            </div>
 
-            {/* Right — Contact + Hours */}
-            <div className="lg:col-span-5 space-y-8">
               {showsContact && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
@@ -203,7 +220,10 @@ export default function PlaceEntryEditorialLayout({
                   />
                 </div>
               )}
+            </div>
 
+            {/* Right — Hours standalone */}
+            <div className="lg:col-span-5 space-y-8">
               {showsHours && businessHours && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
@@ -213,6 +233,33 @@ export default function PlaceEntryEditorialLayout({
             </div>
           </div>
         </div>
+
+        {/* Claim inquiry form — shown when no claim token has been minted.
+            Uses the same anonymous PublicInquiryForm pattern as storefront contact,
+            routed to the platform tenant so the operator can mint a claim token. */}
+        {!hasClaimToken && (
+          <div id="claim-inquiry" className="max-w-3xl mx-auto px-6 py-12 scroll-mt-8">
+            <div className="bg-white rounded-xl p-8 border border-neutral-200 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-neutral-900">Are you the business owner?</h2>
+                  <p className="text-sm text-neutral-500">
+                    Send us a message and we&apos;ll help you claim this listing for free.
+                  </p>
+                </div>
+              </div>
+              <PublicInquiryForm
+                tenantId="platform"
+                tenantName="VisibleShelf"
+                sourceLabel="Place Claim Request"
+                showFaqs={false}
+              />
+            </div>
+          </div>
+        )}
 
         <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Places" />
         <LastViewed />
