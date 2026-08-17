@@ -1246,6 +1246,25 @@ export function generateDirectoryEnrichmentTokenString(): string {
 }
 
 /**
+ * Generate a seek batch ID.
+ * Format: sb-{nanoid12}
+ */
+export function generateSeekBatchId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `sb-${nanoid()}`;
+}
+
+/**
+ * Generate a human-readable seek batch slug.
+ * Format: {category-slug}-{city-count}cities-{yyyymmdd}
+ */
+export function generateSeekBatchSlug(category: string, cityCount: number): string {
+  const categorySlug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return `${categorySlug}-${cityCount}cities-${date}`;
+}
+
+/**
  * Generate a tenant_storefront_hours_settings ID.
  * Format: shs-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

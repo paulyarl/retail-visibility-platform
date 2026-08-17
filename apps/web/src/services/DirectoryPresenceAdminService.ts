@@ -266,6 +266,128 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const data = result.data?.data ?? result.data;
     return data as { token: string; tokenId: string; expiresAt: string };
   }
+
+  /** POST /api/admin/directory-presence/presence-seeds/batch-create */
+  async batchCreateSeeds(
+    queueEntryIds: string[],
+    seedBatch: string,
+  ): Promise<{
+    created: string[];
+    skipped: Array<{ queueEntryId: string; reason: string }>;
+    failed: Array<{ queueEntryId: string; error: string }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/batch-create`,
+      { method: 'POST', body: JSON.stringify({ queueEntryIds, seedBatch }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/batch-publish */
+  async batchPublishSeeds(
+    seedIds: string[],
+  ): Promise<{
+    published: string[];
+    skipped: Array<{ seedId: string; reason: string }>;
+    failed: Array<{ seedId: string; error: string }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/batch-publish`,
+      { method: 'POST', body: JSON.stringify({ seedIds }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/batch-invite */
+  async batchInviteSeeds(
+    seedIds: string[],
+    expiresInDays?: number,
+  ): Promise<{
+    invited: Array<{ seedId: string; token: string }>;
+    skipped: Array<{ seedId: string; reason: string }>;
+    failed: Array<{ seedId: string; error: string }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/batch-invite`,
+      { method: 'POST', body: JSON.stringify({ seedIds, expiresInDays }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** GET /api/admin/directory-presence/seek-batches */
+  async listSeekBatches(status?: string): Promise<any[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seek-batches${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.batches ?? [];
+  }
+
+  /** GET /api/admin/directory-presence/seek-batches/:id */
+  async getSeekBatch(id: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seek-batches/${encodeURIComponent(id)}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.batch ?? null;
+  }
+
+  /** POST /api/admin/directory-presence/seek-batches */
+  async createSeekBatch(input: {
+    profileId: string;
+    profileVersion?: number;
+    nicheCategory: string;
+    cities: string[];
+    state?: string;
+  }): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seek-batches`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.batch ?? null;
+  }
+
+  /** POST /api/admin/directory-presence/seek-batches/:id/launch */
+  async launchSeekBatch(id: string): Promise<{ campaignIds: string[] }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seek-batches/${encodeURIComponent(id)}/launch`,
+      { method: 'POST', body: JSON.stringify({}) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** GET /api/admin/directory-presence/seed-batches */
+  async listSeedBatches(seedBatch?: string): Promise<any[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seed-batches${seedBatch ? `?seedBatch=${encodeURIComponent(seedBatch)}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.batches ?? [];
+  }
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();

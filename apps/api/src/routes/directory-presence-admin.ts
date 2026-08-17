@@ -16,6 +16,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import BatchSeekService from '../services/BatchSeekService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -392,6 +393,212 @@ router.post('/presence-seeds/:id/enrichment-token', requirePlatformAdmin, async 
     res.json({ success: true, token: result.token, tokenId: result.tokenId, expiresAt: result.expiresAt });
   } catch (error: any) {
     logger.error('[POST /api/admin/directory/presence-seeds/:id/enrichment-token] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ====================
+// Batch operations (Sprint 4)
+// ====================
+
+/** POST /api/admin/directory/presence-seeds/batch-create — create seeds from multiple queue entries */
+const batchCreateSchema = z.object({
+  queueEntryIds: z.array(z.string()).min(1).max(200),
+  seedBatch: z.string().min(1).max(100),
+});
+
+router.post('/presence-seeds/batch-create', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = batchCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.createSeedsFromBatch(
+      validation.data.queueEntryIds,
+      validation.data.seedBatch,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/batch-create] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/batch-publish — publish multiple seeds */
+const batchPublishSchema = z.object({
+  seedIds: z.array(z.string()).min(1).max(200),
+});
+
+router.post('/presence-seeds/batch-publish', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = batchPublishSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.publishBatch(
+      validation.data.seedIds,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/batch-publish] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/batch-invite — invite (mint claim tokens) for multiple seeds */
+const batchInviteSchema = z.object({
+  seedIds: z.array(z.string()).min(1).max(200),
+  expiresInDays: z.number().min(1).max(365).optional(),
+});
+
+router.post('/presence-seeds/batch-invite', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = batchInviteSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.inviteBatch(
+      validation.data.seedIds,
+      validation.data.expiresInDays || 90,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/batch-invite] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/seed-batches — list seed batches with metrics */
+router.get('/seed-batches', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const seedBatch = req.query.seedBatch as string | undefined;
+    const result = await BatchSeekService.listSeedBatches({ seedBatch });
+    res.json({ success: true, batches: result });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/seed-batches] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/seek-batches — list seek batches with metrics */
+router.get('/seek-batches', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const result = await BatchSeekService.listBatches({ status });
+    res.json({ success: true, batches: result });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/seek-batches] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/seek-batches/:id — seek batch detail with per-city breakdown */
+router.get('/seek-batches/:id', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await BatchSeekService.getBatchStatus(id);
+    if (!result) {
+      return res.status(404).json({ error: 'batch_not_found' });
+    }
+    res.json({ success: true, batch: result });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/seek-batches/:id] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/seek-batches — create a seek batch */
+const createBatchSchema = z.object({
+  profileId: z.string(),
+  profileVersion: z.number().optional(),
+  nicheCategory: z.string(),
+  cities: z.array(z.string()).min(1).max(10),
+  state: z.string().optional(),
+});
+
+router.post('/seek-batches', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = createBatchSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const result = await BatchSeekService.createBatch(validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    res.json({ success: true, batch: result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/seek-batches] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/seek-batches/:id/launch — launch a seek batch (creates campaigns) */
+router.post('/seek-batches/:id/launch', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await BatchSeekService.launchBatch(id, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        batch_not_found: 404,
+        batch_already_launched: 409,
+      };
+      return res.status(statusMap[result.error || ''] || 400).json({ error: result.error });
+    }
+
+    res.json({ success: true, campaignIds: result.campaignIds });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/seek-batches/:id/launch] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

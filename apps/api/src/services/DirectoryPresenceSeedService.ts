@@ -693,11 +693,220 @@ class DirectoryPresenceSeedService {
   }
 
   // ============================
+  // Batch operations (Sprint 4)
+  // ============================
+
+  /**
+   * Create seeds from multiple prospect queue entries in batch.
+   * Each prospect is converted to a seed independently — one failure
+   * doesn't block others. All seeds get the same seed_batch identifier.
+   */
+  async createSeedsFromBatch(
+    queueEntryIds: string[],
+    seedBatch: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{
+    created: string[];
+    skipped: Array<{ queueEntryId: string; reason: string }>;
+    failed: Array<{ queueEntryId: string; error: string }>;
+  }> {
+    const created: string[] = [];
+    const skipped: Array<{ queueEntryId: string; reason: string }> = [];
+    const failed: Array<{ queueEntryId: string; error: string }> = [];
+
+    // Load queue entries
+    const entries = await prisma.$queryRaw<any[]>`
+      SELECT * FROM mkt_prospect_queue WHERE id = ANY(${queueEntryIds}::text[])
+    `;
+
+    for (const entry of entries) {
+      try {
+        // Check if a seed already exists for this business (by tenant_id or listing)
+        const existing = await prisma.$queryRaw<any[]>`
+          SELECT id FROM directory_presence_seeds
+          WHERE city = ${entry.city} AND category = ${entry.category}
+          AND EXISTS (
+            SELECT 1 FROM directory_listings_list dl
+            WHERE dl.id = directory_presence_seeds.listing_id
+            AND LOWER(dl.business_name) = LOWER(${entry.business_name || entry.title})
+          )
+          LIMIT 1
+        `;
+
+        if (existing[0]) {
+          skipped.push({ queueEntryId: entry.id, reason: 'duplicate_seed' });
+          continue;
+        }
+
+        const snapshot = entry.business_snapshot || {};
+        const seedInput: CreateSeedInput = {
+          businessName: entry.business_name || entry.title || 'Unknown Business',
+          address: snapshot.address || 'Address not available',
+          city: entry.city || 'Unknown City',
+          state: entry.state || snapshot.state || 'IN',
+          zipCode: snapshot.zip_code || null,
+          phone: snapshot.phone || null,
+          website: snapshot.website || null,
+          primaryCategory: entry.category || 'Unknown Category',
+          secondaryCategories: snapshot.secondary_categories || null,
+          latitude: snapshot.latitude || null,
+          longitude: snapshot.longitude || null,
+          snapEbtReported: snapshot.snap_ebt_reported || false,
+          snapEbtAsOf: snapshot.snap_ebt_as_of || null,
+          snapEbtSource: snapshot.snap_ebt_source || null,
+          snapEbtSourceName: snapshot.snap_ebt_source_name || null,
+          seedBatch,
+          identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
+          categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
+          notes: entry.note || null,
+          provenance: entry.discovery_provenance || [],
+        };
+
+        const result = await this.createSeed(seedInput, ctx);
+
+        // Link seed to seek batch if the queue entry has one
+        if (entry.seek_batch_id) {
+          await prisma.$executeRaw`
+            UPDATE directory_presence_seeds
+            SET seek_batch_id = ${entry.seek_batch_id}, updated_at = now()
+            WHERE id = ${result.id}
+          `;
+        }
+
+        // Update queue entry status
+        await prisma.$executeRaw`
+          UPDATE mkt_prospect_queue
+          SET status = 'campaign_created', processed_at = now(), updated_at = now()
+          WHERE id = ${entry.id}
+        `;
+
+        created.push(result.id);
+      } catch (err) {
+        failed.push({ queueEntryId: entry.id, error: (err as Error).message });
+        logger.error('DirectoryPresenceSeedService.createSeedsFromBatch — entry failed', undefined, {
+          queueEntryId: entry.id, error: (err as Error).message,
+        });
+      }
+    }
+
+    // Handle entries that weren't found
+    const foundIds = new Set(entries.map((e) => e.id));
+    for (const id of queueEntryIds) {
+      if (!foundIds.has(id)) {
+        failed.push({ queueEntryId: id, error: 'queue_entry_not_found' });
+      }
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.batch_create',
+      payload: { seedBatch, created: created.length, skipped: skipped.length, failed: failed.length },
+    });
+
+    logger.info('DirectoryPresenceSeedService.createSeedsFromBatch', undefined, {
+      seedBatch, created: created.length, skipped: skipped.length, failed: failed.length,
+    });
+
+    return { created, skipped, failed };
+  }
+
+  /**
+   * Publish multiple seeds in batch.
+   */
+  async publishBatch(
+    seedIds: string[],
+    ctx?: SeedAuditCtx,
+  ): Promise<{
+    published: string[];
+    skipped: Array<{ seedId: string; reason: string }>;
+    failed: Array<{ seedId: string; error: string }>;
+  }> {
+    const published: string[] = [];
+    const skipped: Array<{ seedId: string; reason: string }> = [];
+    const failed: Array<{ seedId: string; error: string }> = [];
+
+    for (const seedId of seedIds) {
+      try {
+        // Check current status
+        const seedRows = await prisma.$queryRaw<any[]>`
+          SELECT status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+        `;
+        if (!seedRows[0]) {
+          failed.push({ seedId, error: 'seed_not_found' });
+          continue;
+        }
+        if (seedRows[0].status === 'published') {
+          skipped.push({ seedId, reason: 'already_published' });
+          continue;
+        }
+        if (seedRows[0].status === 'claimed') {
+          skipped.push({ seedId, reason: 'already_claimed' });
+          continue;
+        }
+
+        await this.publishSeed(seedId, ctx);
+        published.push(seedId);
+      } catch (err) {
+        failed.push({ seedId, error: (err as Error).message });
+      }
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.batch_publish',
+      payload: { published: published.length, skipped: skipped.length, failed: failed.length },
+    });
+
+    return { published, skipped, failed };
+  }
+
+  /**
+   * Invite (mint claim tokens) for multiple seeds in batch.
+   */
+  async inviteBatch(
+    seedIds: string[],
+    expiresInDays: number = 90,
+    ctx?: SeedAuditCtx,
+  ): Promise<{
+    invited: Array<{ seedId: string; token: string }>;
+    skipped: Array<{ seedId: string; reason: string }>;
+    failed: Array<{ seedId: string; error: string }>;
+  }> {
+    const invited: Array<{ seedId: string; token: string }> = [];
+    const skipped: Array<{ seedId: string; reason: string }> = [];
+    const failed: Array<{ seedId: string; error: string }> = [];
+
+    for (const seedId of seedIds) {
+      try {
+        const result = await this.inviteSeed(seedId, expiresInDays, ctx);
+        invited.push({ seedId, token: result.token });
+      } catch (err) {
+        const msg = (err as Error).message;
+        if (msg === 'seed_already_claimed') {
+          skipped.push({ seedId, reason: 'already_claimed' });
+        } else {
+          failed.push({ seedId, error: msg });
+        }
+      }
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.batch_invite',
+      payload: { invited: invited.length, skipped: skipped.length, failed: failed.length },
+    });
+
+    return { invited, skipped, failed };
+  }
+
+  // ============================
   // Enrichment tokens (Sprint 3)
   // ============================
 
   /**
-   * Generate a multi-use enrichment token for a seed.
    * The token is sent to the business owner via email/SMS so they can
    * self-serve enrich their listing without creating an account.
    *
