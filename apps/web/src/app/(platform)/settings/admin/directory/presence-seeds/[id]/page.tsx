@@ -24,6 +24,7 @@ import {
   X,
   Plus,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 
 const PROVENANCE_FIELD_KEYS = [
@@ -405,25 +406,49 @@ export default function PresenceSeedDetailPage() {
           {actionSuccess}
         </div>
       )}
-      {inviteToken && (
-        <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg">
-          <p className="text-sm font-medium text-blue-900 mb-1">Claim Link</p>
-          <p className="text-sm text-blue-700 break-all font-mono">
-            {typeof window !== 'undefined'
-              ? `${window.location.origin}/directory/claim/${inviteToken}`
-              : `/directory/claim/${inviteToken}`}
-          </p>
-          <button
-            className="mt-2 text-xs text-blue-600 underline"
-            onClick={() => {
-              if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                const link = `${window.location.origin}/directory/claim/${inviteToken}`;
-                navigator.clipboard.writeText(link);
-              }
-            }}
-          >
-            Copy link
-          </button>
+      {inviteToken && listing?.slug && (
+        <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg space-y-3">
+          <div>
+            <p className="text-sm font-medium text-blue-900 mb-1">Claim Link</p>
+            <p className="text-sm text-blue-700 break-all font-mono">
+              {typeof window !== 'undefined'
+                ? `${window.location.origin}/directory/claim/${inviteToken}`
+                : `/directory/claim/${inviteToken}`}
+            </p>
+            <button
+              className="mt-2 text-xs text-blue-600 underline"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  const link = `${window.location.origin}/directory/claim/${inviteToken}`;
+                  navigator.clipboard.writeText(link);
+                }
+              }}
+            >
+              Copy claim link
+            </button>
+          </div>
+          <div className="border-t border-blue-200 pt-3">
+            <p className="text-sm font-medium text-blue-900 mb-1">Retail Preview Link</p>
+            <p className="text-xs text-blue-600 mb-1">
+              Private preview of the business profile for the owner. Token-gated, not indexed.
+            </p>
+            <p className="text-sm text-blue-700 break-all font-mono">
+              {typeof window !== 'undefined'
+                ? `${window.location.origin}/retail/${listing.slug}?preview=${inviteToken}`
+                : `/retail/${listing.slug}?preview=${inviteToken}`}
+            </p>
+            <button
+              className="mt-2 text-xs text-blue-600 underline"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  const link = `${window.location.origin}/retail/${listing.slug}?preview=${inviteToken}`;
+                  navigator.clipboard.writeText(link);
+                }
+              }}
+            >
+              Copy preview link
+            </button>
+          </div>
         </div>
       )}
 
@@ -452,6 +477,14 @@ export default function PresenceSeedDetailPage() {
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
             <ExternalLink className="w-4 h-4" /> View Public Listing
+          </Link>
+        )}
+        {listing?.slug && (
+          <Link
+            href={`/settings/admin/directory/presence-seeds/${seedId}/retail-preview`}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+          >
+            <Sparkles className="w-4 h-4" /> Customize Retail Preview
           </Link>
         )}
         {canEdit && !editing && (
