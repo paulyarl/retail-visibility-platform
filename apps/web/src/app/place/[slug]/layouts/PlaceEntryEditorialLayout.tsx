@@ -137,33 +137,61 @@ export default function PlaceEntryEditorialLayout({
           </div>
         </div>
 
-        {/* Asymmetric Content Grid */}
-        <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-            {/* Main Column — seed has no commerce content, so this is intentionally sparse */}
-            <div className="lg:col-span-8 space-y-10">
-              {/* Provenance callout */}
-              <section className="bg-neutral-50 rounded-xl p-8 border border-neutral-200">
-                <h2 className="text-2xl font-bold text-neutral-900 mb-4">About this listing</h2>
+        {/* Full-width provenance callout — the conversion pitch */}
+        <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">
+          <section className="bg-white rounded-xl p-8 border border-neutral-200 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+              <div className="lg:col-span-2">
+                <h2 className="text-2xl font-bold text-neutral-900 mb-3">About this listing</h2>
                 <p className="text-neutral-600 leading-relaxed text-lg">
                   {disclaimer}
                 </p>
-                <p className="text-neutral-500 leading-relaxed mt-4">
+                <p className="text-neutral-500 leading-relaxed mt-3">
                   Claiming is free and lets the business owner verify details, update hours, add a photo,
                   and connect with customers on VisibleShelf.
                 </p>
+              </div>
+              <div className="flex flex-col items-center lg:items-end gap-3">
                 <Link
                   href={claimHref}
-                  className="inline-flex items-center gap-2 mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
                 >
                   <Info className="w-5 h-5" /> Claim this listing
                 </Link>
-              </section>
+                {showsQr && (
+                  <div className="flex flex-col items-center">
+                    <TenantQRCode
+                      url={currentUrl}
+                      tenantId={listing.tenantId}
+                      label="Scan to Share"
+                      downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                      size={120}
+                      showDownload={true}
+                      pageType="directory"
+                      capabilityFlags={null}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Balanced content grid — map on left, NAP data on right */}
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left — Map (visually prominent for a place listing) */}
+            <div className="space-y-8">
+              {showsMap && listing.address && (
+                <div className="bg-neutral-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
+                  <GoogleMapEmbed address={listing.address} />
+                </div>
+              )}
             </div>
 
-            {/* Sidebar — NAP+ data gated by directory entry tier capabilities */}
-            <div className="lg:col-span-4 space-y-8">
-              {/* Contact Card */}
+            {/* Right — Contact + Hours */}
+            <div className="space-y-8">
               {showsContact && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
@@ -176,35 +204,10 @@ export default function PlaceEntryEditorialLayout({
                 </div>
               )}
 
-              {/* Hours */}
               {showsHours && businessHours && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
                   <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
-                </div>
-              )}
-
-              {/* Map */}
-              {showsMap && listing.address && (
-                <div className="bg-neutral-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
-                  <GoogleMapEmbed address={listing.address} />
-                </div>
-              )}
-
-              {/* QR */}
-              {showsQr && (
-                <div className="bg-neutral-50 rounded-xl p-6 flex flex-col items-center">
-                  <TenantQRCode
-                    url={currentUrl}
-                    tenantId={listing.tenantId}
-                    label="Scan to Share"
-                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
-                    size={160}
-                    showDownload={true}
-                    pageType="directory"
-                    capabilityFlags={null}
-                  />
                 </div>
               )}
             </div>
