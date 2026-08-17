@@ -68,6 +68,34 @@ export default function PlaceEntryEditorialLayout({
 }: PlaceEntryEditorialLayoutProps) {
   useQrScanTracking(tenantId, 'directory');
 
+  // ── Verbose debug logging for sidebar conditional variables ──
+  console.log('[PlaceEntryEditorialLayout] DEBUG', {
+    tenantId,
+    listingSlug: listing?.slug,
+    hasListing: !!listing,
+    hasBusinessHours: !!businessHours,
+    businessHoursValue: businessHours,
+    hoursStatus,
+    hasTenantInfo: !!tenantInfo,
+    optFlags,
+    showsHours,
+    showsMap,
+    showsLocation,
+    isRetailStore,
+    fullAddress,
+    listingAddress: listing?.address,
+    listingPhone: listing?.phone,
+    listingEmail: listing?.email,
+    // Evaluate each sidebar gate condition
+    contactGate: optFlags?.showContact !== false,
+    contactGateReason: optFlags ? `optFlags.showContact=${optFlags.showContact}` : 'optFlags is null',
+    hoursGate: showsHours && optFlags?.showHoursStatus !== false && !!businessHours,
+    hoursGateReason: `showsHours=${showsHours}, optFlags?.showHoursStatus=${optFlags?.showHoursStatus}, hasBusinessHours=${!!businessHours}`,
+    mapGate: showsMap && optFlags?.showInteractiveMaps !== false && !!listing?.address,
+    mapGateReason: `showsMap=${showsMap}, optFlags?.showInteractiveMaps=${optFlags?.showInteractiveMaps}, hasAddress=${!!listing?.address}`,
+    heroBadgeGate: showsHours && optFlags?.showHoursStatus !== false,
+  });
+
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
   const claimHref = claimToken ? `/directory/claim/${claimToken}` : '/directory';
   const disclaimer = publicDisclaimer ||

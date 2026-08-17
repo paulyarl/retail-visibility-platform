@@ -157,6 +157,32 @@ export default function PlacePage({ params }: PlacePageProps) {
   const showsMap = optFlags?.showMapDisplay ?? true;
   const showsLocation = optFlags?.showLocationDisplay ?? true;
 
+  // ── Verbose debug logging ──
+  console.log('[PlacePage] DEBUG — values passed to layout', {
+    tenantId,
+    listingSlug: listing.slug,
+    listingOrigin: listing.listingOrigin,
+    listingAddress: listing.address,
+    listingPhone: listing.phone,
+    listingEmail: listing.email,
+    hasBusinessHours: !!businessHours,
+    businessHoursValue: businessHours,
+    hoursStatus,
+    hasTenantInfo: !!tenantInfo,
+    tenantInfoValue: tenantInfo,
+    optFlags,
+    optFlagsIsNull: optFlags === null,
+    showsHours,
+    showsMap,
+    showsLocation,
+    isRetailStore,
+    storefrontCapData: storefrontCap.data,
+    fullAddress,
+    slugForRelated,
+    claimToken: listing.activeClaimToken,
+    publicDisclaimer: listing.publicDisclaimer,
+  });
+
   return (
     <PlaceEntryEditorialLayout
       tenantId={tenantId}
