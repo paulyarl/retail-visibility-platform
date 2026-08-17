@@ -1138,6 +1138,7 @@ model customers {
   email_verification_token          String?                            @db.VarChar(255)
   email_verification_expires        DateTime?                          @db.Timestamp(6)
   customer_key                      String?                            @unique @db.VarChar(7)
+  linked_user_id                    String?                            @db.VarChar(255)
   crm_contacts                      crm_contacts[]
   crm_customer_alert_states         crm_customer_alert_states[]
   crm_customer_read_states          crm_customer_read_states[]
@@ -1149,6 +1150,7 @@ model customers {
   customer_payment_methods          customer_payment_methods[]
   customer_saved_coupons            customer_saved_coupons[]
   customer_tenant_relationships     customer_tenant_relationships[]
+  users                             users?                             @relation(fields: [linked_user_id], references: [id], onUpdate: NoAction, map: "fk_customers_linked_user")
   digital_access_grants             digital_access_grants[]
   marketing_revenue                 marketing_revenue[]
   mkt_campaigns_list                mkt_campaigns_list[]
@@ -5390,6 +5392,7 @@ model users {
   picture                                                     String?                            @db.VarChar(500)
   consent_records                                             consent_records[]
   crm_user_read_states                                        crm_user_read_states[]
+  customers                                                   customers[]
   digital_download_pages                                      digital_download_pages[]
   directory_featured_listings_list                            directory_featured_listings_list[]
   featured_products                                           featured_products[]

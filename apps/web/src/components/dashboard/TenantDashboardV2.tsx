@@ -53,6 +53,8 @@ import { botService } from '@/services/BotService';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { useTenantBehaviorAccess } from '@/hooks/tenant-access/useTenantBehaviorAccess';
+import DirectoryClaimWelcomeBanner from '@/components/dashboard/DirectoryClaimWelcomeBanner';
+import TierUpgradeCard from '@/components/dashboard/TierUpgradeCard';
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -62,6 +64,8 @@ interface TenantDashboardV2Props {
 
 export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const showWelcomeBanner = searchParams.get('welcome') === 'true';
   const {
     tenant: tenantData,
     tier,
@@ -272,6 +276,11 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* ── Banners ── */}
         <SubscriptionStateBanner tenantId={tenantId} />
+        <DirectoryClaimWelcomeBanner
+          tenantId={tenantId}
+          businessName={tenantData?.name}
+          show={showWelcomeBanner}
+        />
         {tenantData?.locationStatus && (
           <LocationStatusBanner
             locationStatus={tenantData.locationStatus as any}
@@ -291,6 +300,17 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
           <p className="text-gray-500 mt-1 text-sm sm:text-base">
             Welcome back, {firstName}. Here&apos;s what&apos;s happening today.
           </p>
+        </div>
+
+        {/* ── Upgrade card for directory_presence tenants ── */}
+        <div className="mb-6">
+          <TierUpgradeCard
+            tenantId={tenantId}
+            isDirectoryPresence={
+              tenantData?.subscriptionTier === 'directory_presence' ||
+              tier?.effective?.id === 'directory_presence'
+            }
+          />
         </div>
 
         {/* ── Meta Bar: Tier + Limits ── */}

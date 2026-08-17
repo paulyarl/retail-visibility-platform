@@ -298,6 +298,7 @@ import directoryAdminRoutes from '../routes/directory-admin';
 import directorySupportRoutes from '../routes/directory-support';
 import directoryPresenceAdminRoutes from '../routes/directory-presence-admin';
 import directoryPresencePublicRoutes from '../routes/directory-presence-public';
+import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
@@ -2032,6 +2033,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public directory claim flow (claim/:token, claim/:token/accept)',
+  },
+  {
+    path: '/api/tenant',
+    router: directoryPresenceUpgradeRoutes,
+    domain: 'directory',
+    authLevel: 'tenant',
+    comment: 'Directory presence tier upgrade (tenant-scoped, auth in routes)',
   },
 
   // ── Brand Partners (authenticated, non-tenant) ──────────────────────
