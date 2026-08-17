@@ -11,7 +11,7 @@ import { tenantPublicService } from '@/services/TenantPublicService';
 import { clientLogger } from '@/lib/client-logger';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
-import type { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
 import PlaceEntryEditorialLayout from './layouts/PlaceEntryEditorialLayout';
 
@@ -48,7 +48,7 @@ export default function PlacePage({ params }: PlacePageProps) {
   const [listing, setListing] = useState<any>(null);
   const [businessHours, setBusinessHours] = useState<any>(null);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
-  const [optFlags, setOptFlags] = useState<StorefrontOptionFlags | null>(null);
+  const [dirEntryOpts, setDirEntryOpts] = useState<DirectoryEntryOptionsState | null>(null);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
   const [isNotFound, setIsNotFound] = useState(false);
 
@@ -74,16 +74,16 @@ export default function PlacePage({ params }: PlacePageProps) {
         setListing(data.listing);
 
         // Fetch sidebar/skill data in parallel
-        const [hours, info, flags, resolvedSlug] = await Promise.all([
+        const [hours, info, dirOpts, resolvedSlug] = await Promise.all([
           getBusinessHours(data.listing.tenantId),
           tenantPublicService.getPublicTenantInfo(data.listing.tenantId),
-          publicUnifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
+          publicUnifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId),
           publicDirectoryService.resolveBySlug(slug),
         ]);
 
         setBusinessHours(hours);
         setTenantInfo(info);
-        if (flags) setOptFlags(flags);
+        if (dirOpts) setDirEntryOpts(dirOpts);
         setSlugForRelated(resolvedSlug || slug);
       } catch (error) {
         clientLogger.error('[Place] Error fetching place data:', { detail: error });
@@ -153,13 +153,11 @@ export default function PlacePage({ params }: PlacePageProps) {
     listing.zipCode,
   ].filter(Boolean).join(', ');
 
-  // For directory presence seeds, NAP+hours+map are public information by
-  // definition. The storefront merchant preferences (optFlags) don't apply to
-  // unclaimed seed listings — they default to false and suppress all sidebar
-  // sections. Override to always show NAP+hours+map when the data exists.
-  const showsHours = true;
-  const showsMap = true;
-  const showsLocation = true;
+  const showsHours = dirEntryOpts?.hoursEnabled ?? true;
+  const showsMap = dirEntryOpts?.mapEnabled ?? true;
+  const showsLocation = dirEntryOpts?.mapEnabled ?? true;
+  const showsContact = dirEntryOpts?.contactEnabled ?? true;
+  const showsQr = dirEntryOpts?.qrEnabled ?? true;
 
   return (
     <PlaceEntryEditorialLayout
@@ -169,10 +167,12 @@ export default function PlacePage({ params }: PlacePageProps) {
       hoursStatus={hoursStatus}
       tenantInfo={tenantInfo}
       slugForRelated={slugForRelated}
-      optFlags={optFlags}
+      dirEntryOpts={dirEntryOpts}
       showsHours={showsHours}
       showsMap={showsMap}
       showsLocation={showsLocation}
+      showsContact={showsContact}
+      showsQr={showsQr}
       isRetailStore={isRetailStore}
       currentUrl={currentUrl}
       baseUrl={baseUrl}

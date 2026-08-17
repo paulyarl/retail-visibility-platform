@@ -13,7 +13,7 @@ import directoryClaimPublicService, { type DirectoryClaimSummary } from '@/servi
 import { clientLogger } from '@/lib/client-logger';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
-import type { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
 import PlaceEntryEditorialLayout from '../../place/[slug]/layouts/PlaceEntryEditorialLayout';
 
@@ -55,7 +55,7 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
   const [listing, setListing] = useState<any>(null);
   const [businessHours, setBusinessHours] = useState<any>(null);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
-  const [optFlags, setOptFlags] = useState<StorefrontOptionFlags | null>(null);
+  const [dirEntryOpts, setDirEntryOpts] = useState<DirectoryEntryOptionsState | null>(null);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
 
   useEffect(() => {
@@ -91,16 +91,16 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
         setListing(data.listing);
 
         // Fetch sidebar data in parallel
-        const [hours, info, flags, resolvedSlug] = await Promise.all([
+        const [hours, info, dirOpts, resolvedSlug] = await Promise.all([
           getBusinessHours(data.listing.tenantId),
           tenantPublicService.getPublicTenantInfo(data.listing.tenantId),
-          publicUnifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
+          publicUnifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId),
           publicDirectoryService.resolveBySlug(slug),
         ]);
 
         setBusinessHours(hours);
         setTenantInfo(info);
-        if (flags) setOptFlags(flags);
+        if (dirOpts) setDirEntryOpts(dirOpts);
         setSlugForRelated(resolvedSlug || slug);
       } catch (error) {
         clientLogger.error('[Retail Preview] Error:', { detail: error });
@@ -173,9 +173,11 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
     listing.zipCode,
   ].filter(Boolean).join(', ');
 
-  const showsHours = optFlags?.showHoursDisplay ?? true;
-  const showsMap = optFlags?.showMapDisplay ?? true;
-  const showsLocation = optFlags?.showLocationDisplay ?? true;
+  const showsHours = dirEntryOpts?.hoursEnabled ?? true;
+  const showsMap = dirEntryOpts?.mapEnabled ?? true;
+  const showsLocation = dirEntryOpts?.mapEnabled ?? true;
+  const showsContact = dirEntryOpts?.contactEnabled ?? true;
+  const showsQr = dirEntryOpts?.qrEnabled ?? true;
 
   const claimHref = previewToken ? `/directory/claim/${previewToken}` : '/directory';
 
@@ -230,10 +232,12 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
         hoursStatus={hoursStatus}
         tenantInfo={tenantInfo}
         slugForRelated={slugForRelated}
-        optFlags={optFlags}
+        dirEntryOpts={dirEntryOpts}
         showsHours={showsHours}
         showsMap={showsMap}
         showsLocation={showsLocation}
+        showsContact={showsContact}
+        showsQr={showsQr}
         isRetailStore={isRetailStore}
         currentUrl={currentUrl}
         baseUrl={baseUrl}

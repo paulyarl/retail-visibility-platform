@@ -15,6 +15,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
 /**
  * PlaceEntryEditorialLayout — editorial-style layout adapted for directory
@@ -28,6 +29,11 @@ import { useQrScanTracking } from '@/hooks/useQrScanTracking';
  *   Inquiry) are omitted — seeds have max_skus: 0 and no storefront
  * - Related Stores kept for shopper discovery
  * - Unclaimed banner at top
+ *
+ * Sidebar visibility is driven by DirectoryEntryOptionsState (tier capability
+ * resolution: directory_entry_hours_on, directory_entry_map_on,
+ * directory_entry_contact_on, directory_entry_qr_on) — NOT by storefront
+ * merchant preferences, which don't apply to unclaimed seed listings.
  */
 export interface PlaceEntryEditorialLayoutProps {
   tenantId: string;
@@ -36,10 +42,12 @@ export interface PlaceEntryEditorialLayoutProps {
   hoursStatus: any;
   tenantInfo: any;
   slugForRelated: string;
-  optFlags: any;
+  dirEntryOpts: DirectoryEntryOptionsState | null;
   showsHours: boolean;
   showsMap: boolean;
   showsLocation: boolean;
+  showsContact: boolean;
+  showsQr: boolean;
   isRetailStore: boolean;
   currentUrl: string;
   baseUrl: string;
@@ -55,10 +63,12 @@ export default function PlaceEntryEditorialLayout({
   hoursStatus,
   tenantInfo,
   slugForRelated,
-  optFlags,
+  dirEntryOpts,
   showsHours,
   showsMap,
   showsLocation,
+  showsContact,
+  showsQr,
   isRetailStore,
   currentUrl,
   baseUrl,
@@ -121,6 +131,7 @@ export default function PlaceEntryEditorialLayout({
                 {showsHours && hoursStatus && (
                   <HoursStatusBadge status={hoursStatus} size="lg" animate={true} />
                 )}
+
               </div>
             </div>
           </div>
@@ -150,18 +161,20 @@ export default function PlaceEntryEditorialLayout({
               </section>
             </div>
 
-            {/* Sidebar — NAP+ data (always shown for seeds; NAP+hours are public information) */}
+            {/* Sidebar — NAP+ data gated by directory entry tier capabilities */}
             <div className="lg:col-span-4 space-y-8">
               {/* Contact Card */}
-              <div className="bg-neutral-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
-                <ContactInformationCollapsible
-                  tenant={listing}
-                  fullAddress={showsLocation ? fullAddress : ''}
-                  initialExpanded={true}
-                  isRetailStore={true}
-                />
-              </div>
+              {showsContact && (
+                <div className="bg-neutral-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
+                  <ContactInformationCollapsible
+                    tenant={listing}
+                    fullAddress={showsLocation ? fullAddress : ''}
+                    initialExpanded={true}
+                    isRetailStore={true}
+                  />
+                </div>
+              )}
 
               {/* Hours */}
               {showsHours && businessHours && (
@@ -180,18 +193,20 @@ export default function PlaceEntryEditorialLayout({
               )}
 
               {/* QR */}
-              <div className="bg-neutral-50 rounded-xl p-6 flex flex-col items-center">
-                <TenantQRCode
-                  url={currentUrl}
-                  tenantId={listing.tenantId}
-                  label="Scan to Share"
-                  downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
-                  size={160}
-                  showDownload={true}
-                  pageType="directory"
-                  capabilityFlags={null}
-                />
-              </div>
+              {showsQr && (
+                <div className="bg-neutral-50 rounded-xl p-6 flex flex-col items-center">
+                  <TenantQRCode
+                    url={currentUrl}
+                    tenantId={listing.tenantId}
+                    label="Scan to Share"
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                    size={160}
+                    showDownload={true}
+                    pageType="directory"
+                    capabilityFlags={null}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
