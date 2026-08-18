@@ -161,6 +161,7 @@ export default function BatchOperationsDashboard() {
       const batch = await directoryPresenceAdminService.createSeekBatch({
         profileId,
         nicheCategory: nicheCategory.trim(),
+        intelligenceFocus: focus || undefined,
         cities,
         state: state.trim() || undefined,
       });
@@ -508,6 +509,7 @@ export default function BatchOperationsDashboard() {
               <tr className="border-b border-gray-200 text-left text-gray-600 bg-gray-50">
                 <th className="py-3 px-4 font-medium">Batch</th>
                 <th className="py-3 px-4 font-medium">Niche</th>
+                <th className="py-3 px-4 font-medium">Focus</th>
                 <th className="py-3 px-4 font-medium">Cities</th>
                 <th className="py-3 px-4 font-medium">Status</th>
                 <th className="py-3 px-4 font-medium">Prospects</th>
@@ -520,7 +522,7 @@ export default function BatchOperationsDashboard() {
             <tbody>
               {seekBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-400">
+                  <td colSpan={10} className="py-8 text-center text-gray-400">
                     No seek batches yet. Click &quot;+ New Seek Batch&quot; to create one.
                   </td>
                 </tr>
@@ -536,6 +538,15 @@ export default function BatchOperationsDashboard() {
                       </Link>
                     </td>
                     <td className="py-3 px-4 text-gray-900">{b.nicheCategory}</td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        b.intelligenceFocus === 'competitive'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {b.intelligenceFocus || 'emerging'}
+                      </span>
+                    </td>
                     <td className="py-3 px-4 text-gray-600">
                       {b.cities?.join(', ') || '—'}
                     </td>

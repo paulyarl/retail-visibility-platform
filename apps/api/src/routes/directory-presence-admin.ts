@@ -550,6 +550,7 @@ const createBatchSchema = z.object({
   profileId: z.string(),
   profileVersion: z.number().optional(),
   nicheCategory: z.string(),
+  intelligenceFocus: z.enum(['emerging', 'competitive']).optional(),
   cities: z.array(z.string()).min(1).max(10),
   state: z.string().optional(),
 });

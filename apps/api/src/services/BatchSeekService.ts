@@ -25,6 +25,7 @@ export interface CreateBatchInput {
   profileId: string;
   profileVersion?: number;
   nicheCategory: string;
+  intelligenceFocus?: string;
   cities: string[];
   state?: string;
 }
@@ -35,6 +36,7 @@ export interface BatchSummary {
   profileId: string;
   profileVersion: number | null;
   nicheCategory: string;
+  intelligenceFocus: string;
   cities: string[];
   campaignIds: string[];
   status: string;
@@ -60,9 +62,11 @@ class BatchSeekService {
     const id = generateSeekBatchId();
     const batchSlug = generateSeekBatchSlug(input.nicheCategory, input.cities.length);
 
+    const focus = input.intelligenceFocus || 'emerging';
+
     await prisma.$executeRaw`
       INSERT INTO mkt_seek_batches (
-        id, batch_slug, profile_id, profile_version, niche_category,
+        id, batch_slug, profile_id, profile_version, niche_category, intelligence_focus,
         cities, campaign_ids, status, created_by, created_at
       ) VALUES (
         ${id},
@@ -70,6 +74,7 @@ class BatchSeekService {
         ${input.profileId},
         ${input.profileVersion || null},
         ${input.nicheCategory},
+        ${focus},
         ${input.cities}::text[],
         ${'{}'}::text[],
         'draft',
@@ -82,7 +87,7 @@ class BatchSeekService {
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'seek_batch.create',
-      payload: { batchId: id, batchSlug, nicheCategory: input.nicheCategory, cities: input.cities },
+      payload: { batchId: id, batchSlug, nicheCategory: input.nicheCategory, intelligenceFocus: focus, cities: input.cities },
     });
 
     logger.info('BatchSeekService.createBatch', undefined, { id, batchSlug, cities: input.cities });
@@ -93,6 +98,7 @@ class BatchSeekService {
       profileId: input.profileId,
       profileVersion: input.profileVersion || null,
       nicheCategory: input.nicheCategory,
+      intelligenceFocus: focus,
       cities: input.cities,
       campaignIds: [],
       status: 'draft',
@@ -115,7 +121,7 @@ class BatchSeekService {
     ctx?: BatchAuditCtx,
   ): Promise<{ success: boolean; error?: string; campaignIds?: string[] }> {
     const batchRows = await prisma.$queryRaw<any[]>`
-      SELECT id, profile_id, profile_version, niche_category, cities, status
+      SELECT id, profile_id, profile_version, niche_category, intelligence_focus, cities, status
       FROM mkt_seek_batches WHERE id = ${batchId} LIMIT 1
     `;
     if (!batchRows[0]) {
@@ -133,6 +139,7 @@ class BatchSeekService {
     // Create one campaign per city
     for (const city of cities) {
       const campaignId = `mkt-${batch.niche_category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+      const focus = batch.intelligence_focus || 'emerging';
 
       try {
         await prisma.$executeRaw`
@@ -146,7 +153,7 @@ class BatchSeekService {
             ${city},
             ${'IN'},
             'intelligence',
-            'emerging',
+            ${focus},
             'discovery',
             ${batchId},
             'seek',
@@ -215,7 +222,7 @@ class BatchSeekService {
   async getBatchStatus(batchId: string): Promise<BatchSummary & { metrics: BatchMetrics; perCity: any[] } | null> {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
-        b.id, b.batch_slug, b.profile_id, b.profile_version, b.niche_category,
+        b.id, b.batch_slug, b.profile_id, b.profile_version, b.niche_category, b.intelligence_focus,
         b.cities, b.campaign_ids, b.status, b.created_at, b.completed_at,
         (SELECT COUNT(*) FROM mkt_prospect_queue pq WHERE pq.seek_batch_id = b.id) AS total_prospects,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id) AS total_seeds,
@@ -251,6 +258,7 @@ class BatchSeekService {
       profileId: r.profile_id,
       profileVersion: r.profile_version,
       nicheCategory: r.niche_category,
+      intelligenceFocus: r.intelligence_focus || 'emerging',
       cities,
       campaignIds: r.campaign_ids || [],
       status: r.status,
@@ -284,7 +292,7 @@ class BatchSeekService {
 
     let query = `
       SELECT
-        b.id, b.batch_slug, b.profile_id, b.profile_version, b.niche_category,
+        b.id, b.batch_slug, b.profile_id, b.profile_version, b.niche_category, b.intelligence_focus,
         b.cities, b.campaign_ids, b.status, b.created_at, b.completed_at,
         (SELECT COUNT(*) FROM mkt_prospect_queue pq WHERE pq.seek_batch_id = b.id) AS total_prospects,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id) AS total_seeds,
@@ -308,6 +316,7 @@ class BatchSeekService {
       profileId: r.profile_id,
       profileVersion: r.profile_version,
       nicheCategory: r.niche_category,
+      intelligenceFocus: r.intelligence_focus || 'emerging',
       cities: r.cities || [],
       campaignIds: r.campaign_ids || [],
       status: r.status,

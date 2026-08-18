@@ -352,6 +352,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     profileId: string;
     profileVersion?: number;
     nicheCategory: string;
+    intelligenceFocus?: string;
     cities: string[];
     state?: string;
   }): Promise<any> {
