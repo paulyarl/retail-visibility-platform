@@ -5860,6 +5860,7 @@ const intelligenceProfileCreateSchema = z.object({
   status: z.enum(['draft', 'active', 'retired']).optional(),
   intelligenceFocus: z.enum(['emerging', 'competitive']).default('emerging'),
   referenceCity: z.string().max(100).nullable().optional(),
+  referenceState: z.string().max(50).nullable().optional(),
 });
 
 const intelligenceProfilePublishSchema = z.object({
@@ -5948,6 +5949,7 @@ router.post('/intelligence-profiles', async (req, res) => {
       status: parsed.status,
       intelligenceFocus: parsed.intelligenceFocus,
       referenceCity: parsed.referenceCity,
+      referenceState: parsed.referenceState,
     }, getCtx(req));
     res.status(201).json({ success: true, data: profile });
   } catch (error) {

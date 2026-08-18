@@ -283,7 +283,9 @@ export default function IntelligenceProfilesClient() {
                 {FOCUS_LABELS[profile.intelligence_focus]}
               </Badge>
               {profile.reference_city ? (
-                <Badge size="xs" variant="dot" color="cyan">{profile.reference_city}</Badge>
+                <Badge size="xs" variant="dot" color="cyan">
+                  {profile.reference_city}{profile.reference_state ? `, ${profile.reference_state}` : ''}
+                </Badge>
               ) : (
                 <Badge size="xs" variant="dot" color="gray">city-agnostic</Badge>
               )}

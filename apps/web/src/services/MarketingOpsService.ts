@@ -4746,6 +4746,7 @@ export interface IntelligenceProfile {
   version: number;
   intelligence_focus: IntelligenceFocus;
   reference_city: string | null;
+  reference_state: string | null;
   configuration_json: Record<string, any>;
   status: ProfileStatus;
   created_at: string;
@@ -4800,6 +4801,7 @@ interface MarketingOpsService {
     status?: ProfileStatus;
     intelligenceFocus?: IntelligenceFocus;
     referenceCity?: string | null;
+    referenceState?: string | null;
   }): Promise<IntelligenceProfile>;
   publishIntelligenceProfile(id: string, input: {
     configurationJson: Record<string, any>;
@@ -5004,6 +5006,7 @@ MarketingOpsService.prototype.createIntelligenceProfile = async function (input:
   status?: ProfileStatus;
   intelligenceFocus?: IntelligenceFocus;
   referenceCity?: string | null;
+  referenceState?: string | null;
 }): Promise<IntelligenceProfile> {
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/intelligence-profiles`,

@@ -7,26 +7,6 @@ import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminServ
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
 
-const US_STATES = [
-  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
-  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
-  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'District of Columbia' },
-  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
-  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
-  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
-  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
-  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
-  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
-  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
-  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
-  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
-  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
-  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
-  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
-  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
-  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
-];
-
 export default function BatchOperationsDashboard() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -156,11 +136,12 @@ export default function BatchOperationsDashboard() {
     }
   }, [selectedCity, profileId, availableProfiles]);
 
-  // When profile is selected, derive focus from it
+  // When profile is selected, derive focus + state from it
   const handleProfileSelect = (id: string) => {
     setProfileId(id);
     const p = profiles.find((pr) => pr.id === id);
     setFocus(p?.intelligence_focus || '');
+    setState(p?.reference_state || '');
   };
 
   // Check if current (category, city, profile) is already in the queue
@@ -464,23 +445,18 @@ export default function BatchOperationsDashboard() {
                 </div>
               )}
 
-              {/* State (optional, applies to the entry being added) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  State <span className="text-gray-400">(optional)</span>
-                </label>
-                <select
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                  <option value="">—</option>
-                  {US_STATES.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+              {/* Derived State (read-only display, derived from the selected profile) */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-500">State (derived from profile):</span>
+                {state ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                    {state}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">
+                    No state on profile — will be left blank
+                  </span>
+                )}
               </div>
 
               {/* Add to Queue button */}

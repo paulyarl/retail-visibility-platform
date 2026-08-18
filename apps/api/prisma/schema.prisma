@@ -7240,12 +7240,14 @@ model mkt_intelligence_profiles {
   updated_at         DateTime @default(now()) @db.Timestamptz(6)
   intelligence_focus String   @default("emerging") @db.VarChar(20)
   reference_city     String?  @db.VarChar(100)
+  reference_state    String?  @db.VarChar(50)
 
   @@id([id, version], map: "pk_mkt_intelligence_profiles")
   @@index([id], map: "idx_mkt_intel_profiles_id")
   @@index([status], map: "idx_mkt_intel_profiles_status")
   @@index([category_key, intelligence_focus], map: "idx_mkt_intel_profiles_category_focus")
   @@index([category_key, reference_city, intelligence_focus], map: "idx_mkt_intel_profiles_category_city_focus")
+  @@index([category_key, reference_state, intelligence_focus], map: "idx_mkt_intel_profiles_category_state_focus")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -7409,6 +7411,7 @@ model mkt_seek_batches {
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   completed_at             DateTime?                  @db.Timestamptz(6)
   intelligence_focus       String?                    @default("emerging") @db.VarChar(20)
+  state                    String?                    @db.VarChar(50)
   directory_presence_seeds directory_presence_seeds[]
   mkt_campaigns_list       mkt_campaigns_list[]
   mkt_prospect_queue       mkt_prospect_queue[]

@@ -111,10 +111,13 @@ class BatchSeekService {
 
     const batchSlug = generateSeekBatchSlug(summaryCategory, summaryCities.length);
 
+    // Summary state: prefer the first entry's state, else the batch-level state.
+    const summaryState = hasEntries ? (entries[0].state || null) : (input.state || null);
+
     await prisma.$executeRaw`
       INSERT INTO mkt_seek_batches (
         id, batch_slug, profile_id, profile_version, niche_category, intelligence_focus,
-        cities, campaign_ids, status, created_by, created_at
+        cities, campaign_ids, status, state, created_by, created_at
       ) VALUES (
         ${id},
         ${batchSlug},
@@ -125,6 +128,7 @@ class BatchSeekService {
         ${summaryCities}::text[],
         ${'{}'}::text[],
         'draft',
+        ${summaryState},
         ${ctx?.actorId || null},
         now()
       )
@@ -207,7 +211,7 @@ class BatchSeekService {
     ctx?: BatchAuditCtx,
   ): Promise<{ success: boolean; error?: string; campaignIds?: string[] }> {
     const batchRows = await prisma.$queryRaw<any[]>`
-      SELECT id, profile_id, profile_version, niche_category, intelligence_focus, cities, status
+      SELECT id, profile_id, profile_version, niche_category, intelligence_focus, cities, state, status
       FROM mkt_seek_batches WHERE id = ${batchId} LIMIT 1
     `;
     if (!batchRows[0]) {
@@ -245,7 +249,7 @@ class BatchSeekService {
               ${campaignId},
               ${entry.niche_category},
               ${entry.city},
-              ${entry.state || 'IN'},
+              ${entry.state || null},
               'intelligence',
               ${focus},
               'discovery',
@@ -279,7 +283,7 @@ class BatchSeekService {
               ${campaignId},
               ${batch.niche_category},
               ${city},
-              ${'IN'},
+              ${batch.state || null},
               'intelligence',
               ${focus},
               'discovery',

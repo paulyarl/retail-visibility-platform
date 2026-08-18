@@ -54,6 +54,7 @@ export interface IntelligenceProfile {
   version: number;
   intelligence_focus: IntelligenceFocus;
   reference_city: string | null;
+  reference_state: string | null;
   configuration_json: any;
   status: IntelligenceProfileStatus;
   created_at: Date;
@@ -104,6 +105,18 @@ export function normalizeCategoryKey(s: string): string {
 export function normalizeReferenceCity(s: string | null | undefined): string | null {
   if (!s) return null;
   const trimmed = s.trim().toLowerCase().replace(/\s+/g, ' ');
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Normalize a US state code for storage as reference_state. Uppercased,
+ * whitespace-trimmed. Empty input returns null. Accepts 2-letter codes
+ * (e.g. 'in' → 'IN'); does NOT validate against the state list — the
+ * caller is responsible for sending a valid code.
+ */
+export function normalizeReferenceState(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const trimmed = s.trim().toUpperCase();
   return trimmed.length > 0 ? trimmed : null;
 }
 
@@ -395,12 +408,14 @@ export class IntelligenceProfileService extends BaseService {
     status?: IntelligenceProfileStatus;
     intelligenceFocus?: IntelligenceFocus;
     referenceCity?: string | null;
+    referenceState?: string | null;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const id = input.id || generateIntelligenceProfileId();
     const categoryKey = normalizeCategoryKey(input.categoryKey);
     const status = input.status ?? 'draft';
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
+    const referenceState = normalizeReferenceState(input.referenceState ?? null);
     try {
       const profile = await this.prisma.mkt_intelligence_profiles.create({
         data: {
@@ -410,6 +425,7 @@ export class IntelligenceProfileService extends BaseService {
           version: 1,
           intelligence_focus: intelligenceFocus,
           reference_city: referenceCity,
+          reference_state: referenceState,
           configuration_json: input.configurationJson as any,
           status,
         },
@@ -420,6 +436,7 @@ export class IntelligenceProfileService extends BaseService {
         status,
         intelligenceFocus,
         referenceCity,
+        referenceState,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -451,10 +468,12 @@ export class IntelligenceProfileService extends BaseService {
     existingProfileId?: string;
     intelligenceFocus?: IntelligenceFocus;
     referenceCity?: string | null;
+    referenceState?: string | null;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const categoryKey = normalizeCategoryKey(input.categoryKey);
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
+    const referenceState = normalizeReferenceState(input.referenceState ?? null);
     try {
       // Determine the profile id + next version number
       let profileId = input.existingProfileId;
@@ -504,6 +523,7 @@ export class IntelligenceProfileService extends BaseService {
           version: nextVersion,
           intelligence_focus: intelligenceFocus,
           reference_city: referenceCity,
+          reference_state: referenceState,
           configuration_json: input.configurationJson as any,
           status: 'draft',
         },
@@ -514,6 +534,7 @@ export class IntelligenceProfileService extends BaseService {
         version: nextVersion,
         intelligenceFocus,
         referenceCity,
+        referenceState,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -556,6 +577,9 @@ export class IntelligenceProfileService extends BaseService {
         //    only the prior active Zionsville profile — the active Indianapolis
         //    profile for the same (category, focus) is untouched. NULL
         //    reference_city is treated as a distinct scope (city-agnostic).
+        //    State-scoped (Migration 229): reference_state is also matched so
+        //    two profiles in the same city name across different states do
+        //    not retire each other.
         const retireWhere: any = {
           category_key: draft.category_key,
           intelligence_focus: draft.intelligence_focus,
@@ -565,6 +589,11 @@ export class IntelligenceProfileService extends BaseService {
           retireWhere.reference_city = draft.reference_city;
         } else {
           retireWhere.reference_city = null;
+        }
+        if (draft.reference_state) {
+          retireWhere.reference_state = draft.reference_state;
+        } else {
+          retireWhere.reference_state = null;
         }
         await tx.mkt_intelligence_profiles.updateMany({
           where: retireWhere,
@@ -679,9 +708,9 @@ export class IntelligenceProfileService extends BaseService {
           data: { status: 'retired', updated_at: new Date() },
         });
 
-        // 3. Create the new active version — carry the focus + reference_city
-        //    from the latest version so all versions of a profile id share the
-        //    same focus and city scope.
+        // 3. Create the new active version — carry the focus + reference_city +
+        //    reference_state from the latest version so all versions of a
+        //    profile id share the same focus and city/state scope.
         const created = await tx.mkt_intelligence_profiles.create({
           data: {
             id: profileId,
@@ -690,6 +719,7 @@ export class IntelligenceProfileService extends BaseService {
             version: nextVersion,
             intelligence_focus: latest.intelligence_focus,
             reference_city: latest.reference_city,
+            reference_state: latest.reference_state,
             configuration_json: input.configurationJson as any,
             status: 'active',
           },
