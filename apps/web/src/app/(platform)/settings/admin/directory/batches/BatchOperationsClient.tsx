@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import marketingOpsService from '@/services/MarketingOpsService';
-import type { IntelligenceProfile } from '@/services/MarketingOpsService';
+import type { IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
 
 const US_STATES = [
   { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
@@ -43,6 +43,7 @@ export default function BatchOperationsDashboard() {
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [profileId, setProfileId] = useState('');
   const [nicheCategory, setNicheCategory] = useState('');
+  const [focus, setFocus] = useState<IntelligenceFocus | ''>('');
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [state, setState] = useState('');
   const [creating, setCreating] = useState(false);
@@ -100,9 +101,12 @@ export default function BatchOperationsDashboard() {
           if (result && result.length > 0 && !profileId) {
             const first = result[0];
             setProfileId(first.id);
-            // Auto-populate niche category from the selected profile
+            // Auto-populate niche category and focus from the selected profile
             if (!nicheCategory && first.category_name) {
               setNicheCategory(first.category_name);
+            }
+            if (!focus && first.intelligence_focus) {
+              setFocus(first.intelligence_focus);
             }
           }
         })
@@ -112,6 +116,22 @@ export default function BatchOperationsDashboard() {
         .finally(() => setProfilesLoading(false));
     }
   }, [showLauncher, profiles, profilesLoading, profileId]);
+
+  // Profiles filtered by selected category + focus
+  const filteredProfiles = profiles.filter((p) => {
+    if (nicheCategory && (p.category_name || p.category_key) !== nicheCategory) return false;
+    if (focus && p.intelligence_focus !== focus) return false;
+    return true;
+  });
+
+  // When category or focus changes, auto-select the first matching profile
+  useEffect(() => {
+    if (filteredProfiles.length === 0) return;
+    const currentMatch = filteredProfiles.find((p) => p.id === profileId);
+    if (!currentMatch) {
+      setProfileId(filteredProfiles[0].id);
+    }
+  }, [nicheCategory, focus, filteredProfiles, profileId]);
 
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,6 +246,7 @@ export default function BatchOperationsDashboard() {
                     setShowLauncher(false);
                     setCreatedBatch(null);
                     setNicheCategory('');
+                    setFocus('');
                     setSelectedCities([]);
                     setState('');
                   }}
@@ -258,34 +279,41 @@ export default function BatchOperationsDashboard() {
                     onChange={(e) => {
                       const id = e.target.value;
                       setProfileId(id);
-                      // Auto-populate niche category from the selected profile
+                      // Auto-populate niche category and focus from the selected profile
                       const p = profiles.find((pr) => pr.id === id);
                       if (p?.category_name) {
                         setNicheCategory(p.category_name);
+                      }
+                      if (p?.intelligence_focus) {
+                        setFocus(p.intelligence_focus);
                       }
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     required
                   >
-                    {profiles.map((p) => {
-                      const focus = p.intelligence_focus
-                        ? p.intelligence_focus.charAt(0).toUpperCase() + p.intelligence_focus.slice(1)
-                        : '';
-                      const city = p.reference_city
-                        ? p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1)
-                        : '';
-                      const label = [
-                        p.category_name || p.category_key || p.id,
-                        focus,
-                        city,
-                        p.version ? `v${p.version}` : '',
-                      ].filter(Boolean).join(' - ');
-                      return (
-                        <option key={p.id} value={p.id}>
-                          {label}
-                        </option>
-                      );
-                    })}
+                    {filteredProfiles.length === 0 ? (
+                      <option value="">No profiles match the selected filters</option>
+                    ) : (
+                      filteredProfiles.map((p) => {
+                        const focusLabel = p.intelligence_focus
+                          ? p.intelligence_focus.charAt(0).toUpperCase() + p.intelligence_focus.slice(1)
+                          : '';
+                        const cityLabel = p.reference_city
+                          ? p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1)
+                          : '';
+                        const label = [
+                          p.category_name || p.category_key || p.id,
+                          cityLabel,
+                          focusLabel,
+                          p.version ? `v${p.version}` : '',
+                        ].filter(Boolean).join(' - ');
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {label}
+                          </option>
+                        );
+                      })
+                    )}
                   </select>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
@@ -300,15 +328,7 @@ export default function BatchOperationsDashboard() {
                 </label>
                 <select
                   value={nicheCategory}
-                  onChange={(e) => {
-                    const cat = e.target.value;
-                    setNicheCategory(cat);
-                    // Auto-select the first profile matching this category
-                    const match = profiles.find(
-                      (p) => (p.category_name || p.category_key) === cat,
-                    );
-                    if (match) setProfileId(match.id);
-                  }}
+                  onChange={(e) => setNicheCategory(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   required
                 >
@@ -387,6 +407,27 @@ export default function BatchOperationsDashboard() {
                       No reference cities found in intelligence profiles.
                     </p>
                   )}
+              </div>
+
+              {/* Focus */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Focus <span className="text-gray-400">(optional)</span>
+                </label>
+                <select
+                  value={focus}
+                  onChange={(e) => setFocus(e.target.value as IntelligenceFocus | '')}
+                  className="w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="">All focuses</option>
+                  <option value="emerging">Emerging</option>
+                  <option value="competitive">Competitive</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Filters intelligence profiles by discovery focus. Emerging
+                  targets underserved businesses; Competitive benchmarks
+                  established operators.
+                </p>
               </div>
 
               {/* State (optional) */}
