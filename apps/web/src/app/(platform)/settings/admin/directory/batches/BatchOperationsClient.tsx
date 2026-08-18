@@ -7,6 +7,26 @@ import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminServ
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
 
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'District of Columbia' },
+  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
+];
+
 export default function BatchOperationsDashboard() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -23,7 +43,7 @@ export default function BatchOperationsDashboard() {
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [profileId, setProfileId] = useState('');
   const [nicheCategory, setNicheCategory] = useState('');
-  const [citiesInput, setCitiesInput] = useState('');
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [state, setState] = useState('');
   const [creating, setCreating] = useState(false);
   const [launcherError, setLauncherError] = useState<string | null>(null);
@@ -64,7 +84,7 @@ export default function BatchOperationsDashboard() {
     if (category || city) {
       setShowLauncher(true);
       if (category) setNicheCategory(category);
-      if (city) setCitiesInput(city);
+      if (city) setSelectedCities([city]);
     }
   }, [searchParams]);
 
@@ -78,7 +98,12 @@ export default function BatchOperationsDashboard() {
           setProfiles(result || []);
           // Auto-select first profile if none selected
           if (result && result.length > 0 && !profileId) {
-            setProfileId(result[0].id);
+            const first = result[0];
+            setProfileId(first.id);
+            // Auto-populate niche category from the selected profile
+            if (!nicheCategory && first.category_name) {
+              setNicheCategory(first.category_name);
+            }
           }
         })
         .catch(() => {
@@ -98,15 +123,12 @@ export default function BatchOperationsDashboard() {
       return;
     }
     if (!nicheCategory.trim()) {
-      setLauncherError('Please enter a niche category.');
+      setLauncherError('Please select a niche category.');
       return;
     }
-    const cities = citiesInput
-      .split(',')
-      .map((c) => c.trim())
-      .filter(Boolean);
+    const cities = selectedCities;
     if (cities.length === 0) {
-      setLauncherError('Please enter at least one city.');
+      setLauncherError('Please select at least one city.');
       return;
     }
     if (cities.length > 10) {
@@ -204,7 +226,7 @@ export default function BatchOperationsDashboard() {
                     setShowLauncher(false);
                     setCreatedBatch(null);
                     setNicheCategory('');
-                    setCitiesInput('');
+                    setSelectedCities([]);
                     setState('');
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
@@ -233,15 +255,37 @@ export default function BatchOperationsDashboard() {
                 ) : (
                   <select
                     value={profileId}
-                    onChange={(e) => setProfileId(e.target.value)}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setProfileId(id);
+                      // Auto-populate niche category from the selected profile
+                      const p = profiles.find((pr) => pr.id === id);
+                      if (p?.category_name) {
+                        setNicheCategory(p.category_name);
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     required
                   >
-                    {profiles.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.category_name || p.category_key || p.id}
-                      </option>
-                    ))}
+                    {profiles.map((p) => {
+                      const focus = p.intelligence_focus
+                        ? p.intelligence_focus.charAt(0).toUpperCase() + p.intelligence_focus.slice(1)
+                        : '';
+                      const city = p.reference_city
+                        ? p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1)
+                        : '';
+                      const label = [
+                        p.category_name || p.category_key || p.id,
+                        focus,
+                        city,
+                        p.version ? `v${p.version}` : '',
+                      ].filter(Boolean).join(' - ');
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
@@ -254,14 +298,39 @@ export default function BatchOperationsDashboard() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Niche Category <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   value={nicheCategory}
-                  onChange={(e) => setNicheCategory(e.target.value)}
-                  placeholder="e.g., African Grocery, Halal Butcher"
+                  onChange={(e) => {
+                    const cat = e.target.value;
+                    setNicheCategory(cat);
+                    // Auto-select the first profile matching this category
+                    const match = profiles.find(
+                      (p) => (p.category_name || p.category_key) === cat,
+                    );
+                    if (match) setProfileId(match.id);
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   required
-                />
+                >
+                  <option value="">Select a category...</option>
+                  {Array.from(
+                    new Set(
+                      profiles
+                        .map((p) => p.category_name || p.category_key)
+                        .filter(Boolean),
+                    ),
+                  )
+                    .sort()
+                    .map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Derived from available intelligence profiles. Selecting a category
+                  auto-selects a matching profile.
+                </p>
               </div>
 
               {/* Cities */}
@@ -269,17 +338,55 @@ export default function BatchOperationsDashboard() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cities <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={citiesInput}
-                  onChange={(e) => setCitiesInput(e.target.value)}
-                  placeholder="e.g., Indianapolis, Columbus, Cincinnati (comma-separated, max 10)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  required
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Comma-separated. Each city gets its own seek run, all sharing the same batch ID.
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(
+                    new Set(
+                      profiles
+                        .map((p) => p.reference_city)
+                        .filter((c): c is string => Boolean(c)),
+                    ),
+                  )
+                    .sort()
+                    .map((city) => {
+                      const label =
+                        city.charAt(0).toUpperCase() + city.slice(1);
+                      const isSelected = selectedCities.includes(city);
+                      return (
+                        <button
+                          key={city}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCities((prev) =>
+                              isSelected
+                                ? prev.filter((c) => c !== city)
+                                : [...prev, city],
+                            );
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                </div>
+                {selectedCities.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Selected: {selectedCities.length}{' '}
+                    {selectedCities.length === 1 ? 'city' : 'cities'} (max 10).
+                    Each city gets its own seek run, all sharing the same batch
+                    ID.
+                  </p>
+                )}
+                {profiles.length > 0 &&
+                  profiles.every((p) => !p.reference_city) && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      No reference cities found in intelligence profiles.
+                    </p>
+                  )}
               </div>
 
               {/* State (optional) */}
@@ -287,20 +394,25 @@ export default function BatchOperationsDashboard() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   State <span className="text-gray-400">(optional)</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  placeholder="e.g., IN"
-                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
+                  className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="">—</option>
+                  {US_STATES.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Submit */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  disabled={creating || !profileId || !nicheCategory.trim() || !citiesInput.trim()}
+                  disabled={creating || !profileId || !nicheCategory.trim() || selectedCities.length === 0}
                   className="px-6 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {creating ? 'Creating...' : 'Create Batch'}
