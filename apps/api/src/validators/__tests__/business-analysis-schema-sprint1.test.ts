@@ -133,6 +133,85 @@ describe('Sprint 1 — website product-visibility fields', () => {
   });
 });
 
+describe('website.status vocabulary drift — "working"/"broken" synonyms', () => {
+  // Agents (e.g. Gemini Flash) frequently reuse the website.status enum values
+  // ("working"/"broken") for the per-field website assessments because the
+  // prompt documents those values first. The schema coerces them so a
+  // structurally-correct audit is not rejected solely for this drift.
+  it('coerces mobile_friendly="working" -> "yes"', () => {
+    const audit = baseAudit();
+    audit.website.mobile_friendly = 'working';
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.website?.mobile_friendly).toBe('yes');
+    }
+  });
+
+  it('coerces mobile_friendly="broken" -> "no"', () => {
+    const audit = baseAudit();
+    audit.website.mobile_friendly = 'broken';
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.website?.mobile_friendly).toBe('no');
+    }
+  });
+
+  it('coerces boolean website fields from "working" -> true', () => {
+    const audit = baseAudit();
+    audit.website.https = 'working';
+    audit.website.contact_information_visible = 'working';
+    audit.website.click_to_call_available = 'working';
+    audit.website.service_information_present = 'working';
+    audit.website.location_information_present = 'working';
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.website?.https).toBe(true);
+      expect(result.data.website?.contact_information_visible).toBe(true);
+      expect(result.data.website?.click_to_call_available).toBe(true);
+      expect(result.data.website?.service_information_present).toBe(true);
+      expect(result.data.website?.location_information_present).toBe(true);
+    }
+  });
+
+  it('coerces boolean website fields from "broken" -> false', () => {
+    const audit = baseAudit();
+    audit.website.https = 'broken';
+    audit.website.call_to_action_present = 'broken';
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.website?.https).toBe(false);
+      expect(result.data.website?.call_to_action_present).toBe(false);
+    }
+  });
+
+  it('accepts the full Gemini-style website block from the field report', () => {
+    // Reproduces the exact shape that triggered the 400 validation_error on
+    // POST /api/admin/marketing-ops/prompts/executions/external.
+    const audit = baseAudit();
+    audit.website = {
+      url: 'https://jaysgrocery.com',
+      status: 'working',
+      mobile_friendly: 'working',
+      https: 'working',
+      contact_information_visible: 'working',
+      click_to_call_available: 'working',
+      call_to_action_present: 'broken',
+      service_information_present: 'working',
+      location_information_present: 'working',
+      category_specific_content_present: 'working',
+      ordering_or_pickup_info_present: 'working',
+      issues: [],
+      conversion_opportunities: [],
+    };
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('Sprint 1 — google platform product-visibility fields', () => {
   it('accepts google with photo_count number', () => {
     const audit = baseAudit();

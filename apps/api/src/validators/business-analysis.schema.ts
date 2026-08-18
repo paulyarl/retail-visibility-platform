@@ -63,8 +63,8 @@ const coercedBooleanNullable = z.union([coercedBoolean, z.null()]);
 /**
  * Like `coercedBooleanNullable`, but also accepts the sentinel strings agents
  * commonly emit for the tri-state website assessment fields:
- *   - "verified" / "present" / "yes" / "true" / "1"  -> true
- *   - "not_verified" / "absent" / "missing" / "no" / "false" / "0" -> false
+ *   - "verified" / "present" / "yes" / "true" / "1" / "working"  -> true
+ *   - "not_verified" / "absent" / "missing" / "no" / "false" / "0" / "broken" -> false
  *   - "unable_to_verify" / "unverified" / "unknown" / "n/a" / "na" -> null
  *
  * The schema stores unable-to-verify as null. Some prompt templates and
@@ -72,12 +72,19 @@ const coercedBooleanNullable = z.union([coercedBoolean, z.null()]);
  * for these boolean fields instead of true/false/null; this preprocessor
  * accepts all three forms so validation does not fail on otherwise-correct
  * audits.
+ *
+ * Agents also frequently reuse the `website.status` enum values
+ * ("working"/"broken") for these sub-fields because the prompt's Website
+ * Assessment section documents those values first and then lists the
+ * sub-fields to "Evaluate" without restating their enum. We accept those as
+ * synonyms ("working" -> true, "broken" -> false) so a structurally-correct
+ * audit is not rejected solely for this vocabulary drift.
  */
 const coercedBooleanNullableTolerant = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'verified' || s === 'present' || s === 'yes' || s === 'true' || s === '1') return true;
-    if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'no' || s === 'false' || s === '0') return false;
+    if (s === 'verified' || s === 'present' || s === 'yes' || s === 'true' || s === '1' || s === 'working') return true;
+    if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'no' || s === 'false' || s === '0' || s === 'broken') return false;
     if (s === 'unable_to_verify' || s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') return null;
   }
   return val;
@@ -122,8 +129,15 @@ const mobileFriendlyEnum = z.enum(['yes', 'likely', 'no', 'unable_to_verify']);
  * (https, contact_information_visible, ...) already tolerate "verified" via
  * `coercedBooleanNullableTolerant`.
  *
- *   - "verified" / "present" / "confirmed" / "true" / "1"  -> "yes"
- *   - "not_verified" / "not present" / "absent" / "missing" / "false" / "0" -> "no"
+ * Agents also frequently reuse the `website.status` enum values
+ * ("working"/"broken") for `mobile_friendly` because the prompt's Website
+ * Assessment section documents those values first and then lists the
+ * sub-fields to "Evaluate" without restating their enum. We accept those as
+ * synonyms so a structurally-correct audit is not rejected solely for this
+ * vocabulary drift.
+ *
+ *   - "verified" / "present" / "confirmed" / "true" / "1" / "working" -> "yes"
+ *   - "not_verified" / "not present" / "absent" / "missing" / "false" / "0" / "broken" -> "no"
  *   - "unverified" / "unknown" / "n/a" / "na" -> "unable_to_verify"
  *
  * "yes", "likely", "no", and "unable_to_verify" pass through unchanged.
@@ -133,8 +147,8 @@ const mobileFriendlyEnum = z.enum(['yes', 'likely', 'no', 'unable_to_verify']);
 const mobileFriendlyCoerced = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'verified' || s === 'present' || s === 'confirmed' || s === 'true' || s === '1') return 'yes';
-    if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'false' || s === '0') return 'no';
+    if (s === 'verified' || s === 'present' || s === 'confirmed' || s === 'true' || s === '1' || s === 'working') return 'yes';
+    if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'false' || s === '0' || s === 'broken') return 'no';
     if (s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') return 'unable_to_verify';
   }
   return val;
@@ -148,6 +162,42 @@ const napStatusEnum = z.enum([
 const tierEnum = z.enum(['tier_1', 'tier_2', 'tier_3']);
 const confidenceEnum = z.enum(['high', 'medium', 'low']);
 const dataStatusEnum = z.enum(['complete', 'partial', 'unavailable', 'unable_to_verify']);
+
+// ---- Category-integrated enums (template v2 Category-Integrated Variant) ----
+
+const storeFormatEnum = z.enum([
+  'grocery',
+  'grocery_plus_prepared_foods',
+  'bakery',
+  'butcher',
+  'restaurant',
+  'caterer',
+  'wholesaler',
+  'beauty_retailer',
+  'online_seller',
+  'service',
+  'unknown',
+]);
+const actionClassificationEnum = z.enum([
+  'ADMIN_NEGLECT',
+  'CORPORATE_SHIELD',
+  'CRITICAL_DISTRESS',
+  'BALANCED_HEALTHY',
+]);
+const leadDispositionEnum = z.enum([
+  'HIGH_PRIORITY_OUTREACH',
+  'DISCARD',
+  'REHABILITATION_OUTREACH',
+  'STANDARD_OUTREACH',
+]);
+const operationalStatusEnum = z.enum([
+  'active',
+  'likely_active',
+  'inactive',
+  'unable_to_verify',
+]);
+const productBreadthEnum = z.enum(['narrow', 'moderate', 'broad']);
+const deliveryModelEnum = z.enum(['none', 'marketplace', 'direct', 'both']);
 
 /**
  * Normalize `data_status` synonyms agents commonly emit. "verified" and
@@ -176,6 +226,8 @@ const requestedBusinessSchema = z.object({
 const matchedBusinessSchema = z.object({
   business_name: z.string(),
   category: z.string().nullable().optional(),
+  store_format: storeFormatEnum.nullable().optional(),
+  hybrid_role: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
@@ -187,6 +239,7 @@ const auditMetadataSchema = z.object({
   matched_business: matchedBusinessSchema.nullable().optional(),
   identity_status: identityStatusEnum,
   identity_confidence: identityConfidenceEnum,
+  identity_corroboration_sources: z.array(z.string()).optional(),
   limitations: z.array(z.string()).optional(),
 }).passthrough();
 
@@ -207,6 +260,7 @@ const platformSchema = z.object({
 const googlePlatformSchema = platformSchema.extend({
   primary_category: z.string().nullable().optional(),
   additional_categories: z.array(z.string()).optional(),
+  category_fit_assessment: z.string().nullable().optional(),
   displayed_name: z.string().nullable().optional(),
   displayed_address: z.string().nullable().optional(),
   displayed_phone: z.string().nullable().optional(),
@@ -268,6 +322,9 @@ const websiteSchema = z.object({
   has_pickup_ordering: coercedBooleanNullableTolerant.optional(),
   has_delivery_option: coercedBooleanNullableTolerant.optional(),
   product_categories_visible: z.array(z.string()).optional(),
+  // Category-integrated fields (template v2 Category-Integrated Variant)
+  category_specific_content_present: coercedBooleanNullableTolerant.optional(),
+  ordering_or_pickup_info_present: coercedBooleanNullableTolerant.optional(),
 }).passthrough();
 
 const napConsistencySchema = z.object({
@@ -331,6 +388,54 @@ const sourceSchema = z.object({
   accessed_date: z.string().nullable().optional(),
 }).passthrough();
 
+// ---- Category-integrated nested schemas (template v2 Category-Integrated Variant) ----
+
+const specializedSourceSchema = z.object({
+  source: z.string(),
+  tier: coercedNumberNullable.optional(),
+  source_type: z.string().nullable().optional(),
+  consulted: coercedBooleanNullable.optional(),
+  findings: z.string().nullable().optional(),
+  url: z.string().nullable().optional(),
+  accessed_date: z.string().nullable().optional(),
+}).passthrough();
+
+const alignmentScoringSchema = z.object({
+  misalignment_index: coercedNumberNullable.optional(),
+  action_classification: actionClassificationEnum.optional(),
+  lead_disposition: leadDispositionEnum.optional(),
+  primary_outreach_hook: z.string().nullable().optional(),
+  alignment_breakdown: z.object({
+    admin_score: coercedNumberNullable.optional(),
+    public_sentiment_score: coercedNumberNullable.optional(),
+    delta: coercedNumberNullable.optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const operationalStatusSchema = z.object({
+  status: operationalStatusEnum.optional(),
+  last_activity_evidence: z.string().nullable().optional(),
+  last_activity_date: z.string().nullable().optional(),
+  evidence_sources: z.array(z.string()).optional(),
+}).passthrough();
+
+const competitiveBenchmarkSchema = z.object({
+  business_name: z.string(),
+  store_format: z.string().nullable().optional(),
+  geographic_reach: z.string().nullable().optional(),
+  product_breadth: productBreadthEnum.nullable().optional(),
+  prepared_food_component: coercedBooleanNullable.optional(),
+  delivery_model: deliveryModelEnum.nullable().optional(),
+  regional_specialization: z.string().nullable().optional(),
+  google_rating: coercedNumberNullable.optional(),
+  google_review_count: coercedNumberNullable.optional(),
+  yelp_rating: coercedNumberNullable.optional(),
+  yelp_review_count: coercedNumberNullable.optional(),
+  profile_completeness_score: coercedNumberNullable.optional(),
+  format_context_note: z.string().nullable().optional(),
+  specialization_evidence_direct: coercedBooleanNullable.optional(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const businessAnalysisSchema = z.object({
@@ -340,9 +445,13 @@ export const businessAnalysisSchema = z.object({
   business_type: z.enum(['service', 'product', 'hybrid', 'unable_to_verify']).nullable().optional(),
   summary: z.string(),
   platforms: platformsSchema,
+  specialized_sources_audited: z.array(specializedSourceSchema).optional(),
   combined_review_metrics: combinedReviewMetricsSchema.optional(),
+  alignment_scoring: alignmentScoringSchema.optional(),
   website: websiteSchema,
   nap_consistency: napConsistencySchema,
+  operational_status: operationalStatusSchema.optional(),
+  competitive_benchmarks: z.array(competitiveBenchmarkSchema).optional(),
   unanswered_negative_review_examples: z.array(reviewExampleSchema).optional(),
   negative_review_themes: z.array(reviewThemeSchema).optional(),
   digital_opportunity_score: digitalOpportunityScoreSchema,
@@ -382,14 +491,18 @@ Return your response as JSON matching this exact schema:
     "matched_business": {
       "business_name": "<string>",
       "category": "<string|null>",
+      "store_format": "grocery|grocery_plus_prepared_foods|bakery|butcher|restaurant|caterer|wholesaler|beauty_retailer|online_seller|service|unknown",
+      "hybrid_role": "<string|null>",
       "address": "<string|null>",
       "phone": "<string|null>",
       "website": "<string|null>"
     },
     "identity_status": "confirmed|ambiguous|mismatched",
     "identity_confidence": "high|medium|low",
+    "identity_corroboration_sources": ["<string>", ...],
     "limitations": ["<string>", ...]
   },
+  "detected_signals": ["<signal_code>", ...],
   "summary": "<one concise paragraph>",
   "platforms": {
     "google": {
@@ -405,6 +518,7 @@ Return your response as JSON matching this exact schema:
       "newest_observable_unanswered_review": "<string|null>",
       "primary_category": "<string|null>",
       "additional_categories": ["<string>", ...],
+      "category_fit_assessment": "<string|null>",
       "displayed_name": "<string|null>",
       "displayed_address": "<string|null>",
       "displayed_phone": "<string|null>",
@@ -412,9 +526,12 @@ Return your response as JSON matching this exact schema:
       "profile_issues": ["<string>", ...],
       "data_status": "complete|partial|unavailable|unable_to_verify"
     },
-    "yelp": { ...same per-platform structure minus primary_category/additional_categories... },
+    "yelp": { ...same per-platform structure minus primary_category/additional_categories/category_fit_assessment... },
     "facebook": { "profile_status": "...", "rating_or_recommendation": "<string|null>", ...same per-platform structure... }
   },
+  "specialized_sources_audited": [
+    { "source": "<string>", "tier": <number>, "source_type": "<string>", "consulted": <boolean>, "findings": "<string>", "url": "<string|null>", "accessed_date": "<string|null>" }
+  ],
   "combined_review_metrics": {
     "observable_total_reviews": <number|null>,
     "observable_reviews_with_response": <number|null>,
@@ -427,6 +544,13 @@ Return your response as JSON matching this exact schema:
     "newest_unanswered_review": "<string|null>",
     "counts_complete": <boolean>
   },
+  "alignment_scoring": {
+    "misalignment_index": <number|null>,
+    "action_classification": "ADMIN_NEGLECT|CORPORATE_SHIELD|CRITICAL_DISTRESS|BALANCED_HEALTHY",
+    "lead_disposition": "HIGH_PRIORITY_OUTREACH|DISCARD|REHABILITATION_OUTREACH|STANDARD_OUTREACH",
+    "primary_outreach_hook": "<string>",
+    "alignment_breakdown": { "admin_score": <number|null>, "public_sentiment_score": <number|null>, "delta": <number|null> }
+  },
   "website": {
     "url": "<string|null>",
     "status": "working|broken|none_found|social_media_only|unable_to_verify",
@@ -437,6 +561,8 @@ Return your response as JSON matching this exact schema:
     "call_to_action_present": <boolean|null> (null when unable to verify),
     "service_information_present": <boolean|null> (null when unable to verify),
     "location_information_present": <boolean|null> (null when unable to verify),
+    "category_specific_content_present": "yes|likely|no|unable_to_verify" (null when unable to verify),
+    "ordering_or_pickup_info_present": "yes|likely|no|unable_to_verify" (null when unable to verify),
     "issues": ["<string>", ...],
     "conversion_opportunities": ["<string>", ...]
   },
@@ -450,6 +576,30 @@ Return your response as JSON matching this exact schema:
     "phone_variations": ["<string>", ...],
     "material_issues": ["<string>", ...]
   },
+  "operational_status": {
+    "status": "active|likely_active|inactive|unable_to_verify",
+    "last_activity_evidence": "<string|null>",
+    "last_activity_date": "<string|null>",
+    "evidence_sources": ["<string>", ...]
+  },
+  "competitive_benchmarks": [
+    {
+      "business_name": "<string>",
+      "store_format": "<string>",
+      "geographic_reach": "<string>",
+      "product_breadth": "narrow|moderate|broad",
+      "prepared_food_component": <boolean>,
+      "delivery_model": "none|marketplace|direct|both",
+      "regional_specialization": "<string|null>",
+      "google_rating": <number|null>,
+      "google_review_count": <number|null>,
+      "yelp_rating": <number|null>,
+      "yelp_review_count": <number|null>,
+      "profile_completeness_score": <number 0-10>,
+      "format_context_note": "<string>",
+      "specialization_evidence_direct": <boolean>
+    }
+  ],
   "unanswered_negative_review_examples": [
     { "platform": "<string>", "rating": <number|null>, "date": "<string|null>", "complaint_summary": "<string>", "response_status": "<string|null>", "verification_status": "<string|null>" }
   ],

@@ -63,11 +63,13 @@ Return ONLY the JSON object, no markdown fences, no commentary.`,
   business_analysis: `
 
 Return your response as JSON matching the Business Analysis schema.
-Top-level keys: audit_metadata, summary, platforms, combined_review_metrics,
-website, nap_consistency, unanswered_negative_review_examples,
-negative_review_themes, digital_opportunity_score, high_attention,
-high_attention_reasons, recommended_tier, tier_rationale,
-estimated_monthly_service_fee, recommended_services, data_quality, sources.
+Top-level keys: audit_metadata, detected_signals, summary, platforms,
+specialized_sources_audited, combined_review_metrics, alignment_scoring,
+website, nap_consistency, operational_status, competitive_benchmarks,
+unanswered_negative_review_examples, negative_review_themes,
+digital_opportunity_score, high_attention, high_attention_reasons,
+recommended_tier, tier_rationale, estimated_monthly_service_fee,
+recommended_services, data_quality, sources.
 
 CRITICAL JSON RULES:
 - Every element of a JSON array MUST be a bare JSON object "{ ... }" separated by
