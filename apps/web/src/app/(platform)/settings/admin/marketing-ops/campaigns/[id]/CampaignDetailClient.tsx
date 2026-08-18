@@ -1215,29 +1215,97 @@ export default function CampaignDetailClient({
                       </div>
                     );
                   }
+                  // ─── Organization: group by category → sort by output_schema,
+                  //     with is_default pinned first within each group. This
+                  //     replaces the flat grid so the operator can scan by
+                  //     intent (profile_repair vs Digital Audit vs outreach)
+                  //     rather than reading every card body.
+                  const UNCATEGORIZED = 'Uncategorized';
+                  const NO_SCHEMA = 'No schema';
+                  const grouped = (() => {
+                    const map = new Map<string, typeof stageRelevant>();
+                    for (const t of stageRelevant) {
+                      const key = t.category?.trim() || UNCATEGORIZED;
+                      const arr = map.get(key) ?? [];
+                      arr.push(t);
+                      map.set(key, arr);
+                    }
+                    // Sort templates within each category: default first, then
+                    // by output_schema, then by name.
+                    for (const [, arr] of map) {
+                      arr.sort((a, b) => {
+                        if (!!a.is_default !== !!b.is_default) return a.is_default ? -1 : 1;
+                        const sa = a.output_schema?.name ?? NO_SCHEMA;
+                        const sb = b.output_schema?.name ?? NO_SCHEMA;
+                        if (sa !== sb) return sa.localeCompare(sb);
+                        return a.name.localeCompare(b.name);
+                      });
+                    }
+                    // Sort category groups: Uncategorized last, otherwise alpha.
+                    return [...map.entries()].sort((a, b) => {
+                      if (a[0] === UNCATEGORIZED) return 1;
+                      if (b[0] === UNCATEGORIZED) return -1;
+                      return a[0].localeCompare(b[0]);
+                    });
+                  })();
+
                   return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {stageRelevant.map((t) => (
-                        <div key={t.id} className="border border-gray-200 dark:border-neutral-700 rounded-xl p-4 flex flex-col">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <h4 className="font-semibold text-gray-900 dark:text-white text-sm">{t.name}</h4>
-                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300">
-                              {PROMPT_TYPE_LABELS[t.prompt_type]}
+                    <div className="space-y-6">
+                      {grouped.map(([categoryLabel, items]) => (
+                        <div key={categoryLabel}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              {categoryLabel}
+                            </h4>
+                            <span className="text-xs text-gray-400 dark:text-gray-500">
+                              {items.length} {items.length === 1 ? 'prompt' : 'prompts'}
                             </span>
+                            <div className="flex-1 border-t border-gray-200 dark:border-neutral-700" />
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-50 dark:bg-neutral-900/50 rounded p-2 line-clamp-3 flex-1">
-                            {t.body.slice(0, 160)}{t.body.length > 160 ? '...' : ''}
-                          </p>
-                          {t.output_schema?.name && (
-                            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">Schema: {t.output_schema.name}</p>
-                          )}
-                          <Link
-                            href={`/settings/admin/marketing-ops/prompts/${t.id}?campaignId=${campaignId}`}
-                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 self-start"
-                          >
-                            Open Workspace
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {items.map((t) => {
+                              const isIntelligenceAware =
+                                t.prompt_type === 'seek' &&
+                                (t.scope ?? 'business').toLowerCase() === 'business';
+                              return (
+                                <div key={t.id} className={`border rounded-xl p-4 flex flex-col ${t.is_default ? 'border-blue-300 dark:border-blue-700 ring-1 ring-blue-200 dark:ring-blue-900/40' : 'border-gray-200 dark:border-neutral-700'}`}>
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">{t.name}</h4>
+                                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300">
+                                      {PROMPT_TYPE_LABELS[t.prompt_type]}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                    {t.is_default && (
+                                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                        Default
+                                      </span>
+                                    )}
+                                    {isIntelligenceAware && (
+                                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300" title="Receives intelligence-profile amplification at runtime when the campaign category has an active profile">
+                                        Intelligence-aware
+                                      </span>
+                                    )}
+                                    {t.output_schema?.name && (
+                                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-400">
+                                        {t.output_schema.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-50 dark:bg-neutral-900/50 rounded p-2 line-clamp-3 flex-1">
+                                    {t.body.slice(0, 160)}{t.body.length > 160 ? '...' : ''}
+                                  </p>
+                                  <Link
+                                    href={`/settings/admin/marketing-ops/prompts/${t.id}?campaignId=${campaignId}`}
+                                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 self-start"
+                                  >
+                                    Open Workspace
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </Link>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>
