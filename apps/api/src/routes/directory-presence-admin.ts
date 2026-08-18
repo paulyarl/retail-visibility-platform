@@ -546,6 +546,15 @@ router.get('/seek-batches/:id', requirePlatformStaff, async (req: Request, res: 
 });
 
 /** POST /api/admin/directory/seek-batches — create a seek batch */
+const createBatchEntrySchema = z.object({
+  profileId: z.string(),
+  profileVersion: z.number().optional(),
+  nicheCategory: z.string(),
+  city: z.string(),
+  state: z.string().optional(),
+  intelligenceFocus: z.enum(['emerging', 'competitive']).optional(),
+});
+
 const createBatchSchema = z.object({
   profileId: z.string(),
   profileVersion: z.number().optional(),
@@ -553,7 +562,11 @@ const createBatchSchema = z.object({
   intelligenceFocus: z.enum(['emerging', 'competitive']).optional(),
   cities: z.array(z.string()).min(1).max(10),
   state: z.string().optional(),
-});
+  entries: z.array(createBatchEntrySchema).max(20).optional(),
+}).refine(
+  (data) => data.entries || (data.profileId && data.nicheCategory && data.cities.length > 0),
+  { message: 'Either entries[] or (profileId + nicheCategory + cities) must be provided' },
+);
 
 router.post('/seek-batches', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {

@@ -355,6 +355,16 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     intelligenceFocus?: string;
     cities: string[];
     state?: string;
+    /** Queue-based entries: one tightly-coupled (profile, city, category, focus) tuple per entry.
+     *  When provided, entries are the source of truth — one campaign per entry at launch time. */
+    entries?: Array<{
+      profileId: string;
+      profileVersion?: number;
+      nicheCategory: string;
+      city: string;
+      state?: string;
+      intelligenceFocus?: string;
+    }>;
   }): Promise<any> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/seek-batches`,

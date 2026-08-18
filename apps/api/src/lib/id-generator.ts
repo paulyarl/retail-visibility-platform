@@ -1265,6 +1265,15 @@ export function generateSeekBatchSlug(category: string, cityCount: number): stri
 }
 
 /**
+ * Generate a seek batch entry ID.
+ * Format: sbe-{nanoid12}
+ */
+export function generateSeekBatchEntryId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `sbe-${nanoid()}`;
+}
+
+/**
  * Generate a tenant_storefront_hours_settings ID.
  * Format: shs-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

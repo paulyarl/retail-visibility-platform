@@ -12,13 +12,34 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
-import { generateSeekBatchId, generateSeekBatchSlug } from '../lib/id-generator';
+import { generateSeekBatchId, generateSeekBatchSlug, generateSeekBatchEntryId } from '../lib/id-generator';
 
 interface BatchAuditCtx {
   actorType?: 'user' | 'system' | 'integration' | 'customer';
   actorId?: string;
   ip?: string;
   userAgent?: string;
+}
+
+export interface BatchEntryInput {
+  profileId: string;
+  profileVersion?: number;
+  nicheCategory: string;
+  city: string;
+  state?: string;
+  intelligenceFocus?: string;
+}
+
+export interface BatchEntry {
+  id: string;
+  batchId: string;
+  profileId: string;
+  profileVersion: number | null;
+  nicheCategory: string;
+  city: string;
+  state: string | null;
+  intelligenceFocus: string;
+  sortOrder: number;
 }
 
 export interface CreateBatchInput {
@@ -28,6 +49,10 @@ export interface CreateBatchInput {
   intelligenceFocus?: string;
   cities: string[];
   state?: string;
+  /** Queue-based entries: one tightly-coupled (profile, city, category, focus) tuple per entry.
+   *  When provided, entries are the source of truth at launch time — one campaign per entry,
+   *  each using its own profile/category/focus. Eliminates profile spillover. */
+  entries?: BatchEntryInput[];
 }
 
 export interface BatchSummary {
@@ -42,6 +67,7 @@ export interface BatchSummary {
   status: string;
   createdAt: Date;
   completedAt: Date | null;
+  entries?: BatchEntry[];
 }
 
 export interface BatchMetrics {
@@ -54,15 +80,36 @@ export interface BatchMetrics {
 class BatchSeekService {
   /**
    * Create a seek batch record (does not launch yet).
+   *
+   * When `input.entries` is provided (queue-based flow), each entry tightly
+   * couples a (profile, city, category, focus) tuple. The parent batch row
+   * stores a summary (first entry's profile/category/focus, all entry cities)
+   * for backward-compatible list views, but the entries table is the source
+   * of truth at launch time.
    */
   async createBatch(
     input: CreateBatchInput,
     ctx?: BatchAuditCtx,
   ): Promise<BatchSummary> {
     const id = generateSeekBatchId();
-    const batchSlug = generateSeekBatchSlug(input.nicheCategory, input.cities.length);
 
-    const focus = input.intelligenceFocus || 'emerging';
+    // Derive summary fields from entries when available, otherwise use legacy fields
+    const hasEntries = input.entries && input.entries.length > 0;
+    const entries = hasEntries ? input.entries! : [];
+
+    const summaryProfileId = hasEntries ? entries[0].profileId : input.profileId;
+    const summaryProfileVersion = hasEntries
+      ? (entries[0].profileVersion || null)
+      : (input.profileVersion || null);
+    const summaryCategory = hasEntries ? entries[0].nicheCategory : input.nicheCategory;
+    const summaryFocus = hasEntries
+      ? (entries[0].intelligenceFocus || 'emerging')
+      : (input.intelligenceFocus || 'emerging');
+    const summaryCities = hasEntries
+      ? Array.from(new Set(entries.map((e) => e.city)))
+      : input.cities;
+
+    const batchSlug = generateSeekBatchSlug(summaryCategory, summaryCities.length);
 
     await prisma.$executeRaw`
       INSERT INTO mkt_seek_batches (
@@ -71,11 +118,11 @@ class BatchSeekService {
       ) VALUES (
         ${id},
         ${batchSlug},
-        ${input.profileId},
-        ${input.profileVersion || null},
-        ${input.nicheCategory},
-        ${focus},
-        ${input.cities}::text[],
+        ${summaryProfileId},
+        ${summaryProfileVersion},
+        ${summaryCategory},
+        ${summaryFocus},
+        ${summaryCities}::text[],
         ${'{}'}::text[],
         'draft',
         ${ctx?.actorId || null},
@@ -83,38 +130,77 @@ class BatchSeekService {
       )
     `;
 
+    // Insert per-entry rows when entries are provided (queue-based flow)
+    const entryRows: BatchEntry[] = [];
+    if (hasEntries) {
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        const entryId = generateSeekBatchEntryId();
+        const entryFocus = e.intelligenceFocus || 'emerging';
+        await prisma.$executeRaw`
+          INSERT INTO mkt_seek_batch_entries (
+            id, batch_id, profile_id, profile_version, niche_category,
+            city, state, intelligence_focus, sort_order, created_at
+          ) VALUES (
+            ${entryId},
+            ${id},
+            ${e.profileId},
+            ${e.profileVersion || null},
+            ${e.nicheCategory},
+            ${e.city},
+            ${e.state || null},
+            ${entryFocus},
+            ${i},
+            now()
+          )
+        `;
+        entryRows.push({
+          id: entryId,
+          batchId: id,
+          profileId: e.profileId,
+          profileVersion: e.profileVersion || null,
+          nicheCategory: e.nicheCategory,
+          city: e.city,
+          state: e.state || null,
+          intelligenceFocus: entryFocus,
+          sortOrder: i,
+        });
+      }
+    }
+
     audit({
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'seek_batch.create',
-      payload: { batchId: id, batchSlug, nicheCategory: input.nicheCategory, intelligenceFocus: focus, cities: input.cities },
+      payload: { batchId: id, batchSlug, nicheCategory: summaryCategory, intelligenceFocus: summaryFocus, cities: summaryCities, entryCount: entries.length },
     });
 
-    logger.info('BatchSeekService.createBatch', undefined, { id, batchSlug, cities: input.cities });
+    logger.info('BatchSeekService.createBatch', undefined, { id, batchSlug, cities: summaryCities, entryCount: entries.length });
 
     return {
       id,
       batchSlug,
-      profileId: input.profileId,
-      profileVersion: input.profileVersion || null,
-      nicheCategory: input.nicheCategory,
-      intelligenceFocus: focus,
-      cities: input.cities,
+      profileId: summaryProfileId,
+      profileVersion: summaryProfileVersion,
+      nicheCategory: summaryCategory,
+      intelligenceFocus: summaryFocus,
+      cities: summaryCities,
       campaignIds: [],
       status: 'draft',
       createdAt: new Date(),
       completedAt: null,
+      entries: entryRows.length > 0 ? entryRows : undefined,
     };
   }
 
   /**
-   * Launch a seek batch: creates one campaign per city and tags them
-   * with the batch_id. The actual intelligence run execution is handled
-   * by the existing seek pipeline (external agent or manual trigger).
+   * Launch a seek batch: creates one campaign per entry (or per city for
+   * legacy batches without entries) and tags them with the batch_id.
    *
-   * This method creates the campaigns and links them to the batch. The
-   * operator then triggers intelligence runs per campaign (or the batch
-   * launcher can trigger them all).
+   * When the batch has `mkt_seek_batch_entries`, each entry drives its own
+   * campaign using the entry's tightly-coupled profile/category/focus/city —
+   * no spillover. Legacy batches fall back to one campaign per city using
+   * the batch-level profile/category/focus.
    */
   async launchBatch(
     batchId: string,
@@ -133,39 +219,82 @@ class BatchSeekService {
       return { success: false, error: 'batch_already_launched' };
     }
 
-    const cities: string[] = batch.cities;
+    // Load entries if they exist (queue-based flow)
+    const entryRows = await prisma.$queryRaw<any[]>`
+      SELECT id, profile_id, profile_version, niche_category, city, state, intelligence_focus, sort_order
+      FROM mkt_seek_batch_entries
+      WHERE batch_id = ${batchId}
+      ORDER BY sort_order ASC
+    `;
+
     const campaignIds: string[] = [];
 
-    // Create one campaign per city
-    for (const city of cities) {
-      const campaignId = `mkt-${batch.niche_category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
-      const focus = batch.intelligence_focus || 'emerging';
+    if (entryRows.length > 0) {
+      // Queue-based launch: one campaign per entry, each using its own profile/category/focus
+      for (const entry of entryRows) {
+        const campaignId = `mkt-${entry.niche_category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${entry.city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+        const focus = entry.intelligence_focus || 'emerging';
 
-      try {
-        await prisma.$executeRaw`
-          INSERT INTO mkt_campaigns_list (
-            id, category, city, state, scope, intelligence_focus,
-            intelligence_campaign_kind, seek_batch_id, stage,
-            created_at, updated_at
-          ) VALUES (
-            ${campaignId},
-            ${batch.niche_category},
-            ${city},
-            ${'IN'},
-            'intelligence',
-            ${focus},
-            'discovery',
-            ${batchId},
-            'seek',
-            now(), now()
-          )
-        `;
-        campaignIds.push(campaignId);
-      } catch (err) {
-        logger.error('BatchSeekService.launchBatch — campaign creation failed', undefined, {
-          batchId, city, error: (err as Error).message,
-        });
-        // Continue with other cities — partial failure is OK
+        try {
+          await prisma.$executeRaw`
+            INSERT INTO mkt_campaigns_list (
+              id, category, city, state, scope, intelligence_focus,
+              intelligence_campaign_kind, seek_batch_id, stage,
+              created_at, updated_at
+            ) VALUES (
+              ${campaignId},
+              ${entry.niche_category},
+              ${entry.city},
+              ${entry.state || 'IN'},
+              'intelligence',
+              ${focus},
+              'discovery',
+              ${batchId},
+              'seek',
+              now(), now()
+            )
+          `;
+          campaignIds.push(campaignId);
+        } catch (err) {
+          logger.error('BatchSeekService.launchBatch — campaign creation failed (entry)', undefined, {
+            batchId, city: entry.city, category: entry.niche_category, error: (err as Error).message,
+          });
+          // Continue with other entries — partial failure is OK
+        }
+      }
+    } else {
+      // Legacy launch: one campaign per city using batch-level profile/category/focus
+      const cities: string[] = batch.cities;
+      for (const city of cities) {
+        const campaignId = `mkt-${batch.niche_category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+        const focus = batch.intelligence_focus || 'emerging';
+
+        try {
+          await prisma.$executeRaw`
+            INSERT INTO mkt_campaigns_list (
+              id, category, city, state, scope, intelligence_focus,
+              intelligence_campaign_kind, seek_batch_id, stage,
+              created_at, updated_at
+            ) VALUES (
+              ${campaignId},
+              ${batch.niche_category},
+              ${city},
+              ${'IN'},
+              'intelligence',
+              ${focus},
+              'discovery',
+              ${batchId},
+              'seek',
+              now(), now()
+            )
+          `;
+          campaignIds.push(campaignId);
+        } catch (err) {
+          logger.error('BatchSeekService.launchBatch — campaign creation failed', undefined, {
+            batchId, city, error: (err as Error).message,
+          });
+          // Continue with other cities — partial failure is OK
+        }
       }
     }
 
@@ -252,6 +381,27 @@ class BatchSeekService {
       GROUP BY pq.city
     `;
 
+    // Load entries if they exist (queue-based flow)
+    const entryRows = await prisma.$queryRaw<any[]>`
+      SELECT id, profile_id, profile_version, niche_category, city, state, intelligence_focus, sort_order
+      FROM mkt_seek_batch_entries
+      WHERE batch_id = ${batchId}
+      ORDER BY sort_order ASC
+    `;
+    const entries: BatchEntry[] | undefined = entryRows.length > 0
+      ? entryRows.map((e) => ({
+          id: e.id,
+          batchId: batchId,
+          profileId: e.profile_id,
+          profileVersion: e.profile_version,
+          nicheCategory: e.niche_category,
+          city: e.city,
+          state: e.state,
+          intelligenceFocus: e.intelligence_focus || 'emerging',
+          sortOrder: e.sort_order,
+        }))
+      : undefined;
+
     return {
       id: r.id,
       batchSlug: r.batch_slug,
@@ -264,6 +414,7 @@ class BatchSeekService {
       status: r.status,
       createdAt: new Date(r.created_at),
       completedAt: r.completed_at ? new Date(r.completed_at) : null,
+      entries,
       metrics: {
         totalProspects: parseInt(r.total_prospects) || 0,
         totalSeeds: parseInt(r.total_seeds) || 0,

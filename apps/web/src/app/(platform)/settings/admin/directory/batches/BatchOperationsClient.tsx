@@ -44,8 +44,18 @@ export default function BatchOperationsDashboard() {
   const [profileId, setProfileId] = useState('');
   const [nicheCategory, setNicheCategory] = useState('');
   const [focus, setFocus] = useState<IntelligenceFocus | ''>('');
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedCity, setSelectedCity] = useState('');
   const [state, setState] = useState('');
+  // Queue of tightly-coupled (category, city, profile, focus) entries
+  const [queue, setQueue] = useState<Array<{
+    profileId: string;
+    profileVersion?: number;
+    nicheCategory: string;
+    city: string;
+    state?: string;
+    intelligenceFocus: string;
+    profileLabel: string;
+  }>>([]);
   const [creating, setCreating] = useState(false);
   const [launcherError, setLauncherError] = useState<string | null>(null);
   const [createdBatch, setCreatedBatch] = useState<any>(null);
@@ -85,7 +95,7 @@ export default function BatchOperationsDashboard() {
     if (category || city) {
       setShowLauncher(true);
       if (category) setNicheCategory(category);
-      if (city) setSelectedCities([city]);
+      if (city) setSelectedCity(city);
     }
   }, [searchParams]);
 
@@ -97,73 +107,140 @@ export default function BatchOperationsDashboard() {
         .listIntelligenceProfiles()
         .then((result) => {
           setProfiles(result || []);
-          // Auto-select first profile if none selected
-          if (result && result.length > 0 && !profileId) {
-            const first = result[0];
-            setProfileId(first.id);
-            // Auto-populate niche category and focus from the selected profile
-            if (!nicheCategory && first.category_name) {
-              setNicheCategory(first.category_name);
-            }
-            if (!focus && first.intelligence_focus) {
-              setFocus(first.intelligence_focus);
-            }
-          }
         })
         .catch(() => {
           setLauncherError('Failed to load intelligence profiles.');
         })
         .finally(() => setProfilesLoading(false));
     }
-  }, [showLauncher, profiles, profilesLoading, profileId]);
+  }, [showLauncher, profiles, profilesLoading]);
 
-  // Profiles filtered by selected category + focus
-  const filteredProfiles = profiles.filter((p) => {
+  // Derived option lists from all profiles
+  const availableCategories = Array.from(
+    new Set(profiles.map((p) => p.category_name || p.category_key).filter(Boolean)),
+  ).sort();
+
+  // Cities filtered by selected category (only cities that have a profile for that category)
+  const availableCities = Array.from(
+    new Set(
+      profiles
+        .filter((p) => !nicheCategory || (p.category_name || p.category_key) === nicheCategory)
+        .map((p) => p.reference_city)
+        .filter((c): c is string => Boolean(c)),
+    ),
+  ).sort();
+
+  // Profiles filtered by selected category + city (tight coupling)
+  const availableProfiles = profiles.filter((p) => {
     if (nicheCategory && (p.category_name || p.category_key) !== nicheCategory) return false;
-    if (focus && p.intelligence_focus !== focus) return false;
+    if (selectedCity && p.reference_city && p.reference_city !== selectedCity) return false;
     return true;
   });
 
-  // When category or focus changes, auto-select the first matching profile
+  // When category changes, reset city + profile if they no longer match
   useEffect(() => {
-    if (filteredProfiles.length === 0) return;
-    const currentMatch = filteredProfiles.find((p) => p.id === profileId);
-    if (!currentMatch) {
-      setProfileId(filteredProfiles[0].id);
+    if (selectedCity && !availableCities.includes(selectedCity)) {
+      setSelectedCity('');
+      setProfileId('');
     }
-  }, [nicheCategory, focus, filteredProfiles, profileId]);
+  }, [nicheCategory, selectedCity, availableCities]);
+
+  // When city changes, reset profile if it no longer matches
+  useEffect(() => {
+    if (profileId) {
+      const stillValid = availableProfiles.find((p) => p.id === profileId);
+      if (!stillValid) {
+        setProfileId('');
+        setFocus('');
+      }
+    }
+  }, [selectedCity, profileId, availableProfiles]);
+
+  // When profile is selected, derive focus from it
+  const handleProfileSelect = (id: string) => {
+    setProfileId(id);
+    const p = profiles.find((pr) => pr.id === id);
+    setFocus(p?.intelligence_focus || '');
+  };
+
+  // Check if current (category, city, profile) is already in the queue
+  const isDuplicateEntry = queue.some(
+    (q) => q.nicheCategory === nicheCategory && q.city === selectedCity,
+  );
+
+  const canAddToQueue = Boolean(
+    nicheCategory.trim() && selectedCity.trim() && profileId && !isDuplicateEntry,
+  );
+
+  const handleAddToQueue = () => {
+    if (!canAddToQueue) return;
+    const p = profiles.find((pr) => pr.id === profileId);
+    if (!p) return;
+    const focusValue = (p.intelligence_focus || 'emerging') as IntelligenceFocus;
+    const focusLabel = focusValue.charAt(0).toUpperCase() + focusValue.slice(1);
+    const cityLabel = selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1);
+    const profileLabel = [
+      p.category_name || p.category_key || p.id,
+      cityLabel,
+      focusLabel,
+      p.version ? `v${p.version}` : '',
+    ].filter(Boolean).join(' - ');
+
+    setQueue((prev) => [
+      ...prev,
+      {
+        profileId: p.id,
+        profileVersion: p.version,
+        nicheCategory,
+        city: selectedCity,
+        state: state.trim() || undefined,
+        intelligenceFocus: focusValue,
+        profileLabel,
+      },
+    ]);
+    // Reset city + profile for next entry (keep category for rapid multi-city queueing)
+    setSelectedCity('');
+    setProfileId('');
+    setFocus('');
+  };
+
+  const handleRemoveFromQueue = (index: number) => {
+    setQueue((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLauncherError(null);
     setCreatedBatch(null);
 
-    if (!profileId) {
-      setLauncherError('Please select an intelligence profile.');
+    if (queue.length === 0) {
+      setLauncherError('Please add at least one entry to the queue.');
       return;
     }
-    if (!nicheCategory.trim()) {
-      setLauncherError('Please select a niche category.');
-      return;
-    }
-    const cities = selectedCities;
-    if (cities.length === 0) {
-      setLauncherError('Please select at least one city.');
-      return;
-    }
-    if (cities.length > 10) {
-      setLauncherError('Maximum 10 cities per batch.');
+    if (queue.length > 20) {
+      setLauncherError('Maximum 20 entries per batch.');
       return;
     }
 
     setCreating(true);
     try {
       const batch = await directoryPresenceAdminService.createSeekBatch({
-        profileId,
-        nicheCategory: nicheCategory.trim(),
-        intelligenceFocus: focus || undefined,
-        cities,
-        state: state.trim() || undefined,
+        // Summary fields (derived from first entry by backend)
+        profileId: queue[0].profileId,
+        profileVersion: queue[0].profileVersion,
+        nicheCategory: queue[0].nicheCategory,
+        intelligenceFocus: queue[0].intelligenceFocus,
+        cities: Array.from(new Set(queue.map((q) => q.city))),
+        state: queue[0].state,
+        // Queue-based entries — source of truth at launch time
+        entries: queue.map((q) => ({
+          profileId: q.profileId,
+          profileVersion: q.profileVersion,
+          nicheCategory: q.nicheCategory,
+          city: q.city,
+          state: q.state,
+          intelligenceFocus: q.intelligenceFocus,
+        })),
       });
       setCreatedBatch(batch);
       // Refresh the seek batches list
@@ -217,8 +294,10 @@ export default function BatchOperationsDashboard() {
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">New Seek Batch</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Create a multi-city seek batch. Intelligence will run across all selected cities for the chosen niche.
-            After creation, click Launch to start the seek runs.
+            Build a batch by queueing tightly-coupled (category, city, profile) entries.
+            Select a category, then a city, then a profile — each entry is locked to its
+            own profile to prevent spillover. Add multiple entries to the queue, then
+            click Create Batch.
           </p>
 
           {launcherError && (
@@ -248,8 +327,10 @@ export default function BatchOperationsDashboard() {
                     setCreatedBatch(null);
                     setNicheCategory('');
                     setFocus('');
-                    setSelectedCities([]);
+                    setSelectedCity('');
+                    setProfileId('');
                     setState('');
+                    setQueue([]);
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
                 >
@@ -258,11 +339,64 @@ export default function BatchOperationsDashboard() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleCreateBatch} className="space-y-4">
-              {/* Intelligence Profile */}
+            <form onSubmit={handleCreateBatch} className="space-y-5">
+              {/* Step 1: Niche Category (top of funnel) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Intelligence Profile <span className="text-red-500">*</span>
+                  1. Niche Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={nicheCategory}
+                  onChange={(e) => setNicheCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="">Select a category...</option>
+                  {availableCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Start with the niche. City and profile options narrow to profiles
+                  that have this category.
+                </p>
+              </div>
+
+              {/* Step 2: City (filtered by category) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  2. City <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  disabled={!nicheCategory}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">
+                    {nicheCategory ? 'Select a city...' : 'Select a category first'}
+                  </option>
+                  {availableCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city.charAt(0).toUpperCase() + city.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Only cities with a matching profile for the selected category are shown.
+                </p>
+                {nicheCategory && availableCities.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No cities found with a profile for this category.
+                  </p>
+                )}
+              </div>
+
+              {/* Step 3: Intelligence Profile (filtered by category + city) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  3. Intelligence Profile <span className="text-red-500">*</span>
                 </label>
                 {profilesLoading ? (
                   <p className="text-sm text-gray-500">Loading profiles...</p>
@@ -277,161 +411,60 @@ export default function BatchOperationsDashboard() {
                 ) : (
                   <select
                     value={profileId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setProfileId(id);
-                      // Auto-populate niche category and focus from the selected profile
-                      const p = profiles.find((pr) => pr.id === id);
-                      if (p?.category_name) {
-                        setNicheCategory(p.category_name);
-                      }
-                      if (p?.intelligence_focus) {
-                        setFocus(p.intelligence_focus);
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    required
+                    onChange={(e) => handleProfileSelect(e.target.value)}
+                    disabled={!selectedCity}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    {filteredProfiles.length === 0 ? (
-                      <option value="">No profiles match the selected filters</option>
-                    ) : (
-                      filteredProfiles.map((p) => {
-                        const focusLabel = p.intelligence_focus
-                          ? p.intelligence_focus.charAt(0).toUpperCase() + p.intelligence_focus.slice(1)
-                          : '';
-                        const cityLabel = p.reference_city
-                          ? p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1)
-                          : '';
-                        const label = [
-                          p.category_name || p.category_key || p.id,
-                          cityLabel,
-                          focusLabel,
-                          p.version ? `v${p.version}` : '',
-                        ].filter(Boolean).join(' - ');
-                        return (
-                          <option key={p.id} value={p.id}>
-                            {label}
-                          </option>
-                        );
-                      })
-                    )}
+                    <option value="">
+                      {selectedCity ? 'Select a profile...' : 'Select a city first'}
+                    </option>
+                    {availableProfiles.map((p) => {
+                      const focusLabel = p.intelligence_focus
+                        ? p.intelligence_focus.charAt(0).toUpperCase() + p.intelligence_focus.slice(1)
+                        : '';
+                      const cityLabel = p.reference_city
+                        ? p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1)
+                        : '';
+                      const label = [
+                        p.category_name || p.category_key || p.id,
+                        cityLabel,
+                        focusLabel,
+                        p.version ? `v${p.version}` : '',
+                      ].filter(Boolean).join(' - ');
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
                   The intelligence profile defines the seek prompts and analysis scope.
+                  Focus is derived from the selected profile.
                 </p>
-              </div>
-
-              {/* Niche Category */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Niche Category <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={nicheCategory}
-                  onChange={(e) => setNicheCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  required
-                >
-                  <option value="">Select a category...</option>
-                  {Array.from(
-                    new Set(
-                      profiles
-                        .map((p) => p.category_name || p.category_key)
-                        .filter(Boolean),
-                    ),
-                  )
-                    .sort()
-                    .map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Derived from available intelligence profiles. Selecting a category
-                  auto-selects a matching profile.
-                </p>
-              </div>
-
-              {/* Cities */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cities <span className="text-red-500">*</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {Array.from(
-                    new Set(
-                      profiles
-                        .map((p) => p.reference_city)
-                        .filter((c): c is string => Boolean(c)),
-                    ),
-                  )
-                    .sort()
-                    .map((city) => {
-                      const label =
-                        city.charAt(0).toUpperCase() + city.slice(1);
-                      const isSelected = selectedCities.includes(city);
-                      return (
-                        <button
-                          key={city}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCities((prev) =>
-                              isSelected
-                                ? prev.filter((c) => c !== city)
-                                : [...prev, city],
-                            );
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                </div>
-                {selectedCities.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Selected: {selectedCities.length}{' '}
-                    {selectedCities.length === 1 ? 'city' : 'cities'} (max 10).
-                    Each city gets its own seek run, all sharing the same batch
-                    ID.
+                {selectedCity && availableProfiles.length === 0 && !profilesLoading && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No profiles found for this category + city combination.
                   </p>
                 )}
-                {profiles.length > 0 &&
-                  profiles.every((p) => !p.reference_city) && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      No reference cities found in intelligence profiles.
-                    </p>
-                  )}
               </div>
 
-              {/* Focus */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Focus <span className="text-gray-400">(optional)</span>
-                </label>
-                <select
-                  value={focus}
-                  onChange={(e) => setFocus(e.target.value as IntelligenceFocus | '')}
-                  className="w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                  <option value="">All focuses</option>
-                  <option value="emerging">Emerging</option>
-                  <option value="competitive">Competitive</option>
-                </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Filters intelligence profiles by discovery focus. Emerging
-                  targets underserved businesses; Competitive benchmarks
-                  established operators.
-                </p>
-              </div>
+              {/* Derived Focus (read-only display) */}
+              {focus && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-500">Focus (derived from profile):</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    focus === 'competitive'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {focus.charAt(0).toUpperCase() + focus.slice(1)}
+                  </span>
+                </div>
+              )}
 
-              {/* State (optional) */}
+              {/* State (optional, applies to the entry being added) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   State <span className="text-gray-400">(optional)</span>
@@ -450,18 +483,91 @@ export default function BatchOperationsDashboard() {
                 </select>
               </div>
 
+              {/* Add to Queue button */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleAddToQueue}
+                  disabled={!canAddToQueue}
+                  className="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  + Add to Queue
+                </button>
+                {isDuplicateEntry && (
+                  <span className="text-xs text-amber-600">
+                    This category + city is already in the queue.
+                  </span>
+                )}
+              </div>
+
+              {/* Queue display */}
+              {queue.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                    <span className="text-sm font-medium text-gray-700">
+                      Batch Queue ({queue.length} {queue.length === 1 ? 'entry' : 'entries'})
+                    </span>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-gray-600 bg-white">
+                        <th className="py-2 px-4 font-medium">Category</th>
+                        <th className="py-2 px-4 font-medium">City</th>
+                        <th className="py-2 px-4 font-medium">Focus</th>
+                        <th className="py-2 px-4 font-medium">Profile</th>
+                        <th className="py-2 px-4 font-medium w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {queue.map((q, i) => (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-2 px-4 text-gray-900">{q.nicheCategory}</td>
+                          <td className="py-2 px-4 text-gray-900">
+                            {q.city.charAt(0).toUpperCase() + q.city.slice(1)}
+                          </td>
+                          <td className="py-2 px-4">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              q.intelligenceFocus === 'competitive'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {q.intelligenceFocus}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4 text-gray-600 text-xs font-mono">
+                            {q.profileLabel}
+                          </td>
+                          <td className="py-2 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFromQueue(i)}
+                              className="text-red-500 hover:text-red-700 text-xs font-medium"
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               {/* Submit */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 border-t border-gray-200">
                 <button
                   type="submit"
-                  disabled={creating || !profileId || !nicheCategory.trim() || selectedCities.length === 0}
+                  disabled={creating || queue.length === 0}
                   className="px-6 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {creating ? 'Creating...' : 'Create Batch'}
+                  {creating ? 'Creating...' : `Create Batch (${queue.length} ${queue.length === 1 ? 'entry' : 'entries'})`}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowLauncher(false)}
+                  onClick={() => {
+                    setShowLauncher(false);
+                    setQueue([]);
+                  }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
                 >
                   Cancel
