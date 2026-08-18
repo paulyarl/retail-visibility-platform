@@ -334,12 +334,22 @@ export default function DirectoryClaimClient() {
 
   if (state === 'success') {
     const tenantId = claimResult?.tenantId;
+    const hasPlatformTokens = !!claimResult?.userTokens;
+    const upgradeHref = tenantId
+      ? `/t/${tenantId}/settings/subscription/upgrade`
+      : null;
+
+    // If the claim returned platform JWTs (customer was promoted), the tokens
+    // are already in localStorage — go straight to the dashboard. Otherwise
+    // (existing platform user), route through /login which will detect the
+    // existing session and redirect.
     const dashboardHref = tenantId
       ? `/t/${tenantId}/dashboard?welcome=true`
       : '/account';
     const loginRedirect = tenantId
       ? `/login?redirect=${encodeURIComponent(`/t/${tenantId}/dashboard?welcome=true`)}`
       : '/login';
+    const goToDashboardHref = hasPlatformTokens ? dashboardHref : loginRedirect;
 
     return (
       <Container size="sm" className="py-12">
@@ -364,13 +374,23 @@ export default function DirectoryClaimClient() {
             )}
 
             <Group>
-              <Button component={Link} href={loginRedirect} leftSection={<IconCheck size={16} />}>
+              <Button component={Link} href={goToDashboardHref} leftSection={<IconCheck size={16} />}>
                 Go to Dashboard
               </Button>
+              {upgradeHref && (
+                <Button
+                  component={Link}
+                  href={upgradeHref}
+                  variant="light"
+                  leftSection={<IconShoppingCart size={16} />}
+                >
+                  Upgrade to Sell Online
+                </Button>
+              )}
               <Button
                 component={Link}
                 href="/directory"
-                variant="light"
+                variant="subtle"
                 leftSection={<IconArrowLeft size={16} />}
               >
                 Back to Directory
@@ -472,16 +492,16 @@ export default function DirectoryClaimClient() {
                 Create a free account or sign in to claim this listing.
               </Text>
               <Group>
-                <Button 
-                component={Link} 
+                <Button
+                component={Link}
                 variant='gradient' style={{ color: 'white' }}
-                href={`/register?redirect=${encodeURIComponent(`/place/claim/${token}`)}`} 
+                href={`/customerlogin?redirect=${encodeURIComponent(`/place/claim/${token}`)}&mode=register`}
                 size="md">
                   Create Account
                 </Button>
                 <Button
                   component={Link}
-                  href={`/login?redirect=${encodeURIComponent(`/place/claim/${token}`)}`}
+                  href={`/customerlogin?redirect=${encodeURIComponent(`/place/claim/${token}`)}&mode=login`}
                  variant='gradient' style={{ color: 'white' }}
                   size="md"
                 >

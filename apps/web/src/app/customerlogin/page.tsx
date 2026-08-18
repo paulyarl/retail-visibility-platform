@@ -17,7 +17,8 @@ export default function CustomerLoginPage() {
   const { settings } = usePlatformSettings();
 
   const redirect = searchParams?.get('redirect') || '/account';
-  const [isLogin, setIsLogin] = useState(true);
+  const modeParam = searchParams?.get('mode');
+  const [isLogin, setIsLogin] = useState(modeParam !== 'register');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
