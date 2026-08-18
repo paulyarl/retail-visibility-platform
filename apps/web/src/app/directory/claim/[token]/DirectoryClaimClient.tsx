@@ -458,6 +458,7 @@ export default function DirectoryClaimClient() {
               )}
               <Button
                 size="md"
+                variant='gradient' style={{ color: 'white' }}
                 loading={initiating || accepting}
                 onClick={handleInitiate}
                 leftSection={<IconCheck size={18} />}
@@ -471,13 +472,17 @@ export default function DirectoryClaimClient() {
                 Create a free account or sign in to claim this listing.
               </Text>
               <Group>
-                <Button component={Link} href={`/register?redirect=${encodeURIComponent(`/place/claim/${token}`)}`} size="md">
+                <Button 
+                component={Link} 
+                variant='gradient' style={{ color: 'white' }}
+                href={`/register?redirect=${encodeURIComponent(`/place/claim/${token}`)}`} 
+                size="md">
                   Create Account
                 </Button>
                 <Button
                   component={Link}
                   href={`/login?redirect=${encodeURIComponent(`/place/claim/${token}`)}`}
-                  variant="light"
+                 variant='gradient' style={{ color: 'white' }}
                   size="md"
                 >
                   Sign In
