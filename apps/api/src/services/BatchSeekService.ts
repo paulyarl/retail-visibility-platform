@@ -309,7 +309,7 @@ class BatchSeekService {
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'seek_batch.launch',
-      payload: { batchId, campaignIds, cities },
+      payload: { batchId, campaignIds, campaignCount: campaignIds.length },
     });
 
     logger.info('BatchSeekService.launchBatch', undefined, { batchId, campaignIds });
