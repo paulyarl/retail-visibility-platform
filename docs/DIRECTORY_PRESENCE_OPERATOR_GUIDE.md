@@ -62,17 +62,24 @@ Each stage is tracked in the Growth Engine dashboard, and demand signals from th
 
 Intelligence seeks discover businesses in a specific category and city. The results become prospects in the queue.
 
-1. Navigate to **Settings → Admin → Marketing Ops** or use the **Batch Seek Launcher**.
-2. Select a **category** (e.g., "African Grocery", "Halal Butcher").
-3. Select a **city** (e.g., "Indianapolis", "Columbus").
-4. Launch the seek — intelligence runs and queues prospects.
+1. Navigate to **Settings → Admin → Directory Presence → Batch Operations**.
+2. Click **"+ New Seek Batch"**.
+3. Select an **intelligence profile** (defines the seek prompts and analysis scope).
+4. Enter a **niche category** (e.g., "African Grocery", "Halal Butcher").
+5. Enter **cities** (comma-separated, max 10 — e.g., "Indianapolis, Columbus, Cincinnati").
+6. Optionally enter a **state** (e.g., "IN").
+7. Click **"Create Batch"** — the batch is created in `draft` status.
+8. Click **"Launch Now"** to start the intelligence runs across all cities, or launch later from the batch list.
+
+Each city gets its own seek run, but they share a batch ID for tracking.
 
 ### Demand-Driven Seeks
 
-Instead of guessing where to seek, use the **Growth Engine dashboard** (Settings → Admin → Growth Engine) to see demand-driven recommendations:
+Instead of guessing where to seek, use the **Growth Engine** (Settings → Admin → Directory Presence → Growth Engine) to see demand-driven recommendations:
 
 - **Next Seek Targets** — prioritized category+city combinations scored by demand signals (zero-result searches, lead gen submissions, underserved areas).
-- Click **"Launch Seek"** on any recommendation to pre-fill the batch seek launcher with that target.
+- Click **"Launch Seek"** on any recommendation — this opens the Batch Seek Launcher with the category and city pre-filled.
+- Review the pre-filled values, select an intelligence profile, and click **"Create Batch"** then **"Launch Now"**.
 
 See [Demand Signals & Next Seek Targets](#demand-signals--next-seek-targets) below.
 
@@ -114,7 +121,7 @@ A directory seed is an unclaimed listing built from public information (address,
 
 1. From a prospect in the queue, select **"Create Seed"**.
 2. The seed is created with status `draft` — it is not yet public.
-3. Review the seed's information at **Settings → Admin → Directory → Presence Seeds**.
+3. Review the seed's information at **Settings → Admin → Directory Presence → Presence Seeds**.
 4. Edit the seed to complete or correct any information (address, phone, category, hours, SNAP/EBT status).
 
 ### Seed Statuses
@@ -129,7 +136,7 @@ A directory seed is an unclaimed listing built from public information (address,
 
 ### Seed Detail Page
 
-At **Settings → Admin → Directory → Presence Seeds → [Seed]**, you can:
+At **Settings → Admin → Directory Presence → Presence Seeds → [Seed]**, you can:
 
 - View the seed's full profile (business name, address, phone, category, city, state, SNAP/EBT status).
 - Edit listing information.
@@ -146,15 +153,16 @@ At **Settings → Admin → Directory → Presence Seeds → [Seed]**, you can:
 
 When you want to expand a niche across multiple cities at once, use **Batch Seek**.
 
-1. Navigate to **Settings → Admin → Directory → Batches**.
-2. Click **"New Batch"**.
-3. Select a **category** and multiple **cities**.
-4. Launch the batch — the system creates a coordinated seek across all selected cities.
-5. Each city gets its own seek run, but they share a batch ID for tracking.
+1. Navigate to **Settings → Admin → Directory Presence → Batch Operations**.
+2. Click **"+ New Seek Batch"**.
+3. Select an **intelligence profile**, enter a **niche category**, and enter **cities** (comma-separated, max 10).
+4. Click **"Create Batch"** — the batch is created in `draft` status.
+5. Click **"Launch Now"** to start intelligence runs across all selected cities, or launch later from the batch detail page.
+6. Each city gets its own seek run, but they share a batch ID for tracking.
 
 ### Batch Dashboard
 
-The batch dashboard at **Settings → Admin → Directory → Batches** shows:
+The batch dashboard at **Settings → Admin → Directory Presence → Batch Operations** shows:
 
 - All batches with their status (running, complete, partial).
 - Per-batch metrics: prospects queued, seeds created, seeds published, seeds claimed.
@@ -218,7 +226,7 @@ Claim tokens are **not** sufficient by themselves for ownership. A bare token-ga
 ### Operator's Role in Claims
 
 - For **bound claims** (token was sent to a known email/phone): the owner verifies via OTP and the claim is processed automatically. You can monitor claims in the seed detail page.
-- For **unbound/self-discovered claims** (the owner found the listing on their own and clicked "Claim"): the claim enters a **review queue**. You must approve or reject it at **Settings → Admin → Directory → Presence Seeds → [Seed] → Claim Review**.
+- For **unbound/self-discovered claims** (the owner found the listing on their own and clicked "Claim"): the claim enters a **review queue**. You must approve or reject it at **Settings → Admin → Directory Presence → Presence Seeds → [Seed] → Claim Review**.
 
 ### After a Successful Claim
 
@@ -247,7 +255,7 @@ Enrichment submissions may require **operator review** before going live:
 
 - Submissions that change critical information (address, phone, category) are flagged for review.
 - The seed's status becomes `enrichment_pending_review`.
-- Review the submission at **Settings → Admin → Directory → Presence Seeds → [Seed]**.
+- Review the submission at **Settings → Admin → Directory Presence → Presence Seeds → [Seed]**.
 - Approve to apply the changes, or reject to keep the existing information.
 
 ### Progressive Engagement
@@ -303,7 +311,7 @@ When a user searches on `/place/search` and gets zero or very few results (< 5),
 
 ### Dashboard
 
-Navigate to **Settings → Admin → Growth Engine**.
+Navigate to **Settings → Admin → Directory Presence → Growth Engine**.
 
 The dashboard shows the end-to-end growth funnel:
 
@@ -381,12 +389,13 @@ Each target shows:
 
 ### How to Use Demand Signals
 
-1. Open **Settings → Admin → Growth Engine**.
+1. Open **Settings → Admin → Directory Presence → Growth Engine**.
 2. Scroll to **Next Seek Targets**.
 3. Review the top recommendations — these are the highest-demand, lowest-supply category+city combinations.
 4. Click **"Launch Seek"** on a target you want to pursue.
-5. The batch seek launcher opens with the category and city pre-filled.
-6. Launch the seek — prospects will be queued for that target.
+5. The Batch Seek Launcher opens at **Settings → Admin → Directory Presence → Batch Operations** with the category and city pre-filled.
+6. Select an intelligence profile and click **"Create Batch"** then **"Launch Now"**.
+7. Prospects will be queued for that target.
 7. After the seek, create seeds, publish, and invite owners to claim.
 8. As listings go live, the demand signals for that category+city will decrease (users will find results instead of zero results).
 9. The loop reinforces — more listings → more traffic → more lead gen → more demand signals → more seeks.
@@ -399,11 +408,11 @@ Each target shows:
 
 | Page | URL |
 |------|-----|
-| Growth Engine Dashboard | `/settings/admin/growth-engine` |
+| Growth Engine | `/settings/admin/growth-engine` |
 | Batch Operations | `/settings/admin/directory/batches` |
 | Presence Seeds | `/settings/admin/directory/presence-seeds` |
 | Seed Detail | `/settings/admin/directory/presence-seeds/[id]` |
-| Prospect Queue | `/settings/admin/marketing-ops` (prospect queue tab) |
+| Prospect Queue | `/settings/admin/marketing-ops/queue` |
 
 ### Public Pages
 
@@ -455,7 +464,7 @@ draft → published → invited → claimed → (tenant promoted)
 ### Typical Operator Workflow
 
 1. **Check the Growth Engine dashboard** — review funnel, demand signals, and next seek targets.
-2. **Launch a seek** — click "Launch Seek" on a recommended target, or manually launch a batch seek for a category+city.
+2. **Launch a seek** — click "Launch Seek" on a recommended target (opens the Batch Seek Launcher with category+city pre-filled), or manually create a batch at **Settings → Admin → Directory Presence → Batch Operations**.
 3. **Review prospects** — check the prospect queue, qualify prospects, route to seeds or campaigns.
 4. **Create seeds** — create directory seeds from qualified prospects (or directly from lead gen prospects).
 5. **Publish seeds** — bulk publish from the batch dashboard, or publish individually from seed detail pages.

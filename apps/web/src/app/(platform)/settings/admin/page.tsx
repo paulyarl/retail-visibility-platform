@@ -630,19 +630,6 @@ export default function AdminDashboardPage() {
           stats: 'Layout & styling',
         },
         {
-          title: 'Directory Presence Seeds',
-          description: 'Manage unclaimed directory listings seeded from public information and mint claim tokens for business owners',
-          href: '/settings/admin/directory/presence-seeds',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          ),
-          color: 'bg-emerald-600',
-          stats: 'Seed & claim workflow',
-          badge: 'NEW',
-        },
-        {
           title: 'Catalog Management',
           description: 'Manage the platform product catalog and catalog rules',
           href: '/settings/admin/catalog',
@@ -800,6 +787,51 @@ export default function AdminDashboardPage() {
           ),
           color: 'bg-violet-600',
           stats: 'Performance metrics',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'Directory Presence',
+      description: 'Discovery, seed, claim, and grow underserved businesses across cities and niches',
+      sections: [
+        {
+          title: 'Presence Seeds',
+          description: 'Manage unclaimed directory listings seeded from public information, mint claim tokens, and review enrichment submissions',
+          href: '/settings/admin/directory/presence-seeds',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          ),
+          color: 'bg-emerald-600',
+          stats: 'Seed & claim workflow',
+          badge: 'NEW',
+        },
+        {
+          title: 'Batch Operations',
+          description: 'Launch multi-city seek batches, track batch metrics, and bulk publish/invite seeds across cities',
+          href: '/settings/admin/directory/batches',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          ),
+          color: 'bg-emerald-700',
+          stats: 'Multi-city seek & bulk ops',
+          badge: 'NEW',
+        },
+        {
+          title: 'Growth Engine',
+          description: 'End-to-end funnel analytics (seeks to upgrades), per-niche and per-city breakdowns, demand signals, and next seek target recommendations',
+          href: '/settings/admin/growth-engine',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          ),
+          color: 'bg-purple-600',
+          stats: 'Funnel, demand signals, seek targets',
           badge: 'NEW',
         },
       ],
