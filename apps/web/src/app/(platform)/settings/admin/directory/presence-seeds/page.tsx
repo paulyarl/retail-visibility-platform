@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
@@ -67,6 +67,24 @@ export default function DirectoryPresenceSeedsPage() {
   useEffect(() => {
     fetchSeeds();
   }, [fetchSeeds]);
+
+  // Derive dropdown options from the loaded seeds
+  const batchOptions = useMemo(
+    () => Array.from(new Set(seeds.map((s) => s.seedBatch).filter(Boolean))).sort(),
+    [seeds],
+  );
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(seeds.map((s) => s.category).filter(Boolean))).sort(),
+    [seeds],
+  );
+  const cityOptions = useMemo(
+    () => Array.from(new Set(seeds.map((s) => s.city).filter(Boolean))).sort(),
+    [seeds],
+  );
+  const stateOptions = useMemo(
+    () => Array.from(new Set(seeds.map((s) => s.state).filter(Boolean))).sort(),
+    [seeds],
+  );
 
   const handlePublish = async (seedId: string) => {
     setActionError(null);
@@ -148,13 +166,16 @@ export default function DirectoryPresenceSeedsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Seed Batch</label>
-            <input
-              type="text"
+            <select
               value={filterBatch}
               onChange={(e) => setFilterBatch(e.target.value)}
-              placeholder="e.g. indianapolis-african-grocery-2026"
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-            />
+            >
+              <option value="">All</option>
+              {batchOptions.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -173,33 +194,42 @@ export default function DirectoryPresenceSeedsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <input
-              type="text"
+            <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              placeholder="e.g. African Grocery"
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-            />
+            >
+              <option value="">All</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-            <input
-              type="text"
+            <select
               value={filterCity}
               onChange={(e) => setFilterCity(e.target.value)}
-              placeholder="e.g. Indianapolis"
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-            />
+            >
+              <option value="">All</option>
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-            <input
-              type="text"
+            <select
               value={filterState}
               onChange={(e) => setFilterState(e.target.value)}
-              placeholder="e.g. IN"
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-            />
+            >
+              <option value="">All</option>
+              {stateOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Identity Confidence</label>
