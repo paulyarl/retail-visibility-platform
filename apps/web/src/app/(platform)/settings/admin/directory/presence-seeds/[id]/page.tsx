@@ -28,6 +28,7 @@ import {
   Ban,
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
+import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 
 const PROVENANCE_FIELD_KEYS = [
   'name',
@@ -1035,6 +1036,9 @@ export default function PresenceSeedDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Linked Campaigns (Migration 230) */}
+      <LinkedCampaignsPanel seedId={seedId} canEdit={canEdit} />
 
       {/* Edit panel */}
       {editing && (

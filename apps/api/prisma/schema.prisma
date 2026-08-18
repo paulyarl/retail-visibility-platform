@@ -4976,6 +4976,7 @@ model tenants {
   directory_field_provenance                                                             directory_field_provenance[]
   directory_photos                                                                       directory_photos[]
   directory_presence_seeds                                                               directory_presence_seeds?
+  directory_seed_campaign_links                                                          directory_seed_campaign_links[]
   directory_settings_list                                                                directory_settings_list?
   download_access_logs                                                                   download_access_logs[]
   faq_categories                                                                         faq_categories[]
@@ -6208,6 +6209,7 @@ model mkt_campaigns_list {
   business_origin_country                                                         String?                              @db.VarChar(100)
   business_origin_region                                                          String?                              @db.VarChar(100)
   seek_batch_id                                                                   String?                              @db.VarChar(60)
+  directory_seed_campaign_links                                                   directory_seed_campaign_links[]
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]
@@ -7321,34 +7323,35 @@ model directory_field_provenance {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_presence_seeds {
-  id                          String                        @id @db.VarChar(60)
-  tenant_id                   String                        @unique(map: "uq_dps_tenant") @db.VarChar(255)
-  listing_id                  String                        @unique(map: "uq_dps_listing") @db.VarChar(255)
-  category                    String                        @db.VarChar(100)
-  city                        String                        @db.VarChar(100)
-  state                       String                        @db.VarChar(50)
-  seed_batch                  String                        @db.VarChar(100)
-  status                      String                        @default("draft") @db.VarChar(20)
-  identity_confidence         String                        @default("medium") @db.VarChar(10)
-  category_fit                String                        @default("probable") @db.VarChar(20)
-  notes                       String?
-  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
-  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
-  published_at                DateTime?                     @db.Timestamptz(6)
-  invited_at                  DateTime?                     @db.Timestamptz(6)
-  claimed_at                  DateTime?                     @db.Timestamptz(6)
-  outreach_status             String                        @default("unverified") @db.VarChar(20)
-  outreach_notes              String?
-  owner_name                  String?                       @db.VarChar(255)
-  owner_email                 String?                       @db.VarChar(255)
-  owner_phone                 String?                       @db.VarChar(40)
-  seek_batch_id               String?                       @db.VarChar(60)
-  directory_claim_tokens      directory_claim_tokens[]
-  directory_enrichment_tokens directory_enrichment_tokens[]
-  directory_field_provenance  directory_field_provenance[]
-  mkt_seek_batches            mkt_seek_batches?             @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
-  directory_listings_list     directory_listings_list       @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
-  tenants                     tenants                       @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
+  id                            String                          @id @db.VarChar(60)
+  tenant_id                     String                          @unique(map: "uq_dps_tenant") @db.VarChar(255)
+  listing_id                    String                          @unique(map: "uq_dps_listing") @db.VarChar(255)
+  category                      String                          @db.VarChar(100)
+  city                          String                          @db.VarChar(100)
+  state                         String                          @db.VarChar(50)
+  seed_batch                    String                          @db.VarChar(100)
+  status                        String                          @default("draft") @db.VarChar(20)
+  identity_confidence           String                          @default("medium") @db.VarChar(10)
+  category_fit                  String                          @default("probable") @db.VarChar(20)
+  notes                         String?
+  created_at                    DateTime                        @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                        @default(now()) @db.Timestamptz(6)
+  published_at                  DateTime?                       @db.Timestamptz(6)
+  invited_at                    DateTime?                       @db.Timestamptz(6)
+  claimed_at                    DateTime?                       @db.Timestamptz(6)
+  outreach_status               String                          @default("unverified") @db.VarChar(20)
+  outreach_notes                String?
+  owner_name                    String?                         @db.VarChar(255)
+  owner_email                   String?                         @db.VarChar(255)
+  owner_phone                   String?                         @db.VarChar(40)
+  seek_batch_id                 String?                         @db.VarChar(60)
+  directory_claim_tokens        directory_claim_tokens[]
+  directory_enrichment_tokens   directory_enrichment_tokens[]
+  directory_field_provenance    directory_field_provenance[]
+  mkt_seek_batches              mkt_seek_batches?               @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
+  directory_listings_list       directory_listings_list         @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
+  tenants                       tenants                         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
+  directory_seed_campaign_links directory_seed_campaign_links[]
 
   @@index([category], map: "idx_dps_category")
   @@index([city, state], map: "idx_dps_city_state")
@@ -7490,6 +7493,30 @@ model mkt_seek_batch_entries {
   @@index([batch_id], map: "idx_msbe_batch")
   @@index([city], map: "idx_msbe_city")
   @@index([profile_id], map: "idx_msbe_profile")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_seed_campaign_links {
+  id                       String                   @id @db.VarChar(60)
+  seed_id                  String                   @db.VarChar(60)
+  campaign_id              String                   @db.VarChar(255)
+  tenant_id                String                   @db.VarChar(255)
+  link_role                String                   @default("primary") @db.VarChar(20)
+  nap_match_confidence     String                   @default("medium") @db.VarChar(10)
+  nap_match_summary        Json?
+  last_synced_at           DateTime?                @db.Timestamptz(6)
+  last_sync_fields         String[]
+  created_by               String?                  @db.VarChar(255)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list       mkt_campaigns_list       @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dscl_campaign")
+  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dscl_seed")
+  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dscl_tenant")
+
+  @@unique([seed_id, campaign_id], map: "idx_dscl_seed_campaign")
+  @@index([campaign_id], map: "idx_dscl_campaign")
+  @@index([tenant_id], map: "idx_dscl_tenant")
 }
 
 enum action {

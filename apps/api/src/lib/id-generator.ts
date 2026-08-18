@@ -1246,6 +1246,16 @@ export function generateDirectoryEnrichmentTokenString(): string {
 }
 
 /**
+ * Generate a directory_seed_campaign_links ID.
+ * Format: dscl-{tenantKey}-{nanoid12}
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectorySeedCampaignLinkId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `dscl-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate a seek batch ID.
  * Format: sb-{nanoid12}
  */

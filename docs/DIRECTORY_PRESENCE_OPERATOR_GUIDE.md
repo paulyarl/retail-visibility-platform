@@ -15,10 +15,11 @@ A practical guide for operators using the Directory Presence system to discover,
 7. [Publishing & Inviting](#publishing--inviting)
 8. [Claim Flow & Identity Verification](#claim-flow--identity-verification)
 9. [Enrichment & Progressive Engagement](#enrichment--progressive-engagement)
-10. [Public Directory & Search](#public-directory--search)
-11. [Growth Engine Analytics](#growth-engine-analytics)
-12. [Demand Signals & Next Seek Targets](#demand-signals--next-seek-targets)
-13. [Quick Reference](#quick-reference)
+10. [Linking Campaigns to Seeds](#linking-campaigns-to-seeds)
+11. [Public Directory & Search](#public-directory--search)
+12. [Growth Engine Analytics](#growth-engine-analytics)
+13. [Demand Signals & Next Seek Targets](#demand-signals--next-seek-targets)
+14. [Quick Reference](#quick-reference)
 
 ---
 
@@ -144,6 +145,7 @@ At **Settings → Admin → Directory Presence → Presence Seeds → [Seed]**, 
 - Send a claim invitation (moves from `published` → `invited`).
 - View claim status and claim history.
 - Review enrichment submissions if the owner has submitted additional data.
+- **Link marketing campaigns** and project operator-validated campaign signals onto the seed listing — see [Linking Campaigns to Seeds](#linking-campaigns-to-seeds) below.
 
 ---
 
@@ -268,6 +270,92 @@ The goal is to move claimed owners from free directory visibility into paid capa
 4. **Full platform** — owner uses the complete retail-to-online-to-ecommerce stack.
 
 The upgrade path is available in the owner's dashboard. The Growth Engine dashboard tracks upgrade conversion rates.
+
+---
+
+## Linking Campaigns to Seeds
+
+### Why Link?
+
+A directory seed and a marketing campaign often describe the **same physical business**. The campaign carries operator-validated signals that the seed doesn't have:
+
+- **Origin country / region** (e.g., "Senegal", "West Africa") — strong SEO signal for niche directories
+- **Neighborhood** — fine-grained location keyword
+- **Reconciled NAP** (name, address, phone) from operator audit
+- **Owner voice profile** and campaign notes — source material for a richer description
+- **Directory profiles** JSON — structured citations
+
+Linking bridges this gap: campaign signals **project onto the seed's public listing** to enrich SEO, while **provenance is preserved per-field** so the public disclaimer ("Listed from public directories…") stays honest.
+
+### When to Link
+
+Link a campaign to a seed when:
+
+- The campaign and seed describe the same business (operator confirms the match).
+- The campaign has operator-validated data the seed is missing (origin country, neighborhood, corrected phone).
+- You want the seed's public listing to surface heritage/origin signals for niche SEO.
+
+A single seed can link to **multiple sibling campaigns** (multi-archetype). One link per seed is marked `primary`; others are `sibling` or `recovery`.
+
+### Linking from the Seed Detail Page
+
+1. Open the seed at **Settings → Admin → Directory Presence → Presence Seeds → [Seed]**.
+2. Scroll to the **Linked Campaigns** panel.
+3. Click **Link Campaign**.
+4. The candidate picker shows campaigns pre-filtered by business name similarity or city+category match. Search to refine.
+5. Choose a **link role**:
+   - `primary` — the main campaign for this business (only one per seed)
+   - `sibling` — a secondary/alternate archetype campaign
+   - `recovery` — a recovery management campaign for the same business
+6. Click **Link** on the matching campaign.
+
+### NAP Match Confidence and Auto-Projection
+
+When you link a campaign, the system computes a **NAP match confidence** by comparing the seed listing's name, address, phone, and city against the campaign's:
+
+| Confidence | Criteria | What happens |
+|------------|----------|--------------|
+| **high** | Business name match AND (address OR phone match) AND city match | **Auto-projects** campaign signals onto the seed listing immediately |
+| **medium** | Business name match plus at least one other signal | Link recorded; operator must sync manually |
+| **low** | Only one signal matches | Link recorded; operator must sync manually |
+| **none** | No signals match | Link still allowed but not recommended — verify the match first |
+
+Auto-projection (high confidence only) writes these fields by default: phone, website, primary category, origin country, origin region, neighborhood.
+
+### Manual Sync (Per-Field Diff)
+
+For medium/low confidence links — or to project additional fields after linking:
+
+1. Click **Sync** on a linked campaign card.
+2. The diff modal shows each projectable field side-by-side: **campaign value** vs **current seed value**.
+3. Check the fields you want to project. Changed fields with campaign values are pre-selected.
+4. Click **Project [N] field(s)**.
+5. The selected campaign values overwrite the seed listing values, and a **provenance row** is written for each field with:
+   - `source_name = 'linked_campaign'`
+   - `source_url = /settings/admin/marketing-ops/recovery/[campaignId]`
+   - `confidence = 'high'`
+   - `show_on_public = true`
+
+### What Gets Projected
+
+| Field | Where it lands on the seed | SEO effect |
+|-------|---------------------------|------------|
+| Phone | `directory_listings_list.phone` | Contact accuracy |
+| Website | `directory_listings_list.website` | Outbound link |
+| Primary category | `directory_listings_list.primary_category` + `directory_presence_seeds.category` | `/place/category/[slug]` grouping |
+| Description (campaign notes) | `directory_listings_list.description` | Richer listing copy |
+| Origin country | `directory_listings_list.keywords[]` as `origin_country:[value]` | Niche heritage search |
+| Origin region | `directory_listings_list.keywords[]` as `origin_region:[value]` | Broader heritage search |
+| Neighborhood | `directory_listings_list.keywords[]` as `neighborhood:[value]` | Fine-grained location search |
+| Directory profile | Provenance row only (not flattened onto listing) | Audit trail for downstream consumers |
+
+### Unlinking
+
+Click **Unlink** on a linked campaign card to remove the link. **Projected fields stay on the listing** — unlinking does not roll back the projection. The provenance rows remain as the audit trail of what was sourced from the campaign. Re-edit the seed manually if you need to revert a specific field.
+
+### Conflict Policy
+
+Linking does **not** silently overwrite operator-entered seed data. The only automatic overwrite happens on high-confidence NAP match at link time (the default projection fields). After that, every projection is explicit — the operator picks fields in the sync diff modal.
 
 ---
 
@@ -439,6 +527,12 @@ Each target shows:
 | GET | `/api/admin/growth-engine/demand-signals` | Demand signals |
 | GET | `/api/admin/growth-engine/next-seek-targets` | Prioritized seek targets |
 | POST | `/api/admin/growth-engine/aggregate` | Trigger daily aggregation |
+| GET | `/api/admin/directory-presence/presence-seeds/:id/campaign-links` | List campaigns linked to a seed |
+| GET | `/api/admin/directory-presence/presence-seeds/:id/campaign-candidates` | Search unlinked campaigns for a seed |
+| GET | `/api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId/diff` | Per-field diff (campaign vs seed) |
+| POST | `/api/admin/directory-presence/presence-seeds/:id/campaign-links` | Link a campaign (body: `{ campaignId, role }`) |
+| DELETE | `/api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId` | Unlink a campaign |
+| POST | `/api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId/sync` | Project selected fields (body: `{ fields[] }`) |
 
 ### API Endpoints (Public)
 
@@ -467,9 +561,10 @@ draft → published → invited → claimed → (tenant promoted)
 2. **Launch a seek** — click "Launch Seek" on a recommended target (opens the Batch Seek Launcher with category+city pre-filled), or manually create a batch at **Settings → Admin → Directory Presence → Batch Operations**.
 3. **Review prospects** — check the prospect queue, qualify prospects, route to seeds or campaigns.
 4. **Create seeds** — create directory seeds from qualified prospects (or directly from lead gen prospects).
-5. **Publish seeds** — bulk publish from the batch dashboard, or publish individually from seed detail pages.
-6. **Send claim invitations** — bulk invite from the batch dashboard, or invite individually.
-7. **Monitor claims** — watch for claims entering review (unbound/self-discovered claims need operator approval).
-8. **Review enrichment** — approve or reject enrichment submissions from claimed owners.
-9. **Watch upgrade conversion** — track how many claimed owners upgrade to retail/ecommerce capabilities.
-10. **Repeat** — the loop reinforces as more listings go live and generate more demand signals.
+5. **Link campaigns to seeds** — when a seed and a campaign describe the same business, link them from the seed detail page's **Linked Campaigns** panel. High-confidence NAP matches auto-project campaign signals (origin country/region, neighborhood, reconciled NAP) onto the seed listing for SEO. See [Linking Campaigns to Seeds](#linking-campaigns-to-seeds).
+6. **Publish seeds** — bulk publish from the batch dashboard, or publish individually from seed detail pages.
+7. **Send claim invitations** — bulk invite from the batch dashboard, or invite individually.
+8. **Monitor claims** — watch for claims entering review (unbound/self-discovered claims need operator approval).
+9. **Review enrichment** — approve or reject enrichment submissions from claimed owners.
+10. **Watch upgrade conversion** — track how many claimed owners upgrade to retail/ecommerce capabilities.
+11. **Repeat** — the loop reinforces as more listings go live and generate more demand signals.

@@ -16,6 +16,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
 import { logger } from '../logger';
 
@@ -616,6 +617,177 @@ router.post('/seek-batches/:id/launch', requirePlatformAdmin, async (req: Reques
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ====================
+// Seed ↔ Campaign links (Migration 230)
+// ====================
+
+const linkCampaignSchema = z.object({
+  campaignId: z.string().min(1).max(255),
+  role: z.enum(['primary', 'sibling', 'recovery']).default('primary'),
+});
+
+const syncFieldsSchema = z.object({
+  fields: z.array(z.enum([
+    'phone',
+    'website',
+    'primaryCategory',
+    'secondaryCategories',
+    'description',
+    'originCountry',
+    'originRegion',
+    'neighborhood',
+    'directoryProfile',
+  ])).min(0).max(20),
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/campaign-links — list linked campaigns */
+router.get('/presence-seeds/:id/campaign-links', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const links = await DirectorySeedCampaignLinkService.listLinks(id);
+    res.json({ success: true, links });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/campaign-links] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/campaign-candidates — search unlinked campaigns */
+router.get('/presence-seeds/:id/campaign-candidates', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const query = req.query.query as string | undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const campaigns = await DirectorySeedCampaignLinkService.findCandidateCampaigns(id, query, limit);
+    res.json({ success: true, campaigns });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/campaign-candidates] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/campaign-links/:campaignId/diff — per-field diff */
+router.get('/presence-seeds/:id/campaign-links/:campaignId/diff', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id, campaignId } = req.params;
+    const diff = await DirectorySeedCampaignLinkService.buildDiff(id, campaignId);
+    res.json({ success: true, diff });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/campaign-links/:campaignId/diff] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/campaign-links — link a campaign */
+router.post('/presence-seeds/:id/campaign-links', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = linkCampaignSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const result = await DirectorySeedCampaignLinkService.linkCampaign(
+      id,
+      validation.data.campaignId,
+      validation.data.role,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.status(201).json({
+      success: true,
+      link: result.link,
+      autoProjected: result.autoProjected,
+      napMatch: result.napMatch,
+    });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = {
+      seed_not_found: 404,
+      campaign_not_found: 404,
+      primary_link_already_exists: 409,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory/presence-seeds/:id/campaign-links] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/** DELETE /api/admin/directory/presence-seeds/:id/campaign-links/:campaignId — unlink a campaign */
+router.delete('/presence-seeds/:id/campaign-links/:campaignId', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id, campaignId } = req.params;
+    await DirectorySeedCampaignLinkService.unlinkCampaign(id, campaignId, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = {
+      link_not_found: 404,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[DELETE /api/admin/directory/presence-seeds/:id/campaign-links/:campaignId] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/campaign-links/:campaignId/sync — project fields */
+router.post('/presence-seeds/:id/campaign-links/:campaignId/sync', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id, campaignId } = req.params;
+    const validation = syncFieldsSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const result = await DirectorySeedCampaignLinkService.syncFromCampaign(
+      id,
+      campaignId,
+      validation.data.fields,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = {
+      seed_or_campaign_not_found: 404,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory/presence-seeds/:id/campaign-links/:campaignId/sync] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
   }
 });
 

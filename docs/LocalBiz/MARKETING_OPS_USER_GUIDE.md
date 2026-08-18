@@ -516,6 +516,17 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ### Run a Prompt
 
+There are two entry points for running a prompt against a campaign:
+
+**From the campaign detail Prompts tab** (recommended — pre-filters by scope + stage):
+
+1. Open the campaign and click the **Prompts** tab.
+2. If triage is decided, the **Recommended by Triage** section surfaces the most relevant prompts for the campaign's detected signals (see §17a).
+3. Click **Open Workspace** on a prompt. The campaign is pre-selected.
+4. Continue with step 3 below.
+
+**From the Prompt Library** (browse all prompts):
+
 1. Go to **Prompt Library**.
 2. Click **Open Workspace** on a template.
 3. Enter or confirm variables.
@@ -614,6 +625,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 - **Demo Storefront** — generate or refresh a demo tenant and preview URL.
 - **Link Tenant** — link the campaign to an existing platform tenant.
+- **Link to Directory Seed** — if this campaign's business also has a directory presence seed (unclaimed public listing), link them from the **seed detail page** at **Settings → Admin → Directory Presence → Presence Seeds → [Seed] → Linked Campaigns panel**. Linking projects operator-validated campaign signals (origin country/region, neighborhood, reconciled NAP) onto the seed's public listing for SEO, with per-field provenance preserved. See the Directory Presence Operator Guide → "Linking Campaigns to Seeds" for the full workflow.
 - **Edit** — open the campaign form.
 - **Delete** — remove the campaign.
 - **Refresh** — reload campaign data.
@@ -630,9 +642,38 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 - **Audits** — `marketing_audits` records (e.g., GBP scores, pain score).
 - **Files** — attached campaign files.
 - **Deliverables** — generate, download, and mark deliverables as sent.
+- **Prompts** — compatible prompt templates for this campaign's scope and stage (see §17a below).
 - **Checklist** — the campaign's playbook operator checklist: step-by-step execution with check-off progress (visible once a playbook is assigned via triage; see §32).
 - **Stage History** — chronological transition log.
 - **Cascade** — multi-channel cascade controls (see §17).
+
+### 17a. Prompts Tab — Compatible Prompts
+
+The Prompts tab shows prompt templates filtered to the campaign's `scope` and current `stage`. Opening a workspace from this tab pre-selects the campaign so variables are auto-filled.
+
+**Organization:**
+
+Prompts are organized into two sections:
+
+1. **Recommended by Triage** (green section) — appears only when triage is decided (accepted or overridden). The triage engine's detected signals and effective playbook category drive prompt recommendations:
+   - **Signal-based matches** (higher rank): specific signals map to specific prompts. For example, `CP_NAP_*` signals → "Profile Repair — NAP Drift Audit", `DS_CLAIMED_STATUS` → "Unclaimed Profile Audit", `WC_*` → "Business Audit", review signals (`RA_REVIEW_DROUGHT`, `RA_LOW_REVIEW_VOLUME`, etc.) → "Business Audit".
+   - **Playbook category matches** (broader fallback): the effective playbook's category maps to prompt template categories. For example, `profile_repair` playbook → `profile_repair` prompts, `review_management` playbook → `Digital Audit` + `Review Response` prompts.
+   - Each recommended card carries green reason badges explaining *why* it was recommended (e.g. "NAP drift detected", "Review gap detected").
+   - Recommended prompts are excluded from the "All Prompts" section below to avoid duplication.
+
+2. **All Prompts** — the remaining prompts grouped by `category`, with `is_default` prompts pinned first within each group and sorted by `output_schema` then name. Uncategorized prompts fall into an "Uncategorized" group at the bottom.
+
+**Card badges:**
+
+- **Default** (blue) — the default prompt for its type/scope.
+- **Intelligence-aware** (violet) — seek + business-scope prompts that receive intelligence-profile amplification at runtime when the campaign's category has an active profile. All business-scope seek prompts are intelligence-aware; the badge makes this visible.
+- **Output schema** (gray) — the prompt's output schema name (e.g., `business_analysis`, `profile_repair_audit`).
+- **Reason** (green, triage section only) — why the triage engine recommended this prompt.
+
+**When to use which section:**
+
+- If triage is decided, start with the **Recommended by Triage** section — those are the prompts most relevant to the campaign's detected signals.
+- If triage is pending or no recommendations appear, scan the **All Prompts** category groups. The `is_default` prompts (blue ring) are the conventional starting points.
 
 ---
 

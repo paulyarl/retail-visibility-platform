@@ -280,6 +280,24 @@ Makes prompt templates focus- and kind-aware so the campaign workspace Prompts t
 - **Backward compatibility**: all focus/kind inference sites retain a name-based or output_schema-based fallback so templates that haven't been re-seeded still work
 - **Fragments excluded**: composition fragments (`prompt_type = 'fragment'`) keep NULL focus/kind — they're identified by `fragment_kind` and assembled by `PromptComposerService`
 
+## Compatible Prompts Tab — Organization + Triage Recommendations
+
+The Prompts tab on the campaign detail page (`CampaignDetailClient.tsx`) surfaces prompt templates filtered by the campaign's `scope` and current `stage`. Two organizational layers help the operator pick the right workspace quickly:
+
+### Category Grouping
+- Prompts are grouped by `category` (e.g., `profile_repair`, `Digital Audit`, `Review Response`), with an "Uncategorized" bucket sorted last
+- Within each group: `is_default` prompts pinned first, then sorted by `output_schema` name, then by name
+- Each card shows badges: **Default** (blue), **Intelligence-aware** (violet — all business-scope seek prompts), **output_schema** (gray)
+
+### Triage Recommendations
+- When triage is decided (`isOperatorAccepted === true` OR `overriddenPlaybook != null`), a green **"Recommended by Triage"** section appears at the top
+- `computeTriageRecommendations()` matches prompts via two layers:
+  - **Signal-based** (higher rank): `SIGNAL_PROMPT_MATCHERS` maps signal code patterns to prompt name patterns (e.g., `CP_NAP_*` → "NAP Drift Audit", `DS_CLAIMED_STATUS` → "Unclaimed Profile Audit", `WC_*` → "Business Audit", review signals → "Business Audit")
+  - **Playbook category-based** (broader fallback): `PLAYBOOK_CATEGORY_TO_PROMPT_CATEGORIES` maps the effective playbook's category to prompt template categories (e.g., `profile_repair` → `profile_repair`, `review_management` → `Digital Audit` + `Review Response`)
+- Each recommended card carries green reason badges explaining why it was recommended
+- Recommended prompts are excluded from the "All Prompts" section below to avoid duplication
+- All computation is client-side (no new API endpoint); triage result is fetched via `getTriage(campaignId)` in parallel with `listPromptTemplates`
+
 ## Business Origin (Diaspora / Heritage Categorization)
 
 Captures the international country/region of origin for diaspora-niche campaigns (e.g. "African Grocery Store" → country: Gambia, region: West Africa). The continent-level qualifier in the `category` field is too coarse for prompt composition, niche overrides, and outreach targeting — a Gambian, Ethiopian, and Nigerian grocery store serve very different diaspora communities.
@@ -455,6 +473,54 @@ Closes the city-contamination gap: an intelligence profile established from a ci
 - `apps/api/src/services/__tests__/IntelligenceProfileService.focus-alignment.test.ts` — 24 tests (existing focus tests updated for `reference_city: null` filter + 13 new city-scoped tests)
 - `apps/api/src/services/__tests__/PromptComposerService.test.ts` — 5 tests (city pass-through test added)
 - `apps/api/src/services/__tests__/ResolvePrompt.test.ts` — 9 tests (business-scope city pass-through assertion updated)
+
+## Directory Seed ↔ Campaign Link (Migration 230)
+
+Bridges `directory_presence_seeds` (unclaimed public listings) with `mkt_campaigns_list` (operator-validated prospect campaigns) so campaign signals can enrich the seed's public SEO surface. One physical business may have many sibling campaigns (multi-archetype), so this is a join table — not a 1:1 FK on the seed.
+
+### Schema (Migration 230)
+- `directory_seed_campaign_links` — join table (`seed_id`, `campaign_id`, `tenant_id`, `link_role`, `nap_match_confidence`, `nap_match_summary` JSONB, `last_synced_at`, `last_sync_fields[]`)
+- `link_role` CHECK: `primary` (one per seed, enforced by partial unique index) / `sibling` / `recovery`
+- `nap_match_confidence` CHECK: `high` / `medium` / `low` / `none`
+- Unique on `(seed_id, campaign_id)` regardless of role
+
+### Backend
+- `apps/api/src/services/DirectorySeedCampaignLinkService.ts`:
+  - `computeNapMatch(seedId, campaignId)` — normalized business name + address + phone + city comparison; high = name match AND (address OR phone match) AND city match
+  - `linkCampaign(seedId, campaignId, role)` — creates link, computes NAP match, **auto-projects campaign signals only when NAP confidence is high**
+  - `unlinkCampaign(seedId, campaignId)` — removes link; does NOT roll back projected fields (provenance rows remain as audit trail)
+  - `listLinks(seedId)` — returns links with campaign summary
+  - `buildDiff(seedId, campaignId)` — per-field diff (campaign value vs current seed value) for operator review
+  - `syncFromCampaign(seedId, campaignId, fields[])` — projects selected fields onto listing + writes `directory_field_provenance` rows with `source_name = 'linked_campaign'`, `confidence = 'high'`, `show_on_public = true`
+  - `findCandidateCampaigns(seedId, query?)` — searches unlinked campaigns by business name similarity or city+category match
+- `apps/api/src/routes/directory-presence-admin.ts` — 6 new endpoints under `/api/admin/directory-presence/presence-seeds/:id/campaign-links`:
+  - `GET  /campaign-links` — list linked campaigns
+  - `GET  /campaign-candidates?query=` — search unlinked campaigns
+  - `GET  /campaign-links/:campaignId/diff` — per-field diff
+  - `POST /campaign-links` — link a campaign (body: `{ campaignId, role }`)
+  - `DELETE /campaign-links/:campaignId` — unlink
+  - `POST /campaign-links/:campaignId/sync` — project fields (body: `{ fields[] }`)
+- `apps/api/src/lib/id-generator.ts` — `generateDirectorySeedCampaignLinkId(tenantId)` (`dscl-` prefix)
+
+### Projection policy
+- **Auto-projection on link**: only when `nap_match_confidence = 'high'`. Default projected fields: phone, website, primaryCategory, originCountry, originRegion, neighborhood.
+- **Manual sync**: operator opens diff modal, picks fields explicitly. Overwrites operator-entered seed values; provenance row preserves the audit trail.
+- **Origin country/region/neighborhood** → merged into `directory_listings_list.keywords[]` as prefixed tokens (`origin_country:Senegal`, `neighborhood:Broad Ripple`) for SEO.
+- **Primary category** projection also mirrors to `directory_presence_seeds.category` so `/place` browse pages stay consistent.
+- **Directory profiles** (JSON) → provenance row only (not flattened onto listing).
+
+### Frontend
+- `apps/web/src/services/DirectoryPresenceAdminService.ts` — `listCampaignLinks`, `findCampaignCandidates`, `getCampaignDiff`, `linkCampaign`, `unlinkCampaign`, `syncFromCampaign` + types `DirectorySeedCampaignLink`, `DirectoryCampaignCandidate`, `DirectoryCampaignDiffEntry`
+- `apps/web/src/app/(platform)/settings/admin/directory/presence-seeds/[id]/LinkedCampaignsPanel.tsx` — panel with:
+  - Linked campaign cards (role badge, NAP confidence badge, last sync metadata, expandable NAP match details)
+  - "Link Campaign" picker modal (search + role selector + candidate list with already-linked state)
+  - "Sync" diff modal (per-field campaign-vs-seed comparison, checkbox select, project button)
+  - "Unlink" with confirm (warns that projected fields stay)
+- Mounted on seed detail page after the Outreach & Enrichment section
+
+### Provenance field keys (new, campaign-sourced)
+- `origin_country`, `origin_region`, `neighborhood`, `description`, `directory_profile`
+- All campaign-sourced provenance: `source_name = 'linked_campaign'`, `source_url = /settings/admin/marketing-ops/recovery/:campaignId`, `confidence = 'high'`, `show_on_public = true`
 
 
 

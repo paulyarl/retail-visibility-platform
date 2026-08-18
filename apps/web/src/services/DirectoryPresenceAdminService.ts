@@ -399,6 +399,146 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const data = result.data?.data ?? result.data;
     return data?.batches ?? [];
   }
+
+  // ============================
+  // Seed ↔ Campaign links (Migration 230)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/campaign-links */
+  async listCampaignLinks(seedId: string): Promise<DirectorySeedCampaignLink[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/campaign-links`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.links ?? [];
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/campaign-candidates?query= */
+  async findCampaignCandidates(
+    seedId: string,
+    query?: string,
+    limit?: number,
+  ): Promise<DirectoryCampaignCandidate[]> {
+    const params = new URLSearchParams();
+    if (query) params.set('query', query);
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/campaign-candidates${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.campaigns ?? [];
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId/diff */
+  async getCampaignDiff(
+    seedId: string,
+    campaignId: string,
+  ): Promise<DirectoryCampaignDiffEntry[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/campaign-links/${encodeURIComponent(campaignId)}/diff`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.diff ?? [];
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/campaign-links */
+  async linkCampaign(
+    seedId: string,
+    campaignId: string,
+    role: 'primary' | 'sibling' | 'recovery' = 'primary',
+  ): Promise<{
+    link: DirectorySeedCampaignLink;
+    autoProjected: boolean;
+    napMatch: any;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/campaign-links`,
+      { method: 'POST', body: JSON.stringify({ campaignId, role }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** DELETE /api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId */
+  async unlinkCampaign(seedId: string, campaignId: string): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/campaign-links/${encodeURIComponent(campaignId)}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId/sync */
+  async syncFromCampaign(
+    seedId: string,
+    campaignId: string,
+    fields: string[],
+  ): Promise<{ projected: string[]; skipped: string[] }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/campaign-links/${encodeURIComponent(campaignId)}/sync`,
+      { method: 'POST', body: JSON.stringify({ fields }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+}
+
+export interface DirectorySeedCampaignLink {
+  id: string;
+  seedId: string;
+  campaignId: string;
+  tenantId: string;
+  linkRole: 'primary' | 'sibling' | 'recovery';
+  napMatchConfidence: 'high' | 'medium' | 'low' | 'none';
+  napMatchSummary: any | null;
+  lastSyncedAt: string | null;
+  lastSyncFields: string[];
+  createdAt: string;
+  updatedAt: string;
+  campaign?: {
+    id: string;
+    displayId: string | null;
+    businessName: string | null;
+    category: string;
+    city: string;
+    state: string | null;
+    stage: string;
+    campaignCategory: string;
+  };
+}
+
+export interface DirectoryCampaignCandidate {
+  id: string;
+  displayId: string | null;
+  businessName: string | null;
+  category: string;
+  city: string;
+  state: string | null;
+  stage: string;
+  campaignCategory: string;
+  alreadyLinked: boolean;
+}
+
+export interface DirectoryCampaignDiffEntry {
+  field: string;
+  campaignValue: any;
+  seedValue: any;
+  changed: boolean;
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();

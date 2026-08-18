@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
@@ -78,6 +78,95 @@ const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   fragment: 'Fragment',
 };
 
+// ─── Triage → Prompt recommendation mapping ──────────────────────────────
+//
+// When triage is decided (accepted or overridden), the detected signals +
+// effective playbook category drive a "Recommended by Triage" section at
+// the top of the Compatible Prompts tab. This helps the operator pick the
+// top workspaces quickly without reading every card body.
+//
+// Two layers of matching:
+//   1. Signal-based (precise): specific signals map to specific prompts by
+//      name pattern. E.g. CP_NAP_* → "Profile Repair — NAP Drift Audit".
+//   2. Category-based (broader fallback): the playbook's category maps to
+//      prompt template categories. E.g. profile_repair → profile_repair.
+//
+// Signal-based matches rank higher than category-based matches. Each
+// recommended prompt carries a short reason string (shown as a badge).
+
+interface TriagePromptMatch {
+  template: PromptTemplate;
+  reasons: string[];
+}
+
+const SIGNAL_PROMPT_MATCHERS: { signalPattern: RegExp; nameTest: RegExp; reason: string }[] = [
+  // NAP drift signals → NAP Drift Audit
+  { signalPattern: /^CP_NAP_/, nameTest: /nap/i, reason: 'NAP drift detected' },
+  // Unclaimed profile → Unclaimed Profile Audit
+  { signalPattern: /DS_CLAIMED_STATUS/, nameTest: /unclaimed/i, reason: 'Unclaimed profile detected' },
+  // Missing/broken profile → Platform Gap Audit
+  { signalPattern: /DS_MISSING_PROFILE|DS_BROKEN_PROFILE_LINK/, nameTest: /platform gap/i, reason: 'Platform gap detected' },
+  // Website signals → Business Audit (business_analysis schema)
+  { signalPattern: /^WC_/, nameTest: /business audit/i, reason: 'Website issues detected' },
+  // Review signals → Business Audit (business_analysis schema)
+  { signalPattern: /RA_REVIEW_DROUGHT|RA_LOW_REVIEW_VOLUME|RA_UNADDRESSED_NEGATIVE_BACKLOG|RA_UNADDRESSED_POSITIVE_BACKLOG/, nameTest: /business audit/i, reason: 'Review gap detected' },
+];
+
+const PLAYBOOK_CATEGORY_TO_PROMPT_CATEGORIES: Record<string, string[]> = {
+  profile_repair: ['profile_repair'],
+  review_management: ['Digital Audit', 'Review Response'],
+  recovery_management: ['Digital Audit'],
+  triage_management: ['profile_repair', 'Digital Audit'],
+};
+
+/**
+ * Compute triage-based prompt recommendations from the triage result +
+ * the stage-relevant prompt templates. Returns matched templates (with
+ * reasons) sorted by match strength (signal-based first, then category).
+ */
+function computeTriageRecommendations(
+  triage: TriageResult,
+  templates: PromptTemplate[],
+): TriagePromptMatch[] {
+  const effective = triage.overriddenPlaybook ?? triage.recommendedPlaybook;
+  if (!effective) return [];
+
+  const signalCodes = triage.detectedSignals.map((s) => s.code);
+  const playbookCategory = effective.category;
+  const matches = new Map<string, TriagePromptMatch>();
+
+  // Layer 1: Signal-based matching (precise)
+  for (const matcher of SIGNAL_PROMPT_MATCHERS) {
+    const hasSignal = signalCodes.some((code) => matcher.signalPattern.test(code));
+    if (!hasSignal) continue;
+    for (const t of templates) {
+      if (matcher.nameTest.test(t.name)) {
+        const existing = matches.get(t.id);
+        if (existing) {
+          if (!existing.reasons.includes(matcher.reason)) existing.reasons.push(matcher.reason);
+        } else {
+          matches.set(t.id, { template: t, reasons: [matcher.reason] });
+        }
+      }
+    }
+  }
+
+  // Layer 2: Playbook category → prompt category matching (broader fallback)
+  const promptCategories = PLAYBOOK_CATEGORY_TO_PROMPT_CATEGORIES[playbookCategory] ?? [];
+  for (const t of templates) {
+    if (matches.has(t.id)) continue; // Already matched by signal (higher rank)
+    if (t.category && promptCategories.includes(t.category)) {
+      matches.set(t.id, { template: t, reasons: [`${playbookCategory.replace(/_/g, ' ')} playbook`] });
+    }
+  }
+
+  // Sort: signal-matched (multiple reasons) first, then by name
+  return [...matches.values()].sort((a, b) => {
+    if (a.reasons.length !== b.reasons.length) return b.reasons.length - a.reasons.length;
+    return a.template.name.localeCompare(b.template.name);
+  });
+}
+
 export default function CampaignDetailClient({
   campaignId,
   initialTab,
@@ -105,6 +194,10 @@ export default function CampaignDetailClient({
   const [deliverableTemplates, setDeliverableTemplates] = useState<DeliverableTemplate[]>([]);
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
   const [promptsLoading, setPromptsLoading] = useState(false);
+  // Triage result for the prompts tab — when triage is decided (accepted or
+  // overridden), the detected signals + effective playbook category drive
+  // prompt recommendations at the top of the Compatible Prompts list.
+  const [triageForPrompts, setTriageForPrompts] = useState<TriageResult | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatingDemo, setGeneratingDemo] = useState(false);
@@ -225,7 +318,12 @@ export default function CampaignDetailClient({
     const isIntelligence = campaign.scope === 'intelligence';
     const focus = campaign.intelligence_focus ?? undefined;
     const kind = campaign.intelligence_campaign_kind ?? undefined;
-    marketingOpsService
+    // Fetch prompt templates + triage result in parallel. The triage result
+    // (when decided) drives a "Recommended by Triage" section at the top of
+    // the Compatible Prompts list — its detected signals map to specific
+    // seek prompts (NAP drift → NAP Drift Audit, etc.) and its playbook
+    // category maps to prompt template categories for broader fallback.
+    const promptsPromise = marketingOpsService
       .listPromptTemplates({
         scope: campaign.scope,
         is_active: true,
@@ -233,8 +331,15 @@ export default function CampaignDetailClient({
         ...(isIntelligence && kind ? { intelligence_campaign_kind: kind } : {}),
         ...(isIntelligence && (focus || kind) ? { include_null_focus_kind: true } : {}),
       })
-      .then(setPromptTemplates)
-      .catch(() => setPromptTemplates([]))
+      .catch(() => [] as PromptTemplate[]);
+    const triagePromise = marketingOpsService
+      .getTriage(campaign.id)
+      .catch(() => null);
+    Promise.all([promptsPromise, triagePromise])
+      .then(([templates, triage]) => {
+        setPromptTemplates(templates);
+        setTriageForPrompts(triage);
+      })
       .finally(() => setPromptsLoading(false));
   }, [activeTab, campaign]);
 
@@ -1215,6 +1320,16 @@ export default function CampaignDetailClient({
                       </div>
                     );
                   }
+                  // ─── Triage recommendations ─────────────────────────────
+                  // When triage is decided (accepted or overridden), compute
+                  // signal-based + category-based prompt recommendations and
+                  // pin them at the top. The remaining prompts follow in
+                  // category groups below.
+                  const triageDecided = triageForPrompts && (triageForPrompts.isOperatorAccepted === true || triageForPrompts.overriddenPlaybook != null);
+                  const triageRecs = triageDecided ? computeTriageRecommendations(triageForPrompts!, stageRelevant) : [];
+                  const recommendedIds = new Set(triageRecs.map((r) => r.template.id));
+                  const unrecommended = stageRelevant.filter((t) => !recommendedIds.has(t.id));
+
                   // ─── Organization: group by category → sort by output_schema,
                   //     with is_default pinned first within each group. This
                   //     replaces the flat grid so the operator can scan by
@@ -1223,8 +1338,8 @@ export default function CampaignDetailClient({
                   const UNCATEGORIZED = 'Uncategorized';
                   const NO_SCHEMA = 'No schema';
                   const grouped = (() => {
-                    const map = new Map<string, typeof stageRelevant>();
-                    for (const t of stageRelevant) {
+                    const map = new Map<string, typeof unrecommended>();
+                    for (const t of unrecommended) {
                       const key = t.category?.trim() || UNCATEGORIZED;
                       const arr = map.get(key) ?? [];
                       arr.push(t);
@@ -1251,6 +1366,86 @@ export default function CampaignDetailClient({
 
                   return (
                     <div className="space-y-6">
+                      {/* Triage Recommended section — only when triage is decided */}
+                      {triageRecs.length > 0 && (() => {
+                        const effective = triageForPrompts!.overriddenPlaybook ?? triageForPrompts!.recommendedPlaybook;
+                        return (
+                          <div className="rounded-xl border border-green-300 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10 p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Sparkles className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <h4 className="text-sm font-semibold text-green-800 dark:text-green-300">
+                                Recommended by Triage
+                              </h4>
+                              <span className="text-xs text-green-600 dark:text-green-400">
+                                {effective.code} · {effective.category.replace(/_/g, ' ')}
+                              </span>
+                              <div className="flex-1 border-t border-green-200 dark:border-green-800" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {triageRecs.map((rec) => {
+                                const t = rec.template;
+                                const isIntelligenceAware =
+                                  t.prompt_type === 'seek' &&
+                                  (t.scope ?? 'business').toLowerCase() === 'business';
+                                return (
+                                  <div key={t.id} className="border border-green-200 dark:border-green-800 rounded-xl p-4 flex flex-col bg-white dark:bg-neutral-800">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <h4 className="font-semibold text-gray-900 dark:text-white text-sm">{t.name}</h4>
+                                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300">
+                                        {PROMPT_TYPE_LABELS[t.prompt_type]}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                      {rec.reasons.map((reason) => (
+                                        <span key={reason} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                          {reason}
+                                        </span>
+                                      ))}
+                                      {t.is_default && (
+                                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                          Default
+                                        </span>
+                                      )}
+                                      {isIntelligenceAware && (
+                                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300" title="Receives intelligence-profile amplification at runtime when the campaign category has an active profile">
+                                          Intelligence-aware
+                                        </span>
+                                      )}
+                                      {t.output_schema?.name && (
+                                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-400">
+                                          {t.output_schema.name}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-50 dark:bg-neutral-900/50 rounded p-2 line-clamp-3 flex-1">
+                                      {t.body.slice(0, 160)}{t.body.length > 160 ? '...' : ''}
+                                    </p>
+                                    <Link
+                                      href={`/settings/admin/marketing-ops/prompts/${t.id}?campaignId=${campaignId}`}
+                                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 self-start"
+                                    >
+                                      Open Workspace
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </Link>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Separator when triage recommendations are shown */}
+                      {triageRecs.length > 0 && grouped.length > 0 && (
+                        <div className="flex items-center gap-2 pt-2">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                            All Prompts
+                          </h4>
+                          <div className="flex-1 border-t border-gray-200 dark:border-neutral-700" />
+                        </div>
+                      )}
+
+                      {/* Category-grouped prompts (excluding triage-recommended) */}
                       {grouped.map(([categoryLabel, items]) => (
                         <div key={categoryLabel}>
                           <div className="flex items-center gap-2 mb-3">

@@ -124,7 +124,7 @@ The campaign has no triage evaluation. Click **Evaluate** in the triage card.
 
 ### "No business_analysis audit"
 
-The triage engine requires a `business_analysis` audit on the campaign. Run a seek-stage business analysis first (via the Prompts tab → business_analysis prompt template).
+The triage engine requires a `business_analysis` audit on the campaign. Run a seek-stage business analysis first (via the Prompts tab → business_analysis prompt template). After triage is decided (accepted or overridden), the Prompts tab will show a **Recommended by Triage** section with signal-matched prompts at the top — use it to pick the next workspace quickly.
 
 ### PB-04 (crisis) never matches
 
