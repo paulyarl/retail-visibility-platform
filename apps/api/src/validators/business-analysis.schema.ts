@@ -233,13 +233,33 @@ const matchedBusinessSchema = z.object({
   website: z.string().nullable().optional(),
 }).passthrough();
 
+/**
+ * Element schema for `audit_metadata.identity_corroboration_sources`.
+ *
+ * The prompt documents this as `["<string>", ...]`, but some agents (e.g.
+ * GPT-5.6 Luna) emit richer objects like
+ * `{ source, matched_identifiers, url }`. The field is persisted as part of
+ * the `audit_data` JSON blob and not consumed by downstream code, so we accept
+ * both shapes via a union — preserving the richer object representation when
+ * the agent provides it. The object variant uses `.passthrough()` to tolerate
+ * varying key names across agents.
+ */
+const corroborationSourceElement = z.union([
+  z.string(),
+  z.object({
+    source: z.string().nullable().optional(),
+    matched_identifiers: z.string().nullable().optional(),
+    url: z.string().nullable().optional(),
+  }).passthrough(),
+]);
+
 const auditMetadataSchema = z.object({
   audit_date: z.string(),
   requested_business: requestedBusinessSchema,
   matched_business: matchedBusinessSchema.nullable().optional(),
   identity_status: identityStatusEnum,
   identity_confidence: identityConfidenceEnum,
-  identity_corroboration_sources: z.array(z.string()).optional(),
+  identity_corroboration_sources: z.array(corroborationSourceElement).optional(),
   limitations: z.array(z.string()).optional(),
 }).passthrough();
 

@@ -245,3 +245,73 @@ describe('Sprint 1 — schema is additive (non-breaking)', () => {
     expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
   });
 });
+
+describe('identity_corroboration_sources — string vs object elements', () => {
+  // The prompt documents `["<string>", ...]`, but some agents (e.g. GPT-5.6
+  // Luna) emit richer objects `{ source, matched_identifiers, url }`. The
+  // schema accepts both via a union so the richer representation is preserved.
+  it('accepts an array of strings (legacy/documented shape)', () => {
+    const audit = baseAudit();
+    audit.audit_metadata.identity_corroboration_sources = [
+      'City of Kansas City Finance Department Business License Database',
+      'Official Business Website',
+    ];
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an array of objects with source/matched_identifiers/url', () => {
+    const audit = baseAudit();
+    audit.audit_metadata.identity_corroboration_sources = [
+      {
+        source: 'Northeast Kansas City Chamber of Commerce',
+        matched_identifiers: 'Exact business name, address, and phone numbers',
+        url: 'https://nekcchamber.com/directory/mogadisho-market-llc/',
+      },
+      {
+        source: 'Kansas City business license directory',
+        matched_identifiers: 'Exact business name and address',
+        url: 'https://opengovus.com/kansas-city-business/225601792',
+      },
+    ];
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const sources = result.data.audit_metadata?.identity_corroboration_sources;
+      expect(Array.isArray(sources)).toBe(true);
+      expect(sources).toHaveLength(2);
+    }
+  });
+
+  it('accepts a mixed array of strings and objects', () => {
+    const audit = baseAudit();
+    audit.audit_metadata.identity_corroboration_sources = [
+      'Official Business Website',
+      { source: 'Chamber of Commerce', url: 'https://example.com/' },
+    ];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+
+  it('accepts object elements with extra keys (passthrough)', () => {
+    const audit = baseAudit();
+    audit.audit_metadata.identity_corroboration_sources = [
+      { source: 'Chamber', accessed_date: '2026-08-18', confidence: 'high' },
+    ];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+
+  it('accepts object elements with null/missing optional fields', () => {
+    const audit = baseAudit();
+    audit.audit_metadata.identity_corroboration_sources = [
+      { source: null, matched_identifiers: null, url: null },
+      {},
+    ];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+
+  it('rejects array elements that are neither string nor object', () => {
+    const audit = baseAudit();
+    audit.audit_metadata.identity_corroboration_sources = [123];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+});
