@@ -1676,6 +1676,97 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  // ─── Profile Repair Prompts & Triage (§4.5, §4.6) ──────────────────────────
+  async runRepairTriage(id: string, templateId?: string): Promise<{
+    executionId: string;
+    recommendation: {
+      severity_score: number;
+      recommended_track: 'standard' | 'escalated';
+      issue_type_confirmed: string;
+      rationale: string;
+      escalation_signals?: string[];
+      standard_signals?: string[];
+    } | null;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/repair-triage`,
+      { method: 'POST', body: JSON.stringify({ templateId }) },
+      `mkt-ops-campaign-repair-triage-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to run profile repair triage');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async renderRepairTriage(id: string, templateId?: string): Promise<{
+    renderedPrompt: string;
+    templateId: string;
+    variablesUsed: Record<string, any>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/repair-triage/render`,
+      { method: 'POST', body: JSON.stringify({ templateId }) },
+      `mkt-ops-campaign-repair-triage-render-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render profile repair triage prompt');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importRepairTriage(id: string, rawOutput: string, templateId?: string): Promise<{
+    executionId: string;
+    passed: boolean;
+    errors?: string[];
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/repair-triage/import`,
+      { method: 'POST', body: JSON.stringify({ raw_output: rawOutput, templateId }) },
+      `mkt-ops-campaign-repair-triage-import-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import profile repair triage result');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async runRepairResolution(id: string, intakeId?: string): Promise<{ executionId: string; campaignId: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/repair-resolution`,
+      { method: 'POST', body: JSON.stringify({ intakeId }) },
+      `mkt-ops-campaign-repair-resolution-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to enqueue repair resolution');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async renderRepairResolution(id: string): Promise<{
+    renderedPrompt: string;
+    templateId: string;
+    variablesUsed: Record<string, any>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/repair-resolution/render`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `mkt-ops-campaign-repair-resolution-render-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render repair resolution prompt');
+    }
+    return result.data?.data ?? result.data;
+  }
+
   async enrichContact(id: string, opts: { force?: boolean } = {}): Promise<EnrichContactResult> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${id}/enrich-contact`,

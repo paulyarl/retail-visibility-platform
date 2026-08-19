@@ -149,4 +149,18 @@ describe('renderTemplate — scope-aware variable injection', () => {
     const rendered = service.renderTemplate(body, undefined, cityCampaign);
     expect(rendered).toBe('Just Plainfield');
   });
+
+  it('injects business_address and business_phone for business scope from composite columns', () => {
+    const campaignWithAddress = {
+      ...businessCampaign,
+      address_line1: '123 Main St',
+      address_city: 'Plainfield',
+      address_state: 'IL',
+      address_zip: '60544',
+      phone: '555-987-6543',
+    };
+    const body = 'Address: {{business_address}} | Phone: {{business_phone}}';
+    const rendered = service.renderTemplate(body, undefined, campaignWithAddress);
+    expect(rendered).toBe('Address: 123 Main St, Plainfield, IL, 60544 | Phone: 555-987-6543');
+  });
 });

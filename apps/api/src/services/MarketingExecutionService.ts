@@ -354,8 +354,16 @@ export class MarketingExecutionService extends BaseService {
 
     // ─── Business-scope §1B amplification path ────────────────────────────
     const isBusinessScope = campaignScope === 'business';
+    const isProfileRepair = (input.template.category || '').toLowerCase() === 'profile_repair';
 
-    if (!isSeek || !isBusinessScope || !hasCategory) {
+    const promptRole: 'category_audit' | 'signal_triage' | 'none' =
+      !isSeek || !isBusinessScope
+        ? 'none'
+        : isProfileRepair
+        ? 'signal_triage'
+        : 'category_audit';
+
+    if (promptRole === 'none' || !hasCategory) {
       // No amplification — return byte-identical base render (plus suffix).
       return {
         renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
@@ -370,6 +378,54 @@ export class MarketingExecutionService extends BaseService {
     //    Indianapolis-biased profile block.
     const profileService = IntelligenceProfileService.getInstance();
     const businessCity = input.campaign.city || null;
+
+    // For signal-driven triage/audit templates (profile_repair):
+    // Only append if audit_signals variable is populated, with framing directive.
+    if (promptRole === 'signal_triage') {
+      const auditSignals = input.variables?.audit_signals ?? '';
+      if (!auditSignals || !String(auditSignals).trim()) {
+        // No signals -> suppress category block (fixes distractor-block bug)
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+
+      const profile = await profileService.resolve(category, undefined, businessCity, ctx);
+      if (!profile) {
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+
+      const profileBlock = profileService.renderBusinessProfileBlock(profile, businessCity);
+      const directive =
+        '\n=== CATEGORY INTELLIGENCE (SUPPLEMENTARY — REPAIR SIGNALS ARE PRIMARY) ===\n' +
+        'Use the category intelligence below for category-fit signals and prohibited inferences only. ' +
+        'The repair signals in the Audit Signals section above are the primary input for this triage.\n';
+      const amplified = baseRendered + '\n' + directive + '\n' + profileBlock;
+
+      logger.info('Profile-aware signal triage prompt resolved', ctx, {
+        campaignId: input.campaign.id,
+        category,
+        city: businessCity ?? 'none',
+        profileId: profile.id,
+        profileVersion: profile.version,
+        intelligenceMode: 'profile',
+      });
+
+      return {
+        renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
+        resolution: {
+          profile_id: profile.id,
+          profile_version: profile.version,
+          intelligence_mode: 'profile',
+        },
+      };
+    }
+
+    // 4. Category audit path (generic audits — unconditional append)
     const profile = await profileService.resolve(category, undefined, businessCity, ctx);
 
     if (!profile) {
@@ -380,9 +436,9 @@ export class MarketingExecutionService extends BaseService {
       };
     }
 
-    // 4. Append the business profile block (§1B amplification). Pass the
-    //    campaign's city so the block can emit a retargeting directive when
-    //    the profile's reference city differs.
+    // Append the business profile block (§1B amplification). Pass the
+    // campaign's city so the block can emit a retargeting directive when
+    // the profile's reference city differs.
     const profileBlock = profileService.renderBusinessProfileBlock(profile, businessCity);
     const amplified = baseRendered + '\n' + profileBlock;
 
@@ -563,6 +619,13 @@ emerging-focus work.`;
       attributes: (campaign.attributes || []).join(', '),
       business_origin: [campaign.business_origin_country, campaign.business_origin_region]
         .filter(Boolean).join(', '),
+      business_address: [
+        campaign.address_line1,
+        campaign.address_city,
+        campaign.address_state,
+        campaign.address_zip,
+      ].filter(Boolean).join(', ') || '',
+      business_phone: campaign.phone || campaign.contact_info || '',
     };
 
     const allVars: Record<string, string> = {};

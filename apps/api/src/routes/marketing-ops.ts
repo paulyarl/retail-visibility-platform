@@ -173,6 +173,10 @@ import DeliverableSectionService from '../services/deliverable/DeliverableSectio
 import DeliverableAssemblyService from '../services/deliverable/DeliverableAssemblyService';
 import DeliverableRenderService from '../services/deliverable/DeliverableRenderService';
 import RecoveryResolutionService from '../services/RecoveryResolutionService';
+import ProfileRepairPromptService, {
+  PROFILE_REPAIR_TRIAGE_TEMPLATE_ID,
+  PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID,
+} from '../services/ProfileRepairPromptService';
 import disputeIntakeService from '../services/DisputeIntakeService';
 import ReviewCascadeService from '../services/ReviewCascadeService';
 import MarketingPlaybookCatalogService from '../services/MarketingPlaybookCatalogService';
@@ -6046,6 +6050,136 @@ router.get('/intelligence-runs/:id', async (req, res) => {
     handleServiceError(res, error, getCtx(req));
   }
 });
+
+// ============================================================================
+// PROFILE REPAIR PROMPTS & TRIAGE (§4.5)
+// ============================================================================
+
+const repairTriageInputSchema = z.object({
+  templateId: z.string().optional(),
+});
+
+const repairTriageImportSchema = z.object({
+  templateId: z.string().optional(),
+  raw_output: z.string().min(10, 'raw_output must be at least 10 characters'),
+});
+
+const repairResolutionInputSchema = z.object({
+  intakeId: z.string().optional(),
+});
+
+// Run Triage Analysis synchronously (executeSeekSync)
+const handleRepairTriage = async (req: any, res: Response) => {
+  try {
+    const campaignId = req.params.id || req.params.campaignId;
+    const parsed = repairTriageInputSchema.parse(req.body || {});
+    const result = await ProfileRepairPromptService.executeSeekSync(
+      campaignId,
+      parsed.templateId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+};
+router.post('/campaigns/:id/repair-triage', handleRepairTriage);
+router.post('/:id/repair-triage', handleRepairTriage);
+
+// Render Triage Prompt Text (Copy-Paste Bridge)
+const handleRepairTriageRender = async (req: any, res: Response) => {
+  try {
+    const campaignId = req.params.id || req.params.campaignId;
+    const templateId = req.body?.templateId || req.query?.templateId || PROFILE_REPAIR_TRIAGE_TEMPLATE_ID;
+    const result = await ProfileRepairPromptService.renderPromptText(
+      campaignId,
+      templateId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+};
+router.post('/campaigns/:id/repair-triage/render', handleRepairTriageRender);
+router.post('/:id/repair-triage/render', handleRepairTriageRender);
+
+// Import External Triage Result
+const handleRepairTriageImport = async (req: any, res: Response) => {
+  try {
+    const campaignId = req.params.id || req.params.campaignId;
+    const parsed = repairTriageImportSchema.parse(req.body || {});
+    const targetTemplateId = parsed.templateId || PROFILE_REPAIR_TRIAGE_TEMPLATE_ID;
+    const result = await ProfileRepairPromptService.importExternalResult(
+      campaignId,
+      targetTemplateId,
+      parsed.raw_output,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+};
+router.post('/campaigns/:id/repair-triage/import', handleRepairTriageImport);
+router.post('/:id/repair-triage/import', handleRepairTriageImport);
+
+// Enqueue Track B Resolution (Async)
+const handleRepairResolution = async (req: any, res: Response) => {
+  try {
+    const campaignId = req.params.id || req.params.campaignId;
+    const parsed = repairResolutionInputSchema.parse(req.body || {});
+
+    let intakeId = parsed.intakeId;
+    if (!intakeId) {
+      const intake = await prisma.mkt_dispute_intake.findFirst({
+        where: { campaign_id: campaignId, intake_kind: 'profile_repair' },
+        orderBy: { created_at: 'desc' },
+      });
+      if (!intake) {
+        return res.status(400).json({ success: false, error: 'no_intake_found', message: 'No profile repair intake found for this campaign' });
+      }
+      intakeId = intake.id;
+    }
+
+    const result = await ProfileRepairPromptService.enqueueResolution(
+      campaignId,
+      intakeId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+};
+router.post('/campaigns/:id/repair-resolution', handleRepairResolution);
+router.post('/:id/repair-resolution', handleRepairResolution);
+
+// Render Resolution Prompt Text (Copy-Paste Bridge)
+const handleRepairResolutionRender = async (req: any, res: Response) => {
+  try {
+    const campaignId = req.params.id || req.params.campaignId;
+    const result = await ProfileRepairPromptService.renderPromptText(
+      campaignId,
+      PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+};
+router.post('/campaigns/:id/repair-resolution/render', handleRepairResolutionRender);
+router.post('/:id/repair-resolution/render', handleRepairResolutionRender);
 
 // ====================
 // CATCH-ALL: GET /:id

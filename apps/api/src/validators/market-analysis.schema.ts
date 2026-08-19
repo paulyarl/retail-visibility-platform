@@ -47,6 +47,17 @@ import {
   INTELLIGENCE_PROFILE_SCHEMA_NAME,
   INTELLIGENCE_PROFILE_PROMPT_SUFFIX,
 } from './intelligence-profile.schema';
+import {
+  profileRepairTriageSchema,
+  PROFILE_REPAIR_TRIAGE_SCHEMA_NAME,
+  PROFILE_REPAIR_TRIAGE_PROMPT_SUFFIX,
+  profileRepairAuditSchema,
+  PROFILE_REPAIR_AUDIT_SCHEMA_NAME,
+  PROFILE_REPAIR_AUDIT_PROMPT_SUFFIX,
+  citationRepairPackageSchema,
+  CITATION_REPAIR_PACKAGE_SCHEMA_NAME,
+  CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
+} from './profile-repair-output.schema';
 
 /**
  * Strip a trailing `%` and coerce to number.
@@ -197,6 +208,21 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: intelligenceProfileSchema,
     auditPlatform: null, // profile establishment creates draft profiles, not audits
     promptSuffix: INTELLIGENCE_PROFILE_PROMPT_SUFFIX,
+  },
+  [PROFILE_REPAIR_TRIAGE_SCHEMA_NAME]: {
+    validator: profileRepairTriageSchema,
+    auditPlatform: null, // triage creates a recommendation, not an audit
+    promptSuffix: PROFILE_REPAIR_TRIAGE_PROMPT_SUFFIX,
+  },
+  [PROFILE_REPAIR_AUDIT_SCHEMA_NAME]: {
+    validator: profileRepairAuditSchema,
+    auditPlatform: null, // per-issue audits create deliverable inputs, not audits
+    promptSuffix: PROFILE_REPAIR_AUDIT_PROMPT_SUFFIX,
+  },
+  [CITATION_REPAIR_PACKAGE_SCHEMA_NAME]: {
+    validator: citationRepairPackageSchema,
+    auditPlatform: null, // fulfill creates a deliverable, not an audit
+    promptSuffix: CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
   },
 };
 

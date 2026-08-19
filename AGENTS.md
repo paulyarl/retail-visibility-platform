@@ -522,5 +522,83 @@ Bridges `directory_presence_seeds` (unclaimed public listings) with `mkt_campaig
 - `origin_country`, `origin_region`, `neighborhood`, `description`, `directory_profile`
 - All campaign-sourced provenance: `source_name = 'linked_campaign'`, `source_url = /settings/admin/marketing-ops/recovery/:campaignId`, `confidence = 'high'`, `show_on_public = true`
 
+## V3.1 Entry Presence Tier (Migration 231)
+
+Implements the V3.1 tier strategy: `directory_presence` (free gateway) → Entry Presence triad (`presence`, `discovery`, `storefront`) → Commerce tiers → Scale tiers. The `presence` tier is a clean directory-enrichment-only tier (display name "Starter", $19/mo) that does NOT inherit Google or platform marketplace capabilities. The legacy `starter` tier remains dormant and inactive.
+
+Strategy source of truth: `docs/PLATFORM_STRATEGY_V3.md`
+Progressive upgrade spec: `docs/LocalBiz/directory_presence_progressive_upgrade_spec.md`
+Tier hierarchy skill: `.devin/skills/tier-hierarchy.md`
+
+### Tier taxonomy
+| Key | Layer | Price | Display | Role |
+|-----|-------|------:|---------|------|
+| `directory_presence` | Gateway | $0 | Directory Presence | Free seed/claim on-ramp |
+| `presence` | Entry Presence | $19 | Starter | Paid in-house directory surface (logo, about, gallery, layouts) |
+| `discovery` | Entry Presence | $29 | Discovery | Google visibility surface |
+| `storefront` | Entry Presence | $59 | Storefront | Platform marketplace/storefront surface |
+| `commitment` | Commerce | $79 | Commitment | Deposit-only money mode |
+| `ecommerce` | Commerce | $99 | E-commerce | Full-payment money mode |
+| `omnichannel` | Commerce | $149 | Omnichannel | Deposit + full-payment mode |
+| `professional` | Scale | $199 | Professional | Advanced single-location tier |
+| `organization` | Scale | $499 | Organization | Organization tier |
+| `enterprise` | Scale | $499 | Enterprise | Multi-location/enterprise tier |
+
+Legacy inactive tiers (do NOT reactivate): `starter`, `google_only`, `chain_starter`.
+
+### Hierarchy
+```text
+directory_presence: []
+presence:           [directory_presence]
+discovery:          [directory_presence]
+storefront:         [discovery, directory_presence]
+```
+`presence` does NOT inherit `google_only` or `starter`. It is directory enrichment only.
+
+### Migration 231
+- `database/migrations/231_entry_presence_tier.sql`
+- Adds `billing_type` column to `subscription_tiers_list` (default `'subscription'`, `directory_presence` set to `'none'`)
+- Inserts `presence` tier row ($19, sort_order=10, `billing_type='subscription'`)
+- Seeds 6 directory-entry feature keys: `directory_entry_logo_on`, `directory_entry_about_on`, `directory_entry_gallery_on`, `directory_entry_social_on`, `directory_entry_layout_editorial`, `directory_entry_layout_immersive`
+- Links features to `directory_entry` capability type
+- Seeds `tier_features_list` for `presence` (directory enrichment only)
+- Renumbers active V3 tier sort orders (0/10/20/30/40/50/60/70/80/90)
+
+### Backend
+- `apps/api/src/services/resolvers/DirectoryEntryOptionsResolver.ts` — reads `directory_entry_logo_on` / `directory_entry_about_on` (with `_enabled` fallbacks); produces `logo_enabled`, `can_show_logo`, `about_enabled`, `can_show_about`
+- `apps/api/src/services/resolvers/types.ts` — `EffectiveDirectoryEntryOptions` includes the 4 new fields
+- `apps/api/src/routes/public-tenant-capabilities.ts` — expired capability response includes false-valued logo/about fields
+- `apps/api/src/routes/directory-presence-upgrade.ts` — V3.1 gateway upgrade API:
+  - GET `/:tenantId/upgrade/options` — when current tier is `directory_presence`, returns the triad (`presence`, `discovery`, `storefront`) with mode metadata (`mode`, `surface`, `tagline`, `isPrimary`) and `isGatewayUpgrade: true`; non-gateway tenants get the flat sort_order ladder
+  - POST `/:tenantId/upgrade` — enforces: from gateway, only the three Entry Presence modes are valid targets (`invalid_gateway_upgrade_target` error otherwise); paid tiers require `paymentMethodId`
+- `apps/api/src/middleware/tier-access.ts` — `presence` added to `TIER_HIERARCHY`, `tierOrder`, display names, pricing
+- `apps/api/src/utils/tier-limits.ts` — `presence` added to `SubscriptionTier` type and `TIER_LIMITS` (maxSkus: 0 — directory mode, no catalog)
+- `apps/api/src/utils/trial-tier-transparency.ts` — `trial_presence` → `presence` mapping
+- `apps/api/src/services/GrowthTipService.ts` — `presence` added to `TIER_ORDER`
+
+### Frontend
+- `apps/web/src/lib/tiers/tier-features.ts` — clean `presence` entry (directory-mode only); `TIER_HIERARCHY.presence = ['directory_presence']`; `TIER_DISPLAY_NAMES.presence = 'Starter'`; `TIER_PRICING.presence = 19`
+- `apps/web/src/lib/tiers/tier-resolver.ts` — `presence` in `TierInfo['level']`, `mapTierLevel`, hierarchy comparison, upgrade options
+- `apps/web/src/lib/tiers/content-consistency.ts` — `presence` progression entry
+- `apps/web/src/lib/growth-tips/tipEngine.ts` — `presence` in `TIER_ORDER`
+- `apps/web/src/services/CapabilityResolutionService.ts` — `logoEnabled`, `aboutEnabled`, `canShowLogo`, `canShowAbout`
+- `apps/web/src/services/UnifiedCapabilityService.ts` — `BackendEffectiveDirectoryEntry` extended; `mapDirectoryEntry()` maps snake_case → camelCase
+- `apps/web/src/services/DirectoryPresenceUpgradeService.ts` — `UpgradeTierOption` gained `mode`, `surface`, `tagline`, `isPrimary`, `billingType`; `UpgradeOptions` gained `isGatewayUpgrade`
+- `apps/web/src/app/t/[tenantId]/settings/subscription/upgrade/page.tsx` — V3.1 mode picker:
+  - When `isGatewayUpgrade` is true: renders mode badges (`directory`/`google`/`platform`), taglines, surface labels, "Recommended" badge on Presence
+  - Presence card gets blue ring + border highlight as primary CTA
+  - Paid tiers show inline Stripe `CardElement` form when selected (SetupIntent flow → `paymentMethodId` → `upgrade()` call)
+- `apps/web/src/app/directory/[slug]/page.tsx` — passes `directoryEntryOptions` through `layoutProps`
+- `apps/web/src/app/directory/[slug]/layouts/types.ts` — `DirectoryEntryLayoutProps` includes capability state
+- All 4 directory layouts (Classic, Editorial, Immersive, Premium) — gate logo with `canShowLogo`, about with `canShowAbout`; default `?? true` so existing tenants keep rendering
+- `apps/web/src/app/place/[slug]/layouts/PlaceEntryEditorialLayout.tsx` — gates logo with `dirEntryOpts?.canShowLogo`
+- `apps/web/src/app/directory/claim/[token]/DirectoryClaimClient.tsx` — claim success CTA is "Choose Your Presence Mode" (not "Upgrade to Sell Online")
+- `apps/web/src/components/dashboard/TierUpgradeCard.tsx` — dashboard CTA is "Choose Your Presence Mode"
+
+### Tests
+- `apps/api/src/services/resolvers/CapabilityResolversOnOff.test.ts` — 8 new `DirectoryEntryOptionsResolver` tests (logo/about gating, flexible tier, disabled capability, layout keys)
+- `apps/web/src/lib/tiers/entry-presence-tier.test.ts` — 21 tests verifying presence feature boundaries, hierarchy isolation, legacy starter dormancy, gateway free-tier limits
+- `apps/web/vitest.config.ts` — vitest config for web app (node environment, `@` alias)
+
 
 

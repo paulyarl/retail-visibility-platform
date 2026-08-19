@@ -235,7 +235,7 @@ Claim tokens are **not** sufficient by themselves for ownership. A bare token-ga
 - The seed's status changes to `claimed`.
 - The owner becomes a platform tenant.
 - The tenant receives a **capability-filtered dashboard** — they see the features available to them based on their current tier (initially `directory_presence`).
-- The owner can now enrich their listing, add business hours, upload a logo, and eventually upgrade to retail/ecommerce capabilities.
+- The owner can enrich basic listing info (hours, contact, map, QR) and is prompted to **choose a presence mode** (Starter, Discovery, or Storefront) to unlock logo, about, gallery, and higher-tier capabilities.
 
 ---
 
@@ -262,14 +262,16 @@ Enrichment submissions may require **operator review** before going live:
 
 ### Progressive Engagement
 
-The goal is to move claimed owners from free directory visibility into paid capabilities:
+The goal is to move claimed owners from free directory visibility into paid capabilities. After claiming, the owner is on the free **Directory Presence** tier. The upgrade page presents an **Entry Presence mode picker** with three peer visibility surfaces:
 
-1. **Directory Presence** (free) — listing is live, owner has a basic dashboard.
-2. **Retail capabilities** — owner can manage inventory, process in-store sales, use the POS.
-3. **Ecommerce capabilities** — owner can sell online, manage orders, process payments.
-4. **Full platform** — owner uses the complete retail-to-online-to-ecommerce stack.
+1. **Directory Presence** (free) — listing is live, owner has a basic dashboard with hours, map, contact, and QR.
+2. **Starter / Presence** ($19/mo) — enrich the in-house directory listing with logo, about, gallery, social links, and editorial/immersive layouts. This is the primary (recommended) CTA.
+3. **Discovery** ($29/mo) — get found on Google with Google Shopping/SWIS visibility.
+4. **Storefront** ($59/mo) — open a platform marketplace storefront with product browse.
+5. **Commerce tiers** ($79–$149/mo) — accept deposits, full payments, or omnichannel checkout.
+6. **Scale tiers** ($199–$499/mo) — advanced single-location, organization, and enterprise features.
 
-The upgrade path is available in the owner's dashboard. The Growth Engine dashboard tracks upgrade conversion rates.
+The owner picks a surface from the mode picker at `/t/[tenantId]/settings/subscription/upgrade`. Paid modes require a Stripe payment method, collected inline via Stripe Elements. The Growth Engine dashboard tracks upgrade conversion rates.
 
 ---
 

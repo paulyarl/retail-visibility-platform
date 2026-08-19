@@ -31,11 +31,13 @@ async function runRecoveryResolutionPass(): Promise<void> {
   logger.info('[RecoveryResolution] Starting pending execution pass...');
 
   try {
-    // Find pending executions whose template is the recovery_resolution template
+    // Find pending executions for recovery resolution and profile repair resolution templates
     const pendingExecutions = await prisma.mkt_prompt_executions_list.findMany({
       where: {
         status: 'pending',
-        template_id: 'mpt-recovery-resolution-default',
+        template_id: {
+          in: ['mpt-recovery-resolution-default', 'mpt-profile-repair-resolution-default'],
+        },
       },
       take: 10, // Process in batches
     });
@@ -48,10 +50,16 @@ async function runRecoveryResolutionPass(): Promise<void> {
     logger.info(`[RecoveryResolution] Found ${pendingExecutions.length} pending execution(s)`);
 
     const { default: RecoveryResolutionService } = await import('../services/RecoveryResolutionService');
+    const { default: ProfileRepairPromptService } = await import('../services/ProfileRepairPromptService');
 
     for (const execution of pendingExecutions) {
       try {
-        const result = await RecoveryResolutionService.run(execution.id);
+        let result: { campaignId: string; passed: boolean; stage: string };
+        if (execution.template_id === 'mpt-profile-repair-resolution-default') {
+          result = await ProfileRepairPromptService.runResolution(execution.id);
+        } else {
+          result = await RecoveryResolutionService.run(execution.id);
+        }
         logger.info('[RecoveryResolution] Execution processed', undefined, {
           executionId: execution.id,
           campaignId: result.campaignId,

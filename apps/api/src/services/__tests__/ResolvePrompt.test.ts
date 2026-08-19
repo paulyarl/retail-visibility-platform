@@ -245,4 +245,76 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     expect(renderedPrompt).toBe(baseRendered);
     expect(resolution.intelligence_mode).toBe('none');
   });
+
+  // ─── Profile Repair Signal-Triage Amplification Tests ───────────────────────
+  describe('signal_triage role (template.category === profile_repair)', () => {
+    const makeRepairTemplate = (body = 'Repair triage for {{business_name}}: {{audit_signals}}') => ({
+      body,
+      prompt_type: 'seek',
+      category: 'profile_repair',
+      scope: 'business',
+    });
+
+    it('signal_triage + empty audit_signals → suppresses category block (distractor fix)', async () => {
+      mockProfileService.resolve.mockResolvedValueOnce({
+        id: 'auto_repair_us',
+        version: 1,
+        status: 'active',
+      });
+
+      const template = makeRepairTemplate();
+      const campaign = makeCampaign('business', 'Auto Repair');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: '' },
+      });
+
+      expect(renderedPrompt).not.toContain('PROFILE_BLOCK');
+      expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
+      expect(resolution.intelligence_mode).toBe('none');
+      expect(resolution.profile_id).toBeNull();
+    });
+
+    it('signal_triage + populated audit_signals + active profile → appends category block with framing directive', async () => {
+      mockProfileService.resolve.mockResolvedValueOnce({
+        id: 'auto_repair_us',
+        version: 1,
+        status: 'active',
+      });
+
+      const template = makeRepairTemplate();
+      const campaign = makeCampaign('business', 'Auto Repair');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'nap_drift\nunclaimed_profile' },
+      });
+
+      expect(renderedPrompt).toContain('nap_drift\nunclaimed_profile');
+      expect(renderedPrompt).toContain('=== CATEGORY INTELLIGENCE (SUPPLEMENTARY — REPAIR SIGNALS ARE PRIMARY) ===');
+      expect(renderedPrompt).toContain('PROFILE_BLOCK:auto_repair_us:v1');
+      expect(resolution.intelligence_mode).toBe('profile');
+      expect(resolution.profile_id).toBe('auto_repair_us');
+    });
+
+    it('signal_triage + populated audit_signals + no active profile → base render only', async () => {
+      mockProfileService.resolve.mockResolvedValueOnce(null);
+
+      const template = makeRepairTemplate();
+      const campaign = makeCampaign('business', 'Unknown Niche');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'suspension' },
+      });
+
+      expect(renderedPrompt).not.toContain('PROFILE_BLOCK');
+      expect(renderedPrompt).not.not.toBe(true);
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+  });
 });
