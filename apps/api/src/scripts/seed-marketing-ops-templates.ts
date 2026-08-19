@@ -15,6 +15,7 @@ import { MarketingPromptService } from '../services/MarketingPromptService';
 import { logger } from '../logger';
 import { BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
 import { CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME } from '../validators/city-category-opportunity.schema';
+import { RAW_JSON_SCHEMA_NAME } from '../validators/market-analysis.schema';
 
 const SEED_TEMPLATES = [
   {
@@ -95,6 +96,10 @@ Provide:
 
 Format as structured JSON.`,
     variables: ['city'],
+    outputSchema: {
+      name: RAW_JSON_SCHEMA_NAME,
+      description: 'City ecosystem scan — top categories by density, ratings, unclaimed profiles, neighborhoods, review response rates, prospecting recommendations. Permissive schema (variable shape).',
+    },
     isDefault: false,
   },
   {
@@ -120,6 +125,10 @@ Guidelines:
 
 Format: Number each response to match the review number.`,
     variables: ['business_name', 'city', 'category', 'voice', 'reviews'],
+    outputSchema: {
+      name: RAW_JSON_SCHEMA_NAME,
+      description: 'Review response fulfill — numbered review responses matching business voice. Permissive schema (freeform text/JSON).',
+    },
     isDefault: true,
   },
   {
@@ -141,6 +150,10 @@ Provide:
 
 Tone: Professional, approachable, locally-rooted. Avoid jargon.`,
     variables: ['business_name', 'category', 'services'],
+    outputSchema: {
+      name: RAW_JSON_SCHEMA_NAME,
+      description: 'Service menu fulfill — business name, tagline, core services, pricing tiers, CTA, contact, why-choose-us. Permissive schema (freeform text/JSON).',
+    },
     isDefault: false,
   },
   {
@@ -168,6 +181,10 @@ Provide:
 
 Format as structured JSON.`,
     variables: ['business_name', 'city', 'category', 'services'],
+    outputSchema: {
+      name: RAW_JSON_SCHEMA_NAME,
+      description: 'GBP optimization plan — description, categories, service area, posts, attributes, Q&A, photo recommendations, hours sync, fulfillment attributes. Permissive schema (variable shape).',
+    },
     isDefault: false,
   },
   {
@@ -198,6 +215,10 @@ For each response, output:
 
 End with: Overall pass rate (X/N responses passed all checks).`,
     variables: ['business_name', 'voice', 'responses'],
+    outputSchema: {
+      name: RAW_JSON_SCHEMA_NAME,
+      description: 'Response quality filter — per-response pass/fail checks, suggested fixes, overall pass rate. Permissive schema (variable shape).',
+    },
     isDefault: true,
   },
   {
@@ -225,6 +246,10 @@ Include a summary of the retainer offer:
 - Services included (tailored to the business type — product-visibility services for product businesses, review-management services for service businesses)
 - Value proposition (time saved, consistent online presence, customers can find and verify the business before visiting)`,
     variables: ['business_name', 'category', 'city'],
+    outputSchema: {
+      name: RAW_JSON_SCHEMA_NAME,
+      description: '4-week follow-up sequence — weekly emails (subject, body, CTA) + retainer offer summary. Permissive schema (freeform text/JSON).',
+    },
     isDefault: true,
   },
 ];

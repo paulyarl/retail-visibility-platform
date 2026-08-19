@@ -77,6 +77,30 @@ export {
   type CitationRepairPackageOutput,
 };
 
+// ============================================================================
+// Raw JSON Schema (permissive — accepts any valid JSON object or array)
+// ============================================================================
+
+/**
+ * Permissive schema for templates that produce variable/freeform JSON without
+ * a strict shape (fulfill deliverables, filter QA checks, retainer sequences,
+ * city ecosystem scans, custom operator templates).
+ *
+ * Accepts any parsed JSON object or array. Used so importExternalResult()
+ * succeeds (parses + stores the JSON) without forcing a specific shape on
+ * templates that don't have a dedicated schema.
+ */
+export const RAW_JSON_SCHEMA_NAME = 'raw_json' as const;
+
+export const rawJsonSchema = z.union([
+  z.record(z.string(), z.any()),
+  z.array(z.any()),
+]);
+
+export const RAW_JSON_PROMPT_SUFFIX = `
+
+Return your response as valid JSON only. No markdown fences, no commentary.`;
+
 /**
  * Strip a trailing `%` and coerce to number.
  * Accepts "85%", "85", 85, "4.2", 4.2 — all become numbers.
@@ -241,6 +265,11 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: citationRepairPackageSchema,
     auditPlatform: null, // fulfill creates a deliverable, not an audit
     promptSuffix: CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
+  },
+  [RAW_JSON_SCHEMA_NAME]: {
+    validator: rawJsonSchema,
+    auditPlatform: null, // permissive schema never creates an audit
+    promptSuffix: RAW_JSON_PROMPT_SUFFIX,
   },
 };
 
