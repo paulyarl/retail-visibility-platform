@@ -257,7 +257,12 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
 
     it('signal_triage + empty audit_signals → suppresses category block (distractor fix)', async () => {
       const template = makeRepairTemplate();
-      const campaign = makeCampaign('business', 'Auto Repair');
+      const campaign = {
+        ...makeCampaign('business', 'Auto Repair'),
+        has_website: 'yes',
+        gbp_claimed: true,
+        nap_consistent: true,
+      };
 
       const { renderedPrompt, resolution } = await service.resolvePrompt({
         template,

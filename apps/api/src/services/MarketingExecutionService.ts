@@ -453,7 +453,6 @@ export class MarketingExecutionService extends BaseService {
 
     // ─── Business-scope §1B amplification path ────────────────────────────
     const isBusinessScope = campaignScope === 'business';
-    const isProfileRepair = (input.template.category || '').toLowerCase() === 'profile_repair';
 
     const promptRole: 'category_audit' | 'signal_triage' | 'none' =
       !isSeek || !isBusinessScope
