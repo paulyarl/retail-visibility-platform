@@ -256,12 +256,6 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     it('signal_triage + empty audit_signals → suppresses category block (distractor fix)', async () => {
-      mockProfileService.resolve.mockResolvedValueOnce({
-        id: 'auto_repair_us',
-        version: 1,
-        status: 'active',
-      });
-
       const template = makeRepairTemplate();
       const campaign = makeCampaign('business', 'Auto Repair');
 
@@ -275,6 +269,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
       expect(resolution.intelligence_mode).toBe('none');
       expect(resolution.profile_id).toBeNull();
+      expect(mockProfileService.resolve).not.toHaveBeenCalled();
     });
 
     it('signal_triage + populated audit_signals + active profile → appends category block with framing directive', async () => {
@@ -313,8 +308,69 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       });
 
       expect(renderedPrompt).not.toContain('PROFILE_BLOCK');
-      expect(renderedPrompt).not.not.toBe(true);
+      expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
       expect(resolution.intelligence_mode).toBe('none');
+    });
+  });
+
+  // ─── Universal Business Prompt Auto-Sourcing Tests ─────────────────────────
+  describe('universal business prompt auto-sourcing', () => {
+    it('auto-sources recovery_resolution variables from campaign notes and intake', async () => {
+      const template = {
+        id: 'mpt-recovery-resolution-default',
+        body: 'Complaint: {{complaintText}}\nIntake: {{intakePayload}}',
+        prompt_type: 'recovery_resolution',
+        scope: 'business',
+      };
+      const campaign = {
+        id: 'camp-rec-1',
+        scope: 'business',
+        category: 'Dentist',
+        notes: 'Customer dispute regarding billing on 2026-05-01',
+        mkt_dispute_intake: [
+          {
+            intake_kind: 'dispute',
+            owner_statement: 'Disputed charge explanation',
+            proposed_resolution: 'Full refund',
+          },
+        ],
+      };
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { complaintText: '', intakePayload: '' },
+      });
+
+      expect(renderedPrompt).toContain('Customer dispute regarding billing');
+      expect(renderedPrompt).toContain('Disputed charge explanation');
+    });
+
+    it('auto-sources fulfill variables (voice, services) when missing or empty', async () => {
+      const template = {
+        id: 'mpt-seed-fulfill-002',
+        body: 'Business: {{business_name}}\nVoice: {{voice}}\nServices: {{services}}',
+        prompt_type: 'fulfill',
+        scope: 'business',
+      };
+      const campaign = {
+        id: 'camp-ful-1',
+        scope: 'business',
+        business_name: 'Acme Auto',
+        category: 'Auto Repair',
+        tone: 'enthusiastic and helpful',
+        service_category: 'Brake Repair, Oil Change',
+      };
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { voice: '', services: '' },
+      });
+
+      expect(renderedPrompt).toContain('Acme Auto');
+      expect(renderedPrompt).toContain('enthusiastic and helpful');
+      expect(renderedPrompt).toContain('Brake Repair, Oil Change');
     });
   });
 });

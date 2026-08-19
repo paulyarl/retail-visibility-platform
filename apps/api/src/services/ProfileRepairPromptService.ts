@@ -43,15 +43,24 @@ const SIGNAL_TO_TRIAGE_VOCAB: Record<string, string> = {
   CP_NAP_NAME_DRIFT: 'nap_drift',
   CP_NAP_ADDRESS_DRIFT: 'nap_drift',
   CP_NAP_PHONE_DRIFT: 'nap_drift',
+  CP_MISSING_CONTACT_INFO: 'nap_drift',
+  CP_NAP_INCONSISTENCY: 'nap_drift',
+  CP_NAP_INCONSISTENT: 'nap_drift',
   DS_CLAIMED_STATUS: 'unclaimed_profile',
   DS_UNCLAIMED_PROFILE: 'unclaimed_profile',
   DS_MISSING_SERVICE_MENU: 'missing_category',
+  DS_MISSING_PRODUCT_CATALOG: 'missing_category',
   DS_MISSING_CATEGORY: 'missing_category',
   DS_OUTDATED_HOURS: 'missing_hours',
   DS_OUTDATED_HOLIDAY_HOURS: 'missing_hours',
   DS_MISSING_HOURS: 'missing_hours',
   DS_MISSING_PROFILE: 'platform_gap',
   DS_PLATFORM_GAP: 'platform_gap',
+  DS_BROKEN_PROFILE_LINK: 'platform_gap',
+  WC_URL_MISMATCH: 'platform_gap',
+  WC_BROKEN_WEBSITE: 'platform_gap',
+  WC_MISSING_WEBSITE: 'platform_gap',
+  VP_MISSING_STOREFRONT_PHOTOS: 'platform_gap',
 };
 
 export class ProfileRepairPromptService extends BaseService {
@@ -165,15 +174,29 @@ export class ProfileRepairPromptService extends BaseService {
     return lines.join('\n').trim();
   }
 
-  buildSeekVariables(campaign: any, latestAudit: any): Record<string, string> {
+  buildSeekVariables(campaign: any, latestAudit?: any): Record<string, string> {
+    const audit = latestAudit || campaign?.audits?.[0] || campaign?.mkt_audits_list?.[0] || null;
     const signalCodes = extractSignals({
       campaign,
-      auditData: latestAudit?.audit_data,
+      auditData: audit?.audit_data,
     });
 
+    // Also include any pre-extracted detected_signals from campaign or triage results
+    const storedSignals = campaign?.mkt_campaign_triage_results?.detected_signals || campaign?.detected_signals;
+    if (Array.isArray(storedSignals)) {
+      for (const s of storedSignals) {
+        const code = typeof s === 'string' ? s : (s as any)?.code;
+        if (code && !signalCodes.includes(code)) {
+          signalCodes.push(code);
+        }
+      }
+    }
+
+    const serialized = this.serializeSignals(signalCodes);
+
     return {
-      audit_signals: this.serializeSignals(signalCodes),
-      issue_type: campaign.repair_issue_type || '',
+      audit_signals: serialized,
+      issue_type: campaign?.repair_issue_type || '',
     };
   }
 

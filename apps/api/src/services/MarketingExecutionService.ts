@@ -263,14 +263,113 @@ export class MarketingExecutionService extends BaseService {
     campaign: any;
     variables?: Record<string, any>;
   }, ctx?: RequestCtx): Promise<{ renderedPrompt: string; resolution: PromptResolution }> {
-    // 1. Base render — always happens first, using the existing renderTemplate().
-    const baseRendered = this.renderTemplate(input.template.body, input.variables, input.campaign);
-
-    // 2. Check amplification gates
     const promptType = (input.template.prompt_type || '').toLowerCase();
     const campaignScope = (input.campaign.scope || 'business').toLowerCase();
     const category = input.campaign.category || '';
+    const isProfileRepair = (input.template.category || '').toLowerCase() === 'profile_repair';
 
+    // Auto-source domain-specific variables if missing/empty in caller variables
+    let effectiveVariables = { ...(input.variables || {}) };
+    if (input.campaign && campaignScope === 'business') {
+      try {
+        let audit = input.campaign.audits?.[0] || input.campaign.mkt_audits_list?.[0];
+        if (!audit && input.campaign.id) {
+          audit = await this.prisma.mkt_audits_list.findFirst({
+            where: { campaign_id: input.campaign.id },
+            orderBy: { created_at: 'desc' },
+          });
+        }
+
+        // 1. Profile Repair templates
+        if (isProfileRepair) {
+          const { default: repairService } = await import('./ProfileRepairPromptService');
+
+          if (promptType === 'seek') {
+            const seekDefaults = repairService.buildSeekVariables(input.campaign, audit);
+            if (!effectiveVariables.audit_signals || !String(effectiveVariables.audit_signals).trim()) {
+              effectiveVariables.audit_signals = seekDefaults.audit_signals;
+            }
+            if (!effectiveVariables.issue_type || !String(effectiveVariables.issue_type).trim()) {
+              effectiveVariables.issue_type = seekDefaults.issue_type;
+            }
+          } else if (promptType === 'fulfill') {
+            const fulfillDefaults = repairService.buildFulfillVariables(input.campaign, audit);
+            if (!effectiveVariables.audit_results || !String(effectiveVariables.audit_results).trim()) {
+              effectiveVariables.audit_results = fulfillDefaults.audit_results;
+            }
+          } else if (promptType === 'recovery_resolution') {
+            let intake = input.campaign.mkt_dispute_intake?.[0];
+            if (!intake && input.campaign.id) {
+              intake = await this.prisma.mkt_dispute_intake.findFirst({
+                where: { campaign_id: input.campaign.id, intake_kind: 'profile_repair' },
+                include: { mkt_dispute_attachments: true },
+                orderBy: { created_at: 'desc' },
+              });
+            }
+            const resDefaults = repairService.buildResolutionVariables(input.campaign, intake);
+            if (!effectiveVariables.evidencePayload || !String(effectiveVariables.evidencePayload).trim()) {
+              effectiveVariables = { ...resDefaults, ...effectiveVariables };
+            }
+          }
+        }
+        // 2. Generic Recovery Resolution template
+        else if (promptType === 'recovery_resolution' || input.template.id === 'mpt-recovery-resolution-default') {
+          let intake = input.campaign.mkt_dispute_intake?.find((i: any) => i.intake_kind === 'dispute') || input.campaign.mkt_dispute_intake?.[0];
+          if (!intake && input.campaign.id) {
+            intake = await this.prisma.mkt_dispute_intake.findFirst({
+              where: { campaign_id: input.campaign.id, intake_kind: 'dispute' },
+              include: { mkt_dispute_attachments: true },
+              orderBy: { created_at: 'desc' },
+            });
+          }
+
+          if (!effectiveVariables.complaintText || !String(effectiveVariables.complaintText).trim()) {
+            effectiveVariables.complaintText = input.campaign.notes || '(No complaint text recorded — see audit data)';
+          }
+          if (!effectiveVariables.intakePayload || !String(effectiveVariables.intakePayload).trim()) {
+            effectiveVariables.intakePayload = JSON.stringify({
+              ownerStatement: intake?.owner_statement ?? '',
+              proposedResolution: intake?.proposed_resolution ?? '',
+              serviceDate: intake?.service_date ?? '',
+              statusFlag: intake?.status_flag ?? '',
+            });
+          }
+          if (!effectiveVariables.attachmentMeta || !String(effectiveVariables.attachmentMeta).trim()) {
+            effectiveVariables.attachmentMeta = JSON.stringify(
+              (intake?.mkt_dispute_attachments || []).map((a: any) => ({
+                fileName: a.file_name,
+                fileType: a.file_type,
+              })),
+            );
+          }
+        }
+        // 3. Fulfill templates (Review responses, Service menus, GBP optimizations)
+        else if (promptType === 'fulfill') {
+          if (!effectiveVariables.voice || !String(effectiveVariables.voice).trim()) {
+            effectiveVariables.voice = input.campaign.tone || 'professional, empathetic, and solution-oriented';
+          }
+          if (!effectiveVariables.services || !String(effectiveVariables.services).trim()) {
+            const recommended = (audit?.audit_data as any)?.recommended_services;
+            if (Array.isArray(recommended) && recommended.length > 0) {
+              effectiveVariables.services = recommended.join(', ');
+            } else if (input.campaign.service_category) {
+              effectiveVariables.services = input.campaign.service_category;
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn('Failed to auto-source domain variables', ctx, {
+          campaignId: input.campaign.id,
+          templateId: input.template.id,
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    // 1. Base render — always happens first, using the existing renderTemplate().
+    const baseRendered = this.renderTemplate(input.template.body, effectiveVariables, input.campaign);
+
+    // 2. Check amplification gates
     const isSeek = promptType === 'seek';
     const hasCategory = category.length > 0;
 
@@ -382,7 +481,7 @@ export class MarketingExecutionService extends BaseService {
     // For signal-driven triage/audit templates (profile_repair):
     // Only append if audit_signals variable is populated, with framing directive.
     if (promptRole === 'signal_triage') {
-      const auditSignals = input.variables?.audit_signals ?? '';
+      const auditSignals = effectiveVariables?.audit_signals ?? '';
       if (!auditSignals || !String(auditSignals).trim()) {
         // No signals -> suppress category block (fixes distractor-block bug)
         return {

@@ -7,6 +7,7 @@ import { resolveIntegrationOptions } from './IntegrationOptionsResolver';
 import { resolveCrmOptions } from './CrmOptionsResolver';
 import { resolveFaqOptions } from './FaqOptionsResolver';
 import { resolveStorefrontOptions } from './StorefrontOptionsResolver';
+import { resolveStorefrontLayouts } from './StorefrontLayoutResolver';
 import { resolveSocialCommerceOptions } from './SocialCommerceOptionsResolver';
 import { resolveDirectoryEntryOptions } from './DirectoryEntryOptionsResolver';
 
@@ -218,18 +219,29 @@ describe('Phase 5 resolvers _on/_off fallback', () => {
         storefront_opt_recommend_on: true,
         storefront_opt_info_on: true,
         storefront_opt_advanced_on: true,
-        storefront_opt_layout_on: true,
       }, {});
       expect(onResult.allowed_category_types).toEqual(['category_store', 'category_product']);
-      expect(onResult.allowed_layouts).toEqual(['classic', 'editorial', 'immersive']);
       expect(onResult.advanced_enabled).toBe(true);
       expect(onResult.info_enabled).toBe(true);
 
-      const legacyResult = resolveStorefrontOptions({
+      // Layouts were extracted to StorefrontLayoutResolver (group gate + individual keys)
+      const onLayouts = resolveStorefrontLayouts({}, null, {
+        storefront_opt_enabled: true,
+        storefront_opt_layout_on: true,
+        storefront_opt_layout_classic: true,
+        storefront_opt_layout_editorial: true,
+        storefront_opt_layout_immersive: true,
+      });
+      expect(onLayouts.allowed_layouts).toEqual(['classic', 'editorial', 'immersive']);
+
+      const legacyLayouts = resolveStorefrontLayouts({}, null, {
         storefront_opt_enabled: true,
         storefront_opt_layout_enabled: true,
-      }, {});
-      expect(legacyResult.allowed_layouts).toEqual(['classic', 'editorial', 'immersive']);
+        storefront_opt_layout_classic: true,
+        storefront_opt_layout_editorial: true,
+        storefront_opt_layout_immersive: true,
+      });
+      expect(legacyLayouts.allowed_layouts).toEqual(['classic', 'editorial', 'immersive']);
     });
   });
 
