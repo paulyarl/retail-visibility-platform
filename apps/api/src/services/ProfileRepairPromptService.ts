@@ -14,10 +14,11 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { MarketingPromptService } from './MarketingPromptService';
 import { MarketingExecutionService } from './MarketingExecutionService';
-import { MarketingCampaignService } from './MarketingCampaignService';
-import { MarketingDeliverableService } from './MarketingDeliverableService';
-import { extractSignals, type SignalCode } from './triage/signal-extractor';
-import { aiProviderFactory } from './ai/AIProviderFactory';
+import MarketingCampaignService from './MarketingCampaignService';
+import { extractSignals } from './triage/signal-extractor';
+import { type SignalCode } from './triage/signal-taxonomy';
+import aiProviderFactory from './ai-providers';
+import { generateDeliverableId, generateDeliverableSectionId } from '../lib/id-generator';
 import {
   resolveOutputSchema,
   profileRepairTriageSchema,
@@ -429,29 +430,62 @@ export class ProfileRepairPromptService extends BaseService {
         throw new Error(`AI output was not valid JSON: ${(e as Error).message}`);
       }
 
-      // Create deliverable of type reinstatement_appeal
-      const deliverableService = MarketingDeliverableService.getInstance();
-      const deliverable = await deliverableService.createDeliverable(
-        {
-          campaignId,
-          type: 'reinstatement_appeal',
-          filePayload: {
-            deliverableText: parsedJson.deliverableText,
-            submissionGuide: parsedJson.submissionGuide,
-          },
-          generatedBy: 'profile-repair-agent',
+      // Create deliverable of type reinstatement_appeal + sections
+      const deliverableId = generateDeliverableId();
+
+      await this.prisma.mkt_deliverables_list.create({
+        data: {
+          id: deliverableId,
+          campaign_id: campaignId,
+          execution_id: executionId,
+          template_id: null,
+          deliverable_type: 'reinstatement_appeal',
+          status: 'drafted',
+          file_name: `reinstatement-appeal-${campaignId}.json`,
+          storage_path: `recovery/${campaignId}/${deliverableId}.json`,
+          mime_type: 'application/json',
+          generated_by: 'profile-repair-agent',
         },
-        ctx,
-      );
+      });
+
+      await this.prisma.mkt_deliverable_section.createMany({
+        data: [
+          {
+            id: generateDeliverableSectionId(),
+            deliverable_id: deliverableId,
+            campaign_id: campaignId,
+            section_type: 'response_draft',
+            title: 'Reinstatement Appeal Letter',
+            content: parsedJson.deliverableText,
+            source: 'ai',
+            quality_gate_passed: true,
+            quality_gate_issues: [],
+            status: 'draft',
+            section_index: 0,
+          },
+          {
+            id: generateDeliverableSectionId(),
+            deliverable_id: deliverableId,
+            campaign_id: campaignId,
+            section_type: 'submission_guide',
+            title: 'Submission Guide',
+            content: parsedJson.submissionGuide,
+            source: 'ai',
+            quality_gate_passed: true,
+            quality_gate_issues: [],
+            status: 'draft',
+            section_index: 1,
+          },
+        ],
+      });
 
       // Transition campaign stage to final_resolution_drafted
       await MarketingCampaignService.transitionStage(
-        campaignId,
-        'final_resolution_drafted',
         {
-          reason: 'AI drafted reinstatement appeal package',
-          changedBy: 'profile-repair-agent',
-          metadata: { deliverableId: deliverable.id, executionId },
+          campaignId,
+          toStage: 'final_resolution_drafted',
+          triggerType: 'system',
+          notes: 'Profile Repair AI Agent drafted reinstatement appeal package',
         },
         ctx,
       );
@@ -459,13 +493,13 @@ export class ProfileRepairPromptService extends BaseService {
       logger.info('Profile repair resolution run completed', ctx, {
         executionId,
         campaignId,
-        deliverableId: deliverable.id,
+        deliverableId,
       });
 
       return {
         executionId,
         campaignId,
-        deliverableId: deliverable.id,
+        deliverableId,
         stage: 'final_resolution_drafted',
         passed: true,
       };
@@ -632,28 +666,60 @@ export class ProfileRepairPromptService extends BaseService {
 
       // Handle resolution import -> deliverable + stage transition
       if (templateId === PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID || template.prompt_type === 'recovery_resolution') {
-        const deliverableService = MarketingDeliverableService.getInstance();
-        const deliverable = await deliverableService.createDeliverable(
-          {
-            campaignId,
-            type: 'reinstatement_appeal',
-            filePayload: {
-              deliverableText: parsedJson.deliverableText,
-              submissionGuide: parsedJson.submissionGuide,
-            },
-            generatedBy: ctx?.userId || 'operator-external',
+        deliverableId = generateDeliverableId();
+
+        await this.prisma.mkt_deliverables_list.create({
+          data: {
+            id: deliverableId,
+            campaign_id: campaignId,
+            execution_id: execution.id,
+            template_id: templateId,
+            deliverable_type: 'reinstatement_appeal',
+            status: 'drafted',
+            file_name: `reinstatement-appeal-${campaignId}.json`,
+            storage_path: `recovery/${campaignId}/${deliverableId}.json`,
+            mime_type: 'application/json',
+            generated_by: ctx?.userId || 'operator-external',
           },
-          ctx,
-        );
-        deliverableId = deliverable.id;
+        });
+
+        await this.prisma.mkt_deliverable_section.createMany({
+          data: [
+            {
+              id: generateDeliverableSectionId(),
+              deliverable_id: deliverableId,
+              campaign_id: campaignId,
+              section_type: 'response_draft',
+              title: 'Reinstatement Appeal Letter',
+              content: parsedJson.deliverableText,
+              source: 'external',
+              quality_gate_passed: true,
+              quality_gate_issues: [],
+              status: 'draft',
+              section_index: 0,
+            },
+            {
+              id: generateDeliverableSectionId(),
+              deliverable_id: deliverableId,
+              campaign_id: campaignId,
+              section_type: 'submission_guide',
+              title: 'Submission Guide',
+              content: parsedJson.submissionGuide,
+              source: 'external',
+              quality_gate_passed: true,
+              quality_gate_issues: [],
+              status: 'draft',
+              section_index: 1,
+            },
+          ],
+        });
 
         await MarketingCampaignService.transitionStage(
-          campaignId,
-          'final_resolution_drafted',
           {
-            reason: 'External reinstatement appeal imported',
-            changedBy: ctx?.userId || 'operator-external',
-            metadata: { deliverableId: deliverable.id, executionId: execution.id },
+            campaignId,
+            toStage: 'final_resolution_drafted',
+            triggerType: 'operator',
+            notes: 'External reinstatement appeal imported',
           },
           ctx,
         );

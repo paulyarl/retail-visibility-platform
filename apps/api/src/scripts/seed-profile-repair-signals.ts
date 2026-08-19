@@ -9,7 +9,7 @@
  */
 
 import { MarketingSignalRegistryService } from '../services/MarketingSignalRegistryService';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { invalidateSignalRegistryCache } from '../services/triage/signal-taxonomy';
 

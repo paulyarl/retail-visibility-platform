@@ -47,16 +47,19 @@ import {
   INTELLIGENCE_PROFILE_SCHEMA_NAME,
   INTELLIGENCE_PROFILE_PROMPT_SUFFIX,
 } from './intelligence-profile.schema';
-import {
+export {
   profileRepairTriageSchema,
   PROFILE_REPAIR_TRIAGE_SCHEMA_NAME,
   PROFILE_REPAIR_TRIAGE_PROMPT_SUFFIX,
+  type ProfileRepairTriageOutput,
   profileRepairAuditSchema,
   PROFILE_REPAIR_AUDIT_SCHEMA_NAME,
   PROFILE_REPAIR_AUDIT_PROMPT_SUFFIX,
+  type ProfileRepairAuditOutput,
   citationRepairPackageSchema,
   CITATION_REPAIR_PACKAGE_SCHEMA_NAME,
   CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
+  type CitationRepairPackageOutput,
 } from './profile-repair-output.schema';
 
 /**
