@@ -284,5 +284,82 @@ describe('Phase 5 resolvers _on/_off fallback', () => {
       expect(legacyResult.allowed_layouts).toContain('immersive');
       expect(legacyResult.hours_enabled).toBe(true);
     });
+
+    // V3.1: logo and about gating tests
+    it('enables logo and about when _on feature keys are present', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_enabled: true,
+        directory_entry_logo_on: true,
+        directory_entry_about_on: true,
+      }, null);
+      expect(result.logo_enabled).toBe(true);
+      expect(result.about_enabled).toBe(true);
+      expect(result.can_show_logo).toBe(true);
+      expect(result.can_show_about).toBe(true);
+    });
+
+    it('disables logo and about when feature keys are absent (gateway tier)', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_enabled: true,
+        directory_entry_layout_classic: true,
+      }, null);
+      expect(result.logo_enabled).toBe(false);
+      expect(result.about_enabled).toBe(false);
+      expect(result.can_show_logo).toBe(false);
+      expect(result.can_show_about).toBe(false);
+    });
+
+    it('falls back to _enabled legacy keys for logo and about', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_enabled: true,
+        directory_entry_logo_enabled: true,
+        directory_entry_about_enabled: true,
+      }, null);
+      expect(result.logo_enabled).toBe(true);
+      expect(result.about_enabled).toBe(true);
+    });
+
+    it('flexible tier unlocks logo and about even without explicit keys', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_enabled: true,
+        directory_entry_flexible: true,
+      }, null);
+      expect(result.can_show_logo).toBe(true);
+      expect(result.can_show_about).toBe(true);
+    });
+
+    it('does not enable logo/about when directory_entry is disabled', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_disabled: true,
+        directory_entry_logo_on: true,
+        directory_entry_about_on: true,
+      }, null);
+      expect(result.enabled).toBe(false);
+      expect(result.logo_enabled).toBe(false);
+      expect(result.about_enabled).toBe(false);
+    });
+
+    it('enables editorial and immersive layouts when _on layout group is set', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_enabled: true,
+        directory_entry_layout_on: true,
+      }, null);
+      expect(result.allowed_layouts).toContain('editorial');
+      expect(result.allowed_layouts).toContain('immersive');
+      expect(result.can_use_layout_editorial).toBe(true);
+      expect(result.can_use_layout_immersive).toBe(true);
+    });
+
+    it('enables editorial and immersive layouts via individual feature keys (presence tier)', () => {
+      const result = resolveDirectoryEntryOptions({
+        directory_entry_enabled: true,
+        directory_entry_layout_editorial: true,
+        directory_entry_layout_immersive: true,
+      }, null);
+      expect(result.allowed_layouts).toContain('editorial');
+      expect(result.allowed_layouts).toContain('immersive');
+      expect(result.can_use_layout_editorial).toBe(true);
+      expect(result.can_use_layout_immersive).toBe(true);
+    });
   });
 });
