@@ -7,6 +7,11 @@
  * These routes let a claimed directory_presence tenant upgrade to a paid tier.
  * Free-tier upgrades are instant; paid-tier upgrades go through Stripe via
  * SubscriptionBillingService.subscribe.
+ *
+ * V3.1: When the current tier is `directory_presence` (the free gateway), the
+ * GET handler returns the Entry Presence triad — `presence`, `discovery`,
+ * `storefront` — as peer visibility modes with mode labels, instead of a flat
+ * sort_order ladder. Presence (display: "Starter") is the primary CTA.
  */
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
@@ -16,6 +21,18 @@ import { authenticateToken } from '../middleware/auth';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 
 const router = Router();
+
+/**
+ * V3.1 Entry Presence mode metadata.
+ * When the gateway tenant asks for upgrade options, these three peer modes
+ * are returned with surface labels so the frontend can render a mode picker
+ * instead of a linear tier ladder.
+ */
+const ENTRY_PRESENCE_MODES: Record<string, { mode: string; surface: string; tagline: string; primary: boolean }> = {
+  presence:   { mode: 'directory', surface: 'Platform in-house directory',     tagline: 'Own your directory listing',  primary: true  },
+  discovery:  { mode: 'google',    surface: 'Third-party (Google)',            tagline: 'Get found on Google',        primary: false },
+  storefront: { mode: 'platform',  surface: 'Platform in-house marketplace',   tagline: 'Open your platform store',   primary: false },
+};
 
 /**
  * GET /api/tenant/:tenantId/upgrade/options
@@ -92,24 +109,53 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
     });
     const currentFeatureKeys = new Set(currentFeatures.map((f) => f.feature_key));
 
-    // Load upgrade-eligible tiers (sort_order > current, price > 0, active)
-    const upgradeTiers = await prisma.subscription_tiers_list.findMany({
-      where: {
-        is_active: true,
-        sort_order: { gt: currentTier.sort_order },
-        price_monthly: { gt: 0 },
-      },
-      orderBy: { sort_order: 'asc' },
-      select: {
-        id: true,
-        tier_key: true,
-        name: true,
-        display_name: true,
-        description: true,
-        price_monthly: true,
-        sort_order: true,
-      },
-    });
+    // V3.1: Gateway special-case — when current tier is directory_presence,
+    // return the Entry Presence triad (presence, discovery, storefront) as
+    // peer visibility modes with mode labels, not a flat sort_order ladder.
+    const isGateway = currentTierKey === 'directory_presence';
+
+    // Load upgrade-eligible tiers
+    let upgradeTiers;
+    if (isGateway) {
+      // Gateway: return exactly the three Entry Presence modes
+      upgradeTiers = await prisma.subscription_tiers_list.findMany({
+        where: {
+          is_active: true,
+          tier_key: { in: ['presence', 'discovery', 'storefront'] },
+        },
+        orderBy: { sort_order: 'asc' },
+        select: {
+          id: true,
+          tier_key: true,
+          name: true,
+          display_name: true,
+          description: true,
+          price_monthly: true,
+          sort_order: true,
+          billing_type: true,
+        },
+      });
+    } else {
+      // Non-gateway: return tiers with sort_order > current (flat ladder)
+      upgradeTiers = await prisma.subscription_tiers_list.findMany({
+        where: {
+          is_active: true,
+          sort_order: { gt: currentTier.sort_order },
+          price_monthly: { gt: 0 },
+        },
+        orderBy: { sort_order: 'asc' },
+        select: {
+          id: true,
+          tier_key: true,
+          name: true,
+          display_name: true,
+          description: true,
+          price_monthly: true,
+          sort_order: true,
+          billing_type: true,
+        },
+      });
+    }
 
     // Load features for each upgrade tier and compute deltas
     const upgradeOptions = await Promise.all(
@@ -122,6 +168,8 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
           .filter((f) => !currentFeatureKeys.has(f.feature_key))
           .map((f) => ({ featureKey: f.feature_key, featureName: f.feature_name }));
 
+        const modeMeta = isGateway ? ENTRY_PRESENCE_MODES[t.tier_key] : undefined;
+
         return {
           tierKey: t.tier_key,
           name: t.name,
@@ -130,6 +178,12 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
           priceMonthly: Number(t.price_monthly),
           priceAnnual: Number(t.price_monthly) * 12,
           sortOrder: t.sort_order,
+          billingType: t.billing_type,
+          // V3.1 mode metadata (only present for gateway upgrades)
+          mode: modeMeta?.mode,
+          surface: modeMeta?.surface,
+          tagline: modeMeta?.tagline,
+          isPrimary: modeMeta?.primary ?? false,
           newFeatures,
         };
       }),
@@ -144,6 +198,8 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
         description: currentTier.description,
         priceMonthly: Number(currentTier.price_monthly),
       },
+      // V3.1: flag so frontend knows to render a mode picker vs a ladder
+      isGatewayUpgrade: isGateway,
       upgradeOptions,
     });
   } catch (error) {
@@ -158,8 +214,11 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
  * POST /api/tenant/:tenantId/upgrade
  * Body: { targetTier: string, billingCycle?: 'monthly'|'annual', paymentMethodId?: string }
  *
- * - If target tier is free → instant upgrade via updateTenantTier
- * - If paid and paymentMethodId provided → Stripe checkout via subscribe
+ * V3.1 rules:
+ * - From directory_presence (gateway), only presence/discovery/storefront are valid targets.
+ * - Paid tiers require a paymentMethodId — no free short-circuit to paid.
+ * - Free tiers (billing_type = 'none') upgrade instantly via updateTenantTier.
+ * - Paid tiers go through Stripe via SubscriptionBillingService.subscribe.
  */
 router.post('/:tenantId/upgrade', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -190,10 +249,28 @@ router.post('/:tenantId/upgrade', authenticateToken, async (req: Request, res: R
       return res.status(404).json({ error: 'tier_not_found' });
     }
 
+    // V3.1: Load current tenant tier to enforce gateway rules
+    const currentTenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subscription_tier: true },
+    });
+    const currentTierKey = currentTenant?.subscription_tier;
+    const isGatewayUpgrade = currentTierKey === 'directory_presence';
+
+    // V3.1: From the gateway, only the three Entry Presence modes are valid
+    // upgrade targets. This prevents flipping to arbitrary tiers bypassing
+    // the mode picker.
+    if (isGatewayUpgrade && !['presence', 'discovery', 'storefront'].includes(targetTier)) {
+      return res.status(400).json({ error: 'invalid_gateway_upgrade_target' });
+    }
+
     const billingService = getSubscriptionBillingService();
     const priceMonthly = Number(targetTierRow.price_monthly);
 
-    // Free-tier upgrade (price === 0)
+    // V3.1: directory_presence is a free gateway (billing_type = 'none').
+    // It cannot self-serve flip into a paid tier without a payment method.
+    // Free-tier upgrade (price === 0) is only allowed for tiers with
+    // billing_type = 'none' (e.g., directory_presence itself).
     if (priceMonthly === 0) {
       await billingService.updateTenantTier(tenantId, targetTier, undefined, billingCycle);
 

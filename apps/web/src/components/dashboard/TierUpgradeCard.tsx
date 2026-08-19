@@ -12,6 +12,10 @@ interface TierUpgradeCardProps {
 /**
  * Shown on the dashboard for directory_presence tenants to surface the
  * upgrade path. Hidden for all other tiers.
+ *
+ * V3.1: Copy reflects the Entry Presence mode picker — Presence/Starter
+ * (directory), Discovery (Google), or Storefront (platform) — instead of
+ * the old "Sell Online" single-path CTA.
  */
 export default function TierUpgradeCard({ tenantId, isDirectoryPresence }: TierUpgradeCardProps) {
   if (!isDirectoryPresence) return null;
@@ -26,13 +30,13 @@ export default function TierUpgradeCard({ tenantId, isDirectoryPresence }: TierU
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1">
-          <h3 className="text-lg font-bold">Upgrade to Sell Online</h3>
+          <h3 className="text-lg font-bold">Choose Your Presence Mode</h3>
           <p className="text-sm text-blue-100 mt-1">
-            You&apos;re on the free Directory Presence plan. Upgrade to manage inventory, accept
-            online orders, and unlock the full retail platform.
+            You&apos;re on the free Directory Presence plan. Pick a visibility surface — enrich your
+            directory listing, get found on Google, or open a platform store.
           </p>
           <div className="mt-3 inline-flex items-center gap-1 text-sm font-medium">
-            Compare plans <ArrowRight className="w-4 h-4" />
+            Compare modes <ArrowRight className="w-4 h-4" />
           </div>
         </div>
       </div>

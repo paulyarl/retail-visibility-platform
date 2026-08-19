@@ -16,6 +16,12 @@ export interface UpgradeTierOption {
   priceMonthly: number;
   priceAnnual: number;
   sortOrder: number;
+  billingType?: string;
+  // V3.1 mode metadata (present for gateway upgrades only)
+  mode?: string;
+  surface?: string;
+  tagline?: string;
+  isPrimary?: boolean;
   newFeatures: { featureKey: string; featureName: string }[];
 }
 
@@ -27,6 +33,8 @@ export interface UpgradeOptions {
     description: string | null;
     priceMonthly: number;
   } | null;
+  // V3.1: when true, frontend renders a mode picker instead of a ladder
+  isGatewayUpgrade?: boolean;
   upgradeOptions: UpgradeTierOption[];
 }
 

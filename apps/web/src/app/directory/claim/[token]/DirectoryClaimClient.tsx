@@ -29,6 +29,7 @@ import {
   IconArrowLeft,
   IconShoppingCart,
   IconShieldCheck,
+  IconSparkles,
 } from '@tabler/icons-react';
 import directoryClaimPublicService, {
   DirectoryClaimSummary,
@@ -382,9 +383,9 @@ export default function DirectoryClaimClient() {
                   component={Link}
                   href={upgradeHref}
                   variant="light"
-                  leftSection={<IconShoppingCart size={16} />}
+                  leftSection={<IconSparkles size={16} />}
                 >
-                  Upgrade to Sell Online
+                  Choose Your Presence Mode
                 </Button>
               )}
               <Button
