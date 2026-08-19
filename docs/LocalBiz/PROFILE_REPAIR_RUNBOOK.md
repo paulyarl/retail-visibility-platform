@@ -136,20 +136,24 @@ DELETE FROM mkt_prompt_templates_list WHERE id = 'mpt-profile-repair-triage-defa
 | File | Role |
 |------|------|
 | `apps/api/src/services/MarketingCampaignService.ts` | `transitionsFor(category, repairTrack)`, `pipelineFor()`, `switchRepairTrack()`, `createCampaign` (persists repair_track + repair_issue_type) |
+| `apps/api/src/services/ProfileRepairPromptService.ts` | Variable builder (seek/fulfill/resolution), synchronous triage (`executeSeekSync`), Track B resolution runner (`runResolution`), copy-paste and external import bridges |
 | `apps/api/src/services/DisputeIntakeService.ts` | `generateIntakeLink(campaignId, ctx, intakeKind)`, `resolveIntake()` (returns intakeKind + issueType), `submitProfileRepairIntake()` |
 | `apps/api/src/services/RecoveryCascadeService.ts` | `buildMessageSnapshot()` — profile-repair-specific cascade copy |
 | `apps/api/src/services/MarketingDeliverableService.ts` | `DeliverableType` union includes `reinstatement_appeal` + `citation_repair_package` |
+| `apps/api/src/validators/profile-repair-output.schema.ts` | Zod schemas and prompt suffixes for `profile_repair_triage`, `profile_repair_audit`, and `citation_repair_package` |
 | `apps/api/src/validators/profile-repair-intake.schema.ts` | Zod schema for evidence payload + issue-type-specific validation |
-| `apps/api/src/routes/marketing-ops.ts` | `POST /:id/switch-track` route, recovery campaigns list includes profile_repair/escalated |
+| `apps/api/src/jobs/recovery-resolution.ts` | Scheduler job polling pending resolution executions for both dispute and profile repair templates |
+| `apps/api/src/scripts/seed-profile-repair-signals.ts` | Seed script for escalated `DS_*` signal codes and triage template output schema registration |
+| `apps/api/src/routes/marketing-ops.ts` | Routes for `switch-track`, `/repair-triage` (execute, render, import), `/repair-resolution` (enqueue, render) |
 | `apps/api/src/routes/recovery-intake-public.ts` | `POST /public/recovery/intake/submit` — dispatches on intake_kind |
 
 ### Web
 
 | File | Role |
 |------|------|
-| `apps/web/src/services/MarketingOpsService.ts` | `CampaignCategory` + `RepairTrack` types, `switchRepairTrack()` method, `DeliverableType` union |
+| `apps/web/src/services/MarketingOpsService.ts` | `CampaignCategory` + `RepairTrack` types, `switchRepairTrack()`, `runRepairTriage()`, `renderRepairTriage()`, `importRepairTriage()`, `runRepairResolution()`, `renderRepairResolution()` |
 | `apps/web/src/services/RecoveryIntakePublicService.ts` | `IntakeContext` includes intakeKind + issueType, `submitProfileRepairIntake()` method |
-| `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx` | Triage panel + Switch Track dialog on campaign detail |
+| `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx` | Interactive triage workflow (Run Analysis, recommendation card, Confirm / Override) + Switch Track dialog |
 | `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/CampaignFormClient.tsx` | Profile Repair category + issue-type selector |
 | `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx` | RepairTrackPanel integration, Cascade tab gated to review pipeline |
 | `apps/web/src/app/(platform)/settings/admin/marketing-ops/openers/OpenerWorkspaceClient.tsx` | Filters by `pipeline === 'review'` (includes Track A) |
@@ -172,15 +176,13 @@ DELETE FROM mkt_prompt_templates_list WHERE id = 'mpt-profile-repair-triage-defa
 ### 5.2 Triaging a Profile Repair Campaign
 
 1. Open the campaign detail page
-2. The **Repair Track Panel** shows "Triage — Track Not Yet Decided"
-3. Run the `profile_repair_triage` prompt from the Prompts tab:
-   - The prompt analyzes the audit signals and returns a severity score + recommended track + rationale
-4. Review the recommendation, then confirm or override:
-   - Click **Switch Track** on the Repair Track Panel
-   - Select the target track (standard or escalated)
-   - Enter a mandatory reason
-   - Optionally revise the issue type
-   - Confirm
+2. The **Repair Track Panel** shows the Triage header with a **"Run Triage Analysis"** button
+3. Click **"Run Triage Analysis"**:
+   - The backend runs `ProfileRepairPromptService.executeSeekSync()`, automatically extracting signals via `SignalExtractor` (covering both model-emitted and legacy-derived signals) and injecting `audit_signals` and `issue_type` into `mpt-profile-repair-triage-default`
+   - AI evaluates severity (1–10) and recommends a track (`standard` vs `escalated`) with structured rationale and detected signal breakdown
+4. Review the **AI Recommendation Card**:
+   - **One-Click Confirm:** Click **"Confirm [Standard/Escalated] Track"** to confirm the recommendation. The system sets the track, revises the confirmed issue type, and stores the rationale in stage history.
+   - **Override:** Click **"Override / Custom..."** to select a different track or manually edit the rationale before saving.
 
 ### 5.3 Switching Tracks Mid-Flight
 
@@ -209,7 +211,7 @@ Track B campaigns behave identically to recovery management campaigns:
 2. **Framework Preview → Outreach Dispatched:** Intake link auto-generated with `intake_kind = 'profile_repair'`.
 3. **Outreach Dispatched → Awaiting Owner Intake:** Day 1 email (profile repair copy) → Day 2 SMS → Day 4 DM cascade.
 4. **Awaiting Owner Intake → Intake Submitted:** Owner submits narrative + evidence payload + attachments via the public intake page.
-5. **Intake Submitted → Final Resolution Drafted:** AI Agent drafts the reinstatement appeal letter + submission guide (`reinstatement_appeal` deliverable).
+5. **Intake Submitted → Final Resolution Drafted:** The `jobs/recovery-resolution.ts` scheduler job (or manual execute) triggers `ProfileRepairPromptService.runResolution()`. The AI Agent drafts the reinstatement appeal letter + submission guide, persists a `reinstatement_appeal` deliverable with response and guide sections, and transitions the campaign to `final_resolution_drafted`.
 6. **Final Resolution Drafted → Owner Approved:** Operator reviews + approves.
 7. **Owner Approved → Resolved & Closed:** Appeal package emailed to owner (tracked + auto-retried).
 

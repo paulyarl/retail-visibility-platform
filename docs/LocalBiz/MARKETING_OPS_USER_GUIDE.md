@@ -1121,12 +1121,29 @@ When creating a profile repair campaign:
 - **Initial Issue Type:** Select the diagnosis from the dropdown (standard: nap_drift, unclaimed_profile, missing_category, missing_hours, platform_gap; escalated: suspension, duplicate_listing, hijacked_listing, ownership_dispute, address_verification_block). This is revisable.
 - **No track selector on the create form.** Campaigns are created in triage; the track is confirmed on the detail page after analysis.
 
-### Campaign Detail — Repair Track Panel
+### Campaign Detail — Repair Track Panel & AI Triage Workflow
 
-For profile repair campaigns, the detail page shows a **Repair Track Panel**:
-- **Triage state** (no track set): amber banner — "Run the triage prompt to get an AI recommendation, then confirm a track."
-- **Track confirmed:** green (standard) or red (escalated) banner showing the current track + issue type + decided-at + reason.
-- **Switch Track button:** opens a dialog with mandatory reason + optional issue-type revision. Blocked moves are rejected with an explanation.
+For profile repair campaigns, the detail page features an interactive **Repair Track Panel**:
+- **Triage state** (`repair_track = NULL`):
+  - **"Run Triage Analysis" button:** One-click synchronous execution (`POST /campaigns/:id/repair-triage`). The backend runs `ProfileRepairPromptService.executeSeekSync()`, extracting audit signals via `SignalExtractor` (covering both model-emitted and legacy-derived signals) and injecting `audit_signals` and `issue_type` automatically.
+  - **AI Recommendation Card:** Displays on completion:
+    - **Severity Score Badge** (1–10 color-coded: green 1–3, amber 4–6, red 7–10).
+    - **Recommended Track** (`Standard (Review)` vs `Escalated (Recovery)`).
+    - **Confirmed Issue Type** (e.g. `nap_drift`, `suspension`).
+    - **Rationale Text** detailing why the track is recommended.
+    - **Detected Signal Chips** (escalation and standard signals).
+  - **Confirm [Standard/Escalated] Track:** One-click confirmation button that pre-fills the track, confirmed issue type, and rationale into `switchRepairTrack()`.
+  - **Override / Custom...:** Opens the track dialog with the AI rationale pre-filled in the reason field, allowing the operator to adjust the target track or issue type before confirming.
+- **Track confirmed:** Color-coded status card (green for standard / red for escalated) showing current track, issue type, decision timestamp, and decision reason.
+- **Switch Track button:** Re-evaluates or shifts tracks mid-flight with mandatory reason logging and stage machine remap guardrails.
+
+### Automatic Variable Injection & Amplification Gating
+
+All Profile Repair templates run through `ProfileRepairPromptService` and `resolvePrompt()`:
+- **Seek / Triage Prompts:** Sourced automatically with `audit_signals` and `issue_type`. The category-intelligence amplification gate operates in `signal_triage` mode — category intelligence is appended with a supplementary framing directive only when `audit_signals` is populated (preventing large distractor blocks when signals are absent).
+- **Fulfill Prompts (`citation_repair_package`):** Sourced automatically with `audit_results` formatted as structured Markdown (Canonical NAP, Platform Status, Website issues, Detected signals).
+- **Resolution Prompts (`profile_repair_resolution`):** Sourced automatically with `issueType`, `intakePayload`, `evidencePayload`, and `attachmentMeta`.
+- **Identity Fields:** `business_address` and `business_phone` are available across all business-scope templates from composite campaign address columns (`address_line1`, `address_city`, etc.) and `phone`.
 
 ### Track A Walkthrough (Standard)
 
