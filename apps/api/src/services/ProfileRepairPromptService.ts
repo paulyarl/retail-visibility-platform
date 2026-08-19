@@ -718,7 +718,7 @@ export class ProfileRepairPromptService extends BaseService {
           {
             campaignId,
             toStage: 'final_resolution_drafted',
-            triggerType: 'operator',
+            triggerType: 'manual',
             notes: 'External reinstatement appeal imported',
           },
           ctx,
