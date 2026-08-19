@@ -81,6 +81,29 @@ export class ProfileRepairPromptService extends BaseService {
   // Template Resolution Helper
   // ==========================================================================
 
+  /**
+   * Code-side track resolution — the deterministic floor for the AI's
+   * recommended_track. The AI may escalate above this (e.g., flag a
+   * nap_drift case as escalated due to context), but never de-escalate
+   * below it (e.g., a suspension signal always forces escalated).
+   *
+   * Used in executeSeekSync to validate the AI's track output.
+   */
+  resolveTrackFromSignals(signals: SignalCode[] | string[]): 'standard' | 'escalated' {
+    const ESCALATION_VOCAB = new Set([
+      'suspension',
+      'hijacked_listing',
+      'duplicate_listing',
+      'ownership_dispute',
+      'address_verification_block',
+    ]);
+    for (const sig of signals) {
+      const vocab = SIGNAL_TO_TRIAGE_VOCAB[sig];
+      if (vocab && ESCALATION_VOCAB.has(vocab)) return 'escalated';
+    }
+    return 'standard';
+  }
+
   resolveSeekTemplateId(issueType: string | null | undefined): string {
     if (!issueType) return PROFILE_REPAIR_TRIAGE_TEMPLATE_ID;
     const normalized = issueType.toLowerCase().trim();
@@ -194,9 +217,17 @@ export class ProfileRepairPromptService extends BaseService {
 
     const serialized = this.serializeSignals(signalCodes);
 
+    // Triage template now uses audit_results as a primary input for scope
+    // assessment (which platforms are broken, what's drifted, what's missing).
+    // Previously only injected for fulfill; triage needs it too so the AI can
+    // produce an evidence-grounded operator briefing instead of rubber-stamping
+    // the signal→track mapping.
+    const auditResults = this.serializeAuditResults(audit?.audit_data ?? {});
+
     return {
       audit_signals: serialized,
       issue_type: campaign?.repair_issue_type || '',
+      audit_results: auditResults,
     };
   }
 
@@ -285,6 +316,25 @@ export class ProfileRepairPromptService extends BaseService {
             // Best-effort extraction if top-level structure is present
             if (parsed?.profile_repair_triage) {
               recommendation = parsed.profile_repair_triage;
+            }
+          }
+
+          // Code-side track floor: the AI may escalate above the signal-derived
+          // track, but never de-escalate below it. If the AI recommends
+          // 'standard' when signals say 'escalated', force 'escalated'.
+          if (recommendation) {
+            const signalCodes = extractSignals({
+              campaign,
+              auditData: latestAudit?.audit_data as any,
+            });
+            const floorTrack = this.resolveTrackFromSignals(signalCodes);
+            if (floorTrack === 'escalated' && recommendation.recommended_track === 'standard') {
+              logger.warn('Triage AI de-escalated below signal floor; forcing escalated', ctx, {
+                campaignId,
+                aiTrack: recommendation.recommended_track,
+                floorTrack,
+              });
+              recommendation.recommended_track = 'escalated';
             }
           }
         } catch (parseErr) {

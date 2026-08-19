@@ -178,9 +178,16 @@ DELETE FROM mkt_prompt_templates_list WHERE id = 'mpt-profile-repair-triage-defa
 1. Open the campaign detail page
 2. The **Repair Track Panel** shows the Triage header with a **"Run Triage Analysis"** button
 3. Click **"Run Triage Analysis"**:
-   - The backend runs `ProfileRepairPromptService.executeSeekSync()`, automatically extracting signals via `SignalExtractor` (covering both model-emitted and legacy-derived signals) and injecting `audit_signals` and `issue_type` into `mpt-profile-repair-triage-default`
-   - AI evaluates severity (1–10) and recommends a track (`standard` vs `escalated`) with structured rationale and detected signal breakdown
-4. Review the **AI Recommendation Card**:
+   - The backend runs `ProfileRepairPromptService.executeSeekSync()`, automatically extracting signals via `SignalExtractor` (covering both model-emitted and legacy-derived signals) and injecting `audit_signals`, `audit_results` (full serialized audit data), and `issue_type` into `mpt-profile-repair-triage-default`
+   - The AI produces an **operator briefing** (not just a track label): scope assessment (what's broken, which platforms, drift details, missing assets), viability assessment (pursue / pursue_with_caveats / low_probability), pitch angle (category-aware opener hook + pain points + marketplace positioning), and risk flags
+   - The track recommendation is backed by a code-side floor (`resolveTrackFromSignals`): the AI may escalate above the deterministic signal→track mapping, but never de-escalate below it
+4. Review the **AI Triage Briefing Card**:
+   - **Scope**: what's actually broken, drawn from audit data
+   - **Viability**: whether the campaign is worth pursuing
+   - **Pitch Angle**: category-aware opener hook + pain points for the Openers workspace
+   - **Risks**: anything that makes this campaign harder than it looks
+   - **Severity Score Badge** (1–10 color-coded: green 1–3, amber 4–6, red 7–10)
+   - **Recommended Track** (`Standard (Review)` vs `Escalated (Recovery)`)
    - **One-Click Confirm:** Click **"Confirm [Standard/Escalated] Track"** to confirm the recommendation. The system sets the track, revises the confirmed issue type, and stores the rationale in stage history.
    - **Override:** Click **"Override / Custom..."** to select a different track or manually edit the rationale before saving.
 

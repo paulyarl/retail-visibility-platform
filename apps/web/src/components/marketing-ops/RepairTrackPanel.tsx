@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb } from 'lucide-react';
 import marketingOpsService, { Campaign, RepairTrack } from '@/services/MarketingOpsService';
 
 interface RepairTrackPanelProps {
@@ -16,6 +16,24 @@ interface TriageRecommendation {
   rationale: string;
   escalation_signals?: string[];
   standard_signals?: string[];
+  // Operator briefing fields (new)
+  scope?: {
+    summary: string;
+    broken_platforms: string[];
+    drift_details: string;
+    missing_assets: string[];
+  };
+  viability?: {
+    pursuit_recommendation: 'pursue' | 'pursue_with_caveats' | 'low_probability';
+    rationale: string;
+  };
+  pitch?: {
+    primary_angle: string;
+    opener_hook: string;
+    pain_points: string[];
+    marketplace_positioning: string;
+  };
+  risks?: string[];
 }
 
 export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPanelProps) {
@@ -154,7 +172,7 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                 <div>
                   <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Triage — Track Not Yet Decided</p>
                   <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                    Run AI triage analysis to evaluate detected audit signals and recommend standard vs escalated repair track.
+                    Run AI triage analysis to produce an operator briefing — scope, viability, pitch angle, and risks — and recommend a repair track.
                   </p>
                 </div>
               </div>
@@ -183,7 +201,7 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                 <div className="flex items-center justify-between gap-2 border-b border-purple-200/60 dark:border-purple-800/40 pb-2.5">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-purple-900 dark:text-purple-200 uppercase tracking-wider">
-                      AI Triage Recommendation
+                      AI Triage Briefing
                     </span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getSeverityBadgeColor(recommendation.severity_score)}`}>
                       Severity {recommendation.severity_score}/10
@@ -208,13 +226,115 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                   </span>
                 </div>
 
-                <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+                {/* Scope section */}
+                {recommendation.scope && (
+                  <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5 text-purple-800 dark:text-purple-300 font-medium">
+                      <Target className="w-3.5 h-3.5" />
+                      Scope
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed pl-5">
+                      {recommendation.scope.summary}
+                    </p>
+                    {recommendation.scope.broken_platforms.length > 0 && (
+                      <p className="pl-5">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Broken platforms: </span>
+                        {recommendation.scope.broken_platforms.join(', ')}
+                      </p>
+                    )}
+                    {recommendation.scope.drift_details && (
+                      <p className="pl-5">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Drift: </span>
+                        {recommendation.scope.drift_details}
+                      </p>
+                    )}
+                    {recommendation.scope.missing_assets.length > 0 && (
+                      <p className="pl-5">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Missing: </span>
+                        {recommendation.scope.missing_assets.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Viability section */}
+                {recommendation.viability && (
+                  <div className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5 text-purple-800 dark:text-purple-300 font-medium">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Viability
+                    </div>
+                    <div className="pl-5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
+                        recommendation.viability.pursuit_recommendation === 'pursue'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                          : recommendation.viability.pursuit_recommendation === 'pursue_with_caveats'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      }`}>
+                        {recommendation.viability.pursuit_recommendation.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed pl-5">
+                      {recommendation.viability.rationale}
+                    </p>
+                  </div>
+                )}
+
+                {/* Pitch section */}
+                {recommendation.pitch && (
+                  <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5 text-purple-800 dark:text-purple-300 font-medium">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Pitch Angle
+                    </div>
+                    <p className="pl-5">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Angle: </span>
+                      {recommendation.pitch.primary_angle}
+                    </p>
+                    <div className="pl-5 mt-1 p-2 rounded bg-purple-100/50 dark:bg-purple-900/20 border border-purple-200/50 dark:border-purple-800/30">
+                      <p className="italic text-gray-700 dark:text-gray-300">
+                        "{recommendation.pitch.opener_hook}"
+                      </p>
+                    </div>
+                    {recommendation.pitch.pain_points.length > 0 && (
+                      <div className="pl-5 mt-1">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Pain points: </span>
+                        <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+                          {recommendation.pitch.pain_points.map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    {recommendation.pitch.marketplace_positioning && (
+                      <p className="pl-5 mt-1">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Market position: </span>
+                        {recommendation.pitch.marketplace_positioning}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Risks section */}
+                {recommendation.risks && recommendation.risks.length > 0 && (
+                  <div className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-medium">
+                      <TrendingDown className="w-3.5 h-3.5" />
+                      Risks
+                    </div>
+                    <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-5">
+                      {recommendation.risks.map((r, i) => <li key={i}>{r}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Confirmed issue + rationale */}
+                <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300 pt-1 border-t border-purple-200/40 dark:border-purple-800/30">
                   <p>
                     <span className="font-medium text-gray-900 dark:text-gray-100">Confirmed Issue: </span>
                     <span className="capitalize">{recommendation.issue_type_confirmed?.replace(/_/g, ' ')}</span>
                   </p>
                   <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">Rationale: </span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Track Rationale: </span>
                     {recommendation.rationale}
                   </p>
                 </div>

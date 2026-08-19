@@ -292,6 +292,11 @@ export class MarketingExecutionService extends BaseService {
             if (!effectiveVariables.issue_type || !String(effectiveVariables.issue_type).trim()) {
               effectiveVariables.issue_type = seekDefaults.issue_type;
             }
+            // Triage template uses audit_results as a primary input for scope
+            // assessment (broken platforms, drift details, missing assets).
+            if (!effectiveVariables.audit_results || !String(effectiveVariables.audit_results).trim()) {
+              effectiveVariables.audit_results = seekDefaults.audit_results;
+            }
           } else if (promptType === 'fulfill') {
             const fulfillDefaults = repairService.buildFulfillVariables(input.campaign, audit);
             if (!effectiveVariables.audit_results || !String(effectiveVariables.audit_results).trim()) {

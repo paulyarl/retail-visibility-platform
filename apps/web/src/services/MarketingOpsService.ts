@@ -1686,6 +1686,23 @@ class MarketingOpsService extends AdminApiSingleton {
       rationale: string;
       escalation_signals?: string[];
       standard_signals?: string[];
+      scope?: {
+        summary: string;
+        broken_platforms: string[];
+        drift_details: string;
+        missing_assets: string[];
+      };
+      viability?: {
+        pursuit_recommendation: 'pursue' | 'pursue_with_caveats' | 'low_probability';
+        rationale: string;
+      };
+      pitch?: {
+        primary_angle: string;
+        opener_hook: string;
+        pain_points: string[];
+        marketplace_positioning: string;
+      };
+      risks?: string[];
     } | null;
   }> {
     const result = await this.makeDefaultRequest<any>(

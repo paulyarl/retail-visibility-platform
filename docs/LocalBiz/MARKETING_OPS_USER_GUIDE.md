@@ -1094,9 +1094,9 @@ Profile repair is not one pipeline — it is two. The nature of the issue determ
 ### Triage-First: The Track is a Decision, Not a Fork
 
 1. **Create in triage.** Every profile repair campaign starts with `repair_track = NULL` in `seek`. Creation only requires the business identity + the raw audit signal.
-2. **Audit analysis recommends a track.** The `profile_repair_triage` prompt runs against the audit payload and returns a severity score (1-10), recommended track, issue type, and rationale. Heuristic guardrails backstop the AI:
-   - Any `suspension` / `hijacked_listing` / `duplicate_listing` / `ownership_dispute` signal → recommend `escalated`.
-   - `nap_drift` / `unclaimed_profile` / `missing_category` / `platform_gap` only → recommend `standard`.
+2. **Audit analysis produces an operator briefing.** The `profile_repair_triage` prompt runs against the audit payload + category intelligence and returns an operator briefing: scope (what's broken, which platforms, drift details, missing assets), viability (pursue / pursue_with_caveats / low_probability), pitch angle (category-aware opener hook + pain points + marketplace positioning), risk flags, severity score (1-10), recommended track, and issue type. The track decision is backed by a code-side floor (`resolveTrackFromSignals`): the AI may escalate above the deterministic signal→track mapping, but never de-escalate below it. Heuristic guardrails:
+   - Any `suspension` / `hijacked_listing` / `duplicate_listing` / `ownership_dispute` signal → floor is `escalated`.
+   - `nap_drift` / `unclaimed_profile` / `missing_category` / `platform_gap` only → floor is `standard`.
 3. **Operator confirms or overrides.** The recommendation is advisory. The operator picks the track on the campaign detail page (Repair Track Panel).
 4. **Switch later if the picture changes.** A NAP-drift case that turns out to be a hijacked listing escalates mid-flight; an apparent suspension that resolves to a simple unclaimed profile de-escalates.
 
@@ -1126,11 +1126,15 @@ When creating a profile repair campaign:
 For profile repair campaigns, the detail page features an interactive **Repair Track Panel**:
 - **Triage state** (`repair_track = NULL`):
   - **"Run Triage Analysis" button:** One-click synchronous execution (`POST /campaigns/:id/repair-triage`). The backend runs `ProfileRepairPromptService.executeSeekSync()`, extracting audit signals via `SignalExtractor` (covering both model-emitted and legacy-derived signals) and injecting `audit_signals` and `issue_type` automatically.
-  - **AI Recommendation Card:** Displays on completion:
+  - **AI Triage Briefing Card:** Displays on completion:
+    - **Scope** — what's actually broken (summary, broken platforms, drift details, missing assets), drawn from audit data.
+    - **Viability** — pursuit recommendation (pursue / pursue_with_caveats / low_probability) + rationale.
+    - **Pitch Angle** — category-aware primary angle, verbatim opener hook, pain points, and marketplace positioning for the Openers workspace.
+    - **Risks** — anything that makes this campaign harder than it looks.
     - **Severity Score Badge** (1–10 color-coded: green 1–3, amber 4–6, red 7–10).
     - **Recommended Track** (`Standard (Review)` vs `Escalated (Recovery)`).
     - **Confirmed Issue Type** (e.g. `nap_drift`, `suspension`).
-    - **Rationale Text** detailing why the track is recommended.
+    - **Track Rationale** detailing why the track is recommended.
     - **Detected Signal Chips** (escalation and standard signals).
   - **Confirm [Standard/Escalated] Track:** One-click confirmation button that pre-fills the track, confirmed issue type, and rationale into `switchRepairTrack()`.
   - **Override / Custom...:** Opens the track dialog with the AI rationale pre-filled in the reason field, allowing the operator to adjust the target track or issue type before confirming.

@@ -12,18 +12,48 @@ import { z } from 'zod';
 const coercedNumber = z.coerce.number();
 
 // ============================================================================
-// 1. Profile Repair Triage Schema
+// 1. Profile Repair Triage Schema (Operator Briefing)
 // ============================================================================
+//
+// The triage AI call produces an operator briefing, not just a track label.
+// The track decision (recommended_track) is retained for the confirm-button
+// UX, but the AI's real value is the scope/viability/pitch/risks briefing
+// that gives the operator actionable intelligence for the Openers workspace.
+//
+// A code-side floor (resolveTrackFromSignals) validates recommended_track:
+// the AI may escalate above the rule, never de-escalate below it.
 
 export const PROFILE_REPAIR_TRIAGE_SCHEMA_NAME = 'profile_repair_triage' as const;
 
 export const profileRepairTriageSchema = z.object({
   profile_repair_triage: z.object({
+    // Track decision (AI-produced; code validates as a floor)
     severity_score: coercedNumber.refine((n) => n >= 1 && n <= 10, {
       message: 'severity_score must be between 1 and 10',
     }),
     recommended_track: z.enum(['standard', 'escalated']),
     issue_type_confirmed: z.string(),
+
+    // Operator briefing — the actual value of the AI call
+    scope: z.object({
+      summary: z.string(),
+      broken_platforms: z.array(z.string()).default([]),
+      drift_details: z.string().default(''),
+      missing_assets: z.array(z.string()).default([]),
+    }),
+    viability: z.object({
+      pursuit_recommendation: z.enum(['pursue', 'pursue_with_caveats', 'low_probability']),
+      rationale: z.string(),
+    }),
+    pitch: z.object({
+      primary_angle: z.string(),
+      opener_hook: z.string(),
+      pain_points: z.array(z.string()).default([]),
+      marketplace_positioning: z.string(),
+    }),
+    risks: z.array(z.string()).default([]),
+
+    // Backward-compat fields (still rendered in stage history + signal chips)
     rationale: z.string(),
     escalation_signals: z.array(z.string()).optional().default([]),
     standard_signals: z.array(z.string()).optional().default([]),
@@ -40,9 +70,26 @@ Return valid JSON only matching this shape:
     "severity_score": <number 1-10>,
     "recommended_track": "standard" | "escalated",
     "issue_type_confirmed": "<string>",
-    "rationale": "<string>",
-    "escalation_signals": ["<string>", ...],
-    "standard_signals": ["<string>", ...]
+    "scope": {
+      "summary": "<1-2 sentence plain-language summary of what is broken>",
+      "broken_platforms": ["<platform name>", ...],
+      "drift_details": "<specifics: which fields drifted, displayed vs canonical, etc.>",
+      "missing_assets": ["<website | apple_maps | photos | hours | ...>", ...]
+    },
+    "viability": {
+      "pursuit_recommendation": "pursue" | "pursue_with_caveats" | "low_probability",
+      "rationale": "<why this campaign is or is not worth pursuing>"
+    },
+    "pitch": {
+      "primary_angle": "<the main hook for the opener, category-aware>",
+      "opener_hook": "<1-2 sentence opener the operator can use verbatim>",
+      "pain_points": ["<category-aware pain point>", ...],
+      "marketplace_positioning": "<how this business is positioned in its market>"
+    },
+    "risks": ["<anything that makes this campaign harder than it looks>", ...],
+    "rationale": "<overall reasoning for the track recommendation>",
+    "escalation_signals": ["<signal>", ...],
+    "standard_signals": ["<signal>", ...]
   }
 }
 
