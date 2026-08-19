@@ -14,12 +14,29 @@ import {
 import { resolveOutputSchema } from '../market-analysis.schema';
 
 describe('profileRepairTriageSchema', () => {
-  it('validates a well-formed triage output', () => {
+  it('validates a well-formed triage briefing output', () => {
     const valid = {
       profile_repair_triage: {
         severity_score: 8,
         recommended_track: 'escalated',
         issue_type_confirmed: 'suspension',
+        scope: {
+          summary: 'Google Business Profile is suspended.',
+          broken_platforms: ['Google'],
+          drift_details: '',
+          missing_assets: [],
+        },
+        viability: {
+          pursuit_recommendation: 'pursue_with_caveats',
+          rationale: 'Suspension is severe but recoverable with evidence.',
+        },
+        pitch: {
+          primary_angle: 'Your Google profile is offline — customers can\'t find you.',
+          opener_hook: 'Your Google Business Profile has been suspended, which means customers searching for you on Google Maps get nothing.',
+          pain_points: ['No Google Maps presence', 'Lost calls and visits'],
+          marketplace_positioning: 'Underexposed on the primary discovery platform.',
+        },
+        risks: ['Appeal may take 2-3 weeks', 'Hard suspension may require video verification'],
         rationale: 'Profile is suspended on Google Maps, blocking phone calls and visits.',
         escalation_signals: ['suspension'],
         standard_signals: [],
@@ -29,6 +46,9 @@ describe('profileRepairTriageSchema', () => {
     const parsed = profileRepairTriageSchema.parse(valid);
     expect(parsed.profile_repair_triage.severity_score).toBe(8);
     expect(parsed.profile_repair_triage.recommended_track).toBe('escalated');
+    expect(parsed.profile_repair_triage.scope.summary).toContain('suspended');
+    expect(parsed.profile_repair_triage.viability.pursuit_recommendation).toBe('pursue_with_caveats');
+    expect(parsed.profile_repair_triage.pitch.opener_hook).toContain('suspended');
   });
 
   it('rejects invalid severity_score outside 1-10 range', () => {
@@ -37,6 +57,10 @@ describe('profileRepairTriageSchema', () => {
         severity_score: 15,
         recommended_track: 'standard',
         issue_type_confirmed: 'nap_drift',
+        scope: { summary: 'test', broken_platforms: [], drift_details: '', missing_assets: [] },
+        viability: { pursuit_recommendation: 'pursue', rationale: 'test' },
+        pitch: { primary_angle: 'test', opener_hook: 'test', pain_points: [], marketplace_positioning: 'test' },
+        risks: [],
         rationale: 'Invalid score',
       },
     };
@@ -50,6 +74,10 @@ describe('profileRepairTriageSchema', () => {
         severity_score: 5,
         recommended_track: 'unknown_track',
         issue_type_confirmed: 'nap_drift',
+        scope: { summary: 'test', broken_platforms: [], drift_details: '', missing_assets: [] },
+        viability: { pursuit_recommendation: 'pursue', rationale: 'test' },
+        pitch: { primary_angle: 'test', opener_hook: 'test', pain_points: [], marketplace_positioning: 'test' },
+        risks: [],
         rationale: 'Invalid track',
       },
     };
@@ -59,31 +87,60 @@ describe('profileRepairTriageSchema', () => {
 });
 
 describe('profileRepairAuditSchema', () => {
-  it('validates per-issue audit output and passes through extra fields', () => {
+  it('validates a well-formed per-issue repair briefing and passes through extra fields', () => {
     const valid = {
       profile_repair_audit: {
         severityScore: 4,
         issueType: 'nap_drift',
-        inconsistentPlatforms: ['Apple Maps', 'Bing'],
-        recommendedFixes: ['Fix phone on Apple Maps'],
-        openerAngle: 'Customers are calling the wrong phone number',
+        scope: {
+          summary: 'Google and Yelp show a stale phone number.',
+          affected_platforms: ['Google', 'Yelp'],
+          specifics: 'Google shows (816) 555-1234 but canonical is (816) 555-9999.',
+        },
+        impact: {
+          primary_consequence: 'Customers are calling the wrong number.',
+          estimated_reach_loss: 'Moderate — affects Google and Yelp users.',
+          competitive_gap: 'Competitors with consistent NAP appear in more local pack results.',
+        },
+        pitch: {
+          opener_hook: 'When customers search for you on Google, they get the wrong phone number.',
+          pain_points: ['Lost calls', 'Customers reach disconnected line'],
+          value_preview: 'We\'ll correct your phone across Google and Yelp so customers reach you every time.',
+        },
+        risks: ['Owner may have intentionally changed the number'],
       },
     };
 
     const parsed = profileRepairAuditSchema.parse(valid);
     expect(parsed.profile_repair_audit.severityScore).toBe(4);
     expect(parsed.profile_repair_audit.issueType).toBe('nap_drift');
-    expect((parsed.profile_repair_audit as any).inconsistentPlatforms).toEqual(['Apple Maps', 'Bing']);
+    expect(parsed.profile_repair_audit.scope.affected_platforms).toEqual(['Google', 'Yelp']);
+    expect(parsed.profile_repair_audit.impact.primary_consequence).toContain('wrong number');
+    expect(parsed.profile_repair_audit.pitch.value_preview).toContain('correct your phone');
   });
 
   it('rejects missing severityScore or issueType', () => {
     const missing = {
       profile_repair_audit: {
-        openerAngle: 'Missing severity',
+        scope: { summary: 'test', affected_platforms: [], specifics: '' },
+        impact: { primary_consequence: 'test' },
+        pitch: { opener_hook: 'test', pain_points: [], value_preview: 'test' },
+        risks: [],
       },
     };
 
     expect(() => profileRepairAuditSchema.parse(missing)).toThrow();
+  });
+
+  it('rejects missing scope/impact/pitch structured fields', () => {
+    const missingStructured = {
+      profile_repair_audit: {
+        severityScore: 4,
+        issueType: 'nap_drift',
+      },
+    };
+
+    expect(() => profileRepairAuditSchema.parse(missingStructured)).toThrow();
   });
 });
 

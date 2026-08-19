@@ -2,8 +2,8 @@
  * Profile Repair Output Schemas
  *
  * Single source of truth for the shape of profile repair prompt outputs:
- *   - profile_repair_triage: Triage assessment (severity, recommended track, rationale)
- *   - profile_repair_audit: Per-issue audit (NAP drift, unclaimed, platform gap)
+ *   - profile_repair_triage: Triage operator briefing (scope, viability, pitch, risks, track)
+ *   - profile_repair_audit: Per-issue repair briefing (scope, impact, pitch, risks)
  *   - citation_repair_package: Fulfill package (deliverableText, submissionGuide)
  */
 
@@ -96,8 +96,18 @@ Return valid JSON only matching this shape:
 Return ONLY the JSON object, no markdown fences, no commentary.`;
 
 // ============================================================================
-// 2. Profile Repair Audit Schema (Per-Issue Seek Prompts)
+// 2. Profile Repair Audit Schema (Per-Issue Seek Prompts — Operator Briefing)
 // ============================================================================
+//
+// The 3 per-issue seek prompts (nap_drift, unclaimed_profile, platform_gap)
+// produce an issue-specific repair briefing aligned with the triage briefing
+// shape. They run at the "Seek → Preview Built" stage (Track A, after triage
+// confirms the issue type) and give the operator deeper ammunition for the
+// opener conversation, grounded in the actual audit data.
+//
+// The shape mirrors triage (scope, pitch, risks) but adds `impact` (business
+// consequence) and `value_preview` (what the repair package will fix) which
+// are the issue-specific depth that these per-issue prompts provide.
 
 export const PROFILE_REPAIR_AUDIT_SCHEMA_NAME = 'profile_repair_audit' as const;
 
@@ -107,6 +117,29 @@ export const profileRepairAuditSchema = z.object({
       message: 'severityScore must be between 1 and 10',
     }),
     issueType: z.string(),
+
+    // Issue-specific scope (grounded in audit_results)
+    scope: z.object({
+      summary: z.string(),
+      affected_platforms: z.array(z.string()).default([]),
+      specifics: z.string().default(''),
+    }),
+
+    // Business impact (what the owner is losing)
+    impact: z.object({
+      primary_consequence: z.string(),
+      estimated_reach_loss: z.string().default(''),
+      competitive_gap: z.string().default(''),
+    }),
+
+    // Category-aware pitch (deeper than triage, issue-specific)
+    pitch: z.object({
+      opener_hook: z.string(),
+      pain_points: z.array(z.string()).default([]),
+      value_preview: z.string(),
+    }),
+
+    risks: z.array(z.string()).default([]),
   }).passthrough(),
 });
 
@@ -118,7 +151,23 @@ Return valid JSON only matching this shape:
 {
   "profile_repair_audit": {
     "severityScore": <number 1-10>,
-    "issueType": "<string>"
+    "issueType": "<nap_drift | unclaimed_profile | platform_gap>",
+    "scope": {
+      "summary": "<1-2 sentence plain-language summary of the issue>",
+      "affected_platforms": ["<platform name>", ...],
+      "specifics": "<issue-specific details: drift fields, missing platforms, missed features, etc.>"
+    },
+    "impact": {
+      "primary_consequence": "<the main business pain: lost calls, lost searchers, lost map clicks, etc.>",
+      "estimated_reach_loss": "<qualitative estimate of reach loss>",
+      "competitive_gap": "<how far behind competitors who have this fixed>"
+    },
+    "pitch": {
+      "opener_hook": "<1-2 sentence opener the operator can use verbatim, category-aware>",
+      "pain_points": ["<category-aware pain point>", ...],
+      "value_preview": "<what the repair package will fix — the value proposition>"
+    },
+    "risks": ["<anything that makes this repair harder than it looks>", ...]
   }
 }
 

@@ -205,8 +205,8 @@ DELETE FROM mkt_prompt_templates_list WHERE id = 'mpt-profile-repair-triage-defa
 ### 5.4 Track A — Standard Profile Repair
 
 Track A campaigns behave identically to review management campaigns:
-1. **Seek → Preview Built:** Run the appropriate seek prompt (nap_drift, unclaimed, or platform_gap). Generate the watermarked NAP report.
-2. **Preview Built → Shown:** The campaign appears in the Openers workspace (A3 Listing Drift archetype). Send the opener.
+1. **Seek → Preview Built:** Run the appropriate seek prompt (nap_drift, unclaimed, or platform_gap). Each produces an issue-specific repair briefing (scope, impact, category-aware pitch, risks) grounded in the audit data, which becomes the basis for the watermarked NAP report and the opener conversation.
+2. **Preview Built → Shown:** The campaign appears in the Openers workspace (A3 Listing Drift archetype). Send the opener using the briefing's opener hook + pain points.
 3. **Shown → Paid:** Owner pays via `/marketing/pay`. Coupon validated against `profile_repair_package`.
 4. **Paid → Delivered:** Run the `citation_repair_package` fulfill prompt. Generate the Citation & Profile Repair Package deliverable.
 5. **Delivered → Retainer:** Standard retainer upsell flow.

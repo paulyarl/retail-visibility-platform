@@ -1204,10 +1204,10 @@ Three new service category values for per-vector coupon validation:
 
 | Template | Type | Track | Purpose |
 |----------|------|-------|---------|
-| `profile_repair_triage` | seek | Both | Analyzes audit signals, recommends track + severity score |
-| `profile_repair_nap_drift` | seek | A | NAP drift audit — inconsistent platforms, recommended fixes, opener angle |
-| `profile_repair_unclaimed` | seek | A | Unclaimed profile audit — missed features, competitor gap, opener angle |
-| `profile_repair_platform_gap` | seek | A | Platform gap audit — missing platforms, reach loss, opener angle |
+| `profile_repair_triage` | seek | Both | Operator briefing — scope, viability, pitch angle, risks, track recommendation (grounded in audit data + category intelligence) |
+| `profile_repair_nap_drift` | seek | A | NAP drift repair briefing — scope (drifted platforms + specifics), impact (lost calls/searchers), category-aware pitch, risks |
+| `profile_repair_unclaimed` | seek | A | Unclaimed profile repair briefing — scope (missed features), impact (engagement loss), category-aware pitch, risks |
+| `profile_repair_platform_gap` | seek | A | Platform gap repair briefing — scope (missing platforms), impact (reach loss), category-aware pitch, risks |
 | `citation_repair_package` | fulfill | A | Constructs the paid Citation & Profile Repair Package |
 | `profile_repair_resolution` | recovery_resolution | B | Drafts reinstatement appeal letter + submission guide (issue-type-specific framing) |
 
