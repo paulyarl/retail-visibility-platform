@@ -165,6 +165,12 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
 
 // Tier progression consistency
 export const TIER_PROGRESSIONS = {
+  presence: {
+    identity: 'I have a directory listing',
+    realization: 'My listing looks bare — I want my logo, story, and gallery to show',
+    upgradeTrigger: 'I want to get found on Google or open a full store',
+    tagline: 'Own Your Directory Listing'
+  },
   discovery: {
     identity: 'I exist online',
     realization: 'People are finding my products on Google',

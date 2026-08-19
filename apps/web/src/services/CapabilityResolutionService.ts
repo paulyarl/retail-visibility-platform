@@ -371,6 +371,8 @@ export interface DirectoryEntryOptionsState {
   qrEnabled: boolean;
   socialEnabled: boolean;
   seoEnabled: boolean;
+  logoEnabled: boolean;
+  aboutEnabled: boolean;
   // Tier-gated availability (for UI disable states)
   canShowHours: boolean;
   canShowMap: boolean;
@@ -379,6 +381,8 @@ export interface DirectoryEntryOptionsState {
   canShowQr: boolean;
   canShowSocial: boolean;
   canShowSeo: boolean;
+  canShowLogo: boolean;
+  canShowAbout: boolean;
   // External link — tier-gated availability + effective state
   canShowExternalLink: boolean;
   externalLinkEnabled: boolean;

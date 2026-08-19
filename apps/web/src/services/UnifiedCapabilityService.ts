@@ -469,6 +469,8 @@ interface BackendEffectiveDirectoryEntry {
   qr_enabled: boolean;
   social_enabled: boolean;
   seo_enabled: boolean;
+  logo_enabled?: boolean;
+  about_enabled?: boolean;
   can_show_hours: boolean;
   can_show_map: boolean;
   can_show_contact: boolean;
@@ -476,6 +478,8 @@ interface BackendEffectiveDirectoryEntry {
   can_show_qr: boolean;
   can_show_social: boolean;
   can_show_seo: boolean;
+  can_show_logo?: boolean;
+  can_show_about?: boolean;
   can_show_external_link: boolean;
   external_link_enabled: boolean;
   snap_ebt_badge_enabled: boolean;
@@ -898,6 +902,8 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     qrEnabled: b.qr_enabled,
     socialEnabled: b.social_enabled,
     seoEnabled: b.seo_enabled,
+    logoEnabled: b.logo_enabled ?? false,
+    aboutEnabled: b.about_enabled ?? false,
     canShowHours: b.can_show_hours,
     canShowMap: b.can_show_map,
     canShowContact: b.can_show_contact,
@@ -905,6 +911,8 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     canShowQr: b.can_show_qr,
     canShowSocial: b.can_show_social,
     canShowSeo: b.can_show_seo,
+    canShowLogo: b.can_show_logo ?? false,
+    canShowAbout: b.can_show_about ?? false,
     canShowExternalLink: b.can_show_external_link,
     externalLinkEnabled: b.external_link_enabled,
     snapEbtBadgeEnabled: b.snap_ebt_badge_enabled ?? false,

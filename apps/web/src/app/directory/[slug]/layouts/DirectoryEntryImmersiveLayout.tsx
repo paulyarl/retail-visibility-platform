@@ -37,8 +37,11 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
-    isDemo, demoExpiresAt,
+    isDemo, demoExpiresAt, directoryEntryOptions,
   } = props;
+
+  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -83,7 +86,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-end gap-6">
-                    {listing.logoUrl && (
+                    {listing.logoUrl && canShowLogo && (
                       <img src={listing.logoUrl} alt="" className="w-24 h-24 rounded-2xl object-cover border-4 border-white/20 shadow-2xl hidden sm:block" />
                     )}
                     <div className="pb-2">
@@ -126,7 +129,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div className="lg:col-span-2 space-y-10">
               {/* Description */}
-              {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+              {(canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
                 <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
                   <h2 className="text-2xl font-bold mb-4">About</h2>
                   <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">{businessProfile.business_description || businessProfile.businessDescription}</p>

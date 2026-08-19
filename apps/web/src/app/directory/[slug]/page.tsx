@@ -659,6 +659,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     fullAddress,
     isDemo: tenantInfo?.isDemo,
     demoExpiresAt: tenantInfo?.demoExpiresAt,
+    directoryEntryOptions,
   };
 
   const unclaimedBanner = consolidatedData?.listing?.listingOrigin === 'directory_seed' ? (

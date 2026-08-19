@@ -110,7 +110,7 @@ export default function PlaceEntryEditorialLayout({
             </Link>
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                {listing.logoUrl && (
+                {listing.logoUrl && (dirEntryOpts?.canShowLogo ?? true) && (
                   <img src={listing.logoUrl} alt={listing.businessName} className="w-20 h-20 rounded-xl object-cover border-2 border-white/20" />
                 )}
                 <div>

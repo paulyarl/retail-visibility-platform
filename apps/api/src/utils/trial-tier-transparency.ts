@@ -14,6 +14,7 @@ function getBaseTierForTrial(tierKey: string): string | null {
   const trialToBaseMap: Record<string, string> = {
     'trial_google_only': 'google_only',
     'trial_directory_presence': 'directory_presence',
+    'trial_presence': 'presence',
     'trial_discovery': 'discovery',
     'trial_starter': 'starter',
     'trial_storefront': 'storefront',

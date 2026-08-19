@@ -37,8 +37,11 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
-    isDemo, demoExpiresAt,
+    isDemo, demoExpiresAt, directoryEntryOptions,
   } = props;
+
+  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -70,7 +73,7 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
             ) : (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
                 <div className="flex items-center gap-5">
-                  {listing.logoUrl && (
+                  {listing.logoUrl && canShowLogo && (
                     <img src={listing.logoUrl} alt={listing.businessName} className="w-20 h-20 rounded-full object-cover ring-2 ring-amber-500/50" />
                   )}
                   <div>
@@ -121,7 +124,7 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-12">
               {/* About */}
-              {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+              {(canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
                 <section className="border-l-2 border-amber-500 pl-6">
                   <h2 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3">About</h2>
                   <p className="text-stone-800 leading-relaxed text-lg whitespace-pre-wrap">

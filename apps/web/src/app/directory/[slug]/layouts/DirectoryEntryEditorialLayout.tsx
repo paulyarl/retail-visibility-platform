@@ -37,8 +37,11 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
-    isDemo, demoExpiresAt,
+    isDemo, demoExpiresAt, directoryEntryOptions,
   } = props;
+
+  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -77,7 +80,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             ) : (
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  {listing.logoUrl && (
+                  {listing.logoUrl && canShowLogo && (
                     <img src={listing.logoUrl} alt={listing.businessName} className="w-20 h-20 rounded-xl object-cover border-2 border-white/20" />
                   )}
                   <div>
@@ -117,7 +120,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             {/* Main Column */}
             <div className="lg:col-span-8 space-y-10">
               {/* About */}
-              {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+              {(canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
                 <section>
                   <h2 className="text-2xl font-bold text-neutral-900 mb-4">About</h2>
                   <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-wrap">

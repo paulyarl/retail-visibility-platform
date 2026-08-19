@@ -10,7 +10,7 @@
  * - Business model alignment (physical vs online vs omnichannel)
  * - Subscription status (trial, active, past_due, frozen, canceled)
  * - Visibility status (directory published, storefront enabled, location status)
- * - Growth path from PLATFORM_STRATEGY_V2
+ * - Growth path from PLATFORM_STRATEGY_V3 (Entry Presence + Commerce dual triads)
  *
  * Mirrors the architecture of NextStepsService: single round-trip data gathering,
  * then evaluate tip definitions to produce a scored, sorted list.
@@ -139,7 +139,7 @@ function hasIntegrations(ctx: TipContext): boolean {
 // ====================
 
 const TIER_ORDER: string[] = [
-  'directory_presence', 'google_only', 'starter', 'discovery', 'storefront', 'commitment',
+  'directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront', 'commitment',
   'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];

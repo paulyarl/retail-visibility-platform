@@ -83,6 +83,8 @@ export function resolveDirectoryEntryOptions(
     qr_enabled: mainOn && (flexible || !!features.directory_entry_qr_on || !!features.directory_entry_qr_enabled),
     social_enabled: mainOn && (flexible || !!features.directory_entry_social_on || !!features.directory_entry_social_enabled) && (merchantPrefs?.storefront_social_media !== false),
     seo_enabled: mainOn && (flexible || !!features.directory_entry_seo_on || !!features.directory_entry_seo_enabled) && (merchantPrefs?.enhanced_seo !== false),
+    logo_enabled: mainOn && (flexible || !!features.directory_entry_logo_on || !!features.directory_entry_logo_enabled),
+    about_enabled: mainOn && (flexible || !!features.directory_entry_about_on || !!features.directory_entry_about_enabled),
     // Tier-gated availability flags (for UI disable states)
     can_show_hours: mainOn && (flexible || !!features.directory_entry_hours_on || !!features.directory_entry_hours_enabled),
     can_show_map: mainOn && (flexible || !!features.directory_entry_map_on || !!features.directory_entry_map_enabled),
@@ -91,6 +93,8 @@ export function resolveDirectoryEntryOptions(
     can_show_qr: mainOn && (flexible || !!features.directory_entry_qr_on || !!features.directory_entry_qr_enabled),
     can_show_social: mainOn && (flexible || !!features.directory_entry_social_on || !!features.directory_entry_social_enabled),
     can_show_seo: mainOn && (flexible || !!features.directory_entry_seo_on || !!features.directory_entry_seo_enabled),
+    can_show_logo: mainOn && (flexible || !!features.directory_entry_logo_on || !!features.directory_entry_logo_enabled),
+    can_show_about: mainOn && (flexible || !!features.directory_entry_about_on || !!features.directory_entry_about_enabled),
     // External link — tier feature OR flexible grants availability; merchant pref gates effective state
     can_show_external_link: externalLinkTierAllowed,
     external_link_enabled: externalLinkTierAllowed && (merchantPrefs?.external_link_enabled === true),

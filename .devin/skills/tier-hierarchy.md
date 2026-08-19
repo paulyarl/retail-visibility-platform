@@ -1,104 +1,209 @@
 # Platform Tier Hierarchy
 
-> **Source of truth:** `docs/PLATFORM_STRATEGY_V2.md`
-> **When to use:** Any work involving tier levels, tier ordering, upgrade paths, growth tips, capability gating, pricing, or tier-aware UI behavior.
+> **Source of truth:** `docs/PLATFORM_STRATEGY_V3.md`
+> **Supersedes:** V2 hierarchy (Discovery-first spine; starter as storefront-level legacy)
+> **When to use:** Tier levels, ordering, upgrade paths, growth tips, capability gating, pricing, tier-aware UI.
+> **v3.1 note:** Entry Presence directory tier uses key `presence` (display: "Starter"). Old `starter` tier stays inactive — no purge.
 
-## Tier Order (low → high)
+## Layer model (V3)
 
-| # | Key | Display Name | Price/mo | Business Model | Purchase Capability |
-|---|---|---|---|---|---|
-| 1 | `discovery` | Discovery | $29 | Visibility only | None |
-| 2 | `storefront` | Storefront | $59 | Platform presence | None |
-| 3 | `commitment` | Commitment | $79 | Physical retail | Deposit only |
-| 4 | `ecommerce` | E-commerce | $99 | Online-only | Full payment only |
-| 5 | `omnichannel` | Omnichannel | $149 | Physical + online | Both (deposit + full) |
-| 6 | `professional` | Professional | $199 | Advanced single-location | Both |
-| 7 | `organization` | Organization | $499 | Multi-location (org type) | All options |
-| 8 | `enterprise` | Enterprise | $499 | Multi-location | All options |
+```
+Gateway          directory_presence     FREE seed/claim on-ramp
+Entry Presence   presence | discovery | storefront   visibility MODES (peer choice)
+Commerce         commitment | ecommerce | omnichannel   money MODES
+Scale            professional | organization | enterprise
+```
 
-**Legacy/alias tiers** (map to the above):
-- `google_only` → maps to `discovery` level
-- `starter` → maps to `storefront` level (legacy)
-- `professional` → sits between `omnichannel` and `enterprise` in code (legacy)
-- `custom` → highest level (escape hatch)
+### Entry Presence modes (same layer — different surface)
 
-**Chain tiers** (multi-location variants):
-- `chain_starter` → `storefront` level
-- `chain_professional` → `professional` level
-- `chain_enterprise` → `enterprise` level
+| Key | Surface | Owner of surface | Job |
+|-----|---------|------------------|-----|
+| `presence` | **Directory** | Platform in-house directory | Paid path from free listing; enriched directory (display: "Starter") |
+| `discovery` | **Google** | Third-party (Google) | Visibility integration onto Google's wave |
+| `storefront` | **Platform** | Platform in-house marketplace | Branded store + product browse |
+
+### Commerce modes (unchanged spirit from V2)
+
+| Key | Mode |
+|-----|------|
+| `commitment` | Deposit only |
+| `ecommerce` | Full payment only |
+| `omnichannel` | Both |
+
+---
+
+## Tier order (low → high for sort / compare)
+
+| # | Key | Display | Price/mo | Layer | Notes |
+|---|-----|---------|----------|-------|-------|
+| 0 | `directory_presence` | Directory Presence | $0 | Gateway | Free; never paid acquisition SKU |
+| 1 | `presence` | Starter | $19 | Entry Presence | **Directory mode only** (new key; old `starter` stays inactive) |
+| 2 | `discovery` | Discovery | $29 | Entry Presence | Google third-party |
+| 3 | `storefront` | Storefront | $59 | Entry Presence | Platform in-house (+ Google inherit) |
+| 4 | `commitment` | Commitment | $79 | Commerce | Deposit |
+| 5 | `ecommerce` | E-commerce | $99 | Commerce | Full pay |
+| 6 | `omnichannel` | Omnichannel | $149 | Commerce | Both |
+| 7 | `professional` | Professional | $199 | Scale | Advanced single-loc |
+| 8 | `organization` | Organization | $499 | Scale | Org type |
+| 9 | `enterprise` | Enterprise | $499 | Scale | Multi-loc |
+
+**Aliases / maintenance (not primary GTM):**
+- `google_only` → treat as discovery-class Google maintenance (inactive)
+- `starter` → **inactive legacy tier**. Do NOT use. Use `presence` for directory mode.
+- `custom` → escape hatch
+
+**Chain tiers:**
+- `chain_starter` → inactive legacy. Multi-loc directory mode would use a new `chain_presence` key if needed.
+- `chain_professional` → professional level
+- `chain_enterprise` → enterprise level
+
+---
 
 ## Canonical TIER_ORDER array
 
-Use this exact ordering in any code that compares tier levels:
+Prefer this ordering for `tierIndex()`-style compares:
 
 ```
-['google_only', 'starter', 'discovery', 'storefront', 'commitment',
- 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
- 'chain_starter', 'chain_professional', 'chain_enterprise', 'custom']
+['directory_presence', 'google_only', 'presence', 'discovery', 'storefront',
+ 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization',
+ 'enterprise', 'starter', 'chain_starter', 'chain_professional', 'chain_enterprise', 'custom']
 ```
 
-**Note:** `organization` is a real active tier (not a legacy alias). It sits between `professional` and `enterprise` in the hierarchy. It is an organization-type tier (not individual-type) and has its own features, pricing ($499/mo), and limits.
+**Critical:** Include `ecommerce` between `commitment` and `omnichannel`, and `organization` between `professional` and `enterprise`. Missing either collapses index fallbacks and mis-gates capabilities.
 
-## Upgrade Path
+Also include `directory_presence` **before** paid entry modes so gateway is never scored as discovery.
+
+---
+
+## Inheritance (capability spirit)
 
 ```
-discovery → storefront → commitment → ecommerce → omnichannel → enterprise
+directory_presence:  []
+presence:            [directory_presence]                 // directory mode ONLY (new key)
+discovery:           [directory_presence]                 // Google mode; thin directory chrome
+storefront:          [discovery, directory_presence]      // platform + Google combine-up
+commitment:          [storefront, discovery, directory_presence]
+ecommerce:           [storefront, discovery, directory_presence]
+omnichannel:         [commitment, ecommerce, storefront, discovery, directory_presence]
+professional+:       [omnichannel, ...]
 ```
 
-- **discovery → storefront:** "Now I want them to find my whole store"
-- **storefront → commitment:** "I want shoppers to commit to buying" (deposit)
-- **storefront → ecommerce:** "I want shoppers to buy fully online" (full payment)
-- **commitment → ecommerce:** "I want to close the full sale online" (same price, different model)
-- **commitment → omnichannel:** "I want both deposit AND full payment"
-- **ecommerce → omnichannel:** "I want to add physical pickup options"
-- **omnichannel → enterprise:** "I want multi-location and advanced features"
+**Hard rules**
+- `presence` must **NOT** inherit `google_only` / Discovery Google caps
+- `starter` (inactive legacy) — do not use; do not modify its hierarchy entry
+- `discovery` must **NOT** grant platform product browse / branded marketplace storefront
+- `storefront` does **NOT** grant checkout (commerce starts at commitment/ecommerce)
+- `directory_presence` stays free gateway features only
 
-**Key V2 insight:** Commitment (Tier 3) and E-commerce (Tier 4) are the same price ($79 vs $99) but serve different business models. Commitment = deposit-only for physical retailers. E-commerce = full-payment-only for online merchants. Omnichannel (Tier 5) combines both.
+---
 
-## Capability Matrix (simplified)
+## Upgrade / mode paths
 
-| Capability | discovery | storefront | commitment | ecommerce | omnichannel | enterprise |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Google visibility | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Directory listing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Branded storefront | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Platform product visibility | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Shopper inquiry | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Add to cart / checkout | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Deposit / holding fee | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
-| Full online payment | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| BOPIS / click & collect | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
-| Delivery / fulfillment | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Shopper payment path choice | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Conversion analytics | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Advanced analytics | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| API access | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Multi-location | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+### From gateway (`directory_presence`) — peer choice
+
+```
+presence    "Own your directory listing"
+discovery   "Get found on Google"
+storefront  "Open your platform store"
+```
+
+Primary CTA default: **presence**.
+
+### From presence
+
+```
+discovery | storefront | (later commerce)
+```
+
+### From discovery
+
+```
+storefront → commitment | ecommerce | omnichannel
+```
+
+### Commerce (unchanged V2 spirit)
+
+```
+storefront → commitment | ecommerce
+commitment → ecommerce | omnichannel
+ecommerce  → omnichannel
+omnichannel → professional / enterprise
+```
+
+**Key V2 insight retained:** Commitment vs Ecommerce are different **money modes**, not a pure feature stack. Omnichannel combines both.
+
+**Key V3 insight:** Presence vs Discovery vs Storefront are different **presence modes**, not a pure feature stack.
+
+---
+
+## Capability matrix (simplified)
+
+| Capability | DP | presence | discovery | storefront | commitment | ecommerce | omni |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Directory listing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Enriched directory (logo/about/gallery) | ❌ | ✅ | ◐ | ✅ | ✅ | ✅ | ✅ |
+| Google SWIS / Shopping / Search | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Platform storefront + product browse | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Deposit checkout | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
+| Full online payment | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Path choice | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+---
+
+## Presence implementation checklist (V3.1)
+
+When adding the `presence` tier:
+
+1. Add `presence` to `TIER_FEATURES` with **directory-mode** keys only (do NOT modify old `starter` entry)
+2. Add `presence` to `TIER_HIERARCHY` inheriting only `[directory_presence]` (no `google_only`)
+3. Add `presence` to `FEATURE_TIER_MAP` for directory-mode feature keys
+4. Add `presence` to `TIER_DISPLAY_NAMES` as "Starter"
+5. Growth tips: gateway → presence primary; not "sell online"
+6. Upgrade options API: from gateway return triad (`presence`, `discovery`, `storefront`), not only `sort_order > current`
+7. Old `starter` entries in all maps stay as-is (dormant code for inactive tier)
+
+Companion: `docs/LocalBiz/directory_presence_progressive_upgrade_spec.md`
+
+---
 
 ## Files that MUST stay in sync
 
 ### Frontend (`apps/web/src/lib/`)
-- `tiers/tier-resolver.ts` — `TierInfo.level` type, `mapTierLevel()`, `getHigherTierLevel()`, `getUpgradeOptions()`
-- `tiers/tier-features.ts` — `TIER_HIERARCHY`, `TIER_DISPLAY_NAMES`, `TIER_PRICING`, `TIER_FEATURES`, `FEATURE_TIER_MAP`
-- `tiers/content-consistency.ts` — `TIER_PROGRESSIONS`, `CONTENT_MAPPINGS` (tier arrays per capability)
-- `tiers/chain-pricing.ts` — `CHAIN_TIERS`, `getIndividualPriceForTier()`
-- `growth-tips/tipEngine.ts` — `TIER_ORDER`, tier helper functions (`isDiscoveryOrBelow`, `isStorefront`, `isCommitment`, `isEcommerce`, `isEcommerceOrAbove`, `isEnterprise`), `nextTierName()`, tip definitions
+- `tiers/tier-resolver.ts` — levels, mapTierLevel, getHigherTierLevel, getUpgradeOptions
+- `tiers/tier-features.ts` — TIER_HIERARCHY, DISPLAY_NAMES, PRICING, FEATURES, FEATURE_TIER_MAP
+- `tiers/content-consistency.ts` — progressions
+- `tiers/chain-pricing.ts`
+- `growth-tips/tipEngine.ts` — TIER_ORDER, helpers, tips
 
 ### Backend (`apps/api/src/`)
-- `services/GrowthTipService.ts` — mirrors frontend tipEngine: `TIER_ORDER`, tier helpers, `nextTierName()`, tip definitions
-- `utils/tier-limits.ts` — `SubscriptionTier` type, `TIER_LIMITS` with `ecommerce` entry
-- `utils/trial-tier-transparency.ts` — trial-to-base tier mapping (includes `trial_ecommerce`, `trial_organization`)
-- `services/TierService.ts` — trial tier mapping
-- `routes/admin/tier-management.ts` — tier ordering, pricing, SKU limits
-- `utils/featured-product-scoring.ts` — tier-based scoring weights
-- `services/IntegrationOptionsService.ts` — `minTier` per integration type
+- `services/GrowthTipService.ts`
+- `utils/tier-limits.ts`
+- `utils/trial-tier-transparency.ts`
+- `services/TierService.ts`
+- `routes/admin/tier-management.ts`
+- `utils/featured-product-scoring.ts`
+- `services/IntegrationOptionsService.ts`
+- `routes/directory-presence-upgrade.ts` — gateway mode options
 
-### Critical pattern
-Any array or switch that enumerates tier levels MUST include `'ecommerce'` between `'commitment'` and `'omnichannel'`, and MUST include `'organization'` between `'professional'` and `'enterprise'`. Missing either causes `tierIndex()` to return `0` (fallback), treating the tenant as Discovery-level — showing wrong upgrade tips, wrong capability gates, and wrong tier comparisons.
+### Docs
+- `docs/PLATFORM_STRATEGY_V3.md` — strategy SoT
+- `docs/LocalBiz/directory_presence_progressive_upgrade_spec.md` — ladder/impl
+- `docs/DIRECTORY_PRESENCE_LIGHT_TIER_SPRINT_PLAN.md` — free gateway
 
-## Common bugs from missing `ecommerce` or `organization` in tier arrays
+---
 
-1. **Wrong growth tips:** E-commerce users see "Upgrade to Storefront" (discovery tip) instead of "Add physical pickup with Omnichannel"; Organization users see no upgrade path
-2. **Wrong capability gating:** E-commerce users treated as discovery-level, denied commerce features they're paying for; Organization users treated as discovery-level, denied propagation and multi-location features
-3. **Wrong tier comparisons:** `getHigherTierLevel()` can't compare ecommerce or organization vs other tiers correctly
-4. **Wrong upgrade options:** `getUpgradeOptions()` skips valid upgrade paths
+## Common bugs
+
+1. **Using `starter` instead of `presence`** — `starter` is inactive legacy with wrong feature bag. Use `presence` for directory mode.
+2. **Missing `directory_presence` in tier arrays** — gateway scored as paid discovery
+3. **Missing `ecommerce` or `organization`** — index fallback → wrong tips/gates
+4. **Presence inheriting Google** — smears Entry Presence modes
+5. **Gateway CTA "Sell Online"** — skips presence mode choice
+6. **Upgrade options `price_monthly > 0` only** — may hide free→paid gateway edges; use mode set for DP
+
+---
+
+## Skill status
+
+**Status:** V3.1 — aligned to Entry Presence + Commerce dual triads; `presence` key replaces `starter`
+**Update when:** Strategy V3 changes, presence feature set lands, sort_order renumber ships

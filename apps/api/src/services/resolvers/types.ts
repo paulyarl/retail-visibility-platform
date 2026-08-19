@@ -544,6 +544,8 @@ export interface EffectiveDirectoryEntryOptions {
   qr_enabled: boolean;
   social_enabled: boolean;
   seo_enabled: boolean;
+  logo_enabled: boolean;
+  about_enabled: boolean;
   // Tier-gated availability (separate from merchant-gated effective state)
   can_show_hours: boolean;
   can_show_map: boolean;
@@ -552,6 +554,8 @@ export interface EffectiveDirectoryEntryOptions {
   can_show_qr: boolean;
   can_show_social: boolean;
   can_show_seo: boolean;
+  can_show_logo: boolean;
+  can_show_about: boolean;
   // External link — tier-gated availability + effective state (tier AND merchant)
   can_show_external_link: boolean;
   external_link_enabled: boolean;

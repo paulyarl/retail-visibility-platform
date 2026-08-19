@@ -8,7 +8,7 @@
  * - Business model alignment (physical vs online vs omnichannel)
  * - Subscription status (trial, active, past_due, frozen, canceled)
  * - Visibility status (directory published, storefront enabled, Google indexing, slug/logo)
- * - Growth path from PLATFORM_STRATEGY_V2
+ * - Growth path from PLATFORM_STRATEGY_V3 (Entry Presence + Commerce dual triads)
  *
  * Tips are scored by relevance and the top N are returned for rotation.
  */
@@ -86,7 +86,7 @@ interface TipDefinition {
 // ====================
 
 const TIER_ORDER: TierInfo['level'][] = [
-  'google_only', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
+  'directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];
 

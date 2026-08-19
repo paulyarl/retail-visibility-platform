@@ -59,7 +59,11 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     fullAddress,
     isDemo,
     demoExpiresAt,
+    directoryEntryOptions,
   } = props;
+
+  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -133,7 +137,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           <div className="space-y-6">
             <div className="space-y-6">
               {/* Store Header */}
-              {tenantLogo && (
+              {tenantLogo && canShowLogo && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex items-start gap-6">
                     {listing.logoUrl && (
@@ -316,7 +320,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
               )}
 
               {/* Business Description */}
-              {(!showStatusPanel && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
+              {(!showStatusPanel && canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
                   <div className="prose prose-gray max-w-none">

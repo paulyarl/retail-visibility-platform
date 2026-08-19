@@ -133,6 +133,8 @@ export const TIER_FEATURES = {
 const TIER_HIERARCHY: Record<string, string[]> = {
   directory_presence: [],
   google_only: ['directory_presence'],
+  // V3.1: presence inherits directory_presence ONLY (no google_only)
+  presence: ['directory_presence'],
   discovery: ['directory_presence'],
   starter: ['google_only', 'directory_presence'],
   storefront: ['discovery', 'google_only', 'directory_presence'],
@@ -237,7 +239,7 @@ export async function checkTierAccess(tier: string, feature: string): Promise<bo
     // Check FEATURE_TIER_MAP as last fallback
     const requiredTier = FEATURE_TIER_MAP[resolvedFeature] || FEATURE_TIER_MAP[feature];
     if (requiredTier) {
-      const tierOrder = ['directory_presence', 'google_only', 'discovery', 'starter', 'storefront', 'commitment', 'professional', 'ecommerce', 'enterprise', 'organization'];
+      const tierOrder = ['directory_presence', 'google_only', 'presence', 'discovery', 'starter', 'storefront', 'commitment', 'professional', 'ecommerce', 'enterprise', 'organization'];
       const tierIndex = tierOrder.indexOf(tier);
       const requiredIndex = tierOrder.indexOf(requiredTier);
       return tierIndex >= requiredIndex;
@@ -262,6 +264,8 @@ export function getTierDisplayName(tier: string): string {
   const displayNames: Record<string, string> = {
     trial: 'Trial',
     google_only: 'Google-Only',
+    directory_presence: 'Directory Presence',
+    presence: 'Starter',
     discovery: 'Discovery',
     starter: 'Starter',
     storefront: 'Storefront',
@@ -283,6 +287,8 @@ export function getTierPricing(tier: string): number {
   const pricing: Record<string, number> = {
     trial: 0,
     google_only: 29,
+    directory_presence: 0,
+    presence: 19,
     discovery: 29,
     starter: 49,
     storefront: 59,

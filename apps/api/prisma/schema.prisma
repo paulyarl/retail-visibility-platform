@@ -4084,6 +4084,7 @@ model subscription_tiers_list {
   featured_featured        Int                        @default(0)
   featured_recommended     Int                        @default(0)
   max_users                Int?
+  billing_type             String                     @default("subscription") @db.VarChar(20)
   capability_type_list     capability_type_list[]
   tier_catalog_permissions tier_catalog_permissions[]
   tier_features_list       tier_features_list[]

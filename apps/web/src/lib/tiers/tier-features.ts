@@ -19,6 +19,24 @@ export const TIER_FEATURES = {
     'storefront_retail',
     'directory_visibility_snap_ebt',
   ],
+  // V3.1 Entry Presence — directory mode (display: "Starter")
+  // Clean key `presence` — does NOT inherit google_only or legacy starter feature bag.
+  presence: [
+    'directory_entry_enabled',
+    'directory_entry_layout_classic',
+    'directory_entry_layout_editorial',
+    'directory_entry_layout_immersive',
+    'directory_entry_logo_on',
+    'directory_entry_about_on',
+    'directory_entry_gallery_on',
+    'directory_entry_social_on',
+    'directory_entry_hours_on',
+    'directory_entry_map_on',
+    'directory_entry_contact_on',
+    'directory_entry_qr_on',
+    'storefront_enabled',
+    'storefront_retail',
+  ],
   google_only: [
     'google_shopping',
     'google_merchant_center',
@@ -120,6 +138,8 @@ export const TIER_FEATURES = {
 export const TIER_HIERARCHY: Record<string, string[]> = {
   directory_presence: [],
   google_only: ['directory_presence'],
+  // V3.1: presence inherits directory_presence ONLY (no google_only)
+  presence: ['directory_presence'],
   starter: ['google_only', 'directory_presence'],
   discovery: ['google_only', 'directory_presence'],
   storefront: ['discovery', 'google_only', 'directory_presence'],
@@ -199,6 +219,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
 export const TIER_DISPLAY_NAMES: Record<string, string> = {
   google_only: 'Google-Only',
   directory_presence: 'Directory Presence',
+  presence: 'Starter',
   starter: 'Starter',
   discovery: 'Discovery',
   storefront: 'Storefront',
@@ -344,6 +365,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
 export const TIER_PRICING: Record<string, number> = {
   google_only: 29,
   directory_presence: 0,
+  presence: 19,
   discovery: 29,
   storefront: 59,
   commitment: 79,  // V2 pricing
