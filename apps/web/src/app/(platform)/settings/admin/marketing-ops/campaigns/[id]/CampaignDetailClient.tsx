@@ -282,7 +282,7 @@ export default function CampaignDetailClient({
       return;
     }
     marketingOpsService
-      .listExecutions(campaignId)
+      .listExecutions({ campaignId })
       .then((execs) => {
         // Find the latest execution that has a sync_report (i.e. syncFromExecution ran).
         const withSync = execs
@@ -303,7 +303,7 @@ export default function CampaignDetailClient({
       return;
     }
     marketingOpsService
-      .listExecutions(campaignId)
+      .listExecutions({ campaignId })
       .then((execs) => {
         const latest = execs
           .filter((e) => e.output_schema?.name === 'profile_repair_audit')

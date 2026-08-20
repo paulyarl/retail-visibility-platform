@@ -2044,11 +2044,29 @@ router.get('/prompts/templates/:id/render', async (req: any, res: Response) => {
 // PROMPT EXECUTION ROUTES
 // ====================
 
+const executionListQuerySchema = z.object({
+  campaign_id: z.string().min(1).optional(),
+  template_id: z.string().min(1).optional(),
+  status: z.string().min(1).max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
 router.get('/prompts/executions', async (req: any, res: Response) => {
   try {
-    const executions = await MarketingPromptService.listExecutions(req.query.campaign_id, getCtx(req));
+    const parsed = executionListQuerySchema.parse(req.query);
+    const executions = await MarketingPromptService.listExecutions({
+      campaignId: parsed.campaign_id,
+      templateId: parsed.template_id,
+      status: parsed.status,
+      limit: parsed.limit,
+      offset: parsed.offset,
+    }, getCtx(req));
     res.json({ success: true, data: executions });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

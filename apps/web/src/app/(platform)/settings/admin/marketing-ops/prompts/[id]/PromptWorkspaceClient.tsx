@@ -305,6 +305,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
   const [renderError, setRenderError] = useState<string | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   const [lastExecution, setLastExecution] = useState<PromptExecution | null>(null);
+  const [hydratingExecution, setHydratingExecution] = useState(false);
   // Intelligence profile resolution indicator (Sprint 3 — §1B)
   const [resolvedProfile, setResolvedProfile] = useState<IntelligenceProfile | null>(null);
 
@@ -335,15 +336,28 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       const t = templates.find((t) => t.id === templateId);
       if (!t) throw new Error('Template not found');
       setTemplate(t);
+      // Filter executions server-side by template_id instead of loading all
+      // executions and filtering client-side. The list endpoint returns a
+      // lightweight projection (no raw_output/variables_used/snapshot), so
+      // hydrate the Execution Result panel via getExecution(:id) for the full
+      // detail.
       const [campResult, execs] = await Promise.all([
         marketingOpsService.listCampaigns({ limit: 100 }),
-        marketingOpsService.listExecutions(),
+        marketingOpsService.listExecutions({ templateId }),
       ]);
       setCampaigns(campResult.items);
-      const templateExecs = execs.filter((e) => e.template_id === templateId);
-      setExecutions(templateExecs);
+      setExecutions(execs);
       // Hydrate the Execution Result panel from the most recent execution.
-      setLastExecution(templateExecs[0] ?? null);
+      if (execs[0]) {
+        try {
+          const full = await marketingOpsService.getExecution(execs[0].id);
+          setLastExecution(full);
+        } catch {
+          setLastExecution(execs[0]);
+        }
+      } else {
+        setLastExecution(null);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load template');
     } finally {
@@ -354,6 +368,24 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
   useEffect(() => {
     fetchTemplate();
   }, [fetchTemplate]);
+
+  // Hydrate a recent-execution click with the full execution detail (raw_output,
+  // filter_flags, etc.) via the detail endpoint. The list endpoint returns a
+  // lightweight projection, so we fetch the complete record on demand.
+  const selectExecution = useCallback(async (id: string) => {
+    setResultOpen(true);
+    setHydratingExecution(true);
+    try {
+      const full = await marketingOpsService.getExecution(id);
+      setLastExecution(full);
+    } catch {
+      // Fallback to the lightweight list item if the detail fetch fails.
+      const lite = executions.find((e) => e.id === id);
+      if (lite) setLastExecution(lite);
+    } finally {
+      setHydratingExecution(false);
+    }
+  }, [executions]);
 
   // Deep-link: when opened from a campaign detail page (?campaignId=), pre-select
   // the campaign and auto-resolve the prompt server-side so the operator lands on
@@ -887,7 +919,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
             </button>
             {resultOpen && (
               <div className="mt-2">
-                {!lastExecution ? (
+                {hydratingExecution ? (
+                  <p className="text-sm text-gray-400">Loading execution details…</p>
+                ) : !lastExecution ? (
                   <p className="text-sm text-gray-400">No execution yet. Run the prompt to see results here.</p>
                 ) : (
                   <div className="space-y-3">
@@ -1062,7 +1096,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                 {executions.slice(0, 10).map((e) => (
                   <button
                     key={e.id}
-                    onClick={() => { setLastExecution(e); setResultOpen(true); }}
+                    onClick={() => selectExecution(e.id)}
                     className="w-full text-left border border-gray-200 dark:border-neutral-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-neutral-700/50"
                   >
                     <div className="flex items-center justify-between mb-1">

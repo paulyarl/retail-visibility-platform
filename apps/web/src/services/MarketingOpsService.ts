@@ -2342,9 +2342,19 @@ class MarketingOpsService extends AdminApiSingleton {
 
   // ─── Prompt Executions ──────────────────────────────────────
 
-  async listExecutions(campaignId?: string): Promise<PromptExecution[]> {
+  async listExecutions(filters?: {
+    campaignId?: string;
+    templateId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PromptExecution[]> {
     const params = new URLSearchParams();
-    if (campaignId) params.set('campaign_id', campaignId);
+    if (filters?.campaignId) params.set('campaign_id', filters.campaignId);
+    if (filters?.templateId) params.set('template_id', filters.templateId);
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.limit != null) params.set('limit', String(filters.limit));
+    if (filters?.offset != null) params.set('offset', String(filters.offset));
     const query = params.toString();
     const url = `${BASE_URL}/prompts/executions${query ? `?${query}` : ''}`;
 

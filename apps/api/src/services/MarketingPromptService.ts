@@ -544,13 +544,49 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  async listExecutions(campaignId?: string, ctx?: RequestCtx): Promise<any[]> {
+  async listExecutions(
+    options: { campaignId?: string; templateId?: string; status?: string; limit?: number; offset?: number } = {},
+    ctx?: RequestCtx,
+  ): Promise<any[]> {
+    const { campaignId, templateId, status, limit, offset } = options;
     const where: any = {};
     if (campaignId) where.campaign_id = campaignId;
+    if (templateId) where.template_id = templateId;
+    if (status) where.status = status;
+
+    // Bound the result set — default 50, hard cap 200.
+    const take = Math.min(Math.max(limit ?? 50, 1), 200);
+    const skip = Math.max(offset ?? 0, 0);
+
     try {
       return await this.prisma.mkt_prompt_executions_list.findMany({
         where,
         orderBy: { executed_at: 'desc' },
+        take,
+        skip,
+        // Lightweight projection — exclude payload-heavy fields that are only
+        // needed when viewing a single execution via getExecution(:id).
+        // variables_used, raw_output, filtered_output, template_body_snapshot
+        // can each be very large and are not consumed by list views.
+        select: {
+          id: true,
+          campaign_id: true,
+          template_id: true,
+          pass_rate: true,
+          flagged_count: true,
+          status: true,
+          executed_by: true,
+          executed_at: true,
+          ai_provider: true,
+          ai_model: true,
+          tokens_used: true,
+          cost_cents: true,
+          created_at: true,
+          updated_at: true,
+          sync_report: true,
+          template_version: true,
+          template_body_hash: true,
+        },
       });
     } catch (error) {
       logger.error('Failed to list prompt executions', ctx, { error: (error as Error).message });
