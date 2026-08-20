@@ -586,7 +586,33 @@ export class MarketingPromptService extends BaseService {
           sync_report: true,
           template_version: true,
           template_body_hash: true,
+          // Include the template relation so the frontend can filter by
+          // output_schema.name (e.g. profile_repair_audit detection in
+          // CampaignDetailClient). Without this, RepairBriefingCard would
+          // never surface because output_schema would be undefined.
+          mkt_prompt_templates_list: {
+            select: {
+              id: true,
+              name: true,
+              prompt_type: true,
+              output_schema: true,
+            },
+          },
         },
+      });
+
+      // Flatten the template relation fields to the top level so the frontend
+      // PromptExecution type (which expects output_schema and prompt_type at
+      // the top level) can consume them without knowing the Prisma relation
+      // name. Mirrors how getExecution exposes the template via include.
+      return executions.map((exec: any) => {
+        const tpl = exec.mkt_prompt_templates_list;
+        if (tpl) {
+          exec.output_schema = tpl.output_schema;
+          exec.prompt_type = tpl.prompt_type;
+          delete exec.mkt_prompt_templates_list;
+        }
+        return exec;
       });
     } catch (error) {
       logger.error('Failed to list prompt executions', ctx, { error: (error as Error).message });
