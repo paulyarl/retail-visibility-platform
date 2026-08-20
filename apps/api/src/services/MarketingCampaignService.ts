@@ -1237,7 +1237,25 @@ export class MarketingCampaignService extends BaseService {
 
       // Determine the remapped stage
       let remappedStage: string | null;
-      if (toTrack === 'escalated') {
+      if (fromTrack === null) {
+        // Initial track confirmation from triage mode (repair_track is null,
+        // stage is 'seek'). This is NOT a track switch — it's the first
+        // assignment. Confirming 'standard' keeps the stage as 'seek' (the
+        // Review pipeline's first stage). Confirming 'escalated' remaps
+        // 'seek' → 'audit_identified' (the Recovery pipeline's first stage).
+        if (toTrack === 'escalated') {
+          remappedStage = MarketingCampaignService.TRACK_REMAP_REVIEW_TO_RECOVERY[fromStage] ?? null;
+          if (!remappedStage) {
+            throw new Error(
+              `Cannot escalate from stage '${fromStage}'. Escalate before payment or refund first (operator procedure).`
+            );
+          }
+        } else {
+          // Confirming standard from triage: keep the current Review-track
+          // stage (typically 'seek'). No remap needed.
+          remappedStage = fromStage;
+        }
+      } else if (toTrack === 'escalated') {
         // Review → Recovery
         remappedStage = MarketingCampaignService.TRACK_REMAP_REVIEW_TO_RECOVERY[fromStage] ?? null;
         if (!remappedStage) {
