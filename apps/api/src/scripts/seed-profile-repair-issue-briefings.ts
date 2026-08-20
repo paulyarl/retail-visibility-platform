@@ -93,34 +93,7 @@ List anything that makes this repair harder than it looks:
 - **severityScore** (1-10): how damaging is this NAP drift to local search visibility and customer acquisition
 - **issueType**: "nap_drift"
 
-## Output
-
-Return valid JSON only with this shape:
-
-{
-  "profile_repair_audit": {
-    "severityScore": <number 1-10>,
-    "issueType": "nap_drift",
-    "scope": {
-      "summary": "<1-2 sentence plain-language summary of the NAP drift>",
-      "affected_platforms": ["<platform name>", ...],
-      "specifics": "<exactly what's drifted: fields, displayed vs canonical, per platform>"
-    },
-    "impact": {
-      "primary_consequence": "<the main business pain>",
-      "estimated_reach_loss": "<qualitative estimate of reach loss>",
-      "competitive_gap": "<how far behind competitors with consistent NAP>"
-    },
-    "pitch": {
-      "opener_hook": "<1-2 sentence opener, category-aware>",
-      "pain_points": ["<category-aware pain point>", ...],
-      "value_preview": "<what the repair package will fix>"
-    },
-    "risks": ["<anything that makes this repair harder than it looks>", ...]
-  }
-}
-
-Return ONLY the JSON object, no markdown fences, no commentary.`,
+The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
   {
     id: 'mpt-profile-repair-unclaimed-seek',
@@ -184,34 +157,7 @@ List anything that makes this repair harder than it looks:
 - **severityScore** (1-10): how damaging is the unclaimed profile to local search visibility and customer acquisition
 - **issueType**: "unclaimed_profile"
 
-## Output
-
-Return valid JSON only with this shape:
-
-{
-  "profile_repair_audit": {
-    "severityScore": <number 1-10>,
-    "issueType": "unclaimed_profile",
-    "scope": {
-      "summary": "<1-2 sentence plain-language summary of the unclaimed profile>",
-      "affected_platforms": ["<platform name>", ...],
-      "specifics": "<what's missing because the profile is unclaimed>"
-    },
-    "impact": {
-      "primary_consequence": "<the main business pain>",
-      "estimated_reach_loss": "<qualitative estimate of engagement loss>",
-      "competitive_gap": "<how far behind competitors with claimed profiles>"
-    },
-    "pitch": {
-      "opener_hook": "<1-2 sentence opener, category-aware>",
-      "pain_points": ["<category-aware pain point>", ...],
-      "value_preview": "<what claiming the profile will unlock>"
-    },
-    "risks": ["<anything that makes this repair harder than it looks>", ...]
-  }
-}
-
-Return ONLY the JSON object, no markdown fences, no commentary.`,
+The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
   {
     id: 'mpt-profile-repair-platform-gap-seek',
@@ -275,34 +221,7 @@ List anything that makes this repair harder than it looks:
 - **severityScore** (1-10): how damaging are the platform gaps to local search visibility and customer acquisition
 - **issueType**: "platform_gap"
 
-## Output
-
-Return valid JSON only with this shape:
-
-{
-  "profile_repair_audit": {
-    "severityScore": <number 1-10>,
-    "issueType": "platform_gap",
-    "scope": {
-      "summary": "<1-2 sentence plain-language summary of the platform gaps>",
-      "affected_platforms": ["<platform name>", ...],
-      "specifics": "<what each missing platform means for discovery>"
-    },
-    "impact": {
-      "primary_consequence": "<the main business pain>",
-      "estimated_reach_loss": "<qualitative estimate of reach loss>",
-      "competitive_gap": "<how competitors with full coverage appear in more contexts>"
-    },
-    "pitch": {
-      "opener_hook": "<1-2 sentence opener, category-aware>",
-      "pain_points": ["<category-aware pain point>", ...],
-      "value_preview": "<what closing the platform gaps will fix>"
-    },
-    "risks": ["<anything that makes this repair harder than it looks>", ...]
-  }
-}
-
-Return ONLY the JSON object, no markdown fences, no commentary.`,
+The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
 ];
 
@@ -320,8 +239,8 @@ async function main() {
       continue;
     }
 
-    if (existing.body.includes(BRIEFING_MARKER)) {
-      logger.info(`Template ${tmpl.id} already contains the briefing body. Skipping.`);
+    if (!existing.body.includes('## Output')) {
+      logger.info(`Template ${tmpl.id} already has no embedded ## Output section (suffix handles output shape). Skipping.`);
       skipped++;
       continue;
     }

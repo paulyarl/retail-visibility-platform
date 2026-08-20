@@ -98,39 +98,7 @@ Also provide:
 - **escalation_signals**: signals that pushed toward escalated (if any)
 - **standard_signals**: signals that kept it on standard (if any)
 
-## Output
-
-Return valid JSON only with this shape:
-
-{
-  "profile_repair_triage": {
-    "severity_score": <number 1-10>,
-    "recommended_track": "standard" | "escalated",
-    "issue_type_confirmed": "<string>",
-    "scope": {
-      "summary": "<1-2 sentence plain-language summary of what is broken>",
-      "broken_platforms": ["<platform name>", ...],
-      "drift_details": "<specifics: which fields drifted, displayed vs canonical, etc.>",
-      "missing_assets": ["<website | apple_maps | photos | hours | ...>", ...]
-    },
-    "viability": {
-      "pursuit_recommendation": "pursue" | "pursue_with_caveats" | "low_probability",
-      "rationale": "<why this campaign is or is not worth pursuing>"
-    },
-    "pitch": {
-      "primary_angle": "<the main hook for the opener, category-aware>",
-      "opener_hook": "<1-2 sentence opener the operator can use verbatim>",
-      "pain_points": ["<category-aware pain point>", ...],
-      "marketplace_positioning": "<how this business is positioned in its market>"
-    },
-    "risks": ["<anything that makes this campaign harder than it looks>", ...],
-    "rationale": "<overall reasoning for the track recommendation>",
-    "escalation_signals": ["<signal>", ...],
-    "standard_signals": ["<signal>", ...]
-  }
-}
-
-Return ONLY the JSON object, no markdown fences, no commentary.`;
+The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`;
 
 async function main() {
   const existing = await prisma.mkt_prompt_templates_list.findUnique({
@@ -142,8 +110,8 @@ async function main() {
     process.exit(1);
   }
 
-  if (existing.body.includes(BRIEFING_MARKER)) {
-    logger.info(`Template ${TEMPLATE_ID} already contains the operator briefing body. No changes made.`);
+  if (!existing.body.includes('## Output')) {
+    logger.info(`Template ${TEMPLATE_ID} already has no embedded ## Output section (suffix handles output shape). No changes made.`);
     process.exit(0);
   }
 
