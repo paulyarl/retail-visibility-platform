@@ -347,13 +347,19 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       ]);
       setCampaigns(campResult.items);
       setExecutions(execs);
-      // Hydrate the Execution Result panel from the most recent execution.
-      if (execs[0]) {
+      // Hydrate the Execution Result panel from the most recent *successful*
+      // execution so a transient failure doesn't blank out the panel — the
+      // operator still sees the last good output. Failed runs remain visible
+      // in the "Recent Executions" list below (click to inspect the error).
+      // Falls back to the most recent execution (whatever its status) when
+      // none have completed, so the panel still surfaces pending/failed state.
+      const preferred = execs.find((e) => e.status === 'completed') ?? execs[0];
+      if (preferred) {
         try {
-          const full = await marketingOpsService.getExecution(execs[0].id);
+          const full = await marketingOpsService.getExecution(preferred.id);
           setLastExecution(full);
         } catch {
-          setLastExecution(execs[0]);
+          setLastExecution(preferred);
         }
       } else {
         setLastExecution(null);
