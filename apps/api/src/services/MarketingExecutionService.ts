@@ -201,6 +201,7 @@ export class MarketingExecutionService extends BaseService {
       } catch (aiError) {
         await promptService.updateExecution(execution.id, {
           status: 'failed',
+          errorMessage: (aiError as Error).message || 'AI call failed',
         }, ctx);
         throw aiError;
       }

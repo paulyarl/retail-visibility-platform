@@ -509,6 +509,7 @@ export class MarketingPromptService extends BaseService {
     aiModel?: string;
     tokensUsed?: number;
     costCents?: number;
+    errorMessage?: string;
   }, ctx?: RequestCtx): Promise<any> {
     const data: any = {};
     if (input.rawOutput !== undefined) data.raw_output = input.rawOutput;
@@ -520,6 +521,7 @@ export class MarketingPromptService extends BaseService {
     if (input.aiModel !== undefined) data.ai_model = input.aiModel;
     if (input.tokensUsed !== undefined) data.tokens_used = input.tokensUsed;
     if (input.costCents !== undefined) data.cost_cents = input.costCents;
+    if (input.errorMessage !== undefined) data.error_message = input.errorMessage;
 
     try {
       return await this.prisma.mkt_prompt_executions_list.update({ where: { id }, data });
@@ -559,7 +561,7 @@ export class MarketingPromptService extends BaseService {
     const skip = Math.max(offset ?? 0, 0);
 
     try {
-      return await this.prisma.mkt_prompt_executions_list.findMany({
+      const executions = await this.prisma.mkt_prompt_executions_list.findMany({
         where,
         orderBy: { executed_at: 'desc' },
         take,
@@ -586,6 +588,7 @@ export class MarketingPromptService extends BaseService {
           sync_report: true,
           template_version: true,
           template_body_hash: true,
+          error_message: true,
           // Include the template relation so the frontend can filter by
           // output_schema.name (e.g. profile_repair_audit detection in
           // CampaignDetailClient). Without this, RepairBriefingCard would

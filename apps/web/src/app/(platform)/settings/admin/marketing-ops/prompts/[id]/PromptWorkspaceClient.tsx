@@ -936,6 +936,14 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                         {lastExecution.cost_cents != null && ` · ${lastExecution.cost_cents}¢`}
                       </div>
                     )}
+                    {lastExecution.status === 'failed' && lastExecution.error_message && (
+                      <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+                        <p className="text-xs text-red-700 dark:text-red-400">
+                          <AlertTriangle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                          {lastExecution.error_message}
+                        </p>
+                      </div>
+                    )}
                     {lastExecution.raw_output && (
                       <div>
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Raw output</p>

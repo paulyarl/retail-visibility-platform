@@ -515,6 +515,7 @@ export class ProfileRepairPromptService extends BaseService {
         await promptService.updateExecution(executionId, {
           status: 'failed',
           flaggedCount: 1,
+          errorMessage: `AI output was not valid JSON: ${(e as Error).message}`,
         }, ctx);
         throw new Error(`AI output was not valid JSON: ${(e as Error).message}`);
       }
@@ -725,7 +726,7 @@ export class ProfileRepairPromptService extends BaseService {
       } catch (e) {
         await promptService.updateExecution(
           execution.id,
-          { rawOutput, status: 'failed', flaggedCount: 1 },
+          { rawOutput, status: 'failed', flaggedCount: 1, errorMessage: `Output is not valid JSON: ${(e as Error).message}` },
           ctx,
         );
         return {
@@ -744,7 +745,7 @@ export class ProfileRepairPromptService extends BaseService {
           const errors = validation.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
           await promptService.updateExecution(
             execution.id,
-            { rawOutput, status: 'failed', flaggedCount: 1 },
+            { rawOutput, status: 'failed', flaggedCount: 1, errorMessage: `Schema validation failed: ${errors.join('; ')}` },
             ctx,
           );
           return { executionId: execution.id, passed: false, errors };

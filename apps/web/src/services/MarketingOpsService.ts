@@ -1111,6 +1111,10 @@ export interface PromptExecution {
   filter_flags?: FilterFlag[];
   // Sprint 5: persisted sync report (for city_analysis executions)
   sync_report?: SyncReport | null;
+  // Failure reason — set when status === 'failed' so the operator can see
+  // why a run failed (AI error, invalid JSON, schema validation) without
+  // having to dig through server logs.
+  error_message?: string | null;
   // Template info (joined from prompt template)
   prompt_type?: string;
   output_schema?: { name: string } | null;

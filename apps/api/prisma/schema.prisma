@@ -6449,6 +6449,7 @@ model mkt_prompt_executions_list {
   template_version          Int?
   template_body_hash        String?                    @db.VarChar(64)
   template_body_snapshot    String?
+  error_message             String?
   mkt_deliverables_list     mkt_deliverables_list[]
   mkt_filter_flags_list     mkt_filter_flags_list[]
   mkt_campaigns_list        mkt_campaigns_list         @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_executions_campaign")
