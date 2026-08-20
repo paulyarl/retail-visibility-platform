@@ -620,9 +620,15 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                   lastOpener.quality_gate_passed
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                    : lastOpener.source === 'ai_briefing'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                 }`}>
-                  {lastOpener.quality_gate_passed ? 'gate passed' : 'gate failed'}
+                  {lastOpener.quality_gate_passed
+                    ? 'gate passed'
+                    : lastOpener.source === 'ai_briefing'
+                      ? 'seed (not yet executed)'
+                      : 'gate failed'}
                 </span>
               )}
             </button>
@@ -672,7 +678,16 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                         </pre>
                       </div>
                     )}
-                    {lastOpener.quality_gate_issues && lastOpener.quality_gate_issues.length > 0 && (
+                    {lastOpener.source === 'ai_briefing' && !lastOpener.quality_gate_passed && (
+                      <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                          <strong>Seed from briefing hook.</strong> This opener text was seeded from the triage briefing&apos;s hook — it&apos;s not a complete opener yet.
+                          Run <strong>Execute</strong> above to generate the full opener via AI, or copy the <strong>Resolved Prompt</strong> and <strong>Import</strong> an external result.
+                          The full opener needs: salutation, preview reference, close, and signoff.
+                        </p>
+                      </div>
+                    )}
+                    {lastOpener.source !== 'ai_briefing' && lastOpener.quality_gate_issues && lastOpener.quality_gate_issues.length > 0 && (
                       <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
                         <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Quality gate issues:</p>
                         <ul className="text-xs text-amber-700 dark:text-amber-400 list-disc list-inside space-y-0.5">

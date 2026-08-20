@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Target, TrendingDown, MessageSquare, ShieldAlert, Loader2, Sparkles, CheckCircle, Wrench } from 'lucide-react';
+import Link from 'next/link';
+import { Target, TrendingDown, MessageSquare, ShieldAlert, Loader2, Sparkles, CheckCircle, Wrench, ArrowRight } from 'lucide-react';
 import marketingOpsService, { PromptExecution } from '@/services/MarketingOpsService';
 
 interface RepairBriefingCardProps {
@@ -218,7 +219,7 @@ export default function RepairBriefingCard({ execution, campaignId }: RepairBrie
             Create Opener from Hook
           </button>
           {openerResult?.created && (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+            <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
               <CheckCircle className="w-3.5 h-3.5" />
               <span>Opener created</span>
               {openerResult.warnings && openerResult.warnings.length > 0 && (
@@ -226,6 +227,13 @@ export default function RepairBriefingCard({ execution, campaignId }: RepairBrie
                   ({openerResult.warnings.length} warning{openerResult.warnings.length === 1 ? '' : 's'})
                 </span>
               )}
+              <Link
+                href={`/settings/admin/marketing-ops/openers?campaign=${campaignId}`}
+                className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              >
+                Open in workspace
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
           )}
           {openerResult && !openerResult.created && openerResult.error && (
