@@ -600,5 +600,35 @@ storefront:         [discovery, directory_presence]
 - `apps/web/src/lib/tiers/entry-presence-tier.test.ts` — 21 tests verifying presence feature boundaries, hierarchy isolation, legacy starter dormancy, gateway free-tier limits
 - `apps/web/vitest.config.ts` — vitest config for web app (node environment, `@` alias)
 
+## Profile Repair Briefing Persistence & Opener Bridge (Migration 232)
+
+AI-generated triage and per-issue briefings are persisted as campaign artifacts (not just execution logs) and can be wired into the Openers workspace.
+
+### Schema (Migration 232)
+- `mkt_campaigns_list.repair_triage_briefing` JSONB NULL — persists the triage briefing (`scope`, `viability`, `pitch`, `risks`, `recommended_track`, etc.) with provenance metadata (`_execution_id`, `_validated`)
+
+### Backend persistence
+- `ProfileRepairPromptService.executeSeekSync()` — after running the triage template (`mpt-profile-repair-triage-default`), parses + validates the AI output, persists the briefing to `repair_triage_briefing` with `_execution_id` and `_validated` flags. Best-effort output (strict Zod fails but `profile_repair_triage` exists) is persisted with `_validated: false`. Unparseable output does NOT overwrite the previous briefing.
+- `ProfileRepairPromptService.importExternalResult()` — persists valid imported triage output the same way.
+- Per-issue seek templates (`mpt-profile-repair-nap-drift-seek`, etc.) do NOT persist to `repair_triage_briefing` — their output (`profile_repair_audit`) is rendered from `mkt_prompt_executions_list.raw_output` by the frontend.
+
+### Opener bridge
+- `OutreachOpenerService.createFromBriefing()` — creates/updates an opener from an AI briefing's `opener_hook`. Mirrors `importOpener` upsert + quality gate + bridge autocomplete logic, but:
+  - `source = 'ai_briefing'` (distinct from `'ai'` and `'external'`)
+  - `hook_angle = null` (briefing's `primary_angle` is free-text, not a HOOK_LIBRARY key)
+  - `extracted_fields` includes `{ sourceBriefing, executionId, primaryAngle }` for provenance
+- Route: `POST /api/admin/marketing-ops/openers/from-briefing` (before the catch-all)
+- Frontend: `MarketingOpsService.createOpenerFromBriefing()` + `OpenerSource` widened to `'ai' | 'external' | 'ai_briefing'`
+
+### Frontend
+- `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx` — reads `campaign.repair_triage_briefing` on mount (survives refresh + track confirmation); re-runs triage with explicit `templateId = 'mpt-profile-repair-triage-default'` (so post-confirmation re-runs don't accidentally run a per-issue seek); shows "Unverified" badge when `_validated === false`; "Create Opener from Hook" button
+- `apps/web/src/components/marketing-ops/RepairBriefingCard.tsx` — renders per-issue `profile_repair_audit` executions (scope, impact, pitch, risks) + "Create Opener from Hook" button
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx` — fetches executions via `listExecutions`, filters by `output_schema.name === 'profile_repair_audit'`, renders `RepairBriefingCard`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/openers/OpenerWorkspaceClient.tsx` — source badge shows "AI Briefing" for `ai_briefing` source
+
+### Tests
+- `apps/api/src/services/__tests__/OutreachOpenerService.test.ts` (4 tests) — create with `source='ai_briefing'`, upsert in place, quality-gate failure doesn't block, provenance fields
+- `apps/api/src/services/__tests__/ProfileRepairPromptService.persistence.test.ts` (4 tests) — strict validation pass (`_validated=true`), best-effort (`_validated=false`), unparseable output (no write), per-issue template (no write)
+
 
 

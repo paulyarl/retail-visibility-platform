@@ -86,6 +86,7 @@ transition) because it crosses stage machines. It:
 | 154 | `154_profile_repair_track_discriminator.sql` | Campaign track columns + intake generalization + triage prompt seed |
 | 155 | `155_profile_repair_resolution_template.sql` | Profile repair resolution prompt template (Track B AI agent) |
 | 156 | `156_profile_repair_track_a_templates.sql` | Track A seek prompts (nap_drift, unclaimed, platform_gap) + fulfill prompt (citation package) + service categories |
+| 232 | `232_repair_triage_briefing.sql` | `repair_triage_briefing` JSONB column on `mkt_campaigns_list` — persists the AI triage briefing as a campaign artifact |
 
 ### Apply order
 
@@ -153,7 +154,8 @@ DELETE FROM mkt_prompt_templates_list WHERE id = 'mpt-profile-repair-triage-defa
 |------|------|
 | `apps/web/src/services/MarketingOpsService.ts` | `CampaignCategory` + `RepairTrack` types, `switchRepairTrack()`, `runRepairTriage()`, `renderRepairTriage()`, `importRepairTriage()`, `runRepairResolution()`, `renderRepairResolution()` |
 | `apps/web/src/services/RecoveryIntakePublicService.ts` | `IntakeContext` includes intakeKind + issueType, `submitProfileRepairIntake()` method |
-| `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx` | Interactive triage workflow (Run Analysis, recommendation card, Confirm / Override) + Switch Track dialog |
+| `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx` | Interactive triage workflow (Run Analysis, recommendation card, Confirm / Override) + Switch Track dialog. Reads persisted `repair_triage_briefing` on refresh; "Create Opener from Hook" button |
+| `apps/web/src/components/marketing-ops/RepairBriefingCard.tsx` | Per-issue briefing card (NAP Drift / Unclaimed / Platform Gap) — renders structured scope/impact/pitch/risks from `profile_repair_audit` executions; "Create Opener from Hook" button |
 | `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/CampaignFormClient.tsx` | Profile Repair category + issue-type selector |
 | `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx` | RepairTrackPanel integration, Cascade tab gated to review pipeline |
 | `apps/web/src/app/(platform)/settings/admin/marketing-ops/openers/OpenerWorkspaceClient.tsx` | Filters by `pipeline === 'review'` (includes Track A) |
@@ -190,6 +192,17 @@ DELETE FROM mkt_prompt_templates_list WHERE id = 'mpt-profile-repair-triage-defa
    - **Recommended Track** (`Standard (Review)` vs `Escalated (Recovery)`)
    - **One-Click Confirm:** Click **"Confirm [Standard/Escalated] Track"** to confirm the recommendation. The system sets the track, revises the confirmed issue type, and stores the rationale in stage history.
    - **Override:** Click **"Override / Custom..."** to select a different track or manually edit the rationale before saving.
+5. **Briefing persistence:** The briefing is persisted to `mkt_campaigns_list.repair_triage_briefing` (migration 232) and survives page refresh and track confirmation. After confirmation, the briefing card remains visible with a **"Re-run Triage"** button (re-runs with the explicit triage template ID so it doesn't accidentally run a per-issue seek).
+6. **Unverified badge:** If the AI output did not pass strict Zod schema validation (best-effort extraction was used), an amber **"Unverified"** badge appears next to the severity score.
+7. **Create Opener from Hook:** Click **"Create Opener from Hook"** below the opener hook quote to wire the AI-generated `pitch.opener_hook` into the Openers workspace. This calls `POST /api/admin/marketing-ops/openers/from-briefing`, which upserts an opener with `source = 'ai_briefing'` (distinct from `ai` and `external`), runs the quality gate, and stores provenance (`sourceBriefing`, `executionId`, `primaryAngle`) in `extracted_fields`. Quality-gate warnings are surfaced inline.
+
+### 5.3 Per-Issue Briefing Card (NAP Drift / Unclaimed / Platform Gap)
+
+When a per-issue seek template (`mpt-profile-repair-nap-drift-seek`, `mpt-profile-repair-unclaimed-seek`, `mpt-profile-repair-platform-gap-seek`) is executed, the campaign detail page renders a **Repair Briefing Card** from the latest `profile_repair_audit` execution:
+
+1. The card is rendered by `RepairBriefingCard.tsx`, which fetches executions via `marketingOpsService.listExecutions(campaignId)` and filters by `output_schema.name === 'profile_repair_audit'`.
+2. The card shows structured **Scope** (summary, affected platforms, specifics), **Impact** (primary consequence, estimated reach loss, competitive gap), **Pitch** (opener hook + pain points + value preview), and **Risks**.
+3. A **"Create Opener from Hook"** button wires the per-issue `pitch.opener_hook` into the Openers workspace via the same `from-briefing` endpoint (with `source_briefing: 'issue_audit'`).
 
 ### 5.3 Switching Tracks Mid-Flight
 

@@ -1138,8 +1138,19 @@ For profile repair campaigns, the detail page features an interactive **Repair T
     - **Detected Signal Chips** (escalation and standard signals).
   - **Confirm [Standard/Escalated] Track:** One-click confirmation button that pre-fills the track, confirmed issue type, and rationale into `switchRepairTrack()`.
   - **Override / Custom...:** Opens the track dialog with the AI rationale pre-filled in the reason field, allowing the operator to adjust the target track or issue type before confirming.
-- **Track confirmed:** Color-coded status card (green for standard / red for escalated) showing current track, issue type, decision timestamp, and decision reason.
+- **Track confirmed:** Color-coded status card (green for standard / red for escalated) showing current track, issue type, decision timestamp, and decision reason. The AI Triage Briefing Card remains visible after confirmation (persisted to `repair_triage_briefing` on the campaign row, migration 232) with a **"Re-run Triage"** button.
 - **Switch Track button:** Re-evaluates or shifts tracks mid-flight with mandatory reason logging and stage machine remap guardrails.
+- **Create Opener from Hook:** Both the triage briefing card and the per-issue briefing card (below) have a **"Create Opener from Hook"** button that wires the AI-generated `pitch.opener_hook` into the Openers workspace. This calls `POST /api/admin/marketing-ops/openers/from-briefing`, which upserts an opener with `source = 'ai_briefing'` (distinct from `ai` and `external`), runs the quality gate, and stores provenance in `extracted_fields`. Quality-gate warnings are surfaced inline. The opener appears in the Openers workspace with an **"AI Briefing"** source badge.
+
+### Per-Issue Briefing Card (NAP Drift / Unclaimed / Platform Gap)
+
+When a per-issue seek template is executed (via Prompt Workspace or the repair-triage endpoint with a per-issue template ID), the campaign detail page renders a **Repair Briefing Card** from the latest `profile_repair_audit` execution:
+
+- **Scope** — summary, affected platforms, specifics (e.g. which fields drift by platform, which profiles are unclaimed, which platforms are absent).
+- **Impact** — primary consequence, estimated reach loss, competitive gap.
+- **Pitch** — opener hook (verbatim, copy/paste-friendly), pain points, value preview.
+- **Risks** — anything that makes this campaign harder than it looks.
+- **Create Opener from Hook** — same bridge as the triage card, with `source_briefing: 'issue_audit'`.
 
 ### Automatic Variable Injection & Amplification Gating
 
