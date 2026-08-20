@@ -345,6 +345,7 @@ export class ProfileRepairPromptService extends BaseService {
             await this.prisma.mkt_campaigns_list.update({
               where: { id: campaignId },
               data: {
+                campaign_category: 'profile_repair',
                 repair_triage_briefing: {
                   ...recommendation,
                   _execution_id: execution.id,
@@ -782,6 +783,7 @@ export class ProfileRepairPromptService extends BaseService {
             await this.prisma.mkt_campaigns_list.update({
               where: { id: campaignId },
               data: {
+                campaign_category: 'profile_repair',
                 repair_triage_briefing: {
                   ...recommendation,
                   _execution_id: execution.id,
