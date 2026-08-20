@@ -82,6 +82,35 @@ export interface DirectoryProfileEntry {
   category?: string;
 }
 
+export interface TriageRecommendation {
+  severity_score: number;
+  recommended_track: 'standard' | 'escalated';
+  issue_type_confirmed: string;
+  rationale: string;
+  escalation_signals?: string[];
+  standard_signals?: string[];
+  scope?: {
+    summary: string;
+    broken_platforms: string[];
+    drift_details: string;
+    missing_assets: string[];
+  };
+  viability?: {
+    pursuit_recommendation: 'pursue' | 'pursue_with_caveats' | 'low_probability';
+    rationale: string;
+  };
+  pitch?: {
+    primary_angle: string;
+    opener_hook: string;
+    pain_points: string[];
+    marketplace_positioning: string;
+  };
+  risks?: string[];
+  // Provenance metadata (persisted alongside the briefing)
+  _execution_id?: string;
+  _validated?: boolean;
+}
+
 export interface Campaign {
   id: string;
   display_id: string | null;
@@ -89,6 +118,7 @@ export interface Campaign {
   campaign_category?: CampaignCategory;
   repair_track?: RepairTrack | null;
   repair_issue_type?: string | null;
+  repair_triage_briefing?: TriageRecommendation | null;
   pipeline?: 'review' | 'recovery';
   title: string | null;
   business_name: string | null;
@@ -246,7 +276,7 @@ export type FollowUpOutcome = 'converted_paid' | 'customer_responded' | 'no_resp
 
 // ─── Outreach Opener Types ──────────────────────────────────────────────
 export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6';
-export type OpenerSource = 'ai' | 'external';
+export type OpenerSource = 'ai' | 'external' | 'ai_briefing';
 export type CloseVariant = 'soft' | 'direct_paid';
 
 export interface OpenerArchetypeSelection {
@@ -3114,6 +3144,38 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import opener');
     }
+    return result.data?.data ?? result.data;
+  }
+
+  // Path 3: Create opener from AI briefing hook (triage or per-issue seek).
+  // Upserts in place — one opener per campaign. Invalidates campaign + openers cache.
+  async createOpenerFromBriefing(input: {
+    campaign_id: string;
+    opener_text: string;
+    primary_angle?: string;
+    operator_name?: string;
+    source_briefing: 'triage' | 'issue_audit';
+    execution_id?: string;
+  }): Promise<OpenerResult> {
+    const body: Record<string, any> = {
+      campaign_id: input.campaign_id,
+      opener_text: input.opener_text,
+      source_briefing: input.source_briefing,
+    };
+    if (input.primary_angle) body.primary_angle = input.primary_angle;
+    if (input.operator_name && input.operator_name.trim()) body.operator_name = input.operator_name.trim();
+    if (input.execution_id) body.execution_id = input.execution_id;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/from-briefing`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-opener-from-briefing-${input.campaign_id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create opener from briefing');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    await this.invalidateCachePattern('mkt-ops-openers');
     return result.data?.data ?? result.data;
   }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
@@ -23,6 +23,7 @@ import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewRespons
 import CascadePanel from '@/components/marketing-ops/CascadePanel';
 import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
+import RepairBriefingCard from '@/components/marketing-ops/RepairBriefingCard';
 import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageCard';
 import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
@@ -221,6 +222,10 @@ export default function CampaignDetailClient({
   const [focusedStage, setFocusedStage] = useState<CampaignStage | null>(null);
   // Sprint 5: latest city_analysis execution for SyncReportCard
   const [cityScanExecutionId, setCityScanExecutionId] = useState<string | null>(null);
+  // Latest per-issue repair seek execution for RepairBriefingCard (§3).
+  // Filtered by output_schema.name === 'profile_repair_audit' so any present
+  // or future per-issue seek template is covered without hardcoding IDs.
+  const [repairExecution, setRepairExecution] = useState<PromptExecution | null>(null);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
     templateId: '',
     deliverableType: 'review_responses',
@@ -287,6 +292,26 @@ export default function CampaignDetailClient({
       })
       .catch(() => setCityScanExecutionId(null));
   }, [campaign?.scope, campaignId]);
+
+  // Fetch the latest per-issue repair seek execution for this campaign.
+  // Filtered by output_schema.name === 'profile_repair_audit' so any present
+  // or future per-issue seek template is covered without hardcoding IDs.
+  // Uses ttl: 0 via listExecutions to avoid stale cache after a new seek run.
+  useEffect(() => {
+    if (campaign?.campaign_category !== 'profile_repair') {
+      setRepairExecution(null);
+      return;
+    }
+    marketingOpsService
+      .listExecutions(campaignId)
+      .then((execs) => {
+        const latest = execs
+          .filter((e) => e.output_schema?.name === 'profile_repair_audit')
+          .sort((a, b) => (b.executed_at || '').localeCompare(a.executed_at || ''))[0];
+        setRepairExecution(latest ?? null);
+      })
+      .catch(() => setRepairExecution(null));
+  }, [campaign?.campaign_category, campaignId, campaign?.stage]);
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -883,6 +908,12 @@ export default function CampaignDetailClient({
                 {/* Repair Track Panel — only for profile_repair campaigns.
                     Shows triage status + Switch Track action. */}
                 <RepairTrackPanel campaign={campaign} onRefresh={fetchCampaign} />
+                {/* Repair Briefing Card — per-issue seek execution rendered as
+                    a structured briefing (scope, impact, pitch, risks). Only
+                    renders when a profile_repair_audit execution exists. */}
+                {repairExecution && (
+                  <RepairBriefingCard execution={repairExecution} campaignId={campaignId} />
+                )}
                 {/* Outreach & Follow-Up card — only for business-scope campaigns
                     in outreach stages (preview_built/shown/paid). */}
                 {campaign.scope === 'business'

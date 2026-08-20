@@ -2721,6 +2721,39 @@ router.post('/openers/import', async (req: any, res: Response) => {
   }
 });
 
+// Path 3: Create opener from AI briefing hook (triage or per-issue seek)
+// Thin variant of import — source='ai_briefing', hook_angle=null, provenance
+// in extracted_fields. Placed before the catch-all GET /:id route.
+const openerFromBriefingSchema = z.object({
+  campaign_id: z.string().min(1),
+  opener_text: z.string().min(10, 'opener_text must be at least 10 characters'),
+  primary_angle: z.string().max(500).optional(),
+  operator_name: z.string().max(120).optional(),
+  source_briefing: z.enum(['triage', 'issue_audit']),
+  execution_id: z.string().optional(),
+});
+
+router.post('/openers/from-briefing', async (req: any, res: Response) => {
+  try {
+    const parsed = openerFromBriefingSchema.parse(req.body);
+    const result = await outreachOpenerService.createFromBriefing({
+      campaignId: parsed.campaign_id,
+      openerText: parsed.opener_text,
+      primaryAngle: parsed.primary_angle ?? null,
+      executedBy: req.user?.id,
+      operatorName: parsed.operator_name,
+      sourceBriefing: parsed.source_briefing,
+      executionId: parsed.execution_id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Split-test analytics — cohort comparison by close_variant
 router.get('/openers/split-tests', async (req: any, res: Response) => {
   try {

@@ -1,40 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb } from 'lucide-react';
-import marketingOpsService, { Campaign, RepairTrack } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, RepairTrack, TriageRecommendation } from '@/services/MarketingOpsService';
 
 interface RepairTrackPanelProps {
   campaign: Campaign;
   onRefresh: () => void;
 }
 
-interface TriageRecommendation {
-  severity_score: number;
-  recommended_track: 'standard' | 'escalated';
-  issue_type_confirmed: string;
-  rationale: string;
-  escalation_signals?: string[];
-  standard_signals?: string[];
-  // Operator briefing fields (new)
-  scope?: {
-    summary: string;
-    broken_platforms: string[];
-    drift_details: string;
-    missing_assets: string[];
-  };
-  viability?: {
-    pursuit_recommendation: 'pursue' | 'pursue_with_caveats' | 'low_probability';
-    rationale: string;
-  };
-  pitch?: {
-    primary_angle: string;
-    opener_hook: string;
-    pain_points: string[];
-    marketplace_positioning: string;
-  };
-  risks?: string[];
-}
+const TRIAGE_TEMPLATE_ID = 'mpt-profile-repair-triage-default';
 
 export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPanelProps) {
   const [showSwitchDialog, setShowSwitchDialog] = useState(false);
@@ -48,6 +23,19 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
   const [triaging, setTriaging] = useState(false);
   const [recommendation, setRecommendation] = useState<TriageRecommendation | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Opener-from-briefing state
+  const [creatingOpener, setCreatingOpener] = useState(false);
+  const [openerResult, setOpenerResult] = useState<{ created: boolean; warnings?: string[]; error?: string } | null>(null);
+
+  // Rehydrate the briefing from the campaign row on mount/refresh. The backend
+  // persists it at triage execution time (§2), so it survives page refresh and
+  // track confirmation. Falls back to null when no triage has run yet.
+  useEffect(() => {
+    const persisted = campaign.repair_triage_briefing;
+    if (persisted) {
+      setRecommendation(persisted as TriageRecommendation);
+    }
+  }, [campaign.repair_triage_briefing]);
 
   if (campaign.campaign_category !== 'profile_repair') return null;
 
@@ -60,12 +48,18 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
     setTriaging(true);
     setError(null);
     try {
-      const result = await marketingOpsService.runRepairTriage(campaign.id);
+      // Always pass the triage template ID explicitly. executeSeekSync resolves
+      // the template from campaign.repair_issue_type when no templateId is
+      // given — after track confirmation that field is set (e.g. nap_drift),
+      // so a bare call would silently run the per-issue seek instead and
+      // return recommendation: null.
+      const result = await marketingOpsService.runRepairTriage(campaign.id, TRIAGE_TEMPLATE_ID);
       if (result.recommendation) {
         setRecommendation(result.recommendation);
       } else {
         setError('AI triage completed but did not return a structured recommendation. You can set the track manually.');
       }
+      onRefresh();
     } catch (err: any) {
       setError(err.message || 'Failed to run triage analysis');
     } finally {
@@ -83,7 +77,6 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
         reason: recommendation.rationale || `Confirmed AI triage recommendation (${recommendation.recommended_track})`,
         issue_type: recommendation.issue_type_confirmed || undefined,
       });
-      setRecommendation(null);
       onRefresh();
     } catch (err: any) {
       setError(err.message || 'Failed to confirm track recommendation');
@@ -121,12 +114,35 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
       setShowSwitchDialog(false);
       setSwitchReason('');
       setSwitchIssueType('');
-      setRecommendation(null);
       onRefresh();
     } catch (err: any) {
       setError(err.message || 'Failed to switch track');
     } finally {
       setSwitching(false);
+    }
+  };
+
+  const handleCreateOpener = async () => {
+    if (!recommendation?.pitch?.opener_hook) return;
+    setCreatingOpener(true);
+    setOpenerResult(null);
+    try {
+      const result = await marketingOpsService.createOpenerFromBriefing({
+        campaign_id: campaign.id,
+        opener_text: recommendation.pitch.opener_hook,
+        primary_angle: recommendation.pitch.primary_angle,
+        source_briefing: 'triage',
+        execution_id: recommendation._execution_id,
+      });
+      const issues = (result as any)?.qualityGate?.issues;
+      setOpenerResult({
+        created: true,
+        warnings: Array.isArray(issues) && issues.length > 0 ? issues : undefined,
+      });
+    } catch (err: any) {
+      setOpenerResult({ created: false, error: err.message || 'Failed to create opener' });
+    } finally {
+      setCreatingOpener(false);
     }
   };
 
@@ -194,9 +210,53 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                 )}
               </button>
             </div>
+          </div>
+        ) : (
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+            currentTrack === 'escalated'
+              ? 'bg-red-50 dark:bg-red-900/20'
+              : 'bg-green-50 dark:bg-green-900/20'
+          }`}>
+            <CheckCircle className={`w-4 h-4 ${
+              currentTrack === 'escalated' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+            }`} />
+            <div className="flex-1">
+              <p className={`text-xs font-medium ${
+                currentTrack === 'escalated' ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'
+              }`}>
+                {currentTrack === 'escalated' ? 'Escalated (Recovery Pipeline)' : 'Standard (Review Pipeline)'}
+              </p>
+              {issueType && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Issue: {issueType.replace(/_/g, ' ')}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleRunTriage}
+              disabled={triaging}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 disabled:opacity-50 rounded-lg transition-colors shrink-0"
+            >
+              {triaging ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Re-running...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Re-run Triage
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
-            {/* Recommendation Card */}
-            {recommendation && (
+        {/* Recommendation Card — rendered in both pre-confirm and post-confirm
+            states. Rehydrated from campaign.repair_triage_briefing (§2) so it
+            survives page refresh. Confirm/override buttons only show before
+            track confirmation; after confirmation only re-run is available. */}
+        {recommendation && (
               <div className="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/60 dark:bg-purple-950/20 p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 border-b border-purple-200/60 dark:border-purple-800/40 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -206,6 +266,12 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getSeverityBadgeColor(recommendation.severity_score)}`}>
                       Severity {recommendation.severity_score}/10
                     </span>
+                    {recommendation._validated === false && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-300 dark:border-amber-800" title="AI output did not pass strict schema validation — best-effort extraction was used">
+                        <AlertTriangle className="w-3 h-3" />
+                        Unverified
+                      </span>
+                    )}
                   </div>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold ${
                     recommendation.recommended_track === 'escalated'
@@ -297,6 +363,33 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                         "{recommendation.pitch.opener_hook}"
                       </p>
                     </div>
+                    {/* Create Opener from Hook — wires the AI briefing's opener
+                        hook into the Openers workspace as a real opener variant.
+                        Upserts in place (one opener per campaign). */}
+                    <div className="pl-5 mt-1.5 flex items-center gap-2">
+                      <button
+                        onClick={handleCreateOpener}
+                        disabled={creatingOpener}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg transition-colors"
+                      >
+                        {creatingOpener ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        Create Opener from Hook
+                      </button>
+                      {openerResult?.created && (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Opener created</span>
+                          {openerResult.warnings && openerResult.warnings.length > 0 && (
+                            <span className="text-amber-600 dark:text-amber-400" title={openerResult.warnings.join('\n')}>
+                              ({openerResult.warnings.length} warning{openerResult.warnings.length === 1 ? '' : 's'})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {openerResult && !openerResult.created && openerResult.error && (
+                        <span className="text-xs text-red-600 dark:text-red-400">{openerResult.error}</span>
+                      )}
+                    </div>
                     {recommendation.pitch.pain_points.length > 0 && (
                       <div className="pl-5 mt-1">
                         <span className="font-medium text-gray-900 dark:text-gray-100">Pain points: </span>
@@ -356,47 +449,27 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                 )}
 
                 <div className="flex items-center gap-2 pt-2 border-t border-purple-200/60 dark:border-purple-800/40">
-                  <button
-                    onClick={handleConfirmRecommendation}
-                    disabled={confirming}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
-                  >
-                    {confirming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                    Confirm {recommendation.recommended_track === 'escalated' ? 'Escalated' : 'Standard'} Track
-                  </button>
-                  <button
-                    onClick={handleOpenOverride}
-                    className="px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-200/70 dark:hover:bg-purple-900/50 rounded-lg transition-colors"
-                  >
-                    Override / Custom...
-                  </button>
+                  {!currentTrack && (
+                    <>
+                      <button
+                        onClick={handleConfirmRecommendation}
+                        disabled={confirming}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
+                      >
+                        {confirming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                        Confirm {recommendation.recommended_track === 'escalated' ? 'Escalated' : 'Standard'} Track
+                      </button>
+                      <button
+                        onClick={handleOpenOverride}
+                        className="px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-200/70 dark:hover:bg-purple-900/50 rounded-lg transition-colors"
+                      >
+                        Override / Custom...
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
-          </div>
-        ) : (
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-            currentTrack === 'escalated'
-              ? 'bg-red-50 dark:bg-red-900/20'
-              : 'bg-green-50 dark:bg-green-900/20'
-          }`}>
-            <CheckCircle className={`w-4 h-4 ${
-              currentTrack === 'escalated' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-            }`} />
-            <div>
-              <p className={`text-xs font-medium ${
-                currentTrack === 'escalated' ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'
-              }`}>
-                {currentTrack === 'escalated' ? 'Escalated (Recovery Pipeline)' : 'Standard (Review Pipeline)'}
-              </p>
-              {issueType && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Issue: {issueType.replace(/_/g, ' ')}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
 
         {error && (
           <div className="flex items-center justify-between p-2.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs rounded-lg border border-red-200 dark:border-red-800">

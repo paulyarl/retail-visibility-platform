@@ -300,12 +300,14 @@ export class ProfileRepairPromptService extends BaseService {
       );
 
       let recommendation: ProfileRepairTriageOutput['profile_repair_triage'] | null = null;
+      let validatedSuccess = false;
 
       if (targetTemplateId === PROFILE_REPAIR_TRIAGE_TEMPLATE_ID && execution.raw_output) {
         try {
           const cleaned = this.stripJsonArtifacts(execution.raw_output);
           const parsed = JSON.parse(cleaned);
           const validated = profileRepairTriageSchema.safeParse(parsed);
+          validatedSuccess = validated.success;
           if (validated.success) {
             recommendation = validated.data.profile_repair_triage;
           } else {
@@ -336,6 +338,20 @@ export class ProfileRepairPromptService extends BaseService {
               });
               recommendation.recommended_track = 'escalated';
             }
+
+            // Persist the briefing on the campaign row with provenance metadata.
+            // No write on AI failure (recommendation is null → skip). Flag
+            // best-effort output with _validated: false so the UI can badge it.
+            await this.prisma.mkt_campaigns_list.update({
+              where: { id: campaignId },
+              data: {
+                repair_triage_briefing: {
+                  ...recommendation,
+                  _execution_id: execution.id,
+                  _validated: validatedSuccess,
+                } as any,
+              },
+            });
           }
         } catch (parseErr) {
           logger.error('Failed to parse triage JSON output', ctx, {
@@ -736,6 +752,52 @@ export class ProfileRepairPromptService extends BaseService {
       }
 
       let deliverableId: string | undefined;
+
+      // Persist triage briefing on the campaign row when the import targets the
+      // triage template. Per-issue imports stay execution-row-only (Non-Goals).
+      // Mirrors executeSeekSync: provenance metadata + _validated flag.
+      if (templateId === PROFILE_REPAIR_TRIAGE_TEMPLATE_ID && parsedJson?.profile_repair_triage) {
+        try {
+          const triageValidated = profileRepairTriageSchema.safeParse(parsedJson);
+          const recommendation = triageValidated.success
+            ? triageValidated.data.profile_repair_triage
+            : parsedJson.profile_repair_triage;
+
+          // Apply the same code-side track floor as executeSeekSync.
+          const signalCodes = extractSignals({
+            campaign,
+            auditData: latestAudit?.audit_data as any,
+          });
+          const floorTrack = this.resolveTrackFromSignals(signalCodes);
+          if (floorTrack === 'escalated' && recommendation?.recommended_track === 'standard') {
+            logger.warn('Imported triage de-escalated below signal floor; forcing escalated', ctx, {
+              campaignId,
+              aiTrack: recommendation.recommended_track,
+              floorTrack,
+            });
+            recommendation.recommended_track = 'escalated';
+          }
+
+          if (recommendation) {
+            await this.prisma.mkt_campaigns_list.update({
+              where: { id: campaignId },
+              data: {
+                repair_triage_briefing: {
+                  ...recommendation,
+                  _execution_id: execution.id,
+                  _validated: triageValidated.success,
+                } as any,
+              },
+            });
+          }
+        } catch (persistErr) {
+          logger.warn('Failed to persist triage briefing from import', ctx, {
+            error: (persistErr as Error).message,
+            campaignId,
+            executionId: execution.id,
+          });
+        }
+      }
 
       // Handle resolution import -> deliverable + stage transition
       if (templateId === PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID || template.prompt_type === 'recovery_resolution') {

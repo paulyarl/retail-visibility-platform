@@ -566,6 +566,119 @@ export class OutreachOpenerService extends BaseService {
   }
 
   // ====================
+  // PATH 3: createFromBriefing (AI briefing → opener)
+  // ====================
+
+  /**
+   * Create or update an opener from an AI briefing's opener_hook field.
+   *
+   * Thin variant of importOpener — same upsert + quality gate + bridge
+   * autocomplete logic, but:
+   *   - source = 'ai_briefing' (distinguishes from 'ai' and 'external')
+   *   - hook_angle = null (the briefing's primary_angle is free-text and
+   *     doesn't fit the VarChar(40) HOOK_ANGLE_KEYS-validated column)
+   *   - extracted_fields includes { sourceBriefing, executionId, primaryAngle }
+   *     for provenance
+   *
+   * Quality-gate failure does not block creation (mirrors importOpener): the
+   * opener is stored with quality_gate_passed: false and the issues are
+   * returned so the frontend can surface them.
+   */
+  async createFromBriefing(input: {
+    campaignId: string;
+    openerText: string;
+    primaryAngle?: string | null;
+    executedBy?: string;
+    operatorName?: string;
+    sourceBriefing: 'triage' | 'issue_audit';
+    executionId?: string;
+  }, ctx?: RequestCtx): Promise<OpenerResult> {
+    const closeVariant = DEFAULT_CLOSE_VARIANT;
+    const { selection, extractedFields, resolvedPrompt } = await this.resolveOpener(
+      input.campaignId,
+      closeVariant,
+      ctx,
+      input.operatorName,
+    );
+
+    let openerText = input.openerText.trim();
+    if (!openerText) {
+      throw new Error('Opener text cannot be empty');
+    }
+    if (input.operatorName && input.operatorName.trim()) {
+      openerText = this.substituteSignoff(openerText, input.operatorName);
+    }
+
+    const qualityGate = runQualityGate(openerText);
+
+    // Upsert — one opener per campaign (partial unique index).
+    const existing = await this.prisma.mkt_outreach_openers_list.findFirst({
+      where: {
+        campaign_id: input.campaignId,
+        OR: [{ message_type: null }, { message_type: { not: 'follow_up' } }],
+      },
+      orderBy: { executed_at: 'desc' },
+    });
+
+    const provenanceFields = {
+      ...extractedFields,
+      sourceBriefing: input.sourceBriefing,
+      executionId: input.executionId ?? null,
+      primaryAngle: input.primaryAngle ?? null,
+    };
+
+    const opener = existing
+      ? await this.prisma.mkt_outreach_openers_list.update({
+          where: { id: existing.id },
+          data: {
+            archetype: selection.archetype,
+            close_variant: closeVariant,
+            opener_text: openerText,
+            quality_gate_passed: qualityGate.passed,
+            quality_gate_issues: qualityGate.issues,
+            source: 'ai_briefing',
+            extracted_fields: provenanceFields as any,
+            executed_by: input.executedBy || null,
+            operator_name: input.operatorName?.trim() || null,
+            hook_angle: null,
+          },
+        })
+      : await this.prisma.mkt_outreach_openers_list.create({
+          data: {
+            id: generateOutreachOpenerId(),
+            campaign_id: input.campaignId,
+            archetype: selection.archetype,
+            close_variant: closeVariant,
+            opener_text: openerText,
+            quality_gate_passed: qualityGate.passed,
+            quality_gate_issues: qualityGate.issues,
+            source: 'ai_briefing',
+            extracted_fields: provenanceFields as any,
+            executed_by: input.executedBy || null,
+            operator_name: input.operatorName?.trim() || null,
+            hook_angle: null,
+          },
+        });
+
+    logger.info('Outreach opener created from briefing', ctx, {
+      openerId: opener.id,
+      campaignId: input.campaignId,
+      archetype: selection.archetype,
+      closeVariant,
+      sourceBriefing: input.sourceBriefing,
+      executionId: input.executionId,
+      qualityGatePassed: qualityGate.passed,
+      issuesCount: qualityGate.issues.length,
+      replaced: !!existing,
+    });
+
+    // Fire-and-forget: auto-complete checklist outreach steps
+    this.fireBridgeAutoComplete(input.campaignId, 'opener', input.executedBy ?? 'system', ctx);
+
+    return { opener, selection, extractedFields, qualityGate, resolvedPrompt };
+  }
+
+  // ====================
   // BRIDGE (fire-and-forget checklist auto-complete)
   // ====================
 

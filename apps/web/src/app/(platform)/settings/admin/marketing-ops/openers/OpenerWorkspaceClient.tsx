@@ -641,7 +641,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                         {lastOpener.archetype}
                       </span>
                       <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300">
-                        {lastOpener.source}
+                        {lastOpener.source === 'ai_briefing' ? 'AI Briefing' : lastOpener.source}
                       </span>
                       {lastOpener.close_variant && (
                         <span className={`px-2 py-0.5 rounded ${
