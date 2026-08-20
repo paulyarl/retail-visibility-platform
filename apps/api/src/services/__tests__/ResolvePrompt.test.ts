@@ -18,7 +18,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
-    renderBusinessProfileBlock: vi.fn((profile: any) => `\nPROFILE_BLOCK:${profile.id}:v${profile.version}`),
+    renderBusinessProfileBlock: vi.fn(
+      (profile: any, _city?: string | null, headerTitle?: string) =>
+        `\n${headerTitle ? `=== ${headerTitle} ===\n` : ''}PROFILE_BLOCK:${profile.id}:v${profile.version}`,
+    ),
   };
   const mockPromptService = {
     getTemplate: vi.fn(),

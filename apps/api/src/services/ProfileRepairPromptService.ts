@@ -226,7 +226,7 @@ export class ProfileRepairPromptService extends BaseService {
 
     return {
       audit_signals: serialized,
-      issue_type: campaign?.repair_issue_type || '',
+      issue_type: campaign?.repair_issue_type || '(not yet diagnosed — infer from audit signals above)',
       audit_results: auditResults,
     };
   }

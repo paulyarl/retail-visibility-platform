@@ -876,14 +876,23 @@ export class IntelligenceProfileService extends BaseService {
    * category evidence rules, prohibited inferences, and category signals.
    * Excludes discovery patterns (not relevant for business audits).
    */
-  renderBusinessProfileBlock(profile: IntelligenceProfile, targetCity?: string | null): string {
+  renderBusinessProfileBlock(
+    profile: IntelligenceProfile,
+    targetCity?: string | null,
+    headerTitle?: string,
+    headerDirective?: string | null,
+  ): string {
     const config = profile.configuration_json as IntelligenceProfileConfiguration;
     const lines: string[] = [];
     const normalizedTarget = normalizeReferenceCity(targetCity);
     const profileCity = normalizeReferenceCity(profile.reference_city);
 
     lines.push('');
-    lines.push('=== CATEGORY INTELLIGENCE (BUSINESS AUDIT AMPLIFICATION) ===');
+    lines.push(`=== ${headerTitle ?? 'CATEGORY INTELLIGENCE (BUSINESS AUDIT AMPLIFICATION)'} ===`);
+    if (headerDirective) {
+      lines.push(headerDirective);
+      lines.push('');
+    }
     lines.push(`Category: ${profile.category_name}`);
     lines.push(`Profile: ${profile.id} v${profile.version}`);
     if (profileCity) {

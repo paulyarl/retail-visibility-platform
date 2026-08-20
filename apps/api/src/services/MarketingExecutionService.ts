@@ -379,17 +379,28 @@ export class MarketingExecutionService extends BaseService {
     const hasCategory = category.length > 0;
 
     // Resolve the output schema's prompt suffix (e.g. JSON format instructions
-    // for intelligence_profile / intelligence_discovery). This is appended to
-    // the final rendered prompt so the external AI knows the expected output
-    // format.
+    // for intelligence_profile / intelligence_discovery / profile_repair_*).
+    // This is appended to the final rendered prompt so the external AI knows
+    // the expected output format.
     //
-    // IMPORTANT: The suffix is only appended for intelligence-scope templates
-    // to preserve byte-identical business/category/city audit prompts (the
-    // business_analysis prompt suffix was never appended historically and
-    // enabling it now would break the no-profile regression).
+    // IMPORTANT: Legacy audit schemas (business_analysis, city_category_opportunity,
+    // regional_city_opportunity, market_analysis) never had their prompt suffix
+    // appended. Preserving this keeps their rendered prompts byte-identical to
+    // the pre-amplification baseline (no-profile regression guard). All other
+    // registered schemas — intelligence, profile_repair, recovery_resolution,
+    // citation_repair_package, raw_json — get their suffix appended as a safety
+    // net so the external AI always receives the expected output shape.
     const outputSchemaName = input.template.output_schema?.name || input.template.outputSchema?.name || '';
-    const isIntelligenceSchema = outputSchemaName === 'intelligence_profile' || outputSchemaName === 'intelligence_discovery';
-    const schemaEntry = isIntelligenceSchema ? resolveOutputSchema(outputSchemaName) : null;
+    const LEGACY_NO_SUFFIX_SCHEMAS = new Set([
+      'business_analysis',
+      'city_category_opportunity',
+      'regional_city_opportunity',
+      'market_analysis',
+    ]);
+    const schemaEntry =
+      outputSchemaName && !LEGACY_NO_SUFFIX_SCHEMAS.has(outputSchemaName)
+        ? resolveOutputSchema(outputSchemaName)
+        : null;
     const promptSuffix = schemaEntry?.promptSuffix ?? '';
 
     // ─── Intelligence-scope composition path (Sprint 3) ───────────────────
@@ -502,12 +513,14 @@ export class MarketingExecutionService extends BaseService {
         };
       }
 
-      const profileBlock = profileService.renderBusinessProfileBlock(profile, businessCity);
-      const directive =
-        '\n=== CATEGORY INTELLIGENCE (SUPPLEMENTARY — REPAIR SIGNALS ARE PRIMARY) ===\n' +
+      const profileBlock = profileService.renderBusinessProfileBlock(
+        profile,
+        businessCity,
+        'CATEGORY INTELLIGENCE (SUPPLEMENTARY — REPAIR SIGNALS ARE PRIMARY)',
         'Use the category intelligence below for category-fit signals and prohibited inferences only. ' +
-        'The repair signals in the Audit Signals section above are the primary input for this triage.\n';
-      const amplified = baseRendered + '\n' + directive + '\n' + profileBlock;
+          'The repair signals in the Audit Signals section above are the primary input for this triage.',
+      );
+      const amplified = baseRendered + '\n' + profileBlock;
 
       logger.info('Profile-aware signal triage prompt resolved', ctx, {
         campaignId: input.campaign.id,
