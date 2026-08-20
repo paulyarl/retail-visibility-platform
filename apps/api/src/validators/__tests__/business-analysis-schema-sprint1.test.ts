@@ -210,6 +210,36 @@ describe('website.status vocabulary drift — "working"/"broken" synonyms', () =
     const result = businessAnalysisSchema.safeParse(audit);
     expect(result.success).toBe(true);
   });
+
+  it('coerces "partial" -> true for boolean website fields (SWE-1.7 field report)', () => {
+    // Reproduces the 400 validation_error from POST
+    // /api/admin/marketing-ops/prompts/executions/external where SWE-1.7 Medium
+    // emitted "partial" for call_to_action_present and
+    // service_information_present. "partial" means present-but-incomplete, so
+    // it maps to true (not false, not null).
+    const audit = baseAudit();
+    audit.website = {
+      url: 'https://afroethiopianmarket.com/',
+      status: 'working',
+      mobile_friendly: 'unable_to_verify',
+      https: 'yes',
+      contact_information_visible: 'yes',
+      click_to_call_available: 'yes',
+      call_to_action_present: 'partial',
+      service_information_present: 'partial',
+      location_information_present: 'yes',
+      category_specific_content_present: 'yes',
+      ordering_or_pickup_info_present: 'no',
+      issues: [],
+      conversion_opportunities: [],
+    };
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.website?.call_to_action_present).toBe(true);
+      expect(result.data.website?.service_information_present).toBe(true);
+    }
+  });
 });
 
 describe('Sprint 1 — google platform product-visibility fields', () => {

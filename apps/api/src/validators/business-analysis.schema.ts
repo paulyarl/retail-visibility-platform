@@ -79,11 +79,19 @@ const coercedBooleanNullable = z.union([coercedBoolean, z.null()]);
  * sub-fields to "Evaluate" without restating their enum. We accept those as
  * synonyms ("working" -> true, "broken" -> false) so a structurally-correct
  * audit is not rejected solely for this vocabulary drift.
+ *
+ * Agents also emit "partial" for fields like call_to_action_present /
+ * service_information_present when something is present but incomplete (e.g.
+ * a CTA exists only on some pages). We treat "partial" as true — the thing IS
+ * present, at least partially — so a structurally-correct audit is not
+ * rejected solely because the agent qualified its yes. Downstream consumers
+ * (e.g. signal-extractor's WC_MISSING_CTA) treat true as "present", which is
+ * the correct semantic for a partial CTA.
  */
 const coercedBooleanNullableTolerant = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'verified' || s === 'present' || s === 'yes' || s === 'true' || s === '1' || s === 'working') return true;
+    if (s === 'verified' || s === 'present' || s === 'yes' || s === 'true' || s === '1' || s === 'working' || s === 'partial') return true;
     if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'no' || s === 'false' || s === '0' || s === 'broken') return false;
     if (s === 'unable_to_verify' || s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') return null;
   }
