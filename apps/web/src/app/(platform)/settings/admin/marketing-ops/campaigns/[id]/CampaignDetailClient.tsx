@@ -297,6 +297,14 @@ export default function CampaignDetailClient({
   // Filtered by output_schema.name === 'profile_repair_audit' so any present
   // or future per-issue seek template is covered without hardcoding IDs.
   // Uses ttl: 0 via listExecutions to avoid stale cache after a new seek run.
+  //
+  // The list endpoint excludes raw_output (lightweight projection), but
+  // RepairBriefingCard parses execution.raw_output to render the briefing.
+  // Without the follow-up getExecution(:id) call, raw_output is undefined,
+  // parseBriefing returns null, and the card renders nothing for every
+  // campaign — even when a valid profile_repair_audit execution exists.
+  // The detail fetch is only fired for the single latest matching execution
+  // so we don't pull raw_output for every execution on the campaign.
   useEffect(() => {
     if (campaign?.campaign_category !== 'profile_repair') {
       setRepairExecution(null);
@@ -304,11 +312,22 @@ export default function CampaignDetailClient({
     }
     marketingOpsService
       .listExecutions({ campaignId })
-      .then((execs) => {
+      .then(async (execs) => {
         const latest = execs
           .filter((e) => e.output_schema?.name === 'profile_repair_audit')
           .sort((a, b) => (b.executed_at || '').localeCompare(a.executed_at || ''))[0];
-        setRepairExecution(latest ?? null);
+        if (!latest) {
+          setRepairExecution(null);
+          return;
+        }
+        // Fetch the full execution (includes raw_output) so
+        // RepairBriefingCard can parse the briefing payload.
+        try {
+          const full = await marketingOpsService.getExecution(latest.id);
+          setRepairExecution(full ?? latest);
+        } catch {
+          setRepairExecution(latest);
+        }
       })
       .catch(() => setRepairExecution(null));
   }, [campaign?.campaign_category, campaignId, campaign?.stage]);
