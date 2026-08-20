@@ -836,6 +836,72 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
+      // Post-import hook for profile_repair_triage schema: persist the
+      // validated briefing to repair_triage_briefing on the campaign row so
+      // RepairTrackPanel can render it. Without this, imports via the generic
+      // /prompts/executions/external endpoint (Prompt Workspace copy-paste
+      // bridge) create the execution row but never surface the briefing on
+      // the campaign detail page. Mirrors the profile-repair-specific import
+      // path (ProfileRepairPromptService.importExternalResult): track floor
+      // enforcement + provenance metadata. Best-effort — failure does not
+      // fail the import (the execution row is already persisted).
+      if (schemaName === 'profile_repair_triage' && parsedJson?.profile_repair_triage) {
+        try {
+          const { ProfileRepairPromptService, PROFILE_REPAIR_TRIAGE_TEMPLATE_ID } =
+            await import('./ProfileRepairPromptService.js');
+          const { extractSignals } = await import('./triage/signal-extractor.js');
+          const repairService = ProfileRepairPromptService.getInstance();
+
+          const recommendation = parsedJson.profile_repair_triage;
+
+          // Apply the code-side track floor (AI may escalate above, never below)
+          const campaignRow = await this.prisma.mkt_campaigns_list.findUnique({
+            where: { id: input.campaignId },
+            include: {
+              mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+            },
+          });
+          if (campaignRow) {
+            const latestAudit = campaignRow.mkt_audits_list?.[0] ?? null;
+            const signalCodes = extractSignals({
+              campaign: campaignRow,
+              auditData: latestAudit?.audit_data as any,
+            });
+            const floorTrack = repairService.resolveTrackFromSignals(signalCodes);
+            if (floorTrack === 'escalated' && recommendation.recommended_track === 'standard') {
+              logger.warn('Generic import de-escalated below signal floor; forcing escalated', ctx, {
+                campaignId: input.campaignId,
+                aiTrack: recommendation.recommended_track,
+                floorTrack,
+              });
+              recommendation.recommended_track = 'escalated';
+            }
+
+            await this.prisma.mkt_campaigns_list.update({
+              where: { id: input.campaignId },
+              data: {
+                repair_triage_briefing: {
+                  ...recommendation,
+                  _execution_id: executionId,
+                  _validated: true,
+                } as any,
+              },
+            });
+            logger.info('Profile repair triage briefing persisted from generic import', ctx, {
+              campaignId: input.campaignId,
+              executionId,
+              templateId: input.templateId,
+            });
+          }
+        } catch (briefingErr) {
+          logger.error('Failed to persist triage briefing from generic import (best-effort)', ctx, {
+            error: (briefingErr as Error).message,
+            campaignId: input.campaignId,
+            executionId,
+          });
+        }
+      }
+
       return result;
     } catch (error) {
       if (error instanceof ScopeMismatchError) {
