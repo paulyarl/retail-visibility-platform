@@ -37,7 +37,16 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
     }
   }, [campaign.repair_triage_briefing]);
 
-  if (campaign.campaign_category !== 'profile_repair') return null;
+  // Render for profile_repair campaigns, triage_management campaigns (PB-05
+  // sets triage_management — the repair triage briefing is the bridge from
+  // triage to the repair track), or any campaign with a persisted briefing.
+  if (
+    campaign.campaign_category !== 'profile_repair' &&
+    campaign.campaign_category !== 'triage_management' &&
+    !campaign.repair_triage_briefing
+  ) {
+    return null;
+  }
 
   const currentTrack = (campaign as any).repair_track as RepairTrack | null;
   const issueType = (campaign as any).repair_issue_type as string | null;

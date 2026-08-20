@@ -1211,8 +1211,16 @@ export class MarketingCampaignService extends BaseService {
       });
       if (!campaign) throw new Error(`Campaign ${input.campaignId} not found`);
 
-      if (campaign.campaign_category !== 'profile_repair') {
-        throw new Error('Track switching is only available for profile_repair campaigns');
+      // Allow track switching for profile_repair campaigns and triage_management
+      // campaigns (PB-05 sets triage_management — the repair triage briefing
+      // bridges from triage to the repair track). On confirm, re-categorize
+      // triage_management campaigns to profile_repair so the campaign enters
+      // the repair pipeline.
+      const isEligibleForRepairTrack =
+        campaign.campaign_category === 'profile_repair' ||
+        campaign.campaign_category === 'triage_management';
+      if (!isEligibleForRepairTrack) {
+        throw new Error('Track switching is only available for profile_repair or triage_management campaigns');
       }
 
       const fromTrack = (campaign.repair_track as RepairTrack | null) ?? null;
@@ -1263,6 +1271,13 @@ export class MarketingCampaignService extends BaseService {
         track_decided_at: new Date(),
         track_decision_reason: input.reason,
       };
+
+      // Re-categorize triage_management campaigns to profile_repair on track
+      // confirmation — the campaign transitions from triage mode to the
+      // repair pipeline. profile_repair campaigns are already categorized.
+      if (campaign.campaign_category === 'triage_management') {
+        updateData.campaign_category = 'profile_repair';
+      }
 
       if (input.issueType) {
         updateData.repair_issue_type = input.issueType;
