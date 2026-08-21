@@ -89,6 +89,8 @@ interface FormState {
   intelligence_search_radius_miles: number | '';
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligence_campaign_kind: 'discovery' | 'establishment' | '';
+  // Migration 234 — platform focus for gold-standard campaigns
+  intelligence_platform: string;
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country: string;
   business_origin_region: string;
@@ -148,6 +150,7 @@ const EMPTY_FORM: FormState = {
   intelligence_zip_codes: '',
   intelligence_search_radius_miles: '',
   intelligence_campaign_kind: 'discovery',
+  intelligence_platform: '',
   business_origin_country: '',
   business_origin_region: '',
 };
@@ -261,6 +264,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         intelligence_zip_codes: (c as any).intelligence_zip_codes ?? '',
         intelligence_search_radius_miles: (c as any).intelligence_search_radius_miles ?? '',
         intelligence_campaign_kind: ((c as any).intelligence_campaign_kind ?? 'discovery') as 'discovery' | 'establishment' | '',
+        intelligence_platform: (c as any).intelligence_platform ?? '',
         business_origin_country: (c as any).business_origin_country ?? '',
         business_origin_region: (c as any).business_origin_region ?? '',
       });
@@ -283,6 +287,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Competitive, Discovery Emerging, Discovery Competitive), so deriving the
   // title from Category + Kind + Focus + City + State removes repetitive
   // typing. Format: "African Grocery Store - Discovery - Emerging - Indianapolis, IN".
+  // Gold-standard campaigns add the platform to the title:
+  // "African Grocery Store - Establishment - Gold Standards - Google".
   // Stops auto-filling once the operator manually edits the Title field.
   useEffect(() => {
     if (form.scope !== 'intelligence') return;
@@ -291,12 +297,22 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     const kindLabel = cap(form.intelligence_campaign_kind);
     const focusLabel = cap(form.intelligence_focus);
     const headParts = [form.category, kindLabel, focusLabel].map((s) => (s ?? '').trim()).filter(Boolean);
-    const locParts = [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean);
+    // Gold-standard campaigns are city-agnostic — the platform replaces
+    // city as the focus dimension. Append the platform to the title.
+    if (form.intelligence_focus === 'gold_standards' && form.intelligence_platform) {
+      const platformLabel = form.intelligence_platform === 'all'
+        ? 'All Platforms'
+        : cap(form.intelligence_platform);
+      headParts.push(platformLabel);
+    }
+    const locParts = form.intelligence_focus === 'gold_standards'
+      ? []
+      : [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean);
     const parts = [...headParts];
     if (locParts.length > 0) parts.push(locParts.join(', '));
     const derived = parts.join(' - ');
     setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
-  }, [form.scope, form.category, form.intelligence_campaign_kind, form.intelligence_focus, form.city, form.state, titleManuallyEdited]);
+  }, [form.scope, form.category, form.intelligence_campaign_kind, form.intelligence_focus, form.intelligence_platform, form.city, form.state, titleManuallyEdited]);
 
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -440,6 +456,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_zip_codes: form.scope === 'intelligence' ? strOrUndef(form.intelligence_zip_codes) : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? numOrUndef(form.intelligence_search_radius_miles) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
+          intelligence_platform: form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' ? (form.intelligence_platform || null) : undefined,
           business_origin_country: strOrUndef(form.business_origin_country),
           business_origin_region: strOrUndef(form.business_origin_region),
         };
@@ -518,6 +535,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_zip_codes: form.scope === 'intelligence' ? form.intelligence_zip_codes : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? (form.intelligence_search_radius_miles === '' ? undefined : Number(form.intelligence_search_radius_miles)) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
+          intelligence_platform: form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' ? (form.intelligence_platform || null) : undefined,
           business_origin_country: form.business_origin_country,
           business_origin_region: form.business_origin_region,
         };
@@ -661,6 +679,26 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Establishment campaigns appear in the Profile Establishment prompt workspace; discovery campaigns appear in the Emerging/Competitive discovery workspaces.</p>
                 </FormField>
+                {form.intelligence_focus === 'gold_standards' && (
+                  <FormField label="Platform" required className="sm:col-span-2">
+                    <select value={form.intelligence_platform}
+                      onChange={(e) => handleChange('intelligence_platform', e.target.value)}
+                      className={inputClass}>
+                      <option value="">— Select Platform —</option>
+                      <option value="all">All Platforms</option>
+                      <option value="google">Google</option>
+                      <option value="yelp">Yelp</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="bbb">BBB</option>
+                      <option value="apple_maps">Apple Maps</option>
+                      <option value="bing">Bing</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      The platform this gold-standard scan focuses on. &quot;All Platforms&quot; evaluates candidates across every major platform.
+                      Gold-standard campaigns are city-agnostic — the platform replaces city as the focus dimension.
+                    </p>
+                  </FormField>
+                )}
                 <FormField label="ZIP Codes (optional)">
                   <input type="text" value={form.intelligence_zip_codes}
                     onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
@@ -713,16 +751,19 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 options={vocab.tones} emptyLabel="-- Select tone --" newLabel="+ New tone..."
                 newInputPlaceholder="Enter new tone" className={inputClass} />
             </FormField>
-            <FormField label="City" required>
-              <SuggestiveSelect required value={form.city} onChange={(v) => handleChange('city', v)}
+            <FormField label="City" required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'}>
+              <SuggestiveSelect required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'} value={form.city} onChange={(v) => handleChange('city', v)}
                 options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
                 newInputPlaceholder="Enter new city" className={inputClass} />
+              {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
+                <p className="text-xs text-gray-400 mt-1">Optional for gold-standard campaigns (city-agnostic). Leave empty for a nationwide scan.</p>
+              )}
             </FormField>
-            <FormField label="State" required={form.scope === 'intelligence'}>
-              <SuggestiveSelect required={form.scope === 'intelligence'} value={form.state} onChange={(v) => handleChange('state', v)}
+            <FormField label="State" required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'}>
+              <SuggestiveSelect required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'} value={form.state} onChange={(v) => handleChange('state', v)}
                 options={vocab.states} emptyLabel="-- Select state --" newLabel="+ New state..."
                 newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
-              <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for other scopes.</p>
+              <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
             </FormField>
             <FormField label="Neighborhood">
               <SuggestiveSelect value={form.neighborhood} onChange={(v) => handleChange('neighborhood', v)}

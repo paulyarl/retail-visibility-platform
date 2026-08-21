@@ -206,6 +206,8 @@ export interface CampaignInput {
   intelligenceSearchRadiusMiles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligenceCampaignKind?: 'discovery' | 'establishment';
+  // Migration 234 — platform focus for gold-standard campaigns
+  intelligencePlatform?: string | null;
   // Migration 204 — diaspora / heritage-origin categorization
   businessOriginCountry?: string;
   businessOriginRegion?: string;
@@ -265,6 +267,8 @@ export interface CampaignUpdateInput {
   intelligenceSearchRadiusMiles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligenceCampaignKind?: 'discovery' | 'establishment';
+  // Migration 234 — platform focus for gold-standard campaigns
+  intelligencePlatform?: string | null;
   // Migration 204 — diaspora / heritage-origin categorization
   businessOriginCountry?: string;
   businessOriginRegion?: string;
@@ -443,6 +447,7 @@ export class MarketingCampaignService extends BaseService {
           intelligence_zip_codes: input.intelligenceZipCodes || null,
           intelligence_search_radius_miles: (input.intelligenceSearchRadiusMiles ?? null) as any,
           intelligence_campaign_kind: input.intelligenceCampaignKind || 'discovery',
+          intelligence_platform: input.intelligencePlatform || null,
           business_origin_country: input.businessOriginCountry || null,
           business_origin_region: input.businessOriginRegion || null,
         },
@@ -987,6 +992,7 @@ export class MarketingCampaignService extends BaseService {
     if (input.intelligenceZipCodes !== undefined) data.intelligence_zip_codes = input.intelligenceZipCodes || null;
     if (input.intelligenceSearchRadiusMiles !== undefined) data.intelligence_search_radius_miles = (input.intelligenceSearchRadiusMiles ?? null) as any;
     if (input.intelligenceCampaignKind !== undefined) data.intelligence_campaign_kind = input.intelligenceCampaignKind || 'discovery';
+    if (input.intelligencePlatform !== undefined) data.intelligence_platform = input.intelligencePlatform || null;
     // Migration 204 — diaspora / heritage-origin categorization
     if (input.businessOriginCountry !== undefined) data.business_origin_country = input.businessOriginCountry || null;
     if (input.businessOriginRegion !== undefined) data.business_origin_region = input.businessOriginRegion || null;

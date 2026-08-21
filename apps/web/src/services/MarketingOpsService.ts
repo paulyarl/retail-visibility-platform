@@ -209,6 +209,8 @@ export interface Campaign {
   intelligence_search_radius_miles?: number | null;
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligence_campaign_kind?: 'discovery' | 'establishment' | null;
+  // Migration 234 — platform focus for gold-standard campaigns
+  intelligence_platform?: string | null;
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country?: string | null;
   business_origin_region?: string | null;
@@ -1318,6 +1320,8 @@ export interface CampaignCreateInput {
   intelligence_search_radius_miles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligence_campaign_kind?: 'discovery' | 'establishment';
+  // Migration 234 — platform focus for gold-standard campaigns
+  intelligence_platform?: string | null;
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country?: string;
   business_origin_region?: string;

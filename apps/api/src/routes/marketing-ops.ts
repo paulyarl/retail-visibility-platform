@@ -252,11 +252,13 @@ const campaignBaseSchema = z.object({
   assigned_to: z.string().optional(),
   notes: z.string().optional(),
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligence_focus: z.enum(['emerging', 'competitive']).optional(),
+  intelligence_focus: z.enum(['emerging', 'competitive', 'gold_standards']).optional(),
   intelligence_zip_codes: z.string().max(500).optional(),
   intelligence_search_radius_miles: z.number().min(0).max(500).optional(),
   // Migration 201 — discriminator for intelligence-scope campaigns
   intelligence_campaign_kind: z.enum(['discovery', 'establishment']).optional(),
+  // Migration 234 — platform focus for gold-standard campaigns
+  intelligence_platform: z.string().max(20).nullable().optional(),
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country: z.string().max(100).optional(),
   business_origin_region: z.string().max(100).optional(),
@@ -267,9 +269,13 @@ const campaignCreateSchema = campaignBaseSchema
     message: 'business_name is required for business-scoped campaigns',
     path: ['business_name'],
   })
-  .refine((data) => data.scope !== 'intelligence' || (data.state && data.state.trim().length > 0), {
-    message: 'state is required for intelligence-scoped campaigns',
+  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus === 'gold_standards' || (data.state && data.state.trim().length > 0), {
+    message: 'state is required for intelligence-scoped campaigns (except gold_standards)',
     path: ['state'],
+  })
+  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || (data.intelligence_platform && data.intelligence_platform.trim().length > 0), {
+    message: 'intelligence_platform is required for gold_standards campaigns',
+    path: ['intelligence_platform'],
   });
 
 const campaignUpdateSchema = campaignBaseSchema.partial().extend({
@@ -592,7 +598,7 @@ const promptTemplateCreateSchema = z.object({
   variables: z.any().optional(),
   output_schema: z.any().optional(),
   is_default: z.boolean().optional(),
-  intelligence_focus: z.enum(['emerging', 'competitive']).nullable().optional(),
+  intelligence_focus: z.enum(['emerging', 'competitive', 'gold_standards']).nullable().optional(),
   intelligence_campaign_kind: z.enum(['discovery', 'establishment']).nullable().optional(),
 });
 
@@ -1057,6 +1063,7 @@ router.post('/', async (req: any, res: Response) => {
       intelligenceZipCodes: parsed.intelligence_zip_codes,
       intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
       intelligenceCampaignKind: parsed.intelligence_campaign_kind,
+      intelligencePlatform: parsed.intelligence_platform,
       businessOriginCountry: parsed.business_origin_country,
       businessOriginRegion: parsed.business_origin_region,
     }, getCtx(req));
@@ -1119,6 +1126,7 @@ router.put('/:id', async (req: any, res: Response) => {
       intelligenceZipCodes: parsed.intelligence_zip_codes,
       intelligenceSearchRadiusMiles: parsed.intelligence_search_radius_miles,
       intelligenceCampaignKind: parsed.intelligence_campaign_kind,
+      intelligencePlatform: parsed.intelligence_platform,
       businessOriginCountry: parsed.business_origin_country,
       businessOriginRegion: parsed.business_origin_region,
     }, getCtx(req));
@@ -1929,7 +1937,7 @@ router.get('/prompts/templates', async (req: any, res: Response) => {
       scope: req.query.scope,
       category: req.query.category,
       isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
-      intelligenceFocus: (intelligenceFocus === 'emerging' || intelligenceFocus === 'competitive') ? intelligenceFocus : undefined,
+      intelligenceFocus: (intelligenceFocus === 'emerging' || intelligenceFocus === 'competitive' || intelligenceFocus === 'gold_standards') ? intelligenceFocus : undefined,
       intelligenceCampaignKind: (intelligenceCampaignKind === 'discovery' || intelligenceCampaignKind === 'establishment') ? intelligenceCampaignKind : undefined,
       includeNullFocusKind: req.query.include_null_focus_kind === 'true',
     }, getCtx(req));
