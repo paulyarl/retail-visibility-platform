@@ -154,7 +154,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
   // Template focus is now a stored column (Migration 203). Falls back to a
   // name-based heuristic for legacy templates that haven't been re-seeded,
   // then to 'emerging' (matches the backend default).
-  const templateFocus: 'emerging' | 'competitive' = useMemo(() => {
+  const templateFocus: IntelligenceFocus = useMemo(() => {
     if (!template) return 'emerging';
     if (template.intelligence_focus) return template.intelligence_focus;
     return /competitive/i.test(template.name) ? 'competitive' : 'emerging';

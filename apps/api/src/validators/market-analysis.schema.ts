@@ -61,6 +61,12 @@ import {
   CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
   type CitationRepairPackageOutput,
 } from './profile-repair-output.schema';
+import {
+  goldStandardScanSchema,
+  GOLD_STANDARD_SCAN_SCHEMA_NAME,
+  GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
+  type GoldStandardScanOutput,
+} from './gold-standard-scan.schema';
 
 export {
   profileRepairTriageSchema,
@@ -75,6 +81,10 @@ export {
   CITATION_REPAIR_PACKAGE_SCHEMA_NAME,
   CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
   type CitationRepairPackageOutput,
+  goldStandardScanSchema,
+  GOLD_STANDARD_SCAN_SCHEMA_NAME,
+  GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
+  type GoldStandardScanOutput,
 };
 
 // ============================================================================
@@ -250,6 +260,17 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: intelligenceProfileSchema,
     auditPlatform: null, // profile establishment creates draft profiles, not audits
     promptSuffix: INTELLIGENCE_PROFILE_PROMPT_SUFFIX,
+  },
+  [GOLD_STANDARD_SCAN_SCHEMA_NAME]: {
+    validator: goldStandardScanSchema,
+    // Gold standard scans create an audit so the campaign's Audits tab
+    // can render the discovered candidates and the operator can add them
+    // to per-platform gold-standard slots. The full validated scan payload
+    // is stored in audit_data. For establishment campaigns, the post-import
+    // hook in importExternalResult() also persists a DRAFT gold-standard
+    // profile via IntelligenceProfileService.importAsDraft().
+    auditPlatform: 'gold_standard_scan',
+    promptSuffix: GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
   },
   [PROFILE_REPAIR_TRIAGE_SCHEMA_NAME]: {
     validator: profileRepairTriageSchema,

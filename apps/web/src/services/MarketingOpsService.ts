@@ -204,7 +204,7 @@ export interface Campaign {
   archetype?: string | null;
   archetypeLabel?: string | null;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligence_focus?: 'emerging' | 'competitive' | null;
+  intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards' | null;
   intelligence_zip_codes?: string | null;
   intelligence_search_radius_miles?: number | null;
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -1313,7 +1313,7 @@ export interface CampaignCreateInput {
   notes?: string;
   service_category?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligence_focus?: 'emerging' | 'competitive';
+  intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards';
   intelligence_zip_codes?: string;
   intelligence_search_radius_miles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -4918,7 +4918,7 @@ export interface GalleryDashboard {
 // INTELLIGENCE PROFILE + RUN TYPES (Sprint 2 — Seek Intelligence Scope)
 // ====================
 
-export type IntelligenceFocus = 'emerging' | 'competitive';
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
 export type IntelligenceCampaignKind = 'discovery' | 'establishment';
 export type IntelligenceMode = 'profile' | 'none';
 export type ProfileStatus = 'draft' | 'active' | 'retired';

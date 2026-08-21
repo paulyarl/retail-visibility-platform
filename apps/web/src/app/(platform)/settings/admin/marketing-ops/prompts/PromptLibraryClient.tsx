@@ -588,6 +588,7 @@ Format the output as plain text, ready to paste into an email or DM.`
                     <option value="">— None —</option>
                     <option value="emerging">emerging</option>
                     <option value="competitive">competitive</option>
+                    <option value="gold_standards">gold_standards</option>
                   </select>
                 </div>
                 <div>

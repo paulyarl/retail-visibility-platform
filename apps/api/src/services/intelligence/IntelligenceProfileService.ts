@@ -44,8 +44,20 @@ export type IntelligenceProfileStatus = 'draft' | 'active' | 'retired';
  *
  * 'emerging' — discover low-visibility, hard-to-find businesses
  * 'competitive' — benchmark established, mainstream-visible market leaders
+ * 'gold_standards' — establish/discover category-platform benchmark profiles
+ *   (Gold Standard System — Sprint 0). Gold-standard profiles are
+ *   city-agnostic and platform-focused; they sit at the top of the flow
+ *   and are consumed by both intelligence establishment/discovery and the
+ *   business audit as a benchmark.
  */
-export type IntelligenceFocus = 'emerging' | 'competitive';
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
+
+/**
+ * Role for gold-standard injection into prompts.
+ *   - 'benchmark' → audit/seek prompt: compare the business against the gold standard
+ *   - 'target' → fulfill prompt: produce fixes that move toward the gold standard
+ */
+export type GoldStandardRole = 'benchmark' | 'target';
 
 export interface IntelligenceProfile {
   id: string;
@@ -953,6 +965,182 @@ export class IntelligenceProfileService extends BaseService {
     }
 
     lines.push('=== END CATEGORY INTELLIGENCE ===');
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  // ====================
+  // GOLD STANDARD SYSTEM (Sprint 0)
+  // ====================
+
+  /**
+   * Resolve the active gold-standard profile for a category.
+   *
+   * Gold-standard profiles are city-agnostic (reference_city = NULL) and
+   * focus = 'gold_standards'. They are resolved by category alone — no
+   * city, no focus parameter needed (the focus is always 'gold_standards').
+   *
+   * Returns null on miss → caller uses degraded fallback (no benchmark).
+   */
+  async resolveGoldStandard(category: string, ctx?: RequestCtx): Promise<IntelligenceProfile | null> {
+    return this.resolve(category, 'gold_standards', null, ctx);
+  }
+
+  /**
+   * Build the scan variables for a gold-standard scan prompt.
+   *
+   * The gold-standard scan template references {category} and {platform}.
+   * This method ensures the platform variable is populated from the
+   * campaign's intelligence_platform field, falling back to 'all'.
+   */
+  buildGoldStandardScanVariables(campaign: {
+    category?: string | null;
+    intelligence_platform?: string | null;
+  }): Record<string, string> {
+    return {
+      category: campaign.category || '',
+      platform: campaign.intelligence_platform || 'all',
+    };
+  }
+
+  /**
+   * Serialize a gold-standard profile into a prompt text block for
+   * injection into audit (benchmark) and fulfill (target) prompts.
+   *
+   * The block includes:
+   *   - A role-specific directive (benchmark vs target)
+   *   - Expected fields (universal + per-platform)
+   *   - Quality gates (non_negotiable + recommended)
+   *   - Pattern exemplars (business name, quality score, destination URL,
+   *     platform config)
+   *
+   * Returns an empty string if the profile has no gold-standard data
+   * (no expected_fields and no candidates) so the caller can skip
+   * injection without producing an empty section.
+   */
+  serializeGoldStandard(
+    profile: IntelligenceProfile,
+    role: GoldStandardRole,
+  ): string {
+    const config = profile.configuration_json as any;
+    if (!config) return '';
+
+    const expectedFields = config.expected_fields;
+    const candidates = config.candidates;
+    if (!expectedFields && !candidates) return '';
+
+    const lines: string[] = [];
+    const roleLabel = role === 'benchmark' ? 'BENCHMARK' : 'TARGET';
+    const roleAction = role === 'benchmark'
+      ? 'Compare the business\'s actual profile against these expected fields and quality gates. Flag any field where the business\'s actual value differs from the expected value as a gap.'
+      : 'Generate fix instructions that move the business\'s profile toward these expected field values. Use the pattern exemplar as the concrete adaptation source.';
+
+    lines.push('');
+    lines.push(`=== GOLD STANDARD ${roleLabel} ===`);
+    lines.push(`Category: ${profile.category_name}`);
+    lines.push(`Profile: ${profile.id} v${profile.version}`);
+    lines.push('');
+    lines.push(`DIRECTIVE: This is your ${roleLabel} for this category. ${roleAction}`);
+    lines.push('');
+
+    // Universal expected fields
+    if (expectedFields?.universal) {
+      const u = expectedFields.universal;
+      lines.push('--- Universal Expected Fields ---');
+      if (u.canonical_name) lines.push(`  Canonical name: ${u.canonical_name}`);
+      if (u.canonical_address) lines.push(`  Canonical address: ${u.canonical_address}`);
+      if (u.canonical_phone) lines.push(`  Canonical phone: ${u.canonical_phone}`);
+      if (u.hours_present !== undefined) lines.push(`  Hours present: ${u.hours_present}`);
+      if (u.website_present !== undefined) lines.push(`  Website present: ${u.website_present}`);
+      if (u.fields && Array.isArray(u.fields)) {
+        for (const f of u.fields) {
+          lines.push(`  ${f.field}: ${f.description}${f.severity ? ` (${f.severity})` : ''}`);
+        }
+      }
+      if (u.quality_gates && Array.isArray(u.quality_gates)) {
+        lines.push('  Quality Gates:');
+        for (const g of u.quality_gates) {
+          lines.push(`    [${g.severity}] ${g.field}: ${g.description}`);
+        }
+      }
+      lines.push('');
+    }
+
+    // Platform-specific expected fields
+    if (expectedFields?.platforms) {
+      for (const [platformKey, platformFields] of Object.entries(expectedFields.platforms)) {
+        const pf = platformFields as any;
+        lines.push(`--- Platform: ${platformKey} ---`);
+        if (pf.primary_category) lines.push(`  Primary category: ${pf.primary_category}`);
+        if (pf.additional_categories) lines.push(`  Additional categories: ${pf.additional_categories.join(', ')}`);
+        if (pf.required_attributes) lines.push(`  Required attributes: ${pf.required_attributes.join(', ')}`);
+        if (pf.recommended_attributes) lines.push(`  Recommended attributes: ${pf.recommended_attributes.join(', ')}`);
+        if (pf.description_requirements) lines.push(`  Description requirements: ${pf.description_requirements}`);
+        if (pf.page_type) lines.push(`  Page type: ${pf.page_type}`);
+        if (pf.expected_photo_count !== undefined) lines.push(`  Expected photo count: ${pf.expected_photo_count}`);
+        if (pf.branding_expectations) {
+          const be = pf.branding_expectations;
+          lines.push('  Branding expectations:');
+          if (be.has_logo !== undefined) lines.push(`    Has logo: ${be.has_logo}`);
+          if (be.has_cover_photo !== undefined) lines.push(`    Has cover photo: ${be.has_cover_photo}`);
+          if (be.has_profile_photo !== undefined) lines.push(`    Has profile photo: ${be.has_profile_photo}`);
+          if (be.photo_count !== undefined) lines.push(`    Photo count: ${be.photo_count}`);
+          if (be.photo_types) lines.push(`    Photo types: ${be.photo_types.join(', ')}`);
+        }
+        if (pf.fields && Array.isArray(pf.fields)) {
+          lines.push('  Fields:');
+          for (const f of pf.fields) {
+            lines.push(`    ${f.field}: ${f.description}${f.severity ? ` (${f.severity})` : ''}`);
+          }
+        }
+        if (pf.quality_gates && Array.isArray(pf.quality_gates)) {
+          lines.push('  Quality Gates:');
+          for (const g of pf.quality_gates) {
+            lines.push(`    [${g.severity}] ${g.field}: ${g.description}`);
+          }
+        }
+        lines.push('');
+      }
+    }
+
+    // Pattern exemplars (candidates flagged as gold standard)
+    if (candidates && Array.isArray(candidates)) {
+      const exemplars = candidates.filter((c: any) => {
+        if (!c.platform_evaluations) return false;
+        return c.platform_evaluations.some((pe: any) => pe.is_gold_standard === true);
+      });
+      if (exemplars.length > 0) {
+        lines.push('--- Pattern Exemplars ---');
+        for (const ex of exemplars) {
+          lines.push(`  Business: ${ex.business_name}`);
+          if (ex.city) lines.push(`    City: ${ex.city}`);
+          if (ex.category_notes) lines.push(`    Notes: ${ex.category_notes}`);
+          if (ex.platform_evaluations) {
+            for (const pe of ex.platform_evaluations) {
+              if (pe.is_gold_standard !== true) continue;
+              lines.push(`    Platform: ${pe.platform}`);
+              if (pe.profile_url) lines.push(`      Destination URL: ${pe.profile_url}`);
+              if (pe.quality_score !== undefined && pe.quality_score !== null) {
+                lines.push(`      Quality score: ${pe.quality_score}/10`);
+              }
+              if (pe.quality_rationale) lines.push(`      Rationale: ${pe.quality_rationale}`);
+              if (pe.branding_artifacts) {
+                const ba = pe.branding_artifacts;
+                if (ba.has_logo) lines.push(`      Has logo: yes`);
+                if (ba.has_cover_photo) lines.push(`      Has cover photo: yes`);
+                if (ba.photo_count !== undefined && ba.photo_count !== null) {
+                  lines.push(`      Photo count: ${ba.photo_count}`);
+                }
+              }
+            }
+          }
+        }
+        lines.push('');
+      }
+    }
+
+    lines.push('=== END GOLD STANDARD ===');
     lines.push('');
 
     return lines.join('\n');

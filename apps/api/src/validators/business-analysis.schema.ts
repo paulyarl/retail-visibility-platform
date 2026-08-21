@@ -283,6 +283,10 @@ const platformSchema = z.object({
   oldest_observable_unanswered_review: z.string().nullable().optional(),
   newest_observable_unanswered_review: z.string().nullable().optional(),
   data_status: dataStatusCoerced.optional(),
+  // Gold Standard System — Sprint 0: live profile URL on the platform.
+  // Captured so the audit can reference the exact profile being evaluated
+  // and so the gold-standard benchmark comparison has a concrete destination.
+  profile_url: z.string().nullable().optional(),
 }).passthrough();
 
 const googlePlatformSchema = platformSchema.extend({
@@ -464,6 +468,45 @@ const competitiveBenchmarkSchema = z.object({
   specialization_evidence_direct: coercedBooleanNullable.optional(),
 }).passthrough();
 
+// ---- Gold Standard gap analysis + quality gate results (Sprint 0) ----
+
+/**
+ * Gap analysis entry — a single field where the business's actual value
+ * differs from the gold-standard expected value. Produced by the audit
+ * prompt when a gold-standard benchmark is injected.
+ */
+const gapAnalysisEntrySchema = z.object({
+  platform: z.string().optional(),
+  field: z.string(),
+  expected: z.string().nullable().optional(),
+  actual: z.string().nullable().optional(),
+  gap_description: z.string().nullable().optional(),
+  severity: z.enum(['non_negotiable', 'recommended']).optional(),
+}).passthrough();
+
+const gapAnalysisSchema = z.object({
+  gaps: z.array(gapAnalysisEntrySchema).optional(),
+  summary: z.string().nullable().optional(),
+}).passthrough();
+
+/**
+ * Quality gate result — whether a specific gold-standard quality gate
+ * passed or failed for this business. Produced by the audit prompt when
+ * a gold-standard benchmark is injected.
+ */
+const qualityGateResultSchema = z.object({
+  platform: z.string().optional(),
+  gate: z.string(),
+  passed: z.boolean().nullable().optional(),
+  severity: z.enum(['non_negotiable', 'recommended']).optional(),
+  notes: z.string().nullable().optional(),
+}).passthrough();
+
+const qualityGateResultsSchema = z.object({
+  results: z.array(qualityGateResultSchema).optional(),
+  summary: z.string().nullable().optional(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const businessAnalysisSchema = z.object({
@@ -491,6 +534,13 @@ export const businessAnalysisSchema = z.object({
   recommended_services: z.array(z.string()).optional(),
   data_quality: dataQualitySchema,
   sources: z.array(sourceSchema).optional(),
+  // Gold Standard System — Sprint 0: gap analysis + quality gate results.
+  // These are optional — only present when a gold-standard benchmark was
+  // injected into the audit prompt. The audit compares the business's
+  // actual profile against the gold-standard expected fields and quality
+  // gates, producing structured gaps and pass/fail results.
+  gap_analysis: gapAnalysisSchema.optional(),
+  quality_gate_results: qualityGateResultsSchema.optional(),
 }).passthrough();
 
 export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
@@ -662,8 +712,25 @@ Return your response as JSON matching this exact schema:
   "sources": [
     { "platform": "<string>", "source_type": "<string|null>", "url": "<string|null>", "accessed_date": "<string|null>" }
   ],
-  "business_type": "service|product|hybrid|unable_to_verify" (classify the business: 'service' for service businesses like HVAC/plumbing/dental, 'product' for inventory businesses like grocery stores/bakeries/pharmacies, 'hybrid' for businesses with both service and product components like restaurants/caterers, 'unable_to_verify' when the business model is unclear)
+  "business_type": "service|product|hybrid|unable_to_verify" (classify the business: 'service' for service businesses like HVAC/plumbing/dental, 'product' for inventory businesses like grocery stores/bakeries/pharmacies, 'hybrid' for businesses with both service and product components like restaurants/caterers, 'unable_to_verify' when the business model is unclear),
+  "gap_analysis": {
+    "gaps": [
+      { "platform": "<string>", "field": "<string>", "expected": "<string|null>", "actual": "<string|null>", "gap_description": "<string>", "severity": "non_negotiable|recommended" }
+    ],
+    "summary": "<string>"
+  },
+  "quality_gate_results": {
+    "results": [
+      { "platform": "<string>", "gate": "<string>", "passed": <boolean>, "severity": "non_negotiable|recommended", "notes": "<string>" }
+    ],
+    "summary": "<string>"
+  }
 }
+
+GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present in the prompt):
+- platforms.{platform}.profile_url: "<string|null>" — the LIVE profile URL on each platform (e.g. "https://www.google.com/maps/place/..."). Always capture this.
+- gap_analysis: compare the business's actual profile against the gold-standard expected fields. For each field where the business's actual value differs from the expected value, produce a gap entry with the platform, field name, expected value, actual value, gap description, and severity (non_negotiable or recommended).
+- quality_gate_results: for each gold-standard quality gate, record whether the business passed or failed, with the platform, gate name, passed boolean, severity, and notes.
 
 PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types):
 - website.has_product_browsing: <boolean|null> — can customers browse products or categories on the website? (null when unable to verify or no website)

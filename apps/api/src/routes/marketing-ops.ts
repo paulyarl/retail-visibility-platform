@@ -5948,7 +5948,7 @@ router.get('/intelligence-profiles/drafts', async (req, res) => {
 // segment is captured as :id and the category is parsed as :version (→ "Invalid version").
 router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
-    const focus = req.query.focus as 'emerging' | 'competitive' | undefined;
+    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
     const city = typeof req.query.city === 'string' ? req.query.city : undefined;
     const profile = await IntelligenceProfileService.getInstance().resolve(
       req.params.category,

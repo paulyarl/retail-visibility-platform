@@ -414,8 +414,16 @@ export class MarketingExecutionService extends BaseService {
     // be composed. We detect it by checking the output_schema name — if it's
     // 'intelligence_profile', render the template body as-is.
     const isProfileEstablishment = outputSchemaName === 'intelligence_profile';
+    // Gold-standard scans have their own self-contained template body
+    // (migration 235 seeds mpt-gold-standard-scan) and must NOT be routed
+    // through the fragment composer — the composer assembles base +
+    // extension + focus fragments for emerging/competitive intelligence
+    // discovery, which is a different prompt shape. Gold-standard focus
+    // is excluded from the composer path; the template body is rendered
+    // as-is (like the intelligence_profile establishment template).
+    const isGoldStandardFocus = (input.campaign.intelligence_focus || '') === 'gold_standards';
 
-    if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment) {
+    if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment && !isGoldStandardFocus) {
       const composer = PromptComposerService.getInstance();
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
       // Pass the campaign's city so the composer resolves a city-scoped
@@ -470,9 +478,14 @@ export class MarketingExecutionService extends BaseService {
 
     // ─── Business-scope §1B amplification path ────────────────────────────
     const isBusinessScope = campaignScope === 'business';
+    const isFulfill = promptType === 'fulfill';
 
-    const promptRole: 'category_audit' | 'signal_triage' | 'none' =
-      !isSeek || !isBusinessScope
+    const promptRole: 'category_audit' | 'signal_triage' | 'fulfill_target' | 'none' =
+      !isBusinessScope
+        ? 'none'
+        : isFulfill
+        ? 'fulfill_target'
+        : !isSeek
         ? 'none'
         : isProfileRepair
         ? 'signal_triage'
@@ -483,6 +496,45 @@ export class MarketingExecutionService extends BaseService {
       return {
         renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+      };
+    }
+
+    // ─── Gold-standard target injection for fulfill prompts ──────────────
+    // Fulfill prompts get the gold-standard profile as a TARGET — the fix
+    // instructions should move the business toward the gold-standard expected
+    // fields and pattern exemplars. This is a separate injection from the
+    // intelligence profile block (which is seek-only).
+    if (promptRole === 'fulfill_target') {
+      const profileService = IntelligenceProfileService.getInstance();
+      const goldStandard = await profileService.resolveGoldStandard(category, ctx);
+      if (!goldStandard) {
+        // No active gold standard — return base render (degraded but functional).
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+      const goldStandardBlock = profileService.serializeGoldStandard(goldStandard, 'target');
+      if (!goldStandardBlock) {
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+      const amplified = baseRendered + '\n' + goldStandardBlock;
+      logger.info('Gold standard target injected into fulfill prompt', ctx, {
+        campaignId: input.campaign.id,
+        category,
+        goldStandardProfileId: goldStandard.id,
+        goldStandardProfileVersion: goldStandard.version,
+      });
+      return {
+        renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
+        resolution: {
+          profile_id: goldStandard.id,
+          profile_version: goldStandard.version,
+          intelligence_mode: 'profile',
+        },
       };
     }
 
@@ -521,7 +573,24 @@ export class MarketingExecutionService extends BaseService {
         'Use the category intelligence below for category-fit signals and prohibited inferences only. ' +
           'The repair signals in the Audit Signals section above are the primary input for this triage.',
       );
-      const amplified = baseRendered + '\n' + profileBlock;
+      let amplified = baseRendered + '\n' + profileBlock;
+
+      // Gold-standard benchmark injection (Sprint 0). Append the gold-
+      // standard benchmark block so the triage can compare the business
+      // against category-platform exemplars. Best-effort — if no active
+      // gold standard exists, skip silently (degraded but functional).
+      const goldStandard = await profileService.resolveGoldStandard(category, ctx);
+      if (goldStandard) {
+        const gsBlock = profileService.serializeGoldStandard(goldStandard, 'benchmark');
+        if (gsBlock) {
+          amplified = amplified + '\n' + gsBlock;
+          logger.info('Gold standard benchmark injected into signal triage', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            goldStandardProfileId: goldStandard.id,
+          });
+        }
+      }
 
       logger.info('Profile-aware signal triage prompt resolved', ctx, {
         campaignId: input.campaign.id,
@@ -546,7 +615,31 @@ export class MarketingExecutionService extends BaseService {
     const profile = await profileService.resolve(category, undefined, businessCity, ctx);
 
     if (!profile) {
-      // No active profile — return byte-identical base render (plus suffix).
+      // No active intelligence profile — but there may still be a gold
+      // standard benchmark to inject. Check for it before returning the
+      // base render. This ensures the audit gets the gold-standard
+      // comparison even when no category intelligence profile exists.
+      const goldStandardOnly = await profileService.resolveGoldStandard(category, ctx);
+      if (goldStandardOnly) {
+        const gsBlock = profileService.serializeGoldStandard(goldStandardOnly, 'benchmark');
+        if (gsBlock) {
+          const gsAmplified = baseRendered + '\n' + gsBlock;
+          logger.info('Gold standard benchmark injected (no intelligence profile)', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            goldStandardProfileId: goldStandardOnly.id,
+          });
+          return {
+            renderedPrompt: this.appendPromptSuffix(gsAmplified, promptSuffix),
+            resolution: {
+              profile_id: goldStandardOnly.id,
+              profile_version: goldStandardOnly.version,
+              intelligence_mode: 'profile',
+            },
+          };
+        }
+      }
+      // No active profile and no gold standard — return byte-identical base render (plus suffix).
       return {
         renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
@@ -557,7 +650,24 @@ export class MarketingExecutionService extends BaseService {
     // campaign's city so the block can emit a retargeting directive when
     // the profile's reference city differs.
     const profileBlock = profileService.renderBusinessProfileBlock(profile, businessCity);
-    const amplified = baseRendered + '\n' + profileBlock;
+    let amplified = baseRendered + '\n' + profileBlock;
+
+    // Gold-standard benchmark injection (Sprint 0). Append the gold-
+    // standard benchmark block so the audit can compare the business
+    // against category-platform exemplars. Best-effort — if no active
+    // gold standard exists, skip silently (degraded but functional).
+    const goldStandard = await profileService.resolveGoldStandard(category, ctx);
+    if (goldStandard) {
+      const gsBlock = profileService.serializeGoldStandard(goldStandard, 'benchmark');
+      if (gsBlock) {
+        amplified = amplified + '\n' + gsBlock;
+        logger.info('Gold standard benchmark injected into category audit', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          goldStandardProfileId: goldStandard.id,
+        });
+      }
+    }
 
     logger.info('Profile-aware prompt resolved (§1B)', ctx, {
       campaignId: input.campaign.id,
@@ -736,6 +846,7 @@ emerging-focus work.`;
       attributes: (campaign.attributes || []).join(', '),
       business_origin: [campaign.business_origin_country, campaign.business_origin_region]
         .filter(Boolean).join(', '),
+      platform: campaign.intelligence_platform || '',
       business_address: [
         campaign.address_line1,
         campaign.address_city,

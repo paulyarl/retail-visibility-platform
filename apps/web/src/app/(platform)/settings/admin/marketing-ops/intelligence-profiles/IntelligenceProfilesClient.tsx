@@ -57,11 +57,13 @@ const STATUS_LABELS: Record<ProfileStatus, string> = {
 const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
   emerging: 'blue',
   competitive: 'violet',
+  gold_standards: 'amber',
 };
 
 const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
   emerging: 'Emerging',
   competitive: 'Competitive',
+  gold_standards: 'Gold Standards',
 };
 
 export default function IntelligenceProfilesClient() {

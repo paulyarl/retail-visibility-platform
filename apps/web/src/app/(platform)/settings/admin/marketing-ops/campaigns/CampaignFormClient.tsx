@@ -84,7 +84,7 @@ interface FormState {
   service_category: string;
   service_category_label: string;
   // Intelligence scope fields (Sprint 3)
-  intelligence_focus: 'emerging' | 'competitive' | '';
+  intelligence_focus: 'emerging' | 'competitive' | 'gold_standards' | '';
   intelligence_zip_codes: string;
   intelligence_search_radius_miles: number | '';
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -257,7 +257,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         coupon_code: c.coupon_code ?? '',
         service_category: c.service_category ?? '',
         service_category_label: c.service_category_label ?? '',
-        intelligence_focus: ((c as any).intelligence_focus ?? 'emerging') as 'emerging' | 'competitive' | '',
+        intelligence_focus: ((c as any).intelligence_focus ?? 'emerging') as 'emerging' | 'competitive' | 'gold_standards' | '',
         intelligence_zip_codes: (c as any).intelligence_zip_codes ?? '',
         intelligence_search_radius_miles: (c as any).intelligence_search_radius_miles ?? '',
         intelligence_campaign_kind: ((c as any).intelligence_campaign_kind ?? 'discovery') as 'discovery' | 'establishment' | '',
@@ -436,7 +436,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           assigned_to: strOrUndef(form.assigned_to),
           notes: strOrUndef(form.notes),
           service_category: strOrUndef(form.service_category),
-          intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' : undefined,
+          intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards' : undefined,
           intelligence_zip_codes: form.scope === 'intelligence' ? strOrUndef(form.intelligence_zip_codes) : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? numOrUndef(form.intelligence_search_radius_miles) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
@@ -514,7 +514,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           subscription_tier_id: form.subscription_tier_id,
           coupon_code: form.coupon_code,
           service_category: form.service_category,
-          intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' : undefined,
+          intelligence_focus: form.scope === 'intelligence' ? (form.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards' : undefined,
           intelligence_zip_codes: form.scope === 'intelligence' ? form.intelligence_zip_codes : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? (form.intelligence_search_radius_miles === '' ? undefined : Number(form.intelligence_search_radius_miles)) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
@@ -635,6 +635,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                         checked={form.intelligence_focus === 'competitive'}
                         onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
                       <span className="text-sm">Competitive — analyze established competitors</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_focus" value="gold_standards"
+                        checked={form.intelligence_focus === 'gold_standards'}
+                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
+                      <span className="text-sm">Gold Standards — establish/discover category-platform benchmark profiles</span>
                     </label>
                   </div>
                 </FormField>

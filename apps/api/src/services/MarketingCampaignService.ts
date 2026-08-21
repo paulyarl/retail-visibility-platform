@@ -201,7 +201,7 @@ export interface CampaignInput {
   parentCampaignId?: string;
   businessProspectId?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligenceFocus?: 'emerging' | 'competitive';
+  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards';
   intelligenceZipCodes?: string;
   intelligenceSearchRadiusMiles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -260,7 +260,7 @@ export interface CampaignUpdateInput {
   couponCode?: string;
   serviceCategory?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligenceFocus?: 'emerging' | 'competitive';
+  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards';
   intelligenceZipCodes?: string;
   intelligenceSearchRadiusMiles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns

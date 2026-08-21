@@ -33,7 +33,7 @@ export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_
 
 export type PromptScope = 'business' | 'category' | 'city' | 'intelligence';
 
-export type IntelligenceFocus = 'emerging' | 'competitive';
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
 export type IntelligenceCampaignKind = 'discovery' | 'establishment';
 
 export interface PromptTemplateInput {
@@ -660,7 +660,7 @@ export class MarketingPromptService extends BaseService {
       intelligence_mode: 'profile' | 'none';
     };
     /** Intelligence focus for intelligence-scope imports (§41 run record). */
-    focus?: 'emerging' | 'competitive';
+    focus?: 'emerging' | 'competitive' | 'gold_standards';
   }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null }> {
     try {
       // 1. Load template + campaign
@@ -857,7 +857,7 @@ export class MarketingPromptService extends BaseService {
             where: { id: input.campaignId },
             select: { intelligence_focus: true, city: true },
           });
-          const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive';
+          const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards';
           const referenceCity = campaign?.city || null;
           const profile = await IntelligenceProfileService.getInstance().importAsDraft({
             categoryKey: parsedJson.category_key,
@@ -899,6 +899,70 @@ export class MarketingPromptService extends BaseService {
             campaignId: input.campaignId,
           });
         }
+      }
+
+      // Gold Standard System — Sprint 0: post-import hook for
+      // gold_standard_scan schema. When an operator imports an externally-
+      // generated gold-standard scan via /executions/external, the validated
+      // JSON is persisted as a DRAFT gold-standard profile by
+      // IntelligenceProfileService.importAsDraft() — but only when the
+      // campaign's intelligence_campaign_kind is 'establishment'. Discovery
+      // imports create an audit (via auditPlatform) so the campaign's Audits
+      // tab can render the discovered candidates; they do NOT create a
+      // profile draft. Best-effort — failure does not fail the import.
+      if (schemaName === 'gold_standard_scan') {
+        let campaignKind: string = 'discovery';
+        try {
+          const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+          // Read the establishment campaign's intelligence_focus and
+          // intelligence_campaign_kind so we only persist a draft for
+          // establishment campaigns. Discovery campaigns skip this hook
+          // (they create an audit instead, handled by auditPlatform above).
+          const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+            where: { id: input.campaignId },
+            select: {
+              intelligence_focus: true,
+              intelligence_campaign_kind: true,
+              intelligence_platform: true,
+            },
+          });
+          campaignKind = campaign?.intelligence_campaign_kind || 'discovery';
+          if (campaignKind !== 'establishment') {
+            // Discovery import — skip draft creation. The audit was already
+            // created by the auditPlatform path above (if applicable).
+            logger.info('Gold standard scan import skipped draft (discovery campaign)', ctx, {
+              campaignId: input.campaignId,
+              campaignKind,
+            });
+          } else {
+            const focus = (campaign?.intelligence_focus || 'gold_standards') as 'emerging' | 'competitive' | 'gold_standards';
+            // Gold-standard profiles are city-agnostic — reference_city = null.
+            const profile = await IntelligenceProfileService.getInstance().importAsDraft({
+              categoryKey: parsedJson.category_key,
+              categoryName: parsedJson.category_name,
+              configurationJson: parsedJson,
+              intelligenceFocus: focus,
+              referenceCity: null,
+            }, ctx);
+            logger.info('Gold standard profile imported as draft', ctx, {
+              profileId: profile.id,
+              version: profile.version,
+              categoryKey: profile.category_key,
+              intelligenceFocus: focus,
+              campaignId: input.campaignId,
+            });
+          }
+        } catch (profileErr) {
+          logger.error('Gold standard profile draft persistence failed (best-effort)', ctx, {
+            error: (profileErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
+
+        // Note: we do NOT auto-mark the campaign as establishment here
+        // (unlike the intelligence_profile hook). The campaign kind is set
+        // at creation time by the campaign form. Discovery campaigns stay
+        // as discovery; establishment campaigns stay as establishment.
       }
 
       // Post-import hook for profile_repair_triage schema: persist the

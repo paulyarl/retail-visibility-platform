@@ -59,7 +59,7 @@ interface IntelligenceDiscoveryData {
   category: string;
   city: string;
   state?: string;
-  focus: 'emerging' | 'competitive';
+  focus: 'emerging' | 'competitive' | 'gold_standards';
   discovered_businesses: DiscoveredBusiness[];
   qualifying_businesses: DiscoveredBusiness[];
   candidate_count: number;
