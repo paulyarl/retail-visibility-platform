@@ -4977,8 +4977,8 @@ interface MarketingOpsService {
   getGalleryDashboard(daysBack?: number): Promise<GalleryDashboard>;
   uploadDiagnosticScreenshot(campaignId: string, file: File): Promise<MarketingFile>;
   // Intelligence Profile + Run methods (Sprint 2 — Seek Intelligence Scope)
-  listIntelligenceProfiles(): Promise<IntelligenceProfile[]>;
-  listIntelligenceProfileDrafts(): Promise<IntelligenceProfile[]>;
+  listIntelligenceProfiles(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
+  listIntelligenceProfileDrafts(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
   getIntelligenceProfile(id: string): Promise<IntelligenceProfileWithVersions>;
   getIntelligenceProfileVersion(id: string, version: number): Promise<IntelligenceProfile>;
   resolveIntelligenceProfile(category: string, focus?: IntelligenceFocus, city?: string): Promise<IntelligenceProfile | null>;
@@ -5116,11 +5116,13 @@ MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
 
 // ─── Intelligence Profile Methods (Sprint 2 — Seek Intelligence Scope) ────
 
-MarketingOpsService.prototype.listIntelligenceProfiles = async function (): Promise<IntelligenceProfile[]> {
+MarketingOpsService.prototype.listIntelligenceProfiles = async function (focus?: IntelligenceFocus): Promise<IntelligenceProfile[]> {
+  const query = focus ? `?focus=${focus}` : '';
+  const cacheKey = focus ? `mkt-ops-intel-profiles-${focus}` : 'mkt-ops-intel-profiles';
   const result = await this.makeDefaultRequest<any>(
-    `${BASE_URL}/intelligence-profiles`,
+    `${BASE_URL}/intelligence-profiles${query}`,
     {},
-    'mkt-ops-intel-profiles',
+    cacheKey,
     this.cacheTTL,
   );
   if (!result.success) {
@@ -5130,11 +5132,13 @@ MarketingOpsService.prototype.listIntelligenceProfiles = async function (): Prom
   return Array.isArray(data) ? data : (data?.items ?? []);
 };
 
-MarketingOpsService.prototype.listIntelligenceProfileDrafts = async function (): Promise<IntelligenceProfile[]> {
+MarketingOpsService.prototype.listIntelligenceProfileDrafts = async function (focus?: IntelligenceFocus): Promise<IntelligenceProfile[]> {
+  const query = focus ? `?focus=${focus}` : '';
+  const cacheKey = focus ? `mkt-ops-intel-profile-drafts-${focus}` : 'mkt-ops-intel-profile-drafts';
   const result = await this.makeDefaultRequest<any>(
-    `${BASE_URL}/intelligence-profiles/drafts`,
+    `${BASE_URL}/intelligence-profiles/drafts${query}`,
     {},
-    'mkt-ops-intel-profile-drafts',
+    cacheKey,
     this.cacheTTL,
   );
   if (!result.success) {

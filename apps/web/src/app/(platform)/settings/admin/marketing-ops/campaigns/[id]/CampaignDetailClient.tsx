@@ -13,6 +13,8 @@ import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCatego
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
+import GoldStandardEstablishmentPanel from '@/components/marketing-ops/GoldStandardEstablishmentPanel';
+import GoldStandardDiscoveryPanel from '@/components/marketing-ops/GoldStandardDiscoveryPanel';
 import AuditImportMetadataBadge from '@/components/marketing-ops/AuditImportMetadataBadge';
 import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
@@ -999,6 +1001,14 @@ export default function CampaignDetailClient({
                       </div>
                     )}
                   </>
+                ) : campaign.scope === 'intelligence' && campaign.intelligence_focus === 'gold_standards' ? (
+                  <div className="space-y-4">
+                    {campaign.intelligence_campaign_kind === 'establishment' ? (
+                      <GoldStandardEstablishmentPanel campaign={campaign} />
+                    ) : (
+                      <GoldStandardDiscoveryPanel campaign={campaign} audits={campaign.audits ?? []} />
+                    )}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <DetailField label="Contact Method" value={campaign.contact_method} />
@@ -1177,6 +1187,19 @@ export default function CampaignDetailClient({
                         <CityAnalysisAuditCard key={audit.id} audit={audit} />
                       ) : audit.platform === 'intelligence_discovery' && audit.audit_data ? (
                         <IntelligenceDiscoveryAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : audit.platform === 'gold_standard_scan' && audit.audit_data ? (
+                        <div key={audit.id} className="border border-amber-200 dark:border-amber-700 rounded-lg p-4 bg-amber-50/50 dark:bg-amber-900/10">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-amber-900 dark:text-amber-300">Gold Standard Scan</span>
+                            <AuditImportMetadataBadge audit={audit} />
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {(audit.audit_data as any)?.candidates?.length ?? 0} candidates evaluated.
+                            {(audit.audit_data as any)?.scan_metadata?.platform_focus && (
+                              <span className="ml-2">Platform: {(audit.audit_data as any).scan_metadata.platform_focus}</span>
+                            )}
+                          </div>
+                        </div>
                       ) : audit.platform === 'city_analysis_summary' ? (
                         <div key={audit.id} className="border border-blue-200 dark:border-blue-700 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/10">
                           <div className="flex items-center justify-between mb-2">

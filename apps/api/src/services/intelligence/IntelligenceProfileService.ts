@@ -355,11 +355,12 @@ export class IntelligenceProfileService extends BaseService {
 
   /**
    * List all active profiles (for admin UI).
+   * Optional focus filter — e.g. 'gold_standards' to list only gold-standard profiles.
    */
-  async listActive(ctx?: RequestCtx): Promise<IntelligenceProfile[]> {
+  async listActive(focus?: IntelligenceFocus, ctx?: RequestCtx): Promise<IntelligenceProfile[]> {
     try {
       const profiles = await this.prisma.mkt_intelligence_profiles.findMany({
-        where: { status: 'active' },
+        where: { status: 'active', ...(focus ? { intelligence_focus: focus } : {}) },
         orderBy: [{ category_key: 'asc' }, { version: 'desc' }],
       });
       return profiles as IntelligenceProfile[];
@@ -371,11 +372,12 @@ export class IntelligenceProfileService extends BaseService {
 
   /**
    * List all draft profiles awaiting activation (GAP-P8 — for admin UI).
+   * Optional focus filter — e.g. 'gold_standards' to list only gold-standard drafts.
    */
-  async listDrafts(ctx?: RequestCtx): Promise<IntelligenceProfile[]> {
+  async listDrafts(focus?: IntelligenceFocus, ctx?: RequestCtx): Promise<IntelligenceProfile[]> {
     try {
       const profiles = await this.prisma.mkt_intelligence_profiles.findMany({
-        where: { status: 'draft' },
+        where: { status: 'draft', ...(focus ? { intelligence_focus: focus } : {}) },
         orderBy: [{ category_key: 'asc' }, { version: 'desc' }],
       });
       return profiles as IntelligenceProfile[];

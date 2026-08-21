@@ -5921,7 +5921,7 @@ const intelligenceProfileCreateSchema = z.object({
   categoryName: z.string().min(1).max(100),
   configurationJson: z.record(z.string(), z.any()),
   status: z.enum(['draft', 'active', 'retired']).optional(),
-  intelligenceFocus: z.enum(['emerging', 'competitive']).default('emerging'),
+  intelligenceFocus: z.enum(['emerging', 'competitive', 'gold_standards']).default('emerging'),
   referenceCity: z.string().max(100).nullable().optional(),
   referenceState: z.string().max(50).nullable().optional(),
 });
@@ -5931,20 +5931,22 @@ const intelligenceProfilePublishSchema = z.object({
   configurationJson: z.record(z.string(), z.any()),
 });
 
-// GET /intelligence-profiles — list active profiles
+// GET /intelligence-profiles — list active profiles (optional ?focus= filter)
 router.get('/intelligence-profiles', async (req, res) => {
   try {
-    const profiles = await IntelligenceProfileService.getInstance().listActive(getCtx(req));
+    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
+    const profiles = await IntelligenceProfileService.getInstance().listActive(focus, getCtx(req));
     res.json({ success: true, data: profiles });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });
 
-// GET /intelligence-profiles/drafts — list draft profiles awaiting activation
+// GET /intelligence-profiles/drafts — list draft profiles awaiting activation (optional ?focus= filter)
 router.get('/intelligence-profiles/drafts', async (req, res) => {
   try {
-    const profiles = await IntelligenceProfileService.getInstance().listDrafts(getCtx(req));
+    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
+    const profiles = await IntelligenceProfileService.getInstance().listDrafts(focus, getCtx(req));
     res.json({ success: true, data: profiles });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
