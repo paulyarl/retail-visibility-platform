@@ -346,7 +346,20 @@ ${OUTPUT_FORMAT_SECTION}`,
 
 // ─── Seed logic ──────────────────────────────────────────────────────────
 
-async function seedTemplate(template: typeof GOLD_STANDARD_SCAN_ESTABLISHMENT_TEMPLATE) {
+type GoldStandardScanTemplate = {
+  id: string;
+  name: string;
+  promptType: 'seek';
+  scope: 'intelligence';
+  body: string;
+  variables: string[];
+  outputSchema: { name: string; description: string };
+  isDefault: boolean;
+  intelligenceFocus: 'gold_standards';
+  intelligenceCampaignKind: 'establishment' | 'discovery';
+};
+
+async function seedTemplate(template: GoldStandardScanTemplate) {
   const service = MarketingPromptService.getInstance();
   const existing = await service.getTemplate(template.id);
   if (existing) {
