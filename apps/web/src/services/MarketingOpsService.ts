@@ -4999,6 +4999,10 @@ interface MarketingOpsService {
   }): Promise<IntelligenceProfile>;
   activateIntelligenceProfileDraft(id: string, version: number): Promise<IntelligenceProfile>;
   deleteIntelligenceProfileDraft(id: string, version: number): Promise<void>;
+  addGoldStandardCandidate(id: string, input: {
+    candidate: Record<string, any>;
+    platform: string;
+  }): Promise<IntelligenceProfile>;
   listIntelligenceRuns(campaignId: string): Promise<IntelligenceRun[]>;
   getIntelligenceRun(runId: string): Promise<IntelligenceRun | null>;
 }
@@ -5264,6 +5268,23 @@ MarketingOpsService.prototype.deleteIntelligenceProfileDraft = async function (i
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete intelligence profile draft');
   }
   await this.invalidateCachePattern('mkt-ops-intel-profile');
+};
+
+MarketingOpsService.prototype.addGoldStandardCandidate = async function (id: string, input: {
+  candidate: Record<string, any>;
+  platform: string;
+}): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/candidates`,
+    { method: 'POST', body: JSON.stringify(input) },
+    'mkt-ops-intel-profile-add-candidate',
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to promote gold-standard candidate');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
+  return result.data?.data ?? result.data;
 };
 
 // ─── Intelligence Run Methods ─────────────────────────────────────────────

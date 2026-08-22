@@ -860,6 +860,209 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   // ====================
+  // GOLD STANDARD SLOT PROMOTION (per-platform candidate injection)
+  // ====================
+
+  /**
+   * Promote a discovered candidate into a specific platform's gold-standard
+   * slot on the active gold-standard profile. This is the operator-facing
+   * "Add to {platform} slot" action — it replaces the manual JSON-surgery
+   * workflow via publishVersion.
+   *
+   * Per-platform independence (architecture doc §"The discovery →
+   * establishment relationship"): a candidate can be added to Google's slot
+   * without being added to Yelp's. The candidate row in configuration_json
+   * is shared, but each platform_evaluation has its own is_gold_standard
+   * flag. This method flips only the target platform's flag.
+   *
+   * Rules:
+   *   - Only gold-standard profiles (focus = 'gold_standards') have slots.
+   *   - Only candidates flagged is_gold_standard = true by the analyst on
+   *     the target platform can be promoted (operator curates, does not
+   *     override the analyst's assessment).
+   *   - Up to 4 gold-standard candidates per platform (cap enforced).
+   *   - Idempotent: if the candidate is already in the profile with the
+   *     target platform flagged gold-standard, returns the current active
+   *     version without creating a new one.
+   *   - If the candidate exists in the profile but the target platform's
+   *     flag is false/null, flips it to true (the per-platform promotion
+   *     case — adds to Google's slot without affecting Yelp's).
+   *   - If the candidate is new, appends the full candidate object
+   *     (preserving all platform_evaluations from the scan) with only the
+   *     target platform's is_gold_standard set to true.
+   *   - Creates a new active version (immutable version pattern — old
+   *     active retires, new active with modified config takes over).
+   *
+   * Candidate matching: by business_name (case-insensitive, trimmed).
+   * Addresses can be formatted differently across scans; business name is
+   * the most stable key.
+   */
+  async addGoldStandardCandidate(profileId: string, input: {
+    candidate: Record<string, any>;
+    platform: string;
+  }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
+    const platform = input.platform.trim().toLowerCase();
+    const candidateName = (input.candidate.business_name || '').trim();
+
+    if (!platform) {
+      throw new Error('Platform is required');
+    }
+    if (!candidateName) {
+      throw new Error('Candidate business_name is required');
+    }
+
+    try {
+      // 1. Load the active version of this profile
+      const active = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId, status: 'active' },
+      });
+      if (!active) {
+        throw new Error(`Active profile ${profileId} not found`);
+      }
+
+      // 2. Validate this is a gold-standard profile
+      if (active.intelligence_focus !== 'gold_standards') {
+        throw new Error(
+          `Profile ${profileId} is not a gold-standard profile (focus: ${active.intelligence_focus}). Only gold-standard profiles have platform slots.`,
+        );
+      }
+
+      // 3. Validate the candidate has an is_gold_standard evaluation on the target platform
+      const inputEvaluations: any[] = Array.isArray(input.candidate.platform_evaluations) ? input.candidate.platform_evaluations : [];
+      const targetEval = inputEvaluations.find(
+        (pe) => (pe.platform || '').trim().toLowerCase() === platform && pe.is_gold_standard === true,
+      );
+      if (!targetEval) {
+        throw new Error(
+          `Candidate "${candidateName}" was not flagged gold-standard on ${platform} by the analyst. Only analyst-flagged candidates can be promoted.`,
+        );
+      }
+
+      // 4. Deep-clone the config and upsert the candidate
+      const config = JSON.parse(JSON.stringify(active.configuration_json ?? {})) as Record<string, any>;
+      const candidates: any[] = Array.isArray(config.candidates) ? config.candidates : [];
+
+      // Find existing candidate by business_name (case-insensitive)
+      const existingIdx = candidates.findIndex(
+        (c) => (c.business_name || '').trim().toLowerCase() === candidateName.toLowerCase(),
+      );
+
+      if (existingIdx >= 0) {
+        // Candidate already in profile — check if the target platform is already flagged
+        const existing = candidates[existingIdx];
+        const existingEvals: any[] = Array.isArray(existing.platform_evaluations) ? existing.platform_evaluations : [];
+        const existingTargetEval = existingEvals.find(
+          (pe) => (pe.platform || '').trim().toLowerCase() === platform,
+        );
+
+        if (existingTargetEval && existingTargetEval.is_gold_standard === true) {
+          // Idempotent — already in slot. Return current active without new version.
+          logger.info('Gold standard candidate already in slot (idempotent)', ctx, {
+            profileId,
+            candidateName,
+            platform,
+          });
+          return active as IntelligenceProfile;
+        }
+
+        // Flip the target platform's flag to true (per-platform promotion).
+        // If the platform_evaluation doesn't exist on the existing candidate,
+        // append it from the input scan data.
+        if (existingTargetEval) {
+          existingTargetEval.is_gold_standard = true;
+        } else {
+          existingEvals.push({ ...targetEval });
+          existing.platform_evaluations = existingEvals;
+        }
+      } else {
+        // New candidate — append the full object from the scan, but ensure
+        // only the target platform's is_gold_standard is true. Other
+        // platform evaluations retain their scan-assigned flags (may be
+        // false/null) so the operator can later promote to those platforms.
+        const newCandidate = JSON.parse(JSON.stringify(input.candidate));
+        const newEvals: any[] = Array.isArray(newCandidate.platform_evaluations) ? newCandidate.platform_evaluations : [];
+        for (const pe of newEvals) {
+          const pePlatform = (pe.platform || '').trim().toLowerCase();
+          pe.is_gold_standard = pePlatform === platform ? true : (pe.is_gold_standard ?? false);
+        }
+        candidates.push(newCandidate);
+      }
+
+      config.candidates = candidates;
+
+      // 5. Enforce the 4-per-platform cap (count after the upsert)
+      const goldCountForPlatform = candidates.reduce((count, c) => {
+        const evals: any[] = Array.isArray(c.platform_evaluations) ? c.platform_evaluations : [];
+        return count + (evals.some((pe) =>
+          (pe.platform || '').trim().toLowerCase() === platform && pe.is_gold_standard === true,
+        ) ? 1 : 0);
+      }, 0);
+
+      if (goldCountForPlatform > 4) {
+        throw new Error(
+          `Platform ${platform} already has 4 gold-standard candidates. Remove one before adding another.`,
+        );
+      }
+
+      // 6. Create a new active version with the modified config (immutable
+      //    version pattern — same transaction as publishVersion).
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Find the max version for this profile id
+        const existing = await tx.mkt_intelligence_profiles.findMany({
+          where: { id: profileId },
+          orderBy: { version: 'desc' },
+          take: 1,
+        });
+        if (existing.length === 0) {
+          throw new Error(`Profile ${profileId} not found`);
+        }
+        const latest = existing[0];
+        const nextVersion = latest.version + 1;
+
+        // Retire any existing active version
+        await tx.mkt_intelligence_profiles.updateMany({
+          where: { id: profileId, status: 'active' },
+          data: { status: 'retired', updated_at: new Date() },
+        });
+
+        // Create the new active version — carry metadata from the latest
+        const created = await tx.mkt_intelligence_profiles.create({
+          data: {
+            id: profileId,
+            category_key: latest.category_key,
+            category_name: latest.category_name,
+            version: nextVersion,
+            intelligence_focus: latest.intelligence_focus,
+            reference_city: latest.reference_city,
+            reference_state: latest.reference_state,
+            reference_platform: latest.reference_platform,
+            configuration_json: config as any,
+            status: 'active',
+          },
+        });
+
+        return created;
+      });
+
+      logger.info('Gold standard candidate promoted to platform slot', ctx, {
+        profileId,
+        version: result.version,
+        candidateName,
+        platform,
+      });
+      return result as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.addGoldStandardCandidate failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        candidateName,
+        platform,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
   // PROMPT BLOCK RENDERING
   // ====================
 

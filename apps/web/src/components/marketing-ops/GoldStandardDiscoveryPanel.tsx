@@ -77,6 +77,9 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
   const [activeProfile, setActiveProfile] = useState<IntelligenceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [promotingKey, setPromotingKey] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!campaign.category) {
@@ -97,7 +100,7 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
       }
     })();
     return () => { cancelled = true; };
-  }, [campaign.category, campaign.intelligence_platform]);
+  }, [campaign.category, campaign.intelligence_platform, refreshTrigger]);
 
   const platformLabel = campaign.intelligence_platform
     ? campaign.intelligence_platform === 'all'
@@ -134,6 +137,81 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
 
   const totalGoldStandard = Object.values(platformSlotCounts).reduce((a, b) => a + b, 0);
   const excludedCandidates = scanMetadata?.excluded_candidates ?? [];
+
+  // Extract establishment exemplars from the active profile's configuration_json.
+  // These are the gold-standard candidates from the establishment scan — already
+  // proven to meet the bar. When a discovery scan finds no new qualifiers, the
+  // operator can reference these as the existing benchmark slots.
+  const establishmentExemplars: Candidate[] = (() => {
+    if (!activeProfile?.configuration_json) return [];
+    const config = activeProfile.configuration_json as any;
+    const candidates: Candidate[] = Array.isArray(config.candidates) ? config.candidates : [];
+    return candidates.filter((c) =>
+      c.platform_evaluations?.some((pe) => pe.is_gold_standard === true),
+    );
+  })();
+
+  // Build a set of already-promoted (business_name|platform) keys from the
+  // active profile's candidates. Used to show "In slot" vs "Add to slot" on
+  // each platform evaluation row.
+  const promotedSlots: Set<string> = (() => {
+    const set = new Set<string>();
+    if (!activeProfile?.configuration_json) return set;
+    const config = activeProfile.configuration_json as any;
+    const candidates: Candidate[] = Array.isArray(config.candidates) ? config.candidates : [];
+    for (const c of candidates) {
+      const name = (c.business_name || '').trim().toLowerCase();
+      if (!name) continue;
+      for (const pe of c.platform_evaluations ?? []) {
+        if (pe.is_gold_standard === true) {
+          set.add(`${name}|${(pe.platform || '').trim().toLowerCase()}`);
+        }
+      }
+    }
+    return set;
+  })();
+
+  // Per-platform slot counts from the active profile (not the scan). This
+  // reflects the actual benchmark state, which changes after promotions.
+  const profileSlotCounts: Record<string, number> = (() => {
+    const counts: Record<string, number> = {};
+    if (!activeProfile?.configuration_json) return counts;
+    const config = activeProfile.configuration_json as any;
+    const candidates: Candidate[] = Array.isArray(config.candidates) ? config.candidates : [];
+    for (const c of candidates) {
+      for (const pe of c.platform_evaluations ?? []) {
+        if (pe.is_gold_standard === true) {
+          counts[pe.platform] = (counts[pe.platform] || 0) + 1;
+        }
+      }
+    }
+    return counts;
+  })();
+
+  // Promote a discovered candidate into a platform's gold-standard slot.
+  const handlePromote = async (candidate: Candidate, platform: string) => {
+    if (!activeProfile) return;
+    const key = `${candidate.business_name}|${platform}`;
+    setPromotingKey(key);
+    setSuccessMessage(null);
+    setError(null);
+    try {
+      await marketingOpsService.addGoldStandardCandidate(activeProfile.id, {
+        candidate,
+        platform,
+      });
+      setSuccessMessage(
+        `Added "${candidate.business_name}" to the ${prettyPlatform(platform)} gold-standard slot.`,
+      );
+      setRefreshTrigger((n) => n + 1);
+      // Auto-dismiss success message after 5s
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to promote candidate to gold-standard slot');
+    } finally {
+      setPromotingKey(null);
+    }
+  };
 
   // Pretty-print a gate field name: "primary_category_exact_match" → "Primary category exact match"
   const prettyGate = (gate: string): string => {
@@ -207,19 +285,18 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Gold Standard Slots
-            <span className="ml-1 text-gray-400 font-normal">(analyst-assigned, up to 4 per platform)</span>
+            <span className="ml-1 text-gray-400 font-normal">(up to 4 per platform)</span>
           </div>
-          {Object.keys(platformSlotCounts).length === 0 ? (
+          {Object.keys(profileSlotCounts).length === 0 ? (
             <div className="text-sm text-gray-400">
-              No candidates qualified
+              No candidates in profile slots yet
               <div className="text-xs mt-1 text-gray-400">
-                The analyst evaluated {allCandidates.length} candidate{allCandidates.length !== 1 ? 's' : ''} against the
-                established quality gates. None passed all non-negotiable gates.
+                Promote analyst-flagged candidates from the scan below to populate the benchmark.
               </div>
             </div>
           ) : (
             <div className="space-y-1">
-              {Object.entries(platformSlotCounts).map(([platform, count]) => (
+              {Object.entries(profileSlotCounts).map(([platform, count]) => (
                 <div key={platform} className="text-xs flex items-center justify-between">
                   <span className="text-gray-700 dark:text-gray-300">{prettyPlatform(platform)}</span>
                   <span className={`font-medium ${count >= 4 ? 'text-green-600' : 'text-amber-600'}`}>
@@ -234,6 +311,12 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
 
       {error && (
         <div className="text-xs text-red-600 dark:text-red-400">{error}</div>
+      )}
+
+      {successMessage && (
+        <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-700 rounded-lg p-3 text-xs text-green-800 dark:text-green-400">
+          {successMessage}
+        </div>
       )}
 
       {/* Candidate evaluations from discovery audits */}
@@ -346,6 +429,40 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                                   View Profile ↗
                                 </a>
                               )}
+                              {/* Per-platform slot promotion — only for analyst-flagged gold-standard evaluations */}
+                              {pe.is_gold_standard === true && activeProfile && (() => {
+                                const slotKey = `${candidate.business_name.trim().toLowerCase()}|${pe.platform.trim().toLowerCase()}`;
+                                const isPromoted = promotedSlots.has(slotKey);
+                                const isPromoting = promotingKey === `${candidate.business_name}|${pe.platform}`;
+                                if (isPromoted) {
+                                  return (
+                                    <span className={`px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium ${pe.profile_url ? '' : 'ml-auto'}`}>
+                                      ✓ In {prettyPlatform(pe.platform)} slot
+                                    </span>
+                                  );
+                                }
+                                const slotCount = profileSlotCounts[pe.platform] ?? 0;
+                                const slotFull = slotCount >= 4;
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={isPromoting || slotFull}
+                                    onClick={() => handlePromote(candidate, pe.platform)}
+                                    className={`text-xs px-2 py-0.5 rounded font-medium transition-colors ${pe.profile_url ? '' : 'ml-auto'} ${
+                                      slotFull
+                                        ? 'bg-gray-100 dark:bg-neutral-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50'
+                                    }`}
+                                    title={slotFull ? `${prettyPlatform(pe.platform)} slot is full (4/4)` : `Add to ${prettyPlatform(pe.platform)} gold-standard slot`}
+                                  >
+                                    {isPromoting
+                                      ? 'Adding…'
+                                      : slotFull
+                                      ? 'Slot full'
+                                      : `+ Add to ${prettyPlatform(pe.platform)} slot`}
+                                  </button>
+                                );
+                              })()}
                             </div>
                             {/* Quality rationale */}
                             {pe.quality_rationale && (
@@ -429,11 +546,54 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
             The analyst evaluated {allCandidates.length} independent candidate{allCandidates.length !== 1 ? 's' : ''} against
             the established gold-standard quality gates for {campaign.category || 'this category'}.
             None passed all non-negotiable gates on any platform. This is a valid outcome — the bar is
-            set by the establishment scan&apos;s exemplars (e.g. Naimie&apos;s at 9.6/10 on Google) and
-            most independents won&apos;t clear it on every platform.
+            set by the establishment scan&apos;s exemplars and most independents won&apos;t clear it on every platform.
           </p>
+
+          {/* Establishment exemplars — already proven gold-standard businesses */}
+          {establishmentExemplars.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs font-medium text-blue-900 dark:text-blue-300 mb-1">
+                Existing benchmark exemplars from the establishment profile ({establishmentExemplars.length}):
+              </div>
+              <p className="text-xs text-blue-700 dark:text-blue-400 mb-2">
+                These businesses already qualified as gold standard in the establishment scan.
+                They remain the active benchmark for audits and fulfillment. No new exemplars were
+                added by this discovery scan, but the existing bar is intact.
+              </p>
+              <div className="space-y-1.5">
+                {establishmentExemplars.map((ex, idx) => {
+                  const goldPlatforms = (ex.platform_evaluations ?? [])
+                    .filter((pe) => pe.is_gold_standard === true);
+                  const bestScore = Math.max(...(ex.platform_evaluations ?? []).map((pe) => pe.quality_score ?? 0));
+                  return (
+                    <div key={idx} className="bg-white dark:bg-neutral-800 rounded p-2 border border-amber-100 dark:border-amber-800">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-medium text-gray-900 dark:text-white">{ex.business_name}</span>
+                        <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded text-xs font-medium">
+                          Gold Standard ({goldPlatforms.length} platform{goldPlatforms.length !== 1 ? 's' : ''})
+                        </span>
+                        {ex.city && <span className="text-xs text-gray-500">{ex.city}{ex.state ? `, ${ex.state}` : ''}</span>}
+                        {bestScore > 0 && <span className="text-xs text-gray-400">Best: {bestScore}/10</span>}
+                      </div>
+                      {ex.category_notes && (
+                        <div className="text-xs text-gray-500 mt-1 italic">{ex.category_notes}</div>
+                      )}
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {goldPlatforms.map((pe) => (
+                          <span key={pe.platform} className="text-xs px-1 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded">
+                            {prettyPlatform(pe.platform)} {pe.quality_score != null ? `${pe.quality_score}/10` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <div className="text-xs font-medium text-blue-900 dark:text-blue-300">Try narrowing the scan:</div>
+            <div className="text-xs font-medium text-blue-900 dark:text-blue-300">Try narrowing the scan to find new exemplars:</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="bg-white dark:bg-neutral-800 rounded p-2 border border-blue-100 dark:border-blue-800">
                 <div className="text-xs font-medium text-gray-700 dark:text-gray-300">Platform-specific</div>
@@ -459,8 +619,7 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
             </div>
           </div>
           <div className="mt-3 text-xs text-blue-700 dark:text-blue-400">
-            Alternatively, the existing establishment exemplars (Naimie&apos;s, Frends Beauty, Alcone, Zoet) remain
-            the active gold standard. These candidates can still be audited and fulfilled against that bar —
+            The discovered candidates can still be audited and fulfilled against the existing gold-standard bar —
             they just didn&apos;t qualify as new exemplars.
           </div>
         </div>

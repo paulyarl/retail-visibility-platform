@@ -5939,6 +5939,38 @@ const intelligenceProfilePublishSchema = z.object({
   configurationJson: z.record(z.string(), z.any()),
 });
 
+// Schema for promoting a discovered candidate into a gold-standard profile's
+// per-platform slot. The candidate is the full scan-output object; the platform
+// specifies which slot to flip is_gold_standard on.
+const intelligenceProfileAddCandidateSchema = z.object({
+  candidate: z.object({
+    business_name: z.string().min(1).max(200),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    nap: z.object({
+      name: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+      phone: z.string().nullable().optional(),
+    }).optional(),
+    ownership_type: z.enum(['independent', 'small_group', 'franchise', 'chain']).optional(),
+    location_count_estimate: z.number().nullable().optional(),
+    independence_rationale: z.string().nullable().optional(),
+    platform_evaluations: z.array(z.object({
+      platform: z.string().min(1),
+      profile_url: z.string().nullable().optional(),
+      quality_score: z.number().nullable().optional(),
+      quality_rationale: z.string().nullable().optional(),
+      is_gold_standard: z.boolean().nullable().optional(),
+      branding_artifacts: z.record(z.string(), z.any()).nullable().optional(),
+      platform_config: z.record(z.string(), z.any()).nullable().optional(),
+      quality_gates_passed: z.array(z.string()).optional(),
+      quality_gates_failed: z.array(z.string()).optional(),
+    })).optional(),
+    category_notes: z.string().nullable().optional(),
+  }),
+  platform: z.string().min(1).max(20),
+});
+
 // GET /intelligence-profiles — list active profiles (optional ?focus= filter)
 router.get('/intelligence-profiles', async (req, res) => {
   try {
@@ -6041,6 +6073,48 @@ router.post('/intelligence-profiles/:id/publish', async (req, res) => {
       categoryName: parsed.categoryName,
       configurationJson: parsed.configurationJson,
     }, getCtx(req));
+    res.status(201).json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /intelligence-profiles/:id/candidates — promote a discovered candidate
+// into a specific platform's gold-standard slot on the active profile.
+// Creates a new active version with the candidate upserted and the target
+// platform's is_gold_standard flag set to true.
+router.post('/intelligence-profiles/:id/candidates', async (req, res) => {
+  try {
+    const parsed = intelligenceProfileAddCandidateSchema.parse(req.body);
+    const profile = await IntelligenceProfileService.getInstance().addGoldStandardCandidate(
+      req.params.id,
+      {
+        candidate: parsed.candidate,
+        platform: parsed.platform,
+      },
+      getCtx(req),
+    );
+    // Audit the operator-initiated slot promotion
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: PLATFORM_SCOPE,
+        actor: req.user?.id || 'unknown',
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: `${profile.id}@${profile.version}`,
+          action_description: 'operator_promote_gold_standard_candidate',
+          profile_id: profile.id,
+          profile_version: profile.version,
+          candidate_name: parsed.candidate.business_name,
+          platform: parsed.platform,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] gold-standard candidate promotion audit failed', getCtx(req), { error: (e as Error).message });
+    }
     res.status(201).json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
