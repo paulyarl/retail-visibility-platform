@@ -46,24 +46,49 @@ The gold-standard profile will be used to:
 === PLATFORM FOCUS ===
 {{platform}} is the platform this scan focuses on. If the platform is "all", evaluate candidates across all major platforms (Google, Yelp, Facebook, BBB, Apple Maps, Bing). If a specific platform is named, focus the evaluation on that platform but still note cross-platform presence.
 
+=== ELIGIBILITY — INDEPENDENT BUSINESSES ONLY ===
+This scan targets INDEPENDENT, owner-operated businesses. The gold standard must reflect what an excellent independent operator can realistically achieve — NOT what a national chain with dedicated marketing staff can do. Chain and franchise profiles are structurally unreachable benchmarks for independent operators and must be excluded.
+
+EXCLUDE these business types from candidacy:
+- National or regional chains (more than ~10 corporate-owned locations)
+- Franchised systems (businesses operating under a franchisor brand, even if a single unit is locally owned)
+- Corporate-owned subsidiaries of holding companies or public companies
+- Big-box or mass retailers where this category is a department, not the whole business
+- Professional-only / trade-only distributors that do not sell to the general public (unless the category explicitly targets trade-only)
+
+A business is ELIGIBLE if it is:
+- Single-location, OR a small locally-owned group (<= ~10 locations) under common local ownership, AND
+- Independently branded (not a licensed franchise name or national chain banner), AND
+- Open to the general public (retail, not trade-only — unless the category is inherently trade-only)
+
+For each candidate, you MUST record:
+- ownership_type: "independent" | "small_group" | "franchise" | "chain"
+- location_count_estimate: approximate number of locations (number or null)
+- independence_rationale: a brief note on why this business qualifies as independent
+
+If a well-known business in this category is a franchise or chain, do NOT include it as a candidate. Instead, note the exclusion in scan_metadata.excluded_candidates with the business name and exclusion reason. This prevents future scans from re-surfacing the same chain.
+
 === CANDIDATE SELECTION ===
 Find businesses that:
+- Are INDEPENDENT, owner-operated businesses (see ELIGIBILITY section — no franchises, chains, or corporate subsidiaries)
 - Have a strong, well-maintained profile on the target platform(s)
 - Use the correct primary category and relevant additional categories
 - Have comprehensive branding (logo, cover photo, multiple photos)
 - Have accurate and consistent NAP (name, address, phone)
 - Have a functional website linked from their profile
 - Have active engagement (respond to reviews, post updates)
-- Are recognized as leaders in their category by the community
+- Are recognized as leaders in their category by the local community (not national brand recognition)
+- Span at least 3 distinct states/regions when possible (avoid coastal/metro clustering)
 
 Evaluate each candidate per platform:
 - profile_url: the LIVE destination URL on the platform (e.g. "https://www.google.com/maps/place/...")
 - quality_score: 0-10 based on profile completeness, branding, accuracy, engagement
 - quality_rationale: why this score
-- is_gold_standard: true if the candidate meets the bar (up to 4 per platform)
+- is_gold_standard: true if the candidate meets the bar (up to 4 per platform). Only independent/small_group businesses can qualify.
 - branding_artifacts: what the candidate has (logo, cover photo, photo count, photo types)
 - platform_config: categories, attributes, description quality
 - quality_gates_passed/failed: which gates this candidate passed/failed
+- ownership_type, location_count_estimate, independence_rationale: recorded per candidate (see ELIGIBILITY)
 
 === EXPECTED FIELDS ===
 Derive expected_fields from the top candidates:

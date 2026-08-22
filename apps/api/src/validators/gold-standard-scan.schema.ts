@@ -161,6 +161,12 @@ const candidateBusinessSchema = z.object({
     address: z.string().nullable().optional(),
     phone: z.string().nullable().optional(),
   }).passthrough().optional(),
+  /** Ownership type — independent, small_group, franchise, or chain. */
+  ownership_type: z.enum(['independent', 'small_group', 'franchise', 'chain']).nullable().optional(),
+  /** Approximate number of locations (for independence verification). */
+  location_count_estimate: z.number().nullable().optional(),
+  /** Why this business qualifies as independent (or why it was excluded). */
+  independence_rationale: z.string().nullable().optional(),
   /** Per-platform evaluations for this candidate. */
   platform_evaluations: z.array(platformEvaluationSchema).optional(),
   /** Category-specific notes (e.g. "African goods store with full butcher counter"). */
@@ -181,6 +187,11 @@ const scanMetadataSchema = z.object({
   expected_field_derivation: z.string().nullable().optional(),
   /** The platform focus of this scan. */
   platform_focus: platformFocusEnum,
+  /** Businesses considered but excluded (franchises, chains, etc.) with reasons. */
+  excluded_candidates: z.array(z.object({
+    business_name: z.string().min(1),
+    reason: z.string().min(1),
+  }).passthrough()).optional(),
 }).passthrough();
 
 // ─── Top-level schema ────────────────────────────────────────────────────
@@ -265,6 +276,9 @@ Return a single JSON object with this structure (the Gold Standard Scan result):
         "address": "<string|null>",
         "phone": "<string|null>"
       },
+      "ownership_type": "independent|small_group|franchise|chain",
+      "location_count_estimate": <number|null>,
+      "independence_rationale": "<string: why this business qualifies as independent>",
       "platform_evaluations": [
         {
           "platform": "google|yelp|facebook|bbb|apple_maps|bing",
@@ -295,7 +309,10 @@ Return a single JSON object with this structure (the Gold Standard Scan result):
     "selection_criteria": "<string>",
     "platforms_evaluated": ["google", "yelp", ...],
     "expected_field_derivation": "<string>",
-    "platform_focus": "all|google|yelp|facebook|bbb|apple_maps|bing"
+    "platform_focus": "all|google|yelp|facebook|bbb|apple_maps|bing",
+    "excluded_candidates": [
+      { "business_name": "<string>", "reason": "<string: why excluded (franchise/chain/etc.)>" }
+    ]
   }
 }
 
@@ -316,4 +333,13 @@ Rules:
   "recommended" for nice-to-have fields.
 - category_key should be the normalized (lowercase, whitespace-collapsed) category name.
 - Up to 4 candidates per platform should be flagged is_gold_standard = true.
+- INDEPENDENT BUSINESSES ONLY. Only independent or small locally-owned groups
+  (<= ~10 locations) qualify as gold-standard candidates. Franchises, chains,
+  and corporate subsidiaries must be excluded and noted in
+  scan_metadata.excluded_candidates with the business name and exclusion reason.
+  Each candidate MUST include ownership_type, location_count_estimate, and
+  independence_rationale. A candidate with ownership_type "franchise" or "chain"
+  cannot have is_gold_standard = true.
+- Aim for geographic diversity: select candidates across at least 3 distinct
+  states/regions when possible to avoid coastal/metro clustering.
 `;

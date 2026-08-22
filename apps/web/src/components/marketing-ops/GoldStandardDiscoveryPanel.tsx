@@ -62,6 +62,10 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
   const allCandidates: Array<{
     business_name: string;
     city?: string;
+    state?: string;
+    ownership_type?: string;
+    location_count_estimate?: number | null;
+    independence_rationale?: string | null;
     platform_evaluations?: Array<any>;
     category_notes?: string;
   }> = [];
@@ -172,8 +176,23 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                       {candidate.business_name}
                     </div>
-                    {candidate.city && (
-                      <div className="text-xs text-gray-500">{candidate.city}</div>
+                    <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                      {candidate.city && <span>{candidate.city}{candidate.state ? `, ${candidate.state}` : ''}</span>}
+                      {candidate.ownership_type && (
+                        <span className={`px-1.5 py-0.5 rounded font-medium ${
+                          candidate.ownership_type === 'independent' || candidate.ownership_type === 'small_group'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                        }`}>
+                          {candidate.ownership_type === 'independent' ? 'Independent' :
+                           candidate.ownership_type === 'small_group' ? `Small group${candidate.location_count_estimate ? ` (${candidate.location_count_estimate})` : ''}` :
+                           candidate.ownership_type === 'franchise' ? 'Franchise' :
+                           candidate.ownership_type === 'chain' ? 'Chain' : candidate.ownership_type}
+                        </span>
+                      )}
+                    </div>
+                    {candidate.independence_rationale && (
+                      <div className="text-xs text-gray-500 mt-1">{candidate.independence_rationale}</div>
                     )}
                     {candidate.category_notes && (
                       <div className="text-xs text-gray-500 mt-1">{candidate.category_notes}</div>

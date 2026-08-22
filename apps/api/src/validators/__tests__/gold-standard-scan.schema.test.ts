@@ -171,6 +171,76 @@ describe('goldStandardScanSchema', () => {
     const result = goldStandardScanSchema.safeParse(valid);
     expect(result.success).toBe(true);
   });
+
+  it('accepts candidates with ownership_type, location_count_estimate, and independence_rationale', () => {
+    const valid = {
+      category_key: 'beauty_supply',
+      category_name: 'Beauty Supply Store',
+      platform_focus: 'all',
+      candidates: [
+        {
+          business_name: 'Independent Beauty Supply',
+          city: 'Atlanta',
+          state: 'GA',
+          ownership_type: 'independent',
+          location_count_estimate: 1,
+          independence_rationale: 'Single-location, family-owned, independently branded',
+          platform_evaluations: [
+            {
+              platform: 'google',
+              profile_url: 'https://www.google.com/maps/place/Independent+Beauty+Supply',
+              quality_score: 9,
+              is_gold_standard: true,
+            },
+          ],
+        },
+        {
+          business_name: 'Small Group Beauty',
+          city: 'Houston',
+          state: 'TX',
+          ownership_type: 'small_group',
+          location_count_estimate: 4,
+          independence_rationale: '4 locations under common local ownership, independently branded',
+        },
+      ],
+    };
+    const result = goldStandardScanSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts scan_metadata with excluded_candidates (franchises/chains)', () => {
+    const valid = {
+      category_key: 'beauty_supply',
+      category_name: 'Beauty Supply Store',
+      platform_focus: 'all',
+      scan_metadata: {
+        scan_date: '2026-08-21',
+        platform_focus: 'all',
+        excluded_candidates: [
+          { business_name: 'Sally Beauty', reason: 'National chain (~2,700 corporate-owned locations)' },
+          { business_name: 'CosmoProf', reason: 'Corporate subsidiary of Sally Beauty Holdings, trade-only' },
+        ],
+      },
+    };
+    const result = goldStandardScanSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid ownership_type value', () => {
+    const invalid = {
+      category_key: 'beauty_supply',
+      category_name: 'Beauty Supply Store',
+      platform_focus: 'all',
+      candidates: [
+        {
+          business_name: 'Test',
+          ownership_type: 'corporation',
+        },
+      ],
+    };
+    const result = goldStandardScanSchema.safeParse(invalid);
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('OUTPUT_SCHEMA_REGISTRY — gold_standard_scan registration', () => {
@@ -221,5 +291,26 @@ describe('GOLD_STANDARD_SCAN_PROMPT_SUFFIX', () => {
 
   it('mentions up to 4 candidates per platform', () => {
     expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('4');
+  });
+
+  it('mentions ownership_type field', () => {
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('ownership_type');
+  });
+
+  it('mentions independence_rationale field', () => {
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('independence_rationale');
+  });
+
+  it('mentions excluded_candidates field', () => {
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('excluded_candidates');
+  });
+
+  it('mentions INDEPENDENT BUSINESSES ONLY rule', () => {
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('INDEPENDENT BUSINESSES ONLY');
+  });
+
+  it('mentions franchise/chain exclusion', () => {
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('franchise');
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('chain');
   });
 });
