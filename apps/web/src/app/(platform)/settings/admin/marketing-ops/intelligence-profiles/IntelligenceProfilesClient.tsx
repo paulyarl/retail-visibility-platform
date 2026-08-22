@@ -41,6 +41,7 @@ import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus, Campaign, CampaignScope } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import GoldStandardProfileView, { isGoldStandardProfile, goldStandardSummary } from '@/components/marketing-ops/GoldStandardProfileView';
 
 const STATUS_COLORS: Record<ProfileStatus, string> = {
   draft: 'orange',
@@ -276,6 +277,7 @@ export default function IntelligenceProfilesClient() {
     const signals = config.category_signals as string[] | undefined;
     const prohibited = config.prohibited_inferences as string[] | undefined;
     const key = `${profile.id}:${profile.version}`;
+    const gsSummary = goldStandardSummary(profile);
 
     return (
       <Paper key={key} shadow="xs" radius="md" withBorder p="md" mb="sm">
@@ -307,6 +309,14 @@ export default function IntelligenceProfilesClient() {
                 {sources.length} specialized source{sources.length !== 1 ? 's' : ''} ·
                 {' '}{signals?.length ?? 0} signal{signals?.length !== 1 ? 's' : ''} ·
                 {' '}{prohibited?.length ?? 0} prohibited inference{prohibited?.length !== 1 ? 's' : ''}
+              </Text>
+            )}
+            {gsSummary && (
+              <Text size="xs" c="dimmed">
+                {gsSummary.candidateCount} benchmark candidate{gsSummary.candidateCount !== 1 ? 's' : ''} ·
+                {' '}{gsSummary.goldCount} gold-standard ·
+                {' '}{gsSummary.platformCount} platform{gsSummary.platformCount !== 1 ? 's' : ''} ·
+                {' '}{gsSummary.gateCount} quality gate{gsSummary.gateCount !== 1 ? 's' : ''}
               </Text>
             )}
           </Stack>
@@ -714,7 +724,7 @@ export default function IntelligenceProfilesClient() {
         onClose={() => setViewProfile(null)}
         title={viewProfile ? `${viewProfile.category_name} v${viewProfile.version} — ${FOCUS_LABELS[viewProfile.intelligence_focus]}` : ''}
         size="xl"
-        styles={{ body: { maxHeight: '70vh' } }}
+        styles={{ body: { maxHeight: '85vh' } }}
       >
         {viewProfile && (
           <Stack gap="sm">
@@ -727,11 +737,15 @@ export default function IntelligenceProfilesClient() {
               </Badge>
               <Text size="xs" c="dimmed" ff="monospace">{viewProfile.id}</Text>
             </Group>
-            <ScrollArea h={400} type="auto">
-              <Code block style={{ fontSize: 11 }}>
-                {JSON.stringify(viewProfile.configuration_json, null, 2)}
-              </Code>
-            </ScrollArea>
+            {isGoldStandardProfile(viewProfile) ? (
+              <GoldStandardProfileView profile={viewProfile} />
+            ) : (
+              <ScrollArea h={400} type="auto">
+                <Code block style={{ fontSize: 11 }}>
+                  {JSON.stringify(viewProfile.configuration_json, null, 2)}
+                </Code>
+              </ScrollArea>
+            )}
           </Stack>
         )}
       </Modal>
