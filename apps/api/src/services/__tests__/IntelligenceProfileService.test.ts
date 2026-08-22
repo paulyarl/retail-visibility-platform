@@ -69,6 +69,22 @@ describe('normalizeCategoryKey', () => {
   it('handles single-word categories', () => {
     expect(normalizeCategoryKey('Plumbing')).toBe('plumbing');
   });
+
+  it('converts underscores to spaces (LLM snake_case)', () => {
+    expect(normalizeCategoryKey('beauty_supply')).toBe('beauty supply');
+  });
+
+  it('converts hyphens to spaces (kebab-case)', () => {
+    expect(normalizeCategoryKey('auto-repair')).toBe('auto repair');
+  });
+
+  it('normalizes snake_case to match display form', () => {
+    expect(normalizeCategoryKey('Beauty Supply')).toBe(normalizeCategoryKey('beauty_supply'));
+  });
+
+  it('collapses mixed separators', () => {
+    expect(normalizeCategoryKey('  Beauty_Supply-Store  ')).toBe('beauty supply store');
+  });
 });
 
 describe('IntelligenceProfileService.renderProfileBlock', () => {

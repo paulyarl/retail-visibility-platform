@@ -103,10 +103,18 @@ export interface PromptResolution {
 
 /**
  * Normalize a category string for exact-match lookup against category_key.
- * Case/whitespace-insensitive. No fuzzy matching (§1B normative rule).
+ * Case/whitespace-insensitive. Also collapses underscores and hyphens to
+ * spaces so that LLM-produced snake_case/kebab-case keys (e.g.
+ * "beauty_supply") normalize to the same canonical form as the display
+ * category (e.g. "Beauty Supply" → "beauty supply"). No fuzzy matching
+ * (§1B normative rule).
  */
 export function normalizeCategoryKey(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ');
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
 }
 
 /**

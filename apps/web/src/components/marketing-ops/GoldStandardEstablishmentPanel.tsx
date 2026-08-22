@@ -42,8 +42,25 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
           marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards'),
         ]);
         if (cancelled) return;
-        // Filter drafts to this campaign's category
-        setDraftProfiles(drafts.filter((p) => p.category_key === campaign.category));
+        // Filter drafts to this campaign's category using normalized
+        // comparison (lowercase, underscores/hyphens → spaces) so that
+        // LLM-produced snake_case keys like "beauty_supply" match the
+        // campaign's display category "Beauty Supply".
+        const normalizedCategory = campaign.category
+          .trim()
+          .toLowerCase()
+          .replace(/[_-]+/g, ' ')
+          .replace(/\s+/g, ' ');
+        setDraftProfiles(
+          drafts.filter((p) => {
+            const normalizedKey = (p.category_key || '')
+              .trim()
+              .toLowerCase()
+              .replace(/[_-]+/g, ' ')
+              .replace(/\s+/g, ' ');
+            return normalizedKey === normalizedCategory;
+          }),
+        );
         setActiveProfile(active);
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load gold-standard profiles');

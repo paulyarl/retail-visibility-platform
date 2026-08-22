@@ -5188,7 +5188,12 @@ MarketingOpsService.prototype.resolveIntelligenceProfile = async function (categ
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve intelligence profile');
   }
-  return result.data?.data ?? result.data;
+  // The resolve endpoint wraps as { success, data: profile | null }.
+  // When no profile is found, data is explicitly null. The standard
+  // `result.data?.data ?? result.data` unwrap would fall back to the
+  // wrapper object (truthy but no id/version), causing the panel to
+  // render a phantom profile. Use explicit null-coalescing instead.
+  return result.data?.data ?? null;
 };
 
 MarketingOpsService.prototype.createIntelligenceProfile = async function (input: {
