@@ -2,10 +2,15 @@
  * Reproduction script for the 400 validation_error on
  * POST /api/admin/marketing-ops/prompts/executions/external
  *
- * Simulates the exact parsing flow:
- *   extractJsonCandidates -> stripLlmJsonArtifacts -> JSON.parse -> schema.safeParse
+ * Usage:
+ *   doppler run --config local -- npx tsx src/scripts/repro-gold-standard-400.ts < path/to/request-body.json
+ *
+ * Or save the request body to a file and pass the path:
+ *   doppler run --config local -- npx tsx src/scripts/repro-gold-standard-400.ts path/to/request-body.json
  */
 import { goldStandardScanSchema } from '../validators/gold-standard-scan.schema';
+
+// ─── Copied from MarketingPromptService.ts (keep in sync) ────────────────
 
 function stripLlmJsonArtifacts(raw: string): string {
   try {
@@ -79,6 +84,8 @@ function extractJsonCandidates(raw: string): string[] {
         candidates.push(text.substring(i, endIdx + 1));
         i = endIdx + 1;
       } else {
+        // Unbalanced opener — log and skip
+        console.log(`  [extractJsonCandidates] UNBALANCED '${openChar}' at position ${i}, skipping`);
         i++;
       }
     } else {
@@ -88,53 +95,139 @@ function extractJsonCandidates(raw: string): string[] {
   return candidates;
 }
 
+// ─── Main ────────────────────────────────────────────────────────────────
+
 async function main() {
-  // Read the raw_output from the file we saved
   const fs = await import('fs');
-  const rawOutput = fs.readFileSync(__dirname + '/repro-raw-output.json', 'utf8');
 
-  console.log('raw_output length:', rawOutput.length);
-  console.log('raw_output starts with:', JSON.stringify(rawOutput.substring(0, 80)));
-  console.log();
-
-  const candidates = extractJsonCandidates(rawOutput);
-  console.log('Number of JSON candidates:', candidates.length);
-  for (let idx = 0; idx < candidates.length; idx++) {
-    console.log(`  Candidate ${idx}: length=${candidates[idx].length}, starts with: ${JSON.stringify(candidates[idx].substring(0, 80))}`);
+  // Read request body from file arg or stdin
+  let bodyText: string;
+  const fileArg = process.argv[2];
+  if (fileArg) {
+    bodyText = fs.readFileSync(fileArg, 'utf8');
+  } else {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk as Buffer);
+    }
+    bodyText = Buffer.concat(chunks).toString('utf8');
   }
+
+  console.log('=== Request Body Analysis ===\n');
+  console.log(`Body length: ${bodyText.length} chars`);
+
+  // Parse the outer request body JSON
+  let body: any;
+  try {
+    body = JSON.parse(bodyText);
+  } catch (e) {
+    console.log('FAILED to parse request body as JSON:', (e as Error).message);
+    console.log('First 200 chars:', JSON.stringify(bodyText.substring(0, 200)));
+    return;
+  }
+
+  const rawOutput = body.raw_output;
+  console.log(`raw_output type: ${typeof rawOutput}`);
+  console.log(`raw_output length: ${rawOutput?.length}`);
+
+  if (typeof rawOutput !== 'string') {
+    console.log('raw_output is NOT a string! Value:', JSON.stringify(rawOutput)?.substring(0, 200));
+    return;
+  }
+
+  console.log(`raw_output first 120 chars: ${JSON.stringify(rawOutput.substring(0, 120))}`);
+  console.log(`raw_output last 80 chars: ${JSON.stringify(rawOutput.substring(rawOutput.length - 80))}`);
   console.log();
+
+  // Check if raw_output is itself valid JSON
+  try {
+    const directParse = JSON.parse(rawOutput);
+    console.log('=== Direct JSON.parse(raw_output) ===');
+    console.log(`Success! Top-level type: ${typeof directParse}`);
+    if (typeof directParse === 'object' && directParse !== null) {
+      console.log(`Top-level keys: ${Object.keys(directParse).join(', ')}`);
+      console.log(`category_key: ${JSON.stringify(directParse.category_key)}`);
+      console.log(`category_name: ${JSON.stringify(directParse.category_name)}`);
+      console.log(`platform_focus: ${JSON.stringify(directParse.platform_focus)}`);
+    } else {
+      console.log(`WARNING: Parsed value is ${typeof directParse}, not an object!`);
+      console.log(`Value (first 200): ${JSON.stringify(String(directParse).substring(0, 200))}`);
+    }
+    console.log();
+  } catch (e) {
+    console.log('=== Direct JSON.parse(raw_output) FAILED ===');
+    console.log(`Error: ${(e as Error).message}`);
+    console.log();
+  }
+
+  // Run through extractJsonCandidates
+  console.log('=== extractJsonCandidates ===');
+  const candidates = extractJsonCandidates(rawOutput);
+  console.log(`Found ${candidates.length} candidate(s)`);
+  console.log();
+
+  let firstValidationIssues: string | null = null;
+  let parsedJson: any | null = null;
 
   for (let idx = 0; idx < candidates.length; idx++) {
     const candidate = candidates[idx];
-    const stripped = stripLlmJsonArtifacts(candidate);
-    console.log(`Candidate ${idx} after stripLlmJsonArtifacts:`);
-    console.log(`  length: ${stripped.length}`);
-    console.log(`  starts with: ${JSON.stringify(stripped.substring(0, 80))}`);
-    console.log(`  identical to original: ${stripped === candidate}`);
+    console.log(`--- Candidate ${idx} ---`);
+    console.log(`  length: ${candidate.length}`);
+    console.log(`  first 120 chars: ${JSON.stringify(candidate.substring(0, 120))}`);
+    console.log(`  last 80 chars: ${JSON.stringify(candidate.substring(candidate.length - 80))}`);
 
-    let parsed: any;
+    const stripped = stripLlmJsonArtifacts(candidate);
+    const changed = stripped !== candidate;
+    console.log(`  stripLlmJsonArtifacts changed: ${changed}`);
+    if (changed) {
+      console.log(`  stripped first 120: ${JSON.stringify(stripped.substring(0, 120))}`);
+    }
+
+    let candidateJson: any;
     try {
-      parsed = JSON.parse(stripped);
+      candidateJson = JSON.parse(stripped);
     } catch (e) {
       console.log(`  JSON.parse FAILED: ${(e as Error).message}`);
+      console.log();
       continue;
     }
 
-    console.log(`  JSON.parse succeeded. Top-level keys: ${Object.keys(parsed).join(', ')}`);
-    console.log(`  category_key: ${JSON.stringify(parsed.category_key)}`);
-    console.log(`  category_name: ${JSON.stringify(parsed.category_name)}`);
-    console.log(`  platform_focus: ${JSON.stringify(parsed.platform_focus)}`);
-
-    const result = goldStandardScanSchema.safeParse(parsed);
-    if (result.success) {
-      console.log(`  Schema validation: PASSED`);
+    console.log(`  JSON.parse succeeded. Type: ${typeof candidateJson}`);
+    if (typeof candidateJson === 'object' && candidateJson !== null) {
+      console.log(`  Top-level keys: ${Object.keys(candidateJson).join(', ')}`);
+      console.log(`  category_key: ${JSON.stringify(candidateJson.category_key)}`);
+      console.log(`  category_name: ${JSON.stringify(candidateJson.category_name)}`);
+      console.log(`  platform_focus: ${JSON.stringify(candidateJson.platform_focus)}`);
     } else {
-      console.log(`  Schema validation: FAILED`);
-      for (const issue of result.error.issues) {
-        console.log(`    ${issue.path.join('.')}: ${issue.message} (code: ${issue.code})`);
+      console.log(`  WARNING: Parsed value is ${typeof candidateJson}, not an object!`);
+      console.log(`  Value (first 200): ${JSON.stringify(String(candidateJson).substring(0, 200))}`);
+    }
+
+    const result = goldStandardScanSchema.safeParse(candidateJson);
+    console.log(`  Schema validation: ${result.success ? 'PASSED' : 'FAILED'}`);
+    if (!result.success) {
+      const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+      console.log(`  Issues: ${issues}`);
+      if (!firstValidationIssues) {
+        firstValidationIssues = issues;
       }
+    } else {
+      parsedJson = candidateJson;
     }
     console.log();
+  }
+
+  console.log('=== Final Result ===');
+  if (parsedJson) {
+    console.log('SUCCESS: A candidate validated against goldStandardScanSchema');
+  } else if (firstValidationIssues) {
+    console.log(`FAILED: No candidate validated. First candidate issues:`);
+    console.log(`  ${firstValidationIssues}`);
+    console.log();
+    console.log('This matches the production error:');
+    console.log(`  External result does not match the "gold_standard_scan" output schema: ${firstValidationIssues}`);
+  } else {
+    console.log('FAILED: No valid JSON found in any candidate');
   }
 }
 

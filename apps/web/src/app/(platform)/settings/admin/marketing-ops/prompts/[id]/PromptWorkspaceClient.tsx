@@ -211,6 +211,51 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     return () => { cancelled = true; };
   }, [selectedCampaign, template, templateFocus]);
 
+  // Establishment workflow communication state — after a successful
+  // establishment scan/import, the operator still needs to review and
+  // activate the resulting draft profile before downstream campaigns can
+  // consume it. This panel surfaces that next step in-context.
+  const [estabDrafts, setEstabDrafts] = useState<IntelligenceProfile[]>([]);
+  const [estabActive, setEstabActive] = useState<IntelligenceProfile | null>(null);
+  const [estabLoading, setEstabLoading] = useState(false);
+  const [estabRefreshKey, setEstabRefreshKey] = useState(0);
+
+  // Establishment workflow communication — fetch draft + active profiles
+  // for the selected campaign's category so the panel can surface the
+  // "activate the draft" next step after a successful scan/import.
+  useEffect(() => {
+    if (!isIntelligenceEstablishment || !selectedCampaign?.category) {
+      setEstabDrafts([]);
+      setEstabActive(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setEstabLoading(true);
+      try {
+        const [drafts, active] = await Promise.all([
+          marketingOpsService.listIntelligenceProfileDrafts(templateFocus),
+          marketingOpsService.resolveIntelligenceProfile(
+            selectedCampaign.category!,
+            templateFocus,
+            selectedCampaign.city || undefined,
+          ),
+        ]);
+        if (cancelled) return;
+        setEstabDrafts(drafts.filter((p) => p.category_key === selectedCampaign.category));
+        setEstabActive(active);
+      } catch {
+        if (!cancelled) {
+          setEstabDrafts([]);
+          setEstabActive(null);
+        }
+      } finally {
+        if (!cancelled) setEstabLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isIntelligenceEstablishment, selectedCampaign, templateFocus, estabRefreshKey]);
+
   const compatibleCampaigns = useMemo(() => {
     if (!template?.scope) return campaigns;
     const scopeMatch = campaigns.filter((c) => c.scope === template.scope);
@@ -503,6 +548,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       // Capture the returned execution and surface it in the Result panel.
       setLastExecution(execution);
       setResultOpen(true);
+      // Refresh the establishment workflow panel so a newly-imported draft
+      // appears immediately after a successful execution.
+      setEstabRefreshKey((k) => k + 1);
       await fetchTemplate();
     } catch (err: any) {
       setError(err.message || 'Failed to execute prompt');
@@ -588,6 +636,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       setImportProvider('');
       setImportRunId('');
       setImportNotes('');
+      // Refresh the establishment workflow panel so the newly-created draft
+      // profile appears in the "Activate" reminder immediately.
+      setEstabRefreshKey((k) => k + 1);
       await fetchTemplate();
     } catch (err: any) {
       setImportError(err.message || 'Failed to import external result');
@@ -855,9 +906,75 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right: Rendered Output + Execution Result + Next Steps */}
+          {/* Workflow Communication panel — establishment templates only.
+              After a successful scan/import, reminds the operator that the
+              resulting draft profile must be reviewed and activated before
+              downstream campaigns can consume it. Keeps the workflow moving
+              to the next logical task. */}
+          {isIntelligenceEstablishment && selectedCampaignId && (
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <ArrowRight className="w-4 h-4 text-blue-500" />
+                Workflow Next Step
+              </h2>
+              {estabLoading ? (
+                <p className="text-sm text-gray-400">Checking profile status…</p>
+              ) : estabDrafts.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                      The establishment scan produced <strong>{estabDrafts.length}</strong> draft
+                      {' '}{templateFocus.replace('_', ' ')} profile{estabDrafts.length > 1 ? 's' : ''} for
+                      {' '}<strong>{selectedCampaign?.category}</strong>.
+                      {' '}Review and <strong>activate</strong> the draft before downstream discovery/audit
+                      {' '}campaigns can consume it.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {estabDrafts.map((p) => (
+                      <div
+                        key={`${p.id}-${p.version}`}
+                        className="flex items-center justify-between bg-gray-50 dark:bg-neutral-900/50 rounded-lg p-3 border border-gray-200 dark:border-neutral-700"
+                      >
+                        <div className="text-sm">
+                          <span className="font-medium text-gray-900 dark:text-white">{p.category_name}</span>
+                          <span className="text-gray-500 ml-2 text-xs">v{p.version} · draft</span>
+                        </div>
+                        <Link
+                          href="/settings/admin/marketing-ops/intelligence-profiles"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          Review &amp; Activate
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : estabActive ? (
+                <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-3">
+                  <p className="text-xs text-green-700 dark:text-green-400">
+                    <strong>Profile active.</strong> {estabActive.id} v{estabActive.version}
+                    {' '}is the active {templateFocus.replace('_', ' ')} profile for
+                    {' '}<strong>{selectedCampaign?.category}</strong>.
+                    {' '}Downstream campaigns can now consume it. No further action needed.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-900/50 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Run the establishment scan and import the result to create a draft
+                    {' '}{templateFocus.replace('_', ' ')} profile for
+                    {' '}<strong>{selectedCampaign?.category}</strong>. After import, a draft will appear here
+                    {' '}with a link to review and activate it.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="space-y-4">
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
             <div className="flex items-center justify-between mb-3">
