@@ -164,16 +164,29 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
   });
 
   it('flips is_gold_standard on an existing candidate for the target platform (per-platform promotion)', async () => {
+    // Scenario: the analyst flagged the candidate gold-standard on BOTH Google
+    // and Yelp in the scan. The operator already promoted to Google's slot
+    // (prior call). Now the operator promotes to Yelp's slot. The input
+    // candidate (from the scan) has is_gold_standard=true on both platforms;
+    // the profile's existing copy only has Google flipped so far.
+    const candidateFlaggedOnBoth = {
+      ...newCandidate,
+      platform_evaluations: [
+        { platform: 'google', profile_url: 'https://www.google.com/maps/place/Afro+Ethiopian+Market', quality_score: 9, is_gold_standard: true, quality_gates_passed: ['business_name'], quality_gates_failed: [] },
+        { platform: 'yelp', profile_url: 'https://www.yelp.com/biz/afro-ethiopian-market', quality_score: 8, is_gold_standard: true, quality_gates_passed: ['business_name'], quality_gates_failed: [] },
+      ],
+    };
     // Profile already has the candidate, but only Google is flagged gold-standard
+    // (from the prior promotion to Google's slot)
     const profileWithCandidate = {
       ...activeProfile,
       configuration_json: {
         candidates: [
           {
-            ...newCandidate,
+            ...candidateFlaggedOnBoth,
             platform_evaluations: [
               { platform: 'google', is_gold_standard: true, quality_score: 9 },
-              { platform: 'yelp', is_gold_standard: false, quality_score: 7 },
+              { platform: 'yelp', is_gold_standard: false, quality_score: 8 },
             ],
           },
         ],
@@ -185,7 +198,7 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
     mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValue({ count: 1 });
 
     await service.addGoldStandardCandidate('gs-african-grocery', {
-      candidate: newCandidate,
+      candidate: candidateFlaggedOnBoth,
       platform: 'yelp',
     });
 
@@ -307,6 +320,15 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
   });
 
   it('matches existing candidate case-insensitively by business_name', async () => {
+    // Analyst flagged gold-standard on both Google and Yelp; operator already
+    // promoted to Google, now promoting to Yelp.
+    const candidateFlaggedOnBoth = {
+      ...newCandidate,
+      platform_evaluations: [
+        { platform: 'google', quality_score: 9, is_gold_standard: true, quality_gates_passed: ['business_name'], quality_gates_failed: [] },
+        { platform: 'yelp', quality_score: 8, is_gold_standard: true, quality_gates_passed: ['business_name'], quality_gates_failed: [] },
+      ],
+    };
     const profileWithCandidate = {
       ...activeProfile,
       configuration_json: {
@@ -315,7 +337,7 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
             business_name: 'afro ethiopian market', // lowercase
             platform_evaluations: [
               { platform: 'google', is_gold_standard: true, quality_score: 9 },
-              { platform: 'yelp', is_gold_standard: false, quality_score: 7 },
+              { platform: 'yelp', is_gold_standard: false, quality_score: 8 },
             ],
           },
         ],
@@ -328,7 +350,7 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
 
     // Input candidate has different casing: "Afro Ethiopian Market"
     await service.addGoldStandardCandidate('gs-african-grocery', {
-      candidate: newCandidate,
+      candidate: candidateFlaggedOnBoth,
       platform: 'yelp',
     });
 
