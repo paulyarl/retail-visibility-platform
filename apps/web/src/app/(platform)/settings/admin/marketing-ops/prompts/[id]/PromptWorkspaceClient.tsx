@@ -442,6 +442,10 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       state: selectedCampaign.state ?? '',
       tone: selectedCampaign.tone || '',
       attributes: (selectedCampaign.attributes || []).join(', '),
+      // Gold-standard campaigns: populate the platform variable from the
+      // campaign's intelligence_platform field so the scan prompt resolves
+      // {{platform}} correctly (e.g., "all", "google", "yelp").
+      platform: (selectedCampaign as any).intelligence_platform ?? '',
     }));
     setServerRendered(null);
   }, [selectedCampaign]);
