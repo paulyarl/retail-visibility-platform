@@ -419,7 +419,7 @@ function CandidateCard({ candidate, idx }: { candidate: Candidate; idx: number }
 
         {/* Per-platform evaluations */}
         {evaluations.length > 0 && (
-          <Table striped highlightOnHover fontSize="xs" style={{ tableLayout: 'fixed' }}>
+          <Table striped highlightOnHover style={{ tableLayout: 'fixed', fontSize: 'var(--mantine-font-size-xs)' }}>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ width: 90 }}>Platform</Table.Th>

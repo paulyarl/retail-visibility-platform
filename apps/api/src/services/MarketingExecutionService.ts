@@ -423,6 +423,68 @@ export class MarketingExecutionService extends BaseService {
     // as-is (like the intelligence_profile establishment template).
     const isGoldStandardFocus = (input.campaign.intelligence_focus || '') === 'gold_standards';
 
+    // ─── Gold-standard discovery scan: inject the activated profile ──────
+    // Discovery scans consume the already-established gold-standard profile
+    // (created by a prior establishment scan) as evaluation criteria. The
+    // serialized block tells the analyst to evaluate candidates against the
+    // established expected_fields/quality_gates instead of deriving them.
+    // Without this injection, the discovery prompt is identical to the
+    // establishment prompt — the analyst has no benchmark to evaluate
+    // against and re-derives expected_fields from scratch.
+    //
+    // Establishment scans skip this branch — they ARE the derivation step.
+    if (isGoldStandardFocus && isSeek && campaignScope === 'intelligence' && hasCategory) {
+      const campaignKind = (input.campaign.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment';
+      if (campaignKind === 'discovery') {
+        const profileService = IntelligenceProfileService.getInstance();
+        const goldStandard = await profileService.resolveGoldStandard(category, ctx);
+        if (!goldStandard) {
+          // No active gold-standard profile — return base render with a
+          // degraded-mode warning so the analyst knows to run an
+          // establishment scan first.
+          const warning = '\n\n=== DEGRADED MODE — NO ACTIVE GOLD STANDARD PROFILE ===\n'
+            + `No active gold-standard profile exists for category "${category}". `
+            + 'Run an Establishment campaign first to create the gold-standard profile. '
+            + 'This discovery scan will run in degraded mode — evaluate candidates against '
+            + 'your own best judgment of what "excellent" looks like for this category, '
+            + 'and derive expected_fields from the top candidates as a fallback.\n';
+          logger.warn('Gold standard discovery scan resolved without active profile (degraded)', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            campaignKind,
+          });
+          return {
+            renderedPrompt: this.appendPromptSuffix(baseRendered + warning, promptSuffix),
+            resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+          };
+        }
+        const discoveryBlock = profileService.serializeGoldStandard(goldStandard, 'discovery');
+        if (!discoveryBlock) {
+          return {
+            renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+            resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+          };
+        }
+        const amplified = baseRendered + '\n' + discoveryBlock;
+        logger.info('Gold standard discovery profile injected', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          goldStandardProfileId: goldStandard.id,
+          goldStandardProfileVersion: goldStandard.version,
+        });
+        return {
+          renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
+          resolution: {
+            profile_id: goldStandard.id,
+            profile_version: goldStandard.version,
+            intelligence_mode: 'profile',
+          },
+        };
+      }
+      // Establishment kind — fall through to the base render (the template
+      // body instructs the analyst to derive expected_fields from scratch).
+    }
+
     if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment && !isGoldStandardFocus) {
       const composer = PromptComposerService.getInstance();
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;

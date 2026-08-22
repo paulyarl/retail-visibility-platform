@@ -56,8 +56,10 @@ export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
  * Role for gold-standard injection into prompts.
  *   - 'benchmark' → audit/seek prompt: compare the business against the gold standard
  *   - 'target' → fulfill prompt: produce fixes that move toward the gold standard
+ *   - 'discovery' → gold-standard discovery scan: evaluate new candidates against
+ *     the already-established expected fields and quality gates (do NOT re-derive)
  */
-export type GoldStandardRole = 'benchmark' | 'target';
+export type GoldStandardRole = 'benchmark' | 'target' | 'discovery';
 
 export interface IntelligenceProfile {
   id: string;
@@ -1041,10 +1043,12 @@ export class IntelligenceProfileService extends BaseService {
     if (!expectedFields && !candidates) return '';
 
     const lines: string[] = [];
-    const roleLabel = role === 'benchmark' ? 'BENCHMARK' : 'TARGET';
+    const roleLabel = role === 'benchmark' ? 'BENCHMARK' : role === 'target' ? 'TARGET' : 'DISCOVERY CRITERIA';
     const roleAction = role === 'benchmark'
       ? 'Compare the business\'s actual profile against these expected fields and quality gates. Flag any field where the business\'s actual value differs from the expected value as a gap.'
-      : 'Generate fix instructions that move the business\'s profile toward these expected field values. Use the pattern exemplar as the concrete adaptation source.';
+      : role === 'target'
+      ? 'Generate fix instructions that move the business\'s profile toward these expected field values. Use the pattern exemplar as the concrete adaptation source.'
+      : 'Evaluate each discovered candidate against these established expected fields and quality gates. Mark is_gold_standard = true ONLY for candidates that pass ALL non_negotiable gates. Do NOT re-derive expected_fields — the ones below are already established. Return the same expected_fields in your output (echoed from this profile) so downstream audits stay consistent.';
 
     lines.push('');
     lines.push(`=== GOLD STANDARD ${roleLabel} ===`);
