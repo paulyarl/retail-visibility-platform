@@ -665,5 +665,44 @@ doppler run --config prd -- npx tsx src/scripts/seed-gold-standard-scan-template
 ```
 Idempotent — updates existing templates in place and creates the discovery template if missing.
 
+## Gold Standard Profile — Platform-Aware Resolution (Migration 236)
+
+Gold-standard profiles are now platform-scoped, mirroring the existing city-aware resolution pattern. The `mkt_intelligence_profiles` table has a `reference_platform` column (VARCHAR(20), nullable):
+- `NULL` = cross-platform profile (the default; backward-compatible with all existing profiles)
+- `'google'` | `'yelp'` | `'facebook'` | `'bbb'` | `'apple_maps'` | `'bing'` = platform-specific profile
+
+### Identity tuple
+`importAsDraft()` now uses `(category_key, intelligence_focus, reference_city, reference_platform)` as the identity tuple. A google-specific establishment scan and a cross-platform establishment scan for the same category get **distinct profile ids** — they coexist rather than shadowing each other.
+
+### Resolution fallback chain (`IntelligenceProfileService.resolve()`)
+When `platform` is provided, the resolver narrows from most-specific to least-specific:
+1. `(category, focus, city, platform)` — city + platform exact
+2. `(category, focus, city, platform=null)` — city exact, cross-platform fallback
+3. `(category, focus, city=null, platform)` — city-agnostic, platform exact
+4. `(category, focus, city=null, platform=null)` — city-agnostic, cross-platform fallback
+5. Legacy focus-only / category-only fallbacks (ignore platform)
+
+This means a business audit on Google first looks for a google-specific gold-standard profile; if none exists, it falls back to the cross-platform profile's google section. You only need per-platform profiles when the cross-platform benchmark isn't deep enough.
+
+### Import hook (`MarketingPromptService`)
+When a gold-standard scan result is imported, `platform_focus` from the scan JSON is persisted as `reference_platform`. If `platform_focus === 'all'`, `reference_platform` is set to `NULL` (cross-platform).
+
+### `resolveGoldStandard(category, platform?, ctx?)`
+- `platform` is optional; when omitted, resolves cross-platform profiles only (backward-compatible).
+- When provided, follows the platform-aware fallback chain above.
+
+### Callers that pass platform
+- `MarketingExecutionService.resolvePrompt()` — discovery scans pass `campaign.intelligence_platform`
+- `MarketingExecutionService` audit/fulfill/triage paths — pass `campaign.intelligence_platform` when available
+- Frontend `GoldStandardEstablishmentPanel` / `GoldStandardDiscoveryPanel` — pass `campaign.intelligence_platform`
+- Frontend `PromptWorkspaceClient` — passes `selectedCampaign.intelligence_platform` for gold-standard focus
+- API route `GET /intelligence-profiles/resolve/:category?platform=...` — accepts `platform` query param
+- API route `POST /intelligence-profiles` — accepts `referencePlatform` in body
+
+### Frontend
+- `IntelligenceProfile` interface includes `reference_platform: string | null`
+- `resolveIntelligenceProfile(category, focus?, city?, platform?)` — 4th param is platform
+- `GoldStandardEstablishmentPanel` shows platform badge on active profile card; draft filter matches campaign platform OR cross-platform drafts
+
 
 
