@@ -114,7 +114,7 @@ export class PromptComposerService extends BaseService {
     //    campaign resolves to the Zionsville-established profile, not the
     //    Indianapolis one. Falls back to city-agnostic / category+focus
     //    profiles with logged warnings when no city-specific profile exists.
-    const profile = await profileService.resolve(input.category, input.focus, input.city, ctx);
+    const profile = await profileService.resolve(input.category, input.focus, input.city, undefined, ctx);
 
     // 3. Build the profile block or generic fallback
     let profileSection: string;

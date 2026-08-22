@@ -40,7 +40,7 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
         setLoading(true);
         const [drafts, active] = await Promise.all([
           marketingOpsService.listIntelligenceProfileDrafts('gold_standards'),
-          marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards'),
+          marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards', undefined, campaign.intelligence_platform ?? undefined),
         ]);
         if (cancelled) return;
         // Filter drafts to this campaign's category using normalized
@@ -59,7 +59,12 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
               .toLowerCase()
               .replace(/[_-]+/g, ' ')
               .replace(/\s+/g, ' ');
-            return normalizedKey === normalizedCategory;
+            if (normalizedKey !== normalizedCategory) return false;
+            // Platform filter: show drafts that match the campaign's
+            // platform OR cross-platform drafts (reference_platform = null).
+            const campaignPlatform = campaign.intelligence_platform ?? null;
+            if (!campaignPlatform) return true;
+            return p.reference_platform === campaignPlatform || p.reference_platform === null;
           }),
         );
         setActiveProfile(active);
@@ -107,6 +112,11 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
           ) : activeProfile ? (
             <div className="text-sm text-gray-900 dark:text-white">
               <span className="font-medium">{activeProfile.id}</span> v{activeProfile.version}
+              {activeProfile.reference_platform && (
+                <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 capitalize">
+                  ({activeProfile.reference_platform})
+                </span>
+              )}
               <div className="text-xs text-gray-500 mt-1">
                 Updated: {activeProfile.updated_at ? new Date(activeProfile.updated_at).toLocaleDateString() : '—'}
               </div>

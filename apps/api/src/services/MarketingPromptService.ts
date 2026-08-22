@@ -937,18 +937,27 @@ export class MarketingPromptService extends BaseService {
           } else {
             const focus = (campaign?.intelligence_focus || 'gold_standards') as 'emerging' | 'competitive' | 'gold_standards';
             // Gold-standard profiles are city-agnostic — reference_city = null.
+            // Platform scoping (Migration 236): if the scan's platform_focus
+            // is a specific platform (not 'all'), persist it as
+            // reference_platform so a platform-specific profile coexists
+            // with a cross-platform profile for the same category.
+            const scanPlatform = parsedJson.platform_focus && parsedJson.platform_focus !== 'all'
+              ? parsedJson.platform_focus
+              : null;
             const profile = await IntelligenceProfileService.getInstance().importAsDraft({
               categoryKey: parsedJson.category_key,
               categoryName: parsedJson.category_name,
               configurationJson: parsedJson,
               intelligenceFocus: focus,
               referenceCity: null,
+              referencePlatform: scanPlatform,
             }, ctx);
             logger.info('Gold standard profile imported as draft', ctx, {
               profileId: profile.id,
               version: profile.version,
               categoryKey: profile.category_key,
               intelligenceFocus: focus,
+              referencePlatform: scanPlatform,
               campaignId: input.campaignId,
             });
           }

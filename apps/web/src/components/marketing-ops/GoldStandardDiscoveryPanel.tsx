@@ -37,7 +37,7 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
     (async () => {
       try {
         setLoading(true);
-        const active = await marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards');
+        const active = await marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards', undefined, campaign.intelligence_platform ?? undefined);
         if (cancelled) return;
         setActiveProfile(active);
       } catch (err: any) {

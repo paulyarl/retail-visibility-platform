@@ -7247,6 +7247,7 @@ model mkt_intelligence_profiles {
   intelligence_focus String   @default("emerging") @db.VarChar(20)
   reference_city     String?  @db.VarChar(100)
   reference_state    String?  @db.VarChar(50)
+  reference_platform String?  @db.VarChar(20)
 
   @@id([id, version], map: "pk_mkt_intelligence_profiles")
   @@index([id], map: "idx_mkt_intel_profiles_id")
@@ -7254,6 +7255,7 @@ model mkt_intelligence_profiles {
   @@index([category_key, intelligence_focus], map: "idx_mkt_intel_profiles_category_focus")
   @@index([category_key, reference_city, intelligence_focus], map: "idx_mkt_intel_profiles_category_city_focus")
   @@index([category_key, reference_state, intelligence_focus], map: "idx_mkt_intel_profiles_category_state_focus")
+  @@index([category_key, reference_platform, intelligence_focus], map: "idx_mkt_intel_profiles_category_platform_focus")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

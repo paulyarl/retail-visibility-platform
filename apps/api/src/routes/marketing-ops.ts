@@ -5931,6 +5931,7 @@ const intelligenceProfileCreateSchema = z.object({
   intelligenceFocus: z.enum(['emerging', 'competitive', 'gold_standards']).default('emerging'),
   referenceCity: z.string().max(100).nullable().optional(),
   referenceState: z.string().max(50).nullable().optional(),
+  referencePlatform: z.string().max(20).nullable().optional(),
 });
 
 const intelligenceProfilePublishSchema = z.object({
@@ -5967,10 +5968,12 @@ router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
     const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
     const city = typeof req.query.city === 'string' ? req.query.city : undefined;
+    const platform = typeof req.query.platform === 'string' ? req.query.platform : undefined;
     const profile = await IntelligenceProfileService.getInstance().resolve(
       req.params.category,
       focus,
       city,
+      platform,
       getCtx(req),
     );
     res.json({ success: true, data: profile });
@@ -6022,6 +6025,7 @@ router.post('/intelligence-profiles', async (req, res) => {
       intelligenceFocus: parsed.intelligenceFocus,
       referenceCity: parsed.referenceCity,
       referenceState: parsed.referenceState,
+      referencePlatform: parsed.referencePlatform,
     }, getCtx(req));
     res.status(201).json({ success: true, data: profile });
   } catch (error) {

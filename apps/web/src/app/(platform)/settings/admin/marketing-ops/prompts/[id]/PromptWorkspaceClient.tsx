@@ -202,6 +202,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
           selectedCampaign.category,
           focus,
           selectedCampaign.city || undefined,
+          (focus === 'gold_standards' && selectedCampaign.intelligence_platform)
+            ? selectedCampaign.intelligence_platform
+            : undefined,
         );
         if (!cancelled) setResolvedProfile(profile);
       } catch {
@@ -239,6 +242,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
             selectedCampaign.category!,
             templateFocus,
             selectedCampaign.city || undefined,
+            (templateFocus === 'gold_standards' && selectedCampaign.intelligence_platform)
+              ? selectedCampaign.intelligence_platform
+              : undefined,
           ),
         ]);
         if (cancelled) return;

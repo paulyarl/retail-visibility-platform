@@ -69,6 +69,7 @@ export interface IntelligenceProfile {
   intelligence_focus: IntelligenceFocus;
   reference_city: string | null;
   reference_state: string | null;
+  reference_platform: string | null;
   configuration_json: any;
   status: IntelligenceProfileStatus;
   created_at: Date;
@@ -200,11 +201,89 @@ export class IntelligenceProfileService extends BaseService {
     category: string,
     focus?: IntelligenceFocus,
     city?: string | null,
+    platform?: string | null,
     ctx?: RequestCtx,
   ): Promise<IntelligenceProfile | null> {
     const key = normalizeCategoryKey(category);
     const normalizedCity = normalizeReferenceCity(city);
+    const normalizedPlatform = platform ? platform.trim().toLowerCase() || null : null;
     try {
+      // Helper: build a where clause for the given (city, platform) combination.
+      // focus is applied when provided.
+      const buildWhere = (cityVal: string | null, platformVal: string | null) => {
+        const w: any = {
+          category_key: key,
+          reference_city: cityVal,
+          status: 'active',
+        };
+        if (focus) w.intelligence_focus = focus;
+        if (platformVal) {
+          w.reference_platform = platformVal;
+        } else {
+          w.reference_platform = null;
+        }
+        return w;
+      };
+
+      const tryFind = async (cityVal: string | null, platformVal: string | null): Promise<IntelligenceProfile | null> => {
+        const found = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: buildWhere(cityVal, platformVal),
+          orderBy: { version: 'desc' },
+        });
+        return found as IntelligenceProfile | null;
+      };
+
+      // ── Platform-aware resolution (Migration 236) ──────────────────────
+      // The fallback chain narrows from most-specific to least-specific:
+      //   1. (category, focus, city, platform)     — city + platform exact
+      //   2. (category, focus, city, platform=null) — city exact, cross-platform
+      //   3. (category, focus, city=null, platform) — city-agnostic, platform exact
+      //   4. (category, focus, city=null, platform=null) — city-agnostic, cross-platform
+      // After the platform-aware chain, fall through to the legacy
+      // focus-only / category-only fallbacks (which ignore platform).
+      if (normalizedPlatform) {
+        // Step 1: city + platform exact
+        if (normalizedCity) {
+          const s1 = await tryFind(normalizedCity, normalizedPlatform);
+          if (s1) return s1;
+        }
+        // Step 2: city exact, cross-platform
+        if (normalizedCity) {
+          const s2 = await tryFind(normalizedCity, null);
+          if (s2) {
+            logger.warn('Gold standard profile resolved via city+cross-platform fallback', ctx, {
+              categoryKey: key, requestedCity: normalizedCity, requestedPlatform: normalizedPlatform,
+              resolvedPlatform: null, focus: focus ?? 'none', profileId: (s2 as any).id,
+            });
+            return s2;
+          }
+        }
+        // Step 3: city-agnostic, platform exact
+        const s3 = await tryFind(null, normalizedPlatform);
+        if (s3) {
+          if (normalizedCity) {
+            logger.warn('Gold standard profile resolved via platform-only fallback — city contamination possible', ctx, {
+              categoryKey: key, requestedCity: normalizedCity, requestedPlatform: normalizedPlatform,
+              resolvedCity: null, focus: focus ?? 'none', profileId: (s3 as any).id,
+            });
+          }
+          return s3;
+        }
+        // Step 4: city-agnostic, cross-platform
+        const s4 = await tryFind(null, null);
+        if (s4) {
+          logger.warn('Gold standard profile resolved via cross-platform fallback — platform contamination possible', ctx, {
+            categoryKey: key, requestedPlatform: normalizedPlatform,
+            resolvedPlatform: null, focus: focus ?? 'none', profileId: (s4 as any).id,
+          });
+          return s4;
+        }
+        // Fall through to legacy fallbacks below (which ignore platform).
+      }
+
+      // ── Legacy resolution (pre-Migration-236, still used when platform is
+      //    not requested or when the platform-aware chain found nothing) ───
+
       // 1. City-specific exact match (primary intelligence-scope path)
       if (normalizedCity) {
         const cityWhere: any = {
@@ -331,6 +410,7 @@ export class IntelligenceProfileService extends BaseService {
         categoryKey: key,
         focus: focus ?? 'none',
         city: normalizedCity ?? 'none',
+        platform: normalizedPlatform ?? 'none',
       });
       throw this.handleError(error, ctx);
     }
@@ -433,6 +513,7 @@ export class IntelligenceProfileService extends BaseService {
     intelligenceFocus?: IntelligenceFocus;
     referenceCity?: string | null;
     referenceState?: string | null;
+    referencePlatform?: string | null;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const id = input.id || generateIntelligenceProfileId();
     const categoryKey = normalizeCategoryKey(input.categoryKey);
@@ -440,6 +521,7 @@ export class IntelligenceProfileService extends BaseService {
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
     const referenceState = normalizeReferenceState(input.referenceState ?? null);
+    const referencePlatform = input.referencePlatform ? input.referencePlatform.trim().toLowerCase() || null : null;
     try {
       const profile = await this.prisma.mkt_intelligence_profiles.create({
         data: {
@@ -450,6 +532,7 @@ export class IntelligenceProfileService extends BaseService {
           intelligence_focus: intelligenceFocus,
           reference_city: referenceCity,
           reference_state: referenceState,
+          reference_platform: referencePlatform,
           configuration_json: input.configurationJson as any,
           status,
         },
@@ -461,6 +544,7 @@ export class IntelligenceProfileService extends BaseService {
         intelligenceFocus,
         referenceCity,
         referenceState,
+        referencePlatform,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -493,11 +577,13 @@ export class IntelligenceProfileService extends BaseService {
     intelligenceFocus?: IntelligenceFocus;
     referenceCity?: string | null;
     referenceState?: string | null;
+    referencePlatform?: string | null;
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const categoryKey = normalizeCategoryKey(input.categoryKey);
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
     const referenceState = normalizeReferenceState(input.referenceState ?? null);
+    const referencePlatform = input.referencePlatform ? input.referencePlatform.trim().toLowerCase() || null : null;
     try {
       // Determine the profile id + next version number
       let profileId = input.existingProfileId;
@@ -514,10 +600,11 @@ export class IntelligenceProfileService extends BaseService {
           nextVersion = existing[0].version + 1;
         }
       } else {
-        // Check if a profile with this (category_key, reference_city, focus)
-        // already exists. City is part of the identity tuple so an
-        // Indianapolis-established profile and a Zionsville-established
-        // profile for the same (category, focus) get distinct profile ids.
+        // Check if a profile with this (category_key, reference_city, focus,
+        // reference_platform) already exists. City AND platform are part of
+        // the identity tuple so a cross-platform establishment and a
+        // google-specific establishment for the same (category, focus) get
+        // distinct profile ids.
         const findWhere: any = {
           category_key: categoryKey,
           intelligence_focus: intelligenceFocus,
@@ -526,6 +613,11 @@ export class IntelligenceProfileService extends BaseService {
           findWhere.reference_city = referenceCity;
         } else {
           findWhere.reference_city = null;
+        }
+        if (referencePlatform) {
+          findWhere.reference_platform = referencePlatform;
+        } else {
+          findWhere.reference_platform = null;
         }
         const existingByKey = await this.prisma.mkt_intelligence_profiles.findFirst({
           where: findWhere,
@@ -548,6 +640,7 @@ export class IntelligenceProfileService extends BaseService {
           intelligence_focus: intelligenceFocus,
           reference_city: referenceCity,
           reference_state: referenceState,
+          reference_platform: referencePlatform,
           configuration_json: input.configurationJson as any,
           status: 'draft',
         },
@@ -559,6 +652,7 @@ export class IntelligenceProfileService extends BaseService {
         intelligenceFocus,
         referenceCity,
         referenceState,
+        referencePlatform,
       });
       return profile as IntelligenceProfile;
     } catch (error) {
@@ -990,13 +1084,14 @@ export class IntelligenceProfileService extends BaseService {
    * Resolve the active gold-standard profile for a category.
    *
    * Gold-standard profiles are city-agnostic (reference_city = NULL) and
-   * focus = 'gold_standards'. They are resolved by category alone — no
-   * city, no focus parameter needed (the focus is always 'gold_standards').
+   * focus = 'gold_standards'. When `platform` is provided, the resolver
+   * first looks for a platform-specific profile (reference_platform = platform),
+   * then falls back to a cross-platform profile (reference_platform = NULL).
    *
    * Returns null on miss → caller uses degraded fallback (no benchmark).
    */
-  async resolveGoldStandard(category: string, ctx?: RequestCtx): Promise<IntelligenceProfile | null> {
-    return this.resolve(category, 'gold_standards', null, ctx);
+  async resolveGoldStandard(category: string, platform?: string | null, ctx?: RequestCtx): Promise<IntelligenceProfile | null> {
+    return this.resolve(category, 'gold_standards', null, platform, ctx);
   }
 
   /**
