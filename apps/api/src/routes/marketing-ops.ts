@@ -212,7 +212,10 @@ const campaignBaseSchema = z.object({
   title: z.string().max(255).optional(),
   business_name: z.string().max(255).optional(),
   category: z.string().min(1).max(100),
-  city: z.string().min(1).max(100),
+  // City is optional in the base schema so gold_standards campaigns
+  // (which are city-agnostic / nationwide) can omit it. The create
+  // schema's refine below enforces city for non-gold_standards campaigns.
+  city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   neighborhood: z.string().max(100).optional(),
   contact_method: z.string().max(50).optional(),
@@ -272,6 +275,10 @@ const campaignCreateSchema = campaignBaseSchema
   .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus === 'gold_standards' || (data.state && data.state.trim().length > 0), {
     message: 'state is required for intelligence-scoped campaigns (except gold_standards)',
     path: ['state'],
+  })
+  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus === 'gold_standards' || (data.city && data.city.trim().length > 0), {
+    message: 'city is required for intelligence-scoped campaigns (except gold_standards)',
+    path: ['city'],
   })
   .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || (data.intelligence_platform && data.intelligence_platform.trim().length > 0), {
     message: 'intelligence_platform is required for gold_standards campaigns',

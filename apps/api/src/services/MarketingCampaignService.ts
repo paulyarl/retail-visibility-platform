@@ -166,7 +166,9 @@ export interface CampaignInput {
   title?: string;
   businessName?: string;
   category: string;
-  city: string;
+  // City is optional for gold_standards campaigns (city-agnostic / nationwide).
+  // Non-gold_standards campaigns enforce city at the route validation layer.
+  city?: string;
   state?: string;
   neighborhood?: string;
   contactMethod?: string;
@@ -403,7 +405,7 @@ export class MarketingCampaignService extends BaseService {
           title: input.title || null,
           business_name: input.businessName || null,
           category: input.category,
-          city: input.city,
+          city: input.city || '',
           state: input.state || null,
           neighborhood: input.neighborhood || null,
           contact_method: input.contactMethod || null,
