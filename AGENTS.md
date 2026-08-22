@@ -630,5 +630,40 @@ AI-generated triage and per-issue briefings are persisted as campaign artifacts 
 - `apps/api/src/services/__tests__/OutreachOpenerService.test.ts` (4 tests) — create with `source='ai_briefing'`, upsert in place, quality-gate failure doesn't block, provenance fields
 - `apps/api/src/services/__tests__/ProfileRepairPromptService.persistence.test.ts` (4 tests) — strict validation pass (`_validated=true`), best-effort (`_validated=false`), unparseable output (no write), per-issue template (no write)
 
+## Gold Standard Scan — Two-Template Pattern (Establishment vs Discovery)
+
+Gold-standard scans use TWO distinct prompt templates, gated by `intelligence_campaign_kind` on the campaign. The Prompts tab filters templates by `intelligence_campaign_kind` (with a NULL fallback for legacy templates), so a discovery campaign sees only the discovery template and an establishment campaign sees only the establishment template.
+
+### Templates (seeded by `apps/api/src/scripts/seed-gold-standard-scan-template.ts`)
+- `mpt-seed-gold-standard-scan-001` — **Establishment** (`intelligence_campaign_kind = 'establishment'`): instructs the analyst to DERIVE `expected_fields` and `quality_gates` from the top candidates. The validated JSON is persisted as a DRAFT gold-standard profile by `IntelligenceProfileService.importAsDraft()`.
+- `mpt-seed-gold-standard-scan-discovery-001` — **Discovery** (`intelligence_campaign_kind = 'discovery'`): instructs the analyst to EVALUATE new candidates against the already-established gold-standard profile (injected at render time). The validated JSON creates an audit; it does NOT create a profile draft.
+
+### Render-time profile injection
+- `MarketingExecutionService.resolvePrompt()` — when `intelligence_focus === 'gold_standards'` AND `intelligence_campaign_kind === 'discovery'`, resolves the active gold-standard profile via `IntelligenceProfileService.resolveGoldStandard(category)` and injects it via `serializeGoldStandard(profile, 'discovery')`.
+- Establishment scans skip injection (they ARE the derivation step) and render the template body as-is.
+- When no active profile exists for a discovery scan, a degraded-mode warning is appended (the analyst falls back to deriving expected_fields from candidates).
+
+### `GoldStandardRole` type (`apps/api/src/services/intelligence/IntelligenceProfileService.ts`)
+- `'benchmark'` — audit/seek prompt: compare a business against the gold standard
+- `'target'` — fulfill prompt: produce fixes that move toward the gold standard
+- `'discovery'` — gold-standard discovery scan: evaluate new candidates against the established expected fields and quality gates (do NOT re-derive)
+
+### `serializeGoldStandard(profile, 'discovery')` output
+Emits a `=== GOLD STANDARD DISCOVERY CRITERIA ===` block containing:
+- Universal expected fields (canonical NAP, hours, website)
+- Per-platform expected fields (primary category, attributes, description, photo count, branding expectations)
+- Quality gates (non_negotiable + recommended)
+- Pattern exemplars (candidates flagged `is_gold_standard` in the establishment scan, with destination URLs)
+
+The directive tells the analyst to: evaluate each candidate against the established gates, mark `is_gold_standard = true` ONLY for candidates that pass ALL non_negotiable gates, and ECHO the established `expected_fields` in the output (not re-derive them).
+
+### Re-seeding
+```bash
+cd apps/api
+doppler run --config local -- npx tsx src/scripts/seed-gold-standard-scan-template.ts
+doppler run --config prd -- npx tsx src/scripts/seed-gold-standard-scan-template.ts
+```
+Idempotent — updates existing templates in place and creates the discovery template if missing.
+
 
 
