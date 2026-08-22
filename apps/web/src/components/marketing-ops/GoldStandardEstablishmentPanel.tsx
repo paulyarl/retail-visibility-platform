@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MarketingOpsService, type IntelligenceProfile, type Campaign } from '@/services/MarketingOpsService';
+import GoldStandardProfileView from './GoldStandardProfileView';
 
 const marketingOpsService = MarketingOpsService.getInstance();
 
@@ -115,6 +116,24 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
           )}
         </div>
       </div>
+
+      {/* Active gold-standard profile — operator-friendly structured view */}
+      {!loading && activeProfile && (
+        <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Active Gold Standard Profile Details
+            </h5>
+            <a
+              href="/settings/admin/marketing-ops/intelligence-profiles"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Manage in Intelligence Profiles →
+            </a>
+          </div>
+          <GoldStandardProfileView profile={activeProfile} />
+        </div>
+      )}
 
       {error && (
         <div className="text-xs text-red-600 dark:text-red-400">{error}</div>
