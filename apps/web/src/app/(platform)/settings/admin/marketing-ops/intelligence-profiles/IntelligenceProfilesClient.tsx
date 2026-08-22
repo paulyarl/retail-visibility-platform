@@ -77,6 +77,10 @@ export default function IntelligenceProfilesClient() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishId, setPublishId] = useState<string | null>(null);
   const [publishConfig, setPublishConfig] = useState('');
+  // Focus filter — 'all' (default) shows every profile; 'gold_standards'
+  // shows only gold-standard profiles; 'emerging'/'competitive' filter
+  // to those respective intelligence focuses.
+  const [focusFilter, setFocusFilter] = useState<IntelligenceFocus | 'all'>('all');
 
   // Non-business campaigns (category/city/intelligence scope) — managed here
   // instead of the sales-pipeline Kanban, since they don't move through stages.
@@ -93,9 +97,10 @@ export default function IntelligenceProfilesClient() {
     setLoading(true);
     setError(null);
     try {
+      const focusArg = focusFilter === 'all' ? undefined : focusFilter;
       const [active, drafts] = await Promise.all([
-        marketingOpsService.listIntelligenceProfiles(),
-        marketingOpsService.listIntelligenceProfileDrafts(),
+        marketingOpsService.listIntelligenceProfiles(focusArg),
+        marketingOpsService.listIntelligenceProfileDrafts(focusArg),
       ]);
       setActiveProfiles(active);
       setDraftProfiles(drafts);
@@ -104,7 +109,7 @@ export default function IntelligenceProfilesClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [focusFilter]);
 
   useEffect(() => {
     fetchProfiles();
@@ -371,6 +376,23 @@ export default function IntelligenceProfilesClient() {
         >
           Refresh
         </Button>
+      </Group>
+
+      {/* Focus filter — filter profiles by intelligence focus */}
+      <Group gap="xs">
+        <Text size="xs" c="dimmed">Focus:</Text>
+        {(['all', 'emerging', 'competitive', 'gold_standards'] as const).map((f) => (
+          <Badge
+            key={f}
+            size="sm"
+            variant={focusFilter === f ? 'filled' : 'light'}
+            color={focusFilter === f ? 'blue' : 'gray'}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setFocusFilter(f)}
+          >
+            {f === 'all' ? 'All' : f === 'gold_standards' ? 'Gold Standards' : f.charAt(0).toUpperCase() + f.slice(1)}
+          </Badge>
+        ))}
       </Group>
 
       {error && (
