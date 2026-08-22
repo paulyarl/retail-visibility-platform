@@ -6,6 +6,19 @@
 `PROFILE_REPAIR_RUNBOOK.md` (operational), `marketing_ops_playbook_catalog_triage_sprint_plan.md` (triage engine),
 `gold_standard_sprint_plan.md` (Sprint 0 — gold standard system, the foundational prerequisite)
 
+> **Implementation status (2026-08-21):** The Gold Standard Sprint (Sprint 0) is
+> **shipped**. The foundational gold standard system is live: scan schema, prompt
+> template, post-import hook, `serializeGoldStandard` with role parameter, dual
+> injection (benchmark into audit, target into fulfill), audit schema additions
+> (`profile_url`, `gap_analysis`, `quality_gate_results`), campaign form with
+> `gold_standards` focus + platform dropdown, Intelligence Profiles focus filter,
+> and campaign detail panels (establishment + discovery). See §10 for per-gap
+> status. The remaining work is the **product packaging layer**: fulfill prompt
+> body, deliverable template, tier selection, execution tracking, access intake,
+> completion report, pay page tier selection, SOP module, and retainer automation.
+> The gold standard infrastructure is the prerequisite for all of these — it's
+> now in place.
+
 ---
 
 ## 1. Purpose
@@ -432,39 +445,50 @@ shows 2516 NW Vivion Rd, Riverside, MO 64150; name varies between 'Afro
 Ethiopian Market' and 'Afro Ethiopia market'"), the fulfill produces a
 precise fix sheet with per-platform corrections.
 
-### 3.3 Implementation: `buildFulfillVariables` extension
+### 3.3 Implementation: `buildFulfillVariables` extension — 🟡 PARTIALLY SHIPPED
 
-Currently `buildFulfillVariables` in `ProfileRepairPromptService.ts` passes
-only `audit_results`:
+The gold standard target injection is shipped via a different path than
+originally proposed. Instead of extending `buildFulfillVariables` in
+`ProfileRepairPromptService.ts`, the gold standard is injected during
+prompt **resolution** in `MarketingExecutionService.resolvePrompt` —
+the same seam that injects the intelligence profile. This keeps the
+injection at the resolution layer (where the profile is resolved) rather
+than the variable-builder layer (which is template-specific).
+
+**✅ Shipped (gold standard target injection):**
+`MarketingExecutionService.resolvePrompt` for `fulfill_target` role:
+1. Resolves the active gold standard via
+   `IntelligenceProfileService.resolveGoldStandard(category)`
+2. Serializes it via `serializeGoldStandard(profile, 'target')`
+3. Appends the serialized block to the rendered prompt
+4. Returns the amplified prompt with resolution metadata
+   (`profile_id`, `profile_version`, `intelligence_mode: 'profile'`)
+5. Falls back to the base render if no gold standard exists (degraded
+   but functional)
+
+**🔲 Pending (seek briefing injection):**
+`buildFulfillVariables` in `ProfileRepairPromptService.ts` still passes
+only `audit_results`. The `seek_briefing` variable is not yet wired.
+Needs extension to also pass:
+- `seek_briefing` — serialized from the latest `profile_repair_audit`
+  execution for the campaign (scope.specifics, scope.affected_platforms,
+  issueType, pitch.value_preview). The query is the same one
+  `RepairBriefingCard` uses on the frontend (filter by
+  `output_schema.name === 'profile_repair_audit'`, take latest by
+  `executed_at`).
 
 ```ts
+// Proposed extension (seek_briefing still pending):
 buildFulfillVariables(campaign, latestAudit) {
-  return {
-    audit_results: this.serializeAuditResults(latestAudit?.audit_data ?? {}),
-  };
-}
-```
-
-Extended to pass the seek briefing + gold standard:
-
-```ts
-buildFulfillVariables(campaign, latestAudit) {
-  // 1. Raw audit data (existing)
   const auditResults = this.serializeAuditResults(latestAudit?.audit_data ?? {});
-
-  // 2. Seek briefing — find the latest profile_repair_audit execution
-  //    for this campaign and serialize its scope + issueType
-  const seekBriefing = this.serializeSeekBriefing(campaign);
-
-  // 3. Gold standard — resolve the niche pattern for this business category
-  const goldStandard = this.serializeGoldStandard(campaign);
-
+  const seekBriefing = this.serializeSeekBriefing(campaign); // 🔲 PENDING
   return {
     audit_results: auditResults,
     seek_briefing: seekBriefing,
-    gold_standard: goldStandard,
     issue_type: campaign?.repair_issue_type || '',
   };
+  // Note: gold_standard is injected at resolution time by
+  // MarketingExecutionService.resolvePrompt, not here.
 }
 ```
 
@@ -853,12 +877,13 @@ businesses may be standards on different platforms. The post-import hook
 (§4.3.3) distributes them into the per-platform arrays, keeping only the
 top 4 per platform (by quality_score).
 
-#### 4.3.3 Post-import: populating the intelligence profile
+#### 4.3.3 Post-import: populating the intelligence profile — ✅ SHIPPED (Sprint 0)
 
 When a gold standard scan result is imported via
 `/api/admin/marketing-ops/prompts/executions/external`, the post-import
 hook (mirroring the `intelligence_profile` hook in
-`MarketingPromptService.importExternalResult`):
+`MarketingPromptService.importExternalResult`) — shipped in
+`MarketingPromptService.importExternalResult`:
 
 1. Detects `output_schema.name === 'gold_standard_scan'`
 2. **Stores the `expected_fields` block as-is** — the scan's derived
@@ -879,7 +904,9 @@ hook (mirroring the `intelligence_profile` hook in
    - `categoryKey`: from the scan output's `category_key`
    - `categoryName`: from the scan output's `category_name`
    - `referenceCity`: **null** (city-agnostic — nationwide gold standard)
-   - `intelligenceFocus`: not applicable (gold standards are focus-agnostic)
+   - `intelligenceFocus`: `'gold_standards'` (the profile is tagged with
+     the gold_standards focus so it resolves via `resolveGoldStandard()`
+     and appears in the Gold Standards focus filter on the admin page)
    - `configurationJson`: both `expected_fields` and `gold_standards`
      blocks merged into the existing `configuration_json` structure
 6. The profile is created as **draft** — operator reviews the expected
@@ -961,14 +988,15 @@ The gold standard scan has two entry points:
    platform tagging ensures the flywheel only promotes patterns that are
    actually good.
 
-### 4.4 Resolution and serialization
+### 4.4 Resolution and serialization — ✅ SHIPPED (Sprint 0)
 
-`serializeGoldStandard(campaign, role)` is called during prompt
+`serializeGoldStandard(profile, role)` is called during prompt
 resolution for both the audit prompt (as benchmark) and the fulfill
-prompt (as target). It resolves the active gold standard profile for
-the campaign's category and serializes all layers (universal fields,
-per-platform expected fields, quality gates, pattern exemplars, and
-destination URLs) into a text block the prompt consumes.
+prompt (as target). The caller first resolves the active gold standard
+profile via `resolveGoldStandard(category)`, then passes the resolved
+profile to `serializeGoldStandard` which serializes all layers (universal
+fields, per-platform expected fields, quality gates, pattern exemplars,
+and destination URLs) into a text block the prompt consumes.
 
 The `role` parameter determines the **platform directive** prepended to
 each platform block:
@@ -998,7 +1026,7 @@ apply. The product works without gold standards but gets better with
 them; a missing standard on one platform doesn't degrade the fix sheet
 for platforms that do have one.
 
-### 4.5 The fulfill prompt's use of all layers
+### 4.5 The fulfill prompt's use of all layers — 🟡 TARGET INJECTION SHIPPED, PROMPT BODY PENDING
 
 The fulfill prompt instructs the AI model to use **universal fields,
 platform-specific expected fields, quality gates, and the gold standard
@@ -1545,89 +1573,55 @@ the talking points.
 The product spec above requires the following infrastructure work to be
 operational:
 
-### 10.0 Audit enhancements (seek-side gaps)
+### 10.0 Audit enhancements (seek-side gaps) — ✅ SHIPPED (Sprint 0)
 
-Two gaps in the existing `business_analysis` audit:
+Two gaps in the existing `business_analysis` audit — both resolved by
+the Gold Standard Sprint.
 
-**10.0a — Profile URL capture.** The audit schema
-(`apps/api/src/validators/business-analysis.schema.ts`) captures
-`profile_status`, `rating`, `categories`, `displayed_name/address/phone`
-per platform — but does **not** capture the live profile URL for each
-platform. The `platformSchema` (line 274) and `googlePlatformSchema`
-(line 288) have no `profile_url` field.
+**10.0a — Profile URL capture. ✅ SHIPPED.** The audit schema
+(`apps/api/src/validators/business-analysis.schema.ts`) now has
+`profile_url: z.string().nullable().optional()` on `platformSchema`
+(line 289), which propagates to all platform subtypes via `.extend()`.
+The audit prompt body has been updated with a `GOLD STANDARD FIELDS`
+section instructing the model to always capture the live profile URL
+for each platform. Existing audits remain valid (optional, passthrough).
 
-The audit should capture the destination URL for each platform it
-evaluates — the Google Maps listing URL, the Yelp business URL, the
-Facebook page URL — so the operator can verify audit findings by
-visiting the live profile. This mirrors the gold standard scan's URL
-capture requirement (§4.3.2 step 4) and the architecture principle
-(`PLATFORM_OFFERING_ARCHITECTURE.md` §8.5).
+**10.0b — Gold standard benchmark injection during prompt resolution. ✅ SHIPPED.**
+`MarketingExecutionService.resolvePrompt` now resolves **two profiles**
+in sequence for business-scope audits:
+1. City-category intelligence profile (existing) → `{intelligence_profile}`
+2. Category gold standard profile (NEW) → appended as a benchmark block
 
-**Proposed:** add `profile_url: z.string().nullable().optional()` to
-`platformSchema` (which propagates to all platform subtypes via
-`.extend()`). The audit prompt should be updated to instruct the model
-to capture the live profile URL for each platform it evaluates. This is
-a schema + prompt change, not a migration — the field is optional and
-passthrough, so existing audits remain valid.
+The gold standard is resolved via `IntelligenceProfileService.resolveGoldStandard(category)`
+and serialized via `serializeGoldStandard(profile, 'benchmark')`. The
+serialized block includes a "GOLD STANDARD BENCHMARK" directive per
+platform, expected fields, quality gates, and pattern exemplars with
+destination URLs.
 
-**10.0b — Gold standard benchmark injection during prompt resolution.**
-The audit currently collects raw data (NAP, categories, photos, claim
-status) and flags generic issues. With an active gold standard for the
-category, the audit can compare the business against the category target
-state on each platform, producing a richer, category-aware,
-platform-aware gap analysis.
+The audit prompt body instructs the model to use the benchmark to
+compare the business's actual state against the category target state
+per platform, producing `gap_analysis` and `quality_gate_results` blocks.
 
-The audit prompt is not only city-category profile aware, but also
-platform-category standards aware. Both profiles are injected during
-prompt **resolution** — the phase where template variables are populated
-before the prompt is sent to the model. See
-`PLATFORM_OFFERING_ARCHITECTURE.md` §2.0.1 for the dual profile injection
-pipeline.
+**Audit output schema additions (✅ SHIPPED):**
+- `gap_analysis` block — per-platform gaps with `field`, `actual`,
+  `expected`, `gap_description`, `severity` (`non_negotiable` |
+  `recommended`). Optional + passthrough — existing audits remain valid.
+- `quality_gate_results` block — per-platform gate pass/fail with
+  `platform`, `gate`, `passed`, `severity`, `notes`. Optional +
+  passthrough.
+- Both blocks are only populated when a gold standard benchmark was
+  injected. If no gold standard exists, the audit runs without them
+  (degraded but functional).
 
-**Proposed:**
-- **Prompt resolution pipeline change** — the audit prompt's resolution
-  step resolves **two profiles** in sequence:
-  1. City-category intelligence profile (existing) → `{intelligence_profile}`
-  2. Category gold standard profile (NEW) → `{gold_standard_benchmark}`
-  Both resolved from `mkt_intelligence_profiles` via the same
-  `IntelligenceProfileService.resolve` / `serializeGoldStandard` path.
-  The gold standard is resolved the same way as fulfill — same call,
-  same table, injected as a different variable with a different role
-  (benchmark vs. target).
-- **Audit prompt body change** — the prompt instructs the model to use
-  `{intelligence_profile}` for source/terminology context AND
-  `{gold_standard_benchmark}` to compare the business's actual state
-  against the category target state per platform, flagging
-  **category-specific** gaps (e.g., "primary_category is 'Grocery
-  store' but the gold standard for African grocery stores sets it to
-  'African goods store'"). The prompt is **branding-aware**: it
-  evaluates the business's branding artifacts (logo, cover photo, photo
-  count, photo types) against the gold standard's branding gates and
-  flags missing/low-quality branding as gaps for upsell opportunity
-  identification.
-- **Audit output schema change** — gains a `gap_analysis` block per
-  platform:
-  - `field` — the field being compared
-  - `actual` — the business's current value
-  - `expected` — the gold standard's expected value
-  - `gap_severity` — high / medium / low
-  - `category_specific_note` — why this gap matters for this category
-  - **`is_branding_gap`** — boolean, true when the gap is a branding
-    artifact (logo, cover photo, photos). Branding gaps are always
-    `low` severity (non-blocking, upsell opportunity) unless the
-    platform requires a logo for listing completeness.
-- **Audit output schema change** — gains a `quality_gate_results` block
-  per platform: which universal, platform-specific, **and branding**
-  gates the business passes/fails against the gold standard. Branding
-  gate results are marked `recommended` (non-blocking).
-- If no gold standard exists for the category, the audit runs without
-  the benchmark (degraded but functional — `gold_standard_benchmark` is
-  empty, `gap_analysis` and `quality_gate_results` are absent)
-- The `gap_analysis` and `quality_gate_results` blocks are optional in
-  the Zod schema so existing audits remain valid. This is a prompt
-  resolution + prompt body + schema change, not a migration.
+**Fallback behavior (✅ SHIPPED):** if no active gold standard exists
+for the category, the audit runs without the benchmark — the
+`gap_analysis` and `quality_gate_results` blocks are absent, and the
+audit falls back to raw data collection. The system also handles the
+case where an intelligence profile exists but no gold standard does
+(benchmark is skipped), and the case where a gold standard exists but
+no intelligence profile does (benchmark is injected alone).
 
-### 10.1 Fulfill prompt body (content gap)
+### 10.1 Fulfill prompt body (content gap) — 🔲 PENDING
 
 `mpt-profile-repair-citation-package-fulfill` has a template ID and output
 schema but no prompt body. Needs a prompt that:
@@ -1652,10 +1646,13 @@ schema but no prompt body. Needs a prompt that:
   creation steps (that's the upsell), but flags the gap and the exemplar
   for the operator's upsell pitch.
 
-### 10.2 Seek → fulfill variable injection (coupling gap)
+### 10.2 Seek → fulfill variable injection (coupling gap) — 🟡 PARTIALLY SHIPPED
 
 `buildFulfillVariables` in `ProfileRepairPromptService.ts` currently passes
-only `audit_results`. Needs extension to also pass:
+only `audit_results`. The gold standard target injection is shipped via
+`MarketingExecutionService.resolvePrompt` (which appends the serialized
+gold standard block to the fulfill prompt as a target directive), but
+the `seek_briefing` variable is not yet wired. Needs extension to also pass:
 - `seek_briefing` — serialized from the latest `profile_repair_audit`
   execution for the campaign (scope.specifics, scope.affected_platforms,
   issueType, pitch.value_preview). The query is the same one
@@ -1671,130 +1668,125 @@ Both are text-serialized into the prompt variables. If either is missing
 is empty and the fulfill prompt runs without that input — degraded but
 functional.
 
-### 10.3 Gold standard scan prompt + schema (new prompt type)
+### 10.3 Gold standard scan prompt + schema (new prompt type) — ✅ SHIPPED (Sprint 0)
 
-The gold standard scan (`mpt-gold-standard-scan`) is a new prompt type
-with a new output schema (`gold_standard_scan`). The scan produces **both
-layers** in a single pass: `expected_fields` (data) and `candidates`
-(pattern). Needs:
-- **Output schema** (`gold_standard_scan`) — Zod schema in a new
-  `gold-standard-scan.schema.ts` file, registered in
-  `market-analysis.schema.ts`'s `OUTPUT_SCHEMA_REGISTRY`. The schema
-  validates:
-  - `expected_fields` — per-platform target field values (primary_category,
-    required_attributes, recommended_attributes, hours_pattern,
-    min_photo_count, description_requirements, category_specific_notes)
-  - `candidates[]` — each with `platform_evaluations` containing
-    per-platform config + `quality_score` + `is_gold_standard` flags
-  - `scan_metadata` — including `expected_fields_derivation` (how the
-    expected fields were aggregated from the candidates)
-- **Prompt template** — seeded `mpt-gold-standard-scan` with
-  `output_schema.name = 'gold_standard_scan'`, `prompt_type = 'seek'`.
-  The prompt body instructs the AI model to:
-  1. Search nationwide for businesses in the given category
-  2. Evaluate each one per-platform (scoring 1-10 and setting
-     `is_gold_standard` per platform)
-  3. Return candidates that are gold standards on at least one platform
-  4. **Capture the destination URL for every platform evaluation** — the
-     live profile URL on each platform (Google Maps URL, Yelp URL,
-     Facebook page URL, etc.). This is a **required focus** of the scan,
-     not an afterthought. If the URL cannot be found, set `profile_url`
-     to null and note it in `quality_rationale`. The destination URL is
-     the verification anchor — it's shown wherever the candidate appears
-     (admin cards, review view, fulfill output, deliverable).
-  5. **Derive `expected_fields`** by aggregating field values across gold
-     standard candidates per platform (most common primary_category, union
-     of additional_categories, required vs. recommended attributes, min
-     photo_count, common description themes, hours pattern)
-- **Post-import hook** — extend `MarketingPromptService.importExternalResult`
-  to detect `output_schema.name === 'gold_standard_scan'` and:
-  1. Store `expected_fields` as-is into `configuration_json.expected_fields`
-  2. Iterate `candidates[]` and their `platform_evaluations`
-  3. For each platform where `is_gold_standard` is true, add the candidate
-     (with platform-specific config) to `gold_standards[platform][]`
-  4. Cap at 4 per platform (replace lowest quality_score if full)
-  5. Call `IntelligenceProfileService.importAsDraft()` with:
-     - `categoryKey` + `categoryName` from the scan output
-     - `referenceCity = null` (city-agnostic, nationwide)
-     - `configurationJson` with both `expected_fields` and `gold_standards`
-       blocks merged into any existing profile configuration
-- **Variable builder** — `buildGoldStandardScanVariables(category)` that
-  injects the category string into the prompt. No campaign coupling —
-  the scan is category-only, not tied to a specific campaign.
-- **Fulfill-time resolver** — `serializeGoldStandard(campaign)` resolves
-  the intelligence profile, reads both `expected_fields[platform]` and
-  `gold_standards[platform][]` for each platform in the campaign's tier
-  scope, picks the highest quality_score pattern per platform, and
-  serializes as a platform-keyed object with `expected_fields` and
-  `pattern` sub-keys per platform — **including the destination URL**
-  for each pattern exemplar so the AI model can reference or browse the
-  live profile during generation.
+The gold standard scan is a new prompt type with a new output schema.
+The scan produces **both layers** in a single pass: `expected_fields`
+(data) and `candidates` (pattern). All infrastructure is shipped:
 
-### 10.4 Gold standard data (content gap)
+- **Output schema** (`gold_standard_scan`) — ✅ SHIPPED. Zod schema in
+  `apps/api/src/validators/gold-standard-scan.schema.ts`, registered in
+  `OUTPUT_SCHEMA_REGISTRY` via `market-analysis.schema.ts`. The schema
+  validates `expected_fields` (universal + per-platform), `candidates[]`
+  with per-platform `platform_evaluations` (including `profile_url`,
+  `quality_score`, `is_gold_standard`, `branding_artifacts`), and
+  `scan_metadata`. Uses `.passthrough()` for forward compatibility.
+  Schema name: `gold_standard_scan`. Audit platform: `gold_standard_scan`.
+  Prompt suffix: `GOLD_STANDARD_SCAN_PROMPT_SUFFIX` (documents required
+  output fields including `profile_url`, `is_gold_standard`, `branding_artifacts`,
+  quality gates with `non_negotiable` | `recommended` severity, and the
+  4-candidates-per-platform cap).
+- **Prompt template** — ✅ SHIPPED. Seeded as `mpt-seed-gold-standard-scan-001`
+  via `apps/api/src/scripts/seed-gold-standard-scan-template.ts`. Run via
+  `pnpm seed:gold-standard-scan-template`. Template has
+  `output_schema.name = 'gold_standard_scan'`, `prompt_type = 'seek'`,
+  `intelligence_focus = 'gold_standards'`, `intelligence_campaign_kind = 'establishment'`.
+  Seeded in both local and production environments.
+- **Post-import hook** — ✅ SHIPPED. `MarketingPromptService.importExternalResult`
+  detects `schemaName === 'gold_standard_scan'` and:
+  1. Reads the campaign's `intelligence_campaign_kind` to distinguish
+     establishment from discovery imports.
+  2. **Establishment imports** — calls `IntelligenceProfileService.importAsDraft()`
+     with `referenceCity = null`, `intelligenceFocus = 'gold_standards'`,
+     and the full scan JSON as `configurationJson`. Creates a draft
+     gold-standard profile.
+  3. **Discovery imports** — skip draft creation (the audit is created
+     via the `auditPlatform` path instead, so the campaign's Audits tab
+     can render the discovered candidates).
+  4. Best-effort — failure does not fail the import (the execution row
+     is already persisted).
+- **Variable builder** — ✅ SHIPPED. `IntelligenceProfileService.buildGoldStandardScanVariables(campaign)`
+  populates `category` and `platform` (from `campaign.intelligence_platform`,
+  falling back to `'all'`).
+- **Fulfill-time resolver** — ✅ SHIPPED. `IntelligenceProfileService.serializeGoldStandard(profile, role)`
+  resolves the active gold-standard profile and serializes all layers
+  (universal fields, per-platform expected fields, quality gates, pattern
+  exemplars with destination URLs) into a text block. The `role`
+  parameter (`'benchmark'` | `'target'`) controls the platform directive:
+  benchmark → "compare the business against this"; target → "generate
+  fix instructions that move the business toward this". Returns empty
+  string for empty configuration (no expected fields and no candidates).
+
+### 10.4 Gold standard data (content gap) — 🔲 PENDING (curation effort)
 
 No `gold_standards` per-platform arrays exist in any intelligence profile
-`configuration_json` yet. The gold standard scan (§10.3) populates them,
+`configuration_json` yet. The scan infrastructure (§10.3) is shipped,
 but the initial scans need to be run. Needs:
 - Run the gold standard scan for priority categories (start with
-  categories that have active repair campaigns)
+  categories that have active repair campaigns — e.g., African grocery
+  stores)
 - Review the scan output (draft profiles) — verify the per-platform
   `is_gold_standard` tags are correct (the AI may over-tag a business as
   a Yelp gold standard when its Yelp profile is actually thin)
 - Activate the profiles with quality candidates per platform
 - Optionally: promote successfully repaired businesses as gold standard
-  candidates (the flywheel, §4.3.5) — the scan re-evaluates the repaired
-  business per-platform and only tags the platforms that are now excellent
+  candidates (the flywheel, §4.3.5)
 
-This is a curation effort once the scan prompt (§10.3) is built — the
-storage and resolution infrastructure already exists in
-`IntelligenceProfileService`. The `gold_standards[]` array is just new
-JSONB content within the existing `configuration_json` field.
+This is a **curation effort** — the storage and resolution infrastructure
+is shipped. The `gold_standards[]` array is just JSONB content within
+the existing `configuration_json` field. The operator runs establishment
+campaigns, imports the scan results, reviews the draft profiles, and
+activates them.
 
-### 10.4a Gold standard activation UX (admin page gap)
+### 10.4a Gold standard activation UX (admin page gap) — 🟡 PARTIALLY SHIPPED
 
 The admin page at `/settings/admin/marketing-ops/intelligence-profiles`
-(`IntelligenceProfilesClient.tsx`) hosts **two separate lists**:
+(`IntelligenceProfilesClient.tsx`) — **focus filter shipped, full
+two-list separation pending**.
 
-1. **Seek Profiles (Intelligence)** — the existing list, filtered to
-   profiles without `gold_standards`/`expected_fields` in
-   `configuration_json`
-2. **Gold Standard Profiles (Fulfill)** — a new list group, filtered to
-   profiles with `gold_standards`/`expected_fields` in
-   `configuration_json`
+**✅ Shipped:**
+- **Focus filter** — `IntelligenceProfilesClient` now has focus filter
+  badges (All / Emerging / Competitive / Gold Standards) that filter the
+  profile list via `marketingOpsService.listIntelligenceProfiles({ focus })`
+  and `listIntelligenceProfileDrafts({ focus })`. The backend routes
+  accept `?focus=` query parameters.
+- **Backend filtering** — `IntelligenceProfileService.listActive(focus?)`
+  and `listDrafts(focus?)` accept an optional focus filter. The
+  `marketing-ops.ts` routes pass the query parameter through.
+- **Frontend service** — `MarketingOpsService` interface + prototype
+  updated to pass `focus` to both list methods, with focus-aware query
+  strings and cache keys.
+- **Activation** — uses the existing `activateIntelligenceProfileDraft`
+  endpoint unchanged. Activation retires the previous active gold
+  standard profile for the same category.
 
-Each list has its own Draft and Active sections. Both share a filter bar
-(category, platform, type, search) so the operator can confirm coverage
-before running a scan campaign.
+**🔲 Pending (full curation UX):**
+- **Two visually separate lists** — Seek Profiles (Intelligence) vs.
+  Gold Standard Profiles (Fulfill) as distinct list groups, each with
+  its own Draft and Active sections. Currently the focus filter shows
+  one list at a time; the spec calls for two lists on the same page.
+- **Gold standard cards** with category + platform badges with type
+  color-coding (e.g., `[Google ✓]` blue/directory, `[Facebook ✗]`
+  violet/social_media). Each platform badge with candidates should be a
+  clickable link to the top candidate's destination URL.
+- **Type coverage summary** line per card ("directory: 3/4 ·
+  social_media: 0/1").
+- **Review view** for gold standard drafts — universal expected fields,
+  per-platform expected fields + quality gates (non-negotiable vs.
+  recommended badges), per-platform candidate cards (up to 4 per
+  platform) with quality scores, rationales, platform config, NAP, and
+  clickable destination URLs. Scan metadata (date, sources, selection
+  criteria).
+- **Per-platform candidate rejection** — operator can individually
+  reject a candidate the scan tagged as `is_gold_standard: true` but
+  the operator disagrees with. This is an edit to the draft's
+  `configuration_json` before activation.
 
 > **See `PLATFORM_OFFERING_ARCHITECTURE.md` §4.3 for the curation UX
 > pattern** — the shared filter bar, card badges, review view, and
 > activation flow.
 
-**Profile Repair-specific details:**
-
-- **Gold standard cards** show category + platform badges with type
-  color-coding (e.g., `[Google ✓]` blue/directory, `[Facebook ✗]`
-  violet/social_media, `[SNAP Directory ✓]` blue/vertical). Each
-  platform badge with candidates is a **clickable link** to the top
-  candidate's destination URL on that platform. A type coverage summary
-  line shows "directory: 3/4 · social_media: 0/1".
-- **The review view** shows universal expected fields (canonical NAP,
-  hours, universal quality gates), per-platform expected fields + quality
-  gates (with non-negotiable vs. recommended badges), and per-platform
-  candidate cards (up to 4 per platform) with quality scores,
-  rationales, platform config, NAP, and **clickable destination URLs**
-  for each candidate. Scan metadata (date, sources, selection criteria)
-  is also shown.
-- **Per-platform candidate rejection** — the operator can individually
-  reject a candidate the scan tagged as `is_gold_standard: true` but the
-  operator disagrees with (e.g., checks the live URL and sees the
-  profile is thin). This is an edit to the draft's `configuration_json`
-  before activation.
-- **Activation** uses the existing `activateIntelligenceProfileDraft`
-  endpoint — no new endpoint needed. Activation retires the previous
-  active gold standard profile for the same category.
-
-### 10.5 Deliverable template (layout gap)
+### 10.5 Deliverable template (layout gap) — 🔲 PENDING
 
 No `mkt_deliverable_templates_list` row exists for `citation_repair_package`.
 Needs a template with:
@@ -1803,7 +1795,7 @@ Needs a template with:
 - PDF generation via `MarketingDeliverableService.generateDeliverable()`
 - Watermarked preview variant (for pre-pay gallery) + clean paid variant
 
-### 10.6 Tier selection (data gap)
+### 10.6 Tier selection (data gap) — 🔲 PENDING
 
 The campaign has `package_price_cents` but no field for:
 - Which tier was selected (Standard / Plus / Premium)
@@ -1824,7 +1816,7 @@ The campaign has `package_price_cents` but no field for:
 }
 ```
 
-### 10.7 Execution tracking (workflow gap)
+### 10.7 Execution tracking (workflow gap) — 🔲 PENDING
 
 For DFY, the operator needs to track per-platform execution status. No
 infrastructure exists for this. Options:
@@ -1837,7 +1829,7 @@ Recommend the lightweight approach for v1 — a `repair_execution_log` JSONB
 field updated by the operator as they work. Upgrade to structured if volume
 justifies it.
 
-### 10.8 Access intake form (DFY only)
+### 10.8 Access intake form (DFY only) — 🔲 PENDING
 
 The existing intake system (`mkt_dispute_intake`) is for Track B evidence
 collection. DFY access collection is lighter — it's a form the customer
@@ -1849,7 +1841,7 @@ fills out to confirm they've granted access, not an evidence submission.
 - Optional: shared login instructions (encrypted, deleted after engagement)
 - No evidence attachments needed
 
-### 10.9 Completion Report deliverable
+### 10.9 Completion Report deliverable — 🔲 PENDING
 
 The Completion Report (§5.3) is a second deliverable type for DFY. Either:
 - Add `completion_report` to the `DeliverableType` union, or
@@ -1860,7 +1852,7 @@ Recommend a new type `repair_completion_report` — it's a different artifact
 with different content (before/after, verification status) than the fix
 sheet.
 
-### 10.10 Pay page tier selection
+### 10.10 Pay page tier selection — 🔲 PENDING
 
 The `/marketing/pay` page currently shows a single price
 (`package_price_cents`). For tiered pricing, it needs:
@@ -1873,7 +1865,7 @@ This is a frontend change — the pay endpoint already accepts
 `package_price_cents` as the amount. The tier selection sets the price
 before checkout.
 
-### 10.11 Platform SOP module (procedural knowledge gap)
+### 10.11 Platform SOP module (procedural knowledge gap) — 🔲 PENDING
 
 No SOP records exist for any platform yet. The fulfill prompt's
 `submissionGuide` (§5.2) needs the SOP module to generate accurate,
@@ -1885,7 +1877,7 @@ prompt generates generic instructions rather than concrete steps.
 > integration, and re-verification cycle. Build SOPs starting with the
 > top 4 platforms (§7.5 coverage priority), then expand.
 
-### 10.12 Retainer automation — drift scan + change requests (workflow gap)
+### 10.12 Retainer automation — drift scan + change requests (workflow gap) — 🔲 PENDING
 
 The retainer (§8) needs infrastructure for both directions: system-
 initiated drift defense and merchant-initiated change requests.
@@ -1938,12 +1930,16 @@ initiated drift defense and merchant-initiated change requests.
    operator can handle? The 24h Premium SLA may require capacity planning.
 6. **Retainer churn** — what's the expected retainer retention curve?
    Affects pricing and the monthly scan cost calculation.
-7. **Gold standard provenance** — should the gold standard block record
-   *which* business is the reference (by name + URL), or should it be
-   anonymized to avoid competitive sensitivity? Recording the reference
-   business makes the gold standard verifiable and updatable; anonymizing
-   avoids exposing a competitor's profile configuration to the AI model's
-   output.
+7. ~~**Gold standard provenance**~~ — **RESOLVED (Sprint 0).** The gold
+   standard block records the reference business by name + destination
+   URL. The scan schema captures `business_name`, `city`, `state`, and
+   per-platform `profile_url` for each candidate. The serialized gold
+   standard block includes the exemplar's name and destination URL so
+   the AI model can reference or browse the live profile. This makes the
+   gold standard verifiable and updatable. The competitive sensitivity
+   concern is mitigated by the fact that gold standards are operator-
+   curated (draft → active) and only injected into prompts, not exposed
+   to end customers.
 8. **Gold standard freshness** — how often should gold standards be
    re-verified? Platform category taxonomies change (Google adds/removes
    categories), attributes change, and a gold standard from 6 months ago
