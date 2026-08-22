@@ -49,9 +49,9 @@ function extractJsonCandidates(raw: string): string[] {
   const candidates: string[] = [];
   let text = raw;
   const fenceGlobal = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/gi;
-  const fenceMatchesess = [...text.matchAll(fenceGlobal)];
-  if (fenceMatchess.length > 0) {
-    text = fenceMatchess.map((m) => m[1]).join('\n');
+  const fenceMatches = [...text.matchAll(fenceGlobal)];
+  if (fenceMatches.length > 0) {
+    text = fenceMatches.map((m) => m[1]).join('\n');
   }
   let i = 0;
   while (i < text.length) {
