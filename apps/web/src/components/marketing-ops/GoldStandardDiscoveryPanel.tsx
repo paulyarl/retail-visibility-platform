@@ -195,8 +195,8 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
   // businesses occupying each platform's gold-standard slots. These may
   // come from the establishment scan (analyst-flagged at profile creation)
   // or from prior discovery promotions via the "Add to slot" button.
-  const profileSlotOccupants: Record<string, Array<{ business_name: string; city?: string; quality_score?: number | null }>> = (() => {
-    const map: Record<string, Array<{ business_name: string; city?: string; quality_score?: number | null }>> = {};
+  const profileSlotOccupants: Record<string, Array<{ business_name: string; city?: string; quality_score?: number | null; profile_url?: string | null; state?: string }>> = (() => {
+    const map: Record<string, Array<{ business_name: string; city?: string; quality_score?: number | null; profile_url?: string | null; state?: string }>> = {};
     if (!activeProfile?.configuration_json) return map;
     const config = activeProfile.configuration_json as any;
     const candidates: Candidate[] = Array.isArray(config.candidates) ? config.candidates : [];
@@ -207,7 +207,9 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
           map[pe.platform].push({
             business_name: c.business_name,
             city: c.city,
+            state: c.state,
             quality_score: pe.quality_score ?? null,
+            profile_url: pe.profile_url ?? null,
           });
         }
       }
@@ -378,12 +380,27 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                           const removeKey = `remove:${occ.business_name}|${platform}`;
                           const isRemoving = promotingKey === removeKey;
                           return (
-                            <div key={i} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                            <div key={i} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
                               <span className="text-amber-500">•</span>
-                              <span>{occ.business_name}</span>
-                              {occ.city && <span className="text-gray-400">({occ.city})</span>}
+                              <span className="text-gray-700 dark:text-gray-300 font-medium">{occ.business_name}</span>
+                              {(occ.city || occ.state) && (
+                                <span className="text-gray-400">
+                                  ({occ.city}{occ.city && occ.state ? ', ' : ''}{occ.state})
+                                </span>
+                              )}
                               {occ.quality_score != null && (
                                 <span className="text-gray-400">{occ.quality_score}/10</span>
+                              )}
+                              {occ.profile_url && (
+                                <a
+                                  href={occ.profile_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  title={`Open ${occ.business_name} on ${prettyPlatform(platform)}`}
+                                >
+                                  ↗
+                                </a>
                               )}
                               {activeProfile && (
                                 <button
