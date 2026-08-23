@@ -308,7 +308,9 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
       expect(block).toContain('per-platform');
       expect(block).toContain('gold_standard_match');
       expect(block).toContain('gold_standard_gate_results');
-      expect(block).toContain('non_negotiable gates');
+      // Relative-top directive: gates are informational, not a filter
+      expect(block).toContain('does NOT filter gold_standard_match');
+      expect(block).toContain('TOP candidates per platform');
     });
 
     it('directive instructs platform_analysis aggregation and outreach recommendation', () => {
