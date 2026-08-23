@@ -205,7 +205,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     // Business-scope §1B path calls resolve with no focus (category-only
     // match). Migration 205 — the campaign's city is now passed as the 3rd
     // arg so business audits resolve a city-scoped profile.
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined, 'Test City', undefined);
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined, 'Test City', undefined, undefined);
   });
 
   it('fulfill prompt → no amplification (gate: seek-only)', async () => {
@@ -452,7 +452,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       // serializeGoldStandard called with discovery_benchmark role
       expect(mockProfileService.serializeGoldStandard).toHaveBeenCalledWith(goldStandard, 'discovery_benchmark');
       // resolveGoldStandard called with platform
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'google');
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'google', undefined);
     });
 
     it('appends degraded-mode note when no gold standard exists', async () => {
@@ -483,7 +483,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'yelp');
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'yelp', undefined);
     });
 
     it('passes null platform when campaign has no intelligence_platform', async () => {
@@ -496,7 +496,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', null);
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', null, undefined);
     });
 
     it('works for competitive focus (not just emerging)', async () => {
@@ -515,6 +515,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       // Composer called with competitive focus
       expect(mockComposerService.composeIntelligencePrompt).toHaveBeenCalledWith(
         expect.objectContaining({ focus: 'competitive' }),
+        undefined,
       );
     });
 
