@@ -299,11 +299,16 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     const headParts = [form.category, kindLabel, focusLabel].map((s) => (s ?? '').trim()).filter(Boolean);
     // Gold-standard campaigns are city-agnostic — the platform replaces
     // city as the focus dimension. Append the platform to the title.
+    // Emerging/competitive campaigns are city-scoped, but when a specific
+    // platform is selected, append it to the title so the operator can
+    // distinguish a platform-targeted discovery scan from a broad one.
     if (form.intelligence_focus === 'gold_standards' && form.intelligence_platform) {
       const platformLabel = form.intelligence_platform === 'all'
         ? 'All Platforms'
         : cap(form.intelligence_platform);
       headParts.push(platformLabel);
+    } else if ((form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && form.intelligence_platform) {
+      headParts.push(cap(form.intelligence_platform));
     }
     const locParts = form.intelligence_focus === 'gold_standards'
       ? []
@@ -456,7 +461,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_zip_codes: form.scope === 'intelligence' ? strOrUndef(form.intelligence_zip_codes) : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? numOrUndef(form.intelligence_search_radius_miles) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
-          intelligence_platform: form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' ? (form.intelligence_platform || null) : undefined,
+          intelligence_platform: form.scope === 'intelligence' ? (form.intelligence_platform || null) : undefined,
           business_origin_country: strOrUndef(form.business_origin_country),
           business_origin_region: strOrUndef(form.business_origin_region),
         };
@@ -535,7 +540,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           intelligence_zip_codes: form.scope === 'intelligence' ? form.intelligence_zip_codes : undefined,
           intelligence_search_radius_miles: form.scope === 'intelligence' ? (form.intelligence_search_radius_miles === '' ? undefined : Number(form.intelligence_search_radius_miles)) : undefined,
           intelligence_campaign_kind: form.scope === 'intelligence' ? (form.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment' : undefined,
-          intelligence_platform: form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' ? (form.intelligence_platform || null) : undefined,
+          intelligence_platform: form.scope === 'intelligence' ? (form.intelligence_platform || null) : undefined,
           business_origin_country: form.business_origin_country,
           business_origin_region: form.business_origin_region,
         };
@@ -696,6 +701,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     <p className="text-xs text-gray-400 mt-1">
                       The platform this gold-standard scan focuses on. &quot;All Platforms&quot; evaluates candidates across every major platform.
                       Gold-standard campaigns are city-agnostic — the platform replaces city as the focus dimension.
+                    </p>
+                  </FormField>
+                )}
+                {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+                  <FormField label="Platform (optional)" className="sm:col-span-2">
+                    <select value={form.intelligence_platform}
+                      onChange={(e) => handleChange('intelligence_platform', e.target.value)}
+                      className={inputClass}>
+                      <option value="">All Platforms (default)</option>
+                      <option value="google">Google</option>
+                      <option value="yelp">Yelp</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="bbb">BBB</option>
+                      <option value="apple_maps">Apple Maps</option>
+                      <option value="bing">Bing</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Point the discovery scan at a specific platform to rate candidates against that platform&apos;s gold standard.
+                      &quot;All Platforms&quot; (default) runs a broad cross-platform scan — efficient for general discovery.
+                      Selecting a specific platform narrows the gold-standard benchmark to that platform, which can uncover
+                      platform-specific gaps and opportunities a broad scan would miss.
                     </p>
                   </FormField>
                 )}

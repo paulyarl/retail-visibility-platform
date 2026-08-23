@@ -548,4 +548,126 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(resolution.gold_standard_profile_id).toBe('gs-001');
     });
   });
+
+  // ─── Platform discovery focus directive (focus amplifier) ────────────────
+  describe('intelligence-scope composer path — platform discovery focus directive', () => {
+    const makeIntelTemplate = (body = 'Discover {{category}} in {{city}}') => ({
+      body,
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_discovery' },
+      outputSchema: { name: 'intelligence_discovery' },
+    });
+
+    const makeIntelCampaign = (focus = 'emerging', platform: string | null = null) => ({
+      id: 'camp-intel-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Kansas City',
+      state: 'MO',
+      intelligence_focus: focus,
+      intelligence_platform: platform,
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('emerging + platform → directive targets businesses with GAPS on the platform', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', 'google'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('PLATFORM DISCOVERY FOCUS: Google');
+      expect(renderedPrompt).toContain('GAPS on Google');
+      // Spectrum of gaps — not just binary "missing"
+      expect(renderedPrompt).toContain('COMPLETELY ABSENT');
+      expect(renderedPrompt).toContain('UNCLAIMED');
+      expect(renderedPrompt).toContain('NAP DRIFT');
+      expect(renderedPrompt).toContain('SPARSE/INCOMPLETE');
+      expect(renderedPrompt).toContain('POORLY RATED');
+      // Should NOT contain competitive-targeting language
+      expect(renderedPrompt).not.toContain('PRESENT on Google');
+      expect(renderedPrompt).not.toContain('competitive leaderboard');
+    });
+
+    it('competitive + platform → directive targets businesses PRESENT on the platform', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('competitive', 'yelp'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('PLATFORM DISCOVERY FOCUS: Yelp');
+      expect(renderedPrompt).toContain('PRESENT on Yelp');
+      expect(renderedPrompt).toContain('competitive leaderboard');
+      // Should NOT contain emerging-targeting language
+      expect(renderedPrompt).not.toContain('MISSING from Yelp');
+    });
+
+    it('no platform → no platform directive block', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('PLATFORM DISCOVERY FOCUS');
+    });
+
+    it('platform directive appears before gold standard block', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce({
+        id: 'gs-001',
+        version: 1,
+        reference_platform: 'google',
+      });
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce(
+        '=== GOLD STANDARD DISCOVERY BENCHMARK ===\nRate each candidate...',
+      );
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', 'google'),
+        variables: undefined,
+      });
+
+      const platformIdx = renderedPrompt.indexOf('PLATFORM DISCOVERY FOCUS');
+      const gsIdx = renderedPrompt.indexOf('GOLD STANDARD DISCOVERY BENCHMARK');
+      expect(platformIdx).toBeGreaterThan(-1);
+      expect(gsIdx).toBeGreaterThan(-1);
+      expect(platformIdx).toBeLessThan(gsIdx);
+    });
+
+    it('emerging directive mentions INT_SINGLE_SOURCE, INT_LOW_VISIBILITY, and INT_WEAK_MAINSTREAM_INDEXING', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', 'google'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('INT_SINGLE_SOURCE');
+      expect(renderedPrompt).toContain('INT_LOW_VISIBILITY');
+      expect(renderedPrompt).toContain('INT_WEAK_MAINSTREAM_INDEXING');
+    });
+
+    it('works for different platforms (not just google)', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('competitive', 'facebook'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('PLATFORM DISCOVERY FOCUS: Facebook');
+      expect(renderedPrompt).toContain('PRESENT on Facebook');
+    });
+  });
 });

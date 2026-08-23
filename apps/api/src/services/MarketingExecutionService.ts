@@ -505,6 +505,33 @@ export class MarketingExecutionService extends BaseService {
       const cleanedBody = this.stripHandlebarsConditionals(composed.body, input.variables);
       let rendered = this.renderTemplate(cleanedBody, input.variables, input.campaign);
 
+      // ─── Platform discovery focus injection ────────────────────────
+      // When the campaign has a specific platform set (e.g. 'google'), the
+      // platform acts as a FOCUS AMPLIFIER — it sharpens what "emerging" and
+      // "competitive" mean for this scan:
+      //   - Emerging + platform → find businesses MISSING from the target
+      //     platform (they exist elsewhere but not on the target). These are
+      //     high-value prospects who need a presence on the target platform.
+      //   - Competitive + platform → find businesses PRESENT on the target
+      //     platform. These are the benchmarks to rate against the platform's
+      //     gold standard.
+      // The directive is focus-aware so the same platform produces opposite
+      // discovery populations depending on the focus. When no platform is set,
+      // this block is skipped (broad cross-platform discovery).
+      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      if (campaignPlatform) {
+        const platformDirective = this.renderPlatformDiscoveryDirective(campaignPlatform, focus);
+        if (platformDirective) {
+          rendered = rendered + '\n' + platformDirective;
+          logger.info('Platform discovery focus injected', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            focus,
+            platform: campaignPlatform,
+          });
+        }
+      }
+
       // ─── Gold standard discovery benchmark injection ───────────────
       // Emerging/competitive discovery scans now resolve the category's
       // gold-standard profile (platform-aware via campaign.intelligence_platform)
@@ -516,7 +543,6 @@ export class MarketingExecutionService extends BaseService {
       // When no gold standard exists, a soft degraded-mode note is appended so
       // the operator knows benchmarking is absent and should run an
       // establishment scan first.
-      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
       const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, ctx);
       let goldStandardProfileId: string | null = null;
       let goldStandardProfileVersion: number | null = null;
@@ -899,6 +925,109 @@ qualifies as a category benchmark versus a generic high-visibility business that
 does not meet the profile's specialization bar. Do NOT bias the profile toward
 emerging discovery, thin-footprint, or hidden-trust work — those are
 emerging-focus work.`;
+    }
+
+    return '';
+  }
+
+  /**
+   * Render a platform discovery focus directive block. The platform acts as
+   * a FOCUS AMPLIFIER — it sharpens what "emerging" and "competitive" mean
+   * for this scan:
+   *
+   *   - Emerging + platform → find businesses MISSING from the target platform.
+   *     They exist on other platforms (Yelp, Facebook, etc.) but not on the
+   *     target. These are high-value prospects who need a presence on the
+   *     target platform.
+   *
+   *   - Competitive + platform → find businesses PRESENT on the target platform.
+   *     These are the benchmarks to rate against the platform's gold standard.
+   *
+   * The directive is focus-aware so the same platform produces opposite
+   * discovery populations depending on the focus. Returns empty string for
+   * unknown focus values (defensive — should not happen in practice).
+   */
+  private renderPlatformDiscoveryDirective(platform: string, focus: IntelligenceFocus): string {
+    const cap = (v: string) => v ? v.charAt(0).toUpperCase() + v.slice(1) : '';
+    const platformLabel = cap(platform);
+
+    if (focus === 'emerging') {
+      return `=== PLATFORM DISCOVERY FOCUS: ${platformLabel} ===
+This discovery scan is platform-targeted. The platform amplifies the emerging
+focus: prioritize finding businesses with GAPS on ${platformLabel}.
+
+TARGET POPULATION — GAPS ON ${platformLabel}:
+"Missing" is a spectrum, not a binary. A business is an emerging prospect for
+this scan if it has ANY of the following gaps on ${platformLabel}:
+1. COMPLETELY ABSENT: no ${platformLabel} presence at all — the business exists
+   on other platforms (Yelp, Facebook, niche directories) but is invisible on
+   ${platformLabel}. Highest-value prospect: they need a full presence built.
+2. UNCLAIMED: has a ${platformLabel} listing but the owner has not claimed it —
+   no control over content, no response to reviews, no posts. High-value: they
+   need claim + optimization.
+3. NAP DRIFT: claimed or unclaimed listing with name/address/phone inconsistencies
+   vs. the business's canonical identity. Medium-value: they need NAP correction.
+4. SPARSE/INCOMPLETE: has a presence but missing key elements — few or no photos,
+   wrong primary category, no description, missing attributes, no posts. The
+   gold standard's expected_fields define what "complete" means for this category.
+5. POORLY RATED: has a presence but with low rating or few reviews relative to
+   the category benchmark — the profile exists but underperforms.
+
+All five are emerging opportunities. The gold standard benchmark block (when
+present) defines the exact gates that distinguish each gap type.
+
+DISCOVERY STRATEGY:
+- Search BOTH other platforms AND ${platformLabel} itself. A business found on
+  Yelp but absent from ${platformLabel} is a gap type #1 prospect. A business
+  found on ${platformLabel} with an unclaimed profile is a gap type #2 prospect.
+- Use INT_SINGLE_SOURCE when a business is found on only one non-${platformLabel}
+  platform. Use INT_LOW_VISIBILITY when a business has no ${platformLabel} listing
+  or a sparse/incomplete one. Use INT_WEAK_MAINSTREAM_INDEXING when a business
+  has a ${platformLabel} presence but it is poorly indexed or incomplete.
+- Note each candidate's ${platformLabel} status explicitly in discovery_provenance
+  (absent, unclaimed, claimed-incomplete, claimed-drift, claimed-sparse) — the
+  platform breakdown in platform_analysis depends on it.
+- Do NOT exclude businesses just because they have SOME presence on ${platformLabel}
+  — an unclaimed or incomplete presence is still an emerging opportunity.
+
+RATING: When a gold standard benchmark block follows, rate each candidate
+against the ${platformLabel} gold standard. Completely absent businesses will
+fail all platform gates. Unclaimed/incomplete businesses will fail specific
+gates (claim status, photo count, category accuracy, etc.). Record the specific
+gate failures in gold_standard_gate_results — the specific gaps ARE the outreach
+opportunities. gold_standard_match = false for all gap types; the value is in
+knowing WHICH gates failed.`;
+    }
+
+    if (focus === 'competitive') {
+      return `=== PLATFORM DISCOVERY FOCUS: ${platformLabel} ===
+This discovery scan is platform-targeted. The platform amplifies the competitive
+focus: prioritize finding businesses that are PRESENT on ${platformLabel}.
+
+TARGET POPULATION — PRESENT ON ${platformLabel}:
+These are your competitive benchmarks. A business with an established ${platformLabel}
+presence (claimed profile, photos, reviews, posts) is a candidate for the
+competitive leaderboard on that platform. The gold standard for ${platformLabel}
+defines what "excellent" looks like — rate each candidate against it.
+
+DISCOVERY STRATEGY:
+- Search ${platformLabel} directly as the PRIMARY discovery source — competitive
+  benchmarks are by definition present on the target platform.
+- For each candidate found on ${platformLabel}, note their profile completeness:
+  claimed status, primary category accuracy, photo count, review velocity,
+  description quality, posting frequency.
+- Use ${platformLabel}-specific evidence to assess competitive positioning —
+  review count, rating, response patterns, photo quality.
+- Other platforms (Yelp, Facebook) remain available as SECONDARY corroboration
+  for category_fit and identity, but the competitive leaderboard is ${platformLabel}-scoped.
+- Note each candidate's ${platformLabel} profile URL in gbp_url or
+  discovery_provenance — the platform breakdown in platform_analysis depends on it.
+
+RATING: When a gold standard benchmark block follows, rate each candidate
+against the ${platformLabel} gold standard. Businesses with strong ${platformLabel}
+profiles that pass all non_negotiable gates are gold_standard_match = true —
+they are the category leaders on this platform. Businesses that fail gates are
+competitive also-rans with identifiable gaps.`;
     }
 
     return '';
