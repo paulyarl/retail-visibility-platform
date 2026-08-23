@@ -87,6 +87,18 @@ const discoveredBusinessSchema = z.object({
   // Rating/reviews (optional — may not be available for thin-footprint businesses)
   rating: z.number().nullable().optional(),
   review_count: z.number().nullable().optional(),
+
+  // Gold standard rating (optional — present only when a gold-standard
+  // discovery benchmark block was injected into the prompt). Forward-compatible:
+  // legacy payloads without these fields import cleanly via .passthrough().
+  gold_standard_match: z.boolean().nullable().optional(),
+  gold_standard_gate_results: z.array(
+    z.object({
+      gate: z.string(),
+      passed: z.boolean(),
+      platform: z.string().optional(),
+    }).passthrough(),
+  ).nullable().optional(),
 }).passthrough();
 
 // ─── Top-level schema ────────────────────────────────────────────────────
@@ -118,6 +130,59 @@ export const intelligenceDiscoverySchema = z.object({
   // Provenance
   profile_id: z.string().nullable().optional(),
   profile_version: z.number().nullable().optional(),
+
+  // Platform-aware analysis (optional — present only when a gold-standard
+  // discovery benchmark block was injected). Introduces platform awareness
+  // into emerging/competitive discovery scans for the first time. When absent
+  // (no gold standard), this section is omitted entirely.
+  platform_analysis: z.object({
+    // Gold standard reference for traceability
+    gold_standard_profile_id: z.string().nullable(),
+    gold_standard_profile_version: z.number().nullable(),
+    gold_standard_platform: z.string().nullable(),
+
+    // Per-platform presence + benchmarking
+    platform_breakdown: z.array(
+      z.object({
+        platform: z.string(),
+        present_count: z.number(),
+        absent_count: z.number(),
+        meets_gold_standard_count: z.number(),
+        common_gate_failures: z.array(
+          z.object({
+            gate: z.string(),
+            failed_count: z.number(),
+          }).passthrough(),
+        ).optional(),
+      }).passthrough(),
+    ).optional(),
+
+    // Category-level benchmarking summary
+    candidates_meeting_all_gates: z.number(),
+    most_common_gate_failures: z.array(
+      z.object({
+        gate: z.string(),
+        failed_count: z.number(),
+        severity: z.enum(['non_negotiable', 'recommended']).optional(),
+      }).passthrough(),
+    ).optional(),
+
+    // Platform-aware outreach recommendations
+    outreach_recommendation: z.object({
+      primary_platform: z.string(),
+      platform_rationale: z.string(),
+      platform_specific_opportunities: z.array(
+        z.object({
+          platform: z.string(),
+          opportunity: z.string(),
+          evidence_summary: z.string(),
+        }).passthrough(),
+      ).optional(),
+      recommended_platform_focus: z.string(),
+      primary_angle: z.string(),
+      suggested_call_to_action: z.string(),
+    }).passthrough(),
+  }).passthrough().optional(),
 }).passthrough();
 
 // ─── Payload normalization (reference-style + missing qualifying_businesses) ───
@@ -274,7 +339,11 @@ Return a single JSON object with this structure:
       "business_seek_recommended": true | false,
       "business_seek_priority": "high" | "medium" | "low" | "hold",
       "rating": <number or null>,
-      "review_count": <number or null>
+      "review_count": <number or null>,
+      "gold_standard_match": <true | false | null — ONLY when a GOLD STANDARD DISCOVERY BENCHMARK block is present in the prompt; null when no gold standard block>,
+      "gold_standard_gate_results": [
+        { "gate": "<gate name>", "passed": <true | false>, "platform": "<platform name, optional>" }
+      ]
     }
   ],
   "qualifying_businesses": [<FULL duplicate records — same structure as discovered_businesses, excludes outside_market, national_chain, national_franchise, regional_chain. Do NOT emit references like {"business_name": "...", "note": "see discovered_businesses"} — repeat the complete record for each qualifying business>],
@@ -285,7 +354,37 @@ Return a single JSON object with this structure:
   "geographic_classification_notes": "<text>",
   "ownership_exclusion_notes": "<text>",
   "profile_id": "<profile id or null>",
-  "profile_version": <number or null>
+  "profile_version": <number or null>,
+  "platform_analysis": {
+    "gold_standard_profile_id": "<gold standard profile id or null>",
+    "gold_standard_profile_version": <number or null>,
+    "gold_standard_platform": "<platform name or null for cross-platform>",
+    "platform_breakdown": [
+      {
+        "platform": "<google | yelp | facebook | bbb | apple_maps | bing | ...>",
+        "present_count": <number of candidates with a presence on this platform>,
+        "absent_count": <number of candidates with no presence on this platform>,
+        "meets_gold_standard_count": <number of candidates that pass ALL non_negotiable gates on this platform>,
+        "common_gate_failures": [
+          { "gate": "<gate name>", "failed_count": <number> }
+        ]
+      }
+    ],
+    "candidates_meeting_all_gates": <number of candidates that pass ALL non_negotiable gates across all platforms where they have a presence>,
+    "most_common_gate_failures": [
+      { "gate": "<gate name>", "failed_count": <number>, "severity": "non_negotiable" | "recommended" }
+    ],
+    "outreach_recommendation": {
+      "primary_platform": "<platform to lead outreach with — where the gold standard is deepest AND where candidates have the most fixable gaps>",
+      "platform_rationale": "<why this platform leads for this category/city>",
+      "platform_specific_opportunities": [
+        { "platform": "<platform>", "opportunity": "<e.g. 12 candidates missing GBP primary category>", "evidence_summary": "<text>" }
+      ],
+      "recommended_platform_focus": "<platform that downstream business audits should target>",
+      "primary_angle": "<outreach angle>",
+      "suggested_call_to_action": "<CTA>"
+    }
+  }
 }
 
 Rules:
@@ -295,4 +394,6 @@ Rules:
 - If identity_confidence is "low", business_seek_priority MUST be "hold".
 - If category_fit is "insufficient", business_seek_priority MUST be "hold" OR business_seek_recommended MUST be false.
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
+- GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
+- When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 `;

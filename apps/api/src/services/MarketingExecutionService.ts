@@ -491,6 +491,7 @@ export class MarketingExecutionService extends BaseService {
 
     if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment && !isGoldStandardFocus) {
       const composer = PromptComposerService.getInstance();
+      const profileService = IntelligenceProfileService.getInstance();
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
       // Pass the campaign's city so the composer resolves a city-scoped
       // profile (Migration 205) and emits a city retargeting directive
@@ -502,7 +503,53 @@ export class MarketingExecutionService extends BaseService {
       // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
       // since renderTemplate() only supports simple {{variable}} replacement.
       const cleanedBody = this.stripHandlebarsConditionals(composed.body, input.variables);
-      const rendered = this.renderTemplate(cleanedBody, input.variables, input.campaign);
+      let rendered = this.renderTemplate(cleanedBody, input.variables, input.campaign);
+
+      // ─── Gold standard discovery benchmark injection ───────────────
+      // Emerging/competitive discovery scans now resolve the category's
+      // gold-standard profile (platform-aware via campaign.intelligence_platform)
+      // and inject it as a discovery_benchmark block. This gives the discovery
+      // scan a category-top benchmark to rate candidates against — without it,
+      // discovery has no benchmark. The block instructs the analyst to rate
+      // each candidate per-platform, aggregate gate failures, and produce
+      // platform-aware outreach recommendations (platform_analysis section).
+      // When no gold standard exists, a soft degraded-mode note is appended so
+      // the operator knows benchmarking is absent and should run an
+      // establishment scan first.
+      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, ctx);
+      let goldStandardProfileId: string | null = null;
+      let goldStandardProfileVersion: number | null = null;
+      if (goldStandard) {
+        const gsBlock = profileService.serializeGoldStandard(goldStandard, 'discovery_benchmark');
+        if (gsBlock) {
+          rendered = rendered + '\n' + gsBlock;
+          goldStandardProfileId = goldStandard.id;
+          goldStandardProfileVersion = goldStandard.version;
+          logger.info('Gold standard discovery benchmark injected into emerging/competitive scan', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            focus,
+            goldStandardProfileId: goldStandard.id,
+            goldStandardProfileVersion: goldStandard.version,
+            goldStandardPlatform: goldStandard.reference_platform ?? 'cross-platform',
+          });
+        }
+      } else {
+        const degradedNote = '\n\n=== NO GOLD STANDARD PROFILE — BENCHMARKING ABSENT ===\n'
+          + `No active gold-standard profile exists for category "${category}"`
+          + (campaignPlatform ? ` on platform "${campaignPlatform}"` : '')
+          + '. This discovery scan will run without a category-top benchmark. '
+          + 'Rate candidates on category-general heuristics only. '
+          + 'To enable gold-standard benchmarking, run a Gold Standard Establishment campaign first.';
+        rendered = rendered + degradedNote;
+        logger.info('Gold standard absent for emerging/competitive scan — degraded mode', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          focus,
+          platform: campaignPlatform ?? 'none',
+        });
+      }
 
       logger.info('Intelligence-scope prompt composed', ctx, {
         campaignId: input.campaign.id,
@@ -510,11 +557,17 @@ export class MarketingExecutionService extends BaseService {
         focus,
         profileId: composed.resolution.profile_id,
         intelligenceMode: composed.resolution.intelligence_mode,
+        goldStandardProfileId,
+        goldStandardProfileVersion,
       });
 
       return {
         renderedPrompt: this.appendPromptSuffix(rendered, promptSuffix),
-        resolution: composed.resolution,
+        resolution: {
+          ...composed.resolution,
+          gold_standard_profile_id: goldStandardProfileId,
+          gold_standard_profile_version: goldStandardProfileVersion,
+        },
       };
     }
 

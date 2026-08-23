@@ -58,8 +58,16 @@ export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
  *   - 'target' → fulfill prompt: produce fixes that move toward the gold standard
  *   - 'discovery' → gold-standard discovery scan: evaluate new candidates against
  *     the already-established expected fields and quality gates (do NOT re-derive)
+ *   - 'discovery_benchmark' → emerging/competitive discovery scan: rate each
+ *     discovered candidate against the established gold standard per-platform,
+ *     aggregate gate failures, and produce platform-aware outreach
+ *     recommendations. Introduces platform awareness into focus discovery scans
+ *     (which were previously platform-agnostic). The gold standard is resolved
+ *     via resolveGoldStandard(category, platform) so a campaign with
+ *     intelligence_platform = 'google' rates candidates against google-specific
+ *     expected fields.
  */
-export type GoldStandardRole = 'benchmark' | 'target' | 'discovery';
+export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery_benchmark';
 
 export interface IntelligenceProfile {
   id: string;
@@ -100,6 +108,12 @@ export interface PromptResolution {
   profile_id: string | null;
   profile_version: number | null;
   intelligence_mode: 'profile' | 'none';
+  // Gold standard reference when a gold-standard block was injected into the
+  // rendered prompt (discovery_benchmark role on emerging/competitive scans,
+  // benchmark/target role on business audits, discovery role on gold-standard
+  // discovery scans). Null when no gold standard was resolved.
+  gold_standard_profile_id?: string | null;
+  gold_standard_profile_version?: number | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -1474,17 +1488,31 @@ export class IntelligenceProfileService extends BaseService {
     if (!expectedFields && !candidates) return '';
 
     const lines: string[] = [];
-    const roleLabel = role === 'benchmark' ? 'BENCHMARK' : role === 'target' ? 'TARGET' : 'DISCOVERY CRITERIA';
+    const roleLabel = role === 'benchmark'
+      ? 'BENCHMARK'
+      : role === 'target'
+      ? 'TARGET'
+      : role === 'discovery_benchmark'
+      ? 'DISCOVERY BENCHMARK'
+      : 'DISCOVERY CRITERIA';
     const roleAction = role === 'benchmark'
       ? 'Compare the business\'s actual profile against these expected fields and quality gates. Flag any field where the business\'s actual value differs from the expected value as a gap.'
       : role === 'target'
       ? 'Generate fix instructions that move the business\'s profile toward these expected field values. Use the pattern exemplar as the concrete adaptation source.'
+      : role === 'discovery_benchmark'
+      ? 'Rate each discovered candidate against these established expected fields and quality gates. For each candidate, evaluate per-platform: a candidate may meet the gold standard on one platform but fail on another. Record gold_standard_match = true ONLY for candidates that pass ALL non_negotiable gates on the platform(s) where they have a presence. Populate gold_standard_gate_results per candidate with per-gate pass/fail. Do NOT re-derive expected_fields — the ones below are the rating benchmark. Aggregate per-platform gate failures into platform_analysis.platform_breakdown, and recommend a primary_platform for outreach based on where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform, not just the most-present platform). Populate platform_analysis.outreach_recommendation with platform-specific opportunities and a recommended_platform_focus that downstream business audits should target.'
       : 'Evaluate each discovered candidate against these established expected fields and quality gates. Mark is_gold_standard = true ONLY for candidates that pass ALL non_negotiable gates. Do NOT re-derive expected_fields — the ones below are already established. Return the same expected_fields in your output (echoed from this profile) so downstream audits stay consistent.';
 
     lines.push('');
     lines.push(`=== GOLD STANDARD ${roleLabel} ===`);
     lines.push(`Category: ${profile.category_name}`);
     lines.push(`Profile: ${profile.id} v${profile.version}`);
+    if (role === 'discovery_benchmark') {
+      const platformLabel = profile.reference_platform
+        ? profile.reference_platform
+        : 'cross-platform (all platforms)';
+      lines.push(`Platform scope: ${platformLabel}`);
+    }
     lines.push('');
     lines.push(`DIRECTIVE: This is your ${roleLabel} for this category. ${roleAction}`);
     lines.push('');

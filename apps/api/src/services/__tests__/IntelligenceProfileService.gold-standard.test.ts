@@ -248,6 +248,94 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
     });
   });
 
+  describe('serializeGoldStandard — discovery_benchmark role', () => {
+    const fakeProfileWithPlatform = {
+      id: 'gs-google-001',
+      category_key: 'african_grocery',
+      category_name: 'African Grocery Store',
+      version: 3,
+      intelligence_focus: 'gold_standards',
+      reference_city: null,
+      reference_state: null,
+      reference_platform: 'google',
+      configuration_json: {
+        expected_fields: {
+          universal: {
+            canonical_name: 'African Grocery Store',
+            hours_present: true,
+            website_present: true,
+            quality_gates: [
+              { field: 'business_name', description: 'Canonical name', severity: 'non_negotiable' },
+            ],
+          },
+          platforms: {
+            google: {
+              primary_category: 'African goods store',
+              quality_gates: [
+                { field: 'primary_category', description: 'Correct GBP category', severity: 'non_negotiable' },
+              ],
+            },
+          },
+        },
+        candidates: [],
+      },
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any;
+
+    it('produces a DISCOVERY BENCHMARK block with the correct header label', () => {
+      const block = service.serializeGoldStandard(fakeProfileWithPlatform, 'discovery_benchmark');
+      expect(block).toContain('GOLD STANDARD DISCOVERY BENCHMARK');
+      expect(block).not.toContain('GOLD STANDARD BENCHMARK');
+      expect(block).not.toContain('GOLD STANDARD DISCOVERY CRITERIA');
+    });
+
+    it('includes platform scope line when reference_platform is set', () => {
+      const block = service.serializeGoldStandard(fakeProfileWithPlatform, 'discovery_benchmark');
+      expect(block).toContain('Platform scope: google');
+    });
+
+    it('shows cross-platform label when reference_platform is null', () => {
+      const crossPlatformProfile = { ...fakeProfileWithPlatform, reference_platform: null } as any;
+      const block = service.serializeGoldStandard(crossPlatformProfile, 'discovery_benchmark');
+      expect(block).toContain('Platform scope: cross-platform (all platforms)');
+    });
+
+    it('directive instructs per-platform rating and gold_standard_match', () => {
+      const block = service.serializeGoldStandard(fakeProfileWithPlatform, 'discovery_benchmark');
+      expect(block).toContain('Rate each discovered candidate');
+      expect(block).toContain('per-platform');
+      expect(block).toContain('gold_standard_match');
+      expect(block).toContain('gold_standard_gate_results');
+      expect(block).toContain('non_negotiable gates');
+    });
+
+    it('directive instructs platform_analysis aggregation and outreach recommendation', () => {
+      const block = service.serializeGoldStandard(fakeProfileWithPlatform, 'discovery_benchmark');
+      expect(block).toContain('platform_analysis.platform_breakdown');
+      expect(block).toContain('primary_platform');
+      expect(block).toContain('recommended_platform_focus');
+      expect(block).toContain('highest-opportunity platform');
+    });
+
+    it('directive does NOT contain benchmark-role or discovery-role text', () => {
+      const block = service.serializeGoldStandard(fakeProfileWithPlatform, 'discovery_benchmark');
+      // benchmark role: "Compare the business's actual profile"
+      expect(block).not.toContain("Compare the business's actual profile");
+      // discovery role: "Return the same expected_fields in your output"
+      expect(block).not.toContain('Return the same expected_fields in your output');
+    });
+
+    it('still serializes universal + platform expected fields', () => {
+      const block = service.serializeGoldStandard(fakeProfileWithPlatform, 'discovery_benchmark');
+      expect(block).toContain('Canonical name: African Grocery Store');
+      expect(block).toContain('Platform: google');
+      expect(block).toContain('Primary category: African goods store');
+      expect(block).toContain('[non_negotiable] primary_category');
+    });
+  });
+
   describe('listActive — focus filtering', () => {
     it('passes focus filter to Prisma when provided', async () => {
       mockPrisma.mkt_intelligence_profiles.findMany.mockResolvedValue([]);

@@ -15,9 +15,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
+    resolveGoldStandard: vi.fn(async (_category: string, _platform?: string | null) => null),
+    serializeGoldStandard: vi.fn((_profile: any, _role: string) => ''),
     renderBusinessProfileBlock: vi.fn(
       (profile: any, _city?: string | null, headerTitle?: string) =>
         `\n${headerTitle ? `=== ${headerTitle} ===\n` : ''}PROFILE_BLOCK:${profile.id}:v${profile.version}`,
@@ -31,12 +33,25 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
   const mockCampaignService = { getCampaign: vi.fn() };
   const mockAiProvider = { generateChatCompletion: vi.fn() };
   const mockHotProspectService = { syncFromExecution: vi.fn() };
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService };
+  const mockComposerService = {
+    composeIntelligencePrompt: vi.fn(async (_input: any) => ({
+      body: 'COMPOSED_BODY',
+      resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' as const },
+      focus: _input.focus,
+    })),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
   IntelligenceProfileService: {
     getInstance: () => mockProfileService,
+  },
+}));
+
+vi.mock('../intelligence/PromptComposerService', () => ({
+  PromptComposerService: {
+    getInstance: () => mockComposerService,
   },
 }));
 
@@ -68,8 +83,16 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
   beforeEach(() => {
     service = MarketingExecutionService.getInstance();
     vi.clearAllMocks();
-    // Reset default behavior: resolve returns null
+    // Reset default behavior: resolve returns null, resolveGoldStandard returns null
     mockProfileService.resolve.mockImplementation(async () => null);
+    mockProfileService.resolveGoldStandard.mockImplementation(async () => null);
+    mockProfileService.serializeGoldStandard.mockImplementation(() => '');
+    // Reset composer to a default composed body
+    mockComposerService.composeIntelligencePrompt.mockImplementation(async (input: any) => ({
+      body: 'COMPOSED_BODY',
+      resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' as const },
+      focus: input.focus,
+    }));
   });
 
   const makeTemplate = (promptType: string, body = 'Hello {{business_name}} in {{category}}') => ({
@@ -379,6 +402,149 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).toContain('Acme Auto');
       expect(renderedPrompt).toContain('enthusiastic and helpful');
       expect(renderedPrompt).toContain('Brake Repair, Oil Change');
+    });
+  });
+
+  // ─── Intelligence-scope composer path + gold standard injection ──────────
+  describe('intelligence-scope composer path — gold standard discovery benchmark', () => {
+    const makeIntelTemplate = (body = 'Discover {{category}} in {{city}}') => ({
+      body,
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_discovery' },
+      outputSchema: { name: 'intelligence_discovery' },
+    });
+
+    const makeIntelCampaign = (focus = 'emerging', platform: string | null = null) => ({
+      id: 'camp-intel-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Kansas City',
+      state: 'MO',
+      intelligence_focus: focus,
+      intelligence_platform: platform,
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('injects gold standard discovery benchmark when profile exists', async () => {
+      const goldStandard = {
+        id: 'gs-african-grocery-001',
+        version: 2,
+        reference_platform: 'google',
+      };
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce(
+        '=== GOLD STANDARD DISCOVERY BENCHMARK ===\nRate each candidate...',
+      );
+
+      const template = makeIntelTemplate();
+      const campaign = makeIntelCampaign('emerging', 'google');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('GOLD STANDARD DISCOVERY BENCHMARK');
+      expect(resolution.gold_standard_profile_id).toBe('gs-african-grocery-001');
+      expect(resolution.gold_standard_profile_version).toBe(2);
+      // serializeGoldStandard called with discovery_benchmark role
+      expect(mockProfileService.serializeGoldStandard).toHaveBeenCalledWith(goldStandard, 'discovery_benchmark');
+      // resolveGoldStandard called with platform
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'google');
+    });
+
+    it('appends degraded-mode note when no gold standard exists', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const template = makeIntelTemplate();
+      const campaign = makeIntelCampaign('competitive', null);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('NO GOLD STANDARD PROFILE');
+      expect(renderedPrompt).toContain('BENCHMARKING ABSENT');
+      expect(resolution.gold_standard_profile_id).toBeNull();
+      expect(resolution.gold_standard_profile_version).toBeNull();
+    });
+
+    it('passes campaign platform through to resolveGoldStandard', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+      const campaign = makeIntelCampaign('emerging', 'yelp');
+
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign,
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'yelp');
+    });
+
+    it('passes null platform when campaign has no intelligence_platform', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+      const campaign = makeIntelCampaign('emerging', null);
+
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign,
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', null);
+    });
+
+    it('works for competitive focus (not just emerging)', async () => {
+      const goldStandard = { id: 'gs-001', version: 1, reference_platform: null };
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD DISCOVERY BENCHMARK ===');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('competitive', null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('GOLD STANDARD DISCOVERY BENCHMARK');
+      expect(resolution.gold_standard_profile_id).toBe('gs-001');
+      // Composer called with competitive focus
+      expect(mockComposerService.composeIntelligencePrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ focus: 'competitive' }),
+      );
+    });
+
+    it('composer body is still rendered (gold standard is appended, not replacing)', async () => {
+      mockComposerService.composeIntelligencePrompt.mockResolvedValueOnce({
+        body: 'COMPOSED_INTEL_BODY',
+        resolution: { profile_id: 'intel-profile-1', profile_version: 3, intelligence_mode: 'profile' as const },
+        focus: 'emerging',
+      });
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce({
+        id: 'gs-001',
+        version: 1,
+        reference_platform: 'google',
+      });
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD DISCOVERY BENCHMARK ===');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', 'google'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('COMPOSED_INTEL_BODY');
+      expect(renderedPrompt).toContain('GOLD STANDARD DISCOVERY BENCHMARK');
+      // Focus profile resolution preserved
+      expect(resolution.profile_id).toBe('intel-profile-1');
+      expect(resolution.profile_version).toBe(3);
+      expect(resolution.intelligence_mode).toBe('profile');
+      // Gold standard resolution also present
+      expect(resolution.gold_standard_profile_id).toBe('gs-001');
     });
   });
 });

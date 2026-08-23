@@ -301,3 +301,162 @@ describe('normalizeIntelligenceDiscoveryPayload', () => {
     expect(normalizeIntelligenceDiscoveryPayload('string')).toBe('string');
   });
 });
+
+// ─── Gold standard per-candidate rating fields ────────────────────────────
+
+describe('intelligence_discovery schema — gold standard candidate fields', () => {
+  it('accepts gold_standard_match + gold_standard_gate_results on a candidate', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        gold_standard_match: true,
+        gold_standard_gate_results: [
+          { gate: 'primary_category', passed: true, platform: 'google' },
+          { gate: 'hours_present', passed: true },
+        ],
+      })],
+      qualifying_businesses: [validCandidate({
+        gold_standard_match: true,
+        gold_standard_gate_results: [
+          { gate: 'primary_category', passed: true, platform: 'google' },
+        ],
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts null gold_standard_match (candidate not rated)', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({ gold_standard_match: null })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts candidates without gold standard fields (legacy / degraded mode)', () => {
+    const data = validDiscovery();
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects gold_standard_gate_results with wrong element shape (missing passed)', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        gold_standard_gate_results: [{ gate: 'primary_category' }] as any,
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts null gold_standard_gate_results', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({ gold_standard_gate_results: null })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+});
+
+// ─── Platform analysis section ────────────────────────────────────────────
+
+describe('intelligence_discovery schema — platform_analysis section', () => {
+  const validPlatformAnalysis = () => ({
+    gold_standard_profile_id: 'gs-001',
+    gold_standard_profile_version: 2,
+    gold_standard_platform: 'google',
+    platform_breakdown: [
+      {
+        platform: 'google',
+        present_count: 10,
+        absent_count: 5,
+        meets_gold_standard_count: 3,
+        common_gate_failures: [
+          { gate: 'primary_category', failed_count: 7 },
+        ],
+      },
+    ],
+    candidates_meeting_all_gates: 3,
+    most_common_gate_failures: [
+      { gate: 'primary_category', failed_count: 7, severity: 'non_negotiable' },
+      { gate: 'photo_count', failed_count: 4, severity: 'recommended' },
+    ],
+    outreach_recommendation: {
+      primary_platform: 'google',
+      platform_rationale: 'Deepest gold standard + most fixable gaps',
+      platform_specific_opportunities: [
+        { platform: 'google', opportunity: '7 candidates missing GBP primary category', evidence_summary: 'See platform_breakdown' },
+      ],
+      recommended_platform_focus: 'google',
+      primary_angle: 'Fix your Google presence to match the category leader',
+      suggested_call_to_action: 'Schedule a free Google profile audit',
+    },
+  });
+
+  it('accepts a valid platform_analysis section', () => {
+    const data = validDiscovery({ platform_analysis: validPlatformAnalysis() });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts absence of platform_analysis (degraded mode / no gold standard)', () => {
+    const data = validDiscovery();
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts platform_analysis with null gold_standard_profile_id', () => {
+    const pa = validPlatformAnalysis();
+    pa.gold_standard_profile_id = null;
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts platform_analysis with null gold_standard_platform (cross-platform)', () => {
+    const pa = validPlatformAnalysis();
+    pa.gold_standard_platform = null;
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts platform_analysis without platform_breakdown (optional)', () => {
+    const pa = validPlatformAnalysis();
+    delete pa.platform_breakdown;
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects platform_analysis with missing outreach_recommendation (required)', () => {
+    const pa = validPlatformAnalysis();
+    delete pa.outreach_recommendation;
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects platform_analysis with missing candidates_meeting_all_gates (required)', () => {
+    const pa = validPlatformAnalysis();
+    delete pa.candidates_meeting_all_gates;
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects platform_breakdown element with wrong shape (missing present_count)', () => {
+    const pa = validPlatformAnalysis();
+    (pa.platform_breakdown as any)[0] = { platform: 'google', absent_count: 5 };
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts extra fields in platform_analysis via passthrough', () => {
+    const pa = { ...validPlatformAnalysis(), future_field: 'ok' };
+    const data = validDiscovery({ platform_analysis: pa });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+});

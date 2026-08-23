@@ -704,5 +704,59 @@ When a gold-standard scan result is imported, `platform_focus` from the scan JSO
 - `resolveIntelligenceProfile(category, focus?, city?, platform?)` — 4th param is platform
 - `GoldStandardEstablishmentPanel` shows platform badge on active profile card; draft filter matches campaign platform OR cross-platform drafts
 
+## Gold Standard — Emerging/Competitive Discovery Benchmark (Platform-Aware)
+
+Closes the gap where emerging/competitive discovery scans had no category-top benchmark to rate candidates against. The gold standard profile (established by a prior Gold Standard Establishment scan) is now injected into emerging/competitive discovery scans as a `discovery_benchmark` block, introducing **platform awareness** into focus discovery scans for the first time.
+
+### Injection point
+`MarketingExecutionService.resolvePrompt()` — composer path (emerging/competitive intelligence-scope seek):
+- After `PromptComposerService.composeIntelligencePrompt()` returns the composed body (base + extension + focus profile + focus modifier), resolves the gold standard via `IntelligenceProfileService.resolveGoldStandard(category, campaign.intelligence_platform, ctx)`
+- If present: appends `serializeGoldStandard(goldStandard, 'discovery_benchmark')` to the rendered prompt
+- If absent: appends a soft degraded-mode note (`=== NO GOLD STANDARD PROFILE — BENCHMARKING ABSENT ===`) so the operator knows to run an establishment scan first
+- Resolution metadata includes `gold_standard_profile_id` + `gold_standard_profile_version` for audit trail
+
+### `'discovery_benchmark'` role (`GoldStandardRole` type)
+New role added to `IntelligenceProfileService.serializeGoldStandard()`:
+- Header: `=== GOLD STANDARD DISCOVERY BENCHMARK ===`
+- Includes `Platform scope:` line (platform-specific or `cross-platform (all platforms)`)
+- Directive instructs the analyst to:
+  - Rate each discovered candidate per-platform against the established expected fields and quality gates
+  - Set `gold_standard_match = true` ONLY for candidates that pass ALL `non_negotiable` gates on the platform(s) where they have a presence
+  - Populate `gold_standard_gate_results` per candidate with per-gate pass/fail
+  - Aggregate per-platform gate failures into `platform_analysis.platform_breakdown`
+  - Recommend a `primary_platform` for outreach based on where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform, not just the most-present platform)
+  - Populate `platform_analysis.outreach_recommendation` with platform-specific opportunities and `recommended_platform_focus` for downstream business audits
+
+### `PromptResolution` type
+Extended with optional `gold_standard_profile_id?: string | null` and `gold_standard_profile_version?: number | null`.
+
+### Output schema (`intelligence-discovery.schema.ts`)
+Per-candidate (all optional, forward-compatible via `.passthrough()`):
+- `gold_standard_match: z.boolean().nullable().optional()` — passes ALL non_negotiable gates
+- `gold_standard_gate_results: z.array(z.object({ gate: z.string(), passed: z.boolean(), platform: z.string().optional() })).nullable().optional()` — per-gate pass/fail
+
+Top-level `platform_analysis` section (optional — present only when a gold standard block was injected):
+- `gold_standard_profile_id` / `gold_standard_profile_version` / `gold_standard_platform` — traceability
+- `platform_breakdown[]` — per-platform presence counts, meets_gold_standard_count, common_gate_failures
+- `candidates_meeting_all_gates` — category-level benchmarking summary
+- `most_common_gate_failures[]` — aggregated gate failures with severity
+- `outreach_recommendation` — `primary_platform`, `platform_rationale`, `platform_specific_opportunities[]`, `recommended_platform_focus`, `primary_angle`, `suggested_call_to_action`
+
+The `recommended_platform_focus` field is the key handoff — it tells downstream business audits which platform to target, closing the loop between discovery and audit.
+
+### Prompt suffix (`INTELLIGENCE_DISCOVERY_PROMPT_SUFFIX`)
+Updated to document the new output fields and rules:
+- When a `=== GOLD STANDARD DISCOVERY BENCHMARK ===` block is present, populate `gold_standard_match`, `gold_standard_gate_results`, and `platform_analysis`
+- When no gold standard block is present (degraded mode), omit all three entirely
+
+### Tests
+- `IntelligenceProfileService.gold-standard.test.ts` — 7 new tests for `discovery_benchmark` role (header label, platform scope line, directive text, field serialization, no cross-contamination with benchmark/discovery roles)
+- `ResolvePrompt.test.ts` — 6 new tests for the composer path (gold standard injected when present, degraded note when absent, platform passed through, competitive focus, composer body preserved + gold standard appended)
+- `IntelligenceDiscoverySchema.test.ts` — 14 new tests for per-candidate gold standard fields + `platform_analysis` section (valid, absent, null, wrong shape, missing required fields, passthrough)
+
+### Downstream consumption (phase 2, documented but not built)
+- Queue ingestion could map `outreach_recommendation.recommended_platform_focus` to the spawned business audit campaign's `intelligence_platform`
+- Frontend discovery audit card renders the `platform_analysis` section with per-platform bars + outreach recommendation + "Meets Gold Standard" badge per candidate
+
 
 
