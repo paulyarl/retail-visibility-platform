@@ -361,3 +361,146 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
     expect(yelpEval.is_gold_standard).toBe(true);
   });
 });
+
+describe('IntelligenceProfileService.removeGoldStandardCandidate', () => {
+  let service: IntelligenceProfileService;
+
+  const profileWithSlots = {
+    id: 'gs-beauty-supply',
+    category_key: 'beauty_supply',
+    category_name: 'Beauty Supply',
+    version: 1,
+    intelligence_focus: 'gold_standards',
+    reference_city: null,
+    reference_state: null,
+    reference_platform: null,
+    configuration_json: {
+      candidates: [
+        {
+          business_name: 'BPolished Beauty Supply',
+          city: 'Addison',
+          platform_evaluations: [
+            { platform: 'google', is_gold_standard: true, quality_score: 9.1 },
+            { platform: 'yelp', is_gold_standard: true, quality_score: 8.5 },
+          ],
+        },
+        {
+          business_name: 'Kinks and Curls',
+          city: 'Lawrenceville',
+          platform_evaluations: [
+            { platform: 'google', is_gold_standard: true, quality_score: 8.8 },
+          ],
+        },
+      ],
+    },
+    status: 'active',
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = IntelligenceProfileService.getInstance();
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockPrisma));
+  });
+
+  it('flips is_gold_standard to false on the target platform and creates a new version', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(profileWithSlots);
+    mockPrisma.mkt_intelligence_profiles.findMany.mockResolvedValue([profileWithSlots]);
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ ...profileWithSlots, version: 2 });
+    mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.removeGoldStandardCandidate('gs-beauty-supply', {
+      businessName: 'BPolished Beauty Supply',
+      platform: 'google',
+    });
+
+    expect(result.version).toBe(2);
+    const config = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data.configuration_json;
+    const candidate = config.candidates.find((c: any) => c.business_name === 'BPolished Beauty Supply');
+    const googleEval = candidate.platform_evaluations.find((pe: any) => pe.platform === 'google');
+    expect(googleEval.is_gold_standard).toBe(false);
+    // Yelp should remain true (per-platform — only Google was removed)
+    const yelpEval = candidate.platform_evaluations.find((pe: any) => pe.platform === 'yelp');
+    expect(yelpEval.is_gold_standard).toBe(true);
+  });
+
+  it('is idempotent — returns current active when candidate not in slot', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(profileWithSlots);
+
+    // Kinks and Curls is not gold-standard on yelp
+    const result = await service.removeGoldStandardCandidate('gs-beauty-supply', {
+      businessName: 'Kinks and Curls',
+      platform: 'yelp',
+    });
+
+    expect(result.version).toBe(1);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.mkt_intelligence_profiles.create).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent — returns current active when candidate not in profile at all', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(profileWithSlots);
+
+    const result = await service.removeGoldStandardCandidate('gs-beauty-supply', {
+      businessName: 'Nonexistent Business',
+      platform: 'google',
+    });
+
+    expect(result.version).toBe(1);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws when the profile is not a gold-standard profile', async () => {
+    const emergingProfile = { ...profileWithSlots, intelligence_focus: 'emerging' };
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(emergingProfile);
+
+    await expect(
+      service.removeGoldStandardCandidate('gs-beauty-supply', {
+        businessName: 'BPolished Beauty Supply',
+        platform: 'google',
+      }),
+    ).rejects.toThrow(/not a gold-standard profile/);
+  });
+
+  it('throws when the active profile is not found', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.removeGoldStandardCandidate('nonexistent', {
+        businessName: 'BPolished Beauty Supply',
+        platform: 'google',
+      }),
+    ).rejects.toThrow(/Active profile nonexistent not found/);
+  });
+
+  it('throws when platform is empty', async () => {
+    await expect(
+      service.removeGoldStandardCandidate('gs-beauty-supply', {
+        businessName: 'BPolished Beauty Supply',
+        platform: '  ',
+      }),
+    ).rejects.toThrow(/Platform is required/);
+  });
+
+  it('matches candidate case-insensitively', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(profileWithSlots);
+    mockPrisma.mkt_intelligence_profiles.findMany.mockResolvedValue([profileWithSlots]);
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ ...profileWithSlots, version: 2 });
+    mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValue({ count: 1 });
+
+    // Input has different casing than the stored candidate
+    await service.removeGoldStandardCandidate('gs-beauty-supply', {
+      businessName: 'bpolished beauty supply',
+      platform: 'google',
+    });
+
+    const config = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data.configuration_json;
+    const candidate = config.candidates.find((c: any) =>
+      (c.business_name || '').toLowerCase() === 'bpolished beauty supply',
+    );
+    expect(candidate).toBeDefined();
+    const googleEval = candidate.platform_evaluations.find((pe: any) => pe.platform === 'google');
+    expect(googleEval.is_gold_standard).toBe(false);
+  });
+});

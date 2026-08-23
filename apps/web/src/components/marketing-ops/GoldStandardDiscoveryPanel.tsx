@@ -22,13 +22,16 @@ interface PlatformEvaluation {
     has_profile_photo?: boolean | null;
     photo_count?: number | null;
     photo_types?: string[];
+    visual_assets?: string[];
   } | null;
   platform_config?: {
     primary_category?: string | null;
     claimed?: boolean | null;
     review_count?: number | null;
     rating?: number | null;
-    attributes?: string[];
+    attributes?: string[] | string;
+    website?: string | null;
+    additional_categories?: string[] | string;
   } | null;
   quality_gates_passed?: string[];
   quality_gates_failed?: string[];
@@ -188,6 +191,30 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
     return counts;
   })();
 
+  // Per-platform slot occupants from the active profile — the actual
+  // businesses occupying each platform's gold-standard slots. These may
+  // come from the establishment scan (analyst-flagged at profile creation)
+  // or from prior discovery promotions via the "Add to slot" button.
+  const profileSlotOccupants: Record<string, Array<{ business_name: string; city?: string; quality_score?: number | null }>> = (() => {
+    const map: Record<string, Array<{ business_name: string; city?: string; quality_score?: number | null }>> = {};
+    if (!activeProfile?.configuration_json) return map;
+    const config = activeProfile.configuration_json as any;
+    const candidates: Candidate[] = Array.isArray(config.candidates) ? config.candidates : [];
+    for (const c of candidates) {
+      for (const pe of c.platform_evaluations ?? []) {
+        if (pe.is_gold_standard === true) {
+          if (!map[pe.platform]) map[pe.platform] = [];
+          map[pe.platform].push({
+            business_name: c.business_name,
+            city: c.city,
+            quality_score: pe.quality_score ?? null,
+          });
+        }
+      }
+    }
+    return map;
+  })();
+
   // Promote a discovered candidate into a platform's gold-standard slot.
   const handlePromote = async (candidate: Candidate, platform: string) => {
     if (!activeProfile) return;
@@ -213,6 +240,30 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
     }
   };
 
+  // Remove a candidate from a platform's gold-standard slot (frees up a slot).
+  const handleRemoveFromSlot = async (businessName: string, platform: string) => {
+    if (!activeProfile) return;
+    const key = `remove:${businessName}|${platform}`;
+    setPromotingKey(key);
+    setSuccessMessage(null);
+    setError(null);
+    try {
+      await marketingOpsService.removeGoldStandardCandidate(activeProfile.id, {
+        businessName,
+        platform,
+      });
+      setSuccessMessage(
+        `Removed "${businessName}" from the ${prettyPlatform(platform)} gold-standard slot.`,
+      );
+      setRefreshTrigger((n) => n + 1);
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove candidate from gold-standard slot');
+    } finally {
+      setPromotingKey(null);
+    }
+  };
+
   // Pretty-print a gate field name: "primary_category_exact_match" → "Primary category exact match"
   const prettyGate = (gate: string): string => {
     return gate
@@ -222,6 +273,21 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
 
   const prettyPlatform = (platform: string): string => {
     return platform === 'apple_maps' ? 'Apple Maps' : platform === 'bbb' ? 'BBB' : platform.charAt(0).toUpperCase() + platform.slice(1);
+  };
+
+  // Normalize attributes/additional_categories which may be an array or a
+  // comma-separated string depending on the scan source.
+  const normalizeList = (val: string[] | string | undefined | null): string[] => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.filter(Boolean);
+    return val.split(',').map((s) => s.trim()).filter(Boolean);
+  };
+
+  // Pretty-print a branding artifact field name for display.
+  const prettyBrandingField = (field: string): string => {
+    return field
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   return (
@@ -295,15 +361,49 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
               </div>
             </div>
           ) : (
-            <div className="space-y-1">
-              {Object.entries(profileSlotCounts).map(([platform, count]) => (
-                <div key={platform} className="text-xs flex items-center justify-between">
-                  <span className="text-gray-700 dark:text-gray-300">{prettyPlatform(platform)}</span>
-                  <span className={`font-medium ${count >= 4 ? 'text-green-600' : 'text-amber-600'}`}>
-                    {count}/4 {count >= 4 ? '(full)' : ''}
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {Object.entries(profileSlotCounts).map(([platform, count]) => {
+                const occupants = profileSlotOccupants[platform] ?? [];
+                return (
+                  <div key={platform}>
+                    <div className="text-xs flex items-center justify-between">
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{prettyPlatform(platform)}</span>
+                      <span className={`font-medium ${count >= 4 ? 'text-green-600' : 'text-amber-600'}`}>
+                        {count}/4 {count >= 4 ? '(full)' : ''}
+                      </span>
+                    </div>
+                    {occupants.length > 0 && (
+                      <div className="ml-2 mt-0.5 space-y-0.5">
+                        {occupants.map((occ, i) => {
+                          const removeKey = `remove:${occ.business_name}|${platform}`;
+                          const isRemoving = promotingKey === removeKey;
+                          return (
+                            <div key={i} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <span className="text-amber-500">•</span>
+                              <span>{occ.business_name}</span>
+                              {occ.city && <span className="text-gray-400">({occ.city})</span>}
+                              {occ.quality_score != null && (
+                                <span className="text-gray-400">{occ.quality_score}/10</span>
+                              )}
+                              {activeProfile && (
+                                <button
+                                  type="button"
+                                  disabled={isRemoving}
+                                  onClick={() => handleRemoveFromSlot(occ.business_name, platform)}
+                                  className="ml-auto text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-400 disabled:opacity-50 text-xs"
+                                  title={`Remove "${occ.business_name}" from ${prettyPlatform(platform)} slot`}
+                                >
+                                  {isRemoving ? '…' : '×'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -371,6 +471,27 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                         {candidate.city && <span>{candidate.city}{candidate.state ? `, ${candidate.state}` : ''}</span>}
                         {bestScore > 0 && <span className="text-gray-400">Best score: {bestScore}/10</span>}
                       </div>
+                      {/* NAP + website — pull from candidate.nap and first platform_config.website */}
+                      {(() => {
+                        const nap = candidate.nap;
+                        const website = (candidate.platform_evaluations ?? [])
+                          .map((pe) => pe.platform_config?.website)
+                          .find((w) => w);
+                        const hasNap = nap?.address || nap?.phone;
+                        if (!hasNap && !website) return null;
+                        return (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-3 flex-wrap">
+                            {nap?.address && <span>{nap.address}</span>}
+                            {nap?.phone && <span>{nap.phone}</span>}
+                            {website && (
+                              <a href={website} target="_blank" rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:underline">
+                                Website ↗
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {candidate.independence_rationale && (
                         <div className="text-xs text-gray-500 mt-1">{candidate.independence_rationale}</div>
                       )}
@@ -423,20 +544,37 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                                   ★ {pe.platform_config.rating} ({pe.platform_config.review_count ?? '?'} reviews)
                                 </span>
                               )}
-                              {pe.profile_url && (
-                                <a href={pe.profile_url} target="_blank" rel="noopener noreferrer"
-                                  className="text-blue-600 dark:text-blue-400 hover:underline ml-auto">
-                                  View Profile ↗
-                                </a>
+                              {pe.platform_config?.claimed != null && (
+                                <span className={`text-xs ${pe.platform_config.claimed ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}>
+                                  {pe.platform_config.claimed ? 'Claimed' : 'Unclaimed'}
+                                </span>
+                              )}
+                              {/* Links — website + profile URL, pushed right */}
+                              {(pe.platform_config?.website || pe.profile_url) && (
+                                <div className="ml-auto flex items-center gap-2">
+                                  {pe.platform_config?.website && (
+                                    <a href={pe.platform_config.website} target="_blank" rel="noopener noreferrer"
+                                      className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Website ↗
+                                    </a>
+                                  )}
+                                  {pe.profile_url && (
+                                    <a href={pe.profile_url} target="_blank" rel="noopener noreferrer"
+                                      className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      View Profile ↗
+                                    </a>
+                                  )}
+                                </div>
                               )}
                               {/* Per-platform slot promotion — only for analyst-flagged gold-standard evaluations */}
                               {pe.is_gold_standard === true && activeProfile && (() => {
                                 const slotKey = `${candidate.business_name.trim().toLowerCase()}|${pe.platform.trim().toLowerCase()}`;
                                 const isPromoted = promotedSlots.has(slotKey);
                                 const isPromoting = promotingKey === `${candidate.business_name}|${pe.platform}`;
+                                const hasLinks = !!(pe.profile_url || pe.platform_config?.website);
                                 if (isPromoted) {
                                   return (
-                                    <span className={`px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium ${pe.profile_url ? '' : 'ml-auto'}`}>
+                                    <span className={`px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium ${hasLinks ? '' : 'ml-auto'}`}>
                                       ✓ In {prettyPlatform(pe.platform)} slot
                                     </span>
                                   );
@@ -448,7 +586,7 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                                     type="button"
                                     disabled={isPromoting || slotFull}
                                     onClick={() => handlePromote(candidate, pe.platform)}
-                                    className={`text-xs px-2 py-0.5 rounded font-medium transition-colors ${pe.profile_url ? '' : 'ml-auto'} ${
+                                    className={`text-xs px-2 py-0.5 rounded font-medium transition-colors ${hasLinks ? '' : 'ml-auto'} ${
                                       slotFull
                                         ? 'bg-gray-100 dark:bg-neutral-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                                         : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50'
@@ -470,6 +608,68 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                                 {pe.quality_rationale}
                               </div>
                             )}
+                            {/* Platform config — categories, attributes, branding artifacts */}
+                            {(() => {
+                              const cfg = pe.platform_config;
+                              const ba = pe.branding_artifacts;
+                              const addlCats = normalizeList(cfg?.additional_categories);
+                              const attrs = normalizeList(cfg?.attributes);
+                              const photoTypes = ba?.photo_types ?? [];
+                              const brandingFlags: string[] = [];
+                              if (ba?.has_logo) brandingFlags.push('Logo');
+                              if (ba?.has_cover_photo) brandingFlags.push('Cover photo');
+                              if (ba?.has_profile_photo) brandingFlags.push('Profile photo');
+                              if (ba?.photo_count != null) brandingFlags.push(`${ba.photo_count} photos`);
+                              const hasAny = cfg?.primary_category || addlCats.length > 0 || attrs.length > 0 || brandingFlags.length > 0 || photoTypes.length > 0;
+                              if (!hasAny) return null;
+                              return (
+                                <div className="mt-1.5 space-y-1 text-xs">
+                                  {/* Categories */}
+                                  {(cfg?.primary_category || addlCats.length > 0) && (
+                                    <div className="flex items-start gap-1.5 flex-wrap">
+                                      <span className="text-gray-400 dark:text-gray-500 font-medium shrink-0">Category:</span>
+                                      {cfg?.primary_category && (
+                                        <span className="text-gray-600 dark:text-gray-300">{cfg.primary_category}</span>
+                                      )}
+                                      {addlCats.length > 0 && (
+                                        <span className="text-gray-400 dark:text-gray-500">
+                                          {addlCats.join(', ')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {/* Attributes */}
+                                  {attrs.length > 0 && (
+                                    <div className="flex items-start gap-1.5 flex-wrap">
+                                      <span className="text-gray-400 dark:text-gray-500 font-medium shrink-0">Attributes:</span>
+                                      <div className="flex flex-wrap gap-1">
+                                        {attrs.map((attr, i) => (
+                                          <span key={i} className="px-1 py-0.5 bg-gray-100 dark:bg-neutral-700 text-gray-500 dark:text-gray-400 rounded">
+                                            {attr}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Branding artifacts */}
+                                  {(brandingFlags.length > 0 || photoTypes.length > 0) && (
+                                    <div className="flex items-start gap-1.5 flex-wrap">
+                                      <span className="text-gray-400 dark:text-gray-500 font-medium shrink-0">Branding:</span>
+                                      {brandingFlags.length > 0 && (
+                                        <span className="text-gray-600 dark:text-gray-300">
+                                          {brandingFlags.join(' · ')}
+                                        </span>
+                                      )}
+                                      {photoTypes.length > 0 && (
+                                        <span className="text-gray-400 dark:text-gray-500">
+                                          ({photoTypes.map(prettyBrandingField).join(', ')})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {/* Gate pass/fail summary */}
                             {(passed.length > 0 || failed.length > 0) && (
                               <div className="mt-1.5 flex items-start gap-3 flex-wrap">

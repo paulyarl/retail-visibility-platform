@@ -6121,6 +6121,49 @@ router.post('/intelligence-profiles/:id/candidates', async (req, res) => {
   }
 });
 
+// DELETE /intelligence-profiles/:id/candidates — remove a candidate from a
+// specific platform's gold-standard slot. Frees up a slot so a new discovery
+// can be promoted. Flips is_gold_standard to false on the target platform;
+// the candidate row stays in the profile (may still be gold-standard on
+// other platforms).
+router.delete('/intelligence-profiles/:id/candidates', async (req, res) => {
+  try {
+    const businessName = typeof req.query.businessName === 'string' ? req.query.businessName : '';
+    const platform = typeof req.query.platform === 'string' ? req.query.platform : '';
+    if (!businessName || !platform) {
+      return res.status(400).json({ success: false, error: 'businessName and platform query params are required' });
+    }
+    const profile = await IntelligenceProfileService.getInstance().removeGoldStandardCandidate(
+      req.params.id,
+      { businessName, platform },
+      getCtx(req),
+    );
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: PLATFORM_SCOPE,
+        actor: req.user?.id || 'unknown',
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: `${profile.id}@${profile.version}`,
+          action_description: 'operator_remove_gold_standard_candidate',
+          profile_id: profile.id,
+          profile_version: profile.version,
+          candidate_name: businessName,
+          platform,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] gold-standard candidate removal audit failed', getCtx(req), { error: (e as Error).message });
+    }
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // POST /intelligence-profiles/:id/:version/activate — activate a draft version
 router.post('/intelligence-profiles/:id/:version/activate', async (req, res) => {
   try {

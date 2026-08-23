@@ -1062,6 +1062,139 @@ export class IntelligenceProfileService extends BaseService {
     }
   }
 
+  /**
+   * Remove a candidate from a specific platform's gold-standard slot on the
+   * active gold-standard profile. Flips is_gold_standard to false on the
+   * target platform's evaluation for the matching candidate (by business_name,
+   * case-insensitive). Creates a new active version.
+   *
+   * This is the inverse of addGoldStandardCandidate — it frees up a slot so
+   * a new discovery can be promoted. The candidate row itself is NOT removed
+   * from configuration_json.candidates (it may still be gold-standard on
+   * other platforms); only the target platform's flag is flipped to false.
+   *
+   * Idempotent: if the candidate is not in the target platform's slot (flag
+   * is already false/null or candidate not found), returns the current active
+   * version without creating a new one.
+   */
+  async removeGoldStandardCandidate(profileId: string, input: {
+    businessName: string;
+    platform: string;
+  }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
+    const platform = input.platform.trim().toLowerCase();
+    const businessName = (input.businessName || '').trim();
+
+    if (!platform) {
+      throw new Error('Platform is required');
+    }
+    if (!businessName) {
+      throw new Error('businessName is required');
+    }
+
+    try {
+      // 1. Load the active version
+      const active = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId, status: 'active' },
+      });
+      if (!active) {
+        throw new Error(`Active profile ${profileId} not found`);
+      }
+
+      // 2. Validate gold-standard profile
+      if (active.intelligence_focus !== 'gold_standards') {
+        throw new Error(
+          `Profile ${profileId} is not a gold-standard profile (focus: ${active.intelligence_focus}).`,
+        );
+      }
+
+      // 3. Deep-clone config and find the candidate
+      const config = JSON.parse(JSON.stringify(active.configuration_json ?? {})) as Record<string, any>;
+      const candidates: any[] = Array.isArray(config.candidates) ? config.candidates : [];
+
+      const existingIdx = candidates.findIndex(
+        (c) => (c.business_name || '').trim().toLowerCase() === businessName.toLowerCase(),
+      );
+
+      if (existingIdx < 0) {
+        // Candidate not in profile at all — idempotent
+        logger.info('Gold standard candidate not in profile (idempotent remove)', ctx, {
+          profileId, businessName, platform,
+        });
+        return active as IntelligenceProfile;
+      }
+
+      const existing = candidates[existingIdx];
+      const existingEvals: any[] = Array.isArray(existing.platform_evaluations) ? existing.platform_evaluations : [];
+      const existingTargetEval = existingEvals.find(
+        (pe) => (pe.platform || '').trim().toLowerCase() === platform,
+      );
+
+      if (!existingTargetEval || existingTargetEval.is_gold_standard !== true) {
+        // Not in this platform's slot — idempotent
+        logger.info('Gold standard candidate not in platform slot (idempotent remove)', ctx, {
+          profileId, businessName, platform,
+        });
+        return active as IntelligenceProfile;
+      }
+
+      // 4. Flip the flag to false
+      existingTargetEval.is_gold_standard = false;
+      config.candidates = candidates;
+
+      // 5. Create a new active version
+      const result = await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.mkt_intelligence_profiles.findMany({
+          where: { id: profileId },
+          orderBy: { version: 'desc' },
+          take: 1,
+        });
+        if (existing.length === 0) {
+          throw new Error(`Profile ${profileId} not found`);
+        }
+        const latest = existing[0];
+        const nextVersion = latest.version + 1;
+
+        await tx.mkt_intelligence_profiles.updateMany({
+          where: { id: profileId, status: 'active' },
+          data: { status: 'retired', updated_at: new Date() },
+        });
+
+        const created = await tx.mkt_intelligence_profiles.create({
+          data: {
+            id: profileId,
+            category_key: latest.category_key,
+            category_name: latest.category_name,
+            version: nextVersion,
+            intelligence_focus: latest.intelligence_focus,
+            reference_city: latest.reference_city,
+            reference_state: latest.reference_state,
+            reference_platform: latest.reference_platform,
+            configuration_json: config as any,
+            status: 'active',
+          },
+        });
+
+        return created;
+      });
+
+      logger.info('Gold standard candidate removed from platform slot', ctx, {
+        profileId,
+        version: result.version,
+        businessName,
+        platform,
+      });
+      return result as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.removeGoldStandardCandidate failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        businessName,
+        platform,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   // ====================
   // PROMPT BLOCK RENDERING
   // ====================

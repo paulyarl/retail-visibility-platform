@@ -5003,6 +5003,10 @@ interface MarketingOpsService {
     candidate: Record<string, any>;
     platform: string;
   }): Promise<IntelligenceProfile>;
+  removeGoldStandardCandidate(id: string, input: {
+    businessName: string;
+    platform: string;
+  }): Promise<IntelligenceProfile>;
   listIntelligenceRuns(campaignId: string): Promise<IntelligenceRun[]>;
   getIntelligenceRun(runId: string): Promise<IntelligenceRun | null>;
 }
@@ -5282,6 +5286,27 @@ MarketingOpsService.prototype.addGoldStandardCandidate = async function (id: str
   );
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to promote gold-standard candidate');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.removeGoldStandardCandidate = async function (id: string, input: {
+  businessName: string;
+  platform: string;
+}): Promise<IntelligenceProfile> {
+  const params = new URLSearchParams({
+    businessName: input.businessName,
+    platform: input.platform,
+  });
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/candidates?${params.toString()}`,
+    { method: 'DELETE' },
+    'mkt-ops-intel-profile-remove-candidate',
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to remove gold-standard candidate');
   }
   await this.invalidateCachePattern('mkt-ops-intel-profile');
   return result.data?.data ?? result.data;
