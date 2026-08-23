@@ -58,10 +58,10 @@ const CANDIDATE_EVALUATION_SECTION = `Evaluate each candidate per platform:
 - profile_url: the LIVE destination URL on the platform (e.g. "https://www.google.com/maps/place/...")
 - quality_score: 0-10 based on profile completeness, branding, accuracy, engagement
 - quality_rationale: why this score
-- is_gold_standard: true if the candidate meets the bar (up to 4 per platform). Only independent/small_group businesses can qualify.
+- is_gold_standard: true for the TOP candidates per platform (up to 4), relative to the candidate pool. The best available candidate on a platform qualifies even if they don't pass every quality gate — the quality_score and quality_gates_passed/failed capture the absolute quality signal so operators can see how strong the benchmark actually is. Only independent/small_group businesses can qualify.
 - branding_artifacts: what the candidate has (logo, cover photo, photo count, photo types)
 - platform_config: categories, attributes, description quality
-- quality_gates_passed/failed: which gates this candidate passed/failed
+- quality_gates_passed/failed: which gates this candidate passed/failed (informational — does NOT filter is_gold_standard)
 - ownership_type, location_count_estimate, independence_rationale: recorded per candidate (see ELIGIBILITY)`;
 
 const BRANDING_ARTIFACTS_SECTION = `=== BRANDING ARTIFACTS ===
@@ -181,17 +181,24 @@ Rules:
   what the top candidates have in common. Evaluate each candidate per platform
   with quality_score, is_gold_standard flag, and branding artifacts.
 - For discovery scans: evaluate additional candidates against the already-
-  established expected_fields and quality gates. Mark is_gold_standard for
-  candidates that meet the bar.
+  established expected_fields and quality gates. Flag is_gold_standard for the
+  top candidates per platform relative to the pool and existing benchmark.
 - profile_url is the LIVE destination URL on the platform (e.g.
   "https://www.google.com/maps/place/..."). Always capture this — it becomes
   the exemplar URL shown to operators and referenced in audit benchmarks.
 - branding_artifacts capture what the candidate has (logo, cover photo, photo
   count, photo types). These become branding quality gates and audit gap inputs.
 - quality_gates use severity "non_negotiable" for must-have fields and
-  "recommended" for nice-to-have fields.
+  "recommended" for nice-to-have fields. Quality gates are aspirational targets
+  derived from the top candidates — they do NOT filter is_gold_standard. A
+  candidate can be flagged is_gold_standard on a platform without passing every
+  gate. The quality_gates_passed/failed fields capture the gap so operators can
+  see how strong the benchmark actually is.
 - category_key should be the normalized (lowercase, whitespace-collapsed) category name.
-- Up to 4 candidates per platform should be flagged is_gold_standard = true.
+- Flag the TOP candidates per platform as is_gold_standard = true (up to 4 per
+  platform), relative to the candidate pool. The best available candidate on a
+  platform qualifies even if they have gaps — the quality_score reflects
+  absolute quality so operators know how strong the benchmark is.
 - INDEPENDENT BUSINESSES ONLY. Only independent or small locally-owned groups
   (<= ~10 locations) qualify as gold-standard candidates. Franchises, chains,
   and corporate subsidiaries must be excluded and noted in
@@ -228,16 +235,17 @@ The gold-standard profile will be used to:
 ${ELIGIBILITY_SECTION}
 
 === CANDIDATE SELECTION ===
-Find businesses that:
-- Are INDEPENDENT, owner-operated businesses (see ELIGIBILITY section — no franchises, chains, or corporate subsidiaries)
-- Have a strong, well-maintained profile on the target platform(s)
-- Use the correct primary category and relevant additional categories
-- Have comprehensive branding (logo, cover photo, multiple photos)
-- Have accurate and consistent NAP (name, address, phone)
-- Have a functional website linked from their profile
-- Have active engagement (respond to reviews, post updates)
-- Are recognized as leaders in their category by the local community (not national brand recognition)
-- Span at least 3 distinct states/regions when possible (avoid coastal/metro clustering)
+Find the BEST AVAILABLE independent businesses for this category. Not every candidate will be perfect — in many niches, no independent operator has a flawless cross-platform presence. Your job is to identify the strongest candidates in the pool and slot them as the benchmark, even if they have gaps.
+
+Prioritize (in rough order):
+- Independent, owner-operated businesses (see ELIGIBILITY section — no franchises, chains, or corporate subsidiaries)
+- Correct primary category and clear category-specific positioning
+- Functional website and published hours
+- Recognizable branding (logo, photos)
+- Active community presence (reviews, social engagement, local recognition)
+- Geographic diversity — span at least 3 distinct states/regions when possible
+
+Do NOT require a candidate to have every quality above before flagging them is_gold_standard. Flag the TOP candidates per platform (up to 4) relative to what the pool actually contains. A 6/10 Bing presence may be the best available benchmark for this category on Bing — flag it and let the quality_score and quality_gates_failed tell operators how strong the benchmark is.
 
 ${CANDIDATE_EVALUATION_SECTION}
 
@@ -297,27 +305,26 @@ The gold-standard profile will be used to:
 ${ELIGIBILITY_SECTION}
 
 === CANDIDATE SELECTION ===
-Find ADDITIONAL businesses that:
-- Are INDEPENDENT, owner-operated businesses (see ELIGIBILITY section — no franchises, chains, or corporate subsidiaries)
+Find ADDITIONAL independent businesses that were NOT already evaluated in the establishment scan. As with establishment, do NOT require candidates to have a flawless profile before flagging them is_gold_standard. Flag the TOP candidates per platform (up to 4) relative to the pool — a candidate that is stronger than the existing benchmark on a platform qualifies even if they don't pass every quality gate.
+
+Prioritize (in rough order):
+- Independent, owner-operated businesses (see ELIGIBILITY section)
 - Were NOT already evaluated in the establishment scan (find new candidates, not duplicates)
-- Have a strong, well-maintained profile on the target platform(s)
-- Use the correct primary category and relevant additional categories
-- Have comprehensive branding (logo, cover photo, multiple photos)
-- Have accurate and consistent NAP (name, address, phone)
-- Have a functional website linked from their profile
-- Have active engagement (respond to reviews, post updates)
-- Are recognized as leaders in their category by the local community (not national brand recognition)
-- Span at least 3 distinct states/regions when possible (avoid coastal/metro clustering)
+- Correct primary category and clear category-specific positioning
+- Functional website and published hours
+- Recognizable branding (logo, photos)
+- Active community presence
+- Geographic diversity — span at least 3 distinct states/regions when possible
 
 ${CANDIDATE_EVALUATION_SECTION}
 
 === EVALUATION CRITERIA ===
-The GOLD STANDARD DISCOVERY CRITERIA section below (injected by the platform) contains the established expected_fields, quality_gates, and pattern exemplars from the prior establishment scan. Use these as your evaluation bar:
+The GOLD STANDARD DISCOVERY CRITERIA section below (injected by the platform) contains the established expected_fields, quality_gates, and pattern exemplars from the prior establishment scan. Use these as your evaluation reference:
 
-1. For each candidate, check whether they pass or fail each non_negotiable quality gate.
-2. Mark is_gold_standard = true ONLY for candidates that pass ALL non_negotiable gates.
+1. For each candidate, check whether they pass or fail each quality gate and record the results.
+2. Flag is_gold_standard = true for the TOP candidates per platform (up to 4), relative to the candidate pool AND the existing benchmark exemplars. A candidate that is at least as strong as the existing benchmark on a platform qualifies — they do NOT need to pass every non_negotiable gate. The quality_score and quality_gates_passed/failed capture the absolute quality signal.
 3. Score quality_score based on how closely the candidate matches the established expected fields.
-4. Record quality_gates_passed and quality_gates_failed for each platform evaluation.
+4. Record quality_gates_passed and quality_gates_failed for each platform evaluation (informational — does NOT filter is_gold_standard).
 5. ECHO the established expected_fields in your output (do not re-derive them). The expected_fields in your output JSON should match the established profile's expected_fields.
 
 If no GOLD STANDARD DISCOVERY CRITERIA section appears below, the platform is running in degraded mode (no active gold-standard profile). In that case, fall back to deriving expected_fields from the top candidates you find, and note this in scan_metadata.expected_field_derivation.

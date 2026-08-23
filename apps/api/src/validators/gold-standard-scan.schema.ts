@@ -322,17 +322,24 @@ Rules:
   what the top candidates have in common. Evaluate each candidate per platform
   with quality_score, is_gold_standard flag, and branding artifacts.
 - For discovery scans: evaluate additional candidates against the already-
-  established expected_fields and quality gates. Mark is_gold_standard for
-  candidates that meet the bar.
+  established expected_fields and quality gates. Flag is_gold_standard for the
+  top candidates per platform relative to the pool and existing benchmark.
 - profile_url is the LIVE destination URL on the platform (e.g.
   "https://www.google.com/maps/place/..."). Always capture this — it becomes
   the exemplar URL shown to operators and referenced in audit benchmarks.
 - branding_artifacts capture what the candidate has (logo, cover photo, photo
   count, photo types). These become branding quality gates and audit gap inputs.
 - quality_gates use severity "non_negotiable" for must-have fields and
-  "recommended" for nice-to-have fields.
+  "recommended" for nice-to-have fields. Quality gates are aspirational targets
+  derived from the top candidates — they do NOT filter is_gold_standard. A
+  candidate can be flagged is_gold_standard on a platform without passing every
+  gate. The quality_gates_passed/failed fields capture the gap so operators can
+  see how strong the benchmark actually is.
 - category_key should be the normalized (lowercase, whitespace-collapsed) category name.
-- Up to 4 candidates per platform should be flagged is_gold_standard = true.
+- Flag the TOP candidates per platform as is_gold_standard = true (up to 4 per
+  platform), relative to the candidate pool. The best available candidate on a
+  platform qualifies even if they have gaps — the quality_score reflects
+  absolute quality so operators know how strong the benchmark is.
 - INDEPENDENT BUSINESSES ONLY. Only independent or small locally-owned groups
   (<= ~10 locations) qualify as gold-standard candidates. Franchises, chains,
   and corporate subsidiaries must be excluded and noted in
