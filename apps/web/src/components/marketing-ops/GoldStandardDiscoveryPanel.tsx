@@ -822,15 +822,15 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
               <div className="bg-white dark:bg-neutral-800 rounded p-2 border border-blue-100 dark:border-blue-800">
                 <div className="text-xs font-medium text-gray-700 dark:text-gray-300">State or region</div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  Target a state with a strong beauty supply scene (CA, NY, TX, GA). The establishment
-                  exemplars are concentrated in these markets.
+                  Target a state or region with a strong {campaign.category || 'category'} scene.
+                  The establishment exemplars above show which markets already have proven benchmarks.
                 </div>
               </div>
               <div className="bg-white dark:bg-neutral-800 rounded p-2 border border-blue-100 dark:border-blue-800">
                 <div className="text-xs font-medium text-gray-700 dark:text-gray-300">City-specific</div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  Run a city-level discovery scan for Los Angeles, Houston, or Atlanta where independent
-                  beauty supply stores have deep community roots.
+                  Run a city-level discovery scan in markets where independent {campaign.category || 'category'}
+                  businesses have deep community roots. Use the exemplar cities above as a starting point.
                 </div>
               </div>
             </div>

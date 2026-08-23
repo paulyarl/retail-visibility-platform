@@ -83,6 +83,57 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
       : campaign.intelligence_platform.charAt(0).toUpperCase() + campaign.intelligence_platform.slice(1)
     : '—';
 
+  const prettyPlatform = (platform: string): string => {
+    return platform === 'apple_maps' ? 'Apple Maps' : platform === 'bbb' ? 'BBB' : platform.charAt(0).toUpperCase() + platform.slice(1);
+  };
+
+  // Per-platform gold-standard slot counts + occupants from the active
+  // profile's candidates. Mirrors the slot card on the discovery overview so
+  // the establishment report states how many of the up-to-4 slots per
+  // platform are filled by the analyst-flagged establishment candidates.
+  const profileSlotCounts: Record<string, number> = (() => {
+    const counts: Record<string, number> = {};
+    if (!activeProfile?.configuration_json) return counts;
+    const config = activeProfile.configuration_json as any;
+    const candidates: Array<{ platform_evaluations?: Array<{ platform: string; is_gold_standard?: boolean | null }> }> =
+      Array.isArray(config.candidates) ? config.candidates : [];
+    for (const c of candidates) {
+      for (const pe of c.platform_evaluations ?? []) {
+        if (pe.is_gold_standard === true) {
+          counts[pe.platform] = (counts[pe.platform] || 0) + 1;
+        }
+      }
+    }
+    return counts;
+  })();
+
+  const profileSlotOccupants: Record<string, Array<{ business_name: string; city?: string; state?: string; quality_score?: number | null; profile_url?: string | null }>> = (() => {
+    const map: Record<string, Array<{ business_name: string; city?: string; state?: string; quality_score?: number | null; profile_url?: string | null }>> = {};
+    if (!activeProfile?.configuration_json) return map;
+    const config = activeProfile.configuration_json as any;
+    const candidates: Array<{
+      business_name: string;
+      city?: string;
+      state?: string;
+      platform_evaluations?: Array<{ platform: string; is_gold_standard?: boolean | null; quality_score?: number | null; profile_url?: string | null }>;
+    }> = Array.isArray(config.candidates) ? config.candidates : [];
+    for (const c of candidates) {
+      for (const pe of c.platform_evaluations ?? []) {
+        if (pe.is_gold_standard === true) {
+          if (!map[pe.platform]) map[pe.platform] = [];
+          map[pe.platform].push({
+            business_name: c.business_name,
+            city: c.city,
+            state: c.state,
+            quality_score: pe.quality_score ?? null,
+            profile_url: pe.profile_url ?? null,
+          });
+        }
+      }
+    }
+    return map;
+  })();
+
   return (
     <div className="space-y-4">
       <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
@@ -142,6 +193,74 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
             </a>
           </div>
           <GoldStandardProfileView profile={activeProfile} />
+        </div>
+      )}
+
+      {/* Per-platform gold-standard slot coverage — mirrors the discovery
+          overview's slot card so the establishment report states how many of
+          the up-to-4 slots per platform are filled by the analyst-flagged
+          establishment candidates. */}
+      {!loading && activeProfile && (
+        <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+            Gold Standard Slots
+            <span className="ml-1 text-gray-400 font-normal">(up to 4 per platform)</span>
+          </div>
+          {Object.keys(profileSlotCounts).length === 0 ? (
+            <div className="text-sm text-gray-400">
+              No candidates in profile slots yet
+              <div className="text-xs mt-1 text-gray-400">
+                The establishment scan did not flag any candidates as gold standard on a platform.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {Object.entries(profileSlotCounts)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([platform, count]) => {
+                  const occupants = profileSlotOccupants[platform] ?? [];
+                  return (
+                    <div key={platform}>
+                      <div className="text-xs flex items-center justify-between">
+                        <span className="text-gray-700 dark:text-gray-300 font-medium">{prettyPlatform(platform)}</span>
+                        <span className={`font-medium ${count >= 4 ? 'text-green-600' : 'text-amber-600'}`}>
+                          {count}/4 {count >= 4 ? '(full)' : ''}
+                        </span>
+                      </div>
+                      {occupants.length > 0 && (
+                        <div className="ml-2 mt-0.5 space-y-0.5">
+                          {occupants.map((occ, i) => (
+                            <div key={i} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-amber-500">&bull;</span>
+                              <span className="text-gray-700 dark:text-gray-300 font-medium">{occ.business_name}</span>
+                              {(occ.city || occ.state) && (
+                                <span className="text-gray-400">
+                                  ({occ.city}{occ.city && occ.state ? ', ' : ''}{occ.state})
+                                </span>
+                              )}
+                              {occ.quality_score != null && (
+                                <span className="text-gray-400">{occ.quality_score}/10</span>
+                              )}
+                              {occ.profile_url && (
+                                <a
+                                  href={occ.profile_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  title={`Open ${occ.business_name} on ${prettyPlatform(platform)}`}
+                                >
+                                  &#8599;
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 
