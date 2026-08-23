@@ -809,6 +809,69 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   /**
+   * Update a draft profile's configuration_json in place.
+   *
+   * Allows operators to correct or supplement scan output (e.g. fix
+   * hallucinated profile URLs, add missing information, adjust quality
+   * gate results) before activating the draft. Only drafts can be
+   * edited — active and retired versions are immutable history.
+   *
+   * Optionally updates category_name if provided (useful when the scan
+   * produced a slightly wrong display name).
+   */
+  async updateDraftConfiguration(
+    profileId: string,
+    version: number,
+    input: { configurationJson: Record<string, any>; categoryName?: string },
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile> {
+    try {
+      const draft = await this.prisma.mkt_intelligence_profiles.findUnique({
+        where: {
+          id_version: { id: profileId, version },
+        },
+      });
+      if (!draft) {
+        throw new Error(`Profile ${profileId} v${version} not found`);
+      }
+      if (draft.status !== 'draft') {
+        throw new Error(
+          `Profile ${profileId} v${version} is not a draft (status: ${draft.status}) — only drafts can be edited`,
+        );
+      }
+
+      const data: any = {
+        configuration_json: input.configurationJson as any,
+        updated_at: new Date(),
+      };
+      if (input.categoryName) {
+        data.category_name = input.categoryName;
+      }
+
+      const updated = await this.prisma.mkt_intelligence_profiles.update({
+        where: {
+          id_version: { id: profileId, version },
+        },
+        data,
+      });
+
+      logger.info('Intelligence profile draft updated', ctx, {
+        profileId,
+        version,
+        categoryKey: draft.category_key,
+      });
+      return updated as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.updateDraftConfiguration failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        version,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
    * Publish a new version from operator-supplied JSON (manual authoring path).
    * Creates a new immutable version row, flips the previous active version to
    * 'retired', marks the new one 'active'. Atomic transaction.

@@ -6178,6 +6178,29 @@ router.post('/intelligence-profiles/:id/:version/activate', async (req, res) => 
   }
 });
 
+// PATCH /intelligence-profiles/:id/:version — update a draft's configuration_json
+// Allows operators to correct or supplement scan output (fix hallucinated URLs,
+// add missing info, adjust gate results) before activating. Only drafts can be
+// edited; active/retired versions are immutable.
+router.patch('/intelligence-profiles/:id/:version', async (req, res) => {
+  try {
+    const version = parseInt(req.params.version, 10);
+    if (isNaN(version)) {
+      return res.status(400).json({ success: false, error: 'Invalid version' });
+    }
+    const parsed = intelligenceProfilePublishSchema.parse(req.body);
+    const profile = await IntelligenceProfileService.getInstance().updateDraftConfiguration(
+      req.params.id,
+      version,
+      { configurationJson: parsed.configurationJson, categoryName: parsed.categoryName },
+      getCtx(req),
+    );
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // DELETE /intelligence-profiles/:id/:version — delete a draft version
 // Only drafts may be deleted; active/retired versions are immutable history.
 router.delete('/intelligence-profiles/:id/:version', async (req, res) => {

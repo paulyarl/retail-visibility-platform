@@ -75,6 +75,9 @@ export default function IntelligenceProfilesClient() {
   const [activating, setActivating] = useState<string | null>(null);
   const [deletingProfileKey, setDeletingProfileKey] = useState<string | null>(null);
   const [viewProfile, setViewProfile] = useState<IntelligenceProfile | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editJson, setEditJson] = useState('');
+  const [savingDraft, setSavingDraft] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishId, setPublishId] = useState<string | null>(null);
   const [publishConfig, setPublishConfig] = useState('');
@@ -271,6 +274,66 @@ export default function IntelligenceProfilesClient() {
     }
   };
 
+  const handleSaveDraft = async () => {
+    if (!viewProfile) return;
+    let configJson: Record<string, any>;
+    try {
+      configJson = JSON.parse(editJson);
+    } catch {
+      notifications.show({
+        title: 'Invalid JSON',
+        message: 'Configuration must be valid JSON',
+        color: 'red',
+      });
+      return;
+    }
+    setSavingDraft(true);
+    try {
+      const updated = await marketingOpsService.updateIntelligenceProfileDraft(
+        viewProfile.id,
+        viewProfile.version,
+        { configurationJson: configJson, categoryName: configJson.category_name },
+      );
+      notifications.show({
+        title: 'Draft Updated',
+        message: `${viewProfile.id} v${viewProfile.version} configuration saved.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      setViewProfile(updated);
+      setEditMode(false);
+      setEditJson('');
+      await fetchProfiles();
+    } catch (err) {
+      notifications.show({
+        title: 'Update Failed',
+        message: (err as Error).message,
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const openViewer = (profile: IntelligenceProfile) => {
+    setViewProfile(profile);
+    setEditMode(false);
+    setEditJson('');
+  };
+
+  const closeViewer = () => {
+    setViewProfile(null);
+    setEditMode(false);
+    setEditJson('');
+  };
+
+  const enterEditMode = () => {
+    if (!viewProfile) return;
+    setEditJson(JSON.stringify(viewProfile.configuration_json, null, 2));
+    setEditMode(true);
+  };
+
   const renderProfileCard = (profile: IntelligenceProfile, isDraft: boolean) => {
     const config = profile.configuration_json || {};
     const sources = config.specialized_sources as any[] | undefined;
@@ -324,7 +387,7 @@ export default function IntelligenceProfilesClient() {
             <Button
               size="xs"
               variant="light"
-              onClick={() => setViewProfile(profile)}
+              onClick={() => openViewer(profile)}
             >
               View
             </Button>
@@ -721,23 +784,55 @@ export default function IntelligenceProfilesClient() {
       {/* View Profile Modal */}
       <Modal
         opened={!!viewProfile}
-        onClose={() => setViewProfile(null)}
+        onClose={closeViewer}
         title={viewProfile ? `${viewProfile.category_name} v${viewProfile.version} — ${FOCUS_LABELS[viewProfile.intelligence_focus]}` : ''}
         size="xl"
         styles={{ body: { maxHeight: '85vh' } }}
       >
         {viewProfile && (
           <Stack gap="sm">
-            <Group gap="xs">
-              <Badge size="sm" variant="light" color={STATUS_COLORS[viewProfile.status]}>
-                {STATUS_LABELS[viewProfile.status]}
-              </Badge>
-              <Badge size="sm" variant="dot" color={FOCUS_COLORS[viewProfile.intelligence_focus]}>
-                {FOCUS_LABELS[viewProfile.intelligence_focus]}
-              </Badge>
-              <Text size="xs" c="dimmed" ff="monospace">{viewProfile.id}</Text>
+            <Group gap="xs" justify="space-between" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap">
+                <Badge size="sm" variant="light" color={STATUS_COLORS[viewProfile.status]}>
+                  {STATUS_LABELS[viewProfile.status]}
+                </Badge>
+                <Badge size="sm" variant="dot" color={FOCUS_COLORS[viewProfile.intelligence_focus]}>
+                  {FOCUS_LABELS[viewProfile.intelligence_focus]}
+                </Badge>
+                <Text size="xs" c="dimmed" ff="monospace">{viewProfile.id}</Text>
+              </Group>
+              {viewProfile.status === 'draft' && !editMode && (
+                <Button size="xs" variant="light" leftSection={<IconEdit size={14} />} onClick={enterEditMode}>
+                  Edit
+                </Button>
+              )}
             </Group>
-            {isGoldStandardProfile(viewProfile) ? (
+            {editMode ? (
+              <>
+                <Text size="xs" c="dimmed">
+                  Edit the configuration JSON below. Use this to correct hallucinated profile URLs,
+                  supplement missing fields, or adjust quality gate results before activating.
+                  Click Save to persist changes, then verify in the structured view before activating.
+                </Text>
+                <Textarea
+                  autosize
+                  minRows={20}
+                  maxRows={40}
+                  value={editJson}
+                  onChange={(e) => setEditJson(e.target.value)}
+                  ff="monospace"
+                  styles={{ input: { fontSize: 11 } }}
+                />
+                <Group justify="flex-end" gap="xs">
+                  <Button size="xs" variant="subtle" onClick={() => { setEditMode(false); setEditJson(''); }}>
+                    Cancel
+                  </Button>
+                  <Button size="xs" onClick={handleSaveDraft} loading={savingDraft} leftSection={<IconCheck size={14} />}>
+                    Save
+                  </Button>
+                </Group>
+              </>
+            ) : isGoldStandardProfile(viewProfile) ? (
               <GoldStandardProfileView profile={viewProfile} />
             ) : (
               <ScrollArea h={400} type="auto">

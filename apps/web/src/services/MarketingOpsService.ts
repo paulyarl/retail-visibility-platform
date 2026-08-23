@@ -4998,6 +4998,10 @@ interface MarketingOpsService {
     categoryName?: string;
   }): Promise<IntelligenceProfile>;
   activateIntelligenceProfileDraft(id: string, version: number): Promise<IntelligenceProfile>;
+  updateIntelligenceProfileDraft(id: string, version: number, input: {
+    configurationJson: Record<string, any>;
+    categoryName?: string;
+  }): Promise<IntelligenceProfile>;
   deleteIntelligenceProfileDraft(id: string, version: number): Promise<void>;
   addGoldStandardCandidate(id: string, input: {
     candidate: Record<string, any>;
@@ -5256,6 +5260,23 @@ MarketingOpsService.prototype.activateIntelligenceProfileDraft = async function 
   );
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to activate intelligence profile draft');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profile');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.updateIntelligenceProfileDraft = async function (id: string, version: number, input: {
+  configurationJson: Record<string, any>;
+  categoryName?: string;
+}): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${id}/${version}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+    `mkt-ops-intel-profile-update-${id}-${version}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update intelligence profile draft');
   }
   await this.invalidateCachePattern('mkt-ops-intel-profile');
   return result.data?.data ?? result.data;
