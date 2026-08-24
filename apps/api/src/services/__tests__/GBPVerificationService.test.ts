@@ -40,7 +40,7 @@ vi.mock('../GBPAdvancedSync', () => ({
   getLinkedLocation: mockGetLinkedLocation,
 }));
 
-vi.mock('../prisma', () => ({
+vi.mock('../../prisma', () => ({
   prisma: {
     gbp_locations_list: {
       updateMany: mockGbpLocationsUpdateMany,
@@ -52,19 +52,19 @@ vi.mock('../prisma', () => ({
   },
 }));
 
-vi.mock('../logger', () => ({
+vi.mock('../../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('../lib/platform-scope', () => ({
+vi.mock('../../lib/platform-scope', () => ({
   PLATFORM_SCOPE: 'platform',
 }));
 
-vi.mock('../lib/id-generator', () => ({
+vi.mock('../../lib/id-generator', () => ({
   generateCrmAlertId: vi.fn().mockReturnValue('crm-alert-001'),
 }));
 
-vi.mock('./CrmAlertService', () => ({
+vi.mock('../CrmAlertService', () => ({
   CrmAlertService: {
     getInstance: () => ({
       create: mockCrmAlertCreate,

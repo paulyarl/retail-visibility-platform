@@ -92,6 +92,75 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
       const result = await service.resolveGoldStandard('nonexistent_category');
       expect(result).toBeNull();
     });
+
+    // Regression: focus contamination. Previously, when a focus was
+    // requested but no focus-matched profile existed, the resolver fell
+    // back to a category-only match that DROPPED the focus filter. That
+    // returned an 'emerging' profile as the "gold standard" result. The
+    // fix: when focus is explicitly requested, a miss must return null
+    // rather than a profile of a different intelligence type.
+    it('returns null when gold_standards focus is requested but only an emerging profile exists (no focus contamination)', async () => {
+      const emergingProfile = {
+        id: 'emerging-001',
+        category_key: 'african grocery store',
+        category_name: 'African Grocery Store',
+        version: 3,
+        intelligence_focus: 'emerging',
+        reference_city: 'indianapolis',
+        reference_state: 'IN',
+        reference_platform: null,
+        configuration_json: {},
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      // Mock: any focus-filtered query (gold_standards) returns null;
+      // an unfiltered category-only query returns the emerging profile.
+      // The buggy code returned emergingProfile here; the fix returns null.
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.intelligence_focus === 'gold_standards') return Promise.resolve(null);
+        // Unfiltered category-only fallback — what the bug used to hit.
+        if (args?.where?.category_key && !args?.where?.intelligence_focus) {
+          return Promise.resolve(emergingProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('African Grocery Store');
+      expect(result).toBeNull();
+    });
+
+    // Same regression via the public resolve() path with platform='all'.
+    // Mirrors the reported HTTP request:
+    //   GET /intelligence-profiles/resolve/African Grocery Store?focus=gold_standards&platform=all
+    it('resolve() with focus=gold_standards + platform=all returns null when only an emerging profile exists', async () => {
+      const emergingProfile = {
+        id: 'mip-2mqjt8p4',
+        category_key: 'african grocery store',
+        category_name: 'African Grocery Store',
+        version: 3,
+        intelligence_focus: 'emerging',
+        reference_city: 'indianapolis',
+        reference_state: 'IN',
+        reference_platform: null,
+        configuration_json: {},
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        // Platform-aware chain (steps 1-4) applies focus — all miss.
+        if (args?.where?.intelligence_focus === 'gold_standards') return Promise.resolve(null);
+        // Legacy focus-specific match (step 3) — also misses.
+        // Legacy category-only fallback (step 4, now removed) — would
+        // have returned emergingProfile. The fix returns null instead.
+        if (args?.where?.category_key && !args?.where?.intelligence_focus) {
+          return Promise.resolve(emergingProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolve('African Grocery Store', 'gold_standards', null, 'all');
+      expect(result).toBeNull();
+    });
   });
 
   describe('buildGoldStandardScanVariables', () => {
