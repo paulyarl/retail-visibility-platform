@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Star, MapPin, Phone, Globe, Tag, RefreshCw, AlertCircle } from 'lucide-react';
+import { Star, MapPin, Phone, Globe, Tag, RefreshCw, AlertCircle, Sparkles, Calendar, CreditCard, ShoppingBag, ArrowRight } from 'lucide-react';
 import marketingCustomerService, {
   GbpStatusResponse,
   GbpVerificationOption,
@@ -223,6 +223,71 @@ export default function GbpDashboardPage() {
                 Updated {new Date(loc.ratingCacheUpdated).toLocaleDateString()}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Funnels + POS/GMC CTAs */}
+      {status.connected && (
+        <div className="space-y-4">
+          {/* AI Review Response upsell */}
+          {status.capabilities && !status.capabilities.canUseAiResponse && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 p-4">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">AI-Powered Review Responses</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Generate owner-voice draft replies to reviews with AI. Save time and never leave a review unanswered.</p>
+                </div>
+                <a href="/settings/feature-store?feature=gbp_ai_response" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex-shrink-0">
+                  Upgrade <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Post Scheduler upsell */}
+          {status.capabilities && !status.capabilities.canUsePostsScheduler && (
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800 p-4">
+              <div className="flex items-start gap-3">
+                <Calendar className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">Schedule Posts in Advance</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Plan your offers, events, and updates ahead of time. Schedule posts for automatic publication at the optimal moment.</p>
+                </div>
+                <a href="/settings/feature-store?feature=gbp_posts_scheduler" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors flex-shrink-0">
+                  Upgrade <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* POS Connection CTA */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-start gap-3">
+              <CreditCard className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 dark:text-gray-100">Connect POS (Square / Clover)</p>
+                <p className="text-sm text-gray-500 mt-1">Sync your inventory and product catalog with your Google Business Profile.</p>
+              </div>
+              <a href="/settings/integration-options" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex-shrink-0">
+                Connect <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* GMC Sync CTA */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-start gap-3">
+              <ShoppingBag className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 dark:text-gray-100">Google Merchant Center Sync</p>
+                <p className="text-sm text-gray-500 mt-1">Sync your products and prices with Google Merchant Center for Shopping ads.</p>
+              </div>
+              <a href="/settings/integration-options" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex-shrink-0">
+                Configure <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       )}

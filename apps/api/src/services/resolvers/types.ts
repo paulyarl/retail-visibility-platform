@@ -61,6 +61,7 @@ export interface MerchantSettingsBundle {
   wholesaleMatching: WholesaleMatchingMerchantSettings | null;
   couponOptions: CouponOptionsMerchantSettings | null;
   funnelOptions: FunnelOptionsMerchantSettings | null;
+  gbpManagement: GbpManagementMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -1002,6 +1003,31 @@ export interface CouponOptionsMerchantSettings {
 }
 
 // ====================
+// GBP MANAGEMENT
+// ====================
+
+export interface GbpManagementMerchantSettings {
+  gbp_reviews_display?: boolean | null;
+  gbp_content_display?: boolean | null;
+}
+
+export interface EffectiveGbpManagement {
+  enabled: boolean;
+  is_flexible: boolean;
+  can_show_reviews: boolean;
+  can_show_content: boolean;
+  can_use_ai_response: boolean;
+  can_use_posts_scheduler: boolean;
+  reviews_enabled: boolean;
+  content_enabled: boolean;
+  merchant_preferences: {
+    gbp_reviews_display: boolean;
+    gbp_content_display: boolean;
+  };
+  features: Record<string, boolean>;
+}
+
+// ====================
 // SUBSCRIPTION CONTEXT
 // ====================
 
@@ -1050,6 +1076,7 @@ export interface EffectiveCapabilities {
     funnel: EffectiveFunnel;
     coupon_options: EffectiveCouponOptions;
     marketing_ops: EffectiveMarketingOps;
+    gbp_management: EffectiveGbpManagement;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

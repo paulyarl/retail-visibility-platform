@@ -43,6 +43,7 @@ import {
   resolveFunnelOptions,
   resolveCouponOptions,
   resolveMarketingOps,
+  resolveGbpManagement,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -257,6 +258,10 @@ export async function resolveEffectiveCapabilities(
     resolveMarketingOps(
       rawCaps.capabilities.marketing_ops?.features || {}
     ),
+    resolveGbpManagement(
+      rawCaps.capabilities.gbp_management?.features || {},
+      merchantBundle.gbpManagement
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -298,6 +303,7 @@ export async function resolveEffectiveCapabilities(
       funnel: effective[25],
       coupon_options: effective[26],
       marketing_ops: effective[27],
+      gbp_management: effective[28],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -755,6 +761,10 @@ export async function resolveEffectiveCapabilitiesFromMV(
     resolveMarketingOps(
       rawCaps.capabilities.marketing_ops?.features || {}
     ),
+    resolveGbpManagement(
+      rawCaps.capabilities.gbp_management?.features || {},
+      merchantBundle.gbpManagement
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -796,6 +806,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       funnel: effective[25],
       coupon_options: effective[26],
       marketing_ops: effective[27],
+      gbp_management: effective[28],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -1202,6 +1213,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     wholesaleMatching,
     couponOptions,
     funnelOptions,
+    gbpManagement,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1227,6 +1239,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_wholesale_matching_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_coupon_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_funnel_options_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => (prisma as any).tenant_gbp_options_settings?.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
   return {
@@ -1254,6 +1267,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     wholesaleMatching: wholesaleMatching as any,
     couponOptions: couponOptions as any,
     funnelOptions: funnelOptions as any,
+    gbpManagement: gbpManagement as any,
   };
 }
 

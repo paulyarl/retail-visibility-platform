@@ -843,6 +843,19 @@ export interface MarketingOpsState {
   isFlexible: boolean;
 }
 
+export interface GbpManagementState {
+  enabled: boolean;
+  isFlexible: boolean;
+  canShowReviews: boolean;
+  canShowContent: boolean;
+  canUseAiResponse: boolean;
+  canUsePostsScheduler: boolean;
+  reviewsEnabled: boolean;
+  contentEnabled: boolean;
+  merchantPreferences: { gbpReviewsDisplay: boolean; gbpContentDisplay: boolean } | null;
+  features: Record<string, boolean>;
+}
+
 export interface CouponOptionsState {
   enabled: boolean;
   canCreateCoupons: boolean;
@@ -1133,6 +1146,7 @@ export interface AllCapabilitiesState {
   funnel: FunnelState;
   couponOptions: CouponOptionsState;
   marketingOps: MarketingOpsState;
+  gbpManagement: GbpManagementState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -1177,6 +1191,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   coupon_: 'coupon_options',
   marketing_ops_: 'marketing_ops',
   marketing_ops: 'marketing_ops',
+  gbp_: 'gbp_management',
 };
 
 /**

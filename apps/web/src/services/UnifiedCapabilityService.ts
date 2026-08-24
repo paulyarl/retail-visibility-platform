@@ -97,6 +97,7 @@ import {
   CouponOptionsState,
   CouponDiscountType,
   MarketingOpsState,
+  GbpManagementState,
 } from './CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -163,6 +164,7 @@ export interface BackendEffectiveCapabilities {
     funnel: BackendEffectiveFunnel;
     coupon_options: BackendEffectiveCouponOptions;
     marketing_ops: BackendEffectiveMarketingOps;
+    gbp_management: BackendEffectiveGbpManagement;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -1154,6 +1156,36 @@ interface BackendEffectiveMarketingOps {
   is_flexible: boolean;
 }
 
+interface BackendEffectiveGbpManagement {
+  enabled: boolean;
+  is_flexible: boolean;
+  can_show_reviews: boolean;
+  can_show_content: boolean;
+  can_use_ai_response: boolean;
+  can_use_posts_scheduler: boolean;
+  reviews_enabled: boolean;
+  content_enabled: boolean;
+  merchant_preferences: { gbp_reviews_display: boolean; gbp_content_display: boolean };
+  features: Record<string, boolean>;
+}
+
+function mapGbpManagement(b: BackendEffectiveGbpManagement): GbpManagementState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    canShowReviews: b.can_show_reviews,
+    canShowContent: b.can_show_content,
+    canUseAiResponse: b.can_use_ai_response,
+    canUsePostsScheduler: b.can_use_posts_scheduler,
+    reviewsEnabled: b.reviews_enabled,
+    contentEnabled: b.content_enabled,
+    merchantPreferences: b.merchant_preferences
+      ? { gbpReviewsDisplay: b.merchant_preferences.gbp_reviews_display, gbpContentDisplay: b.merchant_preferences.gbp_content_display }
+      : null,
+    features: {},
+  };
+}
+
 function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
   return {
     enabled: b.enabled,
@@ -1258,6 +1290,7 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     funnel: mapFunnel(b.effective.funnel),
     couponOptions: mapCouponOptions(b.effective.coupon_options),
     marketingOps: mapMarketingOps(b.effective.marketing_ops),
+    gbpManagement: mapGbpManagement(b.effective.gbp_management),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,

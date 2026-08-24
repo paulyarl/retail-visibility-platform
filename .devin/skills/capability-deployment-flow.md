@@ -23,6 +23,7 @@ When implementing a new capability, emulate the closest matching reference:
 | **Simple (types)** | `ProductTypeResolver.ts` | Pure function, clean R17 precedence, legacy key fallback, clear tier/merchant separation. The simplest canonical pattern. |
 | **Simple (types, DB-backed)** | `StorefrontTypeResolver.ts` | Same pattern but delegates to a service for tier state. Use when resolver needs DB access. |
 | **Complex (options)** | `StorefrontQrResolver.ts` + `StorefrontQrResolver.test.ts` | Groups, sub-groups, flexible fallback, and the canonical R33 test pattern. Use for any options capability with multiple feature groups. |
+| **Complex (options, public surfacing)** | `GbpManagementResolver.ts` + `GbpManagementResolver.test.ts` | Flexible bundle key + individual feature keys, `can_show_*` (tier-level) vs `*_enabled` (effective) naming for public-surfacing capabilities. Clean R33 example with public endpoint gate enforcement. Use for capabilities that gate public-facing content. |
 
 **Key principle**: The resolver's return object has two kinds of fields — **tier-level** (derived from `features` only) and **merchant-gated** (derived from `features` AND `merchantPrefs`). The reference implementations show this separation clearly. Never mix the two (R33).
 

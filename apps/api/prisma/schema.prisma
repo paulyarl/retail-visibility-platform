@@ -5078,6 +5078,7 @@ model tenants {
   tenant_featured_options_settings                                                       tenant_featured_options_settings?
   tenant_fulfillment_settings                                                            tenant_fulfillment_settings?
   tenant_funnel_options_settings                                                         tenant_funnel_options_settings?
+  tenant_gbp_options_settings                                                            tenant_gbp_options_settings?
   tenant_integration_settings                                                            tenant_integration_settings?
   tenant_payment_gateway_settings                                                        tenant_payment_gateway_settings?
   tenant_payment_gateways                                                                tenant_payment_gateways[]
@@ -7566,6 +7567,19 @@ model mkt_customer_gbp_links {
   @@unique([customer_id, tenant_id], map: "uq_mkt_customer_gbp_links")
   @@index([customer_id], map: "idx_mkt_customer_gbp_links_customer")
   @@index([tenant_id], map: "idx_mkt_customer_gbp_links_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_gbp_options_settings {
+  id                  String    @id @db.VarChar(50)
+  tenant_id           String    @unique @db.VarChar(50)
+  gbp_reviews_display Boolean?  @default(true)
+  gbp_content_display Boolean?  @default(true)
+  created_at          DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+  tenants             tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_tenant_gbp_options_settings_tenant")
 }
 
 enum action {

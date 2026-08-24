@@ -126,6 +126,19 @@ A field must not render publicly without a provenance row with `show_on_public =
 7. Backend consumes the token, flips `org_standing_mode` to `independent`, sets seed status to `claimed`
 8. Owner can now manage the listing from their dashboard and upgrade tiers
 
+## Post-Claim GBP Public Surfacing
+
+After a seed is claimed and the owner connects + verifies their Google Business Profile, the directory and place pages can surface GBP content (reviews, posts, photos) if the tenant has the `gbp_management` capability:
+
+- **Hard gate:** `gbp_directory_reviews` or `gbp_directory_content` feature key (from tier, BSaaS purchase, or grant)
+- **Soft gate:** `tenant_gbp_options_settings.gbp_reviews_display` / `gbp_content_display` (merchant toggle, default true)
+
+When both gates pass, the directory/place pages render `GbpReviewsSection`, `GbpPostsSection`, and `GbpPhotoGallerySection` components. When either gate fails, the components render nothing (self-gating).
+
+Public GBP endpoints: `GET /api/public/directory/:slug/gbp-reviews`, `gbp-posts`, `gbp-photos` (see `apps/api/src/routes/directory-gbp-public.ts`).
+
+See `docs/LocalBiz/GBP_USER_GUIDE_PHASE5.md` for the full operational guide.
+
 ## Operator Invite Copy
 
 > You're already listed on the Indianapolis African grocery directory from public information (address, phone, and SNAP where reported). Claim the listing to fix hours or phone and add a photo. This is not an online store.

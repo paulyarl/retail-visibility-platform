@@ -50,6 +50,9 @@ import {
   DirectoryEntryPremiumLayout,
 } from './layouts';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
+import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
+import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
+import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 
@@ -683,6 +686,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           />
           {unclaimedBanner}
           <DirectoryEntryEditorialLayout {...layoutProps} />
+          <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            <GbpReviewsSection slug={identifier} />
+            <GbpPostsSection slug={identifier} />
+            <GbpPhotoGallerySection slug={identifier} />
+          </div>
           <PublicBotWidget
             tenantId={listing.tenantId}
             pageContext="directory"
@@ -702,6 +710,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           />
           {unclaimedBanner}
           <DirectoryEntryImmersiveLayout {...layoutProps} />
+          <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            <GbpReviewsSection slug={identifier} />
+            <GbpPostsSection slug={identifier} />
+            <GbpPhotoGallerySection slug={identifier} />
+          </div>
           <PublicBotWidget
             tenantId={listing.tenantId}
             pageContext="directory"
@@ -721,6 +734,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           />
           {unclaimedBanner}
           <DirectoryEntryPremiumLayout {...layoutProps} />
+          <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            <GbpReviewsSection slug={identifier} />
+            <GbpPostsSection slug={identifier} />
+            <GbpPhotoGallerySection slug={identifier} />
+          </div>
           <PublicBotWidget
             tenantId={listing.tenantId}
             pageContext="directory"
@@ -741,6 +759,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           />
           {unclaimedBanner}
           <DirectoryEntryClassicLayout {...layoutProps} />
+          <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            <GbpReviewsSection slug={identifier} />
+            <GbpPostsSection slug={identifier} />
+            <GbpPhotoGallerySection slug={identifier} />
+          </div>
           <PublicBotWidget
             tenantId={listing.tenantId}
             pageContext="directory"

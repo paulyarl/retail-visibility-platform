@@ -221,6 +221,8 @@ import marketingOpsRoutes from '../routes/marketing-ops';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
 import marketingCustomerRoutes from '../routes/marketing-customer';
 import gbpCustomerRoutes from '../routes/gbp-customer';
+import gbpOptionsSettingsRoutes from '../routes/gbp-options-settings';
+import directoryGbpPublicRoutes from '../routes/directory-gbp-public';
 import recoveryIntakePublicRoutes from '../routes/recovery-intake-public';
 
 // Inline handler route files (extracted from index.ts)
@@ -1304,6 +1306,20 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'tenant',
     comment: 'Funnel options settings at /api/tenants/:tenantId/funnels/settings',
+  },
+  {
+    path: '/api',
+    router: gbpOptionsSettingsRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'GBP options settings (merchant gate toggles) at /api/tenants/:tenantId/gbp-options',
+  },
+  {
+    path: '/api/public/directory',
+    router: directoryGbpPublicRoutes,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Public GBP content surfacing — reviews, posts, photos (Subsystems 6+7)',
   },
   {
     path: '/api',

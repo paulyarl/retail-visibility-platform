@@ -14,6 +14,9 @@ import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCa
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
 import PlaceEntryEditorialLayout from './layouts/PlaceEntryEditorialLayout';
+import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
+import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
+import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -160,25 +163,32 @@ export default function PlacePage({ params }: PlacePageProps) {
   const showsQr = dirEntryOpts?.qrEnabled ?? true;
 
   return (
-    <PlaceEntryEditorialLayout
-      tenantId={tenantId}
-      listing={listing}
-      businessHours={businessHours}
-      hoursStatus={hoursStatus}
-      tenantInfo={tenantInfo}
-      slugForRelated={slugForRelated}
-      dirEntryOpts={dirEntryOpts}
-      showsHours={showsHours}
-      showsMap={showsMap}
-      showsLocation={showsLocation}
-      showsContact={showsContact}
-      showsQr={showsQr}
-      isRetailStore={isRetailStore}
-      currentUrl={currentUrl}
-      baseUrl={baseUrl}
-      fullAddress={fullAddress}
-      claimToken={listing.activeClaimToken}
-      publicDisclaimer={listing.publicDisclaimer}
-    />
+    <>
+      <PlaceEntryEditorialLayout
+        tenantId={tenantId}
+        listing={listing}
+        businessHours={businessHours}
+        hoursStatus={hoursStatus}
+        tenantInfo={tenantInfo}
+        slugForRelated={slugForRelated}
+        dirEntryOpts={dirEntryOpts}
+        showsHours={showsHours}
+        showsMap={showsMap}
+        showsLocation={showsLocation}
+        showsContact={showsContact}
+        showsQr={showsQr}
+        isRetailStore={isRetailStore}
+        currentUrl={currentUrl}
+        baseUrl={baseUrl}
+        fullAddress={fullAddress}
+        claimToken={listing.activeClaimToken}
+        publicDisclaimer={listing.publicDisclaimer}
+      />
+      <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+        <GbpReviewsSection slug={identifier} />
+        <GbpPostsSection slug={identifier} />
+        <GbpPhotoGallerySection slug={identifier} />
+      </div>
+    </>
   );
 }

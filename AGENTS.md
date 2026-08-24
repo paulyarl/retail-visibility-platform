@@ -758,5 +758,103 @@ Updated to document the new output fields and rules:
 - Queue ingestion could map `outreach_recommendation.recommended_platform_focus` to the spawned business audit campaign's `intelligence_platform`
 - Frontend discovery audit card renders the `platform_analysis` section with per-platform bars + outreach recommendation + "Meets Gold Standard" badge per candidate
 
+## GBP Authorized Management Suite (Phases 0–4)
+
+Spec: `docs/LocalBiz/GBP_AUTHORIZED_MANAGEMENT_SUITE_SPEC.md`
+Sprint plans: `docs/LocalBiz/GBP_SPRINT_PHASE0.md` through `GBP_SPRINT_PHASE4.md`
+User guide: `docs/LocalBiz/GBP_USER_GUIDE_PHASE5.md`
+
+A capability module (`gbp_management`) that converts Marketing Ops prospects into claimed, verified, paying tenants with full Google Business Profile management. Initial scope: emerging single-location businesses (multi-location path preserved in schema).
+
+### Capability Keys (Migration 243)
+- `gbp_ai_response` — AI review response (Tier A drafts + future Tier B autopilot)
+- `gbp_posts_scheduler` — Scheduled post queue + lifecycle
+- `gbp_directory_reviews` — Surface GBP reviews on public directory/place pages
+- `gbp_directory_content` — Surface GBP posts + photos on public directory/place pages
+- `gbp_management_flexible` — Flexible bundle key (auto-unlocks all four features above via resolver)
+
+### Tier Assignment + BSaaS Catalog (Migration 244)
+- `full_retail_visibility` tier has `gbp_management_flexible`
+- 5 BSaaS catalog entries: 4 individual features + 1 flexible bundle (`gbp_management_flexible` at $49/mo, best value)
+- Catalog visible at `/settings/admin/bsaas-catalog` and purchasable via Feature Store
+
+### Merchant Gate Toggles (Migration 245)
+- `tenant_gbp_options_settings` table — tenant-scoped soft gate
+- `gbp_reviews_display` (default true) — controls whether entitled reviews surface on public pages
+- `gbp_content_display` (default true) — controls whether entitled posts/photos surface on public pages
+- Settings route: `apps/api/src/routes/gbp-options-settings.ts` (`GET/PUT /api/tenants/:tenantId/gbp-options`)
+- PUT handler calls `invalidateEffectiveCapabilities(tenantId)` to clear in-memory + MV caches
+
+### Two-Gate Architecture (R33 Compliant)
+- **Hard gate (entitlement):** `gbp_directory_reviews` / `gbp_directory_content` / `gbp_ai_response` / `gbp_posts_scheduler` from tier, BSaaS, grants, or admin complimentary
+- **Soft gate (merchant pref):** `gbp_reviews_display` / `gbp_content_display` from `tenant_gbp_options_settings`
+- Resolver: `apps/api/src/services/resolvers/GbpManagementResolver.ts`
+  - `can_show_reviews` / `can_show_content` / `can_use_ai_response` / `can_use_posts_scheduler` — hard gate only (R33: tier-level, never gated by merchant prefs)
+  - `reviews_enabled` / `content_enabled` — effective state (hard AND soft gate)
+- Wired into `EffectiveCapabilityResolver.ts` (both regular + MV paths) via `resolveGbpManagement()`
+- Frontend mapping: `UnifiedCapabilityService.ts` → `mapGbpManagement()` → `GbpManagementState` in `CapabilityResolutionService.ts`
+- `PlanSummaryWidget.tsx` includes GBP Management capability card
+
+### Phase 1 — Claim & Verification
+- Customer claim workflow via `mkt_customer_claim_tokens` (existing claim service)
+- GBP verification: `apps/api/src/services/GBPVerificationService.ts` — fetch options, initiate, complete with PIN
+- Customer routes: `apps/api/src/routes/gbp-customer.ts` — `GET /status`, `GET /verification/options`, `POST /verification/start`, `POST /verification/complete`
+- Directory seed standing transition: `unclaimed` → `claimed` after claim + verification
+- CRM alerts fired on successful conversion
+- Frontend: `apps/web/src/app/account/marketing/gbp/page.tsx` — GBP dashboard with connection status, verification card, location details, aggregate rating
+
+### Phase 2 — Review Intelligence & Tier A Reply Engine
+- Hourly review ingestion: `apps/api/src/jobs/gbpReviewIngestion.ts` — fetches reviews, refreshes cached aggregate rating, applies sentiment tagging, fires CRM alerts
+- Cached aggregate rating: `gbp_locations_list.cached_average_rating` + `cached_review_count`
+- Rule-based sentiment: positive, negative, neutral, mixed
+- Tier A AI draft replies: `apps/api/src/services/GBPReviewReplyService.ts` — 3 drafts per review with owner-voice + category-aware tone
+- Entitlement-aware: drafts only generated when `gbp_ai_response` is entitled
+- Review reply + dispute endpoints in `gbp-customer.ts`
+- Review dispute intake: registry-driven via `mkt_dispute_intake` with `intake_kind`
+- Frontend: `apps/web/src/app/account/marketing/gbp/reviews/page.tsx` — review inbox
+
+### Phase 3 — Local Post Publisher & Media Manager
+- Scheduled post publishing: `apps/api/src/jobs/gbpPostScheduler.ts` (every 15 min) — publishes SCHEDULED posts to Google
+- Post lifecycle: DRAFT → SCHEDULED → PUBLISHING → PUBLISHED | FAILED
+- Post CRUD customer routes in `gbp-customer.ts`
+- Binary upload: `GBPAdvancedSync.uploadPhotoBinary()` for media upload
+- Gold Standard photo benchmark: `IntelligenceProfileService.resolveGoldStandard()` → `expected_fields.platforms.google.expected_photo_count`
+- Frontend: `apps/web/src/app/account/marketing/gbp/posts/` (composer, offer builder, post card) + `apps/web/src/app/account/marketing/gbp/media/` (uploader, gallery)
+
+### Phase 4 — Public Surfacing & Monetization
+- Public GBP endpoints: `apps/api/src/routes/directory-gbp-public.ts`
+  - `GET /api/public/directory/:slug/gbp-reviews` — public reviews + aggregate rating
+  - `GET /api/public/directory/:slug/gbp-posts` — published posts only
+  - `GET /api/public/directory/:slug/gbp-photos` — active photos
+  - All endpoints enforce both gates; return `{ enabled: false }` when either gate fails
+  - Public field filtering: excludes sentiment, ai_drafts, reply_status, dispute_status, view_count, status, scheduled_for, post_name, tenant_id
+- Surface-agnostic GBP components: `apps/web/src/components/gbp/`
+  - `GbpReviewsSection.tsx` — aggregate rating badge + review list with owner replies
+  - `GbpPostsSection.tsx` — post card grid (offers, events, standard)
+  - `GbpPhotoGallerySection.tsx` — category-filtered photo gallery
+  - All self-gating: render nothing when `{ enabled: false }`
+- Directory integration: `apps/web/src/app/directory/[slug]/page.tsx` — all 4 layout variants (classic, editorial, immersive, premium)
+- Place integration: `apps/web/src/app/place/[slug]/page.tsx` — editorial layout
+- Upgrade funnels on GBP dashboard: AI review response + post scheduler upsells linking to `/settings/feature-store?feature=gbp_*`
+- POS/GMC CTAs on GBP dashboard: link to `/settings/integration-options` (wires existing integration settings, no duplicate logic)
+
+### Tests
+- `apps/api/src/services/resolvers/GbpManagementResolver.test.ts` (7 tests) — disabled, flexible, individual features, both gates, defaults, flexible+merchant gate
+- `apps/api/src/tests/directory-gbp-public-routes.test.ts` (7 tests) — 404, both gates pass, hard gate fail, soft gate fail, posts, photos, public field filtering
+- `apps/api/src/tests/gbp-customer-routes.test.ts` (24 tests) — auth, context gating, cross-customer isolation, reviews, replies, posts, media
+- `apps/api/src/tests/gbpPostScheduler.test.ts` (5 tests) — scheduler lifecycle
+- `apps/api/src/services/__tests__/GBPReviewReplyService.test.ts` (15 tests) — draft generation, reply publishing
+- `apps/api/src/services/__tests__/GBPVerificationService.test.ts` (7 tests) — verification options, initiation, completion
+- `apps/api/src/services/__tests__/CustomerGBPAccessService.test.ts` (8 tests) — customer GBP access resolution
+
+### Key Files
+- `apps/api/src/services/GBPAdvancedSync.ts` — GBP API wrapper (reviews, posts, media, locations)
+- `apps/api/src/services/CustomerGBPAccessService.ts` — customer-to-GBP bridge resolution
+- `apps/api/src/services/gbp/prompts.ts` — Tier A prompt construction (owner voice, category tone)
+- `apps/api/src/jobs/gbpReviewIngestion.ts` — hourly review ingestion job
+- `apps/api/src/jobs/gbpPostScheduler.ts` — scheduled post publisher (every 15 min)
+- `apps/web/src/services/MarketingCustomerService.ts` — frontend service for all customer GBP endpoints
+- `apps/web/src/components/customer/CustomerSidebar.tsx` — GBP nav items in customer sidebar
+
 
 

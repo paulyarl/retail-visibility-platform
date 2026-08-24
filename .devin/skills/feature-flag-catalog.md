@@ -376,8 +376,8 @@ The following feature flags are the next eligible group for migration to the cap
 | Flag | Current State | Target Capability | Migration Notes |
 |------|--------------|-------------------|-----------------|
 | `FF_SUPPLIER_CATALOG_IMPORT` | **MIGRATED** (2026-07-03) | **Existing: `product_options`** | ✅ Migrated to `product_opt_supplier_catalog` capability. Removed from all code. See note 5 above. |
-| `FF_GOOGLE_CONNECT_SUITE` | Inactive, `allow_tenant_override=false`, pilot strategy | **Existing: `integrations`** | Google Connect is an integration feature. Add `integrations_google_connect` feature key to the existing `integrations` capability domain. Merchant toggle in `tenant_integrations_settings`. Replaces `GoogleConnectCard` component flag check. |
-| `FF_TENANT_GBP_CATEGORY_SYNC` | Pilot (1 tenant), web-only, no DB row | **Existing: `integrations`** | GBP category sync is an integration feature. Add `integrations_gbp_category_sync` feature key. Migrate from web-only `featureFlags/index.ts` pilot strategy to tier-gated capability. Replaces `GBPCategoryCard` component flag check. |
+| `FF_GOOGLE_CONNECT_SUITE` | Inactive, `allow_tenant_override=false`, pilot strategy | **Existing: `gbp_management`** | Google Connect is a GBP management feature. The `gbp_management` capability type (Migration 243) now covers GBP-related capabilities. Add `gbp_google_connect` feature key to the `gbp_management` capability domain. Merchant toggle in `tenant_gbp_options_settings`. Replaces `GoogleConnectCard` component flag check. |
+| `FF_TENANT_GBP_CATEGORY_SYNC` | Pilot (1 tenant), web-only, no DB row | **Existing: `gbp_management`** | GBP category sync is a GBP management feature. The `gbp_management` capability type (Migration 243) now covers GBP-related capabilities. Add `gbp_category_sync` feature key to the `gbp_management` capability domain. Migrate from web-only `featureFlags/index.ts` pilot strategy to tier-gated capability. Replaces `GBPCategoryCard` component flag check. |
 
 #### Tier 2: Near-Term Candidates (display/behavior features fitting existing capabilities)
 

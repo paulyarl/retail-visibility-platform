@@ -52,6 +52,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },
   { key: 'coupon_options', label: 'Coupons', icon: '🏷️', prefix: 'coupon_', settingsPath: '/settings/coupon-options' },
   { key: 'marketing_ops', label: 'Marketing Ops', icon: '📣', prefix: 'marketing_ops_', settingsPath: '/settings/admin/marketing-ops' },
+  { key: 'gbp_management', label: 'GBP Management', icon: '📍', prefix: 'gbp_', settingsPath: '/settings/integration-options' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {
@@ -112,6 +113,7 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'funnel_options': return !!caps.funnel?.enabled;
     case 'coupon_options': return !!caps.couponOptions?.enabled;
     case 'marketing_ops': return !!caps.marketingOps?.enabled;
+    case 'gbp_management': return !!caps.gbpManagement?.enabled;
     default: return false;
   }
 }

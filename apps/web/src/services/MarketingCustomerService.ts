@@ -191,6 +191,12 @@ export interface GbpStatusResponse {
   tenantId: string;
   connected: boolean;
   location: GbpLocationInfo | null;
+  capabilities?: {
+    canUseAiResponse: boolean;
+    canUsePostsScheduler: boolean;
+    canShowReviews: boolean;
+    canShowContent: boolean;
+  } | null;
 }
 
 export interface GbpVerificationOption {

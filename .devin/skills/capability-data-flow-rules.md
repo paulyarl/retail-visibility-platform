@@ -26,6 +26,7 @@ When implementing or debugging a capability, emulate the closest matching refere
 | **Simple (types)** | `ProductTypeResolver.ts` | Pure function, clean R17 precedence, legacy key fallback, clear tier/merchant separation. The simplest canonical pattern to follow. |
 | **Simple (types, DB-backed)** | `StorefrontTypeResolver.ts` | Same pattern but delegates tier-gate logic to a service. Use when the resolver needs DB access for tier state. |
 | **Complex (options)** | `StorefrontQrResolver.ts` + `StorefrontQrResolver.test.ts` | Groups, sub-groups, flexible fallback, and the canonical R33 test pattern (tier allows + merchant pref false → tier-level field still `true`). Use as the reference for any options capability with multiple feature groups. |
+| **Complex (options, public surfacing)** | `GbpManagementResolver.ts` + `GbpManagementResolver.test.ts` | Flexible bundle key, individual feature keys, and the `can_show_*` (tier-level) vs `*_enabled` (effective) naming pattern for public-surfacing capabilities. Clean R33 example: `can_show_reviews` stays `true` when merchant pref is `false`, but `reviews_enabled` becomes `false`. Use as the reference for capabilities that gate public-facing content. |
 
 **Key principle**: The resolver's return object has two kinds of fields — **tier-level** (derived from `features` only) and **merchant-gated** (derived from `features` AND `merchantPrefs`). The reference implementations show this separation clearly. Never mix the two (R33).
 
@@ -728,6 +729,8 @@ merchant_preferences: {
 **Real-world example**: `StorefrontQrResolver.ts` had `qr_styled_enabled`, `qr_custom_colors`, `qr_gradients`, and `qr_classic_enabled` all gated by `prefs.qr_styled_enabled` or `prefs.qr_classic_enabled`. This caused the styled QR option to be invisible to merchants whose `qr_styled_enabled` pref defaulted to `false`, even when the tier allowed styled QR. The fix removed all `prefs.*` gating from these tier-level fields.
 
 **Companion skill**: `decoupled-domain-self-containment.md` — covers the frontend side of this boundary: components must read from dedicated domain state, not the legacy `StorefrontOptionFlags` overlay. Includes a deviation audit of Hours, Maps, Gallery, and Layout domains.
+
+**Additional reference**: `GbpManagementResolver.ts` — implements the `can_show_*` (tier-level) vs `*_enabled` (effective) naming pattern for public-surfacing capabilities. `can_show_reviews` and `can_show_content` are pure tier-level fields (R33 compliant), while `reviews_enabled` and `content_enabled` are the effective state (hard AND soft gate). This naming convention makes the two-gate boundary explicit in the type signature itself. The test file (`GbpManagementResolver.test.ts`) includes dedicated tests verifying that `can_show_reviews` stays `true` when `gbp_reviews_display` is `false` (test #4 and #7).
 
 ### R34: Every New Resolver Output Field Must Have a Unit Test
 
