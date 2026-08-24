@@ -20,6 +20,7 @@ import { audit } from '../audit';
 import { generateCustomerClaimTokenId, generateClaimTokenSecret, generateStageHistoryId } from '../lib/id-generator';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import type { RequestCtx } from '../context';
+import { CustomerGBPAccessService } from './CustomerGBPAccessService';
 
 export type ClaimPath = 'A' | 'B' | 'C' | 'operator_invite';
 
@@ -74,6 +75,7 @@ export async function claimAllEligible(
       service_category: true,
       customer_id: true,
       date_paid: true,
+      tenant_id: true,
     },
   });
 
@@ -83,7 +85,7 @@ export async function claimAllEligible(
   if (opts.specificCampaignId && !campaignIdsToLink.includes(opts.specificCampaignId)) {
     const specificCampaign = await prisma.mkt_campaigns_list.findUnique({
       where: { id: opts.specificCampaignId },
-      select: { id: true, business_name: true, service_category: true, customer_id: true, date_paid: true, email: true },
+      select: { id: true, business_name: true, service_category: true, customer_id: true, date_paid: true, email: true, tenant_id: true },
     });
     if (specificCampaign && specificCampaign.date_paid) {
       // Check if already claimed by another customer
@@ -158,6 +160,36 @@ export async function claimAllEligible(
     } catch (e) {
       logger.error('[MarketingCustomerService] Audit/stage history write failed', undefined, {
         campaignId: campaign.id,
+        error: (e as Error).message,
+      });
+    }
+  }
+
+  // Provision GBP identity bridge links for GBP-scoped campaigns.
+  // A campaign is "GBP-scoped" if its service_category is gbp_optimization or
+  // review_management (both involve Google Business Profile management).
+  // The bridge links the customer to the campaign's tenant, enabling
+  // CustomerGBPAccessService.resolveTenant() to work for the customer portal.
+  // Idempotent: re-claiming an already-linked campaign is a no-op.
+  const GBP_SCOPED_CATEGORIES = new Set(['gbp_optimization', 'review_management']);
+  const gbpScopedCampaigns = linkedCampaigns.filter(
+    (c) => c.tenant_id && c.service_category && GBP_SCOPED_CATEGORIES.has(c.service_category),
+  );
+  for (const campaign of gbpScopedCampaigns) {
+    try {
+      await CustomerGBPAccessService.getInstance().provisionLink(
+        customerId,
+        campaign.tenant_id!,
+        campaign.id,
+      );
+    } catch (e) {
+      // Non-fatal — bridge provisioning failure must not block the claim.
+      // The customer can still access the portal; GBP features will show
+      // "no connection" until the bridge is provisioned (e.g. by re-claiming
+      // or by an admin manually creating the link).
+      logger.error('[MarketingCustomerService] GBP bridge provisioning failed', undefined, {
+        campaignId: campaign.id,
+        tenantId: campaign.tenant_id,
         error: (e as Error).message,
       });
     }

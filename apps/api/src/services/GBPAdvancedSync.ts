@@ -475,6 +475,8 @@ export interface Review {
     displayName: string;
     profilePhotoUrl?: string;
   };
+  // Google API returns enum strings ('ONE'..'FIVE'); we map to integers (1-5)
+  // at the storage boundary (migration 238 changed gbp_reviews.star_rating to INTEGER).
   starRating: 'ONE' | 'TWO' | 'THREE' | 'FOUR' | 'FIVE';
   comment?: string;
   createTime: string;
@@ -483,6 +485,17 @@ export interface Review {
     comment: string;
     updateTime: string;
   };
+}
+
+/**
+ * Maps Google's enum starRating ('ONE'..'FIVE') to integer (1-5).
+ * Used at the storage boundary so gbp_reviews.star_rating stores Int, not enum string.
+ * Migration 238 changed the column from VarChar(10) to INTEGER.
+ */
+function mapStarRatingToInt(starRating: Review['starRating'] | null | undefined): number | null {
+  if (!starRating) return null;
+  const map: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+  return map[starRating] ?? null;
 }
 
 export interface ReviewsResult {
@@ -857,7 +870,7 @@ async function storeReviews(tenantId: string, reviews: Review[]): Promise<void> 
           google_review_id: review.name,
           reviewer_name: review.reviewer?.displayName,
           reviewer_photo_url: review.reviewer?.profilePhotoUrl,
-          star_rating: review.starRating,
+          star_rating: mapStarRatingToInt(review.starRating),
           comment: review.comment,
           review_reply: review.reviewReply?.comment,
           reply_update_time: review.reviewReply?.updateTime ? new Date(review.reviewReply.updateTime) : null,

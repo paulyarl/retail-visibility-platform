@@ -220,6 +220,7 @@ import couponAnalyticsRoutes from '../routes/coupon-analytics';
 import marketingOpsRoutes from '../routes/marketing-ops';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
 import marketingCustomerRoutes from '../routes/marketing-customer';
+import gbpCustomerRoutes from '../routes/gbp-customer';
 import recoveryIntakePublicRoutes from '../routes/recovery-intake-public';
 
 // Inline handler route files (extracted from index.ts)
@@ -1084,6 +1085,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
     comment: 'Marketing Ops customer portal routes — authenticated, hasPlatformContext-gated (§6.2)',
+  },
+  {
+    path: '/api/customer/marketing/gbp',
+    router: gbpCustomerRoutes,
+    domain: 'customer',
+    authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
+    comment: 'GBP Management Suite customer portal routes — authenticated, platform-context-gated (Phase 0 scaffold)',
   },
   {
     path: '/api/customer-addresses',

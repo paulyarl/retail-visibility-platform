@@ -1945,79 +1945,108 @@ model gbp_locations_list {
   last_fetched_at            DateTime?                  @db.Timestamptz(6)
   created_at                 DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime                   @db.Timestamptz(6)
+  tenant_id                  String?                    @db.VarChar
+  business_name              String?                    @db.VarChar
+  verification_state         String                     @default("UNVERIFIED") @db.VarChar(20)
+  voice_of_merchant          Json?
+  cached_average_rating      Float?
+  cached_review_count        Int?
+  rating_cache_updated       DateTime?                  @db.Timestamptz(6)
   gbp_insights_daily_list    gbp_insights_daily_list[]
   google_oauth_accounts_list google_oauth_accounts_list @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  gbp_media                  gbp_media[]
+  gbp_posts                  gbp_posts[]
+  gbp_reviews                gbp_reviews[]
 
   @@unique([account_id, location_id])
+  @@index([tenant_id], map: "idx_gbp_locations_tenant")
 }
 
 model gbp_media {
-  id              String    @id @db.VarChar(50)
-  tenant_id       String    @db.VarChar(50)
-  google_media_id String?   @db.VarChar(255)
-  media_format    String?   @default("photo") @db.VarChar(20)
-  category        String?   @default("additional") @db.VarChar(50)
-  source_url      String?
-  google_url      String?
-  description     String?
-  is_active       Boolean?  @default(true)
-  created_at      DateTime? @default(now()) @db.Timestamp(6)
-  updated_at      DateTime? @default(now()) @db.Timestamp(6)
-  tenants         tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_media_tenant_id")
+  id                 String              @id @db.VarChar(50)
+  tenant_id          String              @db.VarChar(50)
+  google_media_id    String?             @db.VarChar(255)
+  media_format       String?             @default("photo") @db.VarChar(20)
+  category           String?             @default("additional") @db.VarChar(50)
+  source_url         String?
+  google_url         String?
+  description        String?
+  is_active          Boolean?            @default(true)
+  created_at         DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?           @default(now()) @db.Timestamp(6)
+  location_id        String?             @db.VarChar
+  view_count         Int?                @default(0)
+  tenants            tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_media_tenant_id")
+  gbp_locations_list gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([category], map: "idx_gbp_media_category")
   @@index([is_active], map: "idx_gbp_media_is_active")
   @@index([tenant_id], map: "idx_gbp_media_tenant_id")
+  @@index([tenant_id, location_id], map: "idx_gbp_media_tenant_location")
 }
 
 model gbp_posts {
-  id                  String    @id @db.VarChar(50)
-  tenant_id           String    @db.VarChar(50)
-  google_post_id      String?   @db.VarChar(255)
+  id                  String              @id @db.VarChar(50)
+  tenant_id           String              @db.VarChar(50)
+  google_post_id      String?             @db.VarChar(255)
   summary             String
-  topic_type          String?   @default("standard") @db.VarChar(50)
-  call_to_action_type String?   @db.VarChar(50)
+  topic_type          String?             @default("standard") @db.VarChar(50)
+  call_to_action_type String?             @db.VarChar(50)
   call_to_action_url  String?
   media_url           String?
-  event_title         String?   @db.VarChar(255)
-  event_start_date    DateTime? @db.Timestamp(6)
-  event_end_date      DateTime? @db.Timestamp(6)
-  offer_coupon_code   String?   @db.VarChar(100)
+  event_title         String?             @db.VarChar(255)
+  event_start_date    DateTime?           @db.Timestamp(6)
+  event_end_date      DateTime?           @db.Timestamp(6)
+  offer_coupon_code   String?             @db.VarChar(100)
   offer_redeem_url    String?
   offer_terms         String?
-  state               String?   @default("live") @db.VarChar(50)
-  google_create_time  DateTime? @db.Timestamp(6)
-  google_update_time  DateTime? @db.Timestamp(6)
-  created_at          DateTime? @default(now()) @db.Timestamp(6)
-  updated_at          DateTime? @default(now()) @db.Timestamp(6)
-  tenants             tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_posts_tenant_id")
+  state               String?             @default("live") @db.VarChar(50)
+  google_create_time  DateTime?           @db.Timestamp(6)
+  google_update_time  DateTime?           @db.Timestamp(6)
+  created_at          DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?           @default(now()) @db.Timestamp(6)
+  location_id         String?             @db.VarChar
+  post_name           String?             @db.VarChar
+  status              String              @default("PUBLISHED") @db.VarChar(16)
+  scheduled_for       DateTime?           @db.Timestamptz(6)
+  published_at        DateTime?           @db.Timestamptz(6)
+  tenants             tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_posts_tenant_id")
+  gbp_locations_list  gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([google_post_id], map: "idx_gbp_posts_google_post_id")
   @@index([tenant_id], map: "idx_gbp_posts_tenant_id")
   @@index([topic_type], map: "idx_gbp_posts_topic_type")
+  @@index([tenant_id, status], map: "idx_gbp_posts_tenant_status")
 }
 
 model gbp_reviews {
-  id                 String    @id @db.VarChar(50)
-  tenant_id          String    @db.VarChar(50)
-  google_review_id   String?   @unique(map: "uq_gbp_reviews_google_review_id") @db.VarChar(255)
-  reviewer_name      String?   @db.VarChar(255)
+  id                 String              @id @db.VarChar(50)
+  tenant_id          String              @db.VarChar(50)
+  google_review_id   String?             @unique(map: "uq_gbp_reviews_google_review_id") @db.VarChar(255)
+  reviewer_name      String?             @db.VarChar(255)
   reviewer_photo_url String?
-  star_rating        String?   @db.VarChar(10)
+  star_rating        Int?
   comment            String?
   review_reply       String?
-  reply_update_time  DateTime? @db.Timestamp(6)
-  google_create_time DateTime? @db.Timestamp(6)
-  google_update_time DateTime? @db.Timestamp(6)
-  is_replied         Boolean?  @default(false)
-  created_at         DateTime? @default(now()) @db.Timestamp(6)
-  updated_at         DateTime? @default(now()) @db.Timestamp(6)
-  tenants            tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_reviews_tenant_id")
+  reply_update_time  DateTime?           @db.Timestamp(6)
+  google_create_time DateTime?           @db.Timestamp(6)
+  google_update_time DateTime?           @db.Timestamp(6)
+  is_replied         Boolean?            @default(false)
+  created_at         DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?           @default(now()) @db.Timestamp(6)
+  location_id        String?             @db.VarChar
+  reply_status       String              @default("NONE") @db.VarChar(16)
+  ai_drafts          Json?
+  sentiment          String?             @db.VarChar(12)
+  tenants            tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_reviews_tenant_id")
+  gbp_locations_list gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([google_review_id], map: "idx_gbp_reviews_google_review_id")
   @@index([is_replied], map: "idx_gbp_reviews_is_replied")
   @@index([star_rating], map: "idx_gbp_reviews_star_rating")
   @@index([tenant_id], map: "idx_gbp_reviews_tenant_id")
+  @@index([tenant_id, star_rating], map: "idx_gbp_reviews_tenant_rating")
+  @@index([tenant_id, reply_status], map: "idx_gbp_reviews_tenant_reply")
 }
 
 model gbp_sync_history {
@@ -7523,6 +7552,20 @@ model directory_seed_campaign_links {
   @@unique([seed_id, campaign_id], map: "idx_dscl_seed_campaign")
   @@index([campaign_id], map: "idx_dscl_campaign")
   @@index([tenant_id], map: "idx_dscl_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_customer_gbp_links {
+  id                 String   @id @db.VarChar
+  customer_id        String   @db.VarChar
+  tenant_id          String   @db.VarChar
+  origin_campaign_id String?  @db.VarChar
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([customer_id, tenant_id], map: "uq_mkt_customer_gbp_links")
+  @@index([customer_id], map: "idx_mkt_customer_gbp_links_customer")
+  @@index([tenant_id], map: "idx_mkt_customer_gbp_links_tenant")
 }
 
 enum action {
