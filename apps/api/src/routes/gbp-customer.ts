@@ -163,7 +163,7 @@ router.get('/verification/options', requireCustomerAuth, requirePlatformContext,
 const startVerificationSchema = z.object({
   method: z.string().min(1),
   label: z.string().optional(),
-  data: z.record(z.any()).optional(),
+  data: z.record(z.string(), z.any()).optional(),
 });
 
 router.post('/verification/start', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
