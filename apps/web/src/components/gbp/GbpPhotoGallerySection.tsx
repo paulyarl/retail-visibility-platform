@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Camera } from 'lucide-react';
+import { GoogleSourceBadge } from './GoogleSourceBadge';
 
 interface GbpPhoto {
   id: string;
@@ -80,7 +81,7 @@ export function GbpPhotoGallerySection({ slug }: GbpPhotoGallerySectionProps) {
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
           Photos
         </h2>
-        <span className="text-xs text-gray-400 ml-1">from Google</span>
+        <GoogleSourceBadge label="Photos from Google" />
       </div>
 
       {/* Category Filter */}

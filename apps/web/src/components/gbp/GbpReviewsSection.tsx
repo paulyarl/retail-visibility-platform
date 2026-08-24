@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Star, MessageSquare } from 'lucide-react';
+import { GoogleSourceBadge } from './GoogleSourceBadge';
 
 interface GbpReview {
   id: string;
@@ -117,9 +118,14 @@ export function GbpReviewsSection({ slug }: GbpReviewsSectionProps) {
                 <p className="text-sm text-gray-600 dark:text-gray-400">{review.reviewReply}</p>
               </div>
             )}
-            {review.createTime && (
-              <p className="text-xs text-gray-400 mt-2">{new Date(review.createTime).toLocaleDateString()}</p>
-            )}
+            <div className="flex items-center justify-between mt-2">
+              {review.createTime ? (
+                <p className="text-xs text-gray-400">{new Date(review.createTime).toLocaleDateString()}</p>
+              ) : (
+                <span />
+              )}
+              <GoogleSourceBadge label="Reviewed on Google" />
+            </div>
           </div>
         ))}
       </div>

@@ -22,6 +22,8 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
 import { createPost, type GBPPost } from '../services/GBPAdvancedSync';
+import { CrmAlertService } from '../services/CrmAlertService';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 
 const SCHEDULER_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes
@@ -52,6 +54,74 @@ async function hasPostsSchedulerEntitlement(tenantId: string): Promise<boolean> 
   }
 }
 
+// ── Post-expiration upgrade trigger (§5.1) ──────────────────────────────
+
+/**
+ * Emit gbp_post_expired alerts for posts whose event/offer window ended
+ * ≥6 days ago ("Your Google ranking drops when posts expire..."). Fires
+ * once per post (deduped via existing crm_alerts rows keyed by
+ * metadata.post_id), mkt_direct targeted per linked customer, and
+ * suppressed for tenants with an active gbp_posts_scheduler entitlement.
+ */
+async function emitPostExpirationTriggers(): Promise<void> {
+  const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+
+  const expiredPosts = await prisma.gbp_posts.findMany({
+    where: {
+      status: 'PUBLISHED',
+      event_end_date: { not: null, lte: sixDaysAgo },
+    },
+    select: { id: true, tenant_id: true, summary: true, event_end_date: true },
+    take: 100,
+  });
+
+  for (const post of expiredPosts) {
+    try {
+      // Suppressed once the tenant has the scheduler entitlement
+      const entitled = await hasPostsSchedulerEntitlement(post.tenant_id);
+      if (entitled) continue;
+
+      // Dedupe: only fire once per post
+      const existing = await prisma.crm_alerts.findFirst({
+        where: { type: 'gbp_post_expired', metadata: { path: ['post_id'], equals: post.id } },
+        select: { id: true },
+      });
+      if (existing) continue;
+
+      const links = await prisma.mkt_customer_gbp_links.findMany({
+        where: { tenant_id: post.tenant_id },
+        select: { customer_id: true },
+      });
+
+      const baseMetadata = {
+        tenant_id: post.tenant_id,
+        post_id: post.id,
+        expired_at: post.event_end_date,
+      };
+      const targets: Array<Record<string, any>> = links.length > 0
+        ? links.map((l) => ({ ...baseMetadata, customer_id: l.customer_id }))
+        : [baseMetadata];
+
+      for (const metadata of targets) {
+        await CrmAlertService.getInstance().create({
+          tenant_id: PLATFORM_SCOPE,
+          type: 'gbp_post_expired',
+          title: 'A Google post has expired',
+          body: `"${post.summary.slice(0, 80)}" expired ${post.event_end_date ? `on ${post.event_end_date.toLocaleDateString()}` : 'recently'}. Your Google ranking drops when posts expire — enable Auto-Scheduler to keep fresh offers active.`,
+          icon: 'calendar',
+          metadata,
+        });
+      }
+    } catch (error) {
+      logger.warn('[GbpPostScheduler] Failed to emit post-expiration trigger', undefined, {
+        postId: post.id,
+        tenantId: post.tenant_id,
+        error: (error as Error).message,
+      });
+    }
+  }
+}
+
 // ── Scheduler runner ─────────────────────────────────────────────────────
 
 /**
@@ -72,6 +142,9 @@ async function runPostScheduler(): Promise<void> {
 
     if (duePosts.length === 0) {
       logger.info('[GbpPostScheduler] No due scheduled posts — skipping');
+      // §5.1 post-expiration trigger still runs — expiry observation is
+      // independent of the publish queue
+      await emitPostExpirationTriggers();
       return;
     }
 
@@ -207,6 +280,10 @@ async function runPostScheduler(): Promise<void> {
       failed,
       skipped,
     });
+
+    // §5.1 post-expiration upgrade trigger — emitted when the scheduler
+    // observes expired posts (day 6+ after expiry)
+    await emitPostExpirationTriggers();
   } catch (error) {
     logger.error('[GbpPostScheduler] Failed:', undefined, {
       error: {

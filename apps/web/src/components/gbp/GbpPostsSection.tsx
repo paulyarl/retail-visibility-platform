@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { FileText, Tag, Calendar, ArrowRight } from 'lucide-react';
+import { GoogleSourceBadge } from './GoogleSourceBadge';
 
 interface GbpPost {
   id: string;
@@ -79,11 +80,14 @@ export function GbpPostsSection({ slug }: GbpPostsSectionProps) {
                 </div>
               )}
               <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Icon className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {isEvent ? 'Event' : isOffer ? 'Offer' : "What's New"}
-                  </span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-gray-400" />
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {isEvent ? 'Event' : isOffer ? 'Offer' : "What's New"}
+                    </span>
+                  </div>
+                  <GoogleSourceBadge label="Posted on Google" />
                 </div>
 
                 {isEvent && post.eventTitle && (

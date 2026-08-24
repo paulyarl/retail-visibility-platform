@@ -44,6 +44,8 @@ import {
 } from '../services/MarketingCustomerProjection';
 import { MarketingReceiptPdfService } from '../services/marketing/MarketingReceiptPdfService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { generateTenantAutoId } from '../middleware/tenantAutoId';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
@@ -724,6 +726,62 @@ router.get('/coupons/applicable', requireCustomerAuth, requirePlatformContext, a
   } catch (error: any) {
     logger.error('[marketing-customer] GET /coupons/applicable error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to load applicable coupons' });
+  }
+});
+
+// ── Coupon wallet (GBP offer posts — Phase 3 Task 4) ────────────────────
+//
+// Lists the customer's saved platform-scope coupons with their /s/{autoId}
+// short links so the GBP offer-post composer can wire a wallet coupon's
+// short link into offer_redeem_url (cross-traffic: Google post → platform
+// coupon funnel → redemption).
+
+router.get('/coupons/wallet', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+
+    const savedCoupons = await prisma.customer_saved_coupons.findMany({
+      where: { customer_id: customerId, tenant_id: PLATFORM_SCOPE, status: 'saved' },
+      include: { tenant_coupons: true },
+      orderBy: { created_at: 'desc' },
+    });
+
+    // Resolve the platform tenant's auto_id for short links (generate +
+    // persist if missing — mirrors the /coupons/:id/qr pattern)
+    const platformTenant = await prisma.tenants.findUnique({
+      where: { id: PLATFORM_SCOPE },
+      select: { auto_id: true },
+    });
+    let autoId = platformTenant?.auto_id;
+    if (!autoId) {
+      autoId = generateTenantAutoId(PLATFORM_SCOPE);
+      await prisma.tenants.update({
+        where: { id: PLATFORM_SCOPE },
+        data: { auto_id: autoId },
+      });
+    }
+
+    const baseUrl = unifiedConfig.webBaseUrl.replace(/\/$/, '');
+    const wallet = savedCoupons
+      .filter((sc) => sc.tenant_coupons && sc.tenant_coupons.is_active)
+      .map((sc) => {
+        const coupon = sc.tenant_coupons!;
+        return {
+          savedCouponId: sc.id,
+          code: coupon.code,
+          label: coupon.terms_summary || coupon.code,
+          terms: coupon.terms_summary || null,
+          discountType: coupon.discount_type || 'fixed',
+          discountValue: coupon.discount_value ?? null,
+          expiresAt: coupon.expires_at ? coupon.expires_at.toISOString() : null,
+          shortUrl: `${baseUrl}/s/${autoId}?c=${encodeURIComponent(coupon.code)}`,
+        };
+      });
+
+    res.json({ success: true, data: wallet });
+  } catch (error: any) {
+    logger.error('[marketing-customer] GET /coupons/wallet error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to load coupon wallet' });
   }
 });
 

@@ -43,6 +43,8 @@ import { replyToReview, createPost, deletePost, listMedia, uploadPhoto, uploadPh
 import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
 import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
 import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
+import { isGBPSyncAllowed, isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
@@ -143,12 +145,55 @@ router.get('/status', requireCustomerAuth, requirePlatformContext, async (req: R
       });
     }
 
+    // §5.1 upgrade-trigger signals — evaluated from ingested GBP data.
+    // Each trigger is suppressed once its corresponding entitlement is active.
+    let upgradeTriggers: {
+      reviewVelocity: { active: boolean; recentReviewCount: number };
+      postExpiration: { active: boolean; expiredPostCount: number };
+      posUpsell: { active: boolean };
+    } | null = null;
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+
+      const [recentReviewCount, expiredPostCount, gbpAllowed, gmcAllowed] = await Promise.all([
+        // Review velocity: new reviews in the trailing 7 days
+        prisma.gbp_reviews.count({
+          where: { tenant_id: tenantId, google_create_time: { gte: sevenDaysAgo } },
+        }),
+        // Post expiration: published posts whose event/offer window ended ≥6 days ago
+        prisma.gbp_posts.count({
+          where: { tenant_id: tenantId, status: 'PUBLISHED', event_end_date: { lte: sixDaysAgo } },
+        }),
+        isGBPSyncAllowed(tenantId),
+        isGMCSyncAllowed(tenantId),
+      ]);
+
+      upgradeTriggers = {
+        reviewVelocity: {
+          active: recentReviewCount > 5 && !(capabilities?.canUseAiResponse ?? false),
+          recentReviewCount,
+        },
+        postExpiration: {
+          active: expiredPostCount > 0 && !(capabilities?.canUsePostsScheduler ?? false),
+          expiredPostCount,
+        },
+        posUpsell: { active: gbpAllowed && !gmcAllowed },
+      };
+    } catch (triggerError) {
+      logger.warn('[gbp-customer] GET /status upgrade-trigger evaluation failed — continuing without triggers', undefined, {
+        tenantId,
+        error: (triggerError as Error).message,
+      });
+    }
+
     res.json({
       success: true,
       data: {
         tenantId,
         connected: location !== null,
         capabilities,
+        upgradeTriggers,
         location: location
           ? {
               id: location.id,
@@ -861,6 +906,143 @@ router.post('/media/upload', requireCustomerAuth, requirePlatformContext, mediaU
     }
     logger.error('[gbp-customer] POST /media/upload error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'upload_failed', message: 'Failed to upload media' });
+  }
+});
+
+// ── Diagnostic Gallery → GBP media handoff (§4 Subsystem 4) ─────────────
+//
+// Deliverable images from the Diagnostic Gallery (/g/{shortCode}) can be
+// published directly to live GBP media with one click. Gallery assets are
+// mkt_files_list rows (file_type = 'diagnostic_screenshot') on the tenant's
+// GBP-scoped campaign; signed URLs (5-min TTL) are sufficient because
+// Google's sourceUrl fetch happens immediately.
+
+async function getGalleryAssetsForTenant(tenantId: string) {
+  const campaign = await prisma.mkt_campaigns_list.findFirst({
+    where: {
+      tenant_id: tenantId,
+      category: { in: ['gbp_optimization', 'review_management'] },
+    },
+    orderBy: { created_at: 'desc' },
+    select: { id: true },
+  });
+  if (!campaign) return [];
+
+  const files = await prisma.mkt_files_list.findMany({
+    where: { campaign_id: campaign.id, file_type: 'diagnostic_screenshot' },
+    orderBy: { uploaded_at: 'asc' },
+    select: { id: true, file_name: true, storage_path: true, mime_type: true, uploaded_at: true },
+  });
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const { StorageBuckets } = await import('../storage-config');
+  const supabaseUrl = unifiedConfig.supabaseUrl;
+  const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+
+  return Promise.all(
+    files.map(async (f) => {
+      let signedUrl: string | null = null;
+      if (supabaseUrl && supabaseKey) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const { data, error } = await supabase.storage
+          .from(StorageBuckets.DISPUTES.name)
+          .createSignedUrl(f.storage_path, 300);
+        if (!error && data) signedUrl = data.signedUrl;
+      }
+      return {
+        id: f.id,
+        fileName: f.file_name,
+        signedUrl,
+        mimeType: f.mime_type,
+        uploadedAt: f.uploaded_at,
+      };
+    }),
+  );
+}
+
+// GET /media/gallery-assets — list publishable diagnostic gallery images
+
+router.get('/media/gallery-assets', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    const assets = await getGalleryAssetsForTenant(tenantId);
+    res.json({ success: true, data: { assets } });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] GET /media/gallery-assets error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'gallery_assets_failed', message: 'Failed to load gallery assets' });
+  }
+});
+
+// POST /media/from-gallery — publish a gallery deliverable image to GBP media
+
+const fromGallerySchema = z.object({
+  fileId: z.string().min(1),
+  category: z.enum(['COVER', 'PROFILE', 'LOGO', 'EXTERIOR', 'INTERIOR', 'PRODUCT', 'AT_WORK', 'FOOD_AND_DRINK', 'MENU', 'COMMON_AREA', 'ROOMS', 'TEAMS', 'ADDITIONAL']).default('ADDITIONAL'),
+  description: z.string().max(500).optional(),
+});
+
+router.post('/media/from-gallery', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    const parsed = fromGallerySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'fileId is required' });
+    }
+
+    // Verify the file belongs to a campaign owned by the resolved tenant
+    // (cross-customer isolation — foreign file IDs return 404)
+    const file = await prisma.mkt_files_list.findFirst({
+      where: { id: parsed.data.fileId, file_type: 'diagnostic_screenshot' },
+      select: { id: true, file_name: true, storage_path: true, mkt_campaigns_list: { select: { tenant_id: true } } },
+    });
+    if (!file || file.mkt_campaigns_list?.tenant_id !== tenantId) {
+      return res.status(404).json({ success: false, error: 'asset_not_found', message: 'Gallery asset not found' });
+    }
+
+    // Fresh signed URL for Google's sourceUrl fetch
+    const { createClient } = await import('@supabase/supabase-js');
+    const { StorageBuckets } = await import('../storage-config');
+    const supabase = createClient(unifiedConfig.supabaseUrl!, unifiedConfig.supabaseServiceRoleKey!);
+    const { data: signed, error: signError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .createSignedUrl(file.storage_path, 300);
+    if (signError || !signed) {
+      return res.status(502).json({ success: false, error: 'sign_failed', message: 'Failed to generate asset URL' });
+    }
+
+    const result = await uploadPhoto(tenantId, signed.signedUrl, parsed.data.category as any, parsed.data.description);
+    if (!result.success) {
+      return res.status(502).json({ success: false, error: 'upload_failed', message: result.error || 'Failed to publish to GBP' });
+    }
+
+    const mediaId = `media_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await prisma.gbp_media.create({
+      data: {
+        id: mediaId,
+        tenant_id: tenantId,
+        google_media_id: result.mediaItemId || null,
+        media_format: 'photo',
+        category: parsed.data.category.toLowerCase(),
+        source_url: signed.signedUrl,
+        description: parsed.data.description || file.file_name || null,
+        is_active: true,
+      },
+    });
+
+    res.json({ success: true, data: { mediaItemId: result.mediaItemId, mediaId } });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] POST /media/from-gallery error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'from_gallery_failed', message: 'Failed to publish gallery asset' });
   }
 });
 

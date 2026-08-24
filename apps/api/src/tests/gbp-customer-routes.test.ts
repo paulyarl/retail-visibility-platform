@@ -53,6 +53,11 @@ const {
   mockHasFeature,
   mockResolveGoldStandard,
   mockResolveEffectiveCapabilities,
+  mockIsGBPSyncAllowed,
+  mockIsGMCSyncAllowed,
+  mockMktFilesFindMany,
+  mockMktFilesFindFirst,
+  mockCreateSignedUrl,
 } = vi.hoisted(() => ({
   mockVerifyAccessToken: vi.fn(),
   mockComputeContexts: vi.fn(),
@@ -87,6 +92,11 @@ const {
   mockHasFeature: vi.fn(),
   mockResolveGoldStandard: vi.fn(),
   mockResolveEffectiveCapabilities: vi.fn(),
+  mockIsGBPSyncAllowed: vi.fn(),
+  mockIsGMCSyncAllowed: vi.fn(),
+  mockMktFilesFindMany: vi.fn(),
+  mockMktFilesFindFirst: vi.fn(),
+  mockCreateSignedUrl: vi.fn(),
 }));
 
 vi.mock('../services/CustomerTokenService', () => ({
@@ -143,6 +153,10 @@ vi.mock('../prisma', () => ({
     mkt_campaigns_list: {
       findFirst: mockMktCampaignsFindFirst,
     },
+    mkt_files_list: {
+      findMany: mockMktFilesFindMany,
+      findFirst: mockMktFilesFindFirst,
+    },
   },
 }));
 
@@ -195,6 +209,33 @@ vi.mock('../services/EffectiveCapabilityResolver', () => ({
   resolveEffectiveCapabilitiesFromMV: mockResolveEffectiveCapabilities,
 }));
 
+vi.mock('../lib/google/capability-gate', () => ({
+  isGBPSyncAllowed: mockIsGBPSyncAllowed,
+  isGMCSyncAllowed: mockIsGMCSyncAllowed,
+}));
+
+vi.mock('../config/unifiedConfig', () => ({
+  unifiedConfig: {
+    supabaseUrl: 'https://supabase.test',
+    supabaseServiceRoleKey: 'test-key',
+    webBaseUrl: 'https://app.test',
+  },
+}));
+
+vi.mock('../storage-config', () => ({
+  StorageBuckets: { DISPUTES: { name: 'disputes' } },
+}));
+
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    storage: {
+      from: () => ({
+        createSignedUrl: mockCreateSignedUrl,
+      }),
+    },
+  }),
+}));
+
 vi.mock('../services/DisputeIntakeService', () => ({
   DisputeIntakeService: {
     getInstance: () => ({
@@ -239,6 +280,15 @@ beforeEach(() => {
   mockGbpLocationsFindMany.mockResolvedValue([]);
   // Default: no gbp_management capability block
   mockResolveEffectiveCapabilities.mockResolvedValue(null);
+  // Default: capability gates — GBP allowed, GMC not (posUpsell active)
+  mockIsGBPSyncAllowed.mockResolvedValue(true);
+  mockIsGMCSyncAllowed.mockResolvedValue(false);
+  // Default: no reviews/posts counts
+  mockGbpReviewsCount.mockResolvedValue(0);
+  mockGbpPostsCount.mockResolvedValue(0);
+  // Default: no gallery files
+  mockMktFilesFindMany.mockResolvedValue([]);
+  mockCreateSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://supabase.test/signed/abc' }, error: null });
 });
 
 // ── Auth tests ──────────────────────────────────────────────────────────
@@ -394,6 +444,68 @@ describe('gbp-customer routes — GET /status', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.capabilities).toBeNull();
+  });
+
+  it('returns upgradeTriggers — review velocity active when >5 reviews in 7 days and unentitled', async () => {
+    mockResolveEffectiveCapabilities.mockResolvedValue({
+      effective: {
+        gbp_management: {
+          enabled: false,
+          can_use_ai_response: false,
+          can_use_posts_scheduler: false,
+          can_show_reviews: false,
+          can_show_content: false,
+        },
+      },
+    });
+    mockGbpReviewsCount.mockResolvedValue(7); // >5 in trailing 7 days
+    mockGbpPostsCount.mockResolvedValue(2); // expired posts
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/status')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.upgradeTriggers).toEqual({
+      reviewVelocity: { active: true, recentReviewCount: 7 },
+      postExpiration: { active: true, expiredPostCount: 2 },
+      posUpsell: { active: true },
+    });
+  });
+
+  it('suppresses review-velocity trigger when gbp_ai_response entitlement is active', async () => {
+    mockResolveEffectiveCapabilities.mockResolvedValue({
+      effective: {
+        gbp_management: {
+          enabled: true,
+          can_use_ai_response: true,
+          can_use_posts_scheduler: true,
+          can_show_reviews: true,
+          can_show_content: true,
+        },
+      },
+    });
+    mockGbpReviewsCount.mockResolvedValue(9);
+    mockGbpPostsCount.mockResolvedValue(3);
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/status')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.upgradeTriggers.reviewVelocity.active).toBe(false);
+    expect(res.body.data.upgradeTriggers.postExpiration.active).toBe(false);
+  });
+
+  it('suppresses POS upsell when GMC sync is already allowed', async () => {
+    mockIsGMCSyncAllowed.mockResolvedValue(true);
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/status')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.upgradeTriggers.posUpsell.active).toBe(false);
   });
 });
 
@@ -768,5 +880,88 @@ describe('gbp-customer routes — POST /media/upload (sourceUrl)', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.mediaItemId).toBe('media_123');
     expect(mockUploadPhoto).toHaveBeenCalled();
+  });
+});
+
+// ── /media/gallery-assets + /media/from-gallery tests (Subsystem 4 handoff) ──
+
+describe('gbp-customer routes — GET /media/gallery-assets', () => {
+  it('returns 200 with gallery assets for the tenant campaign', async () => {
+    mockMktCampaignsFindFirst.mockResolvedValue({ id: 'camp-001' });
+    mockMktFilesFindMany.mockResolvedValue([
+      {
+        id: 'file-001',
+        file_name: 'storefront.png',
+        storage_path: 'camp-001/storefront.png',
+        mime_type: 'image/png',
+        uploaded_at: new Date('2026-08-20'),
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/media/gallery-assets')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.assets).toHaveLength(1);
+    expect(res.body.data.assets[0].signedUrl).toBe('https://supabase.test/signed/abc');
+  });
+
+  it('returns empty assets when the tenant has no GBP campaign', async () => {
+    mockMktCampaignsFindFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/media/gallery-assets')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.assets).toEqual([]);
+  });
+});
+
+describe('gbp-customer routes — POST /media/from-gallery', () => {
+  it('returns 200 and publishes the gallery asset to GBP', async () => {
+    mockMktFilesFindFirst.mockResolvedValue({
+      id: 'file-001',
+      file_name: 'storefront.png',
+      storage_path: 'camp-001/storefront.png',
+      mkt_campaigns_list: { tenant_id: TENANT_ID },
+    });
+    mockUploadPhoto.mockResolvedValue({ success: true, mediaItemId: 'media_gallery_1' });
+    mockGbpMediaCreate.mockResolvedValue({});
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/media/from-gallery')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ fileId: 'file-001', category: 'EXTERIOR', description: 'Storefront' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.mediaItemId).toBe('media_gallery_1');
+    expect(mockUploadPhoto).toHaveBeenCalledWith(
+      TENANT_ID,
+      'https://supabase.test/signed/abc',
+      'EXTERIOR',
+      'Storefront',
+    );
+  });
+
+  it('returns 404 for a gallery asset owned by another tenant (cross-customer isolation)', async () => {
+    mockMktFilesFindFirst.mockResolvedValue({
+      id: 'file-foreign',
+      file_name: 'other.png',
+      storage_path: 'camp-999/other.png',
+      mkt_campaigns_list: { tenant_id: 'tenant_other' },
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/media/from-gallery')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ fileId: 'file-foreign', category: 'ADDITIONAL' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('asset_not_found');
+    expect(mockUploadPhoto).not.toHaveBeenCalled();
   });
 });

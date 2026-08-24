@@ -230,6 +230,42 @@ export default function GbpDashboardPage() {
       {/* Upgrade Funnels + POS/GMC CTAs */}
       {status.connected && (
         <div className="space-y-4">
+          {/* §5.1 Review velocity trigger — >5 new reviews in trailing 7 days */}
+          {status.upgradeTriggers?.reviewVelocity.active && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg border border-amber-200 dark:border-amber-800 p-4">
+              <div className="flex items-start gap-3">
+                <Star className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {status.upgradeTriggers.reviewVelocity.recentReviewCount} new reviews this week
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Activate AI Auto-Responder to maintain a 100% response rate within the hour.</p>
+                </div>
+                <a href="/settings/feature-store?feature=gbp_ai_response" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-amber-600 text-white text-sm hover:bg-amber-700 transition-colors flex-shrink-0">
+                  Activate <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* §5.1 Post expiration trigger — posts expired 6+ days ago */}
+          {status.upgradeTriggers?.postExpiration.active && (
+            <div className="bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 rounded-lg border border-rose-200 dark:border-rose-800 p-4">
+              <div className="flex items-start gap-3">
+                <Calendar className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {status.upgradeTriggers.postExpiration.expiredPostCount} {status.upgradeTriggers.postExpiration.expiredPostCount === 1 ? 'post has' : 'posts have'} expired
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Your Google ranking drops when posts expire. Enable Auto-Scheduler to keep fresh offers active.</p>
+                </div>
+                <a href="/settings/feature-store?feature=gbp_posts_scheduler" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rose-600 text-white text-sm hover:bg-rose-700 transition-colors flex-shrink-0">
+                  Enable <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* AI Review Response upsell */}
           {status.capabilities && !status.capabilities.canUseAiResponse && (
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 p-4">
@@ -262,7 +298,9 @@ export default function GbpDashboardPage() {
             </div>
           )}
 
-          {/* POS Connection CTA */}
+          {/* POS Connection CTA — §5.1: shown when GBP sync is allowed but GMC sync is not
+              (defaults to visible when trigger evaluation is unavailable) */}
+          {(status.upgradeTriggers?.posUpsell.active ?? true) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-start gap-3">
               <CreditCard className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
@@ -275,6 +313,7 @@ export default function GbpDashboardPage() {
               </a>
             </div>
           </div>
+          )}
 
           {/* GMC Sync CTA */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">

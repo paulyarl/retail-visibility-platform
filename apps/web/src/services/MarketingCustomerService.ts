@@ -151,6 +151,17 @@ export interface ApplicableCoupon {
   expiresAt: string | null;
 }
 
+export interface WalletCoupon {
+  savedCouponId: string;
+  code: string;
+  label: string;
+  terms: string | null;
+  discountType: string;
+  discountValue: number | null;
+  expiresAt: string | null;
+  shortUrl: string;
+}
+
 export interface CheckoutResult {
   clientSecret?: string;
   paymentIntentId?: string;
@@ -196,6 +207,11 @@ export interface GbpStatusResponse {
     canUsePostsScheduler: boolean;
     canShowReviews: boolean;
     canShowContent: boolean;
+  } | null;
+  upgradeTriggers?: {
+    reviewVelocity: { active: boolean; recentReviewCount: number };
+    postExpiration: { active: boolean; expiredPostCount: number };
+    posUpsell: { active: boolean };
   } | null;
 }
 
@@ -324,6 +340,14 @@ export interface UploadMediaPayload {
   category?: string;
   description?: string;
   file?: File;
+}
+
+export interface GbpGalleryAsset {
+  id: string;
+  fileName: string;
+  signedUrl: string | null;
+  mimeType: string | null;
+  uploadedAt: string | null;
 }
 
 // ── Service ─────────────────────────────────────────────────────────────
@@ -599,6 +623,18 @@ class MarketingCustomerService extends CustomerApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  // ── Coupon wallet (GBP offer posts) ────────────────────────────────────
+
+  async listWalletCoupons(): Promise<WalletCoupon[]> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/coupons/wallet',
+      {},
+      'marketing-portal-coupon-wallet',
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load coupon wallet'));
+    return result.data?.data ?? result.data;
+  }
+
   // ── Portal checkout (§7.6) ────────────────────────────────────────────
 
   async createCheckout(input: {
@@ -860,6 +896,39 @@ class MarketingCustomerService extends CustomerApiSingleton {
       );
     }
     if (!result.success) throw new Error(this.errMsg(result, 'Failed to upload media'));
+    await this.invalidateCache('marketing-portal-gbp-media');
+    return result.data?.data ?? result.data;
+  }
+
+  // ── Diagnostic Gallery → GBP media handoff (Subsystem 4) ───────────────
+
+  async listGalleryAssets(): Promise<GbpGalleryAsset[]> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/media/gallery-assets',
+      {},
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load gallery assets'));
+    const data = result.data?.data ?? result.data;
+    return data.assets ?? [];
+  }
+
+  async publishGalleryAsset(payload: {
+    fileId: string;
+    category?: string;
+    description?: string;
+  }): Promise<{ mediaItemId: string; mediaId: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/media/from-gallery',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to publish gallery asset'));
     await this.invalidateCache('marketing-portal-gbp-media');
     return result.data?.data ?? result.data;
   }

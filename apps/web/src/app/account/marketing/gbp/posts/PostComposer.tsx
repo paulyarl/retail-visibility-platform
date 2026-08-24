@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Send, Calendar, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Send, Calendar, AlertCircle, LayoutTemplate } from 'lucide-react';
 import marketingCustomerService, { CreatePostPayload } from '@/services/MarketingCustomerService';
 import { OfferPostBuilder } from './OfferPostBuilder';
+import { getTemplatesForCategory, getCurrentSeason, fillTemplate, SeasonalPostTemplate } from './seasonalTemplates';
 
 interface PostComposerProps {
   onClose: () => void;
@@ -28,6 +29,37 @@ export function PostComposer({ onClose, onCreated }: PostComposerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schedulingError, setSchedulingError] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState('');
+  const [templates, setTemplates] = useState<SeasonalPostTemplate[]>([]);
+
+  // Load business context for template pre-fill (seasonal template packs)
+  useEffect(() => {
+    let cancelled = false;
+    marketingCustomerService
+      .getGbpStatus()
+      .then((status) => {
+        if (cancelled) return;
+        const name = status.location?.businessName || status.location?.locationName || '';
+        setBusinessName(name);
+        setTemplates(getTemplatesForCategory(status.location?.category));
+      })
+      .catch(() => {
+        if (!cancelled) setTemplates(getTemplatesForCategory(null));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+    setPostType(template.topicType);
+    setSummary(fillTemplate(template, businessName));
+    if (template.callToActionType) setCallToActionType(template.callToActionType);
+    if (template.eventTitle) setEventTitle(template.eventTitle);
+    if (template.offerTerms) setOfferTerms(template.offerTerms);
+  };
 
   const handleCreate = async () => {
     if (!summary.trim()) {
@@ -98,6 +130,38 @@ export function PostComposer({ onClose, onCreated }: PostComposerProps) {
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-orange-700 flex items-start gap-2 text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               {schedulingError}
+            </div>
+          )}
+
+          {/* Seasonal Template Picker */}
+          {templates.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1 flex items-center gap-1">
+                <LayoutTemplate className="w-3.5 h-3.5" />
+                Start from a Template (optional)
+              </label>
+              <select
+                defaultValue=""
+                onChange={(e) => handleTemplateSelect(e.target.value)}
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md p-2.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="" disabled>
+                  Choose a template...
+                </option>
+                {[getCurrentSeason(), 'everyday' as const]
+                  .filter((s, i, arr) => arr.indexOf(s) === i)
+                  .map((season) => (
+                    <optgroup key={season} label={season === 'everyday' ? 'Everyday' : season.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}>
+                      {templates
+                        .filter((t) => t.season === season)
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
+              </select>
             </div>
           )}
 

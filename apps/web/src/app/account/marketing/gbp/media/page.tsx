@@ -7,6 +7,7 @@ import marketingCustomerService, {
   GbpMediaListResponse,
 } from '@/services/MarketingCustomerService';
 import { MediaUploader } from './MediaUploader';
+import { GalleryImport } from './GalleryImport';
 
 const categoryLabels: Record<string, string> = {
   COVER: 'Cover Photos',
@@ -142,6 +143,9 @@ export default function GbpMediaPage() {
           </div>
         </div>
       )}
+
+      {/* Diagnostic Gallery handoff — publish deliverable images to GBP */}
+      <GalleryImport onPublished={loadMedia} />
 
       {/* Media Gallery */}
       {data && data.media.length === 0 ? (

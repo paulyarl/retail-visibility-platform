@@ -20,11 +20,17 @@ const {
   mockGbpPostsFindMany,
   mockGbpPostsUpdate,
   mockCreatePost,
+  mockCrmAlertsFindFirst,
+  mockGbpLinksFindMany,
+  mockCrmAlertCreate,
 } = vi.hoisted(() => ({
   mockHasFeature: vi.fn(),
   mockGbpPostsFindMany: vi.fn(),
   mockGbpPostsUpdate: vi.fn(),
   mockCreatePost: vi.fn(),
+  mockCrmAlertsFindFirst: vi.fn(),
+  mockGbpLinksFindMany: vi.fn(),
+  mockCrmAlertCreate: vi.fn(),
 }));
 
 vi.mock('../prisma', () => ({
@@ -33,11 +39,29 @@ vi.mock('../prisma', () => ({
       findMany: mockGbpPostsFindMany,
       update: mockGbpPostsUpdate,
     },
+    crm_alerts: {
+      findFirst: mockCrmAlertsFindFirst,
+    },
+    mkt_customer_gbp_links: {
+      findMany: mockGbpLinksFindMany,
+    },
   },
 }));
 
 vi.mock('../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('../lib/platform-scope', () => ({
+  PLATFORM_SCOPE: 'platform',
+}));
+
+vi.mock('../services/CrmAlertService', () => ({
+  CrmAlertService: {
+    getInstance: () => ({
+      create: mockCrmAlertCreate,
+    }),
+  },
 }));
 
 vi.mock('../services/permissions/PermissionServiceFactory', () => ({
@@ -87,6 +111,10 @@ beforeEach(() => {
   mockHasFeature.mockResolvedValue(true);
   mockGbpPostsUpdate.mockResolvedValue({});
   mockCreatePost.mockResolvedValue({ success: true, postId: 'google_post_123' });
+  // Default: no expired posts (findMany returns [] for the expiry scan)
+  mockCrmAlertsFindFirst.mockResolvedValue(null);
+  mockGbpLinksFindMany.mockResolvedValue([]);
+  mockCrmAlertCreate.mockResolvedValue({});
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -162,5 +190,74 @@ describe('gbpPostScheduler', () => {
     expect(mockCreatePost).not.toHaveBeenCalled();
     // Should NOT update the post status (leaves as SCHEDULED for potential future entitlement)
     expect(mockGbpPostsUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// ── Post-expiration upgrade trigger (§5.1) ───────────────────────────────
+//
+// NOTE: the scheduler caches entitlement checks per tenant for 1 minute at
+// module level — each trigger test uses a distinct tenant ID to stay clear
+// of cache cross-contamination with tests 1–5.
+
+function expiredPostFor(tenantId: string) {
+  return {
+    id: `post_expired_${tenantId}`,
+    tenant_id: tenantId,
+    summary: 'Holiday sale — 20% off everything in store this week only!',
+    status: 'PUBLISHED',
+    event_end_date: new Date(NOW.getTime() - 7 * 24 * 60 * 60 * 1000), // expired 7 days ago
+  };
+}
+
+describe('gbpPostScheduler — post-expiration trigger', () => {
+  it('6. Emits gbp_post_expired alert per linked customer (mkt_direct) for expired posts when unentitled', async () => {
+    const post = expiredPostFor('tenant_exp_6');
+    // First findMany call: due SCHEDULED posts → none
+    // Second findMany call: expired posts scan → one expired post
+    mockGbpPostsFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([post]);
+    mockHasFeature.mockResolvedValue(false); // no scheduler entitlement
+    mockGbpLinksFindMany.mockResolvedValue([{ customer_id: 'cust_001' }]);
+
+    await runSchedulerPass();
+
+    expect(mockCrmAlertCreate).toHaveBeenCalledTimes(1);
+    expect(mockCrmAlertCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: 'platform',
+        type: 'gbp_post_expired',
+        metadata: expect.objectContaining({
+          customer_id: 'cust_001',
+          tenant_id: 'tenant_exp_6',
+          post_id: post.id,
+        }),
+      }),
+    );
+  });
+
+  it('7. Never fires twice for the same post (deduped via existing alert)', async () => {
+    const post = expiredPostFor('tenant_exp_7');
+    mockGbpPostsFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([post]);
+    mockHasFeature.mockResolvedValue(false);
+    mockCrmAlertsFindFirst.mockResolvedValue({ id: 'alert-existing' }); // already fired
+
+    await runSchedulerPass();
+
+    expect(mockCrmAlertCreate).not.toHaveBeenCalled();
+  });
+
+  it('8. Suppressed when the tenant has the gbp_posts_scheduler entitlement', async () => {
+    const post = expiredPostFor('tenant_exp_8');
+    mockGbpPostsFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([post]);
+    mockHasFeature.mockResolvedValue(true); // entitled → trigger suppressed
+
+    await runSchedulerPass();
+
+    expect(mockCrmAlertCreate).not.toHaveBeenCalled();
   });
 });
