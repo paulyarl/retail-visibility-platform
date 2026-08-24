@@ -334,20 +334,35 @@ export class GBPVerificationService extends BaseService {
 
   /**
    * Fire gbp_verification_milestone CRM alert (platform-scope, customer-visible).
+   * mkt_direct targeting: one alert per linked customer with metadata.customer_id
+   * so the portal read-time targeting filter (marketing-customer.ts) surfaces it.
+   * Falls back to a tenant-scoped alert when no customer link exists yet.
    */
   private async fireMilestoneAlert(tenantId: string): Promise<void> {
     try {
-      await CrmAlertService.getInstance().create({
-        tenant_id: PLATFORM_SCOPE,
-        type: 'gbp_verification_milestone',
-        title: 'Google Business Profile verified',
-        body: 'Your Google Business Profile has been verified. You can now manage reviews, posts, and photos from your dashboard.',
-        icon: '✅',
-        metadata: {
-          tenant_id: tenantId,
-          milestone: 'gbp_verification_completed',
-        },
+      const links = await prisma.mkt_customer_gbp_links.findMany({
+        where: { tenant_id: tenantId },
+        select: { customer_id: true },
       });
+
+      const baseMetadata = {
+        tenant_id: tenantId,
+        milestone: 'gbp_verification_completed',
+      };
+      const targets: Array<Record<string, any>> = links.length > 0
+        ? links.map((l) => ({ ...baseMetadata, customer_id: l.customer_id }))
+        : [baseMetadata];
+
+      for (const metadata of targets) {
+        await CrmAlertService.getInstance().create({
+          tenant_id: PLATFORM_SCOPE,
+          type: 'gbp_verification_milestone',
+          title: 'Google Business Profile verified',
+          body: 'Your Google Business Profile has been verified. You can now manage reviews, posts, and photos from your dashboard.',
+          icon: '✅',
+          metadata,
+        });
+      }
     } catch (error: any) {
       // Non-fatal — alert failure must not block verification completion
       logger.warn('[GBPVerification] Milestone alert failed', undefined, { tenantId, error: error.message });

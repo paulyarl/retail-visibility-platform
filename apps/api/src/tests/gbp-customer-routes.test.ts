@@ -52,6 +52,7 @@ const {
   mockUploadPhotoBinary,
   mockHasFeature,
   mockResolveGoldStandard,
+  mockResolveEffectiveCapabilities,
 } = vi.hoisted(() => ({
   mockVerifyAccessToken: vi.fn(),
   mockComputeContexts: vi.fn(),
@@ -85,6 +86,7 @@ const {
   mockUploadPhotoBinary: vi.fn(),
   mockHasFeature: vi.fn(),
   mockResolveGoldStandard: vi.fn(),
+  mockResolveEffectiveCapabilities: vi.fn(),
 }));
 
 vi.mock('../services/CustomerTokenService', () => ({
@@ -189,6 +191,10 @@ vi.mock('../services/permissions/PermissionServiceFactory', () => ({
   },
 }));
 
+vi.mock('../services/EffectiveCapabilityResolver', () => ({
+  resolveEffectiveCapabilitiesFromMV: mockResolveEffectiveCapabilities,
+}));
+
 vi.mock('../services/DisputeIntakeService', () => ({
   DisputeIntakeService: {
     getInstance: () => ({
@@ -231,6 +237,8 @@ beforeEach(() => {
   });
   // Default: no locations
   mockGbpLocationsFindMany.mockResolvedValue([]);
+  // Default: no gbp_management capability block
+  mockResolveEffectiveCapabilities.mockResolvedValue(null);
 });
 
 // ── Auth tests ──────────────────────────────────────────────────────────
@@ -348,6 +356,44 @@ describe('gbp-customer routes — GET /status', () => {
     expect(res.body.data.tenantId).toBe(TENANT_ID);
     expect(res.body.data.connected).toBe(false);
     expect(res.body.data.location).toBeNull();
+  });
+
+  it('returns capabilities payload for upgrade-funnel CTAs', async () => {
+    mockResolveEffectiveCapabilities.mockResolvedValue({
+      effective: {
+        gbp_management: {
+          enabled: true,
+          can_use_ai_response: true,
+          can_use_posts_scheduler: false,
+          can_show_reviews: true,
+          can_show_content: false,
+        },
+      },
+    });
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/status')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(mockResolveEffectiveCapabilities).toHaveBeenCalledWith(TENANT_ID);
+    expect(res.body.data.capabilities).toEqual({
+      canUseAiResponse: true,
+      canUsePostsScheduler: false,
+      canShowReviews: true,
+      canShowContent: false,
+    });
+  });
+
+  it('returns null capabilities when capability resolution fails (status still 200)', async () => {
+    mockResolveEffectiveCapabilities.mockRejectedValue(new Error('resolver down'));
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/status')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.capabilities).toBeNull();
   });
 });
 

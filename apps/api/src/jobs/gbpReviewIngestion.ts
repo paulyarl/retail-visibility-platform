@@ -36,6 +36,33 @@ function classifySentiment(starRating: number | null, comment: string | null): '
   return null;
 }
 
+// ── Alert targeting ──────────────────────────────────────────────────────
+
+/**
+ * Resolve the marketing customers linked to this tenant via the
+ * mkt_customer_gbp_links bridge (Subsystem 0). gbp_new_review alerts use
+ * mkt_direct targeting (metadata.customer_id) so they are visible to the
+ * customer in the portal — alerts with only tenant metadata are filtered
+ * out by the read-time targeting in marketing-customer.ts.
+ */
+async function getLinkedCustomerIds(tenantId: string): Promise<string[]> {
+  try {
+    const links = await prisma.mkt_customer_gbp_links.findMany({
+      where: { tenant_id: tenantId },
+      select: { customer_id: true },
+    });
+    return links.map((l) => l.customer_id);
+  } catch (error) {
+    logger.warn('[GbpReviewIngestion] Failed to resolve linked customers — alerts will be tenant-scoped only', undefined, {
+      tenantId,
+      error: (error as Error).message,
+    });
+    return [];
+  }
+}
+
+const STAR_RATING_INT: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+
 // ── Per-tenant ingestion ─────────────────────────────────────────────────
 
 /**
@@ -47,6 +74,9 @@ async function ingestReviewsForTenant(tenantId: string): Promise<number> {
   let pageToken: string | undefined;
   let averageRating: number | undefined;
   let totalReviewCount: number | undefined;
+
+  // Resolve linked customers once per tenant for mkt_direct alert targeting
+  const linkedCustomerIds = await getLinkedCustomerIds(tenantId);
 
   // Collect all reviews across pages (single-location v1 — typically 1 page)
   do {
@@ -100,28 +130,43 @@ async function ingestReviewsForTenant(tenantId: string): Promise<number> {
 
         if (isNew) {
           newReviewCount++;
-          // Fire gbp_new_review CRM alert (best-effort — failures logged, never thrown)
-          try {
-            await CrmAlertService.getInstance().create({
-              tenant_id: PLATFORM_SCOPE,
-              type: 'gbp_new_review',
-              title: `New ${review.starRating ?? ''}★ review from ${review.reviewer?.displayName ?? 'a customer'}`,
-              body: review.comment ? review.comment.slice(0, 200) : 'No comment provided.',
-              icon: 'star',
-              metadata: {
-                tenant_id: tenantId,
-                review_id: review.name,
-                reviewer_name: review.reviewer?.displayName ?? null,
-                star_rating: review.starRating ?? null,
-                snippet: review.comment ? review.comment.slice(0, 200) : null,
-              },
-            });
-          } catch (alertError) {
-            logger.warn('[GbpReviewIngestion] Failed to fire gbp_new_review alert', undefined, {
-              tenantId,
-              reviewId: review.name,
-              error: (alertError as Error).message,
-            });
+          // Fire gbp_new_review CRM alert (best-effort — failures logged, never thrown).
+          // mkt_direct targeting: one alert per linked customer with
+          // metadata.customer_id so the portal read-time targeting filter
+          // (marketing-customer.ts) surfaces it. Tenants with no linked
+          // customers get a single tenant-scoped alert (operator visibility).
+          const starInt = review.starRating ? STAR_RATING_INT[review.starRating] ?? null : null;
+          const baseMetadata = {
+            tenant_id: tenantId,
+            review_id: review.name,
+            reviewer_name: review.reviewer?.displayName ?? null,
+            star_rating: starInt,
+            snippet: review.comment ? review.comment.slice(0, 200) : null,
+          };
+          const alertTitle = `New ${starInt ?? ''}★ review from ${review.reviewer?.displayName ?? 'a customer'}`;
+          const alertBody = review.comment ? review.comment.slice(0, 200) : 'No comment provided.';
+          const targets: Array<Record<string, any>> = linkedCustomerIds.length > 0
+            ? linkedCustomerIds.map((customerId) => ({ ...baseMetadata, customer_id: customerId }))
+            : [baseMetadata];
+
+          for (const metadata of targets) {
+            try {
+              await CrmAlertService.getInstance().create({
+                tenant_id: PLATFORM_SCOPE,
+                type: 'gbp_new_review',
+                title: alertTitle,
+                body: alertBody,
+                icon: 'star',
+                metadata,
+              });
+            } catch (alertError) {
+              logger.warn('[GbpReviewIngestion] Failed to fire gbp_new_review alert', undefined, {
+                tenantId,
+                reviewId: review.name,
+                customerId: metadata.customer_id,
+                error: (alertError as Error).message,
+              });
+            }
           }
         }
       }

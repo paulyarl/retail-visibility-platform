@@ -42,6 +42,7 @@ import { DisputeIntakeService } from '../services/DisputeIntakeService';
 import { replyToReview, createPost, deletePost, listMedia, uploadPhoto, uploadPhotoBinary } from '../services/GBPAdvancedSync';
 import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
 import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
+import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
@@ -115,11 +116,39 @@ router.get('/status', requireCustomerAuth, requirePlatformContext, async (req: R
     const locations = await customerGbpAccessService.resolveLocations(customerId);
     const location = locations.length > 0 ? locations[0] : null;
 
+    // Resolve gbp_management capability state for upgrade-funnel CTAs.
+    // Hard-gate fields (can_use_*) — merchant display toggles must not hide
+    // the upgrade CTA. Falls back to null if capability resolution fails.
+    let capabilities: {
+      canUseAiResponse: boolean;
+      canUsePostsScheduler: boolean;
+      canShowReviews: boolean;
+      canShowContent: boolean;
+    } | null = null;
+    try {
+      const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
+      const gbp = caps?.effective?.gbp_management;
+      if (gbp) {
+        capabilities = {
+          canUseAiResponse: gbp.can_use_ai_response,
+          canUsePostsScheduler: gbp.can_use_posts_scheduler,
+          canShowReviews: gbp.can_show_reviews,
+          canShowContent: gbp.can_show_content,
+        };
+      }
+    } catch (capError) {
+      logger.warn('[gbp-customer] GET /status capability resolution failed — continuing without capabilities', undefined, {
+        tenantId,
+        error: (capError as Error).message,
+      });
+    }
+
     res.json({
       success: true,
       data: {
         tenantId,
         connected: location !== null,
+        capabilities,
         location: location
           ? {
               id: location.id,

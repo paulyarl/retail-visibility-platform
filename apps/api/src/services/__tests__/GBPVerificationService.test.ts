@@ -25,6 +25,7 @@ const {
   mockTenantsFindUnique,
   mockTenantsUpdate,
   mockCrmAlertCreate,
+  mockGbpLinksFindMany,
 } = vi.hoisted(() => ({
   mockGetValidAccessToken: vi.fn(),
   mockGetLinkedLocation: vi.fn(),
@@ -33,6 +34,7 @@ const {
   mockTenantsFindUnique: vi.fn(),
   mockTenantsUpdate: vi.fn(),
   mockCrmAlertCreate: vi.fn(),
+  mockGbpLinksFindMany: vi.fn(),
 }));
 
 vi.mock('../GBPAdvancedSync', () => ({
@@ -48,6 +50,9 @@ vi.mock('../../prisma', () => ({
     tenants: {
       findUnique: mockTenantsFindUnique,
       update: mockTenantsUpdate,
+    },
+    mkt_customer_gbp_links: {
+      findMany: mockGbpLinksFindMany,
     },
   },
 }));
@@ -106,6 +111,7 @@ beforeEach(() => {
   mockCrmAlertCreate.mockResolvedValue({});
   mockTenantsFindUnique.mockResolvedValue({ org_standing_mode: 'directory_seed' });
   mockTenantsUpdate.mockResolvedValue({});
+  mockGbpLinksFindMany.mockResolvedValue([]);
 });
 
 // ── fetchOptions tests ───────────────────────────────────────────────────
@@ -205,13 +211,14 @@ describe('GBPVerificationService.complete', () => {
     });
   });
 
-  it('fires gbp_verification_milestone CRM alert on success', async () => {
+  it('fires gbp_verification_milestone CRM alert on success with mkt_direct targeting (metadata.customer_id)', async () => {
     mockFetch.mockResolvedValueOnce(
       mockFetchResponse({
         verifications: [{ name: 'verifications/123', state: 'PENDING', method: 'SMS' }],
       }),
     );
     mockFetch.mockResolvedValueOnce(mockFetchResponse({}, true, 200));
+    mockGbpLinksFindMany.mockResolvedValue([{ customer_id: 'cust_001' }]);
 
     const svc = GBPVerificationService.getInstance();
     await svc.complete(TENANT_ID, '123456');
@@ -221,8 +228,34 @@ describe('GBPVerificationService.complete', () => {
         tenant_id: 'platform',
         type: 'gbp_verification_milestone',
         title: 'Google Business Profile verified',
+        metadata: expect.objectContaining({
+          customer_id: 'cust_001',
+          tenant_id: TENANT_ID,
+        }),
       }),
     );
+  });
+
+  it('falls back to tenant-scoped milestone alert when no customer link exists', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockFetchResponse({
+        verifications: [{ name: 'verifications/123', state: 'PENDING', method: 'SMS' }],
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(mockFetchResponse({}, true, 200));
+    mockGbpLinksFindMany.mockResolvedValue([]);
+
+    const svc = GBPVerificationService.getInstance();
+    await svc.complete(TENANT_ID, '123456');
+
+    expect(mockCrmAlertCreate).toHaveBeenCalledTimes(1);
+    expect(mockCrmAlertCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'gbp_verification_milestone',
+        metadata: expect.objectContaining({ tenant_id: TENANT_ID }),
+      }),
+    );
+    expect(mockCrmAlertCreate.mock.calls[0][0].metadata.customer_id).toBeUndefined();
   });
 
   it('flips directory_seed → independent standing mode on success', async () => {
