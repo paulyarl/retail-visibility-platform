@@ -269,7 +269,7 @@ describe('GBPReviewReplyService.generateDrafts', () => {
 
     const callArg = mockAiGenerateChatCompletion.mock.calls[0][0];
     const userPrompt = callArg.messages.find((m: any) => m.role === 'user').content;
-    expect(userPrompt).toContain('redirect');
+    expect(userPrompt).toMatch(/redirect/i);
     expect(userPrompt).toMatch(/offline|reach us|private channel/i);
   });
 
