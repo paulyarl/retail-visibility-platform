@@ -173,6 +173,25 @@ SELECT * FROM bsaas_catalog WHERE feature_key = '<your_feature_key>';
 - `082_supplier_catalog_capability.sql` — Initial setup, enabled for all tiers
 - `083_supplier_catalog_tier_strategy.sql` — Applies three-tier pattern: removes lower-tier assignments, adds BSaaS catalog entry
 
+## Worked Example: GBP Management Suite
+
+**Capability type**: `gbp_management`
+**Feature keys**: `gbp_ai_response`, `gbp_posts_scheduler`, `gbp_directory_reviews`, `gbp_directory_content`, `gbp_management_flexible`
+
+| Tier Category | Tiers | How They Get It |
+|---------------|-------|-----------------|
+| Flexible | `full_retail_visibility` | Automatic via `gbp_management_flexible` — resolver auto-unlocks all 4 features |
+| BSaaS Purchasable | All other tiers | Individual features ($9–$29/mo) or flexible bundle ($49/mo, best value) via Feature Store |
+
+**Migration files**:
+- `243_gbp_management_capability.sql` — Registers capability type + 5 feature keys + capability-feature links
+- `244_gbp_management_tier_bsaas.sql` — Assigns `gbp_management_flexible` to `full_retail_visibility` + creates 5 BSaaS catalog entries
+- `245_tenant_gbp_options_settings.sql` — Merchant gate toggles (`gbp_reviews_display`, `gbp_content_display`)
+
+**R33 pattern**: `GbpManagementResolver.ts` uses `can_show_reviews` / `can_show_content` (tier-level, never gated by merchant prefs) vs `reviews_enabled` / `content_enabled` (effective state = hard AND soft gate). This naming convention makes the two-gate boundary explicit in the type signature.
+
+**Public surfacing**: Public endpoints (`/api/public/directory/:slug/gbp-*`) enforce both gates — return `{ enabled: false }` when either gate fails, and only expose public-safe fields (no sentiment, AI drafts, dispute status, or internal lifecycle fields).
+
 ## Architectural Insights
 
 ### The Platform Engineer's Decision Space
