@@ -23,7 +23,7 @@ const GBP_POSTS_API = 'https://mybusiness.googleapis.com/v4';
 // TOKEN MANAGEMENT
 // ============================================================================
 
-async function getValidAccessToken(tenantId: string): Promise<string | null> {
+export async function getValidAccessToken(tenantId: string): Promise<string | null> {
   try {
     // First, try the unified OAuth token store
     const account = await prisma.google_oauth_accounts_list.findFirst({
@@ -109,7 +109,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
   }
 }
 
-async function getLinkedLocation(tenantId: string): Promise<{ locationId: string; accountId: string } | null> {
+export async function getLinkedLocation(tenantId: string): Promise<{ locationId: string; accountId: string } | null> {
   try {
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },

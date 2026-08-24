@@ -382,24 +382,16 @@ export class IntelligenceProfileService extends BaseService {
           return exact as IntelligenceProfile;
         }
 
-        // 4. Fallback: category-only match (legacy / pre-Migration-202 behavior)
-        const fallback = await this.prisma.mkt_intelligence_profiles.findFirst({
-          where: { category_key: key, status: 'active' },
-          orderBy: { version: 'desc' },
-        });
-        if (fallback) {
-          logger.warn(
-            'Intelligence profile resolved via focus fallback — type mismatch possible',
-            ctx,
-            {
-              categoryKey: key,
-              requestedFocus: focus,
-              resolvedFocus: (fallback as any).intelligence_focus,
-              profileId: (fallback as any).id,
-            },
-          );
-        }
-        return fallback as IntelligenceProfile | null;
+        // 4. No focus-matched profile found. Do NOT fall back to a
+        //    category-only match that ignores focus — that would return a
+        //    profile of a different intelligence type (e.g. an 'emerging'
+        //    profile masquerading as 'gold_standards'), which is a type
+        //    contamination bug. When a focus is explicitly requested, a
+        //    miss must return null so the caller falls back to
+        //    intelligence_mode: 'none' rather than running on a profile of
+        //    the wrong type. The category-only fallback for the no-focus
+        //    (business-scope §1B) path is handled below at step 5.
+        return null;
       }
 
       // 5. No focus requested (business-scope §1B path) — category-only match.

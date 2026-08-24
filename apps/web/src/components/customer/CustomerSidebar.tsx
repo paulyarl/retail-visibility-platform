@@ -19,6 +19,7 @@ import {
   LifeBuoy,
   Palette,
   ShoppingBag,
+  Building2,
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,11 @@ const platformNavItems = [
   { href: '/account/marketing/support', label: 'Support', icon: LifeBuoy },
   { href: '/account/marketing/alerts', label: 'Service Alerts', icon: Bell },
   { href: '/account/marketing/settings', label: 'Branding', icon: Palette },
+];
+
+// Google Business group — visible when contexts.platform is true (Phase 1)
+const gbpNavItems = [
+  { href: '/account/marketing/gbp', label: 'GBP Dashboard', icon: Building2 },
 ];
 
 // Context-agnostic items (§7.8) — visible in either context
@@ -147,6 +153,16 @@ export function CustomerSidebar() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Services</p>
             </div>
             {platformNavItems.map(renderNavItem)}
+          </>
+        )}
+
+        {/* Google Business group — visible when contexts.platform is true (Phase 1) */}
+        {contexts?.platform && (
+          <>
+            <div className="pt-4 pb-1 px-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Google Business</p>
+            </div>
+            {gbpNavItems.map(renderNavItem)}
           </>
         )}
 

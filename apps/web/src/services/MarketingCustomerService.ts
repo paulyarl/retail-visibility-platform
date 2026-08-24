@@ -171,6 +171,34 @@ export interface CheckoutConfirmResult {
   gatewayTransactionId: string;
 }
 
+// ── GBP Management Suite types (Phase 1) ────────────────────────────────
+
+export interface GbpLocationInfo {
+  id: string;
+  locationName: string;
+  businessName: string | null;
+  verificationState: string;
+  cachedAverageRating: number | null;
+  cachedReviewCount: number | null;
+  ratingCacheUpdated: string | null;
+  address: string | null;
+  phone: string | null;
+  websiteUrl: string | null;
+  category: string | null;
+}
+
+export interface GbpStatusResponse {
+  tenantId: string;
+  connected: boolean;
+  location: GbpLocationInfo | null;
+}
+
+export interface GbpVerificationOption {
+  method: string;
+  label: string;
+  data?: Record<string, any>;
+}
+
 // ── Service ─────────────────────────────────────────────────────────────
 
 class MarketingCustomerService extends CustomerApiSingleton {
@@ -484,6 +512,59 @@ class MarketingCustomerService extends CustomerApiSingleton {
     );
     if (!result.success) throw new Error(this.errMsg(result, 'Failed to confirm checkout'));
     await this.invalidateServiceCaches();
+    return result.data?.data ?? result.data;
+  }
+
+  // ── GBP Management Suite (Phase 1) ─────────────────────────────────────
+
+  async getGbpStatus(): Promise<GbpStatusResponse> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/status',
+      {},
+      'marketing-portal-gbp-status',
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load GBP status'));
+    return result.data?.data ?? result.data;
+  }
+
+  async getVerificationOptions(): Promise<GbpVerificationOption[]> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/verification/options',
+      {},
+      'marketing-portal-gbp-verification-options',
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load verification options'));
+    return result.data?.data?.options ?? [];
+  }
+
+  async startVerification(option: GbpVerificationOption): Promise<{ pending: boolean; verificationId?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/verification/start',
+      {
+        method: 'POST',
+        body: JSON.stringify(option),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to start verification'));
+    await this.invalidateCache('marketing-portal-gbp-status');
+    return result.data?.data ?? result.data;
+  }
+
+  async completeVerification(pin: string): Promise<{ verified: boolean; message?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/verification/complete',
+      {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to complete verification'));
+    await this.invalidateCache('marketing-portal-gbp-status');
     return result.data?.data ?? result.data;
   }
 }

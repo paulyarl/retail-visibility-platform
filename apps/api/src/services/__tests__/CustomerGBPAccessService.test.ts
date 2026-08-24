@@ -32,7 +32,7 @@ const {
   mockGbpLinksUpsert: vi.fn(),
 }));
 
-vi.mock('../prisma', () => ({
+vi.mock('../../prisma', () => ({
   prisma: {
     mkt_customer_gbp_links: {
       findFirst: mockGbpLinksFindFirst,
@@ -48,16 +48,16 @@ vi.mock('../prisma', () => ({
   },
 }));
 
-vi.mock('../logger', () => ({
+vi.mock('../../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 // Mock id-generator (used by provisionLink)
-vi.mock('../lib/id-generator', () => ({
+vi.mock('../../lib/id-generator', () => ({
   generateQuickStart: vi.fn().mockReturnValue('gbpl-TEST1234'),
 }));
 
-import { CustomerGBPAccessService, GbpLinkNotFoundError, GbpLocationNotFoundError, MultipleGbpLocationsError } from '../services/CustomerGBPAccessService';
+import { CustomerGBPAccessService, GbpLinkNotFoundError, GbpLocationNotFoundError, MultipleGbpLocationsError } from '../CustomerGBPAccessService';
 
 // ── Test data ────────────────────────────────────────────────────────────
 

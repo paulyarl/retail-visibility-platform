@@ -26,6 +26,9 @@ const {
   mockGbpLocationsFindMany,
   mockGbpLocationsUpdateMany,
   mockOauthAccountsFindFirst,
+  mockFetchOptions,
+  mockStartVerification,
+  mockCompleteVerification,
 } = vi.hoisted(() => ({
   mockVerifyAccessToken: vi.fn(),
   mockComputeContexts: vi.fn(),
@@ -33,6 +36,9 @@ const {
   mockGbpLocationsFindMany: vi.fn(),
   mockGbpLocationsUpdateMany: vi.fn(),
   mockOauthAccountsFindFirst: vi.fn(),
+  mockFetchOptions: vi.fn(),
+  mockStartVerification: vi.fn(),
+  mockCompleteVerification: vi.fn(),
 }));
 
 vi.mock('../services/CustomerTokenService', () => ({
@@ -76,6 +82,16 @@ vi.mock('../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock('../services/GBPVerificationService', () => ({
+  GBPVerificationService: {
+    getInstance: () => ({
+      fetchOptions: mockFetchOptions,
+      start: mockStartVerification,
+      complete: mockCompleteVerification,
+    }),
+  },
+}));
+
 vi.mock('../lib/id-generator', () => ({
   generateQuickStart: vi.fn().mockReturnValue('gbpl-TEST1234'),
 }));
@@ -101,6 +117,14 @@ beforeEach(() => {
   // Default: no drift reconciliation
   mockOauthAccountsFindFirst.mockResolvedValue(null);
   mockGbpLocationsUpdateMany.mockResolvedValue({ count: 0 });
+  // Default: bridge link exists
+  mockGbpLinksFindFirst.mockResolvedValue({
+    id: 'gbpl-001',
+    customer_id: PLATFORM_CUSTOMER_ID,
+    tenant_id: TENANT_ID,
+  });
+  // Default: no locations
+  mockGbpLocationsFindMany.mockResolvedValue([]);
 });
 
 // ── Auth tests ──────────────────────────────────────────────────────────
@@ -218,5 +242,86 @@ describe('gbp-customer routes — GET /status', () => {
     expect(res.body.data.tenantId).toBe(TENANT_ID);
     expect(res.body.data.connected).toBe(false);
     expect(res.body.data.location).toBeNull();
+  });
+});
+
+// ── /verification/* tests (Phase 1) ──────────────────────────────────────
+
+describe('gbp-customer routes — GET /verification/options', () => {
+  it('returns 200 with options array', async () => {
+    mockFetchOptions.mockResolvedValue({
+      success: true,
+      options: [
+        { method: 'SMS', label: 'Text message (SMS)', data: {} },
+        { method: 'MAIL', label: 'Postcard by mail', data: {} },
+      ],
+    });
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/verification/options')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.options).toHaveLength(2);
+    expect(res.body.data.options[0].method).toBe('SMS');
+  });
+});
+
+describe('gbp-customer routes — POST /verification/start', () => {
+  it('returns 200 with pending status', async () => {
+    mockStartVerification.mockResolvedValue({
+      success: true,
+      pending: true,
+      verificationId: 'verifications/123',
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/verification/start')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ method: 'SMS', label: 'Text message (SMS)' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.pending).toBe(true);
+    expect(res.body.data.verificationId).toBe('verifications/123');
+  });
+
+  it('returns 400 when method is missing', async () => {
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/verification/start')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_request');
+  });
+});
+
+describe('gbp-customer routes — POST /verification/complete', () => {
+  it('returns 200 with verified status on success', async () => {
+    mockCompleteVerification.mockResolvedValue({
+      success: true,
+      verified: true,
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/verification/complete')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ pin: '123456' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.verified).toBe(true);
+  });
+
+  it('returns 400 when PIN is missing', async () => {
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/verification/complete')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_request');
   });
 });
