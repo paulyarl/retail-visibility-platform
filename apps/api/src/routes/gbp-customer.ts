@@ -30,6 +30,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
 import { logger } from '../logger';
 import { prisma } from '../prisma';
 import { CustomerTokenService } from '../services/CustomerTokenService';
@@ -38,7 +39,9 @@ import { CustomerGBPAccessService } from '../services/CustomerGBPAccessService';
 import { GBPVerificationService } from '../services/GBPVerificationService';
 import { GBPReviewReplyService } from '../services/GBPReviewReplyService';
 import { DisputeIntakeService } from '../services/DisputeIntakeService';
-import { replyToReview } from '../services/GBPAdvancedSync';
+import { replyToReview, createPost, deletePost, listMedia, uploadPhoto, uploadPhotoBinary } from '../services/GBPAdvancedSync';
+import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
+import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
@@ -47,6 +50,13 @@ const customerGbpAccessService = CustomerGBPAccessService.getInstance();
 const gbpVerificationService = GBPVerificationService.getInstance();
 const gbpReviewReplyService = GBPReviewReplyService.getInstance();
 const disputeIntakeService = DisputeIntakeService.getInstance();
+const intelligenceProfileService = IntelligenceProfileService.getInstance();
+
+// Multer config for binary media uploads — memory storage, 10MB limit
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 // ── Auth middleware (same pattern as marketing-customer.ts) ───────────────
 
@@ -473,12 +483,356 @@ router.post('/reviews/:id/dispute', requireCustomerAuth, requirePlatformContext,
   }
 });
 
-// ── Phase 3 stubs (Post Publisher & Media Manager) ────────────────────────
+// ── Phase 3 endpoints (Post Publisher & Media Manager) ───────────────────
 
-router.get('/posts', requireCustomerAuth, requirePlatformContext, notImplemented('List posts'));
-router.post('/posts', requireCustomerAuth, requirePlatformContext, notImplemented('Create post'));
-router.delete('/posts/:id', requireCustomerAuth, requirePlatformContext, notImplemented('Delete post'));
-router.get('/media', requireCustomerAuth, requirePlatformContext, notImplemented('List media'));
-router.post('/media/upload', requireCustomerAuth, requirePlatformContext, notImplemented('Upload media'));
+// GET /posts — list posts from gbp_posts (paginated, filtered by status/type)
+
+const listPostsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['PUBLISHED', 'SCHEDULED', 'FAILED']).optional(),
+  topicType: z.enum(['STANDARD', 'EVENT', 'OFFER']).optional(),
+});
+
+router.get('/posts', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    const parsed = listPostsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'Invalid query parameters' });
+    }
+
+    const { page, pageSize, status, topicType } = parsed.data;
+    const where: any = { tenant_id: tenantId };
+    if (status !== undefined) where.status = status;
+    if (topicType !== undefined) where.topic_type = topicType;
+
+    const [posts, total] = await Promise.all([
+      prisma.gbp_posts.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.gbp_posts.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        posts,
+        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+      },
+    });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] GET /posts error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'posts_list_failed', message: 'Failed to list posts' });
+  }
+});
+
+// POST /posts — create post (immediate publish OR schedule for later)
+
+const createPostSchema = z.object({
+  summary: z.string().min(1).max(1000),
+  topicType: z.enum(['STANDARD', 'EVENT', 'OFFER']).default('STANDARD'),
+  callToActionType: z.enum(['BOOK', 'ORDER', 'SHOP', 'LEARN_MORE', 'SIGN_UP', 'CALL']).optional(),
+  callToActionUrl: z.string().url().optional(),
+  mediaUrl: z.string().url().optional(),
+  eventTitle: z.string().max(255).optional(),
+  eventStartDate: z.string().datetime().optional(),
+  eventEndDate: z.string().datetime().optional(),
+  offerCouponCode: z.string().max(100).optional(),
+  offerRedeemUrl: z.string().url().optional(),
+  offerTerms: z.string().optional(),
+  scheduledFor: z.string().datetime().optional(),
+});
+
+router.post('/posts', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    const parsed = createPostSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'Invalid post payload', details: parsed.error.flatten() });
+    }
+
+    const data = parsed.data;
+    const postId = `post_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // If scheduledFor is present, check gbp_posts_scheduler entitlement
+    if (data.scheduledFor) {
+      const entitled = await permissionServiceFactory.hasFeature(tenantId, 'gbp_posts_scheduler');
+      if (!entitled) {
+        return res.status(403).json({ success: false, error: 'scheduling_not_entitled', message: 'Post scheduling requires the GBP Posts Scheduler capability' });
+      }
+
+      // Insert as SCHEDULED — cron will pick it up
+      const post = await prisma.gbp_posts.create({
+        data: {
+          id: postId,
+          tenant_id: tenantId,
+          summary: data.summary,
+          topic_type: data.topicType,
+          call_to_action_type: data.callToActionType || null,
+          call_to_action_url: data.callToActionUrl || null,
+          media_url: data.mediaUrl || null,
+          event_title: data.eventTitle || null,
+          event_start_date: data.eventStartDate ? new Date(data.eventStartDate) : null,
+          event_end_date: data.eventEndDate ? new Date(data.eventEndDate) : null,
+          offer_coupon_code: data.offerCouponCode || null,
+          offer_redeem_url: data.offerRedeemUrl || null,
+          offer_terms: data.offerTerms || null,
+          status: 'SCHEDULED',
+          scheduled_for: new Date(data.scheduledFor),
+        },
+      });
+
+      return res.json({ success: true, data: { post, scheduled: true } });
+    }
+
+    // Immediate publish via Google API
+    const gbpPost = {
+      summary: data.summary,
+      topicType: data.topicType,
+      ...(data.callToActionType && data.callToActionUrl
+        ? { callToAction: { actionType: data.callToActionType, url: data.callToActionUrl } }
+        : {}),
+      ...(data.mediaUrl ? { media: [{ sourceUrl: data.mediaUrl, mediaFormat: 'PHOTO' as const }] } : {}),
+      ...(data.eventTitle && data.eventStartDate && data.eventEndDate
+        ? {
+            event: {
+              title: data.eventTitle,
+              schedule: {
+                startDate: { year: new Date(data.eventStartDate).getFullYear(), month: new Date(data.eventStartDate).getMonth() + 1, day: new Date(data.eventStartDate).getDate() },
+                endDate: { year: new Date(data.eventEndDate).getFullYear(), month: new Date(data.eventEndDate).getMonth() + 1, day: new Date(data.eventEndDate).getDate() },
+              },
+            },
+          }
+        : {}),
+      ...(data.offerCouponCode || data.offerRedeemUrl
+        ? { offer: { couponCode: data.offerCouponCode, redeemOnlineUrl: data.offerRedeemUrl, termsConditions: data.offerTerms } }
+        : {}),
+    };
+
+    const result = await createPost(tenantId, gbpPost);
+    if (!result.success) {
+      return res.status(502).json({ success: false, error: 'publish_failed', message: result.error || 'Failed to publish post' });
+    }
+
+    // Store in gbp_posts with PUBLISHED status
+    const post = await prisma.gbp_posts.create({
+      data: {
+        id: postId,
+        tenant_id: tenantId,
+        summary: data.summary,
+        topic_type: data.topicType,
+        call_to_action_type: data.callToActionType || null,
+        call_to_action_url: data.callToActionUrl || null,
+        media_url: data.mediaUrl || null,
+        event_title: data.eventTitle || null,
+        event_start_date: data.eventStartDate ? new Date(data.eventStartDate) : null,
+        event_end_date: data.eventEndDate ? new Date(data.eventEndDate) : null,
+        offer_coupon_code: data.offerCouponCode || null,
+        offer_redeem_url: data.offerRedeemUrl || null,
+        offer_terms: data.offerTerms || null,
+        status: 'PUBLISHED',
+        published_at: new Date(),
+        post_name: result.postId || null,
+        google_post_id: result.postId || null,
+      },
+    });
+
+    res.json({ success: true, data: { post, scheduled: false } });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] POST /posts error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'post_create_failed', message: 'Failed to create post' });
+  }
+});
+
+// DELETE /posts/:id — delete post from Google + database
+
+router.delete('/posts/:id', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+    const postId = req.params.id;
+
+    const post = await prisma.gbp_posts.findFirst({
+      where: { id: postId, tenant_id: tenantId },
+    });
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'post_not_found', message: 'Post not found' });
+    }
+
+    // If published to Google, delete from Google first
+    if (post.status === 'PUBLISHED' && post.post_name) {
+      const result = await deletePost(tenantId, post.post_name);
+      if (!result.success) {
+        logger.warn('[gbp-customer] Google deletePost failed — proceeding with DB delete', undefined, { error: result.error });
+      }
+    }
+
+    await prisma.gbp_posts.delete({ where: { id: postId } });
+
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] DELETE /posts/:id error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'post_delete_failed', message: 'Failed to delete post' });
+  }
+});
+
+// GET /media — list media from Google + Gold Standard benchmark
+
+router.get('/media', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    // Fetch media from Google
+    const mediaResult = await listMedia(tenantId);
+
+    // Fetch Gold Standard benchmark for the tenant's category
+    let benchmark: { expectedPhotoCount: number | null; currentPhotoCount: number } | null = null;
+    try {
+      const location = await prisma.gbp_locations_list.findFirst({
+        where: { tenant_id: tenantId },
+        select: { category: true },
+      });
+      if (location?.category) {
+        const goldStandard = await intelligenceProfileService.resolveGoldStandard(location.category, 'google');
+        if (goldStandard) {
+          const config = goldStandard.configuration_json as any;
+          const expectedPhotoCount = config?.expected_fields?.platforms?.google?.expected_photo_count
+            ?? config?.expected_fields?.platforms?.google?.branding_expectations?.photo_count
+            ?? null;
+          benchmark = {
+            expectedPhotoCount,
+            currentPhotoCount: mediaResult.media?.length || 0,
+          };
+        }
+      }
+    } catch (benchmarkError) {
+      logger.warn('[gbp-customer] Gold Standard benchmark lookup failed — continuing without benchmark', undefined, {
+        error: (benchmarkError as Error).message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        media: mediaResult.media || [],
+        benchmark,
+      },
+    });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] GET /media error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'media_list_failed', message: 'Failed to list media' });
+  }
+});
+
+// POST /media/upload — upload photo (sourceUrl OR binary)
+
+const uploadMediaSchema = z.object({
+  sourceUrl: z.string().url().optional(),
+  category: z.enum(['COVER', 'PROFILE', 'LOGO', 'EXTERIOR', 'INTERIOR', 'PRODUCT', 'AT_WORK', 'FOOD_AND_DRINK', 'MENU', 'COMMON_AREA', 'ROOMS', 'TEAMS', 'ADDITIONAL']).default('ADDITIONAL'),
+  description: z.string().max(500).optional(),
+});
+
+router.post('/media/upload', requireCustomerAuth, requirePlatformContext, mediaUpload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    // Check if this is a multipart upload (binary) or JSON (sourceUrl)
+    const isMultipart = req.headers['content-type']?.startsWith('multipart/form-data');
+
+    if (isMultipart && (req as any).file) {
+      // Binary upload path
+      const file = (req as any).file;
+      const result = await uploadPhotoBinary(
+        tenantId,
+        file.buffer,
+        file.mimetype,
+        (req.body?.category as any) || 'ADDITIONAL',
+        req.body?.description,
+      );
+
+      if (!result.success) {
+        return res.status(502).json({ success: false, error: 'upload_failed', message: result.error || 'Failed to upload photo' });
+      }
+
+      // Store in gbp_media
+      const mediaId = `media_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await prisma.gbp_media.create({
+        data: {
+          id: mediaId,
+          tenant_id: tenantId,
+          google_media_id: result.mediaItemId || null,
+          media_format: 'photo',
+          category: (req.body?.category as string) || 'additional',
+          description: req.body?.description || null,
+          is_active: true,
+        },
+      });
+
+      return res.json({ success: true, data: { mediaItemId: result.mediaItemId, mediaId } });
+    }
+
+    // JSON path (sourceUrl)
+    const parsed = uploadMediaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'sourceUrl is required for URL-based upload', details: parsed.error.flatten() });
+    }
+
+    const data = parsed.data;
+    if (!data.sourceUrl) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'Either sourceUrl (JSON) or a file (multipart) is required' });
+    }
+
+    const result = await uploadPhoto(tenantId, data.sourceUrl, data.category as any, data.description);
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, error: 'upload_failed', message: result.error || 'Failed to upload photo' });
+    }
+
+    // Store in gbp_media
+    const mediaId = `media_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await prisma.gbp_media.create({
+      data: {
+        id: mediaId,
+        tenant_id: tenantId,
+        google_media_id: result.mediaItemId || null,
+        media_format: 'photo',
+        category: data.category.toLowerCase(),
+        source_url: data.sourceUrl,
+        description: data.description || null,
+        is_active: true,
+      },
+    });
+
+    res.json({ success: true, data: { mediaItemId: result.mediaItemId, mediaId } });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] POST /media/upload error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'upload_failed', message: 'Failed to upload media' });
+  }
+});
 
 export default router;

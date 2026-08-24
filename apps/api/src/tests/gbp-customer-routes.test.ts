@@ -38,6 +38,20 @@ const {
   mockReplyToReview,
   mockGenerateIntakeLink,
   mockSubmitRegistryIntake,
+  mockGbpPostsFindFirst,
+  mockGbpPostsFindMany,
+  mockGbpPostsCount,
+  mockGbpPostsCreate,
+  mockGbpPostsDelete,
+  mockGbpMediaCreate,
+  mockGbpLocationsFindFirstForMedia,
+  mockCreatePost,
+  mockDeletePost,
+  mockListMedia,
+  mockUploadPhoto,
+  mockUploadPhotoBinary,
+  mockHasFeature,
+  mockResolveGoldStandard,
 } = vi.hoisted(() => ({
   mockVerifyAccessToken: vi.fn(),
   mockComputeContexts: vi.fn(),
@@ -57,6 +71,20 @@ const {
   mockReplyToReview: vi.fn(),
   mockGenerateIntakeLink: vi.fn(),
   mockSubmitRegistryIntake: vi.fn(),
+  mockGbpPostsFindFirst: vi.fn(),
+  mockGbpPostsFindMany: vi.fn(),
+  mockGbpPostsCount: vi.fn(),
+  mockGbpPostsCreate: vi.fn(),
+  mockGbpPostsDelete: vi.fn(),
+  mockGbpMediaCreate: vi.fn(),
+  mockGbpLocationsFindFirstForMedia: vi.fn(),
+  mockCreatePost: vi.fn(),
+  mockDeletePost: vi.fn(),
+  mockListMedia: vi.fn(),
+  mockUploadPhoto: vi.fn(),
+  mockUploadPhotoBinary: vi.fn(),
+  mockHasFeature: vi.fn(),
+  mockResolveGoldStandard: vi.fn(),
 }));
 
 vi.mock('../services/CustomerTokenService', () => ({
@@ -88,7 +116,7 @@ vi.mock('../prisma', () => ({
     },
     gbp_locations_list: {
       findMany: mockGbpLocationsFindMany,
-      findFirst: vi.fn().mockResolvedValue(null),
+      findFirst: mockGbpLocationsFindFirstForMedia,
       updateMany: mockGbpLocationsUpdateMany,
     },
     google_oauth_accounts_list: {
@@ -99,6 +127,16 @@ vi.mock('../prisma', () => ({
       findMany: mockGbpReviewsFindMany,
       count: mockGbpReviewsCount,
       update: mockGbpReviewsUpdate,
+    },
+    gbp_posts: {
+      findFirst: mockGbpPostsFindFirst,
+      findMany: mockGbpPostsFindMany,
+      count: mockGbpPostsCount,
+      create: mockGbpPostsCreate,
+      delete: mockGbpPostsDelete,
+    },
+    gbp_media: {
+      create: mockGbpMediaCreate,
     },
     mkt_campaigns_list: {
       findFirst: mockMktCampaignsFindFirst,
@@ -130,6 +168,25 @@ vi.mock('../services/GBPReviewReplyService', () => ({
 
 vi.mock('../services/GBPAdvancedSync', () => ({
   replyToReview: mockReplyToReview,
+  createPost: mockCreatePost,
+  deletePost: mockDeletePost,
+  listMedia: mockListMedia,
+  uploadPhoto: mockUploadPhoto,
+  uploadPhotoBinary: mockUploadPhotoBinary,
+}));
+
+vi.mock('../services/intelligence/IntelligenceProfileService', () => ({
+  IntelligenceProfileService: {
+    getInstance: () => ({
+      resolveGoldStandard: mockResolveGoldStandard,
+    }),
+  },
+}));
+
+vi.mock('../services/permissions/PermissionServiceFactory', () => ({
+  permissionServiceFactory: {
+    hasFeature: mockHasFeature,
+  },
 }));
 
 vi.mock('../services/DisputeIntakeService', () => ({
@@ -500,5 +557,170 @@ describe('gbp-customer routes — POST /reviews/:id/dispute', () => {
       where: { id: 'rev-001' },
       data: expect.objectContaining({ reply_status: 'DISPUTED' }),
     });
+  });
+});
+
+// ── /posts/* and /media/* tests (Phase 3) ────────────────────────────────
+
+describe('gbp-customer routes — GET /posts', () => {
+  it('returns 200 with paginated posts', async () => {
+    mockGbpPostsFindMany.mockResolvedValue([
+      { id: 'post-001', tenant_id: TENANT_ID, summary: 'Hello!', status: 'PUBLISHED', topic_type: 'STANDARD' },
+      { id: 'post-002', tenant_id: TENANT_ID, summary: 'Sale!', status: 'SCHEDULED', topic_type: 'OFFER' },
+    ]);
+    mockGbpPostsCount.mockResolvedValue(2);
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/posts?page=1&pageSize=20')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.posts).toHaveLength(2);
+    expect(res.body.data.pagination.total).toBe(2);
+  });
+});
+
+describe('gbp-customer routes — POST /posts (immediate)', () => {
+  it('returns 200, status = PUBLISHED (immediate publish)', async () => {
+    mockCreatePost.mockResolvedValue({ success: true, postId: 'google_post_123' });
+    mockGbpPostsCreate.mockResolvedValue({
+      id: 'post-001',
+      tenant_id: TENANT_ID,
+      summary: 'Test post',
+      status: 'PUBLISHED',
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/posts')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ summary: 'Test post', topicType: 'STANDARD' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.scheduled).toBe(false);
+    expect(mockCreatePost).toHaveBeenCalled();
+  });
+});
+
+describe('gbp-customer routes — POST /posts (scheduled)', () => {
+  it('returns 200, status = SCHEDULED (requires gbp_posts_scheduler)', async () => {
+    mockHasFeature.mockResolvedValue(true);
+    mockGbpPostsCreate.mockResolvedValue({
+      id: 'post-002',
+      tenant_id: TENANT_ID,
+      summary: 'Scheduled post',
+      status: 'SCHEDULED',
+      scheduled_for: '2026-12-25T00:00:00.000Z',
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/posts')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({
+        summary: 'Scheduled post',
+        topicType: 'STANDARD',
+        scheduledFor: '2026-12-25T00:00:00.000Z',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.scheduled).toBe(true);
+    expect(mockCreatePost).not.toHaveBeenCalled(); // Should NOT publish immediately
+  });
+
+  it('returns 403 when scheduling without gbp_posts_scheduler entitlement', async () => {
+    mockHasFeature.mockResolvedValue(false);
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/posts')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({
+        summary: 'Scheduled post',
+        topicType: 'STANDARD',
+        scheduledFor: '2026-12-25T00:00:00.000Z',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('scheduling_not_entitled');
+  });
+});
+
+describe('gbp-customer routes — DELETE /posts/:id', () => {
+  it('returns 200, post deleted', async () => {
+    mockGbpPostsFindFirst.mockResolvedValue({
+      id: 'post-001',
+      tenant_id: TENANT_ID,
+      status: 'PUBLISHED',
+      post_name: 'accounts/123/locations/456/localPosts/789',
+    });
+    mockDeletePost.mockResolvedValue({ success: true });
+    mockGbpPostsDelete.mockResolvedValue({});
+
+    const res = await request(app)
+      .delete('/api/customer/marketing/gbp/posts/post-001')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.deleted).toBe(true);
+    expect(mockDeletePost).toHaveBeenCalled();
+    expect(mockGbpPostsDelete).toHaveBeenCalled();
+  });
+});
+
+describe('gbp-customer routes — GET /media', () => {
+  it('returns 200 with media list + benchmark', async () => {
+    mockListMedia.mockResolvedValue({
+      success: true,
+      media: [
+        { mediaFormat: 'PHOTO', sourceUrl: 'https://example.com/1.jpg', locationAssociation: { category: 'EXTERIOR' } },
+        { mediaFormat: 'PHOTO', sourceUrl: 'https://example.com/2.jpg', locationAssociation: { category: 'INTERIOR' } },
+      ],
+    });
+    mockGbpLocationsFindFirstForMedia.mockResolvedValue({ category: 'restaurant' });
+    mockResolveGoldStandard.mockResolvedValue({
+      id: 'gs-001',
+      category_name: 'restaurant',
+      configuration_json: {
+        expected_fields: {
+          platforms: {
+            google: { expected_photo_count: 10 },
+          },
+        },
+      },
+    });
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/media')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.media).toHaveLength(2);
+    expect(res.body.data.benchmark).not.toBeNull();
+    expect(res.body.data.benchmark.expectedPhotoCount).toBe(10);
+    expect(res.body.data.benchmark.currentPhotoCount).toBe(2);
+  });
+});
+
+describe('gbp-customer routes — POST /media/upload (sourceUrl)', () => {
+  it('returns 200 with mediaItemId', async () => {
+    mockUploadPhoto.mockResolvedValue({ success: true, mediaItemId: 'media_123' });
+    mockGbpMediaCreate.mockResolvedValue({});
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/media/upload')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({
+        sourceUrl: 'https://example.com/photo.jpg',
+        category: 'EXTERIOR',
+        description: 'Storefront',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.mediaItemId).toBe('media_123');
+    expect(mockUploadPhoto).toHaveBeenCalled();
   });
 });

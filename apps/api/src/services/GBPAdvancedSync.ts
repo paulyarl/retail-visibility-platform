@@ -251,6 +251,105 @@ export async function uploadPhoto(
 }
 
 /**
+ * Upload a photo to GBP via the two-step binary upload flow.
+ *
+ * Google's two-step upload:
+ * 1. POST .../media:startUpload — returns an upload reference
+ * 2. PUT {upload_reference} — write binary bytes to the reference
+ * 3. POST .../media — create the media item from the upload reference
+ *
+ * Use this when the photo is not already hosted at a public URL (i.e., the
+ * merchant is uploading a file directly from their device).
+ */
+export async function uploadPhotoBinary(
+  tenantId: string,
+  binary: Buffer,
+  mimeType: string,
+  category: 'COVER' | 'PROFILE' | 'LOGO' | 'EXTERIOR' | 'INTERIOR' | 'PRODUCT' | 'AT_WORK' | 'FOOD_AND_DRINK' | 'MENU' | 'COMMON_AREA' | 'ROOMS' | 'TEAMS' | 'ADDITIONAL' = 'ADDITIONAL',
+  description?: string
+): Promise<MediaUploadResult> {
+  try {
+    const accessToken = await getValidAccessToken(tenantId);
+    if (!accessToken) {
+      return { success: false, error: 'No valid access token' };
+    }
+
+    const location = await getLinkedLocation(tenantId);
+    if (!location) {
+      return { success: false, error: 'No GBP location linked' };
+    }
+
+    const mediaBase = `${GBP_MEDIA_API}/accounts/${location.accountId}/locations/${location.locationId}/media`;
+
+    // Step 1: startUpload — get an upload reference
+    const startResponse = await fetch(`${mediaBase}:startUpload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!startResponse.ok) {
+      const errorText = await startResponse.text();
+      logger.error('[GBPAdvanced] startUpload failed', undefined, { status: startResponse.status, error: errorText });
+      return { success: false, error: `startUpload API error: ${startResponse.status}` };
+    }
+
+    const startResult = await startResponse.json() as { uploadReference?: string };
+    const uploadReference = startResult.uploadReference;
+    if (!uploadReference) {
+      return { success: false, error: 'No upload reference returned' };
+    }
+
+    // Step 2: PUT binary bytes to the upload reference
+    const putResponse = await fetch(uploadReference, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Length': String(binary.length),
+      },
+      body: binary,
+    });
+
+    if (!putResponse.ok) {
+      const errorText = await putResponse.text();
+      logger.error('[GBPAdvanced] binary PUT failed', undefined, { status: putResponse.status, error: errorText });
+      return { success: false, error: `binary PUT API error: ${putResponse.status}` };
+    }
+
+    // Step 3: create the media item from the upload reference
+    const createResponse = await fetch(mediaBase, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mediaFormat: 'PHOTO',
+        locationAssociation: { category },
+        description: description || undefined,
+        dataRef: { resource_name: uploadReference },
+      }),
+    });
+
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      logger.error('[GBPAdvanced] create media failed', undefined, { status: createResponse.status, error: errorText });
+      return { success: false, error: `create media API error: ${createResponse.status}` };
+    }
+
+    const createResult = await createResponse.json() as { name?: string };
+    console.log(`[GBPAdvanced] Binary-uploaded photo for tenant ${tenantId}`);
+    return { success: true, mediaItemId: createResult.name };
+  } catch (error: any) {
+    logger.error('[GBPAdvanced] Error in binary photo upload:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Delete a media item
  */
 export async function deleteMedia(

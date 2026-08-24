@@ -429,6 +429,17 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         logger.error('Failed to start GBP review ingestion job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
+
+      // Start GBP post scheduler (every 5min) — publishes due SCHEDULED posts
+      // to Google Business Profile. Only processes tenants with
+      // gbp_posts_scheduler entitlement.
+      try {
+        const { startGbpPostScheduler } = await import('./jobs/gbpPostScheduler');
+        startGbpPostScheduler();
+        logger.info('GBP post scheduler started (every 5min)');
+      } catch (err) {
+        logger.error('Failed to start GBP post scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
     });
 
     // Handle server errors

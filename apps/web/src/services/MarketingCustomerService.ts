@@ -249,6 +249,77 @@ export interface GbpDisputePayload {
   attachmentIds?: string[];
 }
 
+// ── GBP Management Suite types (Phase 3 — Post Publisher & Media Manager) ─
+
+export interface GbpPost {
+  id: string;
+  tenant_id: string;
+  google_post_id: string | null;
+  summary: string;
+  topic_type: string | null;
+  call_to_action_type: string | null;
+  call_to_action_url: string | null;
+  media_url: string | null;
+  event_title: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
+  offer_coupon_code: string | null;
+  offer_redeem_url: string | null;
+  offer_terms: string | null;
+  state: string | null;
+  status: string;
+  scheduled_for: string | null;
+  published_at: string | null;
+  post_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface GbpPostsListResponse {
+  posts: GbpPost[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface CreatePostPayload {
+  summary: string;
+  topicType?: 'STANDARD' | 'EVENT' | 'OFFER';
+  callToActionType?: 'BOOK' | 'ORDER' | 'SHOP' | 'LEARN_MORE' | 'SIGN_UP' | 'CALL';
+  callToActionUrl?: string;
+  mediaUrl?: string;
+  eventTitle?: string;
+  eventStartDate?: string;
+  eventEndDate?: string;
+  offerCouponCode?: string;
+  offerRedeemUrl?: string;
+  offerTerms?: string;
+  scheduledFor?: string;
+}
+
+export interface GbpMediaItem {
+  id?: string;
+  mediaFormat: string;
+  sourceUrl?: string;
+  locationAssociation?: { category: string };
+  description?: string;
+}
+
+export interface GbpMediaListResponse {
+  media: GbpMediaItem[];
+  benchmark: { expectedPhotoCount: number | null; currentPhotoCount: number } | null;
+}
+
+export interface UploadMediaPayload {
+  sourceUrl?: string;
+  category?: string;
+  description?: string;
+  file?: File;
+}
+
 // ── Service ─────────────────────────────────────────────────────────────
 
 class MarketingCustomerService extends CustomerApiSingleton {
@@ -684,6 +755,106 @@ class MarketingCustomerService extends CustomerApiSingleton {
     );
     if (!result.success) throw new Error(this.errMsg(result, 'Failed to submit dispute'));
     await this.invalidateCache('marketing-portal-gbp-reviews');
+    return result.data?.data ?? result.data;
+  }
+
+  // ── GBP Management Suite (Phase 3 — Post Publisher & Media Manager) ─────
+
+  async listPosts(params?: {
+    page?: number;
+    pageSize?: number;
+    status?: 'PUBLISHED' | 'SCHEDULED' | 'FAILED';
+    topicType?: 'STANDARD' | 'EVENT' | 'OFFER';
+  }): Promise<GbpPostsListResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.status) query.set('status', params.status);
+    if (params?.topicType) query.set('topicType', params.topicType);
+    const qs = query.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/gbp/posts${qs ? `?${qs}` : ''}`,
+      {},
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to list posts'));
+    return result.data?.data ?? result.data;
+  }
+
+  async createPost(payload: CreatePostPayload): Promise<{ post: GbpPost; scheduled: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/posts',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to create post'));
+    await this.invalidateCache('marketing-portal-gbp-posts');
+    return result.data?.data ?? result.data;
+  }
+
+  async deletePost(postId: string): Promise<{ deleted: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/gbp/posts/${postId}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to delete post'));
+    await this.invalidateCache('marketing-portal-gbp-posts');
+    return result.data?.data ?? result.data;
+  }
+
+  async listMedia(): Promise<GbpMediaListResponse> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/marketing/gbp/media',
+      {},
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to list media'));
+    return result.data?.data ?? result.data;
+  }
+
+  async uploadMedia(payload: UploadMediaPayload): Promise<{ mediaItemId: string; mediaId: string }> {
+    let result: any;
+    if (payload.file) {
+      // Binary upload — multipart
+      const formData = new FormData();
+      formData.append('file', payload.file);
+      if (payload.category) formData.append('category', payload.category);
+      if (payload.description) formData.append('description', payload.description);
+      result = await this.makeDefaultRequest<any>(
+        '/api/customer/marketing/gbp/media/upload',
+        {
+          method: 'POST',
+          body: formData,
+        },
+        undefined,
+        0,
+      );
+    } else {
+      // URL-based upload — JSON
+      result = await this.makeDefaultRequest<any>(
+        '/api/customer/marketing/gbp/media/upload',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            sourceUrl: payload.sourceUrl,
+            category: payload.category,
+            description: payload.description,
+          }),
+        },
+        undefined,
+        0,
+      );
+    }
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to upload media'));
+    await this.invalidateCache('marketing-portal-gbp-media');
     return result.data?.data ?? result.data;
   }
 }

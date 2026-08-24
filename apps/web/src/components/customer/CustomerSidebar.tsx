@@ -21,6 +21,8 @@ import {
   ShoppingBag,
   Building2,
   MessageSquare,
+  FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
@@ -46,6 +48,8 @@ const platformNavItems = [
 const gbpNavItems = [
   { href: '/account/marketing/gbp', label: 'GBP Dashboard', icon: Building2 },
   { href: '/account/marketing/gbp/reviews', label: 'Reviews', icon: MessageSquare },
+  { href: '/account/marketing/gbp/posts', label: 'Posts', icon: FileText },
+  { href: '/account/marketing/gbp/media', label: 'Media', icon: ImageIcon },
 ];
 
 // Context-agnostic items (§7.8) — visible in either context
