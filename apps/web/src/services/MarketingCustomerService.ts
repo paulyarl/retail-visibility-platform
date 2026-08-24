@@ -199,6 +199,56 @@ export interface GbpVerificationOption {
   data?: Record<string, any>;
 }
 
+// ── GBP Management Suite types (Phase 2 — Review Intelligence) ──────────
+
+export interface GbpReview {
+  id: string;
+  tenant_id: string;
+  google_review_id: string | null;
+  reviewer_name: string | null;
+  reviewer_photo_url: string | null;
+  star_rating: number | null;
+  comment: string | null;
+  review_reply: string | null;
+  reply_update_time: string | null;
+  google_create_time: string | null;
+  google_update_time: string | null;
+  is_replied: boolean | null;
+  location_id: string | null;
+  reply_status: string;
+  ai_drafts: AiDraft[] | null;
+  sentiment: string | null;
+}
+
+export interface AiDraft {
+  angle: string;
+  text: string;
+}
+
+export interface GbpReviewsListResponse {
+  reviews: GbpReview[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface GbpAiDraftResponse {
+  drafts: AiDraft[];
+  previewMode: boolean;
+  upgradeCta?: string;
+}
+
+export interface GbpDisputePayload {
+  ownerEmail: string;
+  ownerPhone?: string;
+  ownerStatement?: string;
+  evidencePayload: Record<string, any>;
+  attachmentIds?: string[];
+}
+
 // ── Service ─────────────────────────────────────────────────────────────
 
 class MarketingCustomerService extends CustomerApiSingleton {
@@ -565,6 +615,75 @@ class MarketingCustomerService extends CustomerApiSingleton {
     );
     if (!result.success) throw new Error(this.errMsg(result, 'Failed to complete verification'));
     await this.invalidateCache('marketing-portal-gbp-status');
+    return result.data?.data ?? result.data;
+  }
+
+  // ── GBP Management Suite (Phase 2 — Review Intelligence) ───────────────
+
+  async listReviews(params?: {
+    page?: number;
+    pageSize?: number;
+    rating?: number;
+    sentiment?: 'positive' | 'neutral' | 'negative';
+    replyStatus?: 'NONE' | 'AI_DRAFTED' | 'PUBLISHED' | 'FAILED' | 'DISPUTED';
+  }): Promise<GbpReviewsListResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.rating !== undefined) query.set('rating', String(params.rating));
+    if (params?.sentiment) query.set('sentiment', params.sentiment);
+    if (params?.replyStatus) query.set('replyStatus', params.replyStatus);
+    const qs = query.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/gbp/reviews${qs ? `?${qs}` : ''}`,
+      {},
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to list reviews'));
+    return result.data?.data ?? result.data;
+  }
+
+  async replyToReview(reviewId: string, comment: string): Promise<{ published: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/gbp/reviews/${reviewId}/reply`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ comment }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to publish reply'));
+    await this.invalidateCache('marketing-portal-gbp-reviews');
+    return result.data?.data ?? result.data;
+  }
+
+  async generateAiDraft(reviewId: string): Promise<GbpAiDraftResponse> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/gbp/reviews/${reviewId}/ai-draft`,
+      {
+        method: 'POST',
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to generate AI drafts'));
+    return result.data?.data ?? result.data;
+  }
+
+  async disputeReview(reviewId: string, payload: GbpDisputePayload): Promise<{ success: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/marketing/gbp/reviews/${reviewId}/dispute`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to submit dispute'));
+    await this.invalidateCache('marketing-portal-gbp-reviews');
     return result.data?.data ?? result.data;
   }
 }

@@ -20,6 +20,7 @@ import {
   Palette,
   ShoppingBag,
   Building2,
+  MessageSquare,
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,7 @@ const platformNavItems = [
 // Google Business group — visible when contexts.platform is true (Phase 1)
 const gbpNavItems = [
   { href: '/account/marketing/gbp', label: 'GBP Dashboard', icon: Building2 },
+  { href: '/account/marketing/gbp/reviews', label: 'Reviews', icon: MessageSquare },
 ];
 
 // Context-agnostic items (§7.8) — visible in either context

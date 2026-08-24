@@ -31,16 +31,22 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '../logger';
+import { prisma } from '../prisma';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerGBPAccessService } from '../services/CustomerGBPAccessService';
 import { GBPVerificationService } from '../services/GBPVerificationService';
+import { GBPReviewReplyService } from '../services/GBPReviewReplyService';
+import { DisputeIntakeService } from '../services/DisputeIntakeService';
+import { replyToReview } from '../services/GBPAdvancedSync';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
 const customerAuthService = CustomerAuthService.getInstance();
 const customerGbpAccessService = CustomerGBPAccessService.getInstance();
 const gbpVerificationService = GBPVerificationService.getInstance();
+const gbpReviewReplyService = GBPReviewReplyService.getInstance();
+const disputeIntakeService = DisputeIntakeService.getInstance();
 
 // ── Auth middleware (same pattern as marketing-customer.ts) ───────────────
 
@@ -231,12 +237,241 @@ router.post('/verification/complete', requireCustomerAuth, requirePlatformContex
   }
 });
 
-// ── Phase 2 stubs (Review Intelligence & Tier A Reply Engine) ──────────────
+// ── Phase 2 endpoints (Review Intelligence & Tier A Reply Engine) ─────────
 
-router.get('/reviews', requireCustomerAuth, requirePlatformContext, notImplemented('List reviews'));
-router.post('/reviews/:id/reply', requireCustomerAuth, requirePlatformContext, notImplemented('Reply to review'));
-router.post('/reviews/:id/ai-draft', requireCustomerAuth, requirePlatformContext, notImplemented('Generate AI draft'));
-router.post('/reviews/:id/dispute', requireCustomerAuth, requirePlatformContext, notImplemented('Dispute review'));
+// GET /reviews — list reviews from gbp_reviews (paginated, filtered)
+// Served from the database (kept fresh by the hourly ingestion cron), not
+// a live Google API call.
+
+const listReviewsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  sentiment: z.enum(['positive', 'neutral', 'negative']).optional(),
+  replyStatus: z.enum(['NONE', 'AI_DRAFTED', 'PUBLISHED', 'FAILED', 'DISPUTED']).optional(),
+});
+
+router.get('/reviews', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+
+    const parsed = listReviewsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'Invalid query parameters' });
+    }
+
+    const { page, pageSize, rating, sentiment, replyStatus } = parsed.data;
+    const where: any = { tenant_id: tenantId };
+    if (rating !== undefined) where.star_rating = rating;
+    if (sentiment !== undefined) where.sentiment = sentiment;
+    if (replyStatus !== undefined) where.reply_status = replyStatus;
+
+    const [reviews, total] = await Promise.all([
+      prisma.gbp_reviews.findMany({
+        where,
+        orderBy: { google_create_time: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.gbp_reviews.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        reviews,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      },
+    });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] GET /reviews error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'reviews_list_failed', message: 'Failed to list reviews' });
+  }
+});
+
+// POST /reviews/:id/reply — publish owner reply via Google API + update reply_status
+
+const replySchema = z.object({
+  comment: z.string().min(1).max(4096),
+});
+
+router.post('/reviews/:id/reply', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+    const reviewId = req.params.id;
+
+    const parsed = replySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'Reply comment is required (1–4096 chars)' });
+    }
+
+    // Load review (tenant-scoped — cross-customer isolation)
+    const review = await prisma.gbp_reviews.findFirst({
+      where: { id: reviewId, tenant_id: tenantId },
+    });
+    if (!review) {
+      return res.status(404).json({ success: false, error: 'review_not_found', message: 'Review not found' });
+    }
+    if (!review.google_review_id) {
+      return res.status(400).json({ success: false, error: 'no_google_id', message: 'Review has no Google review ID — cannot reply' });
+    }
+
+    // Publish reply via Google API
+    const result = await replyToReview(tenantId, review.google_review_id, parsed.data.comment);
+    if (!result.success) {
+      return res.status(502).json({ success: false, error: 'reply_failed', message: result.error || 'Failed to publish reply' });
+    }
+
+    // Update reply_status → PUBLISHED
+    await prisma.gbp_reviews.update({
+      where: { id: reviewId },
+      data: {
+        review_reply: parsed.data.comment,
+        is_replied: true,
+        reply_status: 'PUBLISHED',
+        reply_update_time: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
+    res.json({ success: true, data: { published: true } });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    logger.error('[gbp-customer] POST /reviews/:id/reply error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'reply_failed', message: 'Failed to publish reply' });
+  }
+});
+
+// POST /reviews/:id/ai-draft — generate 3 AI drafts (Tier A)
+// Entitlement gate: gbp_ai_response capability (draft-preview mode when unentitled)
+
+router.post('/reviews/:id/ai-draft', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+    const reviewId = req.params.id;
+
+    const result = await gbpReviewReplyService.generateDrafts(tenantId, reviewId);
+
+    res.json({
+      success: true,
+      data: {
+        drafts: result.drafts,
+        previewMode: result.previewMode,
+        upgradeCta: result.upgradeCta,
+      },
+    });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    if (error.message?.includes('not found for tenant')) {
+      return res.status(404).json({ success: false, error: 'review_not_found', message: 'Review not found' });
+    }
+    logger.error('[gbp-customer] POST /reviews/:id/ai-draft error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'ai_draft_failed', message: 'Failed to generate AI drafts' });
+  }
+});
+
+// POST /reviews/:id/dispute — submit a review dispute via DisputeIntakeService
+// Uses the registry-driven intake flow with intake_kind = 'review_dispute'.
+
+const disputeSchema = z.object({
+  ownerEmail: z.string().email(),
+  ownerPhone: z.string().optional(),
+  ownerStatement: z.string().optional(),
+  evidencePayload: z.record(z.string(), z.any()),
+  attachmentIds: z.array(z.string()).optional(),
+});
+
+router.post('/reviews/:id/dispute', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId as string;
+    const { tenantId } = await customerGbpAccessService.resolveTenant(customerId);
+    const reviewId = req.params.id;
+
+    const parsed = disputeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'ownerEmail + evidencePayload are required' });
+    }
+
+    // Load review (tenant-scoped — cross-customer isolation)
+    const review = await prisma.gbp_reviews.findFirst({
+      where: { id: reviewId, tenant_id: tenantId },
+    });
+    if (!review) {
+      return res.status(404).json({ success: false, error: 'review_not_found', message: 'Review not found' });
+    }
+
+    // Find the GBP campaign for this tenant to anchor the intake
+    const campaign = await prisma.mkt_campaigns_list.findFirst({
+      where: {
+        tenant_id: tenantId,
+        category: { in: ['gbp_optimization', 'review_management'] },
+      },
+      orderBy: { created_at: 'desc' },
+      select: { id: true },
+    });
+    if (!campaign) {
+      return res.status(400).json({ success: false, error: 'no_campaign', message: 'No GBP campaign found for this tenant' });
+    }
+
+    // Generate (or reuse) an intake link with intake_kind = 'review_dispute'
+    const intakeLink = await disputeIntakeService.generateIntakeLink(campaign.id, undefined, 'review_dispute');
+
+    // Enrich the evidence payload with review context
+    const enrichedPayload = {
+      ...parsed.data.evidencePayload,
+      review_id: reviewId,
+      google_review_id: review.google_review_id,
+      reviewer_name: review.reviewer_name,
+      star_rating: review.star_rating,
+      comment: review.comment,
+    };
+
+    // Submit the registry intake
+    const submitResult = await disputeIntakeService.submitRegistryIntake({
+      token: intakeLink.token,
+      ownerEmail: parsed.data.ownerEmail,
+      ownerPhone: parsed.data.ownerPhone || null,
+      ownerStatement: parsed.data.ownerStatement,
+      evidencePayload: enrichedPayload,
+      attachmentIds: parsed.data.attachmentIds,
+    });
+
+    // Mark the review as disputed
+    await prisma.gbp_reviews.update({
+      where: { id: reviewId },
+      data: { reply_status: 'DISPUTED', updated_at: new Date() },
+    });
+
+    res.json({ success: true, data: submitResult });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'no_gbp_link', message: 'No GBP connection found for this customer' });
+    }
+    if (error.message?.includes('No active intake definition')) {
+      return res.status(400).json({ success: false, error: 'no_intake_definition', message: 'Review dispute intake kind is not configured' });
+    }
+    if (error.message?.includes('Validation failed')) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', message: error.message });
+    }
+    logger.error('[gbp-customer] POST /reviews/:id/dispute error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'dispute_failed', message: 'Failed to submit dispute' });
+  }
+});
 
 // ── Phase 3 stubs (Post Publisher & Media Manager) ────────────────────────
 

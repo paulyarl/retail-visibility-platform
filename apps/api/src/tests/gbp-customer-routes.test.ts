@@ -29,6 +29,15 @@ const {
   mockFetchOptions,
   mockStartVerification,
   mockCompleteVerification,
+  mockGbpReviewsFindFirst,
+  mockGbpReviewsFindMany,
+  mockGbpReviewsCount,
+  mockGbpReviewsUpdate,
+  mockMktCampaignsFindFirst,
+  mockGenerateDrafts,
+  mockReplyToReview,
+  mockGenerateIntakeLink,
+  mockSubmitRegistryIntake,
 } = vi.hoisted(() => ({
   mockVerifyAccessToken: vi.fn(),
   mockComputeContexts: vi.fn(),
@@ -39,6 +48,15 @@ const {
   mockFetchOptions: vi.fn(),
   mockStartVerification: vi.fn(),
   mockCompleteVerification: vi.fn(),
+  mockGbpReviewsFindFirst: vi.fn(),
+  mockGbpReviewsFindMany: vi.fn(),
+  mockGbpReviewsCount: vi.fn(),
+  mockGbpReviewsUpdate: vi.fn(),
+  mockMktCampaignsFindFirst: vi.fn(),
+  mockGenerateDrafts: vi.fn(),
+  mockReplyToReview: vi.fn(),
+  mockGenerateIntakeLink: vi.fn(),
+  mockSubmitRegistryIntake: vi.fn(),
 }));
 
 vi.mock('../services/CustomerTokenService', () => ({
@@ -70,10 +88,20 @@ vi.mock('../prisma', () => ({
     },
     gbp_locations_list: {
       findMany: mockGbpLocationsFindMany,
+      findFirst: vi.fn().mockResolvedValue(null),
       updateMany: mockGbpLocationsUpdateMany,
     },
     google_oauth_accounts_list: {
       findFirst: mockOauthAccountsFindFirst,
+    },
+    gbp_reviews: {
+      findFirst: mockGbpReviewsFindFirst,
+      findMany: mockGbpReviewsFindMany,
+      count: mockGbpReviewsCount,
+      update: mockGbpReviewsUpdate,
+    },
+    mkt_campaigns_list: {
+      findFirst: mockMktCampaignsFindFirst,
     },
   },
 }));
@@ -88,6 +116,27 @@ vi.mock('../services/GBPVerificationService', () => ({
       fetchOptions: mockFetchOptions,
       start: mockStartVerification,
       complete: mockCompleteVerification,
+    }),
+  },
+}));
+
+vi.mock('../services/GBPReviewReplyService', () => ({
+  GBPReviewReplyService: {
+    getInstance: () => ({
+      generateDrafts: mockGenerateDrafts,
+    }),
+  },
+}));
+
+vi.mock('../services/GBPAdvancedSync', () => ({
+  replyToReview: mockReplyToReview,
+}));
+
+vi.mock('../services/DisputeIntakeService', () => ({
+  DisputeIntakeService: {
+    getInstance: () => ({
+      generateIntakeLink: mockGenerateIntakeLink,
+      submitRegistryIntake: mockSubmitRegistryIntake,
     }),
   },
 }));
@@ -323,5 +372,133 @@ describe('gbp-customer routes — POST /verification/complete', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('invalid_request');
+  });
+});
+
+// ── /reviews/* tests (Phase 2) ───────────────────────────────────────────
+
+describe('gbp-customer routes — GET /reviews', () => {
+  it('returns 200 with paginated reviews', async () => {
+    mockGbpReviewsFindMany.mockResolvedValue([
+      { id: 'rev-001', tenant_id: TENANT_ID, star_rating: 5, comment: 'Great!', reply_status: 'NONE' },
+      { id: 'rev-002', tenant_id: TENANT_ID, star_rating: 3, comment: 'Okay', reply_status: 'PUBLISHED' },
+    ]);
+    mockGbpReviewsCount.mockResolvedValue(2);
+
+    const res = await request(app)
+      .get('/api/customer/marketing/gbp/reviews?page=1&pageSize=20')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.reviews).toHaveLength(2);
+    expect(res.body.data.pagination.total).toBe(2);
+    expect(res.body.data.pagination.page).toBe(1);
+  });
+});
+
+describe('gbp-customer routes — POST /reviews/:id/reply', () => {
+  it('returns 200 and updates reply_status to PUBLISHED', async () => {
+    mockGbpReviewsFindFirst.mockResolvedValue({
+      id: 'rev-001',
+      tenant_id: TENANT_ID,
+      google_review_id: 'accounts/123/reviews/789',
+      reply_status: 'NONE',
+    });
+    mockReplyToReview.mockResolvedValue({ success: true });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/reviews/rev-001/reply')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ comment: 'Thank you for your review!' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.published).toBe(true);
+    expect(mockGbpReviewsUpdate).toHaveBeenCalledWith({
+      where: { id: 'rev-001' },
+      data: expect.objectContaining({ reply_status: 'PUBLISHED' }),
+    });
+  });
+});
+
+describe('gbp-customer routes — POST /reviews/:id/ai-draft', () => {
+  it('returns 200 with 3 drafts (entitled)', async () => {
+    mockGenerateDrafts.mockResolvedValue({
+      drafts: [
+        { angle: 'warm_direct', text: 'Thanks!' },
+        { angle: 'professional_concise', text: 'Thank you.' },
+        { angle: 'empathetic_detailed', text: 'We appreciate...' },
+      ],
+      previewMode: false,
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/reviews/rev-001/ai-draft')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.drafts).toHaveLength(3);
+    expect(res.body.data.previewMode).toBe(false);
+  });
+
+  it('returns 200 with 1 preview draft (unentitled)', async () => {
+    mockGenerateDrafts.mockResolvedValue({
+      drafts: [{ angle: 'preview', text: 'Thanks for the review!' }],
+      previewMode: true,
+      upgradeCta: 'Upgrade to GBP Pro',
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/reviews/rev-001/ai-draft')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.drafts).toHaveLength(1);
+    expect(res.body.data.previewMode).toBe(true);
+    expect(res.body.data.upgradeCta).toBeDefined();
+  });
+});
+
+describe('gbp-customer routes — POST /reviews/:id/dispute', () => {
+  it('returns 200 and creates intake record', async () => {
+    mockGbpReviewsFindFirst.mockResolvedValue({
+      id: 'rev-001',
+      tenant_id: TENANT_ID,
+      google_review_id: 'accounts/123/reviews/789',
+      reviewer_name: 'Jane',
+      star_rating: 1,
+      comment: 'Bad',
+    });
+    mockMktCampaignsFindFirst.mockResolvedValue({ id: 'camp-001' });
+    mockGenerateIntakeLink.mockResolvedValue({
+      intakeId: 'intake-001',
+      token: 'dispute-token-123',
+      url: 'https://example.com/dispute',
+    });
+    mockSubmitRegistryIntake.mockResolvedValue({
+      intakeId: 'intake-001',
+      campaignId: 'camp-001',
+      stage: 'review_dispute_submitted',
+      alreadySubmitted: false,
+    });
+
+    const res = await request(app)
+      .post('/api/customer/marketing/gbp/reviews/rev-001/dispute')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({
+        ownerEmail: 'owner@example.com',
+        evidencePayload: { dispute_reason: 'spam', dispute_explanation: 'Fake review' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.intakeId).toBe('intake-001');
+    expect(mockGbpReviewsUpdate).toHaveBeenCalledWith({
+      where: { id: 'rev-001' },
+      data: expect.objectContaining({ reply_status: 'DISPUTED' }),
+    });
   });
 });

@@ -418,6 +418,17 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         logger.error('Failed to start recovery delivery retry scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
+
+      // Start GBP review ingestion job (hourly) — polls Google reviews.list,
+      // upserts into gbp_reviews, refreshes cached aggregate rating, fires
+      // gbp_new_review CRM alerts for new reviews
+      try {
+        const { startGbpReviewIngestion } = await import('./jobs/gbpReviewIngestion');
+        startGbpReviewIngestion();
+        logger.info('GBP review ingestion job started (hourly)');
+      } catch (err) {
+        logger.error('Failed to start GBP review ingestion job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
     });
 
     // Handle server errors
