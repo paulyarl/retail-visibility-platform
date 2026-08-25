@@ -188,7 +188,7 @@ import MarketingProspectQueueService from '../services/MarketingProspectQueueSer
 import OutreachIntelligenceService, { UpsertInput } from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
-import { IntelligenceProfileService } from '../services/intelligence/IntelligenceProfileService';
+import { IntelligenceProfileService, type IntelligenceProfile } from '../services/intelligence/IntelligenceProfileService';
 import { IntelligenceRunService } from '../services/intelligence/IntelligenceRunService';
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
@@ -5969,6 +5969,13 @@ const intelligenceProfileAddCandidateSchema = z.object({
     category_notes: z.string().nullable().optional(),
   }),
   platform: z.string().min(1).max(20),
+  // Optional geographic scope — when provided, the candidate is promoted
+  // into a city/state-scoped profile (auto-created from the nationwide
+  // profile if it doesn't exist yet) instead of the nationwide profile.
+  scope: z.object({
+    city: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+  }).optional(),
 });
 
 // GET /intelligence-profiles — list active profiles (optional ?focus= filter)
@@ -5993,21 +6000,34 @@ router.get('/intelligence-profiles/drafts', async (req, res) => {
   }
 });
 
-// GET /intelligence-profiles/resolve/:category?focus=emerging|competitive&city=...
+// GET /intelligence-profiles/resolve/:category?focus=emerging|competitive&city=...&state=...&platform=...
 // NOTE: Must be registered BEFORE /:id/:version, otherwise the literal "resolve"
 // segment is captured as :id and the category is parsed as :version (→ "Invalid version").
+// When focus=gold_standards, delegates to resolveGoldStandard (city→state→nationwide cascade).
 router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
     const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
     const city = typeof req.query.city === 'string' ? req.query.city : undefined;
+    const state = typeof req.query.state === 'string' ? req.query.state : undefined;
     const platform = typeof req.query.platform === 'string' ? req.query.platform : undefined;
-    const profile = await IntelligenceProfileService.getInstance().resolve(
-      req.params.category,
-      focus,
-      city,
-      platform,
-      getCtx(req),
-    );
+    let profile: IntelligenceProfile | null;
+    if (focus === 'gold_standards') {
+      profile = await IntelligenceProfileService.getInstance().resolveGoldStandard(
+        req.params.category,
+        platform ?? null,
+        city ?? null,
+        state ?? null,
+        getCtx(req),
+      );
+    } else {
+      profile = await IntelligenceProfileService.getInstance().resolve(
+        req.params.category,
+        focus,
+        city,
+        platform,
+        getCtx(req),
+      );
+    }
     res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
@@ -6091,6 +6111,7 @@ router.post('/intelligence-profiles/:id/candidates', async (req, res) => {
       {
         candidate: parsed.candidate,
         platform: parsed.platform,
+        scope: parsed.scope,
       },
       getCtx(req),
     );

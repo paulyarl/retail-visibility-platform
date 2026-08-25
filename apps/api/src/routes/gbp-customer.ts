@@ -785,7 +785,18 @@ router.get('/media', requireCustomerAuth, requirePlatformContext, async (req: Re
         select: { category: true },
       });
       if (location?.category) {
-        const goldStandard = await intelligenceProfileService.resolveGoldStandard(location.category, 'google');
+        // Look up the tenant's campaign for city/state (scoped gold-standard resolution)
+        const campaign = await prisma.mkt_campaigns_list.findFirst({
+          where: { tenant_id: tenantId },
+          select: { city: true, state: true },
+          orderBy: { date_entered: 'desc' },
+        });
+        const goldStandard = await intelligenceProfileService.resolveGoldStandard(
+          location.category,
+          'google',
+          campaign?.city || null,
+          campaign?.state || null,
+        );
         if (goldStandard) {
           const config = goldStandard.configuration_json as any;
           const expectedPhotoCount = config?.expected_fields?.platforms?.google?.expected_photo_count

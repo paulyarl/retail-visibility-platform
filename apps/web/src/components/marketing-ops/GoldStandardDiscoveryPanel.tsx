@@ -93,7 +93,13 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
     (async () => {
       try {
         setLoading(true);
-        const active = await marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards', undefined, campaign.intelligence_platform ?? undefined);
+        const active = await marketingOpsService.resolveIntelligenceProfile(
+          campaign.category,
+          'gold_standards',
+          campaign.city || undefined,
+          campaign.intelligence_platform ?? undefined,
+          campaign.state || undefined,
+        );
         if (cancelled) return;
         setActiveProfile(active);
       } catch (err: any) {
@@ -103,7 +109,7 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
       }
     })();
     return () => { cancelled = true; };
-  }, [campaign.category, campaign.intelligence_platform, refreshTrigger]);
+  }, [campaign.category, campaign.intelligence_platform, campaign.city, campaign.state, refreshTrigger]);
 
   const platformLabel = campaign.intelligence_platform
     ? campaign.intelligence_platform === 'all'
@@ -218,6 +224,10 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
   })();
 
   // Promote a discovered candidate into a platform's gold-standard slot.
+  // When the campaign has a city/state, the promotion targets a scoped
+  // profile (auto-created from the nationwide profile if needed) so
+  // regionally-narrowed discoveries fill regional slots without evicting
+  // nationwide exemplars.
   const handlePromote = async (candidate: Candidate, platform: string) => {
     if (!activeProfile) return;
     const key = `${candidate.business_name}|${platform}`;
@@ -225,9 +235,13 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
     setSuccessMessage(null);
     setError(null);
     try {
+      const scope = (campaign.city || campaign.state)
+        ? { city: campaign.city || null, state: campaign.state || null }
+        : undefined;
       await marketingOpsService.addGoldStandardCandidate(activeProfile.id, {
         candidate,
         platform,
+        scope,
       });
       setSuccessMessage(
         `Added "${candidate.business_name}" to the ${prettyPlatform(platform)} gold-standard slot.`,

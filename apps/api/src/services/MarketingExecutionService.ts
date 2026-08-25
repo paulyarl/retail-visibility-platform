@@ -440,8 +440,13 @@ export class MarketingExecutionService extends BaseService {
         // Pass the campaign's platform so the resolver prefers a
         // platform-specific gold-standard profile, falling back to
         // cross-platform (reference_platform = NULL).
+        // Pass the campaign's city/state so the resolver prefers a
+        // scoped gold-standard profile (city/state-specific) when the
+        // discovery scan is region-narrowed, falling back to nationwide.
         const campaignPlatform = (input.campaign as any).intelligence_platform || null;
-        const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, ctx);
+        const campaignCity = (input.campaign as any).city || null;
+        const campaignState = (input.campaign as any).state || null;
+        const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, campaignCity, campaignState, ctx);
         if (!goldStandard) {
           // No active gold-standard profile — return base render with a
           // degraded-mode warning so the analyst knows to run an
@@ -543,7 +548,9 @@ export class MarketingExecutionService extends BaseService {
       // When no gold standard exists, a soft degraded-mode note is appended so
       // the operator knows benchmarking is absent and should run an
       // establishment scan first.
-      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, ctx);
+      const campaignCity = (input.campaign as any).city || null;
+      const campaignState = (input.campaign as any).state || null;
+      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, campaignCity, campaignState, ctx);
       let goldStandardProfileId: string | null = null;
       let goldStandardProfileVersion: number | null = null;
       if (goldStandard) {
@@ -652,7 +659,9 @@ export class MarketingExecutionService extends BaseService {
     if (promptRole === 'fulfill_target') {
       const profileService = IntelligenceProfileService.getInstance();
       const campaignPlatform = (input.campaign as any).intelligence_platform || null;
-      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, ctx);
+      const campaignCity = (input.campaign as any).city || null;
+      const campaignState = (input.campaign as any).state || null;
+      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, campaignCity, campaignState, ctx);
       if (!goldStandard) {
         // No active gold standard — return base render (degraded but functional).
         return {
@@ -691,6 +700,7 @@ export class MarketingExecutionService extends BaseService {
     //    Indianapolis-biased profile block.
     const profileService = IntelligenceProfileService.getInstance();
     const businessCity = input.campaign.city || null;
+    const businessState = (input.campaign as any).state || null;
 
     // For signal-driven triage/audit templates (profile_repair):
     // Only append if audit_signals variable is populated, with framing directive.
@@ -726,7 +736,7 @@ export class MarketingExecutionService extends BaseService {
       // against category-platform exemplars. Best-effort — if no active
       // gold standard exists, skip silently (degraded but functional).
       const triagePlatform = (input.campaign as any).intelligence_platform || null;
-      const goldStandard = await profileService.resolveGoldStandard(category, triagePlatform, ctx);
+      const goldStandard = await profileService.resolveGoldStandard(category, triagePlatform, businessCity, businessState, ctx);
       if (goldStandard) {
         const gsBlock = profileService.serializeGoldStandard(goldStandard, 'benchmark');
         if (gsBlock) {
@@ -767,7 +777,7 @@ export class MarketingExecutionService extends BaseService {
       // base render. This ensures the audit gets the gold-standard
       // comparison even when no category intelligence profile exists.
       const auditPlatform = (input.campaign as any).intelligence_platform || null;
-      const goldStandardOnly = await profileService.resolveGoldStandard(category, auditPlatform, ctx);
+      const goldStandardOnly = await profileService.resolveGoldStandard(category, auditPlatform, businessCity, businessState, ctx);
       if (goldStandardOnly) {
         const gsBlock = profileService.serializeGoldStandard(goldStandardOnly, 'benchmark');
         if (gsBlock) {
@@ -805,7 +815,7 @@ export class MarketingExecutionService extends BaseService {
     // against category-platform exemplars. Best-effort — if no active
     // gold standard exists, skip silently (degraded but functional).
     const auditPlatform2 = (input.campaign as any).intelligence_platform || null;
-    const goldStandard = await profileService.resolveGoldStandard(category, auditPlatform2, ctx);
+    const goldStandard = await profileService.resolveGoldStandard(category, auditPlatform2, businessCity, businessState, ctx);
     if (goldStandard) {
       const gsBlock = profileService.serializeGoldStandard(goldStandard, 'benchmark');
       if (gsBlock) {

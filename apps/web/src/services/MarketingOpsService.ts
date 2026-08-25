@@ -4982,7 +4982,7 @@ interface MarketingOpsService {
   listIntelligenceProfileDrafts(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
   getIntelligenceProfile(id: string): Promise<IntelligenceProfileWithVersions>;
   getIntelligenceProfileVersion(id: string, version: number): Promise<IntelligenceProfile>;
-  resolveIntelligenceProfile(category: string, focus?: IntelligenceFocus, city?: string, platform?: string): Promise<IntelligenceProfile | null>;
+  resolveIntelligenceProfile(category: string, focus?: IntelligenceFocus, city?: string, platform?: string, state?: string): Promise<IntelligenceProfile | null>;
   createIntelligenceProfile(input: {
     categoryKey: string;
     categoryName: string;
@@ -5006,6 +5006,7 @@ interface MarketingOpsService {
   addGoldStandardCandidate(id: string, input: {
     candidate: Record<string, any>;
     platform: string;
+    scope?: { city?: string | null; state?: string | null };
   }): Promise<IntelligenceProfile>;
   removeGoldStandardCandidate(id: string, input: {
     businessName: string;
@@ -5188,16 +5189,17 @@ MarketingOpsService.prototype.getIntelligenceProfileVersion = async function (id
   return result.data?.data ?? result.data;
 };
 
-MarketingOpsService.prototype.resolveIntelligenceProfile = async function (category: string, focus?: IntelligenceFocus, city?: string, platform?: string): Promise<IntelligenceProfile | null> {
+MarketingOpsService.prototype.resolveIntelligenceProfile = async function (category: string, focus?: IntelligenceFocus, city?: string, platform?: string, state?: string): Promise<IntelligenceProfile | null> {
   const params = new URLSearchParams();
   if (focus) params.set('focus', focus);
   if (city) params.set('city', city);
+  if (state) params.set('state', state);
   if (platform) params.set('platform', platform);
   const query = params.toString() ? `?${params.toString()}` : '';
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/intelligence-profiles/resolve/${encodeURIComponent(category)}${query}`,
     {},
-    `mkt-ops-intel-profile-resolve-${category}-${focus ?? 'any'}-${city ?? 'any'}-${platform ?? 'any'}`,
+    `mkt-ops-intel-profile-resolve-${category}-${focus ?? 'any'}-${city ?? 'any'}-${state ?? 'any'}-${platform ?? 'any'}`,
     0,
   );
   if (!result.success) {
@@ -5298,6 +5300,7 @@ MarketingOpsService.prototype.deleteIntelligenceProfileDraft = async function (i
 MarketingOpsService.prototype.addGoldStandardCandidate = async function (id: string, input: {
   candidate: Record<string, any>;
   platform: string;
+  scope?: { city?: string | null; state?: string | null };
 }): Promise<IntelligenceProfile> {
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/intelligence-profiles/${id}/candidates`,

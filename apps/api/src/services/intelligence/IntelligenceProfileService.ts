@@ -69,6 +69,24 @@ export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
  */
 export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery_benchmark';
 
+/**
+ * Maximum number of pattern exemplars emitted PER PLATFORM when injecting a
+ * gold-standard profile into benchmark/discovery prompts.
+ *
+ * Saturated niches can fill all 4 slots on every platform (e.g. African
+ * Grocery Store: 4 candidates × 6 platforms = 24 gold-standard evaluations).
+ * Emitting all of them bloats the prompt with marginal exemplars — the top
+ * exemplar per platform already establishes the bar, and a second provides a
+ * comparison point without over-reinforcing. Exemplars 3 and 4 per platform
+ * add token cost without changing the analyst's rating behavior.
+ *
+ * The 'target' (fulfill) role is exempt — fix instructions benefit from the
+ * full exemplar pool as adaptation sources, and fulfill prompts run one
+ * business at a time so the token cost is bounded by the niche saturation
+ * rather than by the candidate count of a discovery scan.
+ */
+const MAX_EXEMPLARS_PER_PLATFORM = 2;
+
 export interface IntelligenceProfile {
   id: string;
   category_key: string;
@@ -933,6 +951,124 @@ export class IntelligenceProfileService extends BaseService {
   // ====================
 
   /**
+   * Create a city/state-scoped gold-standard profile from the nationwide
+   * profile. Copies expected_fields + quality_gates (the bar) from the
+   * nationwide profile, starts with empty candidates (no slots filled),
+   * and sets reference_city/reference_state to the requested scope.
+   *
+   * The scoped profile coexists with the nationwide profile — both are
+   * active, and resolveGoldStandard resolves the scoped one first when
+   * the business's city/state matches.
+   *
+   * The profile gets a new id (suffixed from the nationwide profile's id)
+   * so it doesn't collide with the nationwide profile's version chain.
+   *
+   * Called automatically by addGoldStandardCandidate when a scoped
+   * promotion is requested but no scoped profile exists yet. Can also be
+   * called explicitly by an operator to pre-create a scoped profile.
+   */
+  async createScopedGoldStandardProfile(input: {
+    nationwideProfileId: string;
+    city?: string | null;
+    state?: string | null;
+  }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
+    const normalizedCity = normalizeReferenceCity(input.city);
+    const normalizedState = normalizeReferenceState(input.state);
+
+    if (!normalizedCity && !normalizedState) {
+      throw new Error('At least one of city or state is required to create a scoped profile');
+    }
+
+    try {
+      // 1. Load the nationwide active profile (the bar source)
+      const nationwide = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: {
+          id: input.nationwideProfileId,
+          status: 'active',
+          intelligence_focus: 'gold_standards',
+          reference_city: null,
+          reference_state: null,
+        },
+      });
+      if (!nationwide) {
+        throw new Error(`Nationwide gold-standard profile ${input.nationwideProfileId} not found or not nationwide-scoped`);
+      }
+
+      // 2. Check if a scoped profile already exists for this (city, state)
+      const existing = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: {
+          category_key: nationwide.category_key,
+          intelligence_focus: 'gold_standards',
+          reference_city: normalizedCity,
+          reference_state: normalizedState,
+          status: 'active',
+        },
+      });
+      if (existing) {
+        // Idempotent — return the existing scoped profile
+        logger.info('Scoped gold-standard profile already exists (idempotent)', ctx, {
+          nationwideProfileId: input.nationwideProfileId,
+          scopedProfileId: existing.id,
+          city: normalizedCity,
+          state: normalizedState,
+        });
+        return existing as IntelligenceProfile;
+      }
+
+      // 3. Build the scoped config: copy the bar (expected_fields +
+      //    quality_gates) from nationwide, empty candidates (no slots yet)
+      const nationwideConfig = nationwide.configuration_json as any;
+      const scopedConfig: Record<string, any> = {
+        ...nationwideConfig,
+        candidates: [], // empty — slots filled by promotions
+        scan_metadata: {
+          ...nationwideConfig?.scan_metadata,
+          scoped_from: nationwide.id,
+          scoped_from_version: nationwide.version,
+          scope_city: normalizedCity,
+          scope_state: normalizedState,
+        },
+      };
+
+      // 4. Generate a new profile id for the scoped profile
+      const scopedId = generateIntelligenceProfileId();
+
+      // 5. Create the scoped profile as active (version 1)
+      const created = await this.prisma.mkt_intelligence_profiles.create({
+        data: {
+          id: scopedId,
+          category_key: nationwide.category_key,
+          category_name: nationwide.category_name,
+          version: 1,
+          intelligence_focus: 'gold_standards',
+          reference_city: normalizedCity,
+          reference_state: normalizedState,
+          reference_platform: nationwide.reference_platform,
+          configuration_json: scopedConfig as any,
+          status: 'active',
+        },
+      });
+
+      logger.info('Scoped gold-standard profile created', ctx, {
+        scopedProfileId: scopedId,
+        nationwideProfileId: input.nationwideProfileId,
+        categoryKey: nationwide.category_key,
+        city: normalizedCity,
+        state: normalizedState,
+      });
+      return created as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.createScopedGoldStandardProfile failed', ctx, {
+        error: (error as Error).message,
+        nationwideProfileId: input.nationwideProfileId,
+        city: normalizedCity,
+        state: normalizedState,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
    * Promote a discovered candidate into a specific platform's gold-standard
    * slot on the active gold-standard profile. This is the operator-facing
    * "Add to {platform} slot" action — it replaces the manual JSON-surgery
@@ -969,6 +1105,14 @@ export class IntelligenceProfileService extends BaseService {
   async addGoldStandardCandidate(profileId: string, input: {
     candidate: Record<string, any>;
     platform: string;
+    /**
+     * Optional geographic scope for the promotion. When provided, the
+     * candidate is promoted into a city/state-scoped profile (created
+     * from the nationwide profile if it doesn't exist yet) instead of
+     * the nationwide profile. The profileId param is the nationwide
+     * profile id — the scoped profile is resolved or created from it.
+     */
+    scope?: { city?: string | null; state?: string | null };
   }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
     const platform = input.platform.trim().toLowerCase();
     const candidateName = (input.candidate.business_name || '').trim();
@@ -980,19 +1124,32 @@ export class IntelligenceProfileService extends BaseService {
       throw new Error('Candidate business_name is required');
     }
 
+    // Determine the target profile: if scope is provided, resolve or create
+    // a scoped profile from the nationwide one. Otherwise, use profileId
+    // directly (nationwide promotion — backward compatible).
+    let targetProfileId = profileId;
+    if (input.scope && (input.scope.city || input.scope.state)) {
+      const scopedProfile = await this.createScopedGoldStandardProfile({
+        nationwideProfileId: profileId,
+        city: input.scope.city,
+        state: input.scope.state,
+      }, ctx);
+      targetProfileId = scopedProfile.id;
+    }
+
     try {
-      // 1. Load the active version of this profile
+      // 1. Load the active version of the target profile (nationwide or scoped)
       const active = await this.prisma.mkt_intelligence_profiles.findFirst({
-        where: { id: profileId, status: 'active' },
+        where: { id: targetProfileId, status: 'active' },
       });
       if (!active) {
-        throw new Error(`Active profile ${profileId} not found`);
+        throw new Error(`Active profile ${targetProfileId} not found`);
       }
 
       // 2. Validate this is a gold-standard profile
       if (active.intelligence_focus !== 'gold_standards') {
         throw new Error(
-          `Profile ${profileId} is not a gold-standard profile (focus: ${active.intelligence_focus}). Only gold-standard profiles have platform slots.`,
+          `Profile ${targetProfileId} is not a gold-standard profile (focus: ${active.intelligence_focus}). Only gold-standard profiles have platform slots.`,
         );
       }
 
@@ -1027,7 +1184,7 @@ export class IntelligenceProfileService extends BaseService {
         if (existingTargetEval && existingTargetEval.is_gold_standard === true) {
           // Idempotent — already in slot. Return current active without new version.
           logger.info('Gold standard candidate already in slot (idempotent)', ctx, {
-            profileId,
+            profileId: targetProfileId,
             candidateName,
             platform,
           });
@@ -1078,26 +1235,26 @@ export class IntelligenceProfileService extends BaseService {
       const result = await this.prisma.$transaction(async (tx) => {
         // Find the max version for this profile id
         const existing = await tx.mkt_intelligence_profiles.findMany({
-          where: { id: profileId },
+          where: { id: targetProfileId },
           orderBy: { version: 'desc' },
           take: 1,
         });
         if (existing.length === 0) {
-          throw new Error(`Profile ${profileId} not found`);
+          throw new Error(`Profile ${targetProfileId} not found`);
         }
         const latest = existing[0];
         const nextVersion = latest.version + 1;
 
         // Retire any existing active version
         await tx.mkt_intelligence_profiles.updateMany({
-          where: { id: profileId, status: 'active' },
+          where: { id: targetProfileId, status: 'active' },
           data: { status: 'retired', updated_at: new Date() },
         });
 
         // Create the new active version — carry metadata from the latest
         const created = await tx.mkt_intelligence_profiles.create({
           data: {
-            id: profileId,
+            id: targetProfileId,
             category_key: latest.category_key,
             category_name: latest.category_name,
             version: nextVersion,
@@ -1114,7 +1271,8 @@ export class IntelligenceProfileService extends BaseService {
       });
 
       logger.info('Gold standard candidate promoted to platform slot', ctx, {
-        profileId,
+        profileId: targetProfileId,
+        nationwideProfileId: input.scope ? profileId : undefined,
         version: result.version,
         candidateName,
         platform,
@@ -1123,7 +1281,8 @@ export class IntelligenceProfileService extends BaseService {
     } catch (error) {
       logger.error('IntelligenceProfileService.addGoldStandardCandidate failed', ctx, {
         error: (error as Error).message,
-        profileId,
+        profileId: targetProfileId,
+        nationwideProfileId: input.scope ? profileId : undefined,
         candidateName,
         platform,
       });
@@ -1488,15 +1647,138 @@ export class IntelligenceProfileService extends BaseService {
   /**
    * Resolve the active gold-standard profile for a category.
    *
-   * Gold-standard profiles are city-agnostic (reference_city = NULL) and
-   * focus = 'gold_standards'. When `platform` is provided, the resolver
-   * first looks for a platform-specific profile (reference_platform = platform),
-   * then falls back to a cross-platform profile (reference_platform = NULL).
+   * City/state-aware resolution (scoped gold standards):
+   *   - If `city` is provided, first try a city-specific profile
+   *     (reference_city matches, reference_state matches).
+   *   - If no city-specific profile exists but `state` is provided, try a
+   *     state-specific profile (reference_city = NULL, reference_state
+   *     matches).
+   *   - If neither exists, fall back to the nationwide profile
+   *     (reference_city = NULL, reference_state = NULL).
+   *
+   * Platform-aware resolution (Migration 236):
+   *   At each geographic layer, platform-specific profiles are preferred
+   *   over cross-platform profiles. The full fallback chain is:
+   *     1. (city, state, platform)     — most specific
+   *     2. (city, state, platform=null) — city+state, cross-platform
+   *     3. (city=null, state, platform)  — state, platform-specific
+   *     4. (city=null, state, platform=null) — state, cross-platform
+   *     5. (city=null, state=null, platform)  — nationwide, platform-specific
+   *     6. (city=null, state=null, platform=null) — nationwide, cross-platform
    *
    * Returns null on miss → caller uses degraded fallback (no benchmark).
    */
-  async resolveGoldStandard(category: string, platform?: string | null, ctx?: RequestCtx): Promise<IntelligenceProfile | null> {
-    return this.resolve(category, 'gold_standards', null, platform, ctx);
+  async resolveGoldStandard(
+    category: string,
+    platform?: string | null,
+    city?: string | null,
+    state?: string | null,
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile | null> {
+    const key = normalizeCategoryKey(category);
+    const normalizedCity = normalizeReferenceCity(city);
+    const normalizedState = normalizeReferenceState(state);
+    const normalizedPlatform = platform ? platform.trim().toLowerCase() || null : null;
+
+    try {
+      const buildWhere = (cityVal: string | null, stateVal: string | null, platformVal: string | null) => {
+        const w: any = {
+          category_key: key,
+          intelligence_focus: 'gold_standards' as const,
+          reference_city: cityVal,
+          reference_state: stateVal,
+          status: 'active',
+        };
+        if (platformVal) {
+          w.reference_platform = platformVal;
+        } else {
+          w.reference_platform = null;
+        }
+        return w;
+      };
+
+      const tryFind = async (cityVal: string | null, stateVal: string | null, platformVal: string | null): Promise<IntelligenceProfile | null> => {
+        const found = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: buildWhere(cityVal, stateVal, platformVal),
+          orderBy: { version: 'desc' },
+        });
+        return found as IntelligenceProfile | null;
+      };
+
+      // ── Layer 1: City-specific (reference_city + reference_state match) ──
+      if (normalizedCity && normalizedState) {
+        if (normalizedPlatform) {
+          const s1 = await tryFind(normalizedCity, normalizedState, normalizedPlatform);
+          if (s1) return s1;
+        }
+        const s2 = await tryFind(normalizedCity, normalizedState, null);
+        if (s2) {
+          if (normalizedPlatform) {
+            logger.warn('Gold standard profile resolved via city+cross-platform fallback', ctx, {
+              categoryKey: key, requestedCity: normalizedCity, requestedState: normalizedState,
+              requestedPlatform: normalizedPlatform, profileId: (s2 as any).id,
+            });
+          }
+          return s2;
+        }
+      }
+
+      // ── Layer 2: State-specific (reference_city = NULL, reference_state match) ──
+      if (normalizedState) {
+        if (normalizedPlatform) {
+          const s3 = await tryFind(null, normalizedState, normalizedPlatform);
+          if (s3) {
+            logger.info('Gold standard profile resolved via state-specific match', ctx, {
+              categoryKey: key, requestedState: normalizedState,
+              requestedPlatform: normalizedPlatform, profileId: (s3 as any).id,
+            });
+            return s3;
+          }
+        }
+        const s4 = await tryFind(null, normalizedState, null);
+        if (s4) {
+          logger.info('Gold standard profile resolved via state-specific cross-platform fallback', ctx, {
+            categoryKey: key, requestedState: normalizedState, profileId: (s4 as any).id,
+          });
+          return s4;
+        }
+      }
+
+      // ── Layer 3: Nationwide (reference_city = NULL, reference_state = NULL) ──
+      if (normalizedPlatform) {
+        const s5 = await tryFind(null, null, normalizedPlatform);
+        if (s5) {
+          if (normalizedCity || normalizedState) {
+            logger.info('Gold standard profile resolved via nationwide fallback (no scoped profile)', ctx, {
+              categoryKey: key, requestedCity: normalizedCity, requestedState: normalizedState,
+              requestedPlatform: normalizedPlatform, profileId: (s5 as any).id,
+            });
+          }
+          return s5;
+        }
+      }
+      const s6 = await tryFind(null, null, null);
+      if (s6) {
+        if (normalizedCity || normalizedState || normalizedPlatform) {
+          logger.info('Gold standard profile resolved via nationwide cross-platform fallback', ctx, {
+            categoryKey: key, requestedCity: normalizedCity, requestedState: normalizedState,
+            requestedPlatform: normalizedPlatform, profileId: (s6 as any).id,
+          });
+        }
+        return s6;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.resolveGoldStandard failed', ctx, {
+        error: (error as Error).message,
+        categoryKey: key,
+        requestedCity: normalizedCity,
+        requestedState: normalizedState,
+        requestedPlatform: normalizedPlatform,
+      });
+      throw this.handleError(error, ctx);
+    }
   }
 
   /**
@@ -1531,6 +1813,52 @@ export class IntelligenceProfileService extends BaseService {
    * (no expected_fields and no candidates) so the caller can skip
    * injection without producing an empty section.
    */
+  /**
+   * Select the top-N gold-standard platform evaluations per platform,
+   * ranked by quality_score descending (null/undefined scores sort last).
+   * Ties on quality_score break by business_name ascending for determinism.
+   *
+   * Returns a Set of `${platform}::${business_name}` keys identifying which
+   * (candidate, platform) pairs survived the cap. Callers use the set to
+   * filter platform_evaluations during exemplar emission.
+   */
+  private selectTopExemplarsPerPlatform(
+    candidates: any[],
+    cap: number,
+  ): Set<string> {
+    const all: Array<{ businessName: string; platform: string; qualityScore: number | null | undefined }> = [];
+    for (const c of candidates) {
+      if (!Array.isArray(c.platform_evaluations)) continue;
+      for (const pe of c.platform_evaluations) {
+        if (pe.is_gold_standard !== true) continue;
+        all.push({
+          businessName: c.business_name,
+          platform: pe.platform,
+          qualityScore: pe.quality_score,
+        });
+      }
+    }
+    const byPlatform = new Map<string, typeof all>();
+    for (const e of all) {
+      const arr = byPlatform.get(e.platform) ?? [];
+      arr.push(e);
+      byPlatform.set(e.platform, arr);
+    }
+    const selected = new Set<string>();
+    for (const [, arr] of byPlatform) {
+      arr.sort((a, b) => {
+        const aq = a.qualityScore ?? -1;
+        const bq = b.qualityScore ?? -1;
+        if (bq !== aq) return bq - aq;
+        return a.businessName.localeCompare(b.businessName);
+      });
+      for (const e of arr.slice(0, cap)) {
+        selected.add(`${e.platform}::${e.businessName}`);
+      }
+    }
+    return selected;
+  }
+
   serializeGoldStandard(
     profile: IntelligenceProfile,
     role: GoldStandardRole,
@@ -1632,34 +1960,52 @@ export class IntelligenceProfileService extends BaseService {
       }
     }
 
-    // Pattern exemplars (candidates flagged as gold standard)
+    // Pattern exemplars (candidates flagged as gold standard).
+    //
+    // For non-target roles (benchmark, discovery, discovery_benchmark) we cap
+    // the emitted exemplars to the top MAX_EXEMPLARS_PER_PLATFORM per platform,
+    // ranked by quality_score desc. The top exemplar per platform already
+    // establishes the bar; a second provides a comparison point. Emitting all
+    // 4 slots per platform on a saturated niche adds token cost without
+    // changing the analyst's rating behavior.
+    //
+    // The 'target' (fulfill) role is exempt — fix instructions benefit from
+    // the full exemplar pool as adaptation sources.
     if (candidates && Array.isArray(candidates)) {
-      const exemplars = candidates.filter((c: any) => {
-        if (!c.platform_evaluations) return false;
-        return c.platform_evaluations.some((pe: any) => pe.is_gold_standard === true);
-      });
-      if (exemplars.length > 0) {
+      const exemplarCap = role === 'target' ? Infinity : MAX_EXEMPLARS_PER_PLATFORM;
+      const selectedKeys = exemplarCap === Infinity
+        ? null
+        : this.selectTopExemplarsPerPlatform(candidates, exemplarCap);
+      const exemplarsWithSelected = candidates
+        .filter((c: any) => Array.isArray(c.platform_evaluations))
+        .map((c: any) => ({
+          candidate: c,
+          selectedEvals: c.platform_evaluations.filter((pe: any) =>
+            pe.is_gold_standard === true
+            && (selectedKeys === null
+              || selectedKeys.has(`${pe.platform}::${c.business_name}`)),
+          ),
+        }))
+        .filter((x: any) => x.selectedEvals.length > 0);
+      if (exemplarsWithSelected.length > 0) {
         lines.push('--- Pattern Exemplars ---');
-        for (const ex of exemplars) {
+        for (const { candidate: ex, selectedEvals } of exemplarsWithSelected) {
           lines.push(`  Business: ${ex.business_name}`);
           if (ex.city) lines.push(`    City: ${ex.city}`);
           if (ex.category_notes) lines.push(`    Notes: ${ex.category_notes}`);
-          if (ex.platform_evaluations) {
-            for (const pe of ex.platform_evaluations) {
-              if (pe.is_gold_standard !== true) continue;
-              lines.push(`    Platform: ${pe.platform}`);
-              if (pe.profile_url) lines.push(`      Destination URL: ${pe.profile_url}`);
-              if (pe.quality_score !== undefined && pe.quality_score !== null) {
-                lines.push(`      Quality score: ${pe.quality_score}/10`);
-              }
-              if (pe.quality_rationale) lines.push(`      Rationale: ${pe.quality_rationale}`);
-              if (pe.branding_artifacts) {
-                const ba = pe.branding_artifacts;
-                if (ba.has_logo) lines.push(`      Has logo: yes`);
-                if (ba.has_cover_photo) lines.push(`      Has cover photo: yes`);
-                if (ba.photo_count !== undefined && ba.photo_count !== null) {
-                  lines.push(`      Photo count: ${ba.photo_count}`);
-                }
+          for (const pe of selectedEvals) {
+            lines.push(`    Platform: ${pe.platform}`);
+            if (pe.profile_url) lines.push(`      Destination URL: ${pe.profile_url}`);
+            if (pe.quality_score !== undefined && pe.quality_score !== null) {
+              lines.push(`      Quality score: ${pe.quality_score}/10`);
+            }
+            if (pe.quality_rationale) lines.push(`      Rationale: ${pe.quality_rationale}`);
+            if (pe.branding_artifacts) {
+              const ba = pe.branding_artifacts;
+              if (ba.has_logo) lines.push(`      Has logo: yes`);
+              if (ba.has_cover_photo) lines.push(`      Has cover photo: yes`);
+              if (ba.photo_count !== undefined && ba.photo_count !== null) {
+                lines.push(`      Photo count: ${ba.photo_count}`);
               }
             }
           }

@@ -2,7 +2,7 @@
  * Gold Standard System — Sprint 0 service tests
  *
  * Tests IntelligenceProfileService gold-standard methods:
- *   - resolveGoldStandard delegates to resolve(category, 'gold_standards', null)
+ *   - resolveGoldStandard resolves nationwide gold-standard profile (city→state→nationwide cascade)
  *   - serializeGoldStandard produces a benchmark block with expected fields
  *   - serializeGoldStandard produces a target block with target directive
  *   - serializeGoldStandard returns empty string for empty configuration
@@ -58,7 +58,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
   });
 
   describe('resolveGoldStandard', () => {
-    it('delegates to resolve with focus=gold_standards and city=null', async () => {
+    it('resolves nationwide gold-standard profile when no city/state/platform provided', async () => {
       const fakeProfile = {
         id: 'gs-test-001',
         category_key: 'african_grocery',
@@ -67,6 +67,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
         intelligence_focus: 'gold_standards',
         reference_city: null,
         reference_state: null,
+        reference_platform: null,
         configuration_json: {},
         status: 'active',
         created_at: new Date().toISOString(),
@@ -76,15 +77,16 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
       const result = await service.resolveGoldStandard('african_grocery');
       expect(result).not.toBeNull();
       expect(result?.id).toBe('gs-test-001');
-      // resolveGoldStandard calls resolve(category, 'gold_standards', null).
-      // When city is null, normalizeReferenceCity returns null, so the
-      // resolver skips the city-specific path and goes directly to the
-      // focus-specific match (step 3), which does NOT include reference_city
-      // in the where clause. Verify focus is set and reference_city is absent.
+      // resolveGoldStandard now has its own cascade (city→state→nationwide).
+      // With no city/state/platform, it goes directly to the nationwide
+      // cross-platform layer: reference_city=null, reference_state=null,
+      // reference_platform=null, focus=gold_standards, status=active.
       const callArg = mockPrisma.mkt_intelligence_profiles.findFirst.mock.calls[0][0];
       expect(callArg.where.intelligence_focus).toBe('gold_standards');
       expect(callArg.where.status).toBe('active');
-      expect(callArg.where.reference_city).toBeUndefined();
+      expect(callArg.where.reference_city).toBeNull();
+      expect(callArg.where.reference_state).toBeNull();
+      expect(callArg.where.reference_platform).toBeNull();
     });
 
     it('returns null when no active gold-standard profile exists', async () => {
@@ -160,6 +162,218 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
       });
       const result = await service.resolve('African Grocery Store', 'gold_standards', null, 'all');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('resolveGoldStandard — scoped resolution (city→state→nationwide cascade)', () => {
+    const nationwideProfile = {
+      id: 'gs-nationwide-001',
+      category_key: 'beauty_supply',
+      category_name: 'Beauty Supply Store',
+      version: 2,
+      intelligence_focus: 'gold_standards',
+      reference_city: null,
+      reference_state: null,
+      reference_platform: null,
+      configuration_json: { expected_fields: {}, candidates: [] },
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const cityScopedProfile = {
+      ...nationwideProfile,
+      id: 'gs-atlanta-001',
+      reference_city: 'atlanta',
+      reference_state: 'GA',
+    };
+
+    const stateScopedProfile = {
+      ...nationwideProfile,
+      id: 'gs-ga-001',
+      reference_city: null,
+      reference_state: 'GA',
+    };
+
+    it('resolves city-specific profile first when city+state provided', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA') {
+          return Promise.resolve(cityScopedProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('beauty_supply', null, 'Atlanta', 'GA');
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('gs-atlanta-001');
+    });
+
+    it('falls back to state-specific when city-specific not found', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA') {
+          return Promise.resolve(null); // no city-specific
+        }
+        if (args?.where?.reference_city === null && args?.where?.reference_state === 'GA') {
+          return Promise.resolve(stateScopedProfile); // state-specific exists
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('beauty_supply', null, 'Atlanta', 'GA');
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('gs-ga-001');
+    });
+
+    it('falls back to nationwide when no city or state profile exists', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA') {
+          return Promise.resolve(null);
+        }
+        if (args?.where?.reference_city === null && args?.where?.reference_state === 'GA') {
+          return Promise.resolve(null);
+        }
+        if (args?.where?.reference_city === null && args?.where?.reference_state === null) {
+          return Promise.resolve(nationwideProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('beauty_supply', null, 'Atlanta', 'GA');
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('gs-nationwide-001');
+    });
+
+    it('resolves state-specific profile when only state is provided (no city)', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.reference_city === null && args?.where?.reference_state === 'GA') {
+          return Promise.resolve(stateScopedProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('beauty_supply', null, null, 'GA');
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('gs-ga-001');
+    });
+
+    it('resolves nationwide when no city or state provided', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.reference_city === null && args?.where?.reference_state === null) {
+          return Promise.resolve(nationwideProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('beauty_supply');
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('gs-nationwide-001');
+    });
+
+    it('returns null when no gold-standard profile exists at any scope', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(null);
+      const result = await service.resolveGoldStandard('beauty_supply', null, 'Atlanta', 'GA');
+      expect(result).toBeNull();
+    });
+
+    it('prefers platform-specific at each geographic layer', async () => {
+      const platformProfile = { ...cityScopedProfile, reference_platform: 'google' };
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
+        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA' && args?.where?.reference_platform === 'google') {
+          return Promise.resolve(platformProfile);
+        }
+        return Promise.resolve(null);
+      });
+      const result = await service.resolveGoldStandard('beauty_supply', 'google', 'Atlanta', 'GA');
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('gs-atlanta-001');
+      expect(result?.reference_platform).toBe('google');
+    });
+  });
+
+  describe('createScopedGoldStandardProfile', () => {
+    const nationwideProfile = {
+      id: 'gs-nationwide-001',
+      category_key: 'beauty_supply',
+      category_name: 'Beauty Supply Store',
+      version: 2,
+      intelligence_focus: 'gold_standards',
+      reference_city: null,
+      reference_state: null,
+      reference_platform: null,
+      configuration_json: {
+        expected_fields: { universal: { canonical_name: 'Beauty Supply Store' } },
+        quality_gates: [{ field: 'hours', severity: 'recommended' }],
+        candidates: [{ business_name: 'Existing Nationwide Exemplar' }],
+      },
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    it('creates a scoped profile from the nationwide profile with empty candidates', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(nationwideProfile); // load nationwide
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null); // no existing scoped
+      mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({
+        ...nationwideProfile,
+        id: 'gs-atlanta-new',
+        version: 1,
+        reference_city: 'atlanta',
+        reference_state: 'GA',
+        configuration_json: {
+          expected_fields: nationwideProfile.configuration_json.expected_fields,
+          quality_gates: nationwideProfile.configuration_json.quality_gates,
+          candidates: [],
+          scan_metadata: { scoped_from: 'gs-nationwide-001', scoped_from_version: 2 },
+        },
+      });
+      const result = await service.createScopedGoldStandardProfile({
+        nationwideProfileId: 'gs-nationwide-001',
+        city: 'Atlanta',
+        state: 'GA',
+      });
+      expect(result.id).toBe('gs-atlanta-new');
+      expect(result.reference_city).toBe('atlanta');
+      expect(result.reference_state).toBe('GA');
+      expect(result.version).toBe(1);
+      // Verify the created profile has empty candidates (bar copied, slots empty)
+      const createArg = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0];
+      expect(createArg.data.candidates).toBeUndefined(); // candidates is in configuration_json
+      expect(createArg.data.configuration_json.candidates).toEqual([]);
+      expect(createArg.data.configuration_json.expected_fields).toEqual(
+        nationwideProfile.configuration_json.expected_fields,
+      );
+      expect(createArg.data.configuration_json.quality_gates).toEqual(
+        nationwideProfile.configuration_json.quality_gates,
+      );
+    });
+
+    it('is idempotent — returns existing scoped profile if one already exists', async () => {
+      const existing = { ...nationwideProfile, id: 'gs-atlanta-existing', reference_city: 'atlanta', reference_state: 'GA' };
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(nationwideProfile); // load nationwide
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(existing); // existing scoped
+      const result = await service.createScopedGoldStandardProfile({
+        nationwideProfileId: 'gs-nationwide-001',
+        city: 'Atlanta',
+        state: 'GA',
+      });
+      expect(result.id).toBe('gs-atlanta-existing');
+      expect(mockPrisma.mkt_intelligence_profiles.create).not.toHaveBeenCalled();
+    });
+
+    it('throws when nationwide profile not found', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(null);
+      await expect(
+        service.createScopedGoldStandardProfile({
+          nationwideProfileId: 'nonexistent',
+          city: 'Atlanta',
+          state: 'GA',
+        }),
+      ).rejects.toThrow(/not found or not nationwide-scoped/);
+    });
+
+    it('throws when no city or state provided', async () => {
+      await expect(
+        service.createScopedGoldStandardProfile({
+          nationwideProfileId: 'gs-nationwide-001',
+          city: null,
+          state: null,
+        }),
+      ).rejects.toThrow(/At least one of city or state/);
     });
   });
 
