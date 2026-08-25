@@ -222,6 +222,7 @@ import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
 import marketingCustomerRoutes from '../routes/marketing-customer';
 import gbpCustomerRoutes from '../routes/gbp-customer';
 import gbpOptionsSettingsRoutes from '../routes/gbp-options-settings';
+import gbpMonitorRoutes from '../routes/gbp-monitor';
 import directoryGbpPublicRoutes from '../routes/directory-gbp-public';
 import recoveryIntakePublicRoutes from '../routes/recovery-intake-public';
 
@@ -1370,6 +1371,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'admin',
     authLevel: 'admin',
     comment: 'Marketing Ops admin routes — campaigns, audits, files, files/upload (diagnostic screenshots), prompts, executions, filter flags, scorecards, deliverables, branding, gallery-token, campaigns/:id/gallery-analytics, gallery-analytics/dashboard',
+  },
+  {
+    path: '/api/admin/gbp-monitor',
+    router: gbpMonitorRoutes,
+    domain: 'admin',
+    authLevel: 'admin',
+    comment: 'GBP admin monitoring — overview, per-tenant status, job health, entitlement summary',
   },
 
   // ── Permissions ──────────────────────────────────────────────────────
