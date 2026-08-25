@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory, DirectoryProfileEntry } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory, DirectoryProfileEntry, IntelligenceProfile } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
@@ -173,6 +173,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     originRegions: [] as string[],
   });
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  // Active gold-standard profiles, loaded once on mount. Used to autofill
+  // city/state when an operator selects a category for a gold-standards
+  // campaign — if a scoped profile exists for that category, its
+  // reference_city/reference_state pre-populate the form so the operator
+  // doesn't have to re-type them for each new campaign.
+  const [goldStandardProfiles, setGoldStandardProfiles] = useState<IntelligenceProfile[]>([]);
   // Tracks whether the operator has manually typed in the Title field. While
   // false, intelligence-scope campaigns auto-derive the title from Category,
   // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
@@ -203,7 +209,43 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     marketingOpsService.getServiceCategories()
       .then(setServiceCategories)
       .catch(() => {});
+    // Load active gold-standard profiles for city/state autofill (below).
+    marketingOpsService.listIntelligenceProfiles('gold_standards')
+      .then(setGoldStandardProfiles)
+      .catch(() => {});
   }, []);
+
+  // ─── Gold-standards city/state autofill ───────────────────────────────
+  // When an operator selects a category for a gold-standards campaign (and
+  // they haven't already filled city/state), look up the active gold-standard
+  // profiles for that category. If a scoped profile exists (city or state
+  // set), pre-fill the form's city/state from the most specific one. This
+  // saves re-typing when an operator already has a scoped profile and is
+  // creating a new campaign for the same category/scope.
+  //
+  // Only fires in create mode (not edit — edit preserves existing values).
+  // If multiple scoped profiles exist for the same category, picks the most
+  // specific (city-scoped > state-scoped). Nationwide-only → leaves empty.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    if (form.scope !== 'intelligence') return;
+    if (form.intelligence_focus !== 'gold_standards') return;
+    if (!form.category) return;
+    // Don't override if the operator already filled city or state.
+    if (form.city || form.state) return;
+    const matches = goldStandardProfiles.filter(
+      (p) => p.category_name === form.category && (p.reference_city || p.reference_state),
+    );
+    if (matches.length === 0) return;
+    // Prefer city-scoped over state-scoped (most specific first).
+    const cityScoped = matches.find((p) => p.reference_city);
+    const chosen = cityScoped ?? matches[0];
+    setForm((prev) => ({
+      ...prev,
+      city: chosen.reference_city ?? '',
+      state: chosen.reference_state ?? '',
+    }));
+  }, [mode, form.scope, form.intelligence_focus, form.category, form.city, form.state, goldStandardProfiles]);
 
   const fetchCampaign = useCallback(async () => {
     if (mode !== 'edit' || !campaignId) return;
@@ -297,8 +339,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     const kindLabel = cap(form.intelligence_campaign_kind);
     const focusLabel = cap(form.intelligence_focus);
     const headParts = [form.category, kindLabel, focusLabel].map((s) => (s ?? '').trim()).filter(Boolean);
-    // Gold-standard campaigns are city-agnostic — the platform replaces
-    // city as the focus dimension. Append the platform to the title.
+    // Gold-standard campaigns are nationwide by default — the platform
+    // replaces city as the focus dimension. Append the platform to the title.
+    // When city/state ARE filled (scoped gold-standards campaign), append
+    // them after the platform so the title reflects the geographic scope.
     // Emerging/competitive campaigns are city-scoped, but when a specific
     // platform is selected, append it to the title so the operator can
     // distinguish a platform-targeted discovery scan from a broad one.
@@ -310,9 +354,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     } else if ((form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && form.intelligence_platform) {
       headParts.push(cap(form.intelligence_platform));
     }
-    const locParts = form.intelligence_focus === 'gold_standards'
-      ? []
-      : [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean);
+    const locParts = [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean);
     const parts = [...headParts];
     if (locParts.length > 0) parts.push(locParts.join(', '));
     const derived = parts.join(' - ');

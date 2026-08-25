@@ -5,6 +5,7 @@ import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalL
 import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult, IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 /**
  * Human-readable suffix appended to the rendered prompt when the template
@@ -947,6 +948,11 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                         <div className="text-sm">
                           <span className="font-medium text-gray-900 dark:text-white">{p.category_name}</span>
                           <span className="text-gray-500 ml-2 text-xs">v{p.version} · draft</span>
+                          {profileScopeLabel(p).kind !== 'nationwide' && (
+                            <span className={`ml-2 text-xs ${profileScopeLabel(p).kind === 'state' ? 'text-blue-600 dark:text-blue-400' : 'text-cyan-600 dark:text-cyan-400'}`}>
+                              · {profileScopeLabel(p).label}
+                            </span>
+                          )}
                         </div>
                         <Link
                           href="/settings/admin/marketing-ops/intelligence-profiles"

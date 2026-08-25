@@ -28,6 +28,7 @@ import {
   IconInfoCircle,
 } from '@tabler/icons-react';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 // ─── Types (mirror of gold-standard-scan.schema.ts output) ───────────────
 
@@ -527,11 +528,23 @@ export default function GoldStandardProfileView({ profile }: Props) {
           <Group gap="xs">
             <IconTarget size={18} />
             <Text size="sm" fw={700}>Gold Standard Profile — {config.category_name || profile.category_name}</Text>
+            {(() => {
+              const scope = profileScopeLabel(profile);
+              return (
+                <Badge size="sm" variant="dot" color={scope.color}>
+                  {scope.label}
+                </Badge>
+              );
+            })()}
           </Group>
           <Group gap="lg" wrap="wrap">
             <Stack gap={0}>
               <Text size="xs" c="dimmed">Platform Focus</Text>
               <Text size="sm" fw={500}>{platformLabel(config.platform_focus || 'all')}</Text>
+            </Stack>
+            <Stack gap={0}>
+              <Text size="xs" c="dimmed">Geographic Scope</Text>
+              <Text size="sm" fw={500}>{profileScopeLabel(profile).label}</Text>
             </Stack>
             <Stack gap={0}>
               <Text size="xs" c="dimmed">Scan Date</Text>

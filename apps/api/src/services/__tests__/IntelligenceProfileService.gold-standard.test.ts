@@ -621,6 +621,159 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
     });
   });
 
+  describe('serializeGoldStandard — exemplar cap (top 2 per platform)', () => {
+    // Saturated-niche fixture: 4 candidates × 6 platforms, all gold-standard.
+    // Mirrors the African Grocery Store establishment run that motivated the cap.
+    // quality_score varies per (candidate, platform) so we can verify the cap
+    // keeps the TOP 2 per platform and drops the rest.
+    const platforms = ['google', 'yelp', 'facebook', 'apple', 'bing', 'bbb'];
+    const candidates = [
+      { name: 'Wazobia African Market', base: 9.2 },
+      { name: 'Old World Market', base: 9.0 },
+      { name: 'Naija Pot Foods', base: 8.9 },
+      { name: 'J & B African Market', base: 8.7 },
+    ];
+    const saturatedProfile = {
+      id: 'gs-african-grocery-001',
+      category_key: 'african_grocery',
+      category_name: 'African Grocery Store',
+      version: 2,
+      intelligence_focus: 'gold_standards',
+      reference_city: null,
+      reference_state: null,
+      reference_platform: null,
+      configuration_json: {
+        expected_fields: { universal: { canonical_name: 'African Grocery Store' } },
+        candidates: candidates.map((c) => ({
+          business_name: c.name,
+          city: 'Test City',
+          platform_evaluations: platforms.map((p, i) => ({
+            platform: p,
+            profile_url: `https://example.com/${p}/${c.name.replace(/\s+/g, '-').toLowerCase()}`,
+            // Distinct score per (candidate, platform): base - 0.1 * platformIndex
+            // So Wazobia×google = 9.2, Wazobia×yelp = 9.1, ..., Wazobia×bbb = 8.7
+            // Old World×google = 9.0, ..., etc. Top 2 per platform are always
+            // Wazobia + Old World regardless of platform.
+            quality_score: Number((c.base - 0.1 * i).toFixed(1)),
+            is_gold_standard: true,
+          })),
+        })),
+      },
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any;
+
+    it('caps exemplars at top 2 per platform for role=benchmark', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'benchmark');
+      // Top 2 per platform: Wazobia (highest base) + Old World (second).
+      // Naija Pot + J&B must NOT appear in the exemplars section.
+      expect(block).toContain('Wazobia African Market');
+      expect(block).toContain('Old World Market');
+      expect(block).not.toContain('Naija Pot Foods');
+      expect(block).not.toContain('J & B African Market');
+    });
+
+    it('caps exemplars at top 2 per platform for role=discovery', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'discovery');
+      expect(block).toContain('Wazobia African Market');
+      expect(block).toContain('Old World Market');
+      expect(block).not.toContain('Naija Pot Foods');
+      expect(block).not.toContain('J & B African Market');
+    });
+
+    it('caps exemplars at top 2 per platform for role=discovery_benchmark', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'discovery_benchmark');
+      expect(block).toContain('Wazobia African Market');
+      expect(block).toContain('Old World Market');
+      expect(block).not.toContain('Naija Pot Foods');
+      expect(block).not.toContain('J & B African Market');
+    });
+
+    it('does NOT cap exemplars for role=target (fulfill keeps full pool)', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'target');
+      // Target role is exempt — all 4 candidates appear.
+      expect(block).toContain('Wazobia African Market');
+      expect(block).toContain('Old World Market');
+      expect(block).toContain('Naija Pot Foods');
+      expect(block).toContain('J & B African Market');
+    });
+
+    it('keeps the highest quality_score per platform (ranking by score desc)', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'benchmark');
+      // Wazobia×google = 9.2 (highest google score). Old World×google = 9.0.
+      // Both should appear; the block should contain both google destination URLs
+      // for Wazobia and Old World, but NOT for Naija Pot or J&B.
+      const wazobiaGoogleUrl = 'https://example.com/google/wazobia-african-market';
+      const oldWorldGoogleUrl = 'https://example.com/google/old-world-market';
+      const naijaGoogleUrl = 'https://example.com/google/naija-pot-foods';
+      expect(block).toContain(`Destination URL: ${wazobiaGoogleUrl}`);
+      expect(block).toContain(`Destination URL: ${oldWorldGoogleUrl}`);
+      expect(block).not.toContain(`Destination URL: ${naijaGoogleUrl}`);
+    });
+
+    it('emits exactly 2 destination URLs per platform (12 total) for benchmark role', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'benchmark');
+      // Count "Destination URL:" occurrences — should be 2 per platform × 6 platforms = 12.
+      const urlCount = (block.match(/Destination URL:/g) || []).length;
+      expect(urlCount).toBe(12);
+    });
+
+    it('emits all 24 destination URLs for target role (no cap)', () => {
+      const block = service.serializeGoldStandard(saturatedProfile, 'target');
+      const urlCount = (block.match(/Destination URL:/g) || []).length;
+      expect(urlCount).toBe(24);
+    });
+
+    it('handles ties on quality_score deterministically (business_name asc)', () => {
+      // Two candidates with identical quality_score on every platform.
+      // The cap should pick them alphabetically by business_name.
+      const tieProfile = {
+        ...saturatedProfile,
+        configuration_json: {
+          expected_fields: { universal: {} },
+          candidates: [
+            {
+              business_name: 'Zebra Market',
+              platform_evaluations: [
+                { platform: 'google', profile_url: 'https://example.com/zebra', quality_score: 8.0, is_gold_standard: true },
+              ],
+            },
+            {
+              business_name: 'Alpha Market',
+              platform_evaluations: [
+                { platform: 'google', profile_url: 'https://example.com/alpha', quality_score: 8.0, is_gold_standard: true },
+              ],
+            },
+            {
+              business_name: 'Mid Market',
+              platform_evaluations: [
+                { platform: 'google', profile_url: 'https://example.com/mid', quality_score: 8.0, is_gold_standard: true },
+              ],
+            },
+          ],
+        },
+      } as any;
+      const block = service.serializeGoldStandard(tieProfile, 'benchmark');
+      // Top 2 by business_name asc: Alpha Market, Mid Market. Zebra dropped.
+      expect(block).toContain('Alpha Market');
+      expect(block).toContain('Mid Market');
+      expect(block).not.toContain('Zebra Market');
+    });
+
+    it('preserves exemplar ordering by candidate insertion order in output (not re-sorted globally)', () => {
+      // The cap selects per-platform, but the output iterates candidates in
+      // their original array order. Verify Wazobia (index 0) appears before
+      // Old World (index 1) in the rendered block.
+      const block = service.serializeGoldStandard(saturatedProfile, 'benchmark');
+      const wazobiaIdx = block.indexOf('Wazobia African Market');
+      const oldWorldIdx = block.indexOf('Old World Market');
+      expect(wazobiaIdx).toBeGreaterThan(-1);
+      expect(oldWorldIdx).toBeGreaterThan(-1);
+      expect(wazobiaIdx).toBeLessThan(oldWorldIdx);
+    });
+  });
+
   describe('listActive — focus filtering', () => {
     it('passes focus filter to Prisma when provided', async () => {
       mockPrisma.mkt_intelligence_profiles.findMany.mockResolvedValue([]);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MarketingOpsService, type IntelligenceProfile, type Campaign } from '@/services/MarketingOpsService';
 import GoldStandardProfileView from './GoldStandardProfileView';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 const marketingOpsService = MarketingOpsService.getInstance();
 
@@ -168,6 +169,9 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
                   ({activeProfile.reference_platform})
                 </span>
               )}
+              <span className={`ml-2 text-xs ${profileScopeLabel(activeProfile).kind === 'nationwide' ? 'text-gray-400' : profileScopeLabel(activeProfile).kind === 'state' ? 'text-blue-600 dark:text-blue-400' : 'text-cyan-600 dark:text-cyan-400'}`}>
+                · {profileScopeLabel(activeProfile).label}
+              </span>
               <div className="text-xs text-gray-500 mt-1">
                 Updated: {activeProfile.updated_at ? new Date(activeProfile.updated_at).toLocaleDateString() : '—'}
               </div>
@@ -283,6 +287,11 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
                 <div className="text-sm">
                   <span className="font-medium text-gray-900 dark:text-white">{p.category_name}</span>
                   <span className="text-gray-500 ml-2">v{p.version}</span>
+                  {profileScopeLabel(p).kind !== 'nationwide' && (
+                    <span className={`ml-2 text-xs ${profileScopeLabel(p).kind === 'state' ? 'text-blue-600 dark:text-blue-400' : 'text-cyan-600 dark:text-cyan-400'}`}>
+                      · {profileScopeLabel(p).label}
+                    </span>
+                  )}
                 </div>
                 <a
                   href="/settings/admin/marketing-ops/intelligence-profiles"

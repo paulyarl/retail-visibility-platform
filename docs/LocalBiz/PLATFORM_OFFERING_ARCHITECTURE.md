@@ -346,7 +346,7 @@ only the instruction to the model changes.
 
 | Seek | Fulfill |
 |------|---------|
-| Category intelligence profiles are **city-aware** — `resolve(category, focus, city)` resolves city-specific profiles first, falls back to city-agnostic | Category gold standard profiles are **platform-aware** — `gold_standards[platform][]` resolves per-platform patterns, each platform evaluated independently |
+| Category intelligence profiles are **city-aware** — `resolve(category, focus, city)` resolves city-specific profiles first, falls back to city-agnostic | Category gold standard profiles are **city/state-aware + platform-aware** — `resolveGoldStandard(category, platform, city, state)` resolves city → state → nationwide, with platform-specific preferred over cross-platform at each layer |
 
 The seek side is aware of *where* the business is — a plumbing
 contractor in Zionsville resolves to a different intelligence profile
@@ -354,22 +354,30 @@ than one in Indianapolis, because the competitive landscape and
 discovery sources differ by city. The fulfill side is aware of *which
 platform* it's fixing — a business can be the gold standard for Google
 without being the standard for Yelp, because listing quality varies by
-platform.
+platform. The fulfill side is also now aware of *where* the business is
+— a beauty supply store in Atlanta resolves to a Georgia-scoped gold
+standard profile (if one exists) before falling back to the nationwide
+profile, so the audit compares against regionally-relevant exemplars
+instead of only metro-area ones.
 
 **This awareness extends to the scan itself.** A seek discovery scan has
 a **city focus** — the operator picks a city and the scan searches that
 market. A gold standard scan has a **platform focus** — the operator
 picks a platform (or "all platforms") and the scan evaluates candidates
-on that platform. The gold standard prompt is platform-aware the same
+on that platform. A gold standard **discovery** scan can optionally be
+**city/state-narrowed** — the operator picks a region and the scan
+searches for candidates in that geography only, finding strong local
+independents that a nationwide search would bury under more visible
+metro businesses. The gold standard prompt is platform-aware the same
 way the seek prompt is city-aware:
 
 | Scan property | Seek discovery | Gold standard discovery |
 |--------------|----------------|------------------------|
-| Focus dimension | City | Platform |
-| Scan parameter | `city` | `platform` (or `all`) |
-| What the scan searches | A specific city's market | A specific platform's listings (or all platforms) |
-| Profile produced | City-aware seek profile | Platform-aware gold standard profile |
-| Fallback | City-agnostic profile if no city-specific one exists | All-platforms scan if no platform-specific one exists |
+| Focus dimension | City | Platform + optional city/state |
+| Scan parameter | `city` | `platform` (or `all`) + optional `city`/`state` |
+| What the scan searches | A specific city's market | A specific platform's listings (or all platforms), optionally narrowed to a region |
+| Profile produced | City-aware seek profile | Platform-aware gold standard profile (nationwide, or city/state-scoped) |
+| Fallback | City-agnostic profile if no city-specific one exists | State-specific → nationwide if no city-specific profile exists |
 
 A platform-focused gold standard scan (e.g., "find gold standard
 candidates for African Grocery Store on Google") evaluates candidates
@@ -588,7 +596,11 @@ draft → active → retired
 
 All profiles are stored in `mkt_intelligence_profiles`:
 - Category-keyed (`category_key`)
-- City-aware (`reference_city`) — gold standards use `reference_city = NULL` (city-agnostic, nationwide)
+- City/state-aware (`reference_city`, `reference_state`) — gold standards
+  use `reference_city = NULL, reference_state = NULL` for the nationwide
+  profile (the bar). City/state-scoped gold standard profiles have
+  non-NULL values — they copy the bar from the nationwide profile but
+  hold their own per-platform candidate slots (up to 4 per platform).
 - Versioned (immutable version rows)
 - Status-gated (`draft` / `active` / `retired`)
 - JSONB-structured (`configuration_json`)
@@ -674,17 +686,37 @@ the expected fields + quality gates from them. The operator curates
 with those parameters to find additional candidates that match the
 established standard.
 
-**Gold standard campaigns are city-agnostic but platform-focused.** When
-Focus = `gold_standards`:
-- The City field becomes optional — the scan runs nationwide
-- A **Platform** dropdown appears — the operator picks which platform
-  to scan (`all`, `google`, `yelp`, `facebook`, `bbb`, etc.)
+**Gold standard campaigns are platform-focused, with optional geographic
+narrowing for discovery.** When Focus = `gold_standards`:
+- **Establishment** scans always run nationwide — they derive the bar
+  (expected_fields + quality_gates) from the best independents anywhere
+  in the country. The City field is hidden for establishment campaigns.
+- **Discovery** scans can optionally be narrowed to a city/state — the
+  operator picks a region and the scan searches for candidates in that
+  geography only. The City/State fields appear for discovery campaigns
+  and are optional. When left blank, the scan runs nationwide (same as
+  establishment).
+- A **Platform** dropdown appears for both kinds — the operator picks
+  which platform to scan (`all`, `google`, `yelp`, `facebook`, `bbb`,
+  etc.)
 - A platform-focused scan (e.g., "Google only") evaluates candidates
   only on that platform, producing higher-quality per-platform results
 - An `all`-platforms scan evaluates candidates across all platforms in
   a single pass (broader but shallower per platform)
 - The operator can run separate scans per platform — each scan's
   candidates populate that platform's slots in the gold standard profile
+
+**When a discovery scan is city/state-narrowed and the operator promotes
+a candidate:**
+- A new city/state-scoped gold standard profile is auto-created from the
+  nationwide profile (copies the bar, starts with empty candidate slots)
+- The candidate is promoted into the scoped profile's per-platform slots
+- The nationwide profile's slots are untouched — the scoped profile
+  coexists with it
+- `resolveGoldStandard(category, platform, city, state)` resolves the
+  scoped profile first, falling back to state-specific, then nationwide
+- Business audits in that region see regionally-relevant exemplars;
+  business audits elsewhere see the nationwide exemplars
 
 **Campaign naming convention.** The title auto-fill continues the
 existing intelligence campaign pattern (Category + Kind + Focus +
@@ -737,8 +769,9 @@ The admin page hosts **two separate list groups**:
 
 1. **Seek Profiles (Intelligence)** — city-aware, focus-aware profiles
    that feed the seek prompt
-2. **Gold Standard Profiles (Fulfill)** — city-agnostic, platform-aware
-   profiles that feed the fulfill prompt
+2. **Gold Standard Profiles (Fulfill)** — city/state-aware (nationwide
+   + optional scoped), platform-aware profiles that feed the fulfill
+   prompt
 
 The two lists don't mix. Each has its own Draft and Active sections.
 
@@ -907,10 +940,11 @@ populated only for niches where the website is critical to conversions.
 both the audit prompt (as benchmark) and the fulfill prompt (as target).
 Same function, same resolution, different injection point.
 
-1. Reads `campaign.category` and the campaign's tier scope
-2. Calls `IntelligenceProfileService.resolve(category, undefined, city)`
-   — gold standards are city-agnostic, so the city-agnostic fallback
-   hits
+1. Reads `campaign.category`, `campaign.city`, `campaign.state`, and the
+   campaign's tier scope
+2. Calls `IntelligenceProfileService.resolveGoldStandard(category, platform, city, state)`
+   — resolves city-specific → state-specific → nationwide, with
+   platform-specific preferred over cross-platform at each layer
 3. Extracts `expected_fields` and `gold_standards` from
    `configuration_json`
 4. For each platform in the tier scope:

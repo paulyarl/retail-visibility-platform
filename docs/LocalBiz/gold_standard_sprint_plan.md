@@ -298,7 +298,7 @@ The existing `business_analysis` audit schema (`apps/api/src/validators/business
 
 ### 3.1 Gold standards reuse `mkt_intelligence_profiles`
 
-No new table. Gold standards are stored as intelligence profiles with `reference_city = NULL` (city-agnostic) and `expected_fields` + `gold_standards` blocks in `configuration_json`. The existing draft → active → retired lifecycle and `activateIntelligenceProfileDraft` endpoint apply unchanged.
+No new table. Gold standards are stored as intelligence profiles with `reference_city = NULL, reference_state = NULL` for the nationwide profile (the bar), and non-NULL values for city/state-scoped profiles (regional exemplar slots). `expected_fields` + `gold_standards` blocks in `configuration_json`. The existing draft → active → retired lifecycle and `activateIntelligenceProfileDraft` endpoint apply unchanged.
 
 **Rationale:** the seek/fulfill parallel (architecture §2) is built on the same table, same lifecycle, same activation gate. A new table would break the symmetry and require duplicate curation UX.
 
@@ -359,7 +359,7 @@ produces a **list of businesses** the operator picks from;
 
 When Focus = `gold_standards` and Campaign Kind = `establishment`, the
 campaign bootstraps a **category gold standard profile** — the scan runs
-nationwide (city-agnostic), evaluates candidates per-platform, and the
+nationwide (always — establishment is never region-narrowed), evaluates candidates per-platform, and the
 post-import hook stores the result as a gold standard intelligence
 profile draft with `expected_fields` + `gold_standards` blocks.
 
@@ -412,6 +412,29 @@ established standard — potentially in different cities or with
 different search terms. Discovery candidates are evaluated against the
 active profile's gates and added to the platform slots if they qualify.
 
+**Discovery scans can optionally be narrowed to a city/state.** This
+gives Layer 2 a distinct purpose: filling geographic gaps the
+establishment scan structurally can't cover. The establishment scan is
+nationwide by design — it derives the bar from the best independents
+anywhere. But "best nationwide" naturally surfaces metro businesses
+with the most visible online presence. A beauty supply in rural
+Mississippi won't appear in a nationwide search even if it's the
+strongest independent in its region. A discovery scan narrowed to "the
+South" or "Mississippi" forces the analyst to dig into that geography
+and find strong local independents that pass the same nationwide bar.
+
+When a narrowed discovery candidate is promoted:
+- A city/state-scoped gold standard profile is auto-created from the
+  nationwide profile (copies `expected_fields` + `quality_gates`, starts
+  with empty `candidates[]`)
+- The candidate goes into the scoped profile's per-platform slots
+- The nationwide profile's slots are untouched
+- `resolveGoldStandard(category, platform, city, state)` resolves
+  scoped → state → nationwide, so business audits in that region get
+  regionally-relevant exemplars while audits elsewhere get nationwide
+  exemplars. The bar (`expected_fields`, `quality_gates`) is identical
+  in both — only the pattern exemplars differ.
+
 **No migration needed** — `intelligence_focus` is already `varchar(20)`
 on `mkt_campaigns`, `mkt_intelligence_profiles`,
 `mkt_prompt_templates`, `mkt_seek_batches`, and
@@ -422,9 +445,11 @@ fits. The gold standard scan prompt template is seeded with
 
 **Title auto-fill** — the existing auto-fill logic (Category + Kind +
 Focus + City, State) produces titles like "African Grocery Store -
-Establishment - Gold Standards" (gold standard campaigns are
-city-agnostic, so the city/state part is omitted or noted as
-"Nationwide").
+Establishment - Gold Standards" (gold standard establishment campaigns
+are nationwide, so the city/state part is omitted or noted as
+"Nationwide"). Gold standard discovery campaigns may include the
+city/state when narrowed (e.g., "Beauty Supply Store - Discovery - Gold
+Standards - Atlanta, GA").
 
 **Rationale:** gold standards are not a new scope — they're an
 intelligence focus. They use the same campaign infrastructure, the same
@@ -531,7 +556,7 @@ When `output_schema.name === 'gold_standard_scan'`:
 3. Distribute candidates into per-platform arrays in `configuration_json.gold_standards[platform][]`, keeping top 4 per platform by `quality_score`
 4. Call `IntelligenceProfileService.importAsDraft()` with:
    - `categoryKey` + `categoryName` from scan output
-   - `referenceCity = null` (city-agnostic, nationwide)
+   - `referenceCity = null, referenceState = null` (nationwide — establishment is always nationwide)
    - `configurationJson` with both blocks merged into any existing profile configuration
 5. The profile enters as a draft — inert until the operator activates it
 
@@ -550,7 +575,7 @@ When `output_schema.name === 'gold_standard_scan'`:
 serializeGoldStandard(category: string, role: 'benchmark' | 'target'): string
 ```
 
-1. Calls `resolve(category, undefined, undefined)` — gold standards are city-agnostic
+1. Calls `resolveGoldStandard(category, platform, city, state)` — resolves city → state → nationwide
 2. Extracts `expected_fields` and `gold_standards` from `configuration_json`
 3. For each platform with data:
    - Prepends the **platform directive** based on `role`:
@@ -917,8 +942,10 @@ scope section (lines 625-640). The current Focus radio group has
 ```
 
 **Conditional behavior when Focus = `gold_standards`:**
-- **City/State fields** — gold standard campaigns are city-agnostic
-  (nationwide scan). The City field becomes optional (not required).
+- **City/State fields** — gold standard establishment campaigns are
+  nationwide (City/State hidden). Gold standard discovery campaigns
+  show City/State as optional — when set, the scan narrows to that
+  region and promotions go into a scoped profile.
   The helper text updates: "Gold standard scans are nationwide — city
   is not required. Leave blank for a category-wide scan."
 - **Platform dropdown** (NEW) — a platform selector appears, mirroring
@@ -1188,8 +1215,10 @@ counts stay manageable. The API approach is better for scale.
 `mkt_intelligence_profiles` by category + focus + city.
 
 **Required:** when `focus = 'gold_standards'`, the resolver must:
-- Pass `referenceCity = null` (gold standards are city-agnostic)
-- Query by `(category_key, intelligence_focus = 'gold_standards', reference_city IS NULL, status = 'active')`
+- Call `resolveGoldStandard(category, platform, city, state)` — the
+  dedicated cascade resolver (city → state → nationwide, platform-aware
+  at each layer)
+- Query by `(category_key, intelligence_focus = 'gold_standards', reference_city, reference_state, reference_platform, status = 'active')`
 - Return the active gold standard profile
 
 The existing resolver may already handle this correctly if it falls

@@ -38,6 +38,7 @@ import {
   IconExternalLink,
 } from '@tabler/icons-react';
 import Link from 'next/link';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus, Campaign, CampaignScope } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
@@ -354,13 +355,14 @@ export default function IntelligenceProfilesClient() {
               <Badge size="xs" variant="dot" color={FOCUS_COLORS[profile.intelligence_focus]}>
                 {FOCUS_LABELS[profile.intelligence_focus]}
               </Badge>
-              {profile.reference_city ? (
-                <Badge size="xs" variant="dot" color="cyan">
-                  {profile.reference_city}{profile.reference_state ? `, ${profile.reference_state}` : ''}
-                </Badge>
-              ) : (
-                <Badge size="xs" variant="dot" color="gray">city-agnostic</Badge>
-              )}
+              {(() => {
+                const scope = profileScopeLabel(profile);
+                return (
+                  <Badge size="xs" variant="dot" color={scope.color}>
+                    {scope.label}
+                  </Badge>
+                );
+              })()}
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
@@ -785,7 +787,7 @@ export default function IntelligenceProfilesClient() {
       <Modal
         opened={!!viewProfile}
         onClose={closeViewer}
-        title={viewProfile ? `${viewProfile.category_name} v${viewProfile.version} — ${FOCUS_LABELS[viewProfile.intelligence_focus]}` : ''}
+        title={viewProfile ? `${viewProfile.category_name} v${viewProfile.version} — ${FOCUS_LABELS[viewProfile.intelligence_focus]}${profileScopeLabel(viewProfile).kind !== 'nationwide' ? ` · ${profileScopeLabel(viewProfile).label}` : ''}` : ''}
         size="xl"
         styles={{ body: { maxHeight: '85vh' } }}
       >
@@ -799,6 +801,14 @@ export default function IntelligenceProfilesClient() {
                 <Badge size="sm" variant="dot" color={FOCUS_COLORS[viewProfile.intelligence_focus]}>
                   {FOCUS_LABELS[viewProfile.intelligence_focus]}
                 </Badge>
+                {(() => {
+                  const scope = profileScopeLabel(viewProfile);
+                  return (
+                    <Badge size="sm" variant="dot" color={scope.color}>
+                      {scope.label}
+                    </Badge>
+                  );
+                })()}
                 <Text size="xs" c="dimmed" ff="monospace">{viewProfile.id}</Text>
               </Group>
               {viewProfile.status === 'draft' && !editMode && (

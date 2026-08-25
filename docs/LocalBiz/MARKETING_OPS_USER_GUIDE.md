@@ -1664,6 +1664,81 @@ Queue entries are not campaigns and do not appear in pipeline metrics. They are 
 
 ---
 
+## 33a. Gold Standard Profiles — `/settings/admin/marketing-ops/intelligence-profiles`
+
+**Page:** `/settings/admin/marketing-ops/intelligence-profiles` · Nav: **Intelligence Profiles** (under Admin Marketing Ops)
+
+Gold standard profiles are category-level benchmarks that define what an excellent independent business looks like for a given category. They feed two downstream flows:
+
+1. **Business audits** — the audit prompt receives a gold-standard benchmark block so the model can compare the business's actual profile against expected fields, quality gates, and pattern exemplars
+2. **Fulfill prompts** — the fix instructions reference the gold-standard target so the model knows what "good" looks like when generating repair guidance
+
+### The three layers
+
+| Layer | Campaign kind | What it does | Geographic scope |
+|-------|---------------|--------------|------------------|
+| 1. Establishment | `establishment` | Derives the bar (expected_fields + quality_gates) from the best independents nationwide; creates the gold-standard profile draft | Nationwide (always) |
+| 2. Discovery | `discovery` | Finds additional candidates against the established bar; operator promotes qualifying candidates into per-platform slots | Nationwide (default) or city/state-narrowed (optional) |
+| 3. Business audit | (downstream) | Resolves the active gold-standard profile and injects it as a benchmark block into the audit prompt | Resolves city → state → nationwide |
+
+### Layer 1: Establishment (nationwide)
+
+The establishment scan runs nationwide and derives the bar from the top 3-5 independent businesses it can find. The output is a **draft** profile that the operator reviews and activates.
+
+**Workflow:**
+1. Create a campaign: Scope = `intelligence`, Focus = `gold_standards`, Kind = `establishment`, Platform = `google` (or `all`)
+2. Run the campaign — the scan searches nationwide for well-optimized independents
+3. Review the draft profile at **Intelligence Profiles** → activate it
+4. The active profile is now the benchmark for that category
+
+### Layer 2: Discovery (optionally region-narrowed)
+
+Discovery scans evaluate additional businesses against the already-established bar. They do **not** re-derive expected fields or quality gates — they use the active profile's bar to find more candidates.
+
+**Why narrow discovery to a region?** The establishment scan naturally surfaces metro businesses with the most visible online presence. A beauty supply in rural Mississippi won't appear in a nationwide search even if it's the strongest independent in its region. A discovery scan narrowed to "the South" or "Mississippi" forces the analyst to dig into that geography and find strong local independents that pass the same nationwide bar.
+
+**Workflow:**
+1. Create a campaign: Scope = `intelligence`, Focus = `gold_standards`, Kind = `discovery`, Platform = `google`
+2. Optionally set City/State to narrow the search to a region
+3. Run the campaign — the scan evaluates candidates against the active profile's bar
+4. Review the discovery results in the campaign detail **Discovery Panel**
+5. For analyst-qualified candidates, click **"Add to [platform] slot"**
+6. The candidate is promoted into the gold-standard profile's per-platform slots (up to 4 per platform)
+
+**Per-platform independence:** A candidate can be added to Google's slot without being added to Yelp's. Each platform evaluation has its own `is_gold_standard` flag. Adding to one platform does not affect another.
+
+**Scoped promotion:** When the discovery campaign has a city/state, promoting a candidate auto-creates a city/state-scoped gold-standard profile (copies the bar from the nationwide profile, starts with empty slots). The candidate goes into the scoped profile's slots — the nationwide profile's slots are untouched. This means:
+- 4 nationwide exemplars per platform (from establishment + nationwide discovery)
+- 4 scoped exemplars per platform (from region-narrowed discovery)
+- Business audits in that region resolve the scoped profile first; audits elsewhere fall back to nationwide
+
+**Removing from a slot:** In the Gold Standard Slots card on the discovery panel, each occupant has a **"×"** remove button. Clicking it flips `is_gold_standard` to false on that platform only (preserving other platforms' flags) and creates a new active version of the profile.
+
+### Layer 3: Business audit (downstream)
+
+Business audits automatically resolve the active gold-standard profile for the campaign's category, platform, city, and state. The resolution cascade is:
+
+1. **City-specific** — `reference_city` + `reference_state` match the business's location
+2. **State-specific** — `reference_city = NULL`, `reference_state` matches
+3. **Nationwide** — `reference_city = NULL`, `reference_state = NULL`
+
+At each layer, platform-specific profiles are preferred over cross-platform. The serialized benchmark block contains:
+- Universal expected fields (the bar — identical at every scope)
+- Platform-specific expected fields
+- Quality gates
+- Pattern exemplars (the 4 per-platform slot occupants — these differ by scope)
+
+The audit directive tells the model: "Compare the business's actual profile against these expected fields and quality gates. Flag any field where the business's actual value differs from the expected value as a gap."
+
+### Reference
+
+- `docs/LocalBiz/PLATFORM_OFFERING_ARCHITECTURE.md` §2.1 (Awareness), §4.2 (Storage), §4.2a (Campaign creation)
+- `docs/LocalBiz/gold_standard_sprint_plan.md` — full sprint plan
+- `apps/api/src/services/intelligence/IntelligenceProfileService.ts` — `resolveGoldStandard`, `createScopedGoldStandardProfile`, `addGoldStandardCandidate`, `removeGoldStandardCandidate`
+- `apps/web/src/components/marketing-ops/GoldStandardDiscoveryPanel.tsx` — discovery panel with slot management UI
+
+---
+
 ## 34. Customer Portal — `/account/marketing`
 
 The customer portal is the authenticated self-service surface for business owners who have paid for Marketing Ops campaigns. It extends the existing customer architecture (same JWT, same `CustomerApiSingleton` base) — no parallel auth system.

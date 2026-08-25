@@ -7,6 +7,7 @@ import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptType, CampaignScope, IntelligenceProfile, IntelligenceFocus, IntelligenceCampaignKind } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import { useMemo } from 'react';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   seek: 'Seek',
@@ -94,20 +95,39 @@ export default function PromptLibraryClient() {
   // intelligence profiles. They are merged into the category dropdown so the
   // dropdown serves as "prompt awareness" (showing which categories have
   // profile-amplified prompts) rather than just a prompt organizer.
+  // Deduped by category_name (scoped variants share the same category).
   const profileCategoryNames = useMemo(
-    () => activeProfiles.map((p) => p.category_name).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(activeProfiles.map((p) => p.category_name).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [activeProfiles],
   );
 
-  // Maps category_name → profile record so the badge can link to the
-  // intelligence discovery workspace with the category pre-selected.
-  const profileByCategoryName = useMemo(() => {
+  // Badge entries — one per active profile, with a scope-suffixed label so
+  // scoped variants of the same category are distinguishable in the badge
+  // row (e.g. "Beauty Supply" nationwide vs "Beauty Supply · Atlanta, GA").
+  // The badge label is the key used by profileBadgeCategory state.
+  const profileBadgeEntries = useMemo(
+    () => activeProfiles
+      .filter((p) => p.category_name)
+      .map((p) => {
+        const scope = profileScopeLabel(p);
+        const label = scope.kind === 'nationwide'
+          ? p.category_name!
+          : `${p.category_name} · ${scope.label}`;
+        return { label, profile: p, category: p.category_name! };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    [activeProfiles],
+  );
+
+  // Maps badge label → profile record so the banner can look up the
+  // selected profile by its badge label (scope-aware, no collisions).
+  const profileByBadgeLabel = useMemo(() => {
     const m: Record<string, IntelligenceProfile> = {};
-    for (const p of activeProfiles) {
-      if (p.category_name) m[p.category_name] = p;
+    for (const e of profileBadgeEntries) {
+      m[e.label] = e.profile;
     }
     return m;
-  }, [activeProfiles]);
+  }, [profileBadgeEntries]);
 
   // Tracks which profile-active badge was clicked so a context banner can
   // tell the operator which category they're scoping into. The badge
@@ -247,18 +267,18 @@ export default function PromptLibraryClient() {
             themselves are category-agnostic composition markers — the category
             is selected at workspace runtime via the category → campaign
             cascade — so we do NOT set the category filter here. */}
-        {profileCategoryNames.length > 0 && (
+        {profileBadgeEntries.length > 0 && (
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Profile-active:</span>
-            {profileCategoryNames.map((cat) => {
-              const isActive = profileBadgeCategory === cat;
+            {profileBadgeEntries.map((entry) => {
+              const isActive = profileBadgeCategory === entry.label;
               return (
                 <button
-                  key={cat}
+                  key={entry.label}
                   onClick={() => {
                     setScopeFilter('intelligence');
                     setCategoryFilter('');
-                    setProfileBadgeCategory(isActive ? null : cat);
+                    setProfileBadgeCategory(isActive ? null : entry.label);
                   }}
                   className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
                     isActive
@@ -266,7 +286,7 @@ export default function PromptLibraryClient() {
                       : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-gray-400 dark:hover:border-violet-700 dark:hover:text-violet-300'
                   }`}
                 >
-                  {cat}
+                  {entry.label}
                 </button>
               );
             })}
@@ -287,12 +307,12 @@ export default function PromptLibraryClient() {
                     Intelligence templates for <strong>{profileBadgeCategory}</strong>
                   </p>
                   <p className="text-xs text-violet-700 dark:text-violet-400 mt-1">
-                    Scope switched to <code>intelligence</code>. The category profile ({profileByCategoryName[profileBadgeCategory]?.id} v{profileByCategoryName[profileBadgeCategory]?.version}) will amplify the resolved prompt.
+                    Scope switched to <code>intelligence</code>. The category profile ({profileByBadgeLabel[profileBadgeCategory]?.id} v{profileByBadgeLabel[profileBadgeCategory]?.version}) will amplify the resolved prompt.
                   </p>
                   <div className="flex items-center gap-2 mt-2">
                     {intelligenceDiscoveryTemplateIds.emerging && (
                       <Link
-                        href={`/settings/admin/marketing-ops/prompts/${intelligenceDiscoveryTemplateIds.emerging}?category=${encodeURIComponent(profileBadgeCategory)}`}
+                        href={`/settings/admin/marketing-ops/prompts/${intelligenceDiscoveryTemplateIds.emerging}?category=${encodeURIComponent(profileByBadgeLabel[profileBadgeCategory]?.category_name ?? profileBadgeCategory)}`}
                         className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300 bg-white dark:bg-neutral-800 border border-violet-300 dark:border-violet-800 rounded-lg px-2.5 py-1 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                       >
                         Emerging workspace <ArrowRight className="w-3 h-3" />
@@ -300,7 +320,7 @@ export default function PromptLibraryClient() {
                     )}
                     {intelligenceDiscoveryTemplateIds.competitive && (
                       <Link
-                        href={`/settings/admin/marketing-ops/prompts/${intelligenceDiscoveryTemplateIds.competitive}?category=${encodeURIComponent(profileBadgeCategory)}`}
+                        href={`/settings/admin/marketing-ops/prompts/${intelligenceDiscoveryTemplateIds.competitive}?category=${encodeURIComponent(profileByBadgeLabel[profileBadgeCategory]?.category_name ?? profileBadgeCategory)}`}
                         className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300 bg-white dark:bg-neutral-800 border border-violet-300 dark:border-violet-800 rounded-lg px-2.5 py-1 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                       >
                         Competitive workspace <ArrowRight className="w-3 h-3" />

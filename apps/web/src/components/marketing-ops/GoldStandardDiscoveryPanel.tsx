@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MarketingOpsService, type IntelligenceProfile, type CampaignDetail, type Audit } from '@/services/MarketingOpsService';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 const marketingOpsService = MarketingOpsService.getInstance();
 
@@ -335,7 +336,7 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
           <h4 className="text-sm font-semibold text-green-900 dark:text-green-300 mb-2">
             Active Gold Standard Profile
           </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
             <div>
               <div className="text-gray-500 dark:text-gray-400">Profile ID</div>
               <div className="font-medium text-gray-900 dark:text-white">{activeProfile.id}</div>
@@ -353,6 +354,10 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
               <div className="font-medium text-gray-900 dark:text-white">
                 {activeProfile.reference_platform ? prettyPlatform(activeProfile.reference_platform) : 'Cross-platform'}
               </div>
+            </div>
+            <div>
+              <div className="text-gray-500 dark:text-gray-400">Geographic Scope</div>
+              <div className="font-medium text-gray-900 dark:text-white">{profileScopeLabel(activeProfile).label}</div>
             </div>
           </div>
         </div>
