@@ -89,7 +89,7 @@ router.get('/overview', async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('[gbp-monitor] overview error', { error: error.message });
+    logger.error('[gbp-monitor] overview error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch GBP overview' });
   }
 });
@@ -104,34 +104,30 @@ router.get('/tenants', async (req: any, res: Response) => {
     const search = (req.query.search as string) || '';
     const verificationFilter = (req.query.verification as string) || '';
 
-    const where: any = {};
+    const linkWhere: any = {};
     if (search) {
-      where.OR = [
-        { tenant: { name: { contains: search, mode: 'insensitive' } } },
-        { tenant_id: { contains: search, mode: 'insensitive' } },
-      ];
+      linkWhere.tenant_id = { contains: search, mode: 'insensitive' };
     }
 
     const [links, total] = await Promise.all([
       prisma.mkt_customer_gbp_links.findMany({
-        where,
+        where: linkWhere,
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: {
-          tenant: {
-            select: { id: true, name: true, slug: true, subscription_tier: true },
-          },
-        },
       }),
-      prisma.mkt_customer_gbp_links.count({ where }),
+      prisma.mkt_customer_gbp_links.count({ where: linkWhere }),
     ]);
 
-    // Fetch related data for these tenants
     const tenantIds = links.map((l) => l.tenant_id);
 
-    const [locations, reviewCounts, postCounts, mediaCounts, merchantSettings] =
+    // Fetch tenants, locations, counts, and settings in parallel
+    const [tenants, locations, reviewCounts, postCounts, mediaCounts, merchantSettings] =
       await Promise.all([
+        prisma.tenants.findMany({
+          where: { id: { in: tenantIds } },
+          select: { id: true, name: true, slug: true, subscription_tier: true },
+        }),
         prisma.gbp_locations_list.findMany({
           where: { tenant_id: { in: tenantIds } },
           select: {
@@ -168,6 +164,7 @@ router.get('/tenants', async (req: any, res: Response) => {
       ]);
 
     // Build lookup maps
+    const tenantMap = new Map(tenants.map((t) => [t.id, t]));
     const locationMap = new Map(locations.map((l) => [l.tenant_id, l]));
     const reviewMap = new Map(reviewCounts.map((r) => [r.tenant_id, r._count]));
     const postMap = new Map(postCounts.map((p) => [p.tenant_id, p._count]));
@@ -175,14 +172,15 @@ router.get('/tenants', async (req: any, res: Response) => {
     const settingsMap = new Map(merchantSettings.map((s) => [s.tenant_id, s]));
 
     // Assemble tenant rows
-    let tenants = links.map((link) => {
+    let tenantRows = links.map((link) => {
+      const tenant = tenantMap.get(link.tenant_id);
       const loc = locationMap.get(link.tenant_id);
       const settings = settingsMap.get(link.tenant_id);
       return {
         tenantId: link.tenant_id,
-        tenantName: link.tenant?.name || link.tenant_id,
-        tenantSlug: link.tenant?.slug || null,
-        tier: link.tenant?.subscription_tier || null,
+        tenantName: tenant?.name || link.tenant_id,
+        tenantSlug: tenant?.slug || null,
+        tier: tenant?.subscription_tier || null,
         connected: true,
         connectedAt: link.created_at,
         verificationState: loc?.verification_state || 'UNVERIFIED',
@@ -202,7 +200,7 @@ router.get('/tenants', async (req: any, res: Response) => {
 
     // Apply verification filter after assembly
     if (verificationFilter) {
-      tenants = tenants.filter((t) =>
+      tenantRows = tenantRows.filter((t) =>
         verificationFilter === 'verified'
           ? t.verificationState === 'VERIFIED'
           : t.verificationState !== 'VERIFIED'
@@ -212,12 +210,12 @@ router.get('/tenants', async (req: any, res: Response) => {
     res.json({
       success: true,
       data: {
-        tenants,
+        tenants: tenantRows,
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       },
     });
   } catch (error: any) {
-    logger.error('[gbp-monitor] tenants error', { error: error.message });
+    logger.error('[gbp-monitor] tenants error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch GBP tenants' });
   }
 });
@@ -237,7 +235,6 @@ router.get('/jobs', async (req: any, res: Response) => {
       recentPublishedPosts,
       tenantsWithReviewsNoReply,
     ] = await Promise.all([
-      // Posts stuck in SCHEDULED past their scheduled_for
       prisma.gbp_posts.findMany({
         where: {
           status: 'SCHEDULED',
@@ -254,7 +251,6 @@ router.get('/jobs', async (req: any, res: Response) => {
         take: 20,
         orderBy: { scheduled_for: 'asc' },
       }),
-      // Recently failed posts
       prisma.gbp_posts.findMany({
         where: { status: 'FAILED' },
         select: {
@@ -268,18 +264,15 @@ router.get('/jobs', async (req: any, res: Response) => {
         take: 20,
         orderBy: { created_at: 'desc' },
       }),
-      // Reviews ingested in the last hour (review ingestion job health indicator)
       prisma.gbp_reviews.count({
         where: { google_create_time: { gte: oneHourAgo } },
       }),
-      // Posts published in the last 15 minutes (post scheduler job health indicator)
       prisma.gbp_posts.count({
         where: {
           status: 'PUBLISHED',
           published_at: { gte: fifteenMinutesAgo },
         },
       }),
-      // Reviews without a reply (actionable for operators)
       prisma.gbp_reviews.count({
         where: { review_reply: null },
       }),
@@ -291,7 +284,7 @@ router.get('/jobs', async (req: any, res: Response) => {
         reviewIngestion: {
           reviewsLastHour: recentReviews,
           reviewsAwaitingReply: tenantsWithReviewsNoReply,
-          healthy: recentReviews > 0 || true, // job may have no new reviews
+          healthy: recentReviews > 0 || true,
         },
         postScheduler: {
           stuckScheduled: stuckScheduledPosts,
@@ -303,7 +296,7 @@ router.get('/jobs', async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('[gbp-monitor] jobs error', { error: error.message });
+    logger.error('[gbp-monitor] jobs error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch GBP job health' });
   }
 });
@@ -313,14 +306,12 @@ router.get('/jobs', async (req: any, res: Response) => {
 router.get('/entitlements', async (req: any, res: Response) => {
   try {
     const [tierFeatures, bsaasPurchases, featureGrants, merchantGateOff] = await Promise.all([
-      // Tier-level GBP entitlements
       prisma.tier_features_list.findMany({
         where: { feature_key: { startsWith: 'gbp_' }, is_enabled: true },
         include: {
-          tier: { select: { tier_key: true, name: true } },
+          subscription_tiers_list: { select: { tier_key: true, name: true } },
         },
       }),
-      // BSaaS purchases for GBP features
       prisma.tenant_feature_purchases.findMany({
         where: {
           feature_key: { startsWith: 'gbp_' },
@@ -334,7 +325,6 @@ router.get('/entitlements', async (req: any, res: Response) => {
           expires_at: true,
         },
       }),
-      // Feature grants for GBP features (if table exists)
       prisma.$queryRaw`
         SELECT tenant_id, feature_key, granted_by, reason
         FROM tenant_feature_grants
@@ -342,7 +332,6 @@ router.get('/entitlements', async (req: any, res: Response) => {
         ORDER BY created_at DESC
         LIMIT 100
       ` as Promise<any[]>,
-      // Tenants with merchant gate disabled
       prisma.tenant_gbp_options_settings.findMany({
         where: {
           OR: [{ gbp_reviews_display: false }, { gbp_content_display: false }],
@@ -359,8 +348,8 @@ router.get('/entitlements', async (req: any, res: Response) => {
       success: true,
       data: {
         tierEntitlements: tierFeatures.map((tf) => ({
-          tierKey: tf.tier?.tier_key,
-          tierName: tf.tier?.name,
+          tierKey: tf.subscription_tiers_list?.tier_key,
+          tierName: tf.subscription_tiers_list?.name,
           featureKey: tf.feature_key,
           featureName: tf.feature_name,
         })),
@@ -385,7 +374,7 @@ router.get('/entitlements', async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('[gbp-monitor] entitlements error', { error: error.message });
+    logger.error('[gbp-monitor] entitlements error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch GBP entitlements' });
   }
 });
