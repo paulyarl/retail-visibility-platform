@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
+import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 export default function BatchOperationsDashboard() {
   const searchParams = useSearchParams();
@@ -100,30 +101,118 @@ export default function BatchOperationsDashboard() {
     new Set(profiles.map((p) => p.category_name || p.category_key).filter(Boolean)),
   ).sort();
 
-  // Cities filtered by selected category (only cities that have a profile for that category)
-  const availableCities = Array.from(
-    new Set(
-      profiles
-        .filter((p) => !nicheCategory || (p.category_name || p.category_key) === nicheCategory)
-        .map((p) => p.reference_city)
-        .filter((c): c is string => Boolean(c)),
-    ),
-  ).sort();
+  // Scope-aware geographic options derived from profiles for the selected
+  // category. Each option encodes a (city, state) tuple so the profile
+  // filter and queue entry can be scope-accurate:
+  //   - City-scoped profiles → { label: "Atlanta, GA", value: "atlanta|GA" }
+  //   - State-scoped profiles → { label: "Georgia (statewide)", value: "state:GA" }
+  //   - Nationwide profiles → { label: "Nationwide", value: "nationwide" }
+  // The selected value is stored in `selectedCity` (kept as string for
+  // minimal diff) and decoded via decodeScopeOption() below.
+  const availableScopeOptions = useMemo(() => {
+    const matching = profiles.filter(
+      (p) => !nicheCategory || (p.category_name || p.category_key) === nicheCategory,
+    );
+    const seen = new Set<string>();
+    const options: Array<{ label: string; value: string; city: string; state: string }> = [];
+    // City-scoped options first (most specific)
+    for (const p of matching) {
+      if (p.reference_city) {
+        const value = `${p.reference_city}|${p.reference_state ?? ''}`;
+        if (seen.has(value)) continue;
+        seen.add(value);
+        const cityLabel = p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1);
+        options.push({
+          label: p.reference_state ? `${cityLabel}, ${p.reference_state}` : cityLabel,
+          value,
+          city: p.reference_city,
+          state: p.reference_state ?? '',
+        });
+      }
+    }
+    // State-scoped options (city null, state set)
+    for (const p of matching) {
+      if (!p.reference_city && p.reference_state) {
+        const value = `state:${p.reference_state}`;
+        if (seen.has(value)) continue;
+        seen.add(value);
+        options.push({
+          label: `${p.reference_state} (statewide)`,
+          value,
+          city: '',
+          state: p.reference_state,
+        });
+      }
+    }
+    // Nationwide option (both null) — at most one entry
+    if (matching.some((p) => !p.reference_city && !p.reference_state)) {
+      options.push({
+        label: 'Nationwide',
+        value: 'nationwide',
+        city: '',
+        state: '',
+      });
+    }
+    return options.sort((a, b) => a.label.localeCompare(b.label));
+  }, [profiles, nicheCategory]);
 
-  // Profiles filtered by selected category + city (tight coupling)
+  // Decode the selected scope value into (city, state) for filtering + queue.
+  const selectedScope = useMemo(() => {
+    const opt = availableScopeOptions.find((o) => o.value === selectedCity);
+    if (opt) return { city: opt.city, state: opt.state };
+    // Fallback: raw city name (legacy URL param or unencoded value)
+    return { city: selectedCity, state: '' };
+  }, [availableScopeOptions, selectedCity]);
+
+  // Resolve a raw city name from URL params to a scope option once profiles
+  // load. The URL passes a plain city name (e.g. "atlanta") but the scope
+  // dropdown uses encoded values (e.g. "atlanta|GA"). This effect finds the
+  // matching scope option and updates selectedCity to the encoded value.
+  useEffect(() => {
+    if (!showLauncher || profiles.length === 0 || !selectedCity) return;
+    if (availableScopeOptions.some((o) => o.value === selectedCity)) return;
+    const match = availableScopeOptions.find(
+      (o) => o.city.toLowerCase() === selectedCity.toLowerCase(),
+    );
+    if (match) {
+      setSelectedCity(match.value);
+    }
+  }, [showLauncher, profiles, selectedCity, availableScopeOptions]);
+
+  // Profiles filtered by selected category + scope (tight coupling).
+  // A nationwide or state-scoped profile is valid for any city selection
+  // (it applies broadly). A city-scoped profile is only valid when the
+  // selected scope matches its city.
   const availableProfiles = profiles.filter((p) => {
     if (nicheCategory && (p.category_name || p.category_key) !== nicheCategory) return false;
-    if (selectedCity && p.reference_city && p.reference_city !== selectedCity) return false;
+    if (selectedScope.city) {
+      // City-scoped selection: include city-matching profiles + nationwide/state profiles
+      if (p.reference_city && p.reference_city !== selectedScope.city) return false;
+      // If state is also set on the scope, prefer state-matching but allow nationwide
+      if (selectedScope.state && p.reference_state && p.reference_state !== selectedScope.state && !p.reference_city) return false;
+      return true;
+    }
+    if (selectedScope.state) {
+      // State-scoped selection: include state-matching + nationwide profiles
+      if (p.reference_city) return false; // city-scoped profiles don't match a state-only selection
+      if (p.reference_state && p.reference_state !== selectedScope.state) return false;
+      return true;
+    }
+    if (selectedCity === 'nationwide') {
+      // Nationwide selection: only nationwide profiles
+      return !p.reference_city && !p.reference_state;
+    }
+    // No scope selected: show all profiles for the category
     return true;
   });
 
-  // When category changes, reset city + profile if they no longer match
+  // When category changes, reset scope + profile if they no longer match
   useEffect(() => {
-    if (selectedCity && !availableCities.includes(selectedCity)) {
+    if (selectedCity && !availableScopeOptions.some((o) => o.value === selectedCity)) {
       setSelectedCity('');
       setProfileId('');
     }
-  }, [nicheCategory, selectedCity, availableCities]);
+  }, [nicheCategory, selectedCity, availableScopeOptions]);
 
   // When city changes, reset profile if it no longer matches
   useEffect(() => {
@@ -136,17 +225,23 @@ export default function BatchOperationsDashboard() {
     }
   }, [selectedCity, profileId, availableProfiles]);
 
-  // When profile is selected, derive focus + state from it
+  // When profile is selected, derive focus + state from it. State prefers
+  // the profile's reference_state, falling back to the selected scope's state
+  // (e.g. when a state-scoped selection is made but the profile is nationwide).
   const handleProfileSelect = (id: string) => {
     setProfileId(id);
     const p = profiles.find((pr) => pr.id === id);
     setFocus(p?.intelligence_focus || '');
-    setState(p?.reference_state || '');
+    setState(p?.reference_state || selectedScope.state || '');
   };
 
-  // Check if current (category, city, profile) is already in the queue
+  // Check if current (category, scope, profile) is already in the queue.
+  // Duplicate = same category + same geographic scope (city + state).
   const isDuplicateEntry = queue.some(
-    (q) => q.nicheCategory === nicheCategory && q.city === selectedCity,
+    (q) =>
+      q.nicheCategory === nicheCategory
+      && q.city === selectedScope.city
+      && (q.state || '') === (selectedScope.state || ''),
   );
 
   const canAddToQueue = Boolean(
@@ -159,10 +254,17 @@ export default function BatchOperationsDashboard() {
     if (!p) return;
     const focusValue = (p.intelligence_focus || 'emerging') as IntelligenceFocus;
     const focusLabel = focusValue.charAt(0).toUpperCase() + focusValue.slice(1);
-    const cityLabel = selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1);
+    // Build a scope-aware label for the queue entry. For city-scoped
+    // selections, show "City, State". For state-scoped, "State (statewide)".
+    // For nationwide, "Nationwide".
+    const scopeLabel = selectedScope.city
+      ? `${selectedScope.city.charAt(0).toUpperCase() + selectedScope.city.slice(1)}${selectedScope.state ? `, ${selectedScope.state}` : ''}`
+      : selectedScope.state
+      ? `${selectedScope.state} (statewide)`
+      : 'Nationwide';
     const profileLabel = [
       p.category_name || p.category_key || p.id,
-      cityLabel,
+      scopeLabel,
       focusLabel,
       p.version ? `v${p.version}` : '',
     ].filter(Boolean).join(' - ');
@@ -173,13 +275,13 @@ export default function BatchOperationsDashboard() {
         profileId: p.id,
         profileVersion: p.version,
         nicheCategory,
-        city: selectedCity,
-        state: state.trim() || undefined,
+        city: selectedScope.city,
+        state: (selectedScope.state || state || '').trim() || undefined,
         intelligenceFocus: focusValue,
         profileLabel,
       },
     ]);
-    // Reset city + profile for next entry (keep category for rapid multi-city queueing)
+    // Reset scope + profile for next entry (keep category for rapid multi-scope queueing)
     setSelectedCity('');
     setProfileId('');
     setFocus('');
@@ -344,10 +446,10 @@ export default function BatchOperationsDashboard() {
                 </p>
               </div>
 
-              {/* Step 2: City (filtered by category) */}
+              {/* Step 2: Geographic Scope (filtered by category) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  2. City <span className="text-red-500">*</span>
+                  2. Geographic Scope <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedCity}
@@ -356,20 +458,20 @@ export default function BatchOperationsDashboard() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
                 >
                   <option value="">
-                    {nicheCategory ? 'Select a city...' : 'Select a category first'}
+                    {nicheCategory ? 'Select a scope...' : 'Select a category first'}
                   </option>
-                  {availableCities.map((city) => (
-                    <option key={city} value={city}>
-                      {city.charAt(0).toUpperCase() + city.slice(1)}
+                  {availableScopeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-gray-400 mt-1">
-                  Only cities with a matching profile for the selected category are shown.
+                  City, state, or nationwide scopes with a matching profile for the selected category.
                 </p>
-                {nicheCategory && availableCities.length === 0 && (
+                {nicheCategory && availableScopeOptions.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">
-                    No cities found with a profile for this category.
+                    No scopes found with a profile for this category.
                   </p>
                 )}
               </div>
@@ -397,18 +499,16 @@ export default function BatchOperationsDashboard() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
                   >
                     <option value="">
-                      {selectedCity ? 'Select a profile...' : 'Select a city first'}
+                      {selectedCity ? 'Select a profile...' : 'Select a scope first'}
                     </option>
                     {availableProfiles.map((p) => {
                       const focusLabel = p.intelligence_focus
                         ? p.intelligence_focus.charAt(0).toUpperCase() + p.intelligence_focus.slice(1)
                         : '';
-                      const cityLabel = p.reference_city
-                        ? p.reference_city.charAt(0).toUpperCase() + p.reference_city.slice(1)
-                        : '';
+                      const scope = profileScopeLabel(p);
                       const label = [
                         p.category_name || p.category_key || p.id,
-                        cityLabel,
+                        scope.label,
                         focusLabel,
                         p.version ? `v${p.version}` : '',
                       ].filter(Boolean).join(' - ');
@@ -426,7 +526,7 @@ export default function BatchOperationsDashboard() {
                 </p>
                 {selectedCity && availableProfiles.length === 0 && !profilesLoading && (
                   <p className="text-xs text-amber-600 mt-1">
-                    No profiles found for this category + city combination.
+                    No profiles found for this category + scope combination.
                   </p>
                 )}
               </div>
@@ -445,16 +545,16 @@ export default function BatchOperationsDashboard() {
                 </div>
               )}
 
-              {/* Derived State (read-only display, derived from the selected profile) */}
+              {/* Derived State (read-only display, derived from profile + scope) */}
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">State (derived from profile):</span>
+                <span className="text-gray-500">State (derived from profile + scope):</span>
                 {state ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
                     {state}
                   </span>
                 ) : (
                   <span className="text-xs text-gray-400 italic">
-                    No state on profile — will be left blank
+                    Nationwide — no state set
                   </span>
                 )}
               </div>
@@ -488,7 +588,7 @@ export default function BatchOperationsDashboard() {
                     <thead>
                       <tr className="border-b border-gray-200 text-left text-gray-600 bg-white">
                         <th className="py-2 px-4 font-medium">Category</th>
-                        <th className="py-2 px-4 font-medium">City</th>
+                        <th className="py-2 px-4 font-medium">Scope</th>
                         <th className="py-2 px-4 font-medium">Focus</th>
                         <th className="py-2 px-4 font-medium">Profile</th>
                         <th className="py-2 px-4 font-medium w-16"></th>
@@ -499,7 +599,11 @@ export default function BatchOperationsDashboard() {
                         <tr key={i} className="border-b border-gray-100">
                           <td className="py-2 px-4 text-gray-900">{q.nicheCategory}</td>
                           <td className="py-2 px-4 text-gray-900">
-                            {q.city.charAt(0).toUpperCase() + q.city.slice(1)}
+                            {q.city
+                              ? `${q.city.charAt(0).toUpperCase() + q.city.slice(1)}${q.state ? `, ${q.state}` : ''}`
+                              : q.state
+                              ? `${q.state} (statewide)`
+                              : 'Nationwide'}
                           </td>
                           <td className="py-2 px-4">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
