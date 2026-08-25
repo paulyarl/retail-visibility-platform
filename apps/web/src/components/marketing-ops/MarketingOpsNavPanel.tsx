@@ -19,6 +19,7 @@ import {
   IconBook,
   IconListCheck,
   IconBrain,
+  IconBuildingStore,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops/branding', label: 'Branding', icon: IconPalette, emoji: '🎨' },
   { href: '/settings/admin/marketing-ops/filter-review', label: 'Filter Review', icon: IconFilter, emoji: '🔍' },
   { href: '/settings/admin/marketing-ops/scorecards', label: 'Scorecards', icon: IconChartBar, emoji: '🏆' },
+  { href: '/settings/admin/marketing-ops/gbp', label: 'GBP Monitor', icon: IconBuildingStore, emoji: '🏪' },
 ] as const;
 
 interface MarketingOpsNavPanelProps {
