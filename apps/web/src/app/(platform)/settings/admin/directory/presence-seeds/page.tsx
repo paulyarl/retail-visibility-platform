@@ -5,8 +5,9 @@ import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   DirectoryPresenceSeedSummary,
+  DirectoryClaimRequest,
 } from '@/services/DirectoryPresenceAdminService';
-import { List, Plus, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink } from 'lucide-react';
+import { List, Plus, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,9 @@ export default function DirectoryPresenceSeedsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<{ seedId: string; token: string } | null>(null);
+  const [claimRequests, setClaimRequests] = useState<DirectoryClaimRequest[]>([]);
+  const [claimRequestsLoading, setClaimRequestsLoading] = useState(false);
+  const [claimActionId, setClaimActionId] = useState<string | null>(null);
 
   const fetchSeeds = useCallback(async () => {
     try {
@@ -112,6 +116,63 @@ export default function DirectoryPresenceSeedsPage() {
     }
   };
 
+  const fetchClaimRequests = useCallback(async () => {
+    setClaimRequestsLoading(true);
+    try {
+      const data = await directoryPresenceAdminService.listClaimRequests('pending');
+      setClaimRequests(data);
+    } catch {
+      // Non-critical — claim requests section is supplementary
+    } finally {
+      setClaimRequestsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchClaimRequests();
+  }, [fetchClaimRequests]);
+
+  const handleApproveClaim = async (requestId: string) => {
+    setClaimActionId(requestId);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const result = await directoryPresenceAdminService.approveClaimRequest(requestId);
+      if (result.success) {
+        setActionSuccess('Claim request approved. The listing has been transferred to the owner.');
+        fetchClaimRequests();
+        fetchSeeds();
+      } else {
+        setActionError(result.error || 'Failed to approve claim request');
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to approve claim request');
+    } finally {
+      setClaimActionId(null);
+    }
+  };
+
+  const handleRejectClaim = async (requestId: string) => {
+    const reason = window.prompt('Reason for rejection (optional):');
+    if (reason === null) return; // cancelled
+    setClaimActionId(requestId);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const result = await directoryPresenceAdminService.rejectClaimRequest(requestId, reason || undefined);
+      if (result.success) {
+        setActionSuccess('Claim request rejected.');
+        fetchClaimRequests();
+      } else {
+        setActionError(result.error || 'Failed to reject claim request');
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to reject claim request');
+    } finally {
+      setClaimActionId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -158,6 +219,67 @@ export default function DirectoryPresenceSeedsPage() {
           >
             Copy link
           </button>
+        </div>
+      )}
+
+      {/* Pending Claim Requests */}
+      {claimRequests.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-200 bg-amber-100">
+            <h3 className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Pending Claim Requests ({claimRequests.length})
+            </h3>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {claimRequests.map((req) => (
+              <div key={req.id} className="px-4 py-3 flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/settings/admin/directory/presence-seeds/${req.seedId}`}
+                      className="font-medium text-gray-900 hover:text-blue-600 truncate"
+                    >
+                      {req.businessName}
+                    </Link>
+                    <span className="text-xs text-gray-500">
+                      {req.category} · {req.city}, {req.state}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1 flex items-center gap-3">
+                    {req.customerEmail && (
+                      <span className="flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        {req.customerEmail}
+                      </span>
+                    )}
+                    {req.customerName && <span>{req.customerName}</span>}
+                    <span>
+                      Submitted {new Date(req.submittedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => handleApproveClaim(req.id)}
+                    disabled={claimActionId === req.id}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleRejectClaim(req.id)}
+                    disabled={claimActionId === req.id}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-red-300 text-red-700 rounded-lg text-xs font-medium hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

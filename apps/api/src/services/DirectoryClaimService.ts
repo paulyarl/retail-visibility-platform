@@ -13,7 +13,8 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
-import { generateUserId, generateUserTenantId, generateTenantKey } from '../lib/id-generator';
+import { generateUserId, generateUserTenantId, generateTenantKey, generateDirectoryClaimRequestId } from '../lib/id-generator';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { authService } from '../auth/auth.service';
 import { user_role } from '@prisma/client';
 import crypto from 'crypto';
@@ -25,6 +26,10 @@ interface ClaimAuditCtx {
   actorId?: string;
   ip?: string;
   userAgent?: string;
+  /** Customer email (for operator-approval request display) */
+  customerEmail?: string;
+  /** Customer display name (for operator-approval request display) */
+  customerName?: string;
 }
 
 export interface ClaimTokenSummary {
@@ -61,6 +66,7 @@ export interface InitiateClaimResult {
   verificationRequired: boolean;
   sentTo?: string;
   operatorApprovalRequired?: boolean;
+  requestId?: string;
   error?: string;
 }
 
@@ -240,9 +246,76 @@ class DirectoryClaimService {
 
     // No verification required — check if operator approval is needed
     if (r.operator_approval_required) {
+      // Persist a pending claim request so operators can review it.
+      // Idempotent: if a pending request already exists for this token,
+      // return the existing one rather than creating a duplicate.
+      const existing = await prisma.$queryRaw<any[]>`
+        SELECT id FROM directory_claim_requests
+        WHERE token_id = ${r.token_id} AND status = 'pending'
+        LIMIT 1
+      `;
+
+      let requestId: string;
+      if (existing[0]) {
+        requestId = existing[0].id;
+      } else {
+        requestId = generateDirectoryClaimRequestId(r.tenant_id);
+        await prisma.$executeRaw`
+          INSERT INTO directory_claim_requests (
+            id, seed_id, tenant_id, token_id,
+            customer_id, customer_email, customer_name,
+            status, submitted_at
+          ) VALUES (
+            ${requestId},
+            ${r.seed_id},
+            ${r.tenant_id},
+            ${r.token_id},
+            ${ctx?.actorId || null},
+            ${ctx?.customerEmail || null},
+            ${ctx?.customerName || null},
+            'pending',
+            now()
+          )
+        `;
+
+        // Fire a platform-scoped CRM alert so operators see it in their feed
+        try {
+          const { generateCrmAlertId } = await import('../lib/id-generator.js');
+          await prisma.$executeRaw`
+            INSERT INTO crm_alerts (
+              id, tenant_id, type, title, body, icon, is_read, is_dismissed, metadata, created_at
+            ) VALUES (
+              ${generateCrmAlertId(PLATFORM_SCOPE)},
+              ${PLATFORM_SCOPE},
+              'directory_claim_pending',
+              'Pending directory claim request',
+              ${`A business owner has submitted a claim request for a directory listing. Review and approve at Settings → Directory → Presence Seeds.`},
+              'clock',
+              false,
+              false,
+              ${JSON.stringify({ requestId, seedId: r.seed_id, tenantId: r.tenant_id })}::jsonb,
+              now()
+            )
+          `;
+        } catch (alertErr) {
+          logger.error('DirectoryClaimService.initiateClaim — CRM alert insert failed', undefined, {
+            error: (alertErr as Error).message,
+          });
+          // Non-fatal — the request row is already persisted
+        }
+
+        audit({
+          actor: ctx?.actorId,
+          actorType: ctx?.actorType,
+          action: 'directory_claim.submit_approval_request',
+          payload: { seedId: r.seed_id, tenantId: r.tenant_id, tokenId: r.token_id, requestId },
+        });
+      }
+
       return {
         verificationRequired: false,
         operatorApprovalRequired: true,
+        requestId,
       };
     }
 
@@ -465,6 +538,228 @@ class DirectoryClaimService {
       requiresPasswordSetup,
       platformUserId,
     };
+  }
+
+  // ─── Operator approval: list / approve / reject ──────────────────────
+
+  /**
+   * List claim requests for the admin review queue.
+   * Optionally filtered by status (default: pending).
+   */
+  async listClaimRequests(filters?: { status?: string }): Promise<any[]> {
+    const status = filters?.status || 'pending';
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        dcr.id,
+        dcr.seed_id,
+        dcr.tenant_id,
+        dcr.token_id,
+        dcr.customer_id,
+        dcr.customer_email,
+        dcr.customer_name,
+        dcr.status,
+        dcr.rejection_reason,
+        dcr.submitted_at,
+        dcr.reviewed_at,
+        dcr.reviewed_by,
+        dps.category,
+        dl.business_name,
+        dl.address,
+        dps.city,
+        dps.state
+      FROM directory_claim_requests dcr
+      JOIN directory_presence_seeds dps ON dps.id = dcr.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dcr.status = ${status}
+      ORDER BY dcr.submitted_at DESC
+    `;
+    return rows.map((r) => ({
+      id: r.id,
+      seedId: r.seed_id,
+      tenantId: r.tenant_id,
+      tokenId: r.token_id,
+      customerId: r.customer_id,
+      customerEmail: r.customer_email,
+      customerName: r.customer_name,
+      status: r.status,
+      rejectionReason: r.rejection_reason,
+      submittedAt: r.submitted_at,
+      reviewedAt: r.reviewed_at,
+      reviewedBy: r.reviewed_by,
+      businessName: r.business_name,
+      category: r.category,
+      address: r.address,
+      city: r.city,
+      state: r.state,
+    }));
+  }
+
+  /**
+   * Approve a pending claim request.
+   * Consumes the token, flips org_standing_mode to 'independent', promotes
+   * the customer to a platform user, and updates the request status.
+   */
+  async approveClaimRequest(
+    requestId: string,
+    adminUserId: string,
+    ctx?: ClaimAuditCtx,
+  ): Promise<ClaimResult> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        dcr.id,
+        dcr.seed_id,
+        dcr.tenant_id,
+        dcr.token_id,
+        dcr.customer_id,
+        dcr.status,
+        dct.expires_at,
+        dct.consumed_at,
+        dct.single_use,
+        dps.status AS seed_status
+      FROM directory_claim_requests dcr
+      JOIN directory_claim_tokens dct ON dct.id = dcr.token_id
+      JOIN directory_presence_seeds dps ON dps.id = dcr.seed_id
+      WHERE dcr.id = ${requestId}
+      FOR UPDATE
+    `;
+
+    if (!rows[0]) {
+      return { success: false, tenantId: '', seedId: '', message: 'request_not_found' };
+    }
+
+    const r = rows[0];
+
+    if (r.status !== 'pending') {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'request_already_reviewed' };
+    }
+
+    if (r.seed_status === 'claimed') {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'already_claimed' };
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(r.expires_at);
+
+    if (r.consumed_at && r.single_use) {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'already_claimed' };
+    }
+
+    if (now > expiresAt) {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'token_expired' };
+    }
+
+    // Consume the token
+    await prisma.$executeRaw`
+      UPDATE directory_claim_tokens
+      SET consumed_at = now(), consumed_by = ${adminUserId}
+      WHERE id = ${r.token_id}
+    `;
+
+    // Convert tenant from directory_seed to independent
+    await prisma.$executeRaw`
+      UPDATE tenants
+      SET org_standing_mode = 'independent', updated_at = now()
+      WHERE id = ${r.tenant_id}
+    `;
+
+    // Update seed status
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET status = 'claimed', claimed_at = now(), updated_at = now()
+      WHERE id = ${r.seed_id}
+    `;
+
+    // Update request status
+    await prisma.$executeRaw`
+      UPDATE directory_claim_requests
+      SET status = 'approved', reviewed_at = now(), reviewed_by = ${adminUserId}
+      WHERE id = ${requestId}
+    `;
+
+    // Promote customer to platform user if we have a customer_id
+    let platformUserId: string | undefined;
+    let userTokens: { accessToken: string; refreshToken: string } | undefined;
+    let requiresPasswordSetup = false;
+
+    if (r.customer_id) {
+      const promotion = await this.promoteCustomerToUser(r.customer_id, r.tenant_id, r.seed_id, ctx);
+      platformUserId = promotion.platformUserId;
+      userTokens = promotion.userTokens;
+      requiresPasswordSetup = promotion.requiresPasswordSetup;
+    }
+
+    audit({
+      actor: adminUserId,
+      actorType: 'user',
+      action: 'directory_claim.approve_request',
+      payload: { requestId, seedId: r.seed_id, tenantId: r.tenant_id, customerId: r.customer_id, platformUserId },
+    });
+
+    logger.info('DirectoryClaimService.approveClaimRequest', undefined, {
+      requestId, seedId: r.seed_id, tenantId: r.tenant_id, customerId: r.customer_id, platformUserId,
+    });
+
+    return {
+      success: true,
+      tenantId: r.tenant_id,
+      seedId: r.seed_id,
+      message: 'approved',
+      userTokens,
+      requiresPasswordSetup,
+      platformUserId,
+    };
+  }
+
+  /**
+   * Reject a pending claim request.
+   * Marks the token as consumed (revoked) and updates the request status.
+   */
+  async rejectClaimRequest(
+    requestId: string,
+    adminUserId: string,
+    reason: string,
+    ctx?: ClaimAuditCtx,
+  ): Promise<{ success: boolean; message: string }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, token_id, tenant_id, seed_id, status
+      FROM directory_claim_requests
+      WHERE id = ${requestId}
+      FOR UPDATE
+    `;
+
+    if (!rows[0]) {
+      return { success: false, message: 'request_not_found' };
+    }
+
+    const r = rows[0];
+
+    if (r.status !== 'pending') {
+      return { success: false, message: 'request_already_reviewed' };
+    }
+
+    // Revoke the token so it can't be used
+    await prisma.$executeRaw`
+      UPDATE directory_claim_tokens
+      SET consumed_at = now(), consumed_by = ${`platform:rejected:${adminUserId}`}
+      WHERE id = ${r.token_id}
+    `;
+
+    // Update request status
+    await prisma.$executeRaw`
+      UPDATE directory_claim_requests
+      SET status = 'rejected', reviewed_at = now(), reviewed_by = ${adminUserId},
+          rejection_reason = ${reason || null}
+      WHERE id = ${requestId}
+    `;
+
+    audit({
+      actor: adminUserId,
+      actorType: 'user',
+      action: 'directory_claim.reject_request',
+      payload: { requestId, seedId: r.seed_id, tenantId: r.tenant_id, reason },
+    });
+
+    return { success: true, message: 'rejected' };
   }
 
   /**

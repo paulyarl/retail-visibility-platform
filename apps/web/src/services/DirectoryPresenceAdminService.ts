@@ -496,6 +496,46 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const data = result.data?.data ?? result.data;
     return data;
   }
+
+  // ============================
+  // Claim Requests (Migration 246)
+  // ============================
+
+  /** GET /api/admin/directory-presence/claim-requests?status= */
+  async listClaimRequests(status?: string): Promise<DirectoryClaimRequest[]> {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/claim-requests${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.requests ?? [];
+  }
+
+  /** POST /api/admin/directory-presence/claim-requests/:id/approve */
+  async approveClaimRequest(id: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/claim-requests/${encodeURIComponent(id)}/approve`,
+      { method: 'POST', body: JSON.stringify({}) },
+      undefined,
+      0,
+    );
+    return { success: result.success, error: result.error };
+  }
+
+  /** POST /api/admin/directory-presence/claim-requests/:id/reject */
+  async rejectClaimRequest(id: string, reason?: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/claim-requests/${encodeURIComponent(id)}/reject`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+      undefined,
+      0,
+    );
+    return { success: result.success, error: result.error };
+  }
 }
 
 export interface DirectorySeedCampaignLink {
@@ -539,6 +579,30 @@ export interface DirectoryCampaignDiffEntry {
   campaignValue: any;
   seedValue: any;
   changed: boolean;
+}
+
+// ============================
+// Claim Requests (operator approval flow — Migration 246)
+// ============================
+
+export interface DirectoryClaimRequest {
+  id: string;
+  seedId: string;
+  tenantId: string;
+  tokenId: string;
+  customerId: string | null;
+  customerEmail: string | null;
+  customerName: string | null;
+  status: string;
+  rejectionReason: string | null;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  businessName: string;
+  category: string;
+  address: string;
+  city: string;
+  state: string;
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();

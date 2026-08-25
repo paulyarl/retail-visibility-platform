@@ -644,7 +644,7 @@ export class CustomerAuthService {
    * Cached in CustomerAuthContext and refreshed on login, claim, and purchase events.
    */
   async computeContexts(customerId: string): Promise<CustomerContexts> {
-    const [activeRels, orders, campaigns, revenue] = await Promise.all([
+    const [activeRels, orders, campaigns, revenue, claimedSeeds] = await Promise.all([
       prisma.customer_tenant_relationships.count({
         where: { customer_id: customerId, is_active: true },
       }),
@@ -657,11 +657,21 @@ export class CustomerAuthService {
       prisma.marketing_revenue.count({
         where: { customer_id: customerId },
       }),
+      // Directory claim: customer owns a claimed directory seed via
+      // linked_user_id → user_tenants → directory_presence_seeds
+      prisma.$queryRaw<any[]>`
+        SELECT 1
+        FROM directory_presence_seeds dps
+        JOIN user_tenants ut ON ut.tenant_id = dps.tenant_id
+        JOIN customers c ON c.linked_user_id = ut.user_id
+        WHERE c.id = ${customerId} AND dps.status = 'claimed'
+        LIMIT 1
+      `,
     ]);
 
     return {
       storefront: activeRels > 0 || orders > 0,
-      platform: campaigns > 0 || revenue > 0,
+      platform: campaigns > 0 || revenue > 0 || claimedSeeds.length > 0,
     };
   }
 

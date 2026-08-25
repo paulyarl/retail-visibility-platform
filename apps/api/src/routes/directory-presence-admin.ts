@@ -9,6 +9,9 @@
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
  *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
  *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
+ *   GET    /api/admin/directory/claim-requests           — list claim requests
+ *   POST   /api/admin/directory/claim-requests/:id/approve — approve claim request
+ *   POST   /api/admin/directory/claim-requests/:id/reject  — reject claim request
  *
  * All routes require PLATFORM_ADMIN or PLATFORM_SUPPORT auth.
  */
@@ -16,6 +19,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
 import { logger } from '../logger';
@@ -788,6 +792,99 @@ router.post('/presence-seeds/:id/campaign-links/:campaignId/sync', requirePlatfo
       });
     }
     res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+// ====================
+// Claim Requests (operator approval flow — Migration 246)
+// ====================
+
+/** GET /api/admin/directory/claim-requests — list claim requests (default: pending) */
+router.get('/claim-requests', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const status = (req.query.status as string) || 'pending';
+    const requests = await DirectoryClaimService.listClaimRequests({ status });
+    res.json({ success: true, requests });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/claim-requests] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/claim-requests/:id/approve — approve a pending claim request */
+router.post('/claim-requests/:id/approve', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const adminUserId = (req as any).user?.userId || (req as any).user?.id;
+    const result = await DirectoryClaimService.approveClaimRequest(id, adminUserId, {
+      actorType: 'user',
+      actorId: adminUserId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        request_not_found: 404,
+        request_already_reviewed: 409,
+        already_claimed: 409,
+        token_expired: 410,
+      };
+      return res.status(statusMap[result.message] || 400).json({ error: result.message });
+    }
+
+    res.json({
+      success: true,
+      tenantId: result.tenantId,
+      seedId: result.seedId,
+      message: 'approved',
+      platformUserId: result.platformUserId,
+    });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/claim-requests/:id/approve] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/claim-requests/:id/reject — reject a pending claim request */
+const rejectSchema = z.object({
+  reason: z.string().min(1).max(500).optional(),
+});
+
+router.post('/claim-requests/:id/reject', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = rejectSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const adminUserId = (req as any).user?.userId || (req as any).user?.id;
+    const result = await DirectoryClaimService.rejectClaimRequest(id, adminUserId, validation.data.reason || '', {
+      actorType: 'user',
+      actorId: adminUserId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        request_not_found: 404,
+        request_already_reviewed: 409,
+      };
+      return res.status(statusMap[result.message] || 400).json({ error: result.message });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/claim-requests/:id/reject] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 

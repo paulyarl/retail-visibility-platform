@@ -70,10 +70,20 @@ router.post('/claim/:token/initiate', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'token_required' });
     }
 
+    // Extract customer info (if authenticated) for operator-approval requests
+    const customer = (req as any).customer;
+    const platformUser = (req as any).user;
+    const actorId = customer?.id || platformUser?.id;
+    const customerEmail = customer?.email || platformUser?.email;
+    const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
+
     const result = await DirectoryClaimService.initiateClaim(token, {
       actorType: 'customer',
+      actorId,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
+      customerEmail,
+      customerName,
     } as any);
 
     if (result.error) {
@@ -90,6 +100,7 @@ router.post('/claim/:token/initiate', async (req: Request, res: Response) => {
       verificationRequired: result.verificationRequired,
       sentTo: result.sentTo,
       operatorApprovalRequired: result.operatorApprovalRequired,
+      requestId: result.requestId,
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/claim/:token/initiate] Error:', undefined, {

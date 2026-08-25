@@ -1226,6 +1226,16 @@ export function generateDirectoryClaimTokenString(): string {
 }
 
 /**
+ * Generate a directory_claim_requests ID.
+ * Format: dcr-{tenantKey}-{nanoid12}
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryClaimRequestId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `dcr-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate a directory_enrichment_tokens ID.
  * Format: det-{tenantKey}-{nanoid12}
  * URL-safe, readable, unique, tenant-traceable
