@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -8,17 +8,84 @@ import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import { customerAddressesService } from '@/services/CustomerAddressesService';
 import customerCouponWalletService from '@/services/CustomerCouponWalletService';
-import { Package, MapPin, ShoppingBag, Clock, TrendingUp, Download, Ticket } from 'lucide-react';
+import marketingCustomerService, {
+  CustomerPortalOverview,
+  GbpStatusResponse,
+} from '@/services/MarketingCustomerService';
+import {
+  Package, MapPin, ShoppingBag, Clock, TrendingUp, Download, Ticket,
+  ChevronDown, Briefcase, Building2, Star, ArrowRight, CheckCircle,
+} from 'lucide-react';
 import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
 import { clientLogger } from '@/lib/client-logger';
 
+// ─── Collapsible Section wrapper ─────────────────────────────────────────
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  defaultOpen = true,
+  viewAllHref,
+  viewAllLabel = 'View All',
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  defaultOpen?: boolean;
+  viewAllHref?: string;
+  viewAllLabel?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 flex-1 text-left"
+        >
+          <Icon className="w-5 h-5 text-gray-500" />
+          <CardTitle>{title}</CardTitle>
+          <ChevronDown
+            className={`w-4 h-4 text-gray-400 transition-transform ml-1 ${open ? '' : '-rotate-90'}`}
+          />
+        </button>
+        {viewAllHref && (
+          <Link href={viewAllHref}>
+            <Button variant="ghost" size="sm">{viewAllLabel}</Button>
+          </Link>
+        )}
+      </CardHeader>
+      {open && <CardContent>{children}</CardContent>}
+    </Card>
+  );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+function formatPrice(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatDate(date: string | null): string {
+  if (!date) return '—';
+  return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────
 export default function AccountOverviewPage() {
-  const { customer } = useCustomerAuth();
+  const { customer, contexts } = useCustomerAuth();
   const [recentOrders, setRecentOrders] = useState<CustomerOrder[]>([]);
   const [digitalDownloadsCount, setDigitalDownloadsCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
   const [savedCouponCount, setSavedCouponCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Marketing / platform data
+  const [marketingOverview, setMarketingOverview] = useState<CustomerPortalOverview | null>(null);
+  const [gbpStatus, setGbpStatus] = useState<GbpStatusResponse | null>(null);
+  const [marketingLoading, setMarketingLoading] = useState(false);
+  const [gbpLoading, setGbpLoading] = useState(false);
+
+  const isPlatform = contexts?.platform === true;
 
   useEffect(() => {
     if (customer?.email) {
@@ -29,15 +96,18 @@ export default function AccountOverviewPage() {
     }
   }, [customer?.email, customer?.id]);
 
+  // Load marketing + GBP data only when platform context is active
+  useEffect(() => {
+    if (!isPlatform) return;
+    loadMarketingOverview();
+    loadGbpStatus();
+  }, [isPlatform]);
+
   const loadRecentOrders = async () => {
     if (!customer?.email) return;
-    
     try {
-      // Load recent orders
       const result = await customerOrderService.getCustomerOrders(customer.email, 1, 5);
       setRecentOrders(result.orders);
-
-      // Count digital downloads from recent orders
       let digitalCount = 0;
       for (const order of result.orders) {
         for (const item of order.items) {
@@ -47,11 +117,9 @@ export default function AccountOverviewPage() {
         }
       }
       setDigitalDownloadsCount(digitalCount);
-
-      // Load address count
       try {
-        const result = await customerAddressesService.listAddresses();
-        setAddressCount(result.addresses?.length || 0);
+        const addrResult = await customerAddressesService.listAddresses();
+        setAddressCount(addrResult.addresses?.length || 0);
       } catch (addressError) {
         clientLogger.error('Failed to load addresses:', { detail: addressError });
         setAddressCount(0);
@@ -74,6 +142,30 @@ export default function AccountOverviewPage() {
       setSavedCouponCount(0);
     }
   };
+
+  const loadMarketingOverview = useCallback(async () => {
+    setMarketingLoading(true);
+    try {
+      const data = await marketingCustomerService.getOverview();
+      setMarketingOverview(data);
+    } catch {
+      // Non-critical
+    } finally {
+      setMarketingLoading(false);
+    }
+  }, []);
+
+  const loadGbpStatus = useCallback(async () => {
+    setGbpLoading(true);
+    try {
+      const data = await marketingCustomerService.getGbpStatus();
+      setGbpStatus(data);
+    } catch {
+      // Non-critical
+    } finally {
+      setGbpLoading(false);
+    }
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -167,56 +259,230 @@ export default function AccountOverviewPage() {
         </Link>
       </div>
 
-      {/* Recent Orders */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent Orders</CardTitle>
-          <Link href="/account/orders">
-            <Button variant="ghost" size="sm">View All</Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-500">Loading orders...</div>
-          ) : recentOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">No orders yet</p>
-              <Link href="/">
-                <Button>Start Shopping</Button>
+      {/* Recent Orders — collapsible */}
+      <CollapsibleSection
+        title="Recent Orders"
+        icon={Package}
+        defaultOpen={true}
+        viewAllHref="/account/orders"
+      >
+        {isLoading ? (
+          <div className="text-center py-8 text-gray-500">Loading orders...</div>
+        ) : recentOrders.length === 0 ? (
+          <div className="text-center py-8">
+            <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">No orders yet</p>
+            <Link href="/">
+              <Button>Start Shopping</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {recentOrders.map((order) => (
+              <Link
+                key={order.orderId}
+                href={`/account/orders/${order.orderId}`}
+                className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <Package className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{order.orderNumber}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-gray-900">${order.total.toFixed(2)}</p>
+                  <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.orderStatus)}`}>
+                    {order.orderStatus}
+                  </span>
+                </div>
               </Link>
+            ))}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* My Services — collapsible, only when platform context */}
+      {isPlatform && (
+        <CollapsibleSection
+          title="My Services"
+          icon={Briefcase}
+          defaultOpen={false}
+          viewAllHref="/account/marketing"
+        >
+          {marketingLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading services...</div>
+          ) : marketingOverview ? (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-green-600" />
+                    <p className="text-xs text-gray-500">Total Spent</p>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    {formatPrice(marketingOverview.totalSpentCents)}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <p className="text-xs text-gray-500">Active Engagements</p>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    {marketingOverview.activeEngagements}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-purple-600" />
+                    <p className="text-xs text-gray-500">Deliverables Ready</p>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    {marketingOverview.deliverablesReady}
+                  </p>
+                </div>
+              </div>
+
+              {/* Campaigns list (top 3) */}
+              {marketingOverview.campaigns.length === 0 ? (
+                <div className="text-center py-6 text-gray-500">
+                  <Briefcase className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p>No marketing campaigns yet.</p>
+                  <Link href="/account/marketing" className="text-blue-600 text-sm hover:underline mt-2 inline-block">
+                    Explore services →
+                  </Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {marketingOverview.campaigns.slice(0, 3).map((campaign) => (
+                    <Link
+                      key={campaign.id}
+                      href={`/account/marketing/campaigns/${campaign.id}`}
+                      className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                          <Briefcase className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{campaign.businessName}</p>
+                          <p className="text-xs text-gray-500">{campaign.serviceCategoryLabel}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                          campaign.status.status === 'delivered' ? 'bg-green-50 text-green-700' :
+                          campaign.status.status === 'in_production' ? 'bg-blue-50 text-blue-700' :
+                          campaign.status.status === 'active_plan' ? 'bg-purple-50 text-purple-700' :
+                          'bg-gray-50 text-gray-700'
+                        }`}>
+                          {campaign.status.label}
+                        </span>
+                        <ArrowRight className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {recentOrders.map((order) => (
-                <Link
-                  key={order.orderId}
-                  href={`/account/orders/${order.orderId}`}
-                  className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                      <Package className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{order.orderNumber}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(order.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">${order.total.toFixed(2)}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.orderStatus)}`}>
-                      {order.orderStatus}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+            <div className="text-center py-8 text-gray-500">
+              Unable to load services.{' '}
+              <Link href="/account/marketing" className="text-blue-600 hover:underline">
+                View all →
+              </Link>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </CollapsibleSection>
+      )}
+
+      {/* Google Business — collapsible, only when platform context */}
+      {isPlatform && (
+        <CollapsibleSection
+          title="Google Business"
+          icon={Building2}
+          defaultOpen={false}
+          viewAllHref="/account/marketing/gbp"
+        >
+          {gbpLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading GBP status...</div>
+          ) : gbpStatus ? (
+            <div className="space-y-4">
+              {/* Connection status */}
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-gray-50">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  gbpStatus.connected ? 'bg-green-100' : 'bg-gray-200'
+                }`}>
+                  <Building2 className={`w-5 h-5 ${gbpStatus.connected ? 'text-green-600' : 'text-gray-500'}`} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">
+                    {gbpStatus.connected ? 'Google Business Profile Connected' : 'Not Connected'}
+                  </p>
+                  {gbpStatus.location && (
+                    <p className="text-sm text-gray-500">
+                      {gbpStatus.location.name || gbpStatus.location.address}
+                    </p>
+                  )}
+                </div>
+                {!gbpStatus.connected && (
+                  <Link href="/account/marketing/gbp">
+                    <Button size="sm">Connect</Button>
+                  </Link>
+                )}
+              </div>
+
+              {/* Quick links */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Link
+                  href="/account/marketing/gbp/reviews"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
+                >
+                  <Star className="w-5 h-5 text-amber-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Reviews</p>
+                    <p className="text-xs text-gray-500">View & respond</p>
+                  </div>
+                </Link>
+                <Link
+                  href="/account/marketing/gbp/posts"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
+                >
+                  <Package className="w-5 h-5 text-blue-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Posts</p>
+                    <p className="text-xs text-gray-500">Schedule updates</p>
+                  </div>
+                </Link>
+                <Link
+                  href="/account/marketing/gbp/media"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
+                >
+                  <Download className="w-5 h-5 text-purple-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Media</p>
+                    <p className="text-xs text-gray-500">Photos & videos</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Unable to load GBP status.{' '}
+              <Link href="/account/marketing/gbp" className="text-blue-600 hover:underline">
+                View dashboard →
+              </Link>
+            </div>
+          )}
+        </CollapsibleSection>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
