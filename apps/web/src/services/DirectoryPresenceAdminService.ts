@@ -523,7 +523,8 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
-    return { success: result.success, error: result.error };
+    const error = typeof result.error === 'string' ? result.error : result.error?.message;
+    return { success: result.success, error };
   }
 
   /** POST /api/admin/directory-presence/claim-requests/:id/reject */
@@ -534,7 +535,8 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
-    return { success: result.success, error: result.error };
+    const error = typeof result.error === 'string' ? result.error : result.error?.message;
+    return { success: result.success, error };
   }
 }
 
