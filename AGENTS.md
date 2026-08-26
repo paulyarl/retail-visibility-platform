@@ -856,5 +856,32 @@ A capability module (`gbp_management`) that converts Marketing Ops prospects int
 - `apps/web/src/services/MarketingCustomerService.ts` — frontend service for all customer GBP endpoints
 - `apps/web/src/components/customer/CustomerSidebar.tsx` — GBP nav items in customer sidebar
 
+## Directory Claim Operator Approval Flow (Migration 246)
+
+Closes the gap where `DirectoryClaimService.initiateClaim` returned `operatorApprovalRequired: true` but persisted nothing — the request was lost and operators had no review queue. Also fixes `computeContexts` so directory-claim owners get platform context (and thus see Marketing/GBP nav).
+
+### Schema (Migration 246)
+- `directory_claim_requests` — pending/approved/rejected claim requests with `seed_id`, `tenant_id`, `token_id`, `customer_id`, `customer_email`, `customer_name`, `status`, `rejection_reason`, `submitted_at`, `reviewed_at`, `reviewed_by`
+
+### Backend
+- `apps/api/src/services/DirectoryClaimService.ts`:
+  - `initiateClaim` now persists a `directory_claim_requests` row (status='pending') when `operator_approval_required` is true (idempotent — returns existing pending request if one exists for the token)
+  - Fires a platform-scoped CRM alert (`type='directory_claim_pending'`) so operators see it in their feed
+  - `listClaimRequests({ status })` — admin review queue (joins seed + listing for business name, category, location)
+  - `approveClaimRequest(requestId, adminUserId)` — consumes token, flips `org_standing_mode` to `independent`, promotes customer to platform user, updates request to 'approved'
+  - `rejectClaimRequest(requestId, adminUserId, reason)` — revokes token, updates request to 'rejected'
+- `apps/api/src/routes/directory-presence-public.ts` — `/initiate` now passes `customerEmail` + `customerName` from auth context to `initiateClaim`
+- `apps/api/src/routes/directory-presence-admin.ts` — new routes:
+  - `GET  /api/admin/directory-presence/claim-requests` — list (default: pending)
+  - `POST /api/admin/directory-presence/claim-requests/:id/approve` — approve
+  - `POST /api/admin/directory-presence/claim-requests/:id/reject` — reject
+- `apps/api/src/services/CustomerAuthService.computeContexts` — now grants `platform: true` when the customer owns a claimed directory seed (via `linked_user_id → user_tenants → directory_presence_seeds` join), so directory-claim owners see Marketing + GBP nav groups in `CustomerSidebar`
+- `apps/api/src/lib/id-generator.ts` — `generateDirectoryClaimRequestId(tenantId)` (`dcr-{tenantKey}-{nanoid12}`)
+
+### Frontend
+- `apps/web/src/services/DirectoryPresenceAdminService.ts` — `listClaimRequests`, `approveClaimRequest`, `rejectClaimRequest` methods + `DirectoryClaimRequest` interface
+- `apps/web/src/app/(platform)/settings/admin/directory/presence-seeds/page.tsx` — "Pending Claim Requests" section at the top of the seeds page with Approve/Reject buttons (only renders when there are pending requests)
+
+
 
 
