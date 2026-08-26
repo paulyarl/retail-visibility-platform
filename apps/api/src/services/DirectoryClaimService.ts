@@ -507,6 +507,22 @@ class DirectoryClaimService {
       await this.ensureOwnerMembership(userId, r.tenant_id);
     }
 
+    // Provision the GBP identity bridge so the customer can manage their
+    // Google Business Profile from the portal (Subsystem 0 §1).
+    let gbpBridgeCustomerId: string | undefined;
+    if (isCustomer) {
+      gbpBridgeCustomerId = userId;
+    } else {
+      // Platform user — resolve the customer via linked_user_id
+      const custRows = await prisma.$queryRaw<any[]>`
+        SELECT id FROM customers WHERE linked_user_id = ${userId} LIMIT 1
+      `;
+      gbpBridgeCustomerId = custRows[0]?.id;
+    }
+    if (gbpBridgeCustomerId) {
+      await this.provisionGbpBridge(gbpBridgeCustomerId, r.tenant_id);
+    }
+
     audit({
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
@@ -688,6 +704,13 @@ class DirectoryClaimService {
       requiresPasswordSetup = promotion.requiresPasswordSetup;
     }
 
+    // Provision the GBP identity bridge (Subsystem 0 §1). Only when we have
+    // a customer_id; if the request was approved without one, the bridge is
+    // provisioned later by linkCustomerToClaimRequest.
+    if (r.customer_id) {
+      await this.provisionGbpBridge(r.customer_id, r.tenant_id);
+    }
+
     audit({
       actor: adminUserId,
       actorType: 'user',
@@ -835,6 +858,10 @@ class DirectoryClaimService {
     userTokens = promotion.userTokens;
     requiresPasswordSetup = promotion.requiresPasswordSetup;
 
+    // Provision the GBP identity bridge (Subsystem 0 §1). This is the
+    // catch-all path for claims approved without a customer_id.
+    await this.provisionGbpBridge(customerId, r.tenant_id);
+
     audit({
       actor: adminUserId,
       actorType: 'user',
@@ -855,6 +882,30 @@ class DirectoryClaimService {
       requiresPasswordSetup,
       platformUserId,
     };
+  }
+
+  /**
+   * Provision the GBP identity bridge (mkt_customer_gbp_links) for a claimed
+   * directory seed. The seed tenant is the lightweight tenant row reused per
+   * GBP Authorized Management Suite Spec §4 Subsystem 0 §1. Without this
+   * bridge, the customer gets platform context (sees the GBP nav link) but
+   * 404s on every /api/customer/marketing/gbp/* endpoint because
+   * CustomerGBPAccessService.resolveTenant() finds no link row.
+   *
+   * Non-fatal: a provisioning failure must not block the claim. The customer
+   * can still access the portal; GBP features show "no connection" until the
+   * bridge is provisioned (e.g. by re-claiming or by an admin manually
+   * creating the link).
+   */
+  private async provisionGbpBridge(customerId: string, tenantId: string): Promise<void> {
+    try {
+      const { default: CustomerGBPAccessService } = await import('./CustomerGBPAccessService');
+      await CustomerGBPAccessService.getInstance().provisionLink(customerId, tenantId);
+    } catch (e) {
+      logger.warn('[DirectoryClaim] GBP bridge provisioning failed (non-fatal)', undefined, {
+        customerId, tenantId, error: (e as Error).message,
+      });
+    }
   }
 
   /**

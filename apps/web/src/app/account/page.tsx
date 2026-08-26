@@ -428,7 +428,7 @@ export default function AccountOverviewPage() {
                   </p>
                   {gbpStatus.location && (
                     <p className="text-sm text-gray-500">
-                      {gbpStatus.location.name || gbpStatus.location.address}
+                      {gbpStatus.location.locationName || gbpStatus.location.businessName || gbpStatus.location.address}
                     </p>
                   )}
                 </div>
