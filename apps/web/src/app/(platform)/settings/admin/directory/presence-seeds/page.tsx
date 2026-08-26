@@ -180,7 +180,7 @@ export default function DirectoryPresenceSeedsPage() {
   };
 
   const handleLinkCustomer = async (requestId: string) => {
-    const customerId = window.prompt('Enter the customer ID (e.g. cust-...) to link to this approved claim:');
+    const customerId = window.prompt('Enter the customer ID or email to link to this approved claim:');
     if (!customerId) return; // cancelled
     setClaimActionId(requestId);
     setActionError(null);

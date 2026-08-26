@@ -890,7 +890,7 @@ router.post('/claim-requests/:id/reject', requirePlatformAdmin, async (req: Requ
 
 /** POST /api/admin/directory/claim-requests/:id/link-customer — retroactively link a customer to an approved claim */
 const linkCustomerSchema = z.object({
-  customerId: z.string().min(1).max(60),
+  customerId: z.string().min(1).max(255),
 });
 
 router.post('/claim-requests/:id/link-customer', requirePlatformAdmin, async (req: Request, res: Response) => {

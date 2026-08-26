@@ -804,9 +804,11 @@ class DirectoryClaimService {
       return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'request_already_linked' };
     }
 
-    // Load customer to get email + name for the request row
+    // Load customer by ID or email (accepts both for operator convenience)
     const customerRows = await prisma.$queryRaw<any[]>`
-      SELECT id, email, first_name, last_name FROM customers WHERE id = ${customerId} LIMIT 1
+      SELECT id, email, first_name, last_name FROM customers
+      WHERE id = ${customerId} OR email = ${customerId} OR email = LOWER(${customerId})
+      LIMIT 1
     `;
     if (!customerRows[0]) {
       return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'customer_not_found' };
