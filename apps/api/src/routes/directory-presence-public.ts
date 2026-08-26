@@ -18,6 +18,7 @@ import DirectoryClaimService from '../services/DirectoryClaimService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
+import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
 import crypto from 'crypto';
 
 const router = Router();
@@ -63,7 +64,7 @@ router.get('/claim/:token', async (req: Request, res: Response) => {
 });
 
 /** POST /api/public/directory/claim/:token/initiate — initiate claim (sends OTP if required) */
-router.post('/claim/:token/initiate', async (req: Request, res: Response) => {
+router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     if (!token || typeof token !== 'string') {
@@ -111,7 +112,7 @@ router.post('/claim/:token/initiate', async (req: Request, res: Response) => {
 });
 
 /** POST /api/public/directory/claim/:token/accept — bind owner (requires auth) */
-router.post('/claim/:token/accept', async (req: Request, res: Response) => {
+router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     if (!token || typeof token !== 'string') {

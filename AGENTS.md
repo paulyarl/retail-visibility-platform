@@ -875,7 +875,11 @@ Closes the gap where `DirectoryClaimService.initiateClaim` returned `operatorApp
   - `GET  /api/admin/directory-presence/claim-requests` — list (default: pending)
   - `POST /api/admin/directory-presence/claim-requests/:id/approve` — approve
   - `POST /api/admin/directory-presence/claim-requests/:id/reject` — reject
-- `apps/api/src/services/CustomerAuthService.computeContexts` — now grants `platform: true` when the customer owns a claimed directory seed (via `linked_user_id → user_tenants → directory_presence_seeds` join), so directory-claim owners see Marketing + GBP nav groups in `CustomerSidebar`
+- `apps/api/src/services/CustomerAuthService.computeContexts` — now grants `platform: true` when the customer owns a claimed directory seed via three paths:
+  1. `linked_user_id → user_tenants → directory_presence_seeds` (customer was promoted)
+  2. `directory_claim_requests.customer_id` matches (customer_id was captured on initiate)
+  3. `directory_claim_requests.customer_email` matches customer's email AND status='approved' (covers the case where `/initiate` ran before `optionalCustomerAuth` was added, so `customer_id` was null but email was stored)
+- `apps/api/src/routes/directory-presence-public.ts` — `/initiate` and `/accept` now apply `optionalAuth` + `optionalCustomerAuth` middleware so `req.customer` is populated for authenticated owners (previously the public route didn't parse customer JWTs, so `customer_id` was never stored on claim requests)
 - `apps/api/src/lib/id-generator.ts` — `generateDirectoryClaimRequestId(tenantId)` (`dcr-{tenantKey}-{nanoid12}`)
 
 ### Frontend

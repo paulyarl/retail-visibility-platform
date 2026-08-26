@@ -657,14 +657,27 @@ export class CustomerAuthService {
       prisma.marketing_revenue.count({
         where: { customer_id: customerId },
       }),
-      // Directory claim: customer owns a claimed directory seed via
-      // linked_user_id → user_tenants → directory_presence_seeds
+      // Directory claim: customer owns a claimed directory seed.
+      // Path 1: customer was promoted (linked_user_id → user_tenants → seeds)
+      // Path 2: approved claim request by customer_id (covers cases where
+      //         promotion didn't run because customer_id was captured late)
+      // Path 3: approved claim request by customer_email (covers cases where
+      //         the /initiate route didn't have optionalCustomerAuth so
+      //         customer_id was null but email was stored on the request)
       prisma.$queryRaw<any[]>`
         SELECT 1
         FROM directory_presence_seeds dps
-        JOIN user_tenants ut ON ut.tenant_id = dps.tenant_id
-        JOIN customers c ON c.linked_user_id = ut.user_id
-        WHERE c.id = ${customerId} AND dps.status = 'claimed'
+        LEFT JOIN user_tenants ut ON ut.tenant_id = dps.tenant_id
+        LEFT JOIN customers c ON c.linked_user_id = ut.user_id
+        LEFT JOIN directory_claim_requests dcr ON dcr.seed_id = dps.id
+        WHERE dps.status = 'claimed'
+          AND (
+            c.id = ${customerId}
+            OR dcr.customer_id = ${customerId}
+            OR (dcr.customer_email IS NOT NULL
+                AND dcr.customer_email = (SELECT email FROM customers WHERE id = ${customerId})
+                AND dcr.status = 'approved')
+          )
         LIMIT 1
       `,
     ]);
