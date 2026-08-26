@@ -763,6 +763,99 @@ class DirectoryClaimService {
   }
 
   /**
+   * Link a customer to an already-approved claim request.
+   *
+   * Used to retroactively associate a customer with a claim that was approved
+   * without a customer_id (because the /initiate route didn't have
+   * optionalCustomerAuth at the time). Also runs promoteCustomerToUser so
+   * the customer gets linked_user_id + user_tenants OWNER row, which
+   * grants platform context for sidebar gating.
+   */
+  async linkCustomerToClaimRequest(
+    requestId: string,
+    customerId: string,
+    adminUserId: string,
+    ctx?: ClaimAuditCtx,
+  ): Promise<ClaimResult> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        dcr.id,
+        dcr.seed_id,
+        dcr.tenant_id,
+        dcr.token_id,
+        dcr.status,
+        dcr.customer_id
+      FROM directory_claim_requests dcr
+      WHERE dcr.id = ${requestId}
+      FOR UPDATE
+    `;
+
+    if (!rows[0]) {
+      return { success: false, tenantId: '', seedId: '', message: 'request_not_found' };
+    }
+
+    const r = rows[0];
+
+    if (r.status !== 'approved') {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'request_not_approved' };
+    }
+
+    if (r.customer_id) {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'request_already_linked' };
+    }
+
+    // Load customer to get email + name for the request row
+    const customerRows = await prisma.$queryRaw<any[]>`
+      SELECT id, email, first_name, last_name FROM customers WHERE id = ${customerId} LIMIT 1
+    `;
+    if (!customerRows[0]) {
+      return { success: false, tenantId: r.tenant_id, seedId: r.seed_id, message: 'customer_not_found' };
+    }
+    const customer = customerRows[0];
+    const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || null;
+
+    // Update the request row with customer info
+    await prisma.$executeRaw`
+      UPDATE directory_claim_requests
+      SET customer_id = ${customerId},
+          customer_email = ${customer.email},
+          customer_name = ${customerName}
+      WHERE id = ${requestId}
+    `;
+
+    // Promote the customer to a platform user + create OWNER membership
+    let platformUserId: string | undefined;
+    let userTokens: { accessToken: string; refreshToken: string } | undefined;
+    let requiresPasswordSetup = false;
+
+    const promotion = await this.promoteCustomerToUser(customerId, r.tenant_id, r.seed_id, ctx);
+    platformUserId = promotion.platformUserId;
+    userTokens = promotion.userTokens;
+    requiresPasswordSetup = promotion.requiresPasswordSetup;
+
+    audit({
+      actor: adminUserId,
+      actorType: 'user',
+      action: 'directory_claim.link_customer',
+      payload: { requestId, seedId: r.seed_id, tenantId: r.tenant_id, customerId, platformUserId },
+    });
+
+    logger.info('DirectoryClaimService.linkCustomerToClaimRequest', undefined, {
+      requestId, seedId: r.seed_id, tenantId: r.tenant_id, customerId, platformUserId,
+    });
+
+    return {
+      success: true,
+      tenantId: r.tenant_id,
+      seedId: r.seed_id,
+      message: 'linked',
+      userTokens,
+      requiresPasswordSetup,
+      platformUserId,
+    };
+  }
+
+  /**
    * Promote a customer to a platform user and create an OWNER membership.
    *
    * - If the customer already has `linked_user_id`, reuse that user.

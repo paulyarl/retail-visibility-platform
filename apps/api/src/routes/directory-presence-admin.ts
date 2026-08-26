@@ -888,4 +888,50 @@ router.post('/claim-requests/:id/reject', requirePlatformAdmin, async (req: Requ
   }
 });
 
+/** POST /api/admin/directory/claim-requests/:id/link-customer — retroactively link a customer to an approved claim */
+const linkCustomerSchema = z.object({
+  customerId: z.string().min(1).max(60),
+});
+
+router.post('/claim-requests/:id/link-customer', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = linkCustomerSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const adminUserId = (req as any).user?.userId || (req as any).user?.id;
+    const result = await DirectoryClaimService.linkCustomerToClaimRequest(id, validation.data.customerId, adminUserId, {
+      actorType: 'user',
+      actorId: adminUserId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        request_not_found: 404,
+        request_not_approved: 400,
+        request_already_linked: 409,
+        customer_not_found: 404,
+      };
+      return res.status(statusMap[result.message] || 400).json({ error: result.message });
+    }
+
+    res.json({
+      success: true,
+      tenantId: result.tenantId,
+      seedId: result.seedId,
+      message: 'linked',
+      platformUserId: result.platformUserId,
+    });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/claim-requests/:id/link-customer] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;

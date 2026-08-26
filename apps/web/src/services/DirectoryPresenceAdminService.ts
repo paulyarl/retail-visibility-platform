@@ -538,6 +538,18 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const error = typeof result.error === 'string' ? result.error : result.error?.message;
     return { success: result.success, error };
   }
+
+  /** POST /api/admin/directory-presence/claim-requests/:id/link-customer */
+  async linkCustomerToClaimRequest(id: string, customerId: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/claim-requests/${encodeURIComponent(id)}/link-customer`,
+      { method: 'POST', body: JSON.stringify({ customerId }) },
+      undefined,
+      0,
+    );
+    const error = typeof result.error === 'string' ? result.error : result.error?.message;
+    return { success: result.success, error };
+  }
 }
 
 export interface DirectorySeedCampaignLink {

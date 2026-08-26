@@ -85,7 +85,7 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     try {
       const result = await this.makeDefaultRequest<any>(
         `/api/public/directory/claim/${encodeURIComponent(token)}/initiate`,
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify({}), headers: this.getCustomerAuthHeaders() },
         undefined,
         0,
       );
@@ -105,7 +105,7 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     try {
       const result = await this.makeDefaultRequest<any>(
         `/api/public/directory/claim/${encodeURIComponent(token)}/accept`,
-        { method: 'POST', body: JSON.stringify({ otpCode }) },
+        { method: 'POST', body: JSON.stringify({ otpCode }), headers: this.getCustomerAuthHeaders() },
         undefined,
         0,
       );
@@ -118,6 +118,22 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     } catch (err: any) {
       return { success: false, error: err?.message || 'unknown' };
     }
+  }
+
+  /**
+   * Build auth headers from the customer JWT in localStorage.
+   * The claim initiate/accept endpoints use optionalCustomerAuth middleware
+   * on the backend, so sending the customer token allows the server to
+   * capture customer_id + email for operator-approval claim requests.
+   */
+  private getCustomerAuthHeaders(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    const headers: Record<string, string> = {};
+    const customerToken = localStorage.getItem('customer_auth_token');
+    if (customerToken) {
+      headers['Authorization'] = `Bearer ${customerToken}`;
+    }
+    return headers;
   }
 }
 
