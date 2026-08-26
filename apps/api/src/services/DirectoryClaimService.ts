@@ -899,7 +899,7 @@ class DirectoryClaimService {
    */
   private async provisionGbpBridge(customerId: string, tenantId: string): Promise<void> {
     try {
-      const { default: CustomerGBPAccessService } = await import('./CustomerGBPAccessService');
+      const { CustomerGBPAccessService } = await import('./CustomerGBPAccessService');
       await CustomerGBPAccessService.getInstance().provisionLink(customerId, tenantId);
     } catch (e) {
       logger.warn('[DirectoryClaim] GBP bridge provisioning failed (non-fatal)', undefined, {
