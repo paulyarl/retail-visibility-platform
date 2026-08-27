@@ -23,6 +23,7 @@ import {
   MessageSquare,
   FileText,
   Image as ImageIcon,
+  Store,
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
@@ -62,7 +63,7 @@ const sharedNavItems = [
 
 export function CustomerSidebar() {
   const pathname = usePathname();
-  const { customer, contexts, logout } = useCustomerAuth();
+  const { customer, contexts, tenantId, logout } = useCustomerAuth();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
 
   // Fetch unread alert count when platform context is active (§7.9)
@@ -159,6 +160,19 @@ export function CustomerSidebar() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Services</p>
             </div>
             {platformNavItems.map(renderNavItem)}
+          </>
+        )}
+
+        {/* My Business group — visible when the customer owns a tenant
+            (directory seed claim, GBP-scoped campaign purchase, etc.).
+            Links to the tenant dashboard where the owner can publish their
+            directory listing, manage their storefront, and access GBP tools. */}
+        {tenantId && (
+          <>
+            <div className="pt-4 pb-1 px-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Business</p>
+            </div>
+            {renderNavItem({ href: `/t/${tenantId}/dashboard`, label: 'Business Dashboard', icon: Store })}
           </>
         )}
 

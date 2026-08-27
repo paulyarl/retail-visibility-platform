@@ -642,8 +642,8 @@ produces. The pattern is consistent across all three focuses:
 | `emerging` | `establishment` | Category-city intelligence profile (terminology, synonyms, sources) | Review draft → activate seek profile |
 | `competitive` | `discovery` | List of established competitors for the category-city | Add businesses to prospect queue; create campaigns from them |
 | `competitive` | `establishment` | Category-city intelligence profile (terminology, synonyms, sources) | Review draft → activate seek profile |
-| `gold_standards` | `discovery` | List of gold standard candidate businesses for the category, evaluated per-platform | Add businesses to the category/platform gold standard slots (up to 4 per platform) |
-| `gold_standards` | `establishment` | Category gold standard profile (expected_fields + gold_standards blocks) | Review draft → activate gold standard profile |
+| `gold_standards` | `discovery` | List of gold standard candidate businesses for the category, evaluated per-platform. Optionally narrowed to a city/state to find regional exemplars the nationwide scan missed. | Add businesses to the category/platform gold standard slots (up to 4 per platform). Scoped promotions create a city/state-scoped profile. |
+| `gold_standards` | `establishment` | Category gold standard profile (expected_fields + gold_standards blocks). Always nationwide. | Review draft → activate gold standard profile |
 
 **The discovery → establishment relationship:**
 
@@ -668,10 +668,10 @@ businesses. This mirrors the existing intelligence (seek) flow:
 
 | Step | Intelligence (seek) | Gold standards |
 |------|---------------------|----------------|
-| 1. Establishment | Creates the city/category intelligence profile (terminology, synonyms, sources, evidence rules) | Creates the category/platform gold standard profile (expected_fields, quality gates, pattern exemplars) |
+| 1. Establishment | Creates the city/category intelligence profile (terminology, synonyms, sources, evidence rules) | Creates the nationwide category/platform gold standard profile (expected_fields, quality gates, pattern exemplars). Always nationwide — derives the bar from the best independents anywhere. |
 | 2. Activate | Operator reviews draft → activates the seek profile | Operator reviews draft → activates the gold standard profile |
-| 3. Discovery | Uses the active seek profile's signals to discover emerging/competitive businesses in that city | Uses the active gold standard profile's parameters to discover additional candidates for that platform |
-| 4. Act on results | Add discovered businesses to prospect queue; create campaigns | Add discovered candidates to the platform's gold standard slots (up to 4) |
+| 3. Discovery | Uses the active seek profile's signals to discover emerging/competitive businesses in that city | Uses the active gold standard profile's bar to find additional candidates. Optionally narrowed to a city/state — this is Layer 2's purpose: finding strong regional independents that a nationwide search buries under more visible metro businesses. Candidates pass the same nationwide bar; they fill scoped slots, not nationwide ones. |
+| 4. Act on results | Add discovered businesses to prospect queue; create campaigns | Add discovered candidates to the platform's gold standard slots (up to 4). Scoped promotions auto-create a city/state-scoped profile so regional exemplars coexist with nationwide ones. |
 
 **Why establishment first:** the discovery campaign needs the profile's
 signals to know what to search for. For intelligence, the establishment
@@ -680,11 +680,26 @@ to use when scanning a city. For gold standards, the establishment
 profile tells discovery what expected fields, quality gates, and
 pattern exemplars to evaluate candidates against on a platform.
 
-The establishment scan finds its own candidates nationwide and derives
-the expected fields + quality gates from them. The operator curates
-(rejects weak candidates, activates the profile). Then discovery runs
-with those parameters to find additional candidates that match the
-established standard.
+**The two layers have complementary roles:**
+- **Layer 1 (Establishment):** "What does excellence look like for this
+  category?" — derives the universal bar (expected_fields +
+  quality_gates) from the best independents nationwide, plus initial
+  pattern exemplars. Always nationwide — narrowing it would produce a
+  regionally-biased bar, defeating the purpose of a universal benchmark.
+- **Layer 2 (Discovery):** "Who exemplifies excellence in *this*
+  region?" — evaluates additional candidates against the established
+  bar. The bar doesn't change; only *where you look* changes. A
+  nationwide discovery finds more of the same metro businesses the
+  establishment scan already surfaced. A region-narrowed discovery
+  forces the analyst to dig into a specific geography and find strong
+  local independents that pass the same bar but wouldn't appear in a
+  nationwide search.
+
+Without geographic narrowing, Layer 2 has little reason to exist —
+the establishment scan already picked the strongest nationwide
+candidates, and a nationwide discovery would either find weaker ones
+or duplicates. Geographic narrowing gives Layer 2 a distinct job:
+filling regional gaps the establishment scan structurally can't cover.
 
 **Gold standard campaigns are platform-focused, with optional geographic
 narrowing for discovery.** When Focus = `gold_standards`:

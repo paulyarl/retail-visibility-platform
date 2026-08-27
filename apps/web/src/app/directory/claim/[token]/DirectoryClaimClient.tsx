@@ -18,6 +18,7 @@ import {
   Badge,
   Divider,
   TextInput,
+  PasswordInput,
   PinInput,
 } from '@mantine/core';
 import {
@@ -34,6 +35,7 @@ import {
 import directoryClaimPublicService, {
   DirectoryClaimSummary,
 } from '@/services/DirectoryClaimPublicService';
+import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -57,6 +59,13 @@ export default function DirectoryClaimClient() {
     requiresPasswordSetup?: boolean;
     userTokens?: { accessToken: string; refreshToken: string };
   } | null>(null);
+
+  // Password setup for promoted OAuth-only customers
+  const [platformPassword, setPlatformPassword] = useState('');
+  const [platformPasswordConfirm, setPlatformPasswordConfirm] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     if (!token) {
@@ -138,6 +147,48 @@ export default function DirectoryClaimClient() {
       setError(err?.message || 'claim_failed');
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const handleSetupPlatformPassword = async () => {
+    setPasswordError(null);
+
+    if (!platformPassword) {
+      setPasswordError('Password is required');
+      return;
+    }
+    if (platformPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    if (platformPassword !== platformPasswordConfirm) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const result = await customerAuthService.setupPlatformPassword(platformPassword);
+      if (result.success && result.userTokens) {
+        // Store platform tokens so the dashboard is immediately accessible
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('platform_access_token', result.userTokens.accessToken);
+          localStorage.setItem('platform_refresh_token', result.userTokens.refreshToken);
+        }
+        setPasswordSet(true);
+        // Update claimResult so the dashboard button uses the new tokens
+        setClaimResult((prev) => prev ? {
+          ...prev,
+          requiresPasswordSetup: false,
+          userTokens: result.userTokens,
+        } : prev);
+      } else {
+        setPasswordError(result.error || 'Failed to set password');
+      }
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Failed to set password');
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -336,6 +387,7 @@ export default function DirectoryClaimClient() {
   if (state === 'success') {
     const tenantId = claimResult?.tenantId;
     const hasPlatformTokens = !!claimResult?.userTokens;
+    const needsPasswordSetup = claimResult?.requiresPasswordSetup && !passwordSet;
     const upgradeHref = tenantId
       ? `/t/${tenantId}/settings/subscription/upgrade`
       : null;
@@ -366,42 +418,87 @@ export default function DirectoryClaimClient() {
               account has been created.
             </Text>
 
-            {claimResult?.requiresPasswordSetup && (
-              <Alert color="orange" variant="light" icon={<IconAlertCircle size={16} />} w="100%">
-                Your account was created from your customer profile. You&apos;ll
-                need to set a password or use social login to access your
-                dashboard for the first time.
-              </Alert>
+            {/* Password setup for OAuth-only customers who were promoted */}
+            {needsPasswordSetup && (
+              <>
+                <Alert color="orange" variant="light" icon={<IconShieldCheck size={16} />} w="100%">
+                  <Text size="sm">
+                    Your business owner account was created from your customer
+                    profile. Set a password now to secure your dashboard access.
+                    You can also use Google sign-in on the login page.
+                  </Text>
+                </Alert>
+
+                <Stack gap="sm" w="100%">
+                  <PasswordInput
+                    label="Create Dashboard Password"
+                    placeholder="Minimum 8 characters"
+                    value={platformPassword}
+                    onChange={(e) => setPlatformPassword(e.target.value)}
+                    disabled={settingPassword}
+                  />
+                  <PasswordInput
+                    label="Confirm Password"
+                    placeholder="Re-enter your password"
+                    value={platformPasswordConfirm}
+                    onChange={(e) => setPlatformPasswordConfirm(e.target.value)}
+                    disabled={settingPassword}
+                    error={passwordError || undefined}
+                  />
+                  <Button
+                    onClick={handleSetupPlatformPassword}
+                    loading={settingPassword}
+                    leftSection={<IconShieldCheck size={16} />}
+                    fullWidth
+                  >
+                    Set Password & Continue
+                  </Button>
+                </Stack>
+              </>
             )}
 
-            <Group>
-              <Button component={Link} href={goToDashboardHref} leftSection={<IconCheck size={16} />}>
-                Go to Dashboard
-              </Button>
-              {upgradeHref && (
-                <Button
-                  component={Link}
-                  href={upgradeHref}
-                  variant="light"
-                  leftSection={<IconSparkles size={16} />}
-                >
-                  Choose Your Presence Mode
-                </Button>
-              )}
-              <Button
-                component={Link}
-                href="/directory"
-                variant="subtle"
-                leftSection={<IconArrowLeft size={16} />}
-              >
-                Back to Directory
-              </Button>
-            </Group>
+            {/* Show after password is set (or if it was never needed) */}
+            {!needsPasswordSetup && (
+              <>
+                {passwordSet && (
+                  <Alert color="green" variant="light" icon={<IconCheck size={16} />} w="100%">
+                    <Text size="sm">
+                      Your dashboard password is set. You can now sign in at
+                      the login page with your email and this password.
+                    </Text>
+                  </Alert>
+                )}
 
-            <Text size="xs" c="dimmed" ta="center">
-              You&apos;ll sign in with the same email ({summary?.businessName ? 'your account email' : ''}).
-              Your dashboard is at <strong>{tenantId ? `/t/${tenantId}/dashboard` : 'your account'}</strong>.
-            </Text>
+                <Group>
+                  <Button component={Link} href={goToDashboardHref} leftSection={<IconCheck size={16} />}>
+                    Go to Dashboard
+                  </Button>
+                  {upgradeHref && (
+                    <Button
+                      component={Link}
+                      href={upgradeHref}
+                      variant="light"
+                      leftSection={<IconSparkles size={16} />}
+                    >
+                      Choose Your Presence Mode
+                    </Button>
+                  )}
+                  <Button
+                    component={Link}
+                    href="/directory"
+                    variant="subtle"
+                    leftSection={<IconArrowLeft size={16} />}
+                  >
+                    Back to Directory
+                  </Button>
+                </Group>
+
+                <Text size="xs" c="dimmed" ta="center">
+                  You&apos;ll sign in with the same email ({summary?.businessName ? 'your account email' : ''}).
+                  Your dashboard is at <strong>{tenantId ? `/t/${tenantId}/dashboard` : 'your account'}</strong>.
+                </Text>
+              </>
+            )}
           </Stack>
         </Card>
       </Container>

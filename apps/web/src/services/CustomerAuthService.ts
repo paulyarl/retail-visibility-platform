@@ -36,6 +36,7 @@ export interface CustomerAuthResponse {
   success: boolean;
   customer?: Customer;
   contexts?: CustomerContexts;
+  tenantId?: string;
   isNewCustomer?: boolean;
   tokens?: CustomerAuthTokens;
   error?: string;
@@ -44,6 +45,7 @@ export interface CustomerAuthResponse {
 class CustomerAuthService extends CustomerApiSingleton {
   private static instance: CustomerAuthService;
   private customer: Customer | null = null;
+  private tenantId: string | null = null;
 
   private constructor() {
     super('customer-auth-service', { ttl: 0 }); // No caching for auth
@@ -165,6 +167,7 @@ class CustomerAuthService extends CustomerApiSingleton {
       if (result.data?.customer) {
         this.customer = result.data.customer;
         this.setCurrentCustomer(this.customer.id, this.customer);
+        this.tenantId = (result.data as any).tenantId || null;
         // console.log('[CustomerAuthService] Customer initialized:', this.customer);
         return this.customer;
       }
@@ -486,17 +489,65 @@ class CustomerAuthService extends CustomerApiSingleton {
       const result = await this.makeDefaultRequest<{
         success: boolean;
         contexts?: CustomerContexts;
+        tenantId?: string;
       }>(
         '/api/customer-auth/me',
         { method: 'GET', credentials: 'include' },
         'customer-auth-me',
       );
       if (result.success && result.data?.contexts) {
+        this.tenantId = result.data.tenantId || null;
         return result.data.contexts;
       }
       return null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Get the owned tenant ID for the current customer (resolved from
+   * user_tenants via linked_user_id on the backend). Used by the sidebar
+   * to link to the tenant dashboard and directory listing.
+   */
+  getTenantId(): string | null {
+    return this.tenantId;
+  }
+
+  /**
+   * Set the initial platform password for a customer who was promoted to a
+   * platform user (e.g. via directory seed claim) but had no password
+   * (OAuth-only customer). Returns platform JWT tokens on success so the
+   * frontend can store them and transition to platform auth.
+   *
+   * Only works if the platform user doesn't already have a password —
+   * use changePassword for that case.
+   */
+  async setupPlatformPassword(
+    newPassword: string,
+  ): Promise<{ success: boolean; userTokens?: { accessToken: string; refreshToken: string }; error?: string }> {
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        userTokens?: { accessToken: string; refreshToken: string };
+        error?: string;
+      }>(
+        '/api/customer-auth/setup-platform-password',
+        {
+          method: 'POST',
+          body: JSON.stringify({ newPassword }),
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        },
+        'customer-auth-setup-platform-password',
+      );
+      return {
+        success: result.success,
+        userTokens: result.data?.userTokens,
+        error: result.success ? undefined : (result.data?.error || result.error as string),
+      };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to set platform password' };
     }
   }
 

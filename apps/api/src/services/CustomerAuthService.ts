@@ -31,6 +31,7 @@ export interface CustomerAuthResult {
     emailVerified: boolean;
   };
   contexts?: CustomerContexts;
+  tenantId?: string;
   error?: string;
   isNewCustomer?: boolean;
 }
@@ -712,6 +713,112 @@ export class CustomerAuthService {
   }
 
   /**
+   * Resolve the tenant ID the customer owns (via linked_user_id → user_tenants
+   * OWNER row). Returns the first owned tenant, or null if the customer doesn't
+   * own a tenant yet (e.g. hasn't claimed a directory seed or purchased a
+   * GBP-scoped campaign). Used by /me to expose the tenant ID for sidebar
+   * navigation links to the tenant dashboard and directory listing.
+   */
+  async resolveOwnedTenantId(customerId: string): Promise<string | null> {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT ut.tenant_id
+        FROM user_tenants ut
+        JOIN customers c ON c.linked_user_id = ut.user_id
+        WHERE c.id = ${customerId}
+          AND ut.role = 'OWNER'
+        ORDER BY ut.created_at ASC
+        LIMIT 1
+      `;
+      return rows[0]?.tenant_id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Set the initial platform password for a customer who was promoted to a
+   * platform user via directory seed claim (or similar) but had no password
+   * (OAuth-only customer). This establishes platform credentials so the owner
+   * can log in to /auth/login and access their tenant dashboard.
+   *
+   * Guards:
+   * - Customer must have a linked_user_id (must have been promoted)
+   * - The linked platform user must NOT already have a password_hash (or have
+   *   an empty one) — this is initial-setup only, not a password change
+   * - New password must be ≥ 8 characters
+   *
+   * Returns platform JWT tokens on success so the frontend can transition
+   * to platform auth immediately after setup.
+   */
+  async setupPlatformPassword(
+    customerId: string,
+    newPassword: string,
+  ): Promise<{ success: boolean; userTokens?: { accessToken: string; refreshToken: string }; error?: string }> {
+    if (!newPassword || newPassword.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters' };
+    }
+
+    // Load customer with linked_user_id
+    const customerRows = await prisma.$queryRaw<any[]>`
+      SELECT id, linked_user_id FROM customers WHERE id = ${customerId} LIMIT 1
+    `;
+    if (!customerRows[0]) {
+      return { success: false, error: 'customer_not_found' };
+    }
+    const customer = customerRows[0];
+
+    if (!customer.linked_user_id) {
+      return { success: false, error: 'no_linked_user' };
+    }
+
+    // Load the platform user — check they don't already have a password
+    const userRows = await prisma.$queryRaw<any[]>`
+      SELECT id, email, password_hash, is_active FROM users WHERE id = ${customer.linked_user_id} LIMIT 1
+    `;
+    if (!userRows[0]) {
+      return { success: false, error: 'platform_user_not_found' };
+    }
+    const user = userRows[0];
+
+    if (user.password_hash && user.password_hash.length > 0) {
+      return { success: false, error: 'password_already_set' };
+    }
+
+    // Hash the new password and update the platform user
+    const passwordHash = await hash(newPassword, 12);
+    await prisma.$executeRaw`
+      UPDATE users SET password_hash = ${passwordHash}, updated_at = now()
+      WHERE id = ${user.id}
+    `;
+
+    // Generate platform JWT tokens
+    const { authService } = await import('../auth/auth.service');
+    const { user_role } = await import('@prisma/client');
+    const tenantRows = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id FROM user_tenants WHERE user_id = ${user.id} ORDER BY created_at ASC
+    `;
+    const tenantIds = tenantRows.map((r) => r.tenant_id);
+
+    const payload = {
+      id: user.id,
+      userId: user.id,
+      email: user.email,
+      role: user_role.USER,
+      tenantIds,
+    };
+
+    const accessToken = authService.generateAccessToken(payload);
+    const refreshToken = authService.generateRefreshToken(payload);
+
+    logger.info('[CustomerAuth] Platform password set for promoted customer', undefined, {
+      customerId, platformUserId: user.id,
+    });
+
+    return { success: true, userTokens: { accessToken, refreshToken } };
+  }
+
+  /**
    * Build a CustomerAuthResult with contexts computed (§4.2).
    * Used by register/login/verifyEmail/oauthLogin/resetPassword so every
    * auth response carries the context signals for frontend sidebar gating.
@@ -721,10 +828,12 @@ export class CustomerAuthService {
     extra?: { isNewCustomer?: boolean; error?: string; success?: boolean },
   ): Promise<CustomerAuthResult> {
     const contexts = await this.computeContexts(customer.id);
+    const tenantId = await this.resolveOwnedTenantId(customer.id);
     return {
       success: extra?.success ?? true,
       customer: this.formatCustomer(customer),
       contexts,
+      tenantId: tenantId || undefined,
       isNewCustomer: extra?.isNewCustomer,
       error: extra?.error,
     };

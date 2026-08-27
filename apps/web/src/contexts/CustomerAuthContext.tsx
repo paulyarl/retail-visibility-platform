@@ -17,6 +17,7 @@ interface CustomerAuthContextType {
   // State
   customer: Customer | null;
   contexts: CustomerContexts | null;
+  tenantId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -43,6 +44,7 @@ interface CustomerAuthProviderProps {
 export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [contexts, setContexts] = useState<CustomerContexts | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +59,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
           // Fetch context signals after init (§4.2)
           const ctxResult = await customerAuthService.getContexts();
           if (ctxResult) setContexts(ctxResult);
+          setTenantId(customerAuthService.getTenantId());
         }
         setIsLoading(false);
       } catch (err) {
@@ -86,6 +89,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       if (result.success && result.customer) {
         setCustomer(result.customer);
         if (result.contexts) setContexts(result.contexts);
+        if (result.tenantId) setTenantId(result.tenantId);
       } else {
         setError(result.error || 'Login failed');
       }
@@ -116,6 +120,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       if (result.success && result.customer) {
         setCustomer(result.customer);
         if (result.contexts) setContexts(result.contexts);
+        if (result.tenantId) setTenantId(result.tenantId);
       } else {
         setError(result.error || 'Registration failed');
       }
@@ -136,6 +141,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       await customerAuthService.logout();
       setCustomer(null);
       setContexts(null);
+      setTenantId(null);
     } catch (err) {
       clientLogger.error('[CustomerAuthContext] Logout error:', { detail: err });
       setCustomer(null); // Clear anyway
@@ -160,6 +166,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       if (result.success && result.customer) {
         setCustomer(result.customer);
         if (result.contexts) setContexts(result.contexts);
+        if (result.tenantId) setTenantId(result.tenantId);
       } else {
         setError(result.error || 'OAuth login failed');
       }
@@ -200,6 +207,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       if (result.success && result.customer) {
         setCustomer(result.customer);
         if (result.contexts) setContexts(result.contexts);
+        if (result.tenantId) setTenantId(result.tenantId);
       } else {
         setError(result.error || 'Password reset failed');
       }
@@ -251,6 +259,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
         // Refresh context signals (§4.2) — needed after claim/purchase events
         const ctxResult = await customerAuthService.getContexts();
         if (ctxResult) setContexts(ctxResult);
+        setTenantId(customerAuthService.getTenantId());
       }
     } catch (err) {
       clientLogger.error('[CustomerAuthContext] Refresh customer error:', { detail: err });
@@ -264,6 +273,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
   const value: CustomerAuthContextType = {
     customer,
     contexts,
+    tenantId,
     isAuthenticated: !!customer,
     isLoading,
     error,

@@ -56,7 +56,7 @@ is out of scope for this document.
    sheet is grounded in the same findings the operator used to pitch the
    customer. The fulfill architecture replicates the seek architecture
    across four dimensions: **awareness** (city-aware profiles →
-   platform-aware gold standards), **automatic** (resolve → inject in
+   city/state-aware + platform-aware gold standards), **automatic** (resolve → inject in
    both), **execution** (AI + external import in both), and **briefing**
    (triage + repair briefing → consume seek briefing + produce deliverable
    summary). See §3.1a.
@@ -458,7 +458,7 @@ than the variable-builder layer (which is template-specific).
 **✅ Shipped (gold standard target injection):**
 `MarketingExecutionService.resolvePrompt` for `fulfill_target` role:
 1. Resolves the active gold standard via
-   `IntelligenceProfileService.resolveGoldStandard(category)`
+   `IntelligenceProfileService.resolveGoldStandard(category, platform, city, state)`
 2. Serializes it via `serializeGoldStandard(profile, 'target')`
 3. Appends the serialized block to the rendered prompt
 4. Returns the amplified prompt with resolution metadata
@@ -531,8 +531,11 @@ the same scan.
 ### 4.2 Storage: extend the intelligence profile system
 
 Gold standards are stored in the existing `mkt_intelligence_profiles`
-table, using `reference_city = NULL` (city-agnostic, nationwide). The
-`configuration_json` is extended with two new blocks:
+table. The nationwide profile uses `reference_city = NULL,
+reference_state = NULL` (the universal bar). City/state-scoped profiles
+have non-NULL values — they copy the bar from the nationwide profile
+but hold their own per-platform candidate slots (regional exemplars).
+The `configuration_json` is extended with two new blocks:
 
 1. **`expected_fields`** — the data layer, split into:
    - **`universal`** — NAP, hours, and universal quality gates that apply
@@ -605,6 +608,15 @@ searches **nationwide** (not city-coupled) for well-optimized businesses in
 a category. A gold standard in Hawaii can serve a campaign in New Jersey —
 the gold standard is a *pattern*, not a local competitor.
 
+**Establishment scans are always nationwide** — they derive the bar
+(expected_fields + quality_gates) from the best independents anywhere.
+**Discovery scans can optionally be narrowed to a city/state** — this is
+Layer 2's purpose: finding strong regional independents that a nationwide
+search buries under more visible metro businesses. Discovery candidates
+pass the same nationwide bar; they fill scoped slots in a city/state-scoped
+profile, not nationwide ones. See `PLATFORM_OFFERING_ARCHITECTURE.md`
+§4.2a "The two layers have complementary roles."
+
 The scan produces **both layers** in a single pass:
 1. **Expected fields** — split into:
    - **Universal** (NAP, hours) — derived from the canonical record shared
@@ -622,7 +634,7 @@ The scan produces **both layers** in a single pass:
    exceed the expected fields, with their full platform configuration as
    the pattern.
 
-#### 4.3.1 Why nationwide, not city-coupled
+#### 4.3.1 Why establishment is nationwide, not city-coupled
 
 The gold standard represents the *target state* for a category — what a
 well-optimized [African grocery store] / [plumbing contractor] / [nail
@@ -632,14 +644,21 @@ category-dependent, not geography-dependent:
   and complete listings is a valid gold standard for an African grocery
   store in Kansas City — the *categories, attributes, hours patterns, and
   vertical directories* are what matter, not the local market.
-- City-coupling would artificially limit the candidate pool — a small niche
-  in a small city may have zero well-optimized businesses, but the same
-  niche in a larger market will have several.
+- City-coupling the establishment scan would artificially limit the
+  candidate pool and produce a regionally-biased bar — a small niche in a
+  small city may have zero well-optimized businesses, but the same niche
+  in a larger market will have several.
 
-The intelligence profile system already supports city-agnostic profiles
-(`reference_city = NULL`) — the gold standard scan produces city-agnostic
-profiles that resolve for any campaign in that category regardless of
-location.
+**Discovery scans, however, can be city/state-narrowed.** The bar
+doesn't change — only *where you look* changes. A narrowed discovery
+finds strong local independents that pass the same nationwide bar but
+wouldn't appear in a nationwide search. These fill scoped profile slots,
+giving business audits in that region regionally-relevant exemplars
+alongside the same universal bar. The intelligence profile system
+supports this via `reference_city` and `reference_state` on
+`mkt_intelligence_profiles` — the nationwide profile has both NULL;
+scoped profiles have non-NULL values. `resolveGoldStandard(category,
+platform, city, state)` resolves city → state → nationwide.
 
 #### 4.3.2 The scan prompt
 
@@ -903,7 +922,8 @@ hook (mirroring the `intelligence_profile` hook in
 5. Calls `IntelligenceProfileService.importAsDraft()` with:
    - `categoryKey`: from the scan output's `category_key`
    - `categoryName`: from the scan output's `category_name`
-   - `referenceCity`: **null** (city-agnostic — nationwide gold standard)
+   - `referenceCity`: **null**, `referenceState`: **null** (nationwide —
+     establishment gold standard is always nationwide)
    - `intelligenceFocus`: `'gold_standards'` (the profile is tagged with
      the gold_standards focus so it resolves via `resolveGoldStandard()`
      and appears in the Gold Standards focus filter on the admin page)
@@ -926,8 +946,10 @@ Both layers are stored per-platform. At fulfill time, the
 expected fields, quality gates, and a gold standard pattern per platform**
 in the campaign's tier scope:
 
-1. Resolves the intelligence profile for the campaign's category
-   (city-agnostic match — `referenceCity = null` preferred)
+1. Resolves the gold standard profile for the campaign's category,
+   platform, city, and state via `resolveGoldStandard(category, platform,
+   city, state)` — resolves city-specific → state-specific → nationwide,
+   with platform-specific preferred over cross-platform at each layer
 2. Reads `expected_fields.universal` — the canonical NAP, hours, and
    universal quality gates (presence, nap_accuracy, hours_accuracy).
    These apply to every platform.
@@ -993,7 +1015,7 @@ The gold standard scan has two entry points:
 `serializeGoldStandard(profile, role)` is called during prompt
 resolution for both the audit prompt (as benchmark) and the fulfill
 prompt (as target). The caller first resolves the active gold standard
-profile via `resolveGoldStandard(category)`, then passes the resolved
+profile via `resolveGoldStandard(category, platform, city, state)`, then passes the resolved
 profile to `serializeGoldStandard` which serializes all layers (universal
 fields, per-platform expected fields, quality gates, pattern exemplars,
 and destination URLs) into a text block the prompt consumes.
@@ -1592,7 +1614,7 @@ in sequence for business-scope audits:
 1. City-category intelligence profile (existing) → `{intelligence_profile}`
 2. Category gold standard profile (NEW) → appended as a benchmark block
 
-The gold standard is resolved via `IntelligenceProfileService.resolveGoldStandard(category)`
+The gold standard is resolved via `IntelligenceProfileService.resolveGoldStandard(category, platform, city, state)`
 and serialized via `serializeGoldStandard(profile, 'benchmark')`. The
 serialized block includes a "GOLD STANDARD BENCHMARK" directive per
 platform, expected fields, quality gates, and pattern exemplars with
@@ -1661,7 +1683,7 @@ the `seek_briefing` variable is not yet wired. Needs extension to also pass:
   `executed_at`).
 - `gold_standard` — serialized from the resolved intelligence profile's
   `configuration_json.gold_standard` block (§4.4). Uses
-  `IntelligenceProfileService.resolve(category, undefined, city)`.
+  `IntelligenceProfileService.resolveGoldStandard(category, platform, city, state)`.
 
 Both are text-serialized into the prompt variables. If either is missing
 (no seek execution yet, no gold standard for the category), the variable

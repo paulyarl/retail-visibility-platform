@@ -530,6 +530,88 @@ router.put('/password', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/customer-auth/setup-platform-password
+ *
+ * Set the initial platform password for a customer who was promoted to a
+ * platform user (e.g. via directory seed claim) but had no password (OAuth-only).
+ * This establishes platform credentials so the owner can log in to /auth/login
+ * and access their tenant dashboard. Only works if the platform user doesn't
+ * already have a password — use change-password for that.
+ *
+ * Body: { newPassword: string }
+ * Returns: { success, userTokens: { accessToken, refreshToken } }
+ */
+router.post('/setup-platform-password', async (req: Request, res: Response) => {
+  try {
+    const token = CustomerTokenService.extractBearerToken(req);
+    let customerId: string | null = null;
+
+    if (token) {
+      const payload = customerTokenService.verifyAccessToken(token);
+      if (payload) {
+        customerId = payload.customerId;
+      }
+    }
+
+    if (!customerId) {
+      customerId = req.cookies?.customer_session_id || null;
+    }
+
+    if (!customerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'unauthorized',
+        message: 'Not authenticated',
+      });
+    }
+
+    const { newPassword } = req.body;
+
+    if (!newPassword || typeof newPassword !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_request',
+        message: 'newPassword is required',
+      });
+    }
+
+    const result = await customerAuthService.setupPlatformPassword(customerId, newPassword);
+
+    if (!result.success) {
+      const status = result.error === 'customer_not_found' || result.error === 'platform_user_not_found'
+        ? 404
+        : result.error === 'no_linked_user'
+          ? 400
+          : result.error === 'password_already_set'
+            ? 409
+            : 400;
+      return res.status(status).json({
+        success: false,
+        error: result.error,
+        message: result.error === 'password_already_set'
+          ? 'A password is already set. Use change-password instead.'
+          : result.error === 'no_linked_user'
+            ? 'Your customer account is not linked to a platform user yet.'
+            : 'Failed to set platform password',
+      });
+    }
+
+    res.json({
+      success: true,
+      userTokens: result.userTokens,
+      message: 'Platform password set successfully',
+    });
+  } catch (error: any) {
+    logger.error('[CustomerAuth API] Setup platform password error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: 'Failed to set platform password',
+    });
+  }
+});
+
+/**
  * GET /api/customer-auth/me
  *
  * Get current authenticated customer
@@ -573,6 +655,9 @@ router.get('/me', async (req: Request, res: Response) => {
     // §4.2: include context signals for frontend sidebar gating
     const contexts = await customerAuthService.computeContexts(customer.id);
 
+    // Resolve owned tenant ID for sidebar nav links (dashboard + directory)
+    const tenantId = await customerAuthService.resolveOwnedTenantId(customer.id);
+
     res.json({
       success: true,
       customer: {
@@ -585,6 +670,7 @@ router.get('/me', async (req: Request, res: Response) => {
         emailVerified: customer.emailVerified,
       },
       contexts,
+      tenantId: tenantId || undefined,
     });
   } catch (error: any) {
     logger.error('[CustomerAuth API] Get me error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
