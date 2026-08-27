@@ -28,6 +28,7 @@ import {
   IconPhone,
   IconClock,
   IconArrowLeft,
+  IconArrowRight,
   IconShoppingCart,
   IconShieldCheck,
   IconSparkles,
@@ -375,9 +376,18 @@ export default function DirectoryClaimClient() {
               submitted. Our team will review it and contact you within 1-2 business days
               to verify ownership.
             </Text>
-            <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
-              Back to Directory
-            </Button>
+            <Text size="sm" c="dimmed">
+              You can track your claim and access your account dashboard while you wait.
+              Once approved, your Google Business Profile tools will appear there.
+            </Text>
+            <Group gap="sm">
+              <Button component={Link} href="/account" variant="filled" rightSection={<IconArrowRight size={16} />}>
+                Go to My Account
+              </Button>
+              <Button component={Link} href="/directory" variant="subtle" leftSection={<IconArrowLeft size={16} />}>
+                Back to Directory
+              </Button>
+            </Group>
           </Stack>
         </Card>
       </Container>
