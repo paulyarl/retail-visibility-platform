@@ -676,9 +676,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryEditorialLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {unclaimedBanner}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
@@ -700,9 +700,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryImmersiveLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {unclaimedBanner}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
@@ -724,9 +724,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryPremiumLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {unclaimedBanner}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
@@ -749,9 +749,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryClassicLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {unclaimedBanner}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />

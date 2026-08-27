@@ -54,6 +54,10 @@ interface TaskContext {
     locationStatus: string;
     subscriptionStatus: string;
     ordersCount: number;
+    /** Tier billing_type from subscription_tiers_list ('subscription' | 'none' | ...) */
+    tierBillingType: string;
+    /** Tier monthly price from subscription_tiers_list (0 for free tiers) */
+    tierPriceMonthly: number;
   };
 }
 
@@ -110,6 +114,30 @@ function hasStorefront(ctx: TaskContext): boolean {
 
 function hasSocialCommerce(ctx: TaskContext): boolean {
   return ctx.capabilities?.effective.social_commerce_options.enabled ?? false;
+}
+
+function hasProductTypes(ctx: TaskContext): boolean {
+  return ctx.capabilities?.effective.product_types.enabled ?? false;
+}
+
+function hasProductOptions(ctx: TaskContext): boolean {
+  return ctx.capabilities?.effective.product_options.enabled ?? false;
+}
+
+/** Whether the tenant can create products at all.
+ *  Tiers without product_types or product_options (e.g., directory_presence)
+ *  have max_skus: 0 and no product creation flow — "Add your first product"
+ *  is not actionable for them. */
+function canCreateProducts(ctx: TaskContext): boolean {
+  return hasProductTypes(ctx) || hasProductOptions(ctx);
+}
+
+/** Whether the tier has a real billing flow (paid subscription).
+ *  Free tiers (billing_type = 'none', price = 0) like directory_presence
+ *  and dormant legacy tiers have no payment to "activate" — the
+ *  "Activate your subscription" task is not actionable for them. */
+function hasBillingFlow(ctx: TaskContext): boolean {
+  return ctx.businessState.tierBillingType !== 'none' && ctx.businessState.tierPriceMonthly > 0;
 }
 
 function isReadOnly(ctx: TaskContext): boolean {
@@ -278,7 +306,7 @@ const TASKS: TaskDefinition[] = [
     link: (ctx) => `/t/${ctx.tenantId}/items/create`,
     category: 'visibility',
     priority: 'critical',
-    condition: () => true,
+    condition: (ctx) => canCreateProducts(ctx),
     isDone: (ctx) => ctx.businessState.hasProducts,
     score: () => 95,
   },
@@ -417,7 +445,7 @@ const TASKS: TaskDefinition[] = [
     link: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
     category: 'subscription',
     priority: 'critical',
-    condition: () => true,
+    condition: (ctx) => hasBillingFlow(ctx),
     isDone: (ctx) => ctx.businessState.subscriptionStatus === 'active',
     score: () => 88,
   },
@@ -551,6 +579,7 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
         id: true,
         slug: true,
         subscription_status: true,
+        subscription_tier: true,
         location_status: true,
         gbp_primary_category_id: true,
       },
@@ -602,6 +631,14 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
     }).catch(() => 0),
   ]);
 
+  // Tier billing info (billing_type + price_monthly) — fetched after the
+  // tenant record so we can resolve the tier_key. Gates the "Activate your
+  // subscription" task for free/no-billing tiers (e.g., directory_presence).
+  const tierRow = await prisma.subscription_tiers_list.findUnique({
+    where: { tier_key: tenant?.subscription_tier || 'starter' },
+    select: { billing_type: true, price_monthly: true },
+  }).catch(() => null);
+
   const [totalItems, activeItems] = itemCounts as [number, number];
 
   const hasHours = !!businessProfile?.hours &&
@@ -624,5 +661,7 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
     locationStatus: tenant?.location_status || 'active',
     subscriptionStatus: tenant?.subscription_status || 'active',
     ordersCount,
+    tierBillingType: tierRow?.billing_type || 'subscription',
+    tierPriceMonthly: tierRow ? Number(tierRow.price_monthly) : 0,
   };
 }
