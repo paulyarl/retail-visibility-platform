@@ -119,6 +119,11 @@ export default function DirectoryClaimClient() {
         claimantLastName: claimantLastName.trim() || undefined,
         claimantPhone: claimantPhone.trim() || undefined,
         claimantBusinessAddress: claimantBusinessAddress.trim() || undefined,
+        // Pass customer identity from the frontend context as a fallback
+        // in case the optionalCustomerAuth middleware doesn't parse the JWT
+        // (PublicApiSingleton may not forward the Authorization header)
+        customerEmail: customer?.email || undefined,
+        customerId: customer?.id || undefined,
       });
       if (result.error) {
         setError(result.error);
@@ -466,7 +471,7 @@ export default function DirectoryClaimClient() {
                   />
                   <Button
                     component="span"
-                    variant="light"
+                     variant="gradient" style={{ color: 'white' }} 
                     size="sm"
                     loading={uploadingProof}
                     leftSection={<IconShieldCheck size={16} />}
@@ -490,10 +495,10 @@ export default function DirectoryClaimClient() {
                 Once approved, your Google Business Profile tools will appear there.
               </Text>
               <Group gap="sm">
-                <Button component={Link} href="/account" variant="filled" rightSection={<IconArrowRight size={16} />}>
+                <Button component={Link} href="/account" variant="gradient" style={{ color: 'white' }} rightSection={<IconArrowRight size={16} />}>
                   Go to My Account
                 </Button>
-                <Button component={Link} href="/directory" variant="subtle" leftSection={<IconArrowLeft size={16} />}>
+                <Button component={Link} href="/directory"  variant="gradient" style={{ color: 'white' }}  leftSection={<IconArrowLeft size={16} />}>
                   Back to Directory
                 </Button>
               </Group>

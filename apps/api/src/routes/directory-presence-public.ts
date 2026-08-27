@@ -77,9 +77,6 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     // Extract customer info (if authenticated) for operator-approval requests
     const customer = (req as any).customer;
     const platformUser = (req as any).user;
-    const actorId = customer?.id || platformUser?.id;
-    const customerEmail = customer?.email || platformUser?.email;
-    const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
 
     // Claimant verification fields (from the claim form body)
     const body = req.body || {};
@@ -88,6 +85,14 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     const claimantLastName = body.claimantLastName?.trim() || undefined;
     const claimantPhone = body.claimantPhone?.trim() || undefined;
     const claimantBusinessAddress = body.claimantBusinessAddress?.trim() || undefined;
+
+    // Use JWT-parsed identity if available; fall back to frontend-provided
+    // values (the PublicApiSingleton may not forward the Authorization header
+    // through makeDefaultRequest, so optionalCustomerAuth might not set
+    // req.customer even when the customer is logged in on the frontend)
+    const actorId = customer?.id || platformUser?.id || body.customerId || undefined;
+    const customerEmail = customer?.email || platformUser?.email || body.customerEmail || undefined;
+    const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
 
     const result = await DirectoryClaimService.initiateClaim(token, {
       actorType: 'customer',

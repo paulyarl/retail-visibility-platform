@@ -54,6 +54,10 @@ export interface DirectoryClaimInitiateInput {
   claimantLastName?: string;
   claimantPhone?: string;
   claimantBusinessAddress?: string;
+  /** Customer email (frontend fallback for identity matching) */
+  customerEmail?: string;
+  /** Customer ID (frontend fallback for identity matching) */
+  customerId?: string;
 }
 
 export class DirectoryClaimPublicService extends PublicApiSingleton {
