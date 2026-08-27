@@ -14,9 +14,12 @@
  */
 
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
+import DirectoryClaimService from '../services/DirectoryClaimService';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { validateAttachment } from '../validators/recovery-intake.schema';
 import { logger } from '../logger';
 
 const router = Router();
@@ -687,5 +690,81 @@ router.get('/me', async (req: Request, res: Response) => {
     });
   }
 });
+
+// Multipart upload config for claim proof attachments (customer-scoped)
+const proofUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: unifiedConfig.recoveryMaxAttachmentBytes },
+});
+
+/**
+ * POST /api/customer-auth/claim-requests/:id/proof
+ *
+ * Upload a proof-of-ownership document for a pending claim request.
+ * Customer-authenticated (JWT) — resolves the customer from the token,
+ * then verifies the customer owns the pending request before storing.
+ */
+router.post(
+  '/claim-requests/:id/proof',
+  proofUpload.single('file'),
+  async (req: Request, res: Response) => {
+    try {
+      const token = CustomerTokenService.extractBearerToken(req);
+      let customerId: string | null = null;
+      if (token) {
+        const payload = customerTokenService.verifyAccessToken(token);
+        if (payload) customerId = payload.customerId;
+      }
+      if (!customerId) {
+        customerId = req.cookies?.customer_session_id || null;
+      }
+      if (!customerId) {
+        return res.status(401).json({ success: false, error: 'unauthorized' });
+      }
+
+      const { id } = req.params;
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No file uploaded' });
+      }
+
+      const validation = validateAttachment({
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        originalname: req.file.originalname,
+      });
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, error: validation.error });
+      }
+
+      const result = await DirectoryClaimService.uploadProofAttachmentByRequestId(
+        id,
+        customerId,
+        {
+          buffer: req.file.buffer,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          originalname: req.file.originalname,
+        },
+      );
+
+      res.json({
+        success: true,
+        attachmentId: result.attachmentId,
+        fileName: result.fileName,
+        fileType: result.fileType,
+        fileSize: result.fileSize,
+      });
+    } catch (error: any) {
+      const msg = (error as Error).message;
+      if (msg.includes('No pending') || msg.includes('expired') || msg.includes('consumed')) {
+        return res.status(400).json({ success: false, error: msg });
+      }
+      logger.error('[POST /api/customer-auth/claim-requests/:id/proof] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: msg },
+      });
+      res.status(500).json({ success: false, error: 'Failed to upload proof' });
+    }
+  },
+);
 
 export default router;

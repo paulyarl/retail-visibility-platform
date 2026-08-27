@@ -1236,6 +1236,98 @@ class DirectoryClaimService {
   }
 
   /**
+   * Upload a proof attachment by request ID + customer ID (customer-authenticated).
+   * Used by the account dashboard where the claimant doesn't have the claim
+   * token handy. Verifies the customer owns the pending request before storing.
+   */
+  async uploadProofAttachmentByRequestId(
+    requestId: string,
+    customerId: string,
+    file: { buffer: Buffer; mimetype: string; size: number; originalname: string },
+  ): Promise<{ attachmentId: string; fileName: string; fileType: string; fileSize: number }> {
+    // Resolve customer email for email-match fallback
+    const custRows = await prisma.$queryRaw<any[]>`
+      SELECT email FROM customers WHERE id = ${customerId} LIMIT 1
+    `;
+    const email = custRows[0]?.email || null;
+
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT dcr.id, dcr.status, dct.expires_at, dct.consumed_at
+      FROM directory_claim_requests dcr
+      JOIN directory_claim_tokens dct ON dct.id = dcr.token_id
+      WHERE dcr.id = ${requestId}
+        AND dcr.status = 'pending'
+        AND (dcr.customer_id = ${customerId}
+             OR (dcr.customer_email IS NOT NULL AND dcr.customer_email = ${email}))
+      LIMIT 1
+    `;
+    if (!rows[0]) {
+      throw new Error('No pending claim request found for this customer');
+    }
+
+    const r = rows[0];
+    if (r.consumed_at) {
+      throw new Error('Claim token already consumed');
+    }
+    if (new Date(r.expires_at) < new Date()) {
+      throw new Error('Claim token has expired');
+    }
+
+    // Upload to Supabase DISPUTES bucket
+    const { createClient } = await import('@supabase/supabase-js');
+    const { unifiedConfig } = await import('../config/unifiedConfig');
+    const { StorageBuckets } = await import('../storage-config');
+    const { mimeToFileType } = await import('../validators/recovery-intake.schema');
+
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Storage backend not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const fileType = mimeToFileType(file.mimetype);
+    const pathKey = `claim-${r.id}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .upload(pathKey, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    const attachmentId = `dca-${crypto.randomBytes(8).toString('hex')}`;
+    await prisma.$executeRaw`
+      INSERT INTO directory_claim_attachments (
+        id, claim_request_id, file_url, file_name, file_type, file_size, uploaded_at
+      ) VALUES (
+        ${attachmentId},
+        ${r.id},
+        ${pathKey},
+        ${file.originalname},
+        ${fileType},
+        ${file.size},
+        now()
+      )
+    `;
+
+    logger.info('[DirectoryClaim] Proof attachment uploaded (by requestId)', undefined, {
+      requestId: r.id, attachmentId, fileName: file.originalname, customerId,
+    });
+
+    return {
+      attachmentId,
+      fileName: file.originalname,
+      fileType,
+      fileSize: file.size,
+    };
+  }
+
+  /**
    * List proof attachments for a claim request (admin view).
    */
   async listProofAttachments(requestId: string): Promise<any[]> {

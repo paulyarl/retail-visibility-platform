@@ -729,7 +729,7 @@ export class CustomerAuthService {
       `;
       const email = custRows[0]?.email || null;
 
-      return await prisma.$queryRaw<any[]>`
+      const claims = await prisma.$queryRaw<any[]>`
         SELECT
           dcr.id,
           dcr.seed_id,
@@ -749,6 +749,35 @@ export class CustomerAuthService {
         ORDER BY dcr.submitted_at DESC
         LIMIT 10
       `;
+
+      // Attach proof documents for each pending claim
+      const claimIds = claims.map((c) => c.id);
+      let attachmentsByClaim: Record<string, any[]> = {};
+      if (claimIds.length > 0) {
+        const attRows = await prisma.$queryRaw<any[]>`
+          SELECT claim_request_id, id, file_name, file_type, file_size, uploaded_at
+          FROM directory_claim_attachments
+          WHERE claim_request_id = ANY(${claimIds}::text[])
+          ORDER BY uploaded_at ASC
+        `;
+        for (const a of attRows) {
+          if (!attachmentsByClaim[a.claim_request_id]) {
+            attachmentsByClaim[a.claim_request_id] = [];
+          }
+          attachmentsByClaim[a.claim_request_id].push({
+            id: a.id,
+            fileName: a.file_name,
+            fileType: a.file_type,
+            fileSize: a.file_size,
+            uploadedAt: a.uploaded_at,
+          });
+        }
+      }
+
+      return claims.map((c) => ({
+        ...c,
+        attachments: attachmentsByClaim[c.id] || [],
+      }));
     } catch {
       return [];
     }

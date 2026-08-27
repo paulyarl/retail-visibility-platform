@@ -26,6 +26,14 @@ export interface CustomerContexts {
   platform: boolean;
 }
 
+export interface CustomerPendingClaimAttachment {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  uploadedAt: string;
+}
+
 export interface CustomerPendingClaim {
   id: string;
   seed_id: string;
@@ -37,6 +45,7 @@ export interface CustomerPendingClaim {
   category: string | null;
   city: string | null;
   state: string | null;
+  attachments: CustomerPendingClaimAttachment[];
 }
 
 export interface CustomerAuthTokens {
@@ -527,6 +536,45 @@ class CustomerAuthService extends CustomerApiSingleton {
    */
   getPendingClaims(): CustomerPendingClaim[] {
     return this.pendingClaims;
+  }
+
+  /**
+   * Upload a proof-of-ownership document for a pending claim request
+   * from the account dashboard (customer-authenticated, by request ID).
+   */
+  async uploadProofByRequestId(
+    requestId: string,
+    file: File,
+  ): Promise<{ attachmentId: string; fileName: string; fileType: string; fileSize: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // For multipart uploads, don't set Content-Type — the browser sets the
+    // boundary automatically. Only set Authorization.
+    const authHeaders: Record<string, string> = {};
+    const token = this.getToken();
+    if (token) authHeaders['Authorization'] = `Bearer ${token}`;
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer-auth/claim-requests/${encodeURIComponent(requestId)}/proof`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: authHeaders,
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to upload proof');
+    }
+    const data = result.data?.data ?? result.data;
+    return {
+      attachmentId: data.attachmentId,
+      fileName: data.fileName,
+      fileType: data.fileType,
+      fileSize: data.fileSize,
+    };
   }
 
   /**

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
-import { CustomerPendingClaim } from '@/services/CustomerAuthService';
+import { CustomerPendingClaim, CustomerPendingClaimAttachment } from '@/services/CustomerAuthService';
+import customerAuthService from '@/services/CustomerAuthService';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import { customerAddressesService } from '@/services/CustomerAddressesService';
 import customerCouponWalletService from '@/services/CustomerCouponWalletService';
@@ -16,7 +17,7 @@ import marketingCustomerService, {
 import {
   Package, MapPin, ShoppingBag, Clock, TrendingUp, Download, Ticket,
   ChevronDown, Briefcase, Building2, Star, ArrowRight, CheckCircle,
-  AlertCircle, XCircle,
+  AlertCircle, XCircle, FileText, Upload,
 } from 'lucide-react';
 import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
 import { clientLogger } from '@/lib/client-logger';
@@ -74,12 +75,14 @@ function formatDate(date: string | null): string {
 
 // ─── Main page ───────────────────────────────────────────────────────────
 export default function AccountOverviewPage() {
-  const { customer, contexts, pendingClaims } = useCustomerAuth();
+  const { customer, contexts, pendingClaims, refreshCustomer } = useCustomerAuth();
   const [recentOrders, setRecentOrders] = useState<CustomerOrder[]>([]);
   const [digitalDownloadsCount, setDigitalDownloadsCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
   const [savedCouponCount, setSavedCouponCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [uploadingProofFor, setUploadingProofFor] = useState<string | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
 
   // Marketing / platform data
   const [marketingOverview, setMarketingOverview] = useState<CustomerPortalOverview | null>(null);
@@ -88,6 +91,23 @@ export default function AccountOverviewPage() {
   const [gbpLoading, setGbpLoading] = useState(false);
 
   const isPlatform = contexts?.platform === true;
+
+  const handleUploadProof = async (claimId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadingProofFor(claimId);
+    setProofError(null);
+    try {
+      for (const file of Array.from(files)) {
+        await customerAuthService.uploadProofByRequestId(claimId, file);
+      }
+      // Refresh pending claims to show the new attachment
+      await refreshCustomer();
+    } catch (err: any) {
+      setProofError(err?.message || 'Failed to upload proof');
+    } finally {
+      setUploadingProofFor(null);
+    }
+  };
 
   useEffect(() => {
     if (customer?.email) {
@@ -276,43 +296,86 @@ export default function AccountOverviewPage() {
               const isApproved = claim.status === 'approved';
               const isRejected = claim.status === 'rejected';
               return (
-                <div key={claim.id} className="px-4 py-3 flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">
-                      {claim.business_name || 'Unknown Business'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {claim.category}
-                      {claim.city ? ` · ${claim.city}, ${claim.state}` : ''}
-                      {' · Submitted '}
-                      {new Date(claim.submitted_at).toLocaleDateString()}
-                    </p>
-                    {isRejected && claim.rejection_reason && (
-                      <p className="text-xs text-red-600 mt-1">
-                        Reason: {claim.rejection_reason}
+                <div key={claim.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">
+                        {claim.business_name || 'Unknown Business'}
                       </p>
-                    )}
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {claim.category}
+                        {claim.city ? ` · ${claim.city}, ${claim.state}` : ''}
+                        {' · Submitted '}
+                        {new Date(claim.submitted_at).toLocaleDateString()}
+                      </p>
+                      {isRejected && claim.rejection_reason && (
+                        <p className="text-xs text-red-600 mt-1">
+                          Reason: {claim.rejection_reason}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {isPending && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                          <Clock className="w-3 h-3" />
+                          Pending Review
+                        </span>
+                      )}
+                      {isApproved && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                          <CheckCircle className="w-3 h-3" />
+                          Approved
+                        </span>
+                      )}
+                      {isRejected && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                          <XCircle className="w-3 h-3" />
+                          Rejected
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="shrink-0">
-                    {isPending && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
-                        <Clock className="w-3 h-3" />
-                        Pending Review
-                      </span>
-                    )}
-                    {isApproved && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                        <CheckCircle className="w-3 h-3" />
-                        Approved
-                      </span>
-                    )}
-                    {isRejected && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                        <XCircle className="w-3 h-3" />
-                        Rejected
-                      </span>
-                    )}
-                  </div>
+
+                  {/* Proof documents */}
+                  {claim.attachments && claim.attachments.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {claim.attachments.map((att) => (
+                        <span
+                          key={att.id}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-amber-200 rounded text-xs text-gray-700"
+                        >
+                          <FileText className="w-3 h-3 text-amber-600" />
+                          {att.fileName}
+                          <span className="text-gray-400">
+                            ({att.fileType}, {(att.fileSize / 1024).toFixed(0)}KB)
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload more proof (only for pending claims) */}
+                  {isPending && (
+                    <div className="mt-2">
+                      <label>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleUploadProof(claim.id, e.target.files)}
+                          disabled={uploadingProofFor === claim.id}
+                        />
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 text-amber-800 rounded-lg text-xs font-medium hover:bg-amber-50 cursor-pointer disabled:opacity-50">
+                          <Upload className="w-3.5 h-3.5" />
+                          {uploadingProofFor === claim.id ? 'Uploading...' : 'Upload Proof Document'}
+                        </span>
+                      </label>
+                      {proofError && uploadingProofFor === claim.id && (
+                        <p className="text-xs text-red-600 mt-1">{proofError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
