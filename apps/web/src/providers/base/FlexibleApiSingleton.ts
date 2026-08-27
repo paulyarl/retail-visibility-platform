@@ -1566,10 +1566,11 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
 
     // Inject correlation ID header for request tracing
+    // Skip for external APIs (e.g., Google Maps) that reject non-standard headers in CORS preflight
     const tenantId = await this.getCurrentTenantId();
     const correlationId = getOrCreateCorrelationId(tenantId || undefined);
     const headers = new Headers(options.headers);
-    if (correlationId && !headers.has(CORRELATION_ID_HEADER)) {
+    if (correlationId && !headers.has(CORRELATION_ID_HEADER) && requestTarget !== RequestTarget.EXTERNAL) {
       headers.set(CORRELATION_ID_HEADER, correlationId);
     }
 
