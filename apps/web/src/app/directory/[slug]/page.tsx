@@ -37,7 +37,7 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
-import { StorefrontOptionFlags, PublicCrmOptionsFlags, type FeaturedOptionsState, type DirectoryEntryOptionsState, type DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
+import { PublicCrmOptionsFlags, type FeaturedOptionsState, type DirectoryEntryOptionsState, type DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
 import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
@@ -408,9 +408,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const { status: hoursStatus } = useStoreStatus(consolidatedData?.listing?.tenantId || '', true); // Public scope
 
-  // Storefront capability-driven content control
+  // Storefront capability is only for shopping CTAs / product chrome — not directory sections.
   const storefrontCap = usePublicStorefrontCapability(consolidatedData?.listing?.tenantId || null);
-  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
+  const isStorefrontEnabled = storefrontCap.data?.enabled ?? false;
 
   // Active featured products (from ActiveFeaturedResolver)
   const { data: activeFeatured } = useActiveFeatured(
@@ -421,16 +421,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
   const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'flexible';
-  // showsHours/showsMap/showsLocation now come from storefront_options (merchant-controlled)
-  // storefront_type (platform-controlled) still determines isRetailStore/isOnlineStore/isServiceStore
 
-  // Storefront options capability flags (fetched in parallel with other data below)
-  const [optFlags, setOptFlags] = useState<StorefrontOptionFlags | null>(null);
-
-  // Derived visibility flags from optFlags (merchant-controlled)
-  const showsHours = optFlags?.showHoursDisplay ?? true;
-  const showsMap = optFlags?.showMapDisplay ?? true;
-  const showsLocation = optFlags?.showLocationDisplay ?? true;
+  // Directory listing sections are owned by directory_entry, not storefront_options.
+  const showsHours = directoryEntryOptions?.hoursEnabled ?? true;
+  const showsMap = directoryEntryOptions?.mapEnabled ?? true;
+  const showsLocation = directoryEntryOptions?.mapEnabled ?? true;
 
   // Pending publication state (tenant exists but no directory listing)
   const [pendingTenantId, setPendingTenantId] = useState<string | null>(null);
@@ -483,7 +478,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           related,
           categories,
           productCount,
-          optionFlags,
           featuredPrefs,
           faqOptionFlags,
           crmOptionFlags,
@@ -494,7 +488,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
-          publicUnifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
           publicUnifiedCapabilityService.getFeaturedOptionsState(data.listing.tenantId),
           publicUnifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId),
           publicUnifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId),
@@ -506,7 +499,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         setRelatedProducts(related);
         setStorefrontCategories(categories);
         setActualProductCount(productCount);
-        if (optionFlags) setOptFlags(optionFlags);
         if (featuredPrefs) setFeaturedOptionsState(featuredPrefs);
         if (faqOptionFlags) setFaqFlags(faqOptionFlags);
         if (crmOptionFlags) setCrmFlags(crmOptionFlags);
@@ -642,7 +634,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     relatedProducts,
     tenantInfo,
     slugForRelated,
-    optFlags,
     showStatusPanel,
     hoursStatus,
     isRetailStore,
@@ -663,6 +654,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     isDemo: tenantInfo?.isDemo,
     demoExpiresAt: tenantInfo?.demoExpiresAt,
     directoryEntryOptions,
+    isStorefrontEnabled,
   };
 
   const unclaimedBanner = consolidatedData?.listing?.listingOrigin === 'directory_seed' ? (

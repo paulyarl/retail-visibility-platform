@@ -767,6 +767,23 @@ it('disables <feature> when tier does not allow it', () => {
 
 **Audit rule**: When reviewing a PR that adds a new field to `EffectiveXxx`, verify the resolver test file has at least one test case with default/null merchant prefs for that field. If the field is tier-level (not `can_use_*`, `effective_*`, or `merchant_preferences`), verify the test confirms the field is `true` when the tier allows it and merchant prefs are default — this is the R33 automated check.
 
+### R35: Unassigned Capability Modules MUST Stay Hidden on PlanSummaryPanel
+
+`PlanSummaryPanel` (and `PlanSummaryWidget`/`CapabilityShowcase`) MUST NOT render a capability module card when the tier defines no feature keys for that capability module. This keeps focused/light tiers (e.g., `directory_presence`) uncluttered — only the modules the tier actually assigned appear.
+
+**How it works (already enforced — no special hide-when-unassigned code needed)**:
+1. Every capability block in `resolveCapabilitySummaries()` is gated by `if (xxx.enabled)`.
+2. `enabled` is the master gate (R2). Per R17, `enabled` is `false` when the tier defines no `_enabled`, no `_disabled`, no `_flexible`, no group gates, AND no individual feature keys for that capability domain.
+3. When a tier has zero feature keys for a capability module, `rawCaps.capabilities.<cap_key>` is `undefined` (the group is never created in `fetchRawCapabilities`), so the resolver receives `features = {}` and returns `enabled: false`. The panel's `if (xxx.enabled)` gate then drops the card entirely.
+
+**Concrete example**: The `directory_presence` tier seeds `storefront_types` (`storefront_enabled`, `storefront_retail`) and `directory_entry` keys, but defines NO `storefront_opt_*` keys. Therefore `storefront_options.enabled = false` and the Storefront Options card does NOT appear on the panel — even though Storefront (the type capability) does. Same for `commerce`, `payment_gateway`, `storefront_qr`, `storefront_gallery`, `storefront_hours`, `storefront_layouts`, `storefront_maps`, `product_types`, `product_options`, `featured`, `integrations`, `quickstart`, `faq`, `chatbot`, `social_commerce`, `wholesale_matching`, `platform_services`, `funnel`, `coupons`, `marketing_ops`, `directory_promotion`, and `org_options` — all hidden because the tier assigns no feature keys for them.
+
+**Intentional exception — platform communication channels (R28)**: CRM is force-enabled in `EffectiveCapabilityResolver` Step 6 (`result.effective.crm.enabled = true`) regardless of tier feature keys, so it remains visible on every tier including `directory_presence`. This is deliberate — CRM is the mechanism for resolving subscription issues, not a revocable feature benefit. Do NOT add a per-tier CRM feature-key gate to hide it on light tiers without an explicit product decision overriding R28.
+
+**When adding a new capability domain**: No extra hiding logic is required in `PlanSummaryPanel` — the `if (xxx.enabled)` gate plus a correct resolver (R17-compliant `enabled = false` when no feature keys) is sufficient. The failure mode to watch for is the inverse: a resolver that returns `enabled: true` even when no feature keys exist (e.g., hardcoding `enabled: true`, or deriving `enabled` from `capabilityEnabled` without confirming the group has features). `capabilityEnabled` (passed to `resolveOrgOptions`, `resolveIntegrationOptions`, `resolveDirectoryPromotion`) is only `true` when the group has at least one feature row, so it is safe. Verify the new resolver's `enabled` field is `false` for an empty feature map before shipping.
+
+**Audit rule**: For every capability block in `resolveCapabilitySummaries()`, confirm it is gated by `if (xxx.enabled)` (or `if (xxx && xxx.enabled)` for optional domains). A block that pushes a summary unconditionally will render an empty/"None available" card on tiers that never assigned the module — that is the clutter this rule forbids.
+
 ## File Reference
 
 ### Backend

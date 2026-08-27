@@ -322,7 +322,7 @@ export default function StorefrontImmersiveLayout({
             </div>
 
             <div className="w-full md:w-auto md:max-w-md mx-4">
-              <CouponSpotlight tenantId={tenantId} coupon={null} variant="strip" />
+              <CouponSpotlight tenantId={tenantId} variant="strip" />
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">

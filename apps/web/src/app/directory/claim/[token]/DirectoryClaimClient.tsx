@@ -598,6 +598,16 @@ export default function DirectoryClaimClient() {
                   <Button component={Link} href={goToDashboardHref} leftSection={<IconCheck size={16} />}>
                     Go to Dashboard
                   </Button>
+                  {summary?.slug && (
+                    <Button
+                      component={Link}
+                      href={`/directory/${summary.slug}`}
+                      variant="light"
+                      leftSection={<IconMapPin size={16} />}
+                    >
+                      View Listing
+                    </Button>
+                  )}
                   {upgradeHref && (
                     <Button
                       component={Link}

@@ -75,7 +75,7 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     }
 
     // Extract customer info (if authenticated) for operator-approval requests
-    const customer = (req as any).customer;
+    let customer = (req as any).customer;
     const platformUser = (req as any).user;
 
     // Claimant verification fields (from the claim form body)
@@ -86,12 +86,48 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     const claimantPhone = body.claimantPhone?.trim() || undefined;
     const claimantBusinessAddress = body.claimantBusinessAddress?.trim() || undefined;
 
+    // Direct JWT fallback: if optionalCustomerAuth didn't set req.customer,
+    // try to parse the customer JWT from the Authorization header directly.
+    // PublicApiSingleton may not forward the header through makeDefaultRequest,
+    // but if it does, the middleware should have already handled it.
+    if (!customer) {
+      try {
+        const { CustomerTokenService } = await import('../services/CustomerTokenService');
+        const tokenService = CustomerTokenService.getInstance();
+        const bearerToken = CustomerTokenService.extractBearerToken(req);
+        if (bearerToken) {
+          const payload = tokenService.verifyAccessToken(bearerToken);
+          if (payload?.customerId) {
+            // Fetch customer details to get email + name
+            const { prisma } = await import('../prisma');
+            const custRows = await prisma.$queryRaw<any[]>`
+              SELECT id, email, first_name, last_name FROM customers WHERE id = ${payload.customerId} LIMIT 1
+            `;
+            if (custRows[0]) {
+              customer = {
+                id: custRows[0].id,
+                email: custRows[0].email,
+                firstName: custRows[0].first_name,
+                lastName: custRows[0].last_name,
+              };
+            }
+          }
+        }
+      } catch {
+        // Token invalid or expired — continue with body fallback
+      }
+    }
+
     // Use JWT-parsed identity if available; fall back to frontend-provided
     // values (the PublicApiSingleton may not forward the Authorization header
     // through makeDefaultRequest, so optionalCustomerAuth might not set
-    // req.customer even when the customer is logged in on the frontend)
-    const actorId = customer?.id || platformUser?.id || body.customerId || undefined;
-    const customerEmail = customer?.email || platformUser?.email || body.customerEmail || undefined;
+    // req.customer even when the customer is logged in on the frontend).
+    // Final fallback: x-customer-id / x-customer-email headers sent from
+    // localStorage customer_identity_cache.
+    const headerCustomerId = req.get('x-customer-id') || undefined;
+    const headerCustomerEmail = req.get('x-customer-email') || undefined;
+    const actorId = customer?.id || platformUser?.id || body.customerId || headerCustomerId || undefined;
+    const customerEmail = customer?.email || platformUser?.email || body.customerEmail || headerCustomerEmail || undefined;
     const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
 
     const result = await DirectoryClaimService.initiateClaim(token, {

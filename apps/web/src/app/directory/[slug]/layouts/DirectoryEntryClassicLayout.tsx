@@ -12,7 +12,6 @@ import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
-import DirectoryMagazineGallery from '@/components/directory/DirectoryMagazineGallery';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
@@ -43,10 +42,8 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     activeFeatured,
     tenantInfo,
     slugForRelated,
-    optFlags,
     showStatusPanel,
     hoursStatus,
-    isRetailStore,
     showsHours,
     showsMap,
     showsLocation,
@@ -60,10 +57,15 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     isDemo,
     demoExpiresAt,
     directoryEntryOptions,
+    isStorefrontEnabled,
   } = props;
 
-  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
-  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
+  const canShowLogo = directoryEntryOptions?.logoEnabled ?? directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.aboutEnabled ?? directoryEntryOptions?.canShowAbout ?? true;
+  const canShowGallery = directoryEntryOptions?.galleryEnabled ?? true;
+  const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
+  const canShowSocial = directoryEntryOptions?.socialEnabled ?? true;
+  const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -96,31 +98,33 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                 className={`mt-4 border-2 rounded-xl shadow-sm overflow-hidden ${primaryColor ? '' : 'bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-blue-200'}`}
                 style={primaryColor ? { background: `linear-gradient(135deg, ${primaryColor}22 0%, ${primaryColor}11 50%, ${primaryColor}08 100%)`, borderColor: `${primaryColor}44` } : undefined}
               >
-                <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Shop {listing.businessName}</h2>
-                  <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
-                    Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
-                  </p>
-                  <Link href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
-                    className="inline-flex items-center gap-2 px-8 py-3 text-white rounded-lg transition-colors font-semibold text-lg shadow-md"
-                    style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: '#2563eb' }}
-                  >
-                    <Globe className="w-5 h-5" /> Visit Storefront
-                  </Link>
-                  {storefrontCategories.categories.length > 0 && (
-                    <div className="mt-4">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
-                        <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                        {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
-                      </span>
-                    </div>
-                  )}
-                </div>
+                {isStorefrontEnabled ? (
+                  <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Shop {listing.businessName}</h2>
+                    <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
+                      Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
+                    </p>
+                    <Link href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
+                      className="inline-flex items-center gap-2 px-8 py-3 text-white rounded-lg transition-colors font-semibold text-lg shadow-md"
+                      style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: '#2563eb' }}
+                    >
+                      <Globe className="w-5 h-5" /> Visit Storefront
+                    </Link>
+                    {storefrontCategories.categories.length > 0 && (
+                      <div className="mt-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
+                          <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
                 <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
-                  {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && isRetailStore && (
-                    <HoursStatusBadge status={hoursStatus} size="lg" animate={optFlags?.showAnimatedHours !== false} />
+                  {showsHours && (
+                    <HoursStatusBadge status={hoursStatus} size="lg" animate={true} />
                   )}
                 </div>
               </div>
@@ -130,7 +134,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
 
         {/* Coupon Spotlight Card */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-20 mb-4">
-          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="card" />
+          <CouponSpotlight tenantId={listing.tenantId} variant="card" />
         </section>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -169,29 +173,33 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                       )}
                     </div>
                   </div>
-                  {!showStatusPanel && showsHours && isRetailStore && (
+                  {!showStatusPanel && (showsHours || isStorefrontEnabled) && (
                     <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
-                      <a href={`/tenant/${slugForRelated || listing.tenantId}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition-colors whitespace-nowrap"
-                        title="View Store Products">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                        <span className="hidden lg:inline">Products</span>
-                      </a>
-                      <a href={`/shops/${slugForRelated || listing.tenantId}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition-colors whitespace-nowrap"
-                        title="View Store in Shops">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2a1 1 0 011 1v5m-4 0h4z" /></svg>
-                        <span className="hidden lg:inline">Shop</span>
-                      </a>
-                      <a onClick={() => { const el = document.getElementById('hours-section'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200 transition-colors whitespace-nowrap"
-                        title="View Store Hours">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span className="hidden lg:inline">Hours</span>
-                      </a>
-                      {!showStatusPanel && optFlags?.showStorefrontActions !== false && (
-                        <DirectoryActions listing={{ business_name: listing.businessName, slug: listing.slug, tenantId: listing.tenantId, id: listing.id }} currentUrl={currentUrl} />
+                      {isStorefrontEnabled && (
+                        <a href={`/tenant/${slugForRelated || listing.tenantId}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition-colors whitespace-nowrap"
+                          title="View Store Products">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                          <span className="hidden lg:inline">Products</span>
+                        </a>
                       )}
+                      {isStorefrontEnabled && (
+                        <a href={`/shops/${slugForRelated || listing.tenantId}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition-colors whitespace-nowrap"
+                          title="View Store in Shops">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2a1 1 0 011 1v5m-4 0h4z" /></svg>
+                          <span className="hidden lg:inline">Shop</span>
+                        </a>
+                      )}
+                      {showsHours && (
+                        <a onClick={() => { const el = document.getElementById('hours-section'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200 transition-colors whitespace-nowrap"
+                          title="View Store Hours">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <span className="hidden lg:inline">Hours</span>
+                        </a>
+                      )}
+                      <DirectoryActions listing={{ business_name: listing.businessName, slug: listing.slug, tenantId: listing.tenantId, id: listing.id }} currentUrl={currentUrl} />
                     </div>
                   )}
                 </div>
@@ -334,22 +342,20 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
               )}
 
               {/* Photo Gallery */}
-              {!showStatusPanel && (
-                optFlags?.canUseMagazineGallery && optFlags?.galleryDisplayMode === 'magazine' ? (
-                  <DirectoryMagazineGallery listing={listing} {...businessProfile} isPublished={true} />
-                ) : (
-                  <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
-                )
+              {!showStatusPanel && canShowGallery && (
+                <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
               )}
 
               {/* Product Categories */}
-              {!showStatusPanel && storefrontCategories.categories.length > 0 && (
+              {!showStatusPanel && isStorefrontEnabled && storefrontCategories.categories.length > 0 && (
                 <div className="space-y-4">
                   <ProductCategoriesCollapsible categories={storefrontCategories.categories} tenantId={listing.tenantId} uncategorizedCount={storefrontCategories.uncategorizedCount} />
-                  <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
-                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
-                    size={200} showDownload={true} className="mt-4" pageType="directory" capabilityFlags={optFlags} />
                 </div>
+              )}
+              {!showStatusPanel && canShowQr && (
+                <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
+                  downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                  size={200} showDownload={true} className="mt-4" pageType="directory" isPublic />
               )}
 
               {/* FAQ */}
@@ -367,14 +373,14 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
             </div>
 
             {/* Right Column */}
-            {!showStatusPanel && showsHours && optFlags?.showContact !== false && (
+            {!showStatusPanel && canShowContact && (
               <div className="space-y-6">
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
-                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={isRetailStore} />
+                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} />
                   <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
                   {/* Social Links */}
-                  {optFlags?.showSocialMedia !== false && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
+                  {canShowSocial && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
                     <div className="pt-3 border-t border-neutral-200 mt-3">
                       <h2 className="text-lg font-semibold text-neutral-500 mb-3">Follow Us</h2>
                       <div className="flex flex-wrap gap-4">
@@ -410,15 +416,15 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
             )}
 
             {/* Business Hours */}
-            {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && businessHours && isRetailStore && (
+            {!showStatusPanel && showsHours && businessHours && (
               <>
-                <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={isRetailStore} />
+                <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
                 <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               </>
             )}
 
             {/* Map */}
-            {!showStatusPanel && showsMap && optFlags?.showInteractiveMaps !== false && listing.address && isRetailStore && (
+            {!showStatusPanel && showsMap && listing.address && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Our Location</h2>
@@ -451,7 +457,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
       {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}
 
       {/* Recently Viewed */}
-      {optFlags?.showRecentlyViewed !== false && <LastViewed />}
+      <LastViewed />
 
       {/* Footer */}
       <PoweredByFooter />

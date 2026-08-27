@@ -696,8 +696,16 @@ export default function CapabilityShowcase({
     ];
   }, [capabilities, tenantId]);
 
-  const enabledCount = rows.filter((r) => r.enabled).length;
-  const totalCount = rows.length;
+  // Sort active capabilities to the top so focused/light tiers (e.g., directory_presence)
+  // see their assigned modules first. Tier-gated (not-in-plan) rows sink to the bottom
+  // and remain reachable via "Show more". Stable sort preserves catalog order within groups.
+  const sortedRows = useMemo(() => {
+    const rank = (s: CapabilityStatus) => s === 'tier-gated' ? 1 : 0;
+    return [...rows].sort((a, b) => rank(a.status) - rank(b.status));
+  }, [rows]);
+
+  const enabledCount = sortedRows.filter((r) => r.enabled).length;
+  const totalCount = sortedRows.length;
 
   if (!capabilities) {
     return (
@@ -737,7 +745,7 @@ export default function CapabilityShowcase({
       </div>
 
       <div className="space-y-2">
-        {rows.slice(0, INITIAL_COUNT).map((row, index) => (
+        {sortedRows.slice(0, INITIAL_COUNT).map((row, index) => (
           <motion.div
             key={row.key}
             initial={{ opacity: 0, x: -10 }}
@@ -797,7 +805,7 @@ export default function CapabilityShowcase({
           </motion.div>
         ))}
 
-        {showAll && rows.slice(INITIAL_COUNT).map((row, index) => (
+        {showAll && sortedRows.slice(INITIAL_COUNT).map((row, index) => (
           <motion.div
             key={row.key}
             initial={{ opacity: 0, x: -10 }}
@@ -858,7 +866,7 @@ export default function CapabilityShowcase({
         ))}
       </div>
 
-      {rows.length > INITIAL_COUNT && (
+      {sortedRows.length > INITIAL_COUNT && (
         <button
           onClick={() => setShowAll((v) => !v)}
           className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
@@ -866,7 +874,7 @@ export default function CapabilityShowcase({
           {showAll ? (
             <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
           ) : (
-            <>Show {rows.length - INITIAL_COUNT} more <ChevronDown className="w-3.5 h-3.5" /></>
+            <>Show {sortedRows.length - INITIAL_COUNT} more <ChevronDown className="w-3.5 h-3.5" /></>
           )}
         </button>
       )}

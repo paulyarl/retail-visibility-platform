@@ -170,7 +170,7 @@ export function ProductShowcaseLayout({
       />
 
       <div className="hidden lg:block lg:w-72 shrink-0 mb-4">
-        <CouponSpotlight tenantId={tenant?.id || ''} coupon={null} variant="card" />
+        <CouponSpotlight tenantId={tenant?.id || ''} variant="card" />
       </div>
 
       <StickyPurchaseBar

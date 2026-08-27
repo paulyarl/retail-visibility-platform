@@ -842,7 +842,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               {/* Coupon Spotlight Strip */}
               <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
                 <div className="mb-4">
-                  <CouponSpotlight tenantId={product.tenantId} coupon={null} variant="strip" />
+                  <CouponSpotlight tenantId={product.tenantId} variant="strip" />
                 </div>
 
               {/* Product Description Section */}

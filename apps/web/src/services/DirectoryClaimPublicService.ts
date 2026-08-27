@@ -149,6 +149,18 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     if (customerToken) {
       headers['Authorization'] = `Bearer ${customerToken}`;
     }
+    // Also send customer identity from the cache (more reliable than JWT
+    // parsing for public routes where the singleton may strip headers)
+    try {
+      const identity = localStorage.getItem('customer_identity_cache');
+      if (identity) {
+        const parsed = JSON.parse(identity);
+        if (parsed?.id) headers['x-customer-id'] = parsed.id;
+        if (parsed?.email) headers['x-customer-email'] = parsed.email;
+      }
+    } catch {
+      // ignore parse errors
+    }
     return headers;
   }
 

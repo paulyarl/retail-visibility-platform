@@ -380,11 +380,12 @@ router.put('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
 ### PlanSummaryPanel Rules
 
 - Use `caps.xxx.enabled` to decide whether to show the capability (R2)
+- A capability module with NO feature keys defined for the tier MUST stay hidden — the `if (xxx.enabled)` gate plus an R17-compliant resolver already enforces this; no extra hide-when-unassigned code is needed (R35). This keeps focused/light tiers (e.g., `directory_presence`) uncluttered.
 - Use `allowed*Types` arrays to determine WHICH features to show (R4)
 - Use `canUse*` / `effective*` to determine STATUS: `'enabled'` or `'merchant-gated'` (R4)
 - Tier-allowed features that merchant hasn't enabled MUST show as `'merchant-gated'` (amber), NOT hidden (R5)
 
-**Master-toggle capabilities** (FAQ, CRM): All tier-allowed features show as `'enabled'` — never `'merchant-gated'` (R11)
+**Master-toggle capabilities** (FAQ, CRM): All tier-allowed features show as `'enabled'` — never `'merchant-gated'` (R11). CRM is force-enabled on every tier per R28 (platform communication channel) — do NOT gate it behind a per-tier feature key without an explicit product decision.
 
 **Per-feature toggle capabilities** (Chatbot, Social Commerce, Storefront Options): Use `addXxx(label, tierAllowed, effective)` pattern
 

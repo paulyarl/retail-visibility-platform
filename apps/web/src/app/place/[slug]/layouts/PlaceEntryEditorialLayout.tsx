@@ -13,6 +13,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
@@ -49,7 +50,6 @@ export interface PlaceEntryEditorialLayoutProps {
   showsLocation: boolean;
   showsContact: boolean;
   showsQr: boolean;
-  isRetailStore: boolean;
   currentUrl: string;
   baseUrl: string;
   fullAddress: string;
@@ -70,7 +70,6 @@ export default function PlaceEntryEditorialLayout({
   showsLocation,
   showsContact,
   showsQr,
-  isRetailStore,
   currentUrl,
   baseUrl,
   fullAddress,
@@ -148,6 +147,10 @@ export default function PlaceEntryEditorialLayout({
           </div>
         </div>
 
+        <section className="max-w-6xl mx-auto px-6 -mt-4 relative z-20 mb-4">
+          <CouponSpotlight tenantId={tenantId} variant="banner" />
+        </section>
+
         {/* Full-width provenance callout — the conversion pitch */}
         <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">
           <section className="bg-white rounded-xl p-8 border border-neutral-200 shadow-sm">
@@ -188,7 +191,7 @@ export default function PlaceEntryEditorialLayout({
                       size={120}
                       showDownload={true}
                       pageType="directory"
-                      capabilityFlags={null}
+                      isPublic
                     />
                   </div>
                 )}

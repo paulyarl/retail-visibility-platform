@@ -489,7 +489,7 @@ export default function StorefrontClientWrapper({
       {/* Coupon Spotlight Card */}
       {!storefrontStatus.shouldShowPanel && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
-          <CouponSpotlight tenantId={tenantId} coupon={null} variant="card" />
+          <CouponSpotlight tenantId={tenantId} variant="card" />
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import type { StorefrontOptionFlags, PublicFaqOptionsFlags, PublicCrmOptionsFlags, FeaturedOptionsState, DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
+import type { PublicFaqOptionsFlags, PublicCrmOptionsFlags, FeaturedOptionsState, DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 
 export type DirectoryEntryLayoutKey = 'classic' | 'editorial' | 'immersive' | 'premium';
@@ -15,7 +15,6 @@ export interface DirectoryEntryLayoutProps {
   relatedProducts: any[];
   tenantInfo: any;
   slugForRelated: string;
-  optFlags: StorefrontOptionFlags | null;
   showStatusPanel: boolean;
   hoursStatus: any;
   isRetailStore: boolean;
@@ -37,4 +36,5 @@ export interface DirectoryEntryLayoutProps {
   demoExpiresAt?: string | null;
   spotlightCoupon?: any;
   directoryEntryOptions?: DirectoryEntryOptionsState | null;
+  isStorefrontEnabled?: boolean;
 }

@@ -12,7 +12,6 @@ import { tenantPublicService } from '@/services/TenantPublicService';
 import directoryClaimPublicService, { type DirectoryClaimSummary } from '@/services/DirectoryClaimPublicService';
 import { clientLogger } from '@/lib/client-logger';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
 import PlaceEntryEditorialLayout from '../../place/[slug]/layouts/PlaceEntryEditorialLayout';
@@ -116,8 +115,6 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
   // Hooks that depend on listing.tenantId
   const tenantId = listing?.tenantId || '';
   const { status: hoursStatus } = useStoreStatus(tenantId, true);
-  const storefrontCap = usePublicStorefrontCapability(tenantId || null);
-  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
 
   if (loading) {
     return (
@@ -238,7 +235,6 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
         showsLocation={showsLocation}
         showsContact={showsContact}
         showsQr={showsQr}
-        isRetailStore={isRetailStore}
         currentUrl={currentUrl}
         baseUrl={baseUrl}
         fullAddress={fullAddress}

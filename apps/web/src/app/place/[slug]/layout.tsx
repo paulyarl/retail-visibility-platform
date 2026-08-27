@@ -51,10 +51,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function PlaceSlugLayout({ params, children }: LayoutProps) {
   const { slug } = await params;
 
-  // Redirect non-seed listings to their canonical storefront-oriented path.
+  // Redirect claimed listings to their canonical directory-entry path.
   // /place/{slug} is reserved for directory presence seeds (unclaimed listings
-  // seeded from public information). Subscribed platform tenants live at
-  // /directory/{slug}.
+  // seeded from public information). Claimed tenants live at /directory/{slug}.
   try {
     const data = await directoryService.getDirectoryConsolidated(slug);
     const listing = data?.listing;

@@ -11,7 +11,6 @@ import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
-import DirectoryMagazineGallery from '@/components/directory/DirectoryMagazineGallery';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
@@ -34,14 +33,17 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
   const {
     tenantId, listing, tenantLogo, businessProfile, businessHours,
     storefrontCategories, featuredProducts, activeFeatured, tenantInfo, slugForRelated,
-    optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
+    showStatusPanel, hoursStatus, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
-    isDemo, demoExpiresAt, directoryEntryOptions,
+    isDemo, demoExpiresAt, directoryEntryOptions, isStorefrontEnabled,
   } = props;
 
-  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
-  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
+  const canShowLogo = directoryEntryOptions?.logoEnabled ?? directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.aboutEnabled ?? directoryEntryOptions?.canShowAbout ?? true;
+  const canShowGallery = directoryEntryOptions?.galleryEnabled ?? true;
+  const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
+  const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -92,16 +94,20 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                     )}
                   </div>
                 </div>
-                <p className="text-neutral-300 text-lg max-w-2xl leading-relaxed">
-                  Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront.
-                </p>
+                {isStorefrontEnabled && (
+                  <p className="text-neutral-300 text-lg max-w-2xl leading-relaxed">
+                    Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront.
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center gap-4">
-                  <Link href={`/tenant/${slugForRelated || listing.tenantId}`}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold">
-                    <Globe className="w-5 h-5" /> Visit Storefront
-                  </Link>
-                  {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && isRetailStore && (
-                    <HoursStatusBadge status={hoursStatus} size="lg" animate={optFlags?.showAnimatedHours !== false} />
+                  {isStorefrontEnabled && (
+                    <Link href={`/tenant/${slugForRelated || listing.tenantId}`}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold">
+                      <Globe className="w-5 h-5" /> Visit Storefront
+                    </Link>
+                  )}
+                  {showsHours && (
+                    <HoursStatusBadge status={hoursStatus} size="lg" animate={true} />
                   )}
                 </div>
               </div>
@@ -111,7 +117,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
 
         {/* Coupon Spotlight Banner */}
         <section className="max-w-6xl mx-auto px-6 -mt-6 relative z-20 mb-8">
-          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="banner" />
+          <CouponSpotlight tenantId={listing.tenantId} variant="banner" />
         </section>
 
         {/* Asymmetric Content Grid */}
@@ -130,12 +136,8 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
               )}
 
               {/* Gallery */}
-              {!showStatusPanel && (
-                optFlags?.canUseMagazineGallery && optFlags?.galleryDisplayMode === 'magazine' ? (
-                  <DirectoryMagazineGallery listing={listing} {...businessProfile} isPublished={true} />
-                ) : (
-                  <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
-                )
+              {!showStatusPanel && canShowGallery && (
+                <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
               )}
 
               {/* Active Featured Products (from ActiveFeaturedResolver) */}
@@ -254,7 +256,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
               )}
 
               {/* Categories */}
-              {!showStatusPanel && storefrontCategories.categories.length > 0 && (
+              {!showStatusPanel && isStorefrontEnabled && storefrontCategories.categories.length > 0 && (
                 <section>
                   <ProductCategoriesCollapsible categories={storefrontCategories.categories} tenantId={listing.tenantId} uncategorizedCount={storefrontCategories.uncategorizedCount} />
                 </section>
@@ -275,23 +277,23 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             {/* Sidebar */}
             <div className="lg:col-span-4 space-y-8">
               {/* Contact Card */}
-              {!showStatusPanel && showsHours && optFlags?.showContact !== false && (
+              {!showStatusPanel && canShowContact && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
-                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={isRetailStore} />
+                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} />
                 </div>
               )}
 
               {/* Hours */}
-              {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && businessHours && isRetailStore && (
+              {!showStatusPanel && showsHours && businessHours && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
-                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={isRetailStore} />
+                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
                 </div>
               )}
 
               {/* Map */}
-              {!showStatusPanel && showsMap && optFlags?.showInteractiveMaps !== false && listing.address && isRetailStore && (
+              {!showStatusPanel && showsMap && listing.address && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
                   <GoogleMapEmbed address={listing.address} />
@@ -299,10 +301,12 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
               )}
 
               {/* QR */}
-              <div className="bg-neutral-50 rounded-xl p-6 flex flex-col items-center">
-                <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
-                  downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={160} showDownload={true} pageType="directory" capabilityFlags={optFlags} />
-              </div>
+              {canShowQr && (
+                <div className="bg-neutral-50 rounded-xl p-6 flex flex-col items-center">
+                  <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={160} showDownload={true} pageType="directory" isPublic />
+                </div>
+              )}
 
               {/* Inquiry */}
               {crmFlags?.crm_enabled && crmFlags?.crm_inquiry_directory_enabled && !showStatusPanel && tenantId && (
@@ -316,7 +320,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
         </div>
 
         {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}
-        {optFlags?.showRecentlyViewed !== false && <LastViewed />}
+        <LastViewed />
         <PoweredByFooter />
       </div>
     </>

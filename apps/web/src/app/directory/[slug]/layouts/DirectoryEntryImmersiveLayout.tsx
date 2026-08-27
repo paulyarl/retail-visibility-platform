@@ -11,7 +11,6 @@ import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
-import DirectoryMagazineGallery from '@/components/directory/DirectoryMagazineGallery';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
@@ -34,14 +33,17 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
   const {
     tenantId, listing, tenantLogo, businessProfile, businessHours,
     storefrontCategories, featuredProducts, activeFeatured, tenantInfo, slugForRelated,
-    optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
+    showStatusPanel, hoursStatus, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
-    isDemo, demoExpiresAt, directoryEntryOptions,
+    isDemo, demoExpiresAt, directoryEntryOptions, isStorefrontEnabled,
   } = props;
 
-  const canShowLogo = directoryEntryOptions?.canShowLogo ?? true;
-  const canShowAbout = directoryEntryOptions?.canShowAbout ?? true;
+  const canShowLogo = directoryEntryOptions?.logoEnabled ?? directoryEntryOptions?.canShowLogo ?? true;
+  const canShowAbout = directoryEntryOptions?.aboutEnabled ?? directoryEntryOptions?.canShowAbout ?? true;
+  const canShowGallery = directoryEntryOptions?.galleryEnabled ?? true;
+  const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
+  const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -101,12 +103,14 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-4">
-                    <Link href={`/tenant/${slugForRelated || listing.tenantId}`}
-                      className="inline-flex items-center gap-2 px-8 py-3 bg-white text-gray-900 rounded-full hover:bg-gray-100 transition-colors font-bold text-lg">
-                      <Globe className="w-5 h-5" /> Visit Storefront
-                    </Link>
-                    {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && isRetailStore && (
-                      <HoursStatusBadge status={hoursStatus} size="lg" animate={optFlags?.showAnimatedHours !== false} />
+                    {isStorefrontEnabled && (
+                      <Link href={`/tenant/${slugForRelated || listing.tenantId}`}
+                        className="inline-flex items-center gap-2 px-8 py-3 bg-white text-gray-900 rounded-full hover:bg-gray-100 transition-colors font-bold text-lg">
+                        <Globe className="w-5 h-5" /> Visit Storefront
+                      </Link>
+                    )}
+                    {showsHours && (
+                      <HoursStatusBadge status={hoursStatus} size="lg" animate={true} />
                     )}
                   </div>
                 </div>
@@ -117,7 +121,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
 
         {/* Coupon Spotlight Strip */}
         <section className="max-w-7xl mx-auto px-6 -mt-4 relative z-20 mb-4">
-          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="strip" />
+          <CouponSpotlight tenantId={listing.tenantId} variant="strip" />
         </section>
 
         {/* Content */}
@@ -137,12 +141,8 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
               )}
 
               {/* Gallery */}
-              {!showStatusPanel && (
-                optFlags?.canUseMagazineGallery && optFlags?.galleryDisplayMode === 'magazine' ? (
-                  <DirectoryMagazineGallery listing={listing} {...businessProfile} isPublished={true} />
-                ) : (
-                  <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
-                )
+              {!showStatusPanel && canShowGallery && (
+                <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
               )}
 
               {/* Active Featured Products (from ActiveFeaturedResolver) */}
@@ -261,7 +261,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
               )}
 
               {/* Categories */}
-              {!showStatusPanel && storefrontCategories.categories.length > 0 && (
+              {!showStatusPanel && isStorefrontEnabled && storefrontCategories.categories.length > 0 && (
                 <ProductCategoriesCollapsible categories={storefrontCategories.categories} tenantId={listing.tenantId} uncategorizedCount={storefrontCategories.uncategorizedCount} />
               )}
 
@@ -279,28 +279,30 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {!showStatusPanel && showsHours && optFlags?.showContact !== false && (
+              {!showStatusPanel && canShowContact && (
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="text-lg font-semibold mb-4">Contact</h3>
-                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={isRetailStore} />
+                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} />
                 </div>
               )}
-              {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && businessHours && isRetailStore && (
+              {!showStatusPanel && showsHours && businessHours && (
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="text-lg font-semibold mb-4">Hours</h3>
-                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={isRetailStore} />
+                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
                 </div>
               )}
-              {!showStatusPanel && showsMap && optFlags?.showInteractiveMaps !== false && listing.address && isRetailStore && (
+              {!showStatusPanel && showsMap && listing.address && (
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="text-lg font-semibold mb-4">Location</h3>
                   <GoogleMapEmbed address={listing.address} />
                 </div>
               )}
-              <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 flex flex-col items-center">
-                <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Share"
-                  downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={160} showDownload={true} pageType="directory" capabilityFlags={optFlags} />
-              </div>
+              {canShowQr && (
+                <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 flex flex-col items-center">
+                  <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Share"
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={160} showDownload={true} pageType="directory" isPublic />
+                </div>
+              )}
               {crmFlags?.crm_enabled && crmFlags?.crm_inquiry_directory_enabled && !showStatusPanel && tenantId && (
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="text-lg font-semibold mb-4">Inquiry</h3>
@@ -312,7 +314,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
         </div>
 
         {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}
-        {optFlags?.showRecentlyViewed !== false && <LastViewed />}
+        <LastViewed />
         <PoweredByFooter />
       </div>
     </>

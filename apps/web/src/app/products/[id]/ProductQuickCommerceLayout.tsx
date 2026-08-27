@@ -140,7 +140,7 @@ export default function ProductQuickCommerceLayout({
         </div>
 
         <div className="mb-4">
-          <CouponSpotlight tenantId={product.tenantId} coupon={null} variant="strip" />
+          <CouponSpotlight tenantId={product.tenantId} variant="strip" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[45fr_55fr] gap-5 lg:gap-8 mb-8">

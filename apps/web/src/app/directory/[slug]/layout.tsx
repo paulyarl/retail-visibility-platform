@@ -56,8 +56,8 @@ export default async function DirectorySlugLayout({ params, children }: LayoutPr
   const { slug } = await params;
 
   // Directory presence seeds (unclaimed listings seeded from public information)
-  // live at /place/{slug}. /directory/{slug} is the canonical path for subscribed
-  // platform tenants with storefront-oriented layouts. Redirect seeds away so
+  // live at /place/{slug}. /directory/{slug} is the canonical path for claimed
+  // tenants (listing_origin != 'directory_seed'). Redirect seeds away so
   // there is a single canonical URL per listing.
   try {
     const data = await directoryService.getDirectoryConsolidated(slug);

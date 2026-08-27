@@ -6,7 +6,8 @@
  *   2. POST /api/public/directory/claim/:token/accept — bind owner (requires auth)
  *
  * Claim converts org_standing_mode from 'directory_seed' to 'independent'
- * without wiping the listing or tenant identity. The tenant keeps its
+ * and listing_origin from 'directory_seed' to 'claimed' so the public URL
+ * moves from /place/{slug} to /directory/{slug}. The tenant keeps its
  * directory_presence tier until the owner upgrades.
  */
 
@@ -513,6 +514,8 @@ class DirectoryClaimService {
       WHERE id = ${r.seed_id}
     `;
 
+    await this.promoteListingToClaimed(r.tenant_id);
+
     // --- Customer-to-user promotion bridge ---
     let platformUserId: string | undefined;
     let userTokens: { accessToken: string; refreshToken: string } | undefined;
@@ -749,6 +752,8 @@ class DirectoryClaimService {
       SET status = 'claimed', claimed_at = now(), updated_at = now()
       WHERE id = ${r.seed_id}
     `;
+
+    await this.promoteListingToClaimed(r.tenant_id);
 
     // Update request status
     await prisma.$executeRaw`
@@ -989,18 +994,21 @@ class DirectoryClaimService {
   }
 
   /**
-   * Provision the GBP identity bridge (mkt_customer_gbp_links) for a claimed
-   * directory seed. The seed tenant is the lightweight tenant row reused per
-   * GBP Authorized Management Suite Spec §4 Subsystem 0 §1. Without this
-   * bridge, the customer gets platform context (sees the GBP nav link) but
-   * 404s on every /api/customer/marketing/gbp/* endpoint because
-   * CustomerGBPAccessService.resolveTenant() finds no link row.
-   *
-   * Non-fatal: a provisioning failure must not block the claim. The customer
-   * can still access the portal; GBP features show "no connection" until the
-   * bridge is provisioned (e.g. by re-claiming or by an admin manually
-   * creating the link).
+   * Move the public listing off /place onto /directory.
+   * Routing is origin-based: listing_origin = 'directory_seed' stays on
+   * /place/{slug}; anything else (default 'claimed') lives at /directory/{slug}.
    */
+  private async promoteListingToClaimed(tenantId: string): Promise<void> {
+    await prisma.$executeRaw`
+      UPDATE directory_listings_list
+      SET listing_origin = 'claimed',
+          public_disclaimer = NULL,
+          updated_at = now()
+      WHERE tenant_id = ${tenantId}
+        AND listing_origin = 'directory_seed'
+    `;
+  }
+
   /**
    * Populate the tenant business profile from the claimed directory listing.
    *
@@ -1163,6 +1171,19 @@ class DirectoryClaimService {
     }
   }
 
+  /**
+   * Provision the GBP identity bridge (mkt_customer_gbp_links) for a claimed
+   * directory seed. The seed tenant is the lightweight tenant row reused per
+   * GBP Authorized Management Suite Spec §4 Subsystem 0 §1. Without this
+   * bridge, the customer gets platform context (sees the GBP nav link) but
+   * 404s on every /api/customer/marketing/gbp/* endpoint because
+   * CustomerGBPAccessService.resolveTenant() finds no link row.
+   *
+   * Non-fatal: a provisioning failure must not block the claim. The customer
+   * can still access the portal; GBP features show "no connection" until the
+   * bridge is provisioned (e.g. by re-claiming or by an admin manually
+   * creating the link).
+   */
   private async provisionGbpBridge(customerId: string, tenantId: string): Promise<void> {
     try {
       const { CustomerGBPAccessService } = await import('./CustomerGBPAccessService');

@@ -131,7 +131,7 @@ export default function PlanSummaryWidget({ capabilities, loading, tenantId, mer
 
   const { tierName, tierKey, purchasedFeatureKeys, overrideFeatureKeys } = capabilities;
 
-  const entries: CapabilityTypeEntry[] = CAPABILITY_META.map(meta => {
+  const allEntries: CapabilityTypeEntry[] = CAPABILITY_META.map(meta => {
     const enabled = getCapabilityEnabled(capabilities, meta.key);
     const gated = merchantGates?.[meta.key] ?? false;
     const color = resolveCapabilityColor(meta.key, meta.prefix, enabled, gated, purchasedFeatureKeys, overrideFeatureKeys);
@@ -145,8 +145,16 @@ export default function PlanSummaryWidget({ capabilities, loading, tenantId, mer
     };
   });
 
-  const enabledCount = entries.filter(e => e.enabled).length;
-  const totalCount = entries.length;
+  // Only render capability modules the tier actually assigned (R35).
+  // Tiers with a focused feature set (e.g., directory_presence) define feature keys
+  // for just a few modules; the rest resolve to enabled=false and would clutter the
+  // widget with red "not in plan" chips. The full PlanSummaryPanel already hides
+  // unassigned modules via its per-capability `if (xxx.enabled)` gates — the widget
+  // now mirrors that behavior. The X/Y active count still reflects the full catalog
+  // so the merchant can see their plan's scope relative to the platform.
+  const visibleEntries = allEntries.filter(e => e.enabled);
+  const enabledCount = visibleEntries.length;
+  const totalCount = allEntries.length;
 
   return (
     <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
@@ -162,23 +170,29 @@ export default function PlanSummaryWidget({ capabilities, loading, tenantId, mer
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-1">
-        <div className="flex flex-wrap gap-1.5">
-          {entries.map(entry => {
-            const colors = COLOR_CLASSES[entry.color];
-            const href = entry.settingsPath ? `/t/${tenantId}${entry.settingsPath}` : `/t/${tenantId}/settings/plan-summary`;
-            return (
-              <Link
-                key={entry.key}
-                href={href}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${colors.text} ${colors.hover} border border-transparent hover:border-current/20`}
-              >
-                <span className={`h-2 w-2 rounded-full ${colors.dot}`} />
-                <span>{entry.icon}</span>
-                <span>{entry.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+        {visibleEntries.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {visibleEntries.map(entry => {
+              const colors = COLOR_CLASSES[entry.color];
+              const href = entry.settingsPath ? `/t/${tenantId}${entry.settingsPath}` : `/t/${tenantId}/settings/plan-summary`;
+              return (
+                <Link
+                  key={entry.key}
+                  href={href}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${colors.text} ${colors.hover} border border-transparent hover:border-current/20`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${colors.dot}`} />
+                  <span>{entry.icon}</span>
+                  <span>{entry.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-neutral-500 py-2">
+            No capability modules assigned to this plan.
+          </p>
+        )}
         <Link
           href={`/t/${tenantId}/settings/plan-summary`}
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"

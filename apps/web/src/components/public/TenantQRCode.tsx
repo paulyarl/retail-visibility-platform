@@ -435,17 +435,16 @@ export function TenantQRCode({
     }
   };
 
-  // QR namespace gate: if qrState resolved and QR codes not allowed for this page type, render nothing
-  if (qrState) {
+  // QR namespace gate: storefront_qr merchant prefs control product/storefront surfaces.
+  // Directory listings are gated by directory_entry.qr_enabled in the parent layout — do not hide them here.
+  if (qrState && pageType !== 'directory') {
     const qrPrefs = qrState.merchantPreferences as any;
     const pageSpecificFlag =
       pageType === 'product'
         ? qrPrefs?.qr_product
-        : pageType === 'directory'
-          ? qrPrefs?.qr_directory
-          : pageType === 'storefront'
-            ? qrPrefs?.qr_store
-            : qrState.qrEnabled;
+        : pageType === 'storefront'
+          ? qrPrefs?.qr_store
+          : qrState.qrEnabled;
     if (!pageSpecificFlag) {
       return null;
     }
