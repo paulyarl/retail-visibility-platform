@@ -713,6 +713,48 @@ export class CustomerAuthService {
   }
 
   /**
+   * List the customer's own directory claim requests (pending + recently
+   * approved/rejected). Used by /me so the account dashboard can show a
+   * "Pending Claims" section before the operator approves — otherwise the
+   * owner sees no indication their claim was submitted.
+   *
+   * Matches by customer_id OR customer_email (covers claims submitted before
+   * optionalCustomerAuth was added to the /initiate route).
+   */
+  async listMyClaimRequests(customerId: string): Promise<any[]> {
+    try {
+      // Resolve email for the email-match fallback
+      const custRows = await prisma.$queryRaw<any[]>`
+        SELECT email FROM customers WHERE id = ${customerId} LIMIT 1
+      `;
+      const email = custRows[0]?.email || null;
+
+      return await prisma.$queryRaw<any[]>`
+        SELECT
+          dcr.id,
+          dcr.seed_id,
+          dcr.status,
+          dcr.submitted_at,
+          dcr.reviewed_at,
+          dcr.rejection_reason,
+          dl.business_name,
+          dl.category,
+          dl.city,
+          dl.state
+        FROM directory_claim_requests dcr
+        JOIN directory_presence_seeds dps ON dps.id = dcr.seed_id
+        LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dcr.customer_id = ${customerId}
+           OR (dcr.customer_email IS NOT NULL AND dcr.customer_email = ${email})
+        ORDER BY dcr.submitted_at DESC
+        LIMIT 10
+      `;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Resolve the tenant ID the customer owns (via linked_user_id → user_tenants
    * OWNER row). Returns the first owned tenant, or null if the customer doesn't
    * own a tenant yet (e.g. hasn't claimed a directory seed or purchased a

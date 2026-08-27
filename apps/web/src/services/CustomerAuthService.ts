@@ -26,6 +26,19 @@ export interface CustomerContexts {
   platform: boolean;
 }
 
+export interface CustomerPendingClaim {
+  id: string;
+  seed_id: string;
+  status: string;
+  submitted_at: string;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  business_name: string | null;
+  category: string | null;
+  city: string | null;
+  state: string | null;
+}
+
 export interface CustomerAuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -46,6 +59,7 @@ class CustomerAuthService extends CustomerApiSingleton {
   private static instance: CustomerAuthService;
   private customer: Customer | null = null;
   private tenantId: string | null = null;
+  private pendingClaims: CustomerPendingClaim[] = [];
 
   private constructor() {
     super('customer-auth-service', { ttl: 0 }); // No caching for auth
@@ -490,6 +504,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         success: boolean;
         contexts?: CustomerContexts;
         tenantId?: string;
+        pendingClaims?: CustomerPendingClaim[];
       }>(
         '/api/customer-auth/me',
         { method: 'GET', credentials: 'include' },
@@ -497,12 +512,21 @@ class CustomerAuthService extends CustomerApiSingleton {
       );
       if (result.success && result.data?.contexts) {
         this.tenantId = result.data.tenantId || null;
+        this.pendingClaims = result.data.pendingClaims || [];
         return result.data.contexts;
       }
       return null;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Get the customer's pending/recent directory claim requests.
+   * Populated by getContexts() — call getContexts() first.
+   */
+  getPendingClaims(): CustomerPendingClaim[] {
+    return this.pendingClaims;
   }
 
   /**

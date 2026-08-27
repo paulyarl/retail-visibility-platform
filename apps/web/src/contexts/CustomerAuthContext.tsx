@@ -10,7 +10,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import customerAuthService, { Customer, CustomerAuthResponse, CustomerContexts } from '@/services/CustomerAuthService';
+import customerAuthService, { Customer, CustomerAuthResponse, CustomerContexts, CustomerPendingClaim } from '@/services/CustomerAuthService';
 import { clientLogger } from '@/lib/client-logger';
 
 interface CustomerAuthContextType {
@@ -18,6 +18,7 @@ interface CustomerAuthContextType {
   customer: Customer | null;
   contexts: CustomerContexts | null;
   tenantId: string | null;
+  pendingClaims: CustomerPendingClaim[];
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -45,6 +46,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [contexts, setContexts] = useState<CustomerContexts | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [pendingClaims, setPendingClaims] = useState<CustomerPendingClaim[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +62,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
           const ctxResult = await customerAuthService.getContexts();
           if (ctxResult) setContexts(ctxResult);
           setTenantId(customerAuthService.getTenantId());
+          setPendingClaims(customerAuthService.getPendingClaims());
         }
         setIsLoading(false);
       } catch (err) {
@@ -260,6 +263,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
         const ctxResult = await customerAuthService.getContexts();
         if (ctxResult) setContexts(ctxResult);
         setTenantId(customerAuthService.getTenantId());
+        setPendingClaims(customerAuthService.getPendingClaims());
       }
     } catch (err) {
       clientLogger.error('[CustomerAuthContext] Refresh customer error:', { detail: err });
@@ -274,6 +278,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
     customer,
     contexts,
     tenantId,
+    pendingClaims,
     isAuthenticated: !!customer,
     isLoading,
     error,

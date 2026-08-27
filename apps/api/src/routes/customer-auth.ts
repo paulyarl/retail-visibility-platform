@@ -658,6 +658,11 @@ router.get('/me', async (req: Request, res: Response) => {
     // Resolve owned tenant ID for sidebar nav links (dashboard + directory)
     const tenantId = await customerAuthService.resolveOwnedTenantId(customer.id);
 
+    // Pending/recent claim requests so the account dashboard can show
+    // "Pending Claims" before operator approval (otherwise the owner sees
+    // no indication their claim was submitted)
+    const pendingClaims = await customerAuthService.listMyClaimRequests(customer.id);
+
     res.json({
       success: true,
       customer: {
@@ -671,6 +676,7 @@ router.get('/me', async (req: Request, res: Response) => {
       },
       contexts,
       tenantId: tenantId || undefined,
+      pendingClaims,
     });
   } catch (error: any) {
     logger.error('[CustomerAuth API] Get me error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });

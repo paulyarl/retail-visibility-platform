@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
+import { CustomerPendingClaim } from '@/services/CustomerAuthService';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import { customerAddressesService } from '@/services/CustomerAddressesService';
 import customerCouponWalletService from '@/services/CustomerCouponWalletService';
@@ -15,6 +16,7 @@ import marketingCustomerService, {
 import {
   Package, MapPin, ShoppingBag, Clock, TrendingUp, Download, Ticket,
   ChevronDown, Briefcase, Building2, Star, ArrowRight, CheckCircle,
+  AlertCircle, XCircle,
 } from 'lucide-react';
 import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
 import { clientLogger } from '@/lib/client-logger';
@@ -72,7 +74,7 @@ function formatDate(date: string | null): string {
 
 // ─── Main page ───────────────────────────────────────────────────────────
 export default function AccountOverviewPage() {
-  const { customer, contexts } = useCustomerAuth();
+  const { customer, contexts, pendingClaims } = useCustomerAuth();
   const [recentOrders, setRecentOrders] = useState<CustomerOrder[]>([]);
   const [digitalDownloadsCount, setDigitalDownloadsCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
@@ -258,6 +260,73 @@ export default function AccountOverviewPage() {
           </Card>
         </Link>
       </div>
+
+      {/* Pending Directory Claims — shown regardless of platform context */}
+      {pendingClaims.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-200 bg-amber-100">
+            <h3 className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Directory Claim Requests ({pendingClaims.length})
+            </h3>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {pendingClaims.map((claim) => {
+              const isPending = claim.status === 'pending';
+              const isApproved = claim.status === 'approved';
+              const isRejected = claim.status === 'rejected';
+              return (
+                <div key={claim.id} className="px-4 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 truncate">
+                      {claim.business_name || 'Unknown Business'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {claim.category}
+                      {claim.city ? ` · ${claim.city}, ${claim.state}` : ''}
+                      {' · Submitted '}
+                      {new Date(claim.submitted_at).toLocaleDateString()}
+                    </p>
+                    {isRejected && claim.rejection_reason && (
+                      <p className="text-xs text-red-600 mt-1">
+                        Reason: {claim.rejection_reason}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0">
+                    {isPending && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                        <Clock className="w-3 h-3" />
+                        Pending Review
+                      </span>
+                    )}
+                    {isApproved && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                        <CheckCircle className="w-3 h-3" />
+                        Approved
+                      </span>
+                    )}
+                    {isRejected && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                        <XCircle className="w-3 h-3" />
+                        Rejected
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {pendingClaims.some((c) => c.status === 'pending') && (
+            <div className="px-4 py-2 bg-amber-50 border-t border-amber-100">
+              <p className="text-xs text-amber-700">
+                Our team will review your claim within 1-2 business days. Once approved,
+                your Google Business Profile tools will appear in the dashboard.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recent Orders — collapsible */}
       <CollapsibleSection
