@@ -501,6 +501,11 @@ class DirectoryClaimService {
       WHERE id = ${r.tenant_id}
     `;
 
+    // Populate the tenant business profile from the claimed directory listing
+    // so the directory entry has proper initial data (same shape as the
+    // Edit Business Profile modal produces via PATCH /api/tenant/profile).
+    await this.populateTenantProfileFromListing(r.seed_id, r.tenant_id);
+
     // Update seed status
     await prisma.$executeRaw`
       UPDATE directory_presence_seeds
@@ -732,6 +737,11 @@ class DirectoryClaimService {
       SET org_standing_mode = 'independent', updated_at = now()
       WHERE id = ${r.tenant_id}
     `;
+
+    // Populate the tenant business profile from the claimed directory listing
+    // so the directory entry has proper initial data (same shape as the
+    // Edit Business Profile modal produces via PATCH /api/tenant/profile).
+    await this.populateTenantProfileFromListing(r.seed_id, r.tenant_id);
 
     // Update seed status
     await prisma.$executeRaw`
@@ -991,6 +1001,168 @@ class DirectoryClaimService {
    * bridge is provisioned (e.g. by re-claiming or by an admin manually
    * creating the link).
    */
+  /**
+   * Populate the tenant business profile from the claimed directory listing.
+   *
+   * Mirrors the shape produced by PATCH /api/tenant/profile (the Edit Business
+   * Profile modal). If a profile row already exists, only fills in fields that
+   * are empty so we don't overwrite operator/owner edits. If no profile row
+   * exists, creates one with the listing data.
+   *
+   * Also updates `tenants.name` to match the listing business name (when the
+   * tenant name is empty or still the default placeholder).
+   *
+   * Non-fatal: logs a warning on failure so claim approval still succeeds.
+   */
+  private async populateTenantProfileFromListing(seedId: string, tenantId: string): Promise<void> {
+    try {
+      // Fetch the directory listing details
+      const listingRows = await prisma.$queryRaw<any[]>`
+        SELECT
+          dl.business_name,
+          dl.address,
+          dl.city,
+          dl.state,
+          dl.zip_code,
+          dl.phone,
+          dl.email,
+          dl.website,
+          dl.logo_url,
+          dl.description,
+          dl.business_hours,
+          dl.latitude,
+          dl.longitude
+        FROM directory_presence_seeds dps
+        JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dps.id = ${seedId}
+        LIMIT 1
+      `;
+      const listing = listingRows[0];
+      if (!listing) {
+        logger.warn('[DirectoryClaim] No listing found for seed — skipping profile population', undefined, { seedId });
+        return;
+      }
+
+      // Check if a tenant business profile already exists
+      const existingRows = await prisma.$queryRaw<any[]>`
+        SELECT tenant_id FROM tenant_business_profiles_list WHERE tenant_id = ${tenantId}
+      `;
+      const exists = existingRows.length > 0;
+
+      if (exists) {
+        // Only fill in fields that are currently empty/null — don't overwrite
+        // anything the operator or owner has already set.
+        const currentRows = await prisma.$queryRaw<any[]>`
+          SELECT
+            business_name, address_line1, city, state, postal_code, country_code,
+            phone_number, email, website, logo_url, business_description, hours,
+            latitude, longitude
+          FROM tenant_business_profiles_list
+          WHERE tenant_id = ${tenantId}
+        `;
+        const current = currentRows[0] || {};
+
+        const updates: string[] = [];
+        const values: any[] = [];
+
+        const maybeAdd = (col: string, val: any, currentVal: any) => {
+          if (val && (currentVal === null || currentVal === undefined || currentVal === '')) {
+            values.push(val);
+            updates.push(`"${col}" = $${values.length}`);
+          }
+        };
+
+        maybeAdd('business_name', listing.business_name, current.business_name);
+        maybeAdd('address_line1', listing.address, current.address_line1);
+        maybeAdd('city', listing.city, current.city);
+        maybeAdd('state', listing.state, current.state);
+        maybeAdd('postal_code', listing.zip_code, current.postal_code);
+        maybeAdd('phone_number', listing.phone, current.phone_number);
+        maybeAdd('email', listing.email, current.email);
+        maybeAdd('website', listing.website, current.website);
+        maybeAdd('logo_url', listing.logo_url, current.logo_url);
+        maybeAdd('business_description', listing.description, current.business_description);
+        if (listing.business_hours && (current.hours === null || current.hours === undefined)) {
+          values.push(listing.business_hours);
+          updates.push(`"hours" = $${values.length}::jsonb`);
+        }
+        if (listing.latitude !== null && listing.latitude !== undefined && (current.latitude === null || current.latitude === undefined)) {
+          values.push(listing.latitude);
+          updates.push(`"latitude" = $${values.length}`);
+        }
+        if (listing.longitude !== null && listing.longitude !== undefined && (current.longitude === null || current.longitude === undefined)) {
+          values.push(listing.longitude);
+          updates.push(`"longitude" = $${values.length}`);
+        }
+
+        if (updates.length > 0) {
+          values.push(tenantId);
+          const updateQuery = `
+            UPDATE tenant_business_profiles_list
+            SET ${updates.join(', ')}, updated_at = now()
+            WHERE tenant_id = $${values.length}
+          `;
+          await prisma.$executeRawUnsafe(updateQuery, ...values);
+        }
+      } else {
+        // Create a new profile row with the listing data
+        const businessName = listing.business_name || 'Unknown Business';
+        const addressLine1 = listing.address || '';
+        const city = listing.city || '';
+        const state = listing.state || null;
+        const postalCode = listing.zip_code || '';
+        const countryCode = 'US';
+
+        await prisma.$executeRaw`
+          INSERT INTO tenant_business_profiles_list (
+            tenant_id, business_name, address_line1, city, state, postal_code, country_code,
+            phone_number, email, website, logo_url, business_description, hours,
+            latitude, longitude, display_map, map_privacy_mode, updated_at
+          ) VALUES (
+            ${tenantId},
+            ${businessName},
+            ${addressLine1},
+            ${city},
+            ${state},
+            ${postalCode},
+            ${countryCode},
+            ${listing.phone || null},
+            ${listing.email || null},
+            ${listing.website || null},
+            ${listing.logo_url || null},
+            ${listing.description || null},
+            ${listing.business_hours || null}::jsonb,
+            ${listing.latitude || null},
+            ${listing.longitude || null},
+            false,
+            'precise',
+            now()
+          )
+          ON CONFLICT (tenant_id) DO NOTHING
+        `;
+      }
+
+      // Update tenant name if it's empty or a placeholder
+      const tenantRows = await prisma.$queryRaw<any[]>`
+        SELECT name FROM tenants WHERE id = ${tenantId}
+      `;
+      const tenantName = tenantRows[0]?.name;
+      if (listing.business_name && (!tenantName || tenantName === 'New Tenant' || tenantName.trim() === '')) {
+        await prisma.$executeRaw`
+          UPDATE tenants SET name = ${listing.business_name}, updated_at = now() WHERE id = ${tenantId}
+        `;
+      }
+
+      logger.info('[DirectoryClaim] Tenant profile populated from listing', undefined, {
+        tenantId, seedId, businessName: listing.business_name,
+      });
+    } catch (e) {
+      logger.warn('[DirectoryClaim] Tenant profile population failed (non-fatal)', undefined, {
+        tenantId, seedId, error: (e as Error).message,
+      });
+    }
+  }
+
   private async provisionGbpBridge(customerId: string, tenantId: string): Promise<void> {
     try {
       const { CustomerGBPAccessService } = await import('./CustomerGBPAccessService');
