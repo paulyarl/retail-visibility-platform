@@ -14,10 +14,13 @@
  */
 
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
+import { validateAttachment } from '../validators/recovery-intake.schema';
 import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
 import crypto from 'crypto';
 
@@ -78,6 +81,14 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     const customerEmail = customer?.email || platformUser?.email;
     const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
 
+    // Claimant verification fields (from the claim form body)
+    const body = req.body || {};
+    const claimantFirstName = body.claimantFirstName?.trim() || undefined;
+    const claimantMiddleName = body.claimantMiddleName?.trim() || undefined;
+    const claimantLastName = body.claimantLastName?.trim() || undefined;
+    const claimantPhone = body.claimantPhone?.trim() || undefined;
+    const claimantBusinessAddress = body.claimantBusinessAddress?.trim() || undefined;
+
     const result = await DirectoryClaimService.initiateClaim(token, {
       actorType: 'customer',
       actorId,
@@ -85,6 +96,11 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
       userAgent: req.get('User-Agent'),
       customerEmail,
       customerName,
+      claimantFirstName,
+      claimantMiddleName,
+      claimantLastName,
+      claimantPhone,
+      claimantBusinessAddress,
     } as any);
 
     if (result.error) {
@@ -762,5 +778,61 @@ router.post('/search-demand', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'internal_error' });
   }
 });
+
+// Multipart upload config for claim proof attachments
+const claimUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: unifiedConfig.recoveryMaxAttachmentBytes },
+});
+
+/** POST /api/public/directory/claim/:token/proof — upload proof of ownership (multipart) */
+router.post(
+  '/claim/:token/proof',
+  claimUpload.single('file'),
+  async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, error: 'token_required' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No file uploaded' });
+      }
+
+      const validation = validateAttachment({
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        originalname: req.file.originalname,
+      });
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, error: validation.error });
+      }
+
+      const result = await DirectoryClaimService.uploadProofAttachment(token, {
+        buffer: req.file.buffer,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        originalname: req.file.originalname,
+      });
+
+      res.json({
+        success: true,
+        attachmentId: result.attachmentId,
+        fileName: result.fileName,
+        fileType: result.fileType,
+        fileSize: result.fileSize,
+      });
+    } catch (error: any) {
+      const msg = (error as Error).message;
+      if (msg.includes('expired') || msg.includes('No pending') || msg.includes('consumed')) {
+        return res.status(400).json({ success: false, error: msg });
+      }
+      logger.error('[POST /api/public/directory/claim/:token/proof] Error:', undefined, {
+        error: { name: (error as any)?.name || 'Error', message: msg },
+      });
+      res.status(500).json({ success: false, error: 'Failed to upload proof' });
+    }
+  },
+);
 
 export default router;

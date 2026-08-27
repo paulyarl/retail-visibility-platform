@@ -934,4 +934,92 @@ router.post('/claim-requests/:id/link-customer', requirePlatformAdmin, async (re
   }
 });
 
+/** GET /api/admin/directory/claim-requests/:id/attachments — list proof attachments */
+router.get('/claim-requests/:id/attachments', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const attachments = await DirectoryClaimService.listProofAttachments(id);
+    res.json({
+      success: true,
+      data: attachments.map((a) => ({
+        id: a.id,
+        fileName: a.file_name,
+        fileType: a.file_type,
+        fileSize: a.file_size,
+        uploadedAt: a.uploaded_at,
+      })),
+    });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/claim-requests/:id/attachments] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/claim-requests/attachments/:attachmentId — download proof attachment */
+router.get('/claim-requests/attachments/:attachmentId', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { attachmentId } = req.params;
+    const result = await DirectoryClaimService.downloadProofAttachment(attachmentId);
+    if (!result) {
+      return res.status(404).json({ error: 'attachment_not_found' });
+    }
+
+    const contentTypeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      png: 'image/png',
+      jpeg: 'image/jpeg',
+    };
+    const contentType = contentTypeMap[result.fileType] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${result.fileName}"`);
+    return res.send(result.buffer);
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/claim-requests/attachments/:attachmentId] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/claim-requests/:id/verify — save operator verification worksheet */
+const verifySchema = z.object({
+  method: z.enum(['phone', 'email', 'website', 'in_person', 'document', 'other']),
+  notes: z.string().max(2000).optional(),
+});
+
+router.post('/claim-requests/:id/verify', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = verifySchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const adminUserId = (req as any).user?.userId || (req as any).user?.id;
+    const result = await DirectoryClaimService.saveVerification(
+      id,
+      adminUserId,
+      validation.data.method,
+      validation.data.notes || '',
+    );
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        request_not_found: 404,
+      };
+      return res.status(statusMap[result.message] || 400).json({ error: result.message });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/claim-requests/:id/verify] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;

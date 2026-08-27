@@ -30,6 +30,16 @@ interface ClaimAuditCtx {
   customerEmail?: string;
   /** Customer display name (for operator-approval request display) */
   customerName?: string;
+  /** Claimant's first name (verification worksheet) */
+  claimantFirstName?: string;
+  /** Claimant's middle name */
+  claimantMiddleName?: string;
+  /** Claimant's last name */
+  claimantLastName?: string;
+  /** Claimant's phone number (for operator verification call/text) */
+  claimantPhone?: string;
+  /** Claimant's stated business address (optional, for cross-reference) */
+  claimantBusinessAddress?: string;
 }
 
 export interface ClaimTokenSummary {
@@ -264,6 +274,8 @@ class DirectoryClaimService {
           INSERT INTO directory_claim_requests (
             id, seed_id, tenant_id, token_id,
             customer_id, customer_email, customer_name,
+            claimant_first_name, claimant_middle_name, claimant_last_name,
+            claimant_phone, claimant_business_address,
             status, submitted_at
           ) VALUES (
             ${requestId},
@@ -273,6 +285,11 @@ class DirectoryClaimService {
             ${ctx?.actorId || null},
             ${ctx?.customerEmail || null},
             ${ctx?.customerName || null},
+            ${ctx?.claimantFirstName || null},
+            ${ctx?.claimantMiddleName || null},
+            ${ctx?.claimantLastName || null},
+            ${ctx?.claimantPhone || null},
+            ${ctx?.claimantBusinessAddress || null},
             'pending',
             now()
           )
@@ -289,11 +306,11 @@ class DirectoryClaimService {
               ${PLATFORM_SCOPE},
               'directory_claim_pending',
               'Pending directory claim request',
-              ${`A business owner has submitted a claim request for a directory listing. Review and approve at Settings → Directory → Presence Seeds.`},
+              ${`A business owner has submitted a claim request for a directory listing.\n\nClaimant: ${[ctx?.claimantFirstName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}\nEmail: ${ctx?.customerEmail || '—'}\nPhone: ${ctx?.claimantPhone || '—'}\n\nReview and approve at Settings → Directory → Presence Seeds.`},
               'clock',
               false,
               false,
-              ${JSON.stringify({ requestId, seedId: r.seed_id, tenantId: r.tenant_id })}::jsonb,
+              ${JSON.stringify({ requestId, seedId: r.seed_id, tenantId: r.tenant_id, claimantEmail: ctx?.customerEmail, claimantPhone: ctx?.claimantPhone })}::jsonb,
               now()
             )
           `;
@@ -573,14 +590,24 @@ class DirectoryClaimService {
         dcr.customer_id,
         dcr.customer_email,
         dcr.customer_name,
+        dcr.claimant_first_name,
+        dcr.claimant_middle_name,
+        dcr.claimant_last_name,
+        dcr.claimant_phone,
+        dcr.claimant_business_address,
         dcr.status,
         dcr.rejection_reason,
         dcr.submitted_at,
         dcr.reviewed_at,
         dcr.reviewed_by,
+        dcr.verification_method,
+        dcr.verification_notes,
+        dcr.verification_completed_at,
+        dcr.verification_completed_by,
         dps.category,
         dl.business_name,
         dl.address,
+        dl.phone AS business_phone,
         dps.city,
         dps.state
       FROM directory_claim_requests dcr
@@ -589,6 +616,23 @@ class DirectoryClaimService {
       WHERE dcr.status = ${status}
       ORDER BY dcr.submitted_at DESC
     `;
+
+    // Fetch attachment counts for each request (separate query to avoid
+    // row multiplication from the join)
+    const requestIds = rows.map((r) => r.id);
+    let attachmentCounts: Record<string, number> = {};
+    if (requestIds.length > 0) {
+      const countRows = await prisma.$queryRaw<any[]>`
+        SELECT claim_request_id, COUNT(*)::int AS cnt
+        FROM directory_claim_attachments
+        WHERE claim_request_id = ANY(${requestIds}::text[])
+        GROUP BY claim_request_id
+      `;
+      for (const cr of countRows) {
+        attachmentCounts[cr.claim_request_id] = cr.cnt;
+      }
+    }
+
     return rows.map((r) => ({
       id: r.id,
       seedId: r.seed_id,
@@ -597,16 +641,27 @@ class DirectoryClaimService {
       customerId: r.customer_id,
       customerEmail: r.customer_email,
       customerName: r.customer_name,
+      claimantFirstName: r.claimant_first_name,
+      claimantMiddleName: r.claimant_middle_name,
+      claimantLastName: r.claimant_last_name,
+      claimantPhone: r.claimant_phone,
+      claimantBusinessAddress: r.claimant_business_address,
       status: r.status,
       rejectionReason: r.rejection_reason,
       submittedAt: r.submitted_at,
       reviewedAt: r.reviewed_at,
       reviewedBy: r.reviewed_by,
+      verificationMethod: r.verification_method,
+      verificationNotes: r.verification_notes,
+      verificationCompletedAt: r.verification_completed_at,
+      verificationCompletedBy: r.verification_completed_by,
       businessName: r.business_name,
       category: r.category,
       address: r.address,
+      businessPhone: r.business_phone,
       city: r.city,
       state: r.state,
+      attachmentCount: attachmentCounts[r.id] || 0,
     }));
   }
 
@@ -783,6 +838,45 @@ class DirectoryClaimService {
     });
 
     return { success: true, message: 'rejected' };
+  }
+
+  /**
+   * Save operator verification worksheet data for a claim request.
+   * The operator fills out a verification worksheet (method, notes) before
+   * approving or rejecting. This records the verification step without
+   * changing the request status — the operator still needs to approve or
+   * reject separately.
+   */
+  async saveVerification(
+    requestId: string,
+    adminUserId: string,
+    method: string,
+    notes: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, status FROM directory_claim_requests WHERE id = ${requestId} LIMIT 1
+    `;
+    if (!rows[0]) {
+      return { success: false, message: 'request_not_found' };
+    }
+
+    await prisma.$executeRaw`
+      UPDATE directory_claim_requests
+      SET verification_method = ${method},
+          verification_notes = ${notes || null},
+          verification_completed_at = now(),
+          verification_completed_by = ${adminUserId}
+      WHERE id = ${requestId}
+    `;
+
+    audit({
+      actor: adminUserId,
+      actorType: 'user',
+      action: 'directory_claim.save_verification',
+      payload: { requestId, method, notesLength: notes?.length || 0 },
+    });
+
+    return { success: true, message: 'saved' };
   }
 
   /**
@@ -1049,6 +1143,147 @@ class DirectoryClaimService {
       SELECT tenant_id FROM user_tenants WHERE user_id = ${userId}
     `;
     return rows.map((r) => r.tenant_id);
+  }
+
+  // ─── Claim proof attachments ────────────────────────────────────────
+
+  /**
+   * Upload a proof-of-ownership attachment for a pending claim request.
+   * The claimant provides the claim token (from the claim URL) — we resolve
+   * it to the pending request and store the file in the Supabase DISPUTES
+   * bucket (reused for proof documents).
+   *
+   * Returns the attachment metadata so the frontend can show the uploaded
+   * file list.
+   */
+  async uploadProofAttachment(
+    token: string,
+    file: { buffer: Buffer; mimetype: string; size: number; originalname: string },
+  ): Promise<{ attachmentId: string; fileName: string; fileType: string; fileSize: number }> {
+    // Resolve token → pending claim request
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT dcr.id, dcr.status, dct.expires_at, dct.consumed_at
+      FROM directory_claim_requests dcr
+      JOIN directory_claim_tokens dct ON dct.id = dcr.token_id
+      WHERE dct.token = ${token} AND dcr.status = 'pending'
+      LIMIT 1
+    `;
+    if (!rows[0]) {
+      throw new Error('No pending claim request found for this token');
+    }
+
+    const r = rows[0];
+    const now = new Date();
+    if (r.consumed_at) {
+      throw new Error('Claim token already consumed');
+    }
+    if (new Date(r.expires_at) < now) {
+      throw new Error('Claim token has expired');
+    }
+
+    // Upload to Supabase DISPUTES bucket
+    const { createClient } = await import('@supabase/supabase-js');
+    const { unifiedConfig } = await import('../config/unifiedConfig');
+    const { StorageBuckets } = await import('../storage-config');
+    const { mimeToFileType } = await import('../validators/recovery-intake.schema');
+
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Storage backend not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const fileType = mimeToFileType(file.mimetype);
+    const pathKey = `claim-${r.id}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .upload(pathKey, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    const attachmentId = `dca-${crypto.randomBytes(8).toString('hex')}`;
+    await prisma.$executeRaw`
+      INSERT INTO directory_claim_attachments (
+        id, claim_request_id, file_url, file_name, file_type, file_size, uploaded_at
+      ) VALUES (
+        ${attachmentId},
+        ${r.id},
+        ${pathKey},
+        ${file.originalname},
+        ${fileType},
+        ${file.size},
+        now()
+      )
+    `;
+
+    logger.info('[DirectoryClaim] Proof attachment uploaded', undefined, {
+      requestId: r.id, attachmentId, fileName: file.originalname,
+    });
+
+    return {
+      attachmentId,
+      fileName: file.originalname,
+      fileType,
+      fileSize: file.size,
+    };
+  }
+
+  /**
+   * List proof attachments for a claim request (admin view).
+   */
+  async listProofAttachments(requestId: string): Promise<any[]> {
+    return prisma.$queryRaw<any[]>`
+      SELECT id, file_url, file_name, file_type, file_size, uploaded_at
+      FROM directory_claim_attachments
+      WHERE claim_request_id = ${requestId}
+      ORDER BY uploaded_at ASC
+    `;
+  }
+
+  /**
+   * Download a proof attachment (admin view). Returns the file buffer +
+   * metadata so the route handler can stream it to the operator.
+   */
+  async downloadProofAttachment(
+    attachmentId: string,
+  ): Promise<{ buffer: Buffer; fileName: string; fileType: string } | null> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT file_url, file_name, file_type FROM directory_claim_attachments
+      WHERE id = ${attachmentId} LIMIT 1
+    `;
+    if (!rows[0]) return null;
+
+    const { unifiedConfig } = await import('../config/unifiedConfig');
+    const { StorageBuckets } = await import('../storage-config');
+    const { createClient } = await import('@supabase/supabase-js');
+
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Storage backend not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data, error: downloadError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .download(rows[0].file_url);
+
+    if (downloadError || !data) {
+      throw new Error(`Storage download failed: ${downloadError?.message || 'no data'}`);
+    }
+
+    return {
+      buffer: Buffer.from(await data.arrayBuffer()),
+      fileName: rows[0].file_name,
+      fileType: rows[0].file_type,
+    };
   }
 }
 

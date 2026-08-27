@@ -20,6 +20,7 @@ import {
   TextInput,
   PasswordInput,
   PinInput,
+  List,
 } from '@mantine/core';
 import {
   IconCheck,
@@ -61,6 +62,19 @@ export default function DirectoryClaimClient() {
     userTokens?: { accessToken: string; refreshToken: string };
   } | null>(null);
 
+  // Claimant verification fields (for operator-approval claims)
+  const [claimantFirstName, setClaimantFirstName] = useState('');
+  const [claimantLastName, setClaimantLastName] = useState('');
+  const [claimantPhone, setClaimantPhone] = useState('');
+  const [claimantBusinessAddress, setClaimantBusinessAddress] = useState('');
+
+  // Proof attachments (uploaded after claim submission, while pending)
+  const [uploadedProofs, setUploadedProofs] = useState<Array<{
+    attachmentId: string; fileName: string; fileType: string; fileSize: number;
+  }>>([]);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+
   // Password setup for promoted OAuth-only customers
   const [platformPassword, setPlatformPassword] = useState('');
   const [platformPasswordConfirm, setPlatformPasswordConfirm] = useState('');
@@ -100,7 +114,12 @@ export default function DirectoryClaimClient() {
     setInitiating(true);
     setError(null);
     try {
-      const result = await directoryClaimPublicService.initiateClaim(token);
+      const result = await directoryClaimPublicService.initiateClaim(token, {
+        claimantFirstName: claimantFirstName.trim() || undefined,
+        claimantLastName: claimantLastName.trim() || undefined,
+        claimantPhone: claimantPhone.trim() || undefined,
+        claimantBusinessAddress: claimantBusinessAddress.trim() || undefined,
+      });
       if (result.error) {
         setError(result.error);
       } else if (result.verificationRequired) {
@@ -116,6 +135,22 @@ export default function DirectoryClaimClient() {
       setError(err?.message || 'initiate_failed');
     } finally {
       setInitiating(false);
+    }
+  };
+
+  const handleUploadProof = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadingProof(true);
+    setProofError(null);
+    try {
+      for (const file of Array.from(files)) {
+        const result = await directoryClaimPublicService.uploadProofAttachment(token, file);
+        setUploadedProofs((prev) => [...prev, result]);
+      }
+    } catch (err: any) {
+      setProofError(err?.message || 'Failed to upload file');
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -366,28 +401,103 @@ export default function DirectoryClaimClient() {
     return (
       <Container size="sm" className="py-12">
         <Card withBorder shadow="sm" padding="xl" radius="md">
-          <Stack align="center" gap="md" ta="center">
-            <ThemeIcon size={56} radius="xl" color="orange">
-              <IconClock size={28} />
-            </ThemeIcon>
-            <Title order={3}>Claim Submitted for Review</Title>
-            <Text c="dimmed">
-              Your claim request for <strong>{summary?.businessName}</strong> has been
-              submitted. Our team will review it and contact you within 1-2 business days
-              to verify ownership.
-            </Text>
-            <Text size="sm" c="dimmed">
-              You can track your claim and access your account dashboard while you wait.
-              Once approved, your Google Business Profile tools will appear there.
-            </Text>
-            <Group gap="sm">
-              <Button component={Link} href="/account" variant="filled" rightSection={<IconArrowRight size={16} />}>
-                Go to My Account
-              </Button>
-              <Button component={Link} href="/directory" variant="subtle" leftSection={<IconArrowLeft size={16} />}>
-                Back to Directory
-              </Button>
-            </Group>
+          <Stack gap="md">
+            <Stack align="center" gap="md" ta="center">
+              <ThemeIcon size={56} radius="xl" color="orange">
+                <IconClock size={28} />
+              </ThemeIcon>
+              <Title order={3}>Claim Submitted for Review</Title>
+              <Text c="dimmed">
+                Your claim request for <strong>{summary?.businessName}</strong> has been
+                submitted. Our team will review it and contact you within 1-2 business days
+                to verify ownership.
+              </Text>
+            </Stack>
+
+            <Divider />
+
+            {/* Proof of ownership upload */}
+            <Stack gap="sm">
+              <Text size="sm" fw={500}>
+                Speed up approval — upload proof of ownership
+              </Text>
+              <Text size="xs" c="dimmed">
+                Provide any of the following to help our team verify you are the business owner.
+                Accepted formats: PDF, PNG, JPEG.
+              </Text>
+              <List size="sm" c="dimmed" spacing={4}>
+                <List.Item>Business license or permit</List.Item>
+                <List.Item>Utility bill matching the business address</List.Item>
+                <List.Item>Photo of the business storefront / interior</List.Item>
+                <List.Item>Government-issued ID matching the claimant name</List.Item>
+              </List>
+
+              {uploadedProofs.length > 0 && (
+                <Stack gap="xs" mt="xs">
+                  {uploadedProofs.map((att) => (
+                    <Group key={att.attachmentId} gap="xs" align="center">
+                      <ThemeIcon size={24} radius="xl" color="green" variant="light">
+                        <IconCheck size={14} />
+                      </ThemeIcon>
+                      <Text size="sm">
+                        {att.fileName}{' '}
+                        <Text size="xs" c="dimmed" span>
+                          ({att.fileType}, {(att.fileSize / 1024).toFixed(0)}KB)
+                        </Text>
+                      </Text>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+
+              {proofError && (
+                <Text size="xs" c="red">{proofError}</Text>
+              )}
+
+              <Group gap="sm">
+                <label>
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={(e) => handleUploadProof(e.target.files)}
+                    disabled={uploadingProof}
+                  />
+                  <Button
+                    component="span"
+                    variant="light"
+                    size="sm"
+                    loading={uploadingProof}
+                    leftSection={<IconShieldCheck size={16} />}
+                  >
+                    Upload Proof Document
+                  </Button>
+                </label>
+                {uploadedProofs.length > 0 && (
+                  <Text size="xs" c="green">
+                    {uploadedProofs.length} file{uploadedProofs.length !== 1 ? 's' : ''} uploaded
+                  </Text>
+                )}
+              </Group>
+            </Stack>
+
+            <Divider />
+
+            <Stack align="center" gap="sm" ta="center">
+              <Text size="sm" c="dimmed">
+                You can track your claim and access your account dashboard while you wait.
+                Once approved, your Google Business Profile tools will appear there.
+              </Text>
+              <Group gap="sm">
+                <Button component={Link} href="/account" variant="filled" rightSection={<IconArrowRight size={16} />}>
+                  Go to My Account
+                </Button>
+                <Button component={Link} href="/directory" variant="subtle" leftSection={<IconArrowLeft size={16} />}>
+                  Back to Directory
+                </Button>
+              </Group>
+            </Stack>
           </Stack>
         </Card>
       </Container>
@@ -575,6 +685,49 @@ export default function DirectoryClaimClient() {
               <Text size="sm" c="dimmed">
                 Signed in as <strong>{customer.email}</strong>
               </Text>
+
+              {/* Claimant verification info — used by operator to verify ownership */}
+              <Stack gap="xs">
+                <Text size="sm" fw={500}>
+                  Your contact information
+                </Text>
+                <Text size="xs" c="dimmed">
+                  We use this to verify you are the business owner before approving your claim.
+                </Text>
+                <Group grow>
+                  <TextInput
+                    label="First name"
+                    placeholder="First name"
+                    value={claimantFirstName}
+                    onChange={(e) => setClaimantFirstName(e.target.value)}
+                    size="sm"
+                  />
+                  <TextInput
+                    label="Last name"
+                    placeholder="Last name"
+                    value={claimantLastName}
+                    onChange={(e) => setClaimantLastName(e.target.value)}
+                    size="sm"
+                  />
+                </Group>
+                <TextInput
+                  label="Phone number"
+                  placeholder="(555) 123-4567"
+                  value={claimantPhone}
+                  onChange={(e) => setClaimantPhone(e.target.value)}
+                  size="sm"
+                  leftSection={<IconPhone size={14} />}
+                />
+                <TextInput
+                  label="Business address (optional)"
+                  placeholder="123 Main St, Indianapolis, IN 46224"
+                  value={claimantBusinessAddress}
+                  onChange={(e) => setClaimantBusinessAddress(e.target.value)}
+                  size="sm"
+                  leftSection={<IconMapPin size={14} />}
+                />
+              </Stack>
+
               {error && (
                 <Alert color="red" variant="light">
                   {error === 'authentication_required'

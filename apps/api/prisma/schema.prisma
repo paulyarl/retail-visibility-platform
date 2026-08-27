@@ -7588,26 +7588,50 @@ model tenant_gbp_options_settings {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_claim_requests {
-  id                       String                   @id @db.VarChar(60)
-  seed_id                  String                   @db.VarChar(60)
-  tenant_id                String                   @db.VarChar(255)
-  token_id                 String                   @db.VarChar(60)
-  customer_id              String?                  @db.VarChar(60)
-  customer_email           String?                  @db.VarChar(255)
-  customer_name            String?                  @db.VarChar(200)
-  status                   String                   @default("pending") @db.VarChar(20)
-  rejection_reason         String?
-  submitted_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  reviewed_at              DateTime?                @db.Timestamptz(6)
-  reviewed_by              String?                  @db.VarChar(255)
-  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcr_seed")
-  tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcr_tenant")
-  directory_claim_tokens   directory_claim_tokens   @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcr_token")
+  id                          String                        @id @db.VarChar(60)
+  seed_id                     String                        @db.VarChar(60)
+  tenant_id                   String                        @db.VarChar(255)
+  token_id                    String                        @db.VarChar(60)
+  customer_id                 String?                       @db.VarChar(60)
+  customer_email              String?                       @db.VarChar(255)
+  customer_name               String?                       @db.VarChar(200)
+  status                      String                        @default("pending") @db.VarChar(20)
+  rejection_reason            String?
+  submitted_at                DateTime                      @default(now()) @db.Timestamptz(6)
+  reviewed_at                 DateTime?                     @db.Timestamptz(6)
+  reviewed_by                 String?                       @db.VarChar(255)
+  claimant_first_name         String?                       @db.VarChar(100)
+  claimant_middle_name        String?                       @db.VarChar(100)
+  claimant_last_name          String?                       @db.VarChar(100)
+  claimant_phone              String?                       @db.VarChar(30)
+  claimant_business_address   String?
+  verification_method         String?                       @db.VarChar(20)
+  verification_notes          String?
+  verification_completed_at   DateTime?                     @db.Timestamptz(6)
+  verification_completed_by   String?                       @db.VarChar(255)
+  directory_claim_attachments directory_claim_attachments[]
+  directory_presence_seeds    directory_presence_seeds      @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcr_seed")
+  tenants                     tenants                       @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcr_tenant")
+  directory_claim_tokens      directory_claim_tokens        @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcr_token")
 
   @@index([seed_id], map: "idx_dcr_seed")
   @@index([status], map: "idx_dcr_status")
   @@index([submitted_at(sort: Desc)], map: "idx_dcr_submitted")
   @@index([tenant_id], map: "idx_dcr_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_claim_attachments {
+  id                       String                   @id @db.VarChar(255)
+  claim_request_id         String                   @db.VarChar(60)
+  file_url                 String                   @db.VarChar(500)
+  file_name                String                   @db.VarChar(255)
+  file_type                String                   @db.VarChar(20)
+  file_size                Int?
+  uploaded_at              DateTime                 @default(now()) @db.Timestamptz(6)
+  directory_claim_requests directory_claim_requests @relation(fields: [claim_request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dca_request")
+
+  @@index([claim_request_id], map: "idx_dca_request")
 }
 
 enum action {

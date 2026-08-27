@@ -48,6 +48,14 @@ export interface DirectoryClaimInitiateResult {
   error?: string;
 }
 
+export interface DirectoryClaimInitiateInput {
+  claimantFirstName?: string;
+  claimantMiddleName?: string;
+  claimantLastName?: string;
+  claimantPhone?: string;
+  claimantBusinessAddress?: string;
+}
+
 export class DirectoryClaimPublicService extends PublicApiSingleton {
   private static instance: DirectoryClaimPublicService;
 
@@ -81,11 +89,15 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
   }
 
   /** POST /api/public/directory/claim/:token/initiate — initiate claim (sends OTP if required) */
-  async initiateClaim(token: string): Promise<DirectoryClaimInitiateResult> {
+  async initiateClaim(token: string, claimant?: DirectoryClaimInitiateInput): Promise<DirectoryClaimInitiateResult> {
     try {
       const result = await this.makeDefaultRequest<any>(
         `/api/public/directory/claim/${encodeURIComponent(token)}/initiate`,
-        { method: 'POST', body: JSON.stringify({}), headers: this.getCustomerAuthHeaders() },
+        {
+          method: 'POST',
+          body: JSON.stringify(claimant || {}),
+          headers: this.getCustomerAuthHeaders(),
+        },
         undefined,
         0,
       );
@@ -134,6 +146,36 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
       headers['Authorization'] = `Bearer ${customerToken}`;
     }
     return headers;
+  }
+
+  /** POST /api/public/directory/claim/:token/proof — upload proof of ownership (multipart) */
+  async uploadProofAttachment(
+    token: string,
+    file: File,
+  ): Promise<{ attachmentId: string; fileName: string; fileType: string; fileSize: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/public/directory/claim/${encodeURIComponent(token)}/proof`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: this.getCustomerAuthHeaders(),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to upload proof');
+    }
+    const data = result.data?.data ?? result.data;
+    return {
+      attachmentId: data.attachmentId,
+      fileName: data.fileName,
+      fileType: data.fileType,
+      fileSize: data.fileSize,
+    };
   }
 }
 

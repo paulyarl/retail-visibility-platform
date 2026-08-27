@@ -550,6 +550,37 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const error = typeof result.error === 'string' ? result.error : result.error?.message;
     return { success: result.success, error };
   }
+
+  /** POST /api/admin/directory-presence/claim-requests/:id/verify — save verification worksheet */
+  async saveVerification(
+    id: string,
+    method: string,
+    notes?: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/claim-requests/${encodeURIComponent(id)}/verify`,
+      { method: 'POST', body: JSON.stringify({ method, notes }) },
+      undefined,
+      0,
+    );
+    const error = typeof result.error === 'string' ? result.error : result.error?.message;
+    return { success: result.success, error };
+  }
+
+  /** GET /api/admin/directory-presence/claim-requests/:id/attachments — list proof attachments */
+  async listClaimAttachments(
+    requestId: string,
+  ): Promise<Array<{ id: string; fileName: string; fileType: string; fileSize: number; uploadedAt: string }>> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/claim-requests/${encodeURIComponent(requestId)}/attachments`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
 }
 
 export interface DirectorySeedCampaignLink {
@@ -607,16 +638,27 @@ export interface DirectoryClaimRequest {
   customerId: string | null;
   customerEmail: string | null;
   customerName: string | null;
+  claimantFirstName: string | null;
+  claimantMiddleName: string | null;
+  claimantLastName: string | null;
+  claimantPhone: string | null;
+  claimantBusinessAddress: string | null;
   status: string;
   rejectionReason: string | null;
   submittedAt: string;
   reviewedAt: string | null;
   reviewedBy: string | null;
+  verificationMethod: string | null;
+  verificationNotes: string | null;
+  verificationCompletedAt: string | null;
+  verificationCompletedBy: string | null;
   businessName: string;
   category: string;
   address: string;
+  businessPhone: string | null;
   city: string;
   state: string;
+  attachmentCount: number;
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();
