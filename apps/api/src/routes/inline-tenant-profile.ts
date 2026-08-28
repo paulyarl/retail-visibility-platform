@@ -102,7 +102,7 @@ router.get("/api/tenant/profile", authenticateToken, async (req, res) => {
     const tenant_id = (req.query.tenant_id as string) || (req.query.tenant_id as string);
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
 
-    let profile = await prisma.tenant_business_profiles_list.findUnique({
+    let profile: any = await prisma.tenant_business_profiles_list.findUnique({
       where: { tenant_id }
     });
 
