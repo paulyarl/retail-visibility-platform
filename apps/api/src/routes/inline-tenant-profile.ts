@@ -102,12 +102,49 @@ router.get("/api/tenant/profile", authenticateToken, async (req, res) => {
     const tenant_id = (req.query.tenant_id as string) || (req.query.tenant_id as string);
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
 
-    const profile = await prisma.tenant_business_profiles_list.findUnique({
+    let profile = await prisma.tenant_business_profiles_list.findUnique({
       where: { tenant_id }
     });
 
     if (!profile) {
-      return res.status(404).json({ error: "profile_not_found" });
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenant_id },
+        select: { id: true, metadata: true },
+      });
+      const listing = await prisma.directory_listings_list.findFirst({
+        where: { tenant_id, listing_origin: 'directory_seed' },
+      });
+
+      if (!tenant || !listing) {
+        return res.status(404).json({ error: "profile_not_found" });
+      }
+
+      const metadata = (tenant.metadata as Record<string, any>) || {};
+      profile = {
+        id: tenant_id,
+        tenant_id,
+        business_name: listing.business_name,
+        business_description: listing.public_disclaimer,
+        address_line1: listing.address,
+        address_line2: null,
+        city: listing.city,
+        state: listing.state,
+        postal_code: listing.zip_code,
+        country_code: listing.state ? 'US' : null,
+        phone_number: listing.phone,
+        email: null,
+        website: listing.website,
+        logo_url: metadata.logoUrl || null,
+        banner_url: null,
+        latitude: listing.latitude,
+        longitude: listing.longitude,
+        map_privacy_mode: 'precise',
+        hours: listing.business_hours,
+        social_links: null,
+        gbp_category_name: listing.primary_category,
+        created_at: listing.created_at,
+        updated_at: listing.updated_at,
+      };
     }
 
     res.json(profile);
