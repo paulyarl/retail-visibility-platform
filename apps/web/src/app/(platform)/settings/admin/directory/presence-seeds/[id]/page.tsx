@@ -7,6 +7,8 @@ import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   DirectoryPresenceSeedDetail,
 } from '@/services/DirectoryPresenceAdminService';
+import { clientLogger } from '@/lib/client-logger';
+import { geocodeAddress } from '@/lib/validation/businessProfile';
 import {
   ArrowLeft,
   Send,
@@ -139,6 +141,7 @@ export default function PresenceSeedDetailPage() {
   // Edit mode state
   const [editing, setEditing] = useState(false);
   const [savingFields, setSavingFields] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
   const [editPhone, setEditPhone] = useState('');
   const [editWebsite, setEditWebsite] = useState('');
   const [editSnapReported, setEditSnapReported] = useState(false);
@@ -299,6 +302,38 @@ export default function PresenceSeedDetailPage() {
     (status === 'published' || status === 'invited') &&
     !claimTokens.some((t) => !t.consumedAt);
   const canEdit = status !== 'claimed';
+
+  const handleGetCoordinates = async () => {
+    if (!editAddress.trim() || !editCity.trim() || !editZipCode.trim()) {
+      setActionError('Please fill in address, city, and ZIP code before geocoding.');
+      return;
+    }
+
+    setGeocoding(true);
+    setActionError(null);
+
+    try {
+      const coordinates = await geocodeAddress({
+        address_line1: editAddress,
+        city: editCity,
+        state: editState,
+        postal_code: editZipCode,
+        country_code: 'US',
+      });
+
+      if (coordinates) {
+        setEditLatitude(String(coordinates.latitude));
+        setEditLongitude(String(coordinates.longitude));
+      } else {
+        setActionError('Could not find coordinates for this address. Please check the address and try again.');
+      }
+    } catch (err) {
+      clientLogger.error('Failed to geocode seed address:', { detail: err });
+      setActionError(err instanceof Error ? err.message : 'Failed to geocode address.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
 
   const startEditing = () => {
     setEditPhone(listing?.phone ?? '');
@@ -1164,6 +1199,16 @@ export default function PresenceSeedDetailPage() {
                   onChange={(e) => setEditLongitude(e.target.value)}
                   placeholder="-86.1581"
                 />
+              </div>
+              <div className="md:col-span-2 flex items-end">
+                <button
+                  type="button"
+                  onClick={handleGetCoordinates}
+                  disabled={geocoding}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-60"
+                >
+                  {geocoding ? 'Geocoding…' : 'Get Coordinates'}
+                </button>
               </div>
             </div>
           </div>
