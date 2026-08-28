@@ -39,6 +39,14 @@ const PROVENANCE_FIELD_KEYS = [
   'specialty_line',
 ] as const;
 
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+];
+
 interface EditProvenanceRow {
   fieldKey: string;
   value: string;
@@ -138,6 +146,12 @@ export default function PresenceSeedDetailPage() {
   const [editSnapSource, setEditSnapSource] = useState('');
   const [editSnapSourceName, setEditSnapSourceName] = useState('');
   const [editProvenance, setEditProvenance] = useState<EditProvenanceRow[]>([]);
+  const [editAddress, setEditAddress] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+  const [editZipCode, setEditZipCode] = useState('');
+  const [editLatitude, setEditLatitude] = useState('');
+  const [editLongitude, setEditLongitude] = useState('');
   const [editHours, setEditHours] = useState<Record<string, DayHours>>({
     ...EMPTY_HOURS,
   });
@@ -292,6 +306,12 @@ export default function PresenceSeedDetailPage() {
     setEditSecondaryCategories(
       Array.isArray(listing?.secondary_categories) ? listing.secondary_categories : [],
     );
+    setEditAddress(listing?.address ?? '');
+    setEditCity(listing?.city ?? '');
+    setEditState(listing?.state ?? '');
+    setEditZipCode(listing?.zip_code ?? '');
+    setEditLatitude(listing?.latitude != null ? String(listing.latitude) : '');
+    setEditLongitude(listing?.longitude != null ? String(listing.longitude) : '');
     setEditSnapReported(!!listing?.snap_ebt_reported);
     const asOf = listing?.snap_ebt_as_of
       ? new Date(listing.snap_ebt_as_of).toISOString().slice(0, 10)
@@ -355,6 +375,12 @@ export default function PresenceSeedDetailPage() {
         website: editWebsite.trim() || undefined,
         primaryCategory: editPrimaryCategory.trim() || null,
         secondaryCategories: editSecondaryCategories,
+        address: editAddress.trim() || undefined,
+        city: editCity.trim() || undefined,
+        state: editState.trim() || undefined,
+        zipCode: editZipCode.trim() || null,
+        latitude: editLatitude.trim() && !Number.isNaN(Number(editLatitude)) ? Number(editLatitude) : null,
+        longitude: editLongitude.trim() && !Number.isNaN(Number(editLongitude)) ? Number(editLongitude) : null,
       };
 
       // Business hours — only include if any day is not closed
@@ -558,7 +584,7 @@ export default function PresenceSeedDetailPage() {
             <Send className="w-4 h-4" /> Generate Claim Invite
           </button>
         )}
-        {listing?.slug && (
+        {listing?.slug && status === 'published' ? (
           <Link
             href={`/place/${listing.slug}`}
             target="_blank"
@@ -566,7 +592,14 @@ export default function PresenceSeedDetailPage() {
           >
             <ExternalLink className="w-4 h-4" /> View Public Listing
           </Link>
-        )}
+        ) : listing?.slug ? (
+          <span
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
+            title="Publish the listing before viewing the public page"
+          >
+            <ExternalLink className="w-4 h-4" /> View Public Listing
+          </span>
+        ) : null}
         {listing?.slug && (
           <Link
             href={`/settings/admin/directory/presence-seeds/${seedId}/retail-preview`}
@@ -1066,6 +1099,70 @@ export default function PresenceSeedDetailPage() {
                 onChange={(e) => setEditWebsite(e.target.value)}
                 placeholder="https://"
               />
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Location</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Street address, city, state, and ZIP are used for the public listing and map.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editCity}
+                  onChange={(e) => setEditCity(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editState}
+                  onChange={(e) => setEditState(e.target.value)}
+                >
+                  <option value="">Select state</option>
+                  {US_STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editZipCode}
+                  onChange={(e) => setEditZipCode(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editLatitude}
+                  onChange={(e) => setEditLatitude(e.target.value)}
+                  placeholder="39.7684"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editLongitude}
+                  onChange={(e) => setEditLongitude(e.target.value)}
+                  placeholder="-86.1581"
+                />
+              </div>
             </div>
           </div>
 

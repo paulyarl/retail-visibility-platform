@@ -197,6 +197,12 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       businessHours?: any;
       primaryCategory?: string | null;
       secondaryCategories?: string[];
+      address?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
     },
     provenanceUpdates?: Array<{
       fieldKey: string;

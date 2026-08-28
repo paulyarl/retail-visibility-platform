@@ -481,6 +481,12 @@ class DirectoryPresenceSeedService {
       businessHours?: any;
       primaryCategory?: string | null;
       secondaryCategories?: string[];
+      address?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
     },
     provenanceUpdates?: Array<{
       fieldKey: string;
@@ -540,6 +546,30 @@ class DirectoryPresenceSeedService {
       setClauses.push('secondary_categories = $' + (params.length + 1) + '::text[]');
       params.push(fields.secondaryCategories || []);
     }
+    if (fields.address !== undefined) {
+      setClauses.push('address = $' + (params.length + 1));
+      params.push(fields.address);
+    }
+    if (fields.city !== undefined) {
+      setClauses.push('city = $' + (params.length + 1));
+      params.push(fields.city);
+    }
+    if (fields.state !== undefined) {
+      setClauses.push('state = $' + (params.length + 1));
+      params.push(fields.state);
+    }
+    if (fields.zipCode !== undefined) {
+      setClauses.push('zip_code = $' + (params.length + 1));
+      params.push(fields.zipCode);
+    }
+    if (fields.latitude !== undefined) {
+      setClauses.push('latitude = $' + (params.length + 1));
+      params.push(fields.latitude);
+    }
+    if (fields.longitude !== undefined) {
+      setClauses.push('longitude = $' + (params.length + 1));
+      params.push(fields.longitude);
+    }
 
     params.push(listingId);
     await prisma.$executeRawUnsafe(
@@ -552,6 +582,15 @@ class DirectoryPresenceSeedService {
     if (fields.primaryCategory !== undefined) {
       await prisma.$executeRaw`
         UPDATE directory_presence_seeds SET category = ${fields.primaryCategory || null}, updated_at = now()
+        WHERE id = ${seedId}
+      `;
+    }
+
+    // Keep seed city/state in sync with the listing.
+    if (fields.city !== undefined || fields.state !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET city = ${fields.city || null}, state = ${fields.state || null}, updated_at = now()
         WHERE id = ${seedId}
       `;
     }

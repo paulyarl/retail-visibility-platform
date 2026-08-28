@@ -21,7 +21,35 @@ interface PlacePageProps {
   params: Promise<{ slug: string }>;
 }
 
-async function getBusinessHours(tenantId: string) {
+function normalizeListingBusinessHours(raw: any): any {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const periods: any[] = [];
+  const fullDays: any = {};
+
+  Object.entries(raw).forEach(([day, value]: [string, any]) => {
+    if (!value || typeof value !== 'object') return;
+    const dayName = day.toUpperCase();
+    if (!value.closed && value.open && value.close) {
+      periods.push({ day: dayName, open: value.open, close: value.close });
+      fullDays[dayName] = { open: value.open, close: value.close };
+    }
+  });
+
+  if (periods.length === 0) return null;
+  return { periods, ...fullDays };
+}
+
+async function getBusinessHours(listing: any) {
+  // For directory-seed listings, prefer the hours stored on the listing itself.
+  if (listing?.business_hours) {
+    const listingHours = normalizeListingBusinessHours(listing.business_hours);
+    if (listingHours) return listingHours;
+  }
+
+  const tenantId = listing?.tenantId;
+  if (!tenantId) return null;
+
   try {
     const data = await directoryService.getBusinessHours(tenantId);
     if (!data || !data.success || !data.data) return null;
@@ -77,7 +105,7 @@ export default function PlacePage({ params }: PlacePageProps) {
 
         // Fetch sidebar/skill data in parallel
         const [hours, info, dirOpts, resolvedSlug] = await Promise.all([
-          getBusinessHours(data.listing.tenantId),
+          getBusinessHours(data.listing),
           tenantPublicService.getPublicTenantInfo(data.listing.tenantId),
           publicUnifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId),
           publicDirectoryService.resolveBySlug(slug),
