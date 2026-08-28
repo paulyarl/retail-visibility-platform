@@ -4,10 +4,12 @@
  * Handles subscription status transitions based on payment outcomes
  * - Payment success: active status
  * - Payment failure: past_due status (triggers grace period)
- * - Grace period expiry: canceled + expired_trial demotion
- * 
+ * - Grace period expiry: downgrade to presence (free baseline tier)
+ *
  * NOTE: google_only is now a paid tier ($29/mo), not a downgrade target.
- * Expired trials go to expired_trial (invisible on public pages).
+ * Expired trials revert to presence (free place entry). The presence tier has
+ * no capability privileges, so the capability resolver strips paid features.
+ * The tenant can renew into any paid tier later and all platform data is restored.
  */
 
 import { prisma } from '../../prisma';
@@ -206,7 +208,7 @@ export class SubscriptionStatusService {
   }
 
   /**
-   * Handle grace period expiry - demote to expired_trial
+   * Handle grace period expiry - downgrade to presence (free baseline)
    * Called by the scheduled job after 30 days of past_due
    */
   async handleGracePeriodExpiry(tenantId: string): Promise<StatusTransitionResult> {
@@ -217,13 +219,13 @@ export class SubscriptionStatusService {
     await trialService.downgradeToExpired(tenantId);
 
     // Log the transition
-    await this.logStatusTransition(tenantId, current.status, 'canceled', current.tier, 'expired_trial', 'grace_period_expired');
+    await this.logStatusTransition(tenantId, current.status, 'active', current.tier, 'presence', 'grace_period_expired');
 
     return {
       previousStatus: current.status,
-      newStatus: 'canceled',
+      newStatus: 'active',
       previousTier: current.tier,
-      newTier: 'expired_trial',
+      newTier: 'presence',
       changedAt: new Date(),
       reason: 'grace_period_expired',
     };

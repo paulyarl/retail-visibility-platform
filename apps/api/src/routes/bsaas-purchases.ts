@@ -927,6 +927,23 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       return res.status(409).json({ success: false, error: 'already_active', message: 'This feature is already active for your tenant' });
     }
 
+    // 2a. Trial abuse prevention — block new trials if this tenant has
+    // previously trialed this feature (even if the trial expired or was
+    // suspended). The existing purchase record persists with status
+    // 'expired' or 'suspended', and its metadata.trial_started_at is the
+    // evidence of prior trial usage. One trial per feature per tenant.
+    if (trialEligible && trialDays > 0 && existing) {
+      const existingMeta = (existing.metadata as any) || {};
+      const hasPriorTrial = !!existingMeta.trial_started_at || existing.status === 'expired' || existing.status === 'suspended';
+      if (hasPriorTrial) {
+        return res.status(409).json({
+          success: false,
+          error: 'trial_already_used',
+          message: 'You have already used a free trial for this feature. Purchase it to continue using it.',
+        });
+      }
+    }
+
     // 2b. Check if feature is already enabled by the tenant's tier
     const tierStatus = await checkTierFeatureStatus(tenantId, featureKey);
     if (tierStatus.inTier) {
@@ -1352,6 +1369,33 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
     });
     if (existingPurchases.length === featureKeys.length) {
       return res.status(409).json({ success: false, error: 'already_active', message: 'All components of this bundle are already active for your tenant' });
+    }
+
+    // 2a. Trial abuse prevention — block new bundle trials if the tenant has
+    // previously trialed ANY component of this bundle. One trial per feature
+    // per tenant, whether purchased individually or via a bundle.
+    if (trialEligible && trialDays > 0) {
+      const priorTrials = await prisma.tenant_feature_purchases.findMany({
+        where: {
+          tenant_id: tenantId,
+          feature_key: { in: featureKeys },
+          status: { in: ['expired', 'suspended'] },
+        },
+        select: { feature_key: true, metadata: true, status: true },
+      });
+      const trialedKeys = priorTrials
+        .filter(p => {
+          const meta = (p.metadata as any) || {};
+          return !!meta.trial_started_at || p.status === 'expired' || p.status === 'suspended';
+        })
+        .map(p => p.feature_key);
+      if (trialedKeys.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'trial_already_used',
+          message: `You have already used a free trial for: ${trialedKeys.join(', ')}. Purchase the bundle to continue using these features.`,
+        });
+      }
     }
 
     // 3. Check capability engagement for ALL components

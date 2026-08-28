@@ -164,6 +164,10 @@ class TenantService {
     }
 
     // Auto-expire trial if past trial_ends_at
+    // Reverts to presence (free baseline) so the tenant keeps its free place
+    // entry. The presence tier has no capability privileges, so the capability
+    // resolver naturally strips paid features. The tenant can renew into any
+    // paid tier later and all platform data is restored.
     if (
       tenant.subscription_status === 'trial' &&
       tenant.trial_ends_at &&
@@ -174,8 +178,8 @@ class TenantService {
       tenant = await prisma.tenants.update({
         where: { id: tenant.id },
         data: {
-          subscription_status: 'expired',
-          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : 'discovery',
+          subscription_status: 'active',
+          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : 'presence',
         },
       });
     }

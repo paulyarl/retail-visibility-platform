@@ -28,7 +28,8 @@ function getBaseTierForTrial(tierKey: string): string | null {
     'trial_chain_starter': 'chain_starter',
     'trial_chain_professional': 'chain_professional',
     'trial_chain_enterprise': 'chain_enterprise',
-    // expired_trial has no base tier - it's a terminal state
+    // expired_trial is deprecated — new downgrades go to 'presence' (free baseline).
+    // Kept for backward compatibility with existing expired_trial tenants.
   };
   
   return trialToBaseMap[tierKey] || null;

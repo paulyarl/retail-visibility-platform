@@ -5,7 +5,7 @@
  * - Start trial (requires payment method)
  * - Trial end: auto-charge payment method
  * - Grace period: retry payment, send reminders
- * - Grace expiry: downgrade to expired_trial
+ * - Grace expiry: downgrade to presence (free baseline tier)
  */
 
 import { prisma } from '../../prisma';
@@ -30,7 +30,7 @@ export interface TrialStartResult {
 export interface TrialChargeResult {
   success: boolean;
   charged: boolean;
-  newStatus: 'active' | 'past_due' | 'expired_trial' | 'trial';
+  newStatus: 'active' | 'past_due' | 'presence' | 'trial';
   error?: string;
 }
 
@@ -141,7 +141,7 @@ export class TrialManagementService {
       return {
         success: false,
         charged: false,
-        newStatus: 'expired_trial',
+        newStatus: 'presence',
         error: 'Tenant not in trial status',
       };
     }
@@ -161,12 +161,12 @@ export class TrialManagementService {
 
     const selectedTier = tenant.trial_selected_tier as TrialEligibleTier;
     if (!selectedTier) {
-      // No selected tier - downgrade to expired_trial
+      // No selected tier - downgrade to presence (free baseline)
       await this.downgradeToExpired(tenantId);
       return {
         success: false,
         charged: false,
-        newStatus: 'expired_trial',
+        newStatus: 'presence',
         error: 'No tier selected for trial',
       };
     }
@@ -297,7 +297,7 @@ export class TrialManagementService {
       return {
         success: false,
         charged: false,
-        newStatus: 'expired_trial',
+        newStatus: 'presence',
         error: 'Tenant not in past_due status',
       };
     }
@@ -308,7 +308,7 @@ export class TrialManagementService {
       return {
         success: false,
         charged: false,
-        newStatus: 'expired_trial',
+        newStatus: 'presence',
         error: 'Grace period expired',
       };
     }
@@ -318,8 +318,10 @@ export class TrialManagementService {
   }
 
   /**
-   * Downgrade tenant to expired_trial
-   * Tenant becomes invisible on public pages
+   * Downgrade tenant to presence (free baseline tier)
+   * Tenant retains its free place entry; paid capabilities are stripped by the
+   * capability resolver since the presence tier has no capability privileges.
+   * The tenant can renew into any paid tier later and all platform data is restored.
    */
   async downgradeToExpired(tenantId: string): Promise<void> {
     // Check manual subscription control before downgrading
@@ -343,8 +345,8 @@ export class TrialManagementService {
     await prisma.tenants.update({
       where: { id: tenantId },
       data: {
-        subscription_tier: 'expired_trial',
-        subscription_status: 'canceled',
+        subscription_tier: 'presence',
+        subscription_status: 'active',
         trial_ends_at: null,
         trial_selected_tier: null,
         grace_ends_at: null,

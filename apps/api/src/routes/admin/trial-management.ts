@@ -200,7 +200,7 @@ router.post('/cancel', async (req, res) => {
       });
     }
 
-    // Cancel the trial (downgrade to expired_trial)
+    // Cancel the trial (downgrade to presence — free baseline)
     const billingService = getTrialManagementService();
     await billingService.downgradeToExpired(tenantId);
 
@@ -212,7 +212,7 @@ router.post('/cancel', async (req, res) => {
       payload: {
         reason,
         previousTier: currentTenant.subscription_tier,
-        newTier: 'expired_trial',
+        newTier: 'presence',
         adminUserId: req.user?.userId,
         adminEmail: req.user?.email,
       },
@@ -224,8 +224,8 @@ router.post('/cancel', async (req, res) => {
       success: true,
       tenant: {
         id: currentTenant.id,
-        subscription_tier: 'expired_trial',
-        subscription_status: 'canceled',
+        subscription_tier: 'presence',
+        subscription_status: 'active',
         trial_ends_at: null,
         subscription_ends_at: null,
       },

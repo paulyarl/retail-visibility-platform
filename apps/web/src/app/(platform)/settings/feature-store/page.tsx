@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
 import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag, IconLock, IconPalette } from '@tabler/icons-react';
@@ -10,6 +10,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem, type BsaasBundleCatalogItem } from '@/services/BsaasPurchaseService';
 import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import { useTenantComplete } from '@/hooks/dashboard/useTenantComplete';
+import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import {
+  recommendFeatures,
+  recommendBundles,
+  RECOMMENDATION_REASON_LABELS,
+  type StoreRecommendationContext,
+} from '@/lib/store/storeRecommendations';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +51,21 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [grantError, setGrantError] = useState<string | null>(null);
   const [grantSuccess, setGrantSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'features' | 'bundles' | 'services'>('features');
+
+  // Tier + capability awareness for "Recommended for your plan" grouping.
+  // Mirrors the growth-tip engine's context: effective tier level + resolved
+  // capability state power the recommendation scoring.
+  const { tier } = useTenantComplete(tenantId, false);
+  const allCaps = useAllCapabilities(tenantId);
+  const tierLevel = tier?.effective?.level || 'discovery';
+  const tierName = tier?.effective?.name || 'Discovery';
+  const recContext: StoreRecommendationContext = {
+    tierLevel,
+    tierName,
+    capabilities: allCaps.data ?? null,
+  };
+  const featureRecs = recommendFeatures(catalog, recContext, 4);
+  const bundleRecs = recommendBundles(bundleCatalog, recContext, 3);
 
   const loadData = useCallback(async () => {
     if (!tenantId) {
@@ -296,6 +319,255 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
     return `$${dollars}/mo`;
   };
 
+  // ─── Card renderers (shared by the "Recommended" section and full catalog) ───
+  // Extracted so the recommended grouping can reuse the exact same card markup
+  // without duplicating the tier-awareness badges / action buttons.
+
+  const renderFeatureCard = (item: BsaasCatalogItem, recommended = false) => {
+    const isActive = item.purchase?.status === 'active';
+    const isSuspended = item.purchase?.status === 'suspended';
+    const inTier = item.tierAvailability === 'in_tier_active';
+    const gateOff = item.tierAvailability === 'in_tier_gate_off';
+    const notEligible = item.tierEligible === false && !isActive && !inTier && !gateOff;
+    const demoBlocked = isDemoTenant && !item.demoEligible;
+
+    return (
+      <Grid.Col key={item.key} span={{ base: 12, md: 6, lg: 4 }}>
+        <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''} ${recommended ? 'ring-2 ring-blue-200' : ''}`}>
+          <Group justify="space-between" mb="xs">
+            <Text fw={600} size="lg">{item.name}</Text>
+            {recommended && <Badge color="blue" variant="filled" size="sm" leftSection={<IconBolt size={12} />}>Recommended</Badge>}
+            {isActive && <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>Active</Badge>}
+            {isSuspended && <Badge color="orange" variant="light">Suspended</Badge>}
+            {inTier && !isActive && <Badge color="blue" variant="light">In Your Plan</Badge>}
+            {gateOff && !isActive && <Badge color="yellow" variant="light">Disabled in Settings</Badge>}
+            {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
+            {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
+          </Group>
+
+          <Text size="sm" c="dimmed" className="flex-grow" mb="md">
+            {item.description}
+          </Text>
+
+          {notEligible && (
+            <Text size="xs" c="dimmed" className="mb-md" style={{ fontStyle: 'italic' }}>
+              {item.ineligibleReason}
+            </Text>
+          )}
+
+          <Group justify="space-between" mt="auto">
+            <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'blue'}>
+              {formatPrice(item.priceCents, item.billingCycle)}
+            </Text>
+
+            {isActive ? (
+              <Button
+                variant="light"
+                color="red"
+                size="sm"
+                loading={processing}
+                onClick={() => handleCancelPurchase(item.purchase!.id, item.name)}
+                leftSection={<IconCircleX size={16} />}
+              >
+                Cancel
+              </Button>
+            ) : inTier ? (
+              <Button variant="light" color="blue" size="sm" disabled>
+                Included in Plan
+              </Button>
+            ) : gateOff ? (
+              <Button variant="light" color="yellow" size="sm" disabled>
+                Enable in Settings
+              </Button>
+            ) : notEligible ? (
+              <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
+                <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
+                  Upgrade Plan
+                </Button>
+              </Link>
+            ) : demoBlocked ? (
+              <Button variant="light" color="red" size="sm" disabled>
+                Not Available for Demo
+              </Button>
+            ) : !hasPaymentMethod ? (
+              <Group gap="xs">
+                <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
+                <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
+                  <Button variant="light" color="orange" size="sm">
+                    Add Payment Method
+                  </Button>
+                </Link>
+              </Group>
+            ) : (
+              <Button
+                variant="gradient"
+                style={{ color: 'white' }}
+                size="sm"
+                onClick={() => handlePurchaseClick(item)}
+                leftSection={<IconBolt size={16} />}
+              >
+                Purchase
+              </Button>
+            )}
+          </Group>
+        </Card>
+      </Grid.Col>
+    );
+  };
+
+  const renderBundleCard = (bundle: BsaasBundleCatalogItem, recommended = false) => {
+    const notEligible = bundle.tierEligible === false;
+    const demoBlocked = isDemoTenant && !bundle.demoEligible;
+    const allInTier = bundle.allInTier;
+    const componentSum = bundle.items.reduce((sum, _item) => sum, 0);
+    const savingsPercent = componentSum > 0 && bundle.priceCents < componentSum
+      ? Math.round(((componentSum - bundle.priceCents) / componentSum) * 100)
+      : 0;
+
+    return (
+      <Grid.Col key={bundle.bundleKey} span={{ base: 12, md: 6 }}>
+        <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''} ${recommended ? 'ring-2 ring-violet-200' : ''}`}>
+          <Group justify="space-between" mb="xs">
+            <Group gap="sm">
+              <Text fw={700} size="lg">{bundle.name}</Text>
+              <Badge color="violet" variant="filled" size="sm">Bundle</Badge>
+              {recommended && <Badge color="blue" variant="filled" size="sm" leftSection={<IconBolt size={12} />}>Recommended</Badge>}
+              {bundle.items.some(item => item.featureKey.startsWith('org_')) && (
+                <Badge color="orange" variant="light" size="sm">ORG</Badge>
+              )}
+              {bundle.trialEligible && bundle.trialDays > 0 && (
+                <Badge color="teal" variant="light" size="sm">{bundle.trialDays}-day trial</Badge>
+              )}
+            </Group>
+            {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
+            {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
+          </Group>
+
+          <Text size="sm" c="dimmed" className="flex-grow" mb="sm">
+            {bundle.description}
+          </Text>
+
+          {/* Component list */}
+          <Stack gap="xs" mb="md">
+            {bundle.items.map((item) => (
+              <Group key={item.featureKey} gap="sm">
+                {item.alreadyPurchased ? (
+                  <IconCheck size={16} className="text-green-600" />
+                ) : item.inTier ? (
+                  <IconCheck size={16} className="text-blue-500" />
+                ) : (
+                  <IconCircleX size={16} className="text-neutral-400" />
+                )}
+                <Text size="sm" c={item.alreadyPurchased ? 'green' : item.inTier ? 'blue' : 'dimmed'}>
+                  {item.name}
+                  {item.alreadyPurchased && ' (already owned)'}
+                  {item.inTier && !item.alreadyPurchased && ' (in your plan)'}
+                </Text>
+              </Group>
+            ))}
+          </Stack>
+
+          {notEligible && (
+            <div className="mb-md space-y-1">
+              <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
+                {bundle.ineligibleReason}
+              </Text>
+              {bundle.ineligibleDomains && bundle.ineligibleDomains.length > 0 && (
+                <Group gap="xs">
+                  <Text size="xs" fw={500} c="dimmed">Blocked domains:</Text>
+                  {bundle.ineligibleDomains.map((domain) => (
+                    <Badge key={domain} color="red" variant="light" size="xs">
+                      {domain.replace(/_options$/, '').replace(/_/g, ' ')}
+                    </Badge>
+                  ))}
+                </Group>
+              )}
+            </div>
+          )}
+
+          <Group justify="space-between" mt="auto">
+            <Group gap="sm">
+              <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'violet'}>
+                {formatPrice(bundle.priceCents, bundle.billingCycle)}
+              </Text>
+              {savingsPercent > 0 && (
+                <Badge color="green" variant="light" size="sm">Save {savingsPercent}%</Badge>
+              )}
+            </Group>
+
+            {notEligible ? (
+              <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
+                <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
+                  Upgrade Plan
+                </Button>
+              </Link>
+            ) : demoBlocked ? (
+              <Button variant="light" color="red" size="sm" disabled>
+                Not Available for Demo
+              </Button>
+            ) : allInTier ? (
+              <Button variant="light" color="blue" size="sm" disabled>
+                Included in Plan
+              </Button>
+            ) : !hasPaymentMethod ? (
+              <Group gap="xs">
+                <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
+                <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
+                  <Button variant="light" color="orange" size="sm">
+                    Add Payment Method
+                  </Button>
+                </Link>
+              </Group>
+            ) : (
+              <Button
+                variant="gradient"
+                gradient={{ from: 'violet', to: 'blue' }}
+                style={{ color: 'white' }}
+                size="sm"
+                onClick={() => handleBundlePurchaseClick(bundle)}
+                leftSection={<IconBolt size={16} />}
+              >
+                {bundle.trialEligible && bundle.trialDays > 0 ? 'Start Trial' : 'Purchase Bundle'}
+              </Button>
+            )}
+          </Group>
+        </Card>
+      </Grid.Col>
+    );
+  };
+
+  // "Recommended for your plan" section header — pinned above the full catalog
+  // on the Features and Bundles tabs. Surfaces the tier name and the reason
+  // chips (capability gap / next-tier bridge) for the top recommendation.
+  const renderRecommendedSection = (
+    tierLabel: string,
+    accent: 'blue' | 'violet',
+    reasonChips: string[],
+    children: ReactNode
+  ) => (
+    <Card withBorder p="lg" className={`bg-gradient-to-br ${accent === 'blue' ? 'from-blue-50 to-indigo-50 border-blue-200' : 'from-violet-50 to-purple-50 border-violet-200'}`}>
+      <Group justify="space-between" mb="md" align="flex-start">
+        <Group gap="sm">
+          <div className={`p-2 rounded-lg ${accent === 'blue' ? 'bg-blue-100' : 'bg-violet-100'}`}>
+            <IconBolt size={20} className={accent === 'blue' ? 'text-blue-600' : 'text-violet-600'} />
+          </div>
+          <div>
+            <Text fw={700} size="lg" className="text-gray-900">Recommended for your plan</Text>
+            <Text size="xs" c="dimmed">Tailored to the {tierLabel} tier — fill capability gaps and step up to your next plan.</Text>
+          </div>
+        </Group>
+        {reasonChips.length > 0 && (
+          <Group gap="xs" className="flex-wrap justify-end">
+            {reasonChips.map((chip) => (
+              <Badge key={chip} size="xs" variant="light" color={accent}>{chip}</Badge>
+            ))}
+          </Group>
+        )}
+      </Group>
+      <Grid>{children}</Grid>
+    </Card>
+  );
+
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -435,131 +707,21 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
         {/* Bundles Tab */}
         {activeTab === 'bundles' && bundleCatalog.filter(b => !b.allActive).length > 0 && (
           <div className="space-y-4">
+            {/* Recommended for your plan — tier-aware grouping */}
+            {bundleRecs.length > 0 && renderRecommendedSection(
+              tierName,
+              'violet',
+              Array.from(new Set(bundleRecs.flatMap((r) => r.reasons))).map((r) => RECOMMENDATION_REASON_LABELS[r]),
+              bundleRecs.map((r) => renderBundleCard(r.bundle, true))
+            )}
+
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 text-violet-600" />
-              <h2 className="text-xl font-bold text-gray-900">Bundles</h2>
+              <h2 className="text-xl font-bold text-gray-900">All Bundles</h2>
               <Badge color="violet" variant="light" size="sm">Save more</Badge>
             </div>
             <Grid>
-              {bundleCatalog.filter(b => !b.allActive).map((bundle) => {
-                const notEligible = bundle.tierEligible === false;
-                const demoBlocked = isDemoTenant && !bundle.demoEligible;
-                const allInTier = bundle.allInTier;
-                const componentSum = bundle.items.reduce((sum, _item) => sum, 0);
-                const savingsPercent = componentSum > 0 && bundle.priceCents < componentSum
-                  ? Math.round(((componentSum - bundle.priceCents) / componentSum) * 100)
-                  : 0;
-
-                return (
-                  <Grid.Col key={bundle.bundleKey} span={{ base: 12, md: 6 }}>
-                    <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''}`}>
-                      <Group justify="space-between" mb="xs">
-                        <Group gap="sm">
-                          <Text fw={700} size="lg">{bundle.name}</Text>
-                          <Badge color="violet" variant="filled" size="sm">Bundle</Badge>
-                          {bundle.items.some(item => item.featureKey.startsWith('org_')) && (
-                            <Badge color="orange" variant="light" size="sm">ORG</Badge>
-                          )}
-                          {bundle.trialEligible && bundle.trialDays > 0 && (
-                            <Badge color="teal" variant="light" size="sm">{bundle.trialDays}-day trial</Badge>
-                          )}
-                        </Group>
-                        {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
-                        {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
-                      </Group>
-
-                      <Text size="sm" c="dimmed" className="flex-grow" mb="sm">
-                        {bundle.description}
-                      </Text>
-
-                      {/* Component list */}
-                      <Stack gap="xs" mb="md">
-                        {bundle.items.map((item) => (
-                          <Group key={item.featureKey} gap="sm">
-                            {item.alreadyPurchased ? (
-                              <IconCheck size={16} className="text-green-600" />
-                            ) : item.inTier ? (
-                              <IconCheck size={16} className="text-blue-500" />
-                            ) : (
-                              <IconCircleX size={16} className="text-neutral-400" />
-                            )}
-                            <Text size="sm" c={item.alreadyPurchased ? 'green' : item.inTier ? 'blue' : 'dimmed'}>
-                              {item.name}
-                              {item.alreadyPurchased && ' (already owned)'}
-                              {item.inTier && !item.alreadyPurchased && ' (in your plan)'}
-                            </Text>
-                          </Group>
-                        ))}
-                      </Stack>
-
-                      {notEligible && (
-                        <div className="mb-md space-y-1">
-                          <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
-                            {bundle.ineligibleReason}
-                          </Text>
-                          {bundle.ineligibleDomains && bundle.ineligibleDomains.length > 0 && (
-                            <Group gap="xs">
-                              <Text size="xs" fw={500} c="dimmed">Blocked domains:</Text>
-                              {bundle.ineligibleDomains.map((domain) => (
-                                <Badge key={domain} color="red" variant="light" size="xs">
-                                  {domain.replace(/_options$/, '').replace(/_/g, ' ')}
-                                </Badge>
-                              ))}
-                            </Group>
-                          )}
-                        </div>
-                      )}
-
-                      <Group justify="space-between" mt="auto">
-                        <Group gap="sm">
-                          <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'violet'}>
-                            {formatPrice(bundle.priceCents, bundle.billingCycle)}
-                          </Text>
-                          {savingsPercent > 0 && (
-                            <Badge color="green" variant="light" size="sm">Save {savingsPercent}%</Badge>
-                          )}
-                        </Group>
-
-                        {notEligible ? (
-                          <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
-                            <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
-                              Upgrade Plan
-                            </Button>
-                          </Link>
-                        ) : demoBlocked ? (
-                          <Button variant="light" color="red" size="sm" disabled>
-                            Not Available for Demo
-                          </Button>
-                        ) : allInTier ? (
-                          <Button variant="light" color="blue" size="sm" disabled>
-                            Included in Plan
-                          </Button>
-                        ) : !hasPaymentMethod ? (
-                          <Group gap="xs">
-                            <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
-                            <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
-                              <Button variant="light" color="orange" size="sm">
-                                Add Payment Method
-                              </Button>
-                            </Link>
-                          </Group>
-                        ) : (
-                          <Button
-                            variant="gradient"
-                            gradient={{ from: 'violet', to: 'blue' }}
-                            style={{ color: 'white' }}
-                            size="sm"
-                            onClick={() => handleBundlePurchaseClick(bundle)}
-                            leftSection={<IconBolt size={16} />}
-                          >
-                            {bundle.trialEligible && bundle.trialDays > 0 ? 'Start Trial' : 'Purchase Bundle'}
-                          </Button>
-                        )}
-                      </Group>
-                    </Card>
-                  </Grid.Col>
-                );
-              })}
+              {bundleCatalog.filter(b => !b.allActive).map((bundle) => renderBundleCard(bundle))}
             </Grid>
           </div>
         )}
@@ -567,98 +729,17 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
         {/* Individual Features Tab */}
         {activeTab === 'features' && catalog.filter(item => item.capabilityType !== 'platform_services').length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">Individual Features</h2>
+            {/* Recommended for your plan — tier-aware grouping */}
+            {featureRecs.length > 0 && renderRecommendedSection(
+              tierName,
+              'blue',
+              Array.from(new Set(featureRecs.flatMap((r) => r.reasons))).map((r) => RECOMMENDATION_REASON_LABELS[r]),
+              featureRecs.map((r) => renderFeatureCard(r.item, true))
+            )}
+
+            <h2 className="text-xl font-bold text-gray-900">All Features</h2>
             <Grid>
-          {catalog.filter(item => item.capabilityType !== 'platform_services').map((item) => {
-            const isActive = item.purchase?.status === 'active';
-            const isSuspended = item.purchase?.status === 'suspended';
-            const inTier = item.tierAvailability === 'in_tier_active';
-            const gateOff = item.tierAvailability === 'in_tier_gate_off';
-            const notEligible = item.tierEligible === false && !isActive && !inTier && !gateOff;
-            const demoBlocked = isDemoTenant && !item.demoEligible;
-
-            return (
-              <Grid.Col key={item.key} span={{ base: 12, md: 6, lg: 4 }}>
-                <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''}`}>
-                  <Group justify="space-between" mb="xs">
-                    <Text fw={600} size="lg">{item.name}</Text>
-                    {isActive && <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>Active</Badge>}
-                    {isSuspended && <Badge color="orange" variant="light">Suspended</Badge>}
-                    {inTier && !isActive && <Badge color="blue" variant="light">In Your Plan</Badge>}
-                    {gateOff && !isActive && <Badge color="yellow" variant="light">Disabled in Settings</Badge>}
-                    {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
-                    {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
-                  </Group>
-
-                  <Text size="sm" c="dimmed" className="flex-grow" mb="md">
-                    {item.description}
-                  </Text>
-
-                  {notEligible && (
-                    <Text size="xs" c="dimmed" className="mb-md" style={{ fontStyle: 'italic' }}>
-                      {item.ineligibleReason}
-                    </Text>
-                  )}
-
-                  <Group justify="space-between" mt="auto">
-                    <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'blue'}>
-                      {formatPrice(item.priceCents, item.billingCycle)}
-                    </Text>
-
-                    {isActive ? (
-                      <Button
-                        variant="light"
-                        color="red"
-                        size="sm"
-                        loading={processing}
-                        onClick={() => handleCancelPurchase(item.purchase!.id, item.name)}
-                        leftSection={<IconCircleX size={16} />}
-                      >
-                        Cancel
-                      </Button>
-                    ) : inTier ? (
-                      <Button variant="light" color="blue" size="sm" disabled>
-                        Included in Plan
-                      </Button>
-                    ) : gateOff ? (
-                      <Button variant="light" color="yellow" size="sm" disabled>
-                        Enable in Settings
-                      </Button>
-                    ) : notEligible ? (
-                      <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
-                        <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
-                          Upgrade Plan
-                        </Button>
-                      </Link>
-                    ) : demoBlocked ? (
-                      <Button variant="light" color="red" size="sm" disabled>
-                        Not Available for Demo
-                      </Button>
-                    ) : !hasPaymentMethod ? (
-                      <Group gap="xs">
-                        <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
-                        <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
-                          <Button variant="light" color="orange" size="sm">
-                            Add Payment Method
-                          </Button>
-                        </Link>
-                      </Group>
-                    ) : (
-                      <Button 
-                        variant="gradient"
-                        style={{ color: 'white' }}
-                        size="sm"
-                        onClick={() => handlePurchaseClick(item)}
-                        leftSection={<IconBolt size={16} />}
-                      >
-                        Purchase
-                      </Button>
-                    )}
-                  </Group>
-                </Card>
-              </Grid.Col>
-            );
-          })}
+              {catalog.filter(item => item.capabilityType !== 'platform_services').map((item) => renderFeatureCard(item))}
             </Grid>
           </div>
         )}

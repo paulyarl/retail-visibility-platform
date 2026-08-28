@@ -153,6 +153,18 @@ function isDiscoveryOrBelow(key: string): boolean {
   return tierIndex(key) <= tierIndex('discovery');
 }
 
+function isPresence(key: string): boolean {
+  return key === 'presence';
+}
+
+function isPresenceOrBelow(key: string): boolean {
+  return tierIndex(key) <= tierIndex('presence');
+}
+
+function isDirectoryPresence(key: string): boolean {
+  return key === 'directory_presence';
+}
+
 function isStorefront(key: string): boolean {
   return key === 'storefront' || key === 'chain_starter';
 }
@@ -175,6 +187,8 @@ function isEnterprise(key: string): boolean {
 
 function nextTierName(key: string): string | null {
   const map: Record<string, string> = {
+    presence: 'Directory Presence',
+    directory_presence: 'Discovery',
     google_only: 'Storefront',
     starter: 'Storefront',
     discovery: 'Storefront',
@@ -416,6 +430,202 @@ const TIPS: TipDefinition[] = [
     gradient: 'from-indigo-500 to-blue-600',
     condition: (ctx) => !ctx.businessState.hasSlug,
     score: () => 65,
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // TIER-SPECIFIC: Presence (Free Baseline — 3 Equal Paths)
+  // ═══════════════════════════════════════════════════════
+
+  {
+    id: 'presence-choose-your-path',
+    category: 'upgrade',
+    priority: 'high',
+    title: 'Your place is live — choose your visibility path',
+    body: 'You\'re on the free place listing. Three upgrade paths are available, each serving a different visibility need: Directory Presence for an enriched platform directory listing with featured products, Discovery for Google Search visibility with products, or Storefront for a branded platform marketplace page. Pick the surface that fits your business.',
+    cta: 'Compare plans',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'Compass',
+    gradient: 'from-blue-500 to-indigo-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 88;
+      if (ctx.businessState.hasPublishedDirectory) s += 10;
+      if (ctx.businessState.hasLogo) s += 5;
+      if (ctx.businessState.hasHours) s += 5;
+      return s;
+    },
+  },
+
+  {
+    id: 'presence-upgrade-directory',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Enrich your directory listing with Directory Presence',
+    body: 'Upgrade to Directory Presence to unlock up to 4 directory layouts, featured products on your listing, and enhanced directory placement. Perfect for businesses that want to stand out in the platform directory without needing Google or a full storefront.',
+    cta: 'Explore Directory Presence',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'LayoutGrid',
+    gradient: 'from-emerald-500 to-teal-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 65;
+      if (ctx.businessState.hasPublishedDirectory) s += 15;
+      if (!ctx.businessState.hasProducts) s += 5;
+      return s;
+    },
+  },
+
+  {
+    id: 'presence-upgrade-discovery',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Get found on Google with Discovery',
+    body: 'Upgrade to Discovery to sync your products and business info to Google Search and Maps. Reach shoppers where they\'re already searching — no storefront needed, just Google visibility with your product catalog.',
+    cta: 'Explore Discovery',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'Search',
+    gradient: 'from-blue-500 to-cyan-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 62;
+      if (ctx.businessState.hasStoreCategory) s += 10;
+      if (ctx.businessState.hasMap) s += 8;
+      return s;
+    },
+  },
+
+  {
+    id: 'presence-upgrade-storefront',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Open a branded storefront on the platform marketplace',
+    body: 'Upgrade to Storefront for a branded store page on the platform marketplace with product browsing, categories, and shopper inquiries. Your own URL, your own brand, fully managed from this dashboard.',
+    cta: 'Explore Storefront',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'Store',
+    gradient: 'from-violet-500 to-purple-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 60;
+      if (ctx.businessState.hasLogo) s += 10;
+      if (ctx.businessState.hasProducts) s += 10;
+      return s;
+    },
+  },
+
+  {
+    id: 'presence-complete-profile',
+    category: 'optimization',
+    priority: 'high',
+    title: 'Complete your place listing to attract more shoppers',
+    body: 'Your free place listing is live but incomplete. Add your logo, business hours, store category, and location to make your listing more discoverable and trustworthy — these details help shoppers find and choose you.',
+    cta: 'Edit profile',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/tenant`,
+    icon: 'ClipboardCheck',
+    gradient: 'from-amber-500 to-orange-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && (!ctx.businessState.hasLogo || !ctx.businessState.hasHours || !ctx.businessState.hasStoreCategory || !ctx.businessState.hasMap),
+    score: (ctx) => {
+      let s = 72;
+      if (!ctx.businessState.hasLogo) s += 8;
+      if (!ctx.businessState.hasHours) s += 12;
+      if (!ctx.businessState.hasStoreCategory) s += 10;
+      if (!ctx.businessState.hasMap) s += 8;
+      return s;
+    },
+  },
+
+  {
+    id: 'presence-publish-directory',
+    category: 'onboarding',
+    priority: 'high',
+    title: 'Publish your directory listing',
+    body: 'Your place listing isn\'t published in the platform directory yet. Publish it so shoppers browsing the directory can find you — even on the free tier, your listing is visible to anyone searching the platform.',
+    cta: 'Publish listing',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/directory`,
+    icon: 'MapPin',
+    gradient: 'from-emerald-600 to-teal-700',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.hasPublishedDirectory,
+    score: () => 82,
+  },
+
+  {
+    id: 'presence-app-store',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Add capabilities without changing your plan — browse the App Store',
+    body: 'Not ready to upgrade your tier? The App Store lets you add individual capabilities like featured products, directory promotions, and AI chatbot — one at a time, with free trials available. Build your own bundle without committing to a full plan.',
+    cta: 'Browse App Store',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/store`,
+    icon: 'Store',
+    gradient: 'from-blue-500 to-purple-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 50;
+      if (ctx.businessState.hasPublishedDirectory) s += 10;
+      if (ctx.businessState.hasLogo) s += 5;
+      return s;
+    },
+  },
+
+  {
+    id: 'presence-trial-available',
+    category: 'upgrade',
+    priority: 'high',
+    title: 'Try any paid surface free — no payment upfront',
+    body: 'Every upgrade path offers a free trial with no payment required upfront. Test Directory Presence, Discovery, or Storefront and see which surface works best for your business before committing. Trial lengths vary by feature — check each plan for details.',
+    cta: 'Start a free trial',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'Sparkles',
+    gradient: 'from-indigo-500 to-blue-600',
+    condition: (ctx) => isPresence(ctx.tierKey) && !ctx.businessState.isTrial && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 70;
+      if (ctx.businessState.hasPublishedDirectory) s += 10;
+      if (ctx.businessState.hasHours) s += 5;
+      return s;
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // TIER-SPECIFIC: Directory Presence (Paid Directory Surface)
+  // ═══════════════════════════════════════════════════════
+
+  {
+    id: 'directory-presence-to-discovery',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Add Google visibility with Discovery',
+    body: 'You\'re live in the platform directory. Now extend your reach to Google Search and Maps with Discovery — sync your products and business info to Google where shoppers are already searching.',
+    cta: 'Explore Discovery',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'Search',
+    gradient: 'from-blue-500 to-cyan-600',
+    condition: (ctx) => isDirectoryPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 68;
+      if (ctx.businessState.hasPublishedDirectory) s += 10;
+      if (ctx.businessState.hasStoreCategory) s += 5;
+      return s;
+    },
+  },
+
+  {
+    id: 'directory-presence-to-storefront',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Open a branded storefront alongside your directory listing',
+    body: 'You\'re visible in the directory — now add a branded storefront on the platform marketplace. Storefront gives you a full store page with product browsing, categories, and shopper inquiries, while keeping your directory listing.',
+    cta: 'Explore Storefront',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'Store',
+    gradient: 'from-violet-500 to-purple-600',
+    condition: (ctx) => isDirectoryPresence(ctx.tierKey) && !ctx.businessState.isReadOnly,
+    score: (ctx) => {
+      let s = 65;
+      if (ctx.businessState.hasLogo) s += 8;
+      if (ctx.businessState.hasProducts) s += 10;
+      return s;
+    },
   },
 
   // ═══════════════════════════════════════════════════════

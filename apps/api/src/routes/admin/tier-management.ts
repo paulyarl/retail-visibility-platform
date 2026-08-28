@@ -312,7 +312,8 @@ const updateTenantTierSchema = z.object({
     'trial_commitment',
     'trial_professional',
     'trial_chain_starter',
-    'expired_trial',
+    'expired_trial', // deprecated — kept for backward compat, maps to presence
+    'presence',
   ]).optional(),
   subscriptionStatus: z.enum([
     'trial',
@@ -435,12 +436,12 @@ router.patch('/tenants/:tenantId', async (req, res) => {
           manualControl: false,
         });
       }
-    } else if (updateData.subscriptionTier === 'expired_trial') {
-      // Handle expired trial tier
+    } else if (updateData.subscriptionTier === 'expired_trial' || updateData.subscriptionTier === 'presence') {
+      // Handle downgrade to presence (free baseline) — expired_trial is deprecated
       updatePayload.trial_ends_at = null;
-      updatePayload.subscription_status = 'expired';
-      
-      console.log(`[Tier Management] Set tenant ${tenantId} to expired_trial status`);
+      updatePayload.subscription_status = 'active';
+
+      console.log(`[Tier Management] Set tenant ${tenantId} to presence (free baseline)`);
     } else if (updateData.subscriptionTier && !updateData.subscriptionTier.startsWith('trial_')) {
       // Moving from trial to paid tier - clear trial dates
       if ((currentTenant as any).subscription_tier?.startsWith('trial_')) {

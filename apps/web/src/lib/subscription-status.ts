@@ -41,7 +41,9 @@ export function deriveInternalStatus(tenant: {
   const status = tenant.subscriptionStatus || 'active';
   const tier = tenant.subscriptionTier || 'starter';
 
-  // 1. Check for expired_trial tier (frozen, read-only)
+  // 1. Check for expired_trial tier (deprecated — frozen, read-only)
+  //    New downgrades go to 'presence' tier with 'active' status instead.
+  //    This kept for backward compatibility with existing expired_trial tenants.
   if (tier === 'expired_trial') {
     return 'frozen';
   }

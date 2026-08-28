@@ -4,7 +4,7 @@
  * Scheduled job that runs daily to:
  * 1. Process trial ends (charge payment method)
  * 2. Retry payments during grace period (every 3 days)
- * 3. Demote tenants with expired grace period to expired_trial tier
+ * 3. Downgrade tenants with expired grace period to presence (free baseline)
  * 
  * Run schedule: Daily at midnight (00:00 UTC)
  */
@@ -26,7 +26,7 @@ export interface GracePeriodResult {
 
 /**
  * Process tenants that have exceeded the grace period
- * Demotes them to expired_trial tier (invisible on public pages)
+ * Downgrades them to presence tier (free baseline — place entry remains visible)
  */
 export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
   const result: GracePeriodResult = {
@@ -87,7 +87,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
         
         if (retryResult.charged) {
           console.log(`[GracePeriodJob] Payment retry succeeded for tenant ${tenantId}`);
-        } else if (retryResult.newStatus === 'expired_trial') {
+        } else if (retryResult.newStatus === 'presence') {
           console.log(`[GracePeriodJob] Grace period expired for tenant ${tenantId}`);
           result.demoted++;
         } else {
@@ -99,7 +99,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
       }
     }
 
-    // 3. Process grace period expiry (downgrade to expired_trial)
+    // 3. Process grace period expiry (downgrade to presence — free baseline)
     const graceExpired = await trialService.getGracePeriodExpired();
     console.log(`[GracePeriodJob] Found ${graceExpired.length} tenants with expired grace period`);
 
@@ -122,7 +122,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
           reason: 'Grace period expired',
         }).catch(err => console.error('[GracePeriodJob] Failed to create CRM task for cancellation:', err));
         
-        console.log(`[GracePeriodJob] Demoted tenant ${tenantId} to expired_trial - grace period expired`);
+        console.log(`[GracePeriodJob] Downgraded tenant ${tenantId} to presence - grace period expired`);
         result.demoted++;
       } catch (error: any) {
         logger.error(`[GracePeriodJob] Error demoting tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });

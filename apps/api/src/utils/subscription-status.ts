@@ -90,7 +90,7 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
  * 1. Trial (14 days) -> Full access within tier limits
  * 2. Trial ends -> Auto-charge payment method
  * 3. Grace period (14 days) -> Retry payment every 3 days
- * 4. Grace expires -> Auto-downgrade to expired_trial (invisible on public pages)
+ * 4. Grace expires -> Auto-downgrade to presence (free baseline, place entry remains)
  * 
  * @param tenant - Tenant object with subscription fields
  * @returns InternalStatus enum value
@@ -105,7 +105,9 @@ export function deriveInternalStatus(tenant: {
   const status = tenant.subscription_status || 'active';
   const tier = tenant.subscription_tier || 'discovery';
 
-  // 1. Check for expired_trial tier (invisible on public pages)
+  // 1. Check for expired_trial tier (deprecated — frozen, read-only)
+  //    New downgrades go to 'presence' tier with 'active' status instead.
+  //    Kept for backward compatibility with existing expired_trial tenants.
   if (tier === 'expired_trial') {
     return 'frozen';
   }

@@ -26,7 +26,7 @@ function getBaseTierForTrial(tier: string): SubscriptionTier {
     'trial_chain_starter': 'starter', // Use starter as base for chain trial
     'trial_chain_professional': 'professional',
     'trial_chain_enterprise': 'enterprise',
-    'expired_trial': 'starter', // Fallback to starter for expired trials
+    'expired_trial': 'presence', // Deprecated — expired_trial now maps to presence (free baseline)
   };
   
   return trialToBaseMap[tier] || 'discovery';

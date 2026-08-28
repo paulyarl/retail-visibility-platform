@@ -20,6 +20,8 @@ import { authService } from '../auth/auth.service';
 import { user_role } from '@prisma/client';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import CrmTicketService from './CrmTicketService';
+import CrmTicketMessageService from './CrmTicketMessageService';
 
 /** Audit context for claim operations */
 interface ClaimAuditCtx {
@@ -318,6 +320,58 @@ class DirectoryClaimService {
         } catch (alertErr) {
           logger.error('DirectoryClaimService.initiateClaim — CRM alert insert failed', undefined, {
             error: (alertErr as Error).message,
+          });
+          // Non-fatal — the request row is already persisted
+        }
+
+        // Also create a CRM support ticket so the claim appears in the
+        // operator's Admin CRM dashboard (requests / tickets / dashboard stats).
+        try {
+          const listingRows = await prisma.$queryRaw<any[]>`
+            SELECT dl.business_name FROM directory_presence_seeds dps
+            JOIN directory_listings_list dl ON dl.id = dps.listing_id
+            WHERE dps.id = ${r.seed_id}
+            LIMIT 1
+          `;
+          const businessName = listingRows[0]?.business_name || 'Unknown Business';
+
+          const ticket = await CrmTicketService.getInstance().create({
+            tenant_id: PLATFORM_SCOPE,
+            title: `Directory listing claim request: ${businessName}`,
+            description: `A business owner submitted a claim request for a directory listing.
+
+Business: ${businessName}
+Seed ID: ${r.seed_id}
+Tenant ID: ${r.tenant_id}
+Request ID: ${requestId}
+Claimant: ${[ctx?.claimantFirstName, ctx?.claimantMiddleName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}
+Email: ${ctx?.customerEmail || '—'}
+Phone: ${ctx?.claimantPhone || '—'}
+Stated address: ${ctx?.claimantBusinessAddress || '—'}
+
+Review at Settings → Directory → Presence Seeds.`,
+            priority: 'high',
+            category: 'directory_claim',
+            inquiry_id: requestId,
+          });
+
+          await CrmTicketMessageService.getInstance().create({
+            ticket_id: ticket.id,
+            author_id: 'system',
+            author_type: 'platform',
+            author_name: 'Directory Claims',
+            content_blocks: {
+              version: '1',
+              blocks: [
+                { type: 'paragraph', text: `A business owner submitted a claim request for ${businessName}.` },
+                { type: 'paragraph', text: `Request ID: ${requestId} · Seed: ${r.seed_id}` },
+                { type: 'button', label: 'Review claim in Presence Seeds', url: '/settings/admin/directory/presence-seeds', variant: 'primary' },
+              ],
+            },
+          });
+        } catch (ticketErr) {
+          logger.error('DirectoryClaimService.initiateClaim — CRM support ticket creation failed', undefined, {
+            error: (ticketErr as Error).message,
           });
           // Non-fatal — the request row is already persisted
         }
@@ -762,6 +816,9 @@ class DirectoryClaimService {
       WHERE id = ${requestId}
     `;
 
+    // Close the linked CRM support ticket
+    await this.closeClaimTicket(requestId, 'resolved');
+
     // Promote customer to platform user if we have a customer_id
     let platformUserId: string | undefined;
     let userTokens: { accessToken: string; refreshToken: string } | undefined;
@@ -844,6 +901,9 @@ class DirectoryClaimService {
           rejection_reason = ${reason || null}
       WHERE id = ${requestId}
     `;
+
+    // Close the linked CRM support ticket
+    await this.closeClaimTicket(requestId, 'closed');
 
     audit({
       actor: adminUserId,
@@ -991,6 +1051,29 @@ class DirectoryClaimService {
       requiresPasswordSetup,
       platformUserId,
     };
+  }
+
+  /**
+   * Resolve or close the CRM support ticket linked to a claim request.
+   * Tickets are linked via crm_support_tickets.inquiry_id = directory_claim_requests.id.
+   */
+  private async closeClaimTicket(requestId: string, status: 'resolved' | 'closed') {
+    try {
+      const updateData: any = { status, updated_at: new Date() };
+      if (status === 'resolved') {
+        updateData.resolved_at = new Date();
+      }
+      await prisma.crm_support_tickets.updateMany({
+        where: { inquiry_id: requestId, status: { not: 'closed' } },
+        data: updateData,
+      });
+    } catch (err) {
+      logger.error('DirectoryClaimService.closeClaimTicket — failed to update linked CRM ticket', undefined, {
+        error: (err as Error).message,
+        requestId,
+        status,
+      });
+    }
   }
 
   /**

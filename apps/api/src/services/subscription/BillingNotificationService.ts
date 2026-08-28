@@ -1007,8 +1007,8 @@ Thank you for your business!`;
 
       case 'subscription_canceled':
         return {
-          title: `Subscription canceled — ${tenantName} demoted to expired_trial`,
-          description: `Tenant "${tenantName}" has been demoted to expired_trial after grace period expiry. Reason: ${data.reason || 'Grace period expired'}. The tenant is now invisible on public pages.\n\nIf the tenant adds a payment method, the subscription can be reactivated.\n\nBilling settings: ${billingUrl}`,
+          title: `Subscription canceled — ${tenantName} downgraded to presence`,
+          description: `Tenant "${tenantName}" has been downgraded to the free presence tier after grace period expiry. Reason: ${data.reason || 'Grace period expired'}. The tenant retains its free place entry but loses paid capabilities.\n\nIf the tenant adds a payment method, the subscription can be reactivated into any tier.\n\nBilling settings: ${billingUrl}`,
           priority: 'urgent',
         };
 
