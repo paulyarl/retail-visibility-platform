@@ -149,6 +149,23 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     }
   }
 
+  /** GET /api/public/directory/claim/:token/slug-patterns — available slugs */
+  async getSlugPatterns(token: string): Promise<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }[]> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/claim/${encodeURIComponent(token)}/slug-patterns`,
+        { method: 'GET' },
+        undefined,
+        0,
+      );
+      if (!result.success) return [];
+      const data = result.data?.data ?? result.data;
+      return data?.patterns || [];
+    } catch {
+      return [];
+    }
+  }
+
   /** POST /api/public/directory/claim/:token/accept — bind owner (requires auth) */
   async acceptClaim(token: string, otpCode?: string): Promise<DirectoryClaimAcceptResult> {
     try {

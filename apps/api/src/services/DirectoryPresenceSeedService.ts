@@ -490,6 +490,7 @@ class DirectoryPresenceSeedService {
       zipCode?: string | null;
       latitude?: number | null;
       longitude?: number | null;
+      slug?: string;
     },
     provenanceUpdates?: Array<{
       fieldKey: string;
@@ -576,6 +577,10 @@ class DirectoryPresenceSeedService {
     if (fields.longitude !== undefined) {
       setClauses.push('longitude = $' + (params.length + 1));
       params.push(fields.longitude);
+    }
+    if (fields.slug !== undefined) {
+      setClauses.push('slug = $' + (params.length + 1));
+      params.push(fields.slug);
     }
 
     params.push(listingId);

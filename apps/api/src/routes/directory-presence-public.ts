@@ -18,6 +18,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import slugSingletonService from '../services/SlugSingletonService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { prisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
@@ -889,6 +890,7 @@ const claimListingUpdateSchema = z.object({
   secondaryCategories: z.array(z.string()).optional(),
   notes: z.string().optional(),
   socialLinks: z.array(socialLinkSchema).optional(),
+  slug: z.string().optional(),
 });
 
 /** PUT /api/public/directory/claim/:token/listing — owner pre-approval edits (token auth) */
@@ -919,6 +921,30 @@ router.put('/claim/:token/listing', async (req: Request, res: Response) => {
     if (data.businessHours !== undefined) fields.businessHours = data.businessHours;
     if (data.primaryCategory !== undefined) fields.primaryCategory = data.primaryCategory;
     if (data.secondaryCategories !== undefined) fields.secondaryCategories = data.secondaryCategories;
+    if (data.slug !== undefined) fields.slug = data.slug;
+
+    if (data.slug) {
+      const takenInSettings = await prisma.directory_settings_list.findFirst({
+        where: { slug: data.slug, NOT: { tenant_id: summary.tenantId } },
+      });
+      const takenInListings = await prisma.directory_listings_list.findFirst({
+        where: { slug: data.slug, NOT: { tenant_id: summary.tenantId } },
+      });
+      if (takenInSettings || takenInListings) {
+        return res.status(409).json({ error: 'slug_taken' });
+      }
+
+      await prisma.directory_settings_list.upsert({
+        where: { tenant_id: summary.tenantId },
+        update: { slug: data.slug, updated_at: new Date() },
+        create: {
+          id: `${summary.tenantId}_settings`,
+          tenant_id: summary.tenantId,
+          slug: data.slug,
+          updated_at: new Date(),
+        },
+      });
+    }
 
     await DirectoryPresenceSeedService.updateFields(summary.seedId, fields, [], {
       actorType: 'customer',
@@ -965,6 +991,45 @@ router.put('/claim/:token/listing', async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error: any) {
     logger.error('[PUT /api/public/directory/claim/:token/listing] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/claim/:token/slug-patterns — available slug patterns */
+router.get('/claim/:token/slug-patterns', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const summary = await DirectoryClaimService.getTokenSummary(token);
+    if (!summary) return res.status(404).json({ error: 'token_not_found' });
+    if (summary.isExpired) return res.status(410).json({ error: 'token_expired' });
+    if (summary.isConsumed) return res.status(409).json({ error: 'already_claimed' });
+
+    const patterns = await slugSingletonService.getAllSlugPatterns(
+      summary.businessName,
+      { city: summary.city, state: summary.state, country: 'US' },
+      summary.tenantId,
+    );
+
+    // Cross-check against other directory listings so owners don't pick
+    // a public place slug already assigned to another listing.
+    const slugs = patterns.map((p) => p.slug);
+    const conflicting = await prisma.directory_listings_list.findMany({
+      where: { slug: { in: slugs }, NOT: { tenant_id: summary.tenantId } },
+      select: { slug: true },
+    });
+    const conflictSet = new Set(conflicting.map((r) => r.slug));
+
+    res.json({
+      success: true,
+      patterns: patterns.map((p) => ({
+        ...p,
+        isAvailable: p.isAvailable && !conflictSet.has(p.slug),
+      })),
+    });
+  } catch (error: any) {
+    logger.error('[GET /api/public/directory/claim/:token/slug-patterns] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
