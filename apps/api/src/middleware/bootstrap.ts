@@ -89,7 +89,7 @@ export function bootstrapMiddleware(app: Express): void {
     origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-correlation-id', 'cache-control', 'x-platform-cache', 'x-service-admin'],
+    allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-customer-email', 'x-correlation-id', 'cache-control', 'x-platform-cache', 'x-service-admin'],
   }));
 
   // ── 6. Pre-middleware routes (before JSON parsing) ───────────────────
