@@ -7,6 +7,8 @@ import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   CreateSeedRequest,
 } from '@/services/DirectoryPresenceAdminService';
+import { addressParser } from '@/lib/address-parser';
+import { geocodeAddress } from '@/lib/validation/businessProfile';
 import { Plus, ArrowLeft, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +40,14 @@ const EMPTY_PROVENANCE_ROW: ProvenanceRow = {
   showOnPublic: true,
 };
 
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+];
+
 export default function NewPresenceSeedPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +72,7 @@ export default function NewPresenceSeedPage() {
     'verified',
   );
   const [notes, setNotes] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
 
   // SNAP/EBT
   const [snapEbtReported, setSnapEbtReported] = useState(false);
@@ -83,6 +94,49 @@ export default function NewPresenceSeedPage() {
     setProvenance((rows) =>
       rows.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
     );
+
+  const handleAddressChange = (value: string) => {
+    if (addressParser.canParse(value)) {
+      const parsed = addressParser.parse(value);
+      setAddress(parsed.address_line1 ?? value);
+      setCity((prev) => parsed.city ?? prev);
+      setState((prev) => (parsed.state && US_STATES.includes(parsed.state) ? parsed.state : prev));
+      setZipCode((prev) => parsed.postal_code ?? prev);
+    } else {
+      setAddress(value);
+    }
+  };
+
+  const handleGeocodeAddress = async () => {
+    if (!address.trim() || !city.trim() || !zipCode.trim()) {
+      setError('Please fill in address, city, and ZIP code before geocoding.');
+      return;
+    }
+
+    setGeocoding(true);
+    setError(null);
+
+    try {
+      const coordinates = await geocodeAddress({
+        address_line1: address,
+        city,
+        state,
+        postal_code: zipCode,
+        country_code: 'US',
+      });
+
+      if (coordinates) {
+        setLatitude(String(coordinates.latitude));
+        setLongitude(String(coordinates.longitude));
+      } else {
+        setError('Could not find coordinates for this address. Please check the address and try again.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to geocode address.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,10 +278,14 @@ export default function NewPresenceSeedPage() {
               <input
                 className={inputClass}
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                onChange={(e) => handleAddressChange(e.target.value)}
+                placeholder="123 Main St, Suite 200, Indianapolis, IN 46214 — paste a full address to auto-split"
                 required
                 maxLength={300}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Paste a full address to auto-fill city, state, and ZIP.
+              </p>
             </div>
             <div>
               <label className={labelClass}>City *</label>
@@ -240,12 +298,19 @@ export default function NewPresenceSeedPage() {
             </div>
             <div>
               <label className={labelClass}>State *</label>
-              <input
+              <select
                 className={inputClass}
                 value={state}
                 onChange={(e) => setState(e.target.value)}
                 required
-              />
+              >
+                <option value="">Select state</option>
+                {US_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>ZIP Code</label>
@@ -290,6 +355,36 @@ export default function NewPresenceSeedPage() {
                 onChange={(e) => setLongitude(e.target.value)}
                 placeholder="-86.1581"
               />
+            </div>
+            <div className="md:col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900">
+                    Map Coordinates
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    Get latitude and longitude for map display
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGeocodeAddress}
+                  disabled={geocoding || !address.trim() || !city.trim() || !zipCode.trim()}
+                  className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {geocoding ? 'Getting...' : 'Get Coordinates'}
+                </button>
+              </div>
+              {latitude && longitude && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-green-700">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    Coordinates: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </section>

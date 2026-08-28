@@ -7,7 +7,8 @@ import directoryPresenceAdminService, {
   DirectoryPresenceSeedSummary,
   DirectoryClaimRequest,
 } from '@/services/DirectoryPresenceAdminService';
-import { List, Plus, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText } from 'lucide-react';
+import PresenceSeedsBulkUploadModal from '@/components/directory/PresenceSeedsBulkUploadModal';
+import { List, Plus, Upload, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,7 @@ export default function DirectoryPresenceSeedsPage() {
     id: string; fileName: string; fileType: string; fileSize: number; uploadedAt: string;
   }>>([]);
   const [verifyAttachmentsLoading, setVerifyAttachmentsLoading] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   const fetchSeeds = useCallback(async () => {
     try {
@@ -256,13 +258,23 @@ export default function DirectoryPresenceSeedsPage() {
         description="Manage unclaimed directory listings seeded from public information."
         icon={<List className="w-6 h-6" />}
         actions={
-          <Link
-            href="/settings/admin/directory/presence-seeds/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            <Plus className="w-4 h-4" />
-            Create Seed
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/settings/admin/directory/presence-seeds/new"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4" />
+              Create Seed
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowBulkUpload(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            >
+              <Upload className="w-4 h-4" />
+              Bulk Upload
+            </button>
+          </div>
         }
       />
 
@@ -296,6 +308,17 @@ export default function DirectoryPresenceSeedsPage() {
             Copy link
           </button>
         </div>
+      )}
+
+      {showBulkUpload && (
+        <PresenceSeedsBulkUploadModal
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={(createdCount) => {
+            setShowBulkUpload(false);
+            setActionSuccess(`Successfully created ${createdCount} presence seeds.`);
+            fetchSeeds();
+          }}
+        />
       )}
 
       {/* Pending Claim Requests */}
