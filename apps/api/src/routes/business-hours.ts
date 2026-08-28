@@ -13,6 +13,38 @@ const CACHE_TTL = {
   BUSINESS_HOURS: 30 * 60 * 1000 // 30 minutes
 };
 
+const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+
+async function getTenantBusinessHours(tenantId: string): Promise<{ timezone: string; periods: any[] }> {
+  let row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } });
+  let timezone = row?.timezone || 'America/New_York';
+  let periods: any[] = (row?.periods as any) || [];
+
+  // Fall back to directory listing hours (e.g. unclaimed directory seeds) when
+  // the canonical business_hours_list has no saved periods.
+  if (periods.length === 0) {
+    const listing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: tenantId, listing_origin: 'directory_seed' }
+    });
+    const listingHours = listing?.business_hours as any;
+    if (listingHours && typeof listingHours === 'object') {
+      const fallbackPeriods: any[] = [];
+      for (const day of DAYS) {
+        const h = listingHours[day];
+        if (h && !h.closed && h.open && h.close) {
+          fallbackPeriods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
+        }
+      }
+      if (fallbackPeriods.length > 0) {
+        periods = fallbackPeriods;
+        timezone = listingHours.timezone || timezone;
+      }
+    }
+  }
+
+  return { timezone, periods };
+}
+
 const router = Router()
 
 // Public router for unauthenticated access (mounted at /api/public/tenants/:tenantId)
@@ -25,9 +57,7 @@ const mirrorAttempts = new Map<string, number>()
 publicBusinessHoursRouter.get('/business-hours',
   async (req: Request<{ tenantId: string }>, res: Response) => {
   const { tenantId } = req.params
-  const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })
-  const timezone = row?.timezone || 'America/New_York'
-  const periods: any[] = (row?.periods as any) || []
+  const { timezone, periods } = await getTenantBusinessHours(tenantId)
   res.json({ success: true, data: { timezone, periods } })
 })
 
@@ -35,9 +65,7 @@ publicBusinessHoursRouter.get('/business-hours',
 router.get('/tenant/:tenantId/business-hours',
   async (req, res) => {
   const { tenantId } = req.params
-  const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })
-  const timezone = row?.timezone || 'America/New_York'
-  const periods: any[] = (row?.periods as any) || []
+  const { timezone, periods } = await getTenantBusinessHours(tenantId)
   res.json({ success: true, data: { timezone, periods } })
 })
 
@@ -45,9 +73,7 @@ router.get('/tenant/:tenantId/business-hours',
 router.get('/business-hours/:tenantId',
   async (req, res) => {
   const { tenantId } = req.params
-  const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })
-  const timezone = row?.timezone || 'America/New_York'
-  const periods: any[] = (row?.periods as any) || []
+  const { timezone, periods } = await getTenantBusinessHours(tenantId)
   res.json({ success: true, data: { timezone, periods } })
 })
 
