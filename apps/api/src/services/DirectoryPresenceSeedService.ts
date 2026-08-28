@@ -579,6 +579,36 @@ class DirectoryPresenceSeedService {
       ...params
     );
 
+    // Sync seed hours into the canonical business_hours_list so the public
+    // business-hours and status endpoints (which read that table) reflect them.
+    if (fields.businessHours && typeof fields.businessHours === 'object') {
+      const tz = fields.businessHours.timezone || 'America/New_York';
+      const periods: any[] = [];
+      const dayOrder = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+      for (const day of dayOrder) {
+        const h = fields.businessHours[day];
+        if (h && typeof h === 'object' && !h.closed && h.open && h.close) {
+          periods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
+        }
+      }
+
+      await prisma.business_hours_list.upsert({
+        where: { tenant_id: tenantId },
+        update: { timezone: tz, periods: periods as any, updated_at: new Date() },
+        create: {
+          id: `${tenantId}_hours`,
+          tenant_id: tenantId,
+          timezone: tz,
+          periods: periods as any,
+          updated_at: new Date(),
+        },
+      });
+
+      // Keep the legacy business profile hours in sync.
+      const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
+      await updateBusinessProfileHours(tenantId);
+    }
+
     // If primary category changed, also update the seed's category column so
     // the /place browse pages and seed list reflect the new category.
     if (fields.primaryCategory !== undefined) {

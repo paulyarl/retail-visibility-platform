@@ -15,29 +15,49 @@ const CACHE_TTL = {
 
 const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
+function parseProfileHoursToPeriods(hours: any): any[] {
+  if (!hours || typeof hours !== 'object') return [];
+  const fallbackPeriods: any[] = [];
+  for (const day of DAYS) {
+    const h = hours[day];
+    if (h && typeof h === 'object' && !h.closed && h.open && h.close) {
+      fallbackPeriods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
+    } else if (typeof h === 'string' && h.toLowerCase() !== 'closed') {
+      const match = h.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+      if (match) {
+        fallbackPeriods.push({ day: day.toUpperCase(), open: match[1].trim(), close: match[2].trim() });
+      }
+    }
+  }
+  return fallbackPeriods;
+}
+
 async function getTenantBusinessHours(tenantId: string): Promise<{ timezone: string; periods: any[] }> {
   let row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } });
   let timezone = row?.timezone || 'America/New_York';
   let periods: any[] = (row?.periods as any) || [];
 
-  // Fall back to directory listing hours (e.g. unclaimed directory seeds) when
-  // the canonical business_hours_list has no saved periods.
+  // Fall back to directory listing or business profile hours (e.g. unclaimed
+  // directory seeds) when the canonical business_hours_list has no saved periods.
   if (periods.length === 0) {
     const listing = await prisma.directory_listings_list.findFirst({
       where: { tenant_id: tenantId, listing_origin: 'directory_seed' }
     });
     const listingHours = listing?.business_hours as any;
     if (listingHours && typeof listingHours === 'object') {
-      const fallbackPeriods: any[] = [];
-      for (const day of DAYS) {
-        const h = listingHours[day];
-        if (h && !h.closed && h.open && h.close) {
-          fallbackPeriods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
-        }
-      }
-      if (fallbackPeriods.length > 0) {
-        periods = fallbackPeriods;
-        timezone = listingHours.timezone || timezone;
+      periods = parseProfileHoursToPeriods(listingHours);
+      timezone = listingHours.timezone || timezone;
+    }
+
+    if (periods.length === 0) {
+      const profile = await prisma.tenant_business_profiles_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: { hours: true },
+      });
+      const profileHours = profile?.hours as any;
+      if (profileHours && typeof profileHours === 'object') {
+        periods = parseProfileHoursToPeriods(profileHours);
+        timezone = profileHours.timezone || timezone;
       }
     }
   }
@@ -343,12 +363,10 @@ router.get('/tenant/:tenantId/business-hours/status',
       return res.json(result);
     }
 
-    // Get business hours data
-    const hoursRow = await prisma.business_hours_list.findUnique({
-      where: { tenant_id: tenantId }
-    })
+    // Get business hours data (canonical + fallbacks)
+    const { timezone, periods } = await getTenantBusinessHours(tenantId)
 
-    if (!hoursRow) {
+    if (periods.length === 0) {
       const result = {
         success: true,
         data: {
@@ -369,8 +387,7 @@ router.get('/tenant/:tenantId/business-hours/status',
     })
 
     // Build hours object
-    const periods = hoursRow.periods as any[] || []
-    const hours: any = { timezone: hoursRow.timezone }
+    const hours: any = { timezone }
 
     // Convert periods to day-based format for computeStoreStatus
     periods.forEach((period: any) => {
@@ -442,12 +459,10 @@ router.get('/business-hours/status/:tenantId',
 
     console.log(`[Business Hours] Cache miss for tenant ${tenantId}, fetching from database (alias endpoint)`)
 
-    // Get business hours data
-    const hoursRow = await prisma.business_hours_list.findUnique({
-      where: { tenant_id: tenantId }
-    })
+    // Get business hours data (canonical + fallbacks)
+    const { timezone, periods } = await getTenantBusinessHours(tenantId)
 
-    if (!hoursRow) {
+    if (periods.length === 0) {
       const result = {
         success: true,
         data: {
@@ -468,8 +483,7 @@ router.get('/business-hours/status/:tenantId',
     })
 
     // Build hours object
-    const periods = hoursRow.periods as any[] || []
-    const hours: any = { timezone: hoursRow.timezone }
+    const hours: any = { timezone }
 
     // Convert periods to day-based format for computeStoreStatus
     periods.forEach((period: any) => {

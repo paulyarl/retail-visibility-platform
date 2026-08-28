@@ -26,6 +26,7 @@ const tenantProfileSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   map_privacy_mode: z.enum(["precise", "neighborhood"]).optional(),
+  hours: z.any().optional(),
 });
 router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
@@ -61,6 +62,7 @@ router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
           latitude: profileData.latitude,
           longitude: profileData.longitude,
           map_privacy_mode: profileData.map_privacy_mode,
+          hours: profileData.hours ?? existing.hours,
           updated_at: new Date(),
         }
       });
@@ -85,6 +87,7 @@ router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
           latitude: profileData.latitude || null,
           longitude: profileData.longitude || null,
           map_privacy_mode: profileData.map_privacy_mode || undefined,
+          hours: profileData.hours ?? null,
           updated_at: new Date(),
         }
       });
