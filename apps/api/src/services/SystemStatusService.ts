@@ -127,11 +127,15 @@ function buildStatusItems(
       });
     }
   } else {
+    // Storefront not enabled by the tier (e.g., directory_presence, presence).
+    // This is not a critical issue — it's expected for directory-focused tiers
+    // that don't include a storefront. Only escalate to 'error' for read-only
+    // (frozen/canceled/expired) tenants who lost it involuntarily.
     items.push({
       key: 'store',
       label: 'Store',
-      status: 'error',
-      detail: 'Storefront disabled',
+      status: isReadOnly ? 'error' : 'inactive',
+      detail: isReadOnly ? 'Storefront disabled' : 'Not available on your plan',
       link: `/t/${tenantId}/settings`,
     });
   }
