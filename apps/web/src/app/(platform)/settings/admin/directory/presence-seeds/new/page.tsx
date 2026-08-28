@@ -9,6 +9,7 @@ import directoryPresenceAdminService, {
 } from '@/services/DirectoryPresenceAdminService';
 import { addressParser } from '@/lib/address-parser';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
+import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import { Plus, ArrowLeft, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -62,7 +63,7 @@ export default function NewPresenceSeedPage() {
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
   const [primaryCategory, setPrimaryCategory] = useState('');
-  const [secondaryCategories, setSecondaryCategories] = useState('');
+  const [secondaryCategories, setSecondaryCategories] = useState<string[]>([]);
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [seedBatch, setSeedBatch] = useState('');
@@ -176,11 +177,8 @@ export default function NewPresenceSeedPage() {
       phone: phone.trim() || undefined,
       website: website.trim() || undefined,
       primaryCategory: primaryCategory.trim(),
-      secondaryCategories: secondaryCategories.trim()
+      secondaryCategories: secondaryCategories.length > 0
         ? secondaryCategories
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
         : undefined,
       latitude: lat,
       longitude: lng,
@@ -393,23 +391,12 @@ export default function NewPresenceSeedPage() {
         <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Classification</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Primary Category *</label>
-              <input
-                className={inputClass}
-                value={primaryCategory}
-                onChange={(e) => setPrimaryCategory(e.target.value)}
-                required
-                placeholder="African Grocery"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Secondary Categories</label>
-              <input
-                className={inputClass}
-                value={secondaryCategories}
-                onChange={(e) => setSecondaryCategories(e.target.value)}
-                placeholder="Comma-separated, e.g. Halal, International"
+            <div className="md:col-span-2">
+              <DirectoryCategorySelectorAdapter
+                primary={primaryCategory}
+                secondary={secondaryCategories}
+                onPrimaryChange={setPrimaryCategory}
+                onSecondaryChange={setSecondaryCategories}
               />
             </div>
             <div>
