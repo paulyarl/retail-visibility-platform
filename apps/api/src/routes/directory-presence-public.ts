@@ -19,6 +19,7 @@ import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
+import { prisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -868,18 +869,26 @@ router.post(
   },
 );
 
+const socialLinkSchema = z.object({
+  platform: z.string(),
+  url: z.string(),
+});
+
 const claimListingUpdateSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   zipCode: z.string().optional().or(z.literal('').transform(() => null)),
   phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
   website: z.string().optional().or(z.literal('')),
   latitude: z.number().optional().or(z.null()),
   longitude: z.number().optional().or(z.null()),
   businessHours: z.any().optional(),
   primaryCategory: z.string().optional().or(z.literal('').transform(() => null)),
   secondaryCategories: z.array(z.string()).optional(),
+  notes: z.string().optional(),
+  socialLinks: z.array(socialLinkSchema).optional(),
 });
 
 /** PUT /api/public/directory/claim/:token/listing — owner pre-approval edits (token auth) */
@@ -903,6 +912,7 @@ router.put('/claim/:token/listing', async (req: Request, res: Response) => {
     if (data.state !== undefined) fields.state = data.state;
     if (data.zipCode !== undefined) fields.zipCode = data.zipCode;
     if (data.phone !== undefined) fields.phone = data.phone;
+    if (data.email !== undefined) fields.email = data.email || null;
     if (data.website !== undefined) fields.website = data.website || undefined;
     if (data.latitude !== undefined) fields.latitude = data.latitude;
     if (data.longitude !== undefined) fields.longitude = data.longitude;
@@ -915,6 +925,42 @@ router.put('/claim/:token/listing', async (req: Request, res: Response) => {
       ip: req.ip,
       userAgent: req.get('User-Agent'),
     });
+
+    // Delegate owner-provided email/social to the canonical tenant business
+    // profile, mirroring the Edit Business Profile pattern.
+    const profileUpdate: any = {};
+    if (data.email !== undefined) profileUpdate.email = data.email || null;
+    if (data.socialLinks !== undefined) profileUpdate.social_links = data.socialLinks || [];
+
+    if (Object.keys(profileUpdate).length > 0) {
+      await prisma.tenant_business_profiles_list.upsert({
+        where: { tenant_id: summary.tenantId },
+        update: { ...profileUpdate, updated_at: new Date() },
+        create: {
+          tenant_id: summary.tenantId,
+          business_name: summary.businessName || '',
+          business_description: '',
+          address_line1: summary.address || '',
+          city: summary.city || '',
+          state: summary.state || null,
+          postal_code: summary.zipCode || '',
+          country_code: summary.state ? 'US' : null,
+          phone_number: summary.phone || null,
+          website: summary.website || null,
+          ...profileUpdate,
+          updated_at: new Date(),
+        },
+      });
+    }
+
+    // Store free-form correction notes on the seed for operator review.
+    if (data.notes !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET notes = ${data.notes || null}, updated_at = now()
+        WHERE id = ${summary.seedId}
+      `;
+    }
 
     res.json({ success: true });
   } catch (error: any) {

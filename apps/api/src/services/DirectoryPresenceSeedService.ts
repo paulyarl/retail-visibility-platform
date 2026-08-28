@@ -479,6 +479,7 @@ class DirectoryPresenceSeedService {
       snapEbtSource?: string | null;
       snapEbtSourceName?: string | null;
       phone?: string;
+      email?: string | null;
       website?: string;
       businessHours?: any;
       primaryCategory?: string | null;
@@ -512,6 +513,10 @@ class DirectoryPresenceSeedService {
     // Build dynamic UPDATE for listing
     const setClauses: string[] = ['updated_at = now()'];
     const params: any[] = [];
+    if (fields.email !== undefined) {
+      setClauses.push('email = $' + (params.length + 1));
+      params.push(fields.email);
+    }
     if (fields.snapEbtReported !== undefined) {
       setClauses.push('snap_ebt_reported = $' + (params.length + 1));
       params.push(fields.snapEbtReported);

@@ -58,6 +58,7 @@ export interface ClaimTokenSummary {
   phone: string | null;
   website: string | null;
   email: string | null;
+  notes: string | null;
   latitude: number | null;
   longitude: number | null;
   primaryCategory: string | null;
@@ -110,6 +111,7 @@ class DirectoryClaimService {
         dps.category,
         dps.city,
         dps.state,
+        dps.notes,
         dl.slug,
         dl.business_name,
         dl.address,
@@ -148,6 +150,7 @@ class DirectoryClaimService {
       city: r.city,
       state: r.state,
       address: r.address,
+      notes: r.notes,
       zipCode: r.zip_code,
       phone: r.phone,
       website: r.website,

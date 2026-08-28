@@ -10,6 +10,7 @@ import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCa
 import {
   Button,
   TextInput,
+  Textarea,
   Select,
   Stack,
   Group,
@@ -110,9 +111,12 @@ export default function DirectoryClaimListingEditor({
   const [editState, setEditState] = useState('');
   const [editZipCode, setEditZipCode] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editWebsite, setEditWebsite] = useState('');
   const [editLatitude, setEditLatitude] = useState('');
   const [editLongitude, setEditLongitude] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editSocialLinks, setEditSocialLinks] = useState<{ platform: string; url: string }[]>([]);
   const [editPrimaryCategory, setEditPrimaryCategory] = useState('');
   const [editSecondaryCategories, setEditSecondaryCategories] = useState<string[]>([]);
   const [editHours, setEditHours] = useState<Record<string, DayHours>>({ ...EMPTY_HOURS });
@@ -129,10 +133,13 @@ export default function DirectoryClaimListingEditor({
     setEditState(summary.state ?? '');
     setEditZipCode(summary.zipCode ?? '');
     setEditPhone(summary.phone ?? '');
+    setEditEmail(summary.email ?? '');
     setEditWebsite(summary.website ?? '');
     setEditLatitude(summary.latitude != null ? String(summary.latitude) : '');
     setEditLongitude(summary.longitude != null ? String(summary.longitude) : '');
     setEditPrimaryCategory(summary.primaryCategory ?? '');
+    setEditNotes(summary.notes ?? '');
+    setEditSocialLinks(Array.isArray(summary.socialLinks) ? summary.socialLinks : []);
     setEditSecondaryCategories(Array.isArray(summary.secondaryCategories) ? summary.secondaryCategories : []);
     setEditHours(parseHours(summary.businessHours));
     setEditTimezone(summary.businessHours?.timezone || 'America/New_York');
@@ -183,12 +190,15 @@ export default function DirectoryClaimListingEditor({
       state: editState.trim() || undefined,
       zipCode: editZipCode.trim() || null,
       phone: editPhone.trim() || null,
+      email: editEmail.trim() || null,
       website: editWebsite.trim() || null,
       latitude: editLatitude.trim() && !Number.isNaN(Number(editLatitude)) ? Number(editLatitude) : null,
       longitude: editLongitude.trim() && !Number.isNaN(Number(editLongitude)) ? Number(editLongitude) : null,
       primaryCategory: editPrimaryCategory.trim() || null,
       secondaryCategories: editSecondaryCategories,
       businessHours: { ...hoursObj, timezone: editTimezone },
+      notes: editNotes.trim() || null,
+      socialLinks: editSocialLinks.filter((s) => s.platform.trim() && s.url.trim()),
     };
 
     const result = await directoryClaimPublicService.updateListing(token, payload);
@@ -311,10 +321,78 @@ export default function DirectoryClaimListingEditor({
             onChange={(e) => setEditPhone(e.currentTarget.value)}
           />
           <TextInput
+            label="Email"
+            type="email"
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.currentTarget.value)}
+          />
+          <TextInput
             label="Website"
             value={editWebsite}
             onChange={(e) => setEditWebsite(e.currentTarget.value)}
           />
+        </Stack>
+
+        <Divider />
+
+        <Stack gap="sm">
+          <Text size="sm" fw={500}>
+            Correction notes for the reviewer
+          </Text>
+          <Textarea
+            label="Notes"
+            description="Use this for any other corrections, including the business name."
+            value={editNotes}
+            onChange={(e) => setEditNotes(e.currentTarget.value)}
+            minRows={3}
+          />
+        </Stack>
+
+        <Divider />
+
+        <Stack gap="sm">
+          <Text size="sm" fw={500}>
+            Social media profiles
+          </Text>
+          {editSocialLinks.map((s, idx) => (
+            <Group key={idx} grow align="flex-start">
+              <TextInput
+                label="Platform"
+                value={s.platform}
+                onChange={(e) =>
+                  setEditSocialLinks((prev) =>
+                    prev.map((p, i) => (i === idx ? { ...p, platform: e.currentTarget.value } : p))
+                  )
+                }
+                placeholder="Facebook"
+              />
+              <TextInput
+                label="Profile URL"
+                value={s.url}
+                onChange={(e) =>
+                  setEditSocialLinks((prev) =>
+                    prev.map((p, i) => (i === idx ? { ...p, url: e.currentTarget.value } : p))
+                  )
+                }
+                placeholder="https://..."
+              />
+              <Button
+                variant="subtle"
+                color="red"
+                onClick={() => setEditSocialLinks((prev) => prev.filter((_, i) => i !== idx))}
+              >
+                Remove
+              </Button>
+            </Group>
+          ))}
+          <Group>
+            <Button
+              variant="light"
+              onClick={() => setEditSocialLinks((prev) => [...prev, { platform: '', url: '' }])}
+            >
+              Add Social Link
+            </Button>
+          </Group>
         </Stack>
 
         <Divider />

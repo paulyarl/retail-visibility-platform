@@ -22,11 +22,13 @@ export interface DirectoryClaimSummary {
   phone: string | null;
   website: string | null;
   email: string | null;
+  notes: string | null;
   latitude: number | null;
   longitude: number | null;
   primaryCategory: string | null;
   secondaryCategories: string[];
   businessHours: any;
+  socialLinks?: { platform: string; url: string }[];
   snapEbtReported: boolean;
   isExpired: boolean;
   isConsumed: boolean;
