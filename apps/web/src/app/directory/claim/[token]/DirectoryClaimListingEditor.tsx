@@ -393,7 +393,9 @@ export default function DirectoryClaimListingEditor({
         </Stack>
 
         <Group justify="flex-end">
-          <Button onClick={handleSave} loading={saving} leftSection={<span>+</span>}>
+          <Button onClick={handleSave}
+            variant='gradient' style={{ color: 'white' }}
+            loading={saving} leftSection={<span>+</span>}>
             Save Listing Updates
           </Button>
         </Group>
