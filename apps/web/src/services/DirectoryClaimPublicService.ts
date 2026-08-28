@@ -18,7 +18,15 @@ export interface DirectoryClaimSummary {
   city: string;
   state: string;
   address: string;
+  zipCode: string | null;
   phone: string | null;
+  website: string | null;
+  email: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  primaryCategory: string | null;
+  secondaryCategories: string[];
+  businessHours: any;
   snapEbtReported: boolean;
   isExpired: boolean;
   isConsumed: boolean;
@@ -111,6 +119,29 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
       }
       const data = result.data?.data ?? result.data;
       return (data as any) ?? { success: false, error: 'unknown' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'unknown' };
+    }
+  }
+
+  /** PUT /api/public/directory/claim/:token/listing — owner pre-approval edits */
+  async updateListing(token: string, fields: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/claim/${encodeURIComponent(token)}/listing`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(fields),
+          headers: this.getCustomerAuthHeaders(),
+        },
+        undefined,
+        0,
+      );
+      if (!result.success) {
+        const error = typeof result.error === 'string' ? result.error : 'unknown';
+        return { success: false, error };
+      }
+      return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || 'unknown' };
     }

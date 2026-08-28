@@ -14,8 +14,10 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
+import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
@@ -43,19 +45,9 @@ router.get('/claim/:token', async (req: Request, res: Response) => {
     res.json({
       success: true,
       summary: {
-        seedId: summary.seedId,
-        slug: summary.slug,
-        businessName: summary.businessName,
-        category: summary.category,
-        city: summary.city,
-        state: summary.state,
-        address: summary.address,
-        phone: summary.phone,
-        snapEbtReported: summary.snapEbtReported,
-        isExpired: summary.isExpired,
-        isConsumed: summary.isConsumed,
-        expiresAt: summary.expiresAt,
-        consumedAt: summary.consumedAt,
+        ...summary,
+        // keep internal tenantId out of public response
+        tenantId: undefined,
       },
     });
   } catch (error) {
@@ -875,5 +867,62 @@ router.post(
     }
   },
 );
+
+const claimListingUpdateSchema = z.object({
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional().or(z.literal('').transform(() => null)),
+  phone: z.string().optional(),
+  website: z.string().optional().or(z.literal('')),
+  latitude: z.number().optional().or(z.null()),
+  longitude: z.number().optional().or(z.null()),
+  businessHours: z.any().optional(),
+  primaryCategory: z.string().optional().or(z.literal('').transform(() => null)),
+  secondaryCategories: z.array(z.string()).optional(),
+});
+
+/** PUT /api/public/directory/claim/:token/listing — owner pre-approval edits (token auth) */
+router.put('/claim/:token/listing', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const summary = await DirectoryClaimService.getTokenSummary(token);
+    if (!summary) return res.status(404).json({ error: 'token_not_found' });
+    if (summary.isExpired) return res.status(410).json({ error: 'token_expired' });
+    if (summary.isConsumed) return res.status(409).json({ error: 'already_claimed' });
+
+    const validation = claimListingUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const data = validation.data;
+    const fields: any = {};
+    if (data.address !== undefined) fields.address = data.address;
+    if (data.city !== undefined) fields.city = data.city;
+    if (data.state !== undefined) fields.state = data.state;
+    if (data.zipCode !== undefined) fields.zipCode = data.zipCode;
+    if (data.phone !== undefined) fields.phone = data.phone;
+    if (data.website !== undefined) fields.website = data.website || undefined;
+    if (data.latitude !== undefined) fields.latitude = data.latitude;
+    if (data.longitude !== undefined) fields.longitude = data.longitude;
+    if (data.businessHours !== undefined) fields.businessHours = data.businessHours;
+    if (data.primaryCategory !== undefined) fields.primaryCategory = data.primaryCategory;
+    if (data.secondaryCategories !== undefined) fields.secondaryCategories = data.secondaryCategories;
+
+    await DirectoryPresenceSeedService.updateFields(summary.seedId, fields, [], {
+      actorType: 'customer',
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[PUT /api/public/directory/claim/:token/listing] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
 
 export default router;

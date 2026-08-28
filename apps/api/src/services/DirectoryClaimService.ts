@@ -54,8 +54,19 @@ export interface ClaimTokenSummary {
   city: string;
   state: string;
   address: string;
+  zipCode: string | null;
   phone: string | null;
+  website: string | null;
+  email: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  primaryCategory: string | null;
+  secondaryCategories: string[];
+  businessHours: any;
   snapEbtReported: boolean;
+  snapEbtAsOf: Date | null;
+  snapEbtSource: string | null;
+  snapEbtSourceName: string | null;
   isExpired: boolean;
   isConsumed: boolean;
   expiresAt: Date;
@@ -102,8 +113,19 @@ class DirectoryClaimService {
         dl.slug,
         dl.business_name,
         dl.address,
+        dl.zip_code,
         dl.phone,
-        dl.snap_ebt_reported
+        dl.website,
+        dl.email,
+        dl.latitude,
+        dl.longitude,
+        dl.primary_category,
+        dl.secondary_categories,
+        dl.business_hours,
+        dl.snap_ebt_reported,
+        dl.snap_ebt_as_of,
+        dl.snap_ebt_source,
+        dl.snap_ebt_source_name
       FROM directory_claim_tokens dct
       JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
@@ -126,8 +148,19 @@ class DirectoryClaimService {
       city: r.city,
       state: r.state,
       address: r.address,
+      zipCode: r.zip_code,
       phone: r.phone,
+      website: r.website,
+      email: r.email,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      primaryCategory: r.primary_category,
+      secondaryCategories: r.secondary_categories || [],
+      businessHours: r.business_hours,
       snapEbtReported: r.snap_ebt_reported ?? false,
+      snapEbtAsOf: r.snap_ebt_as_of ? new Date(r.snap_ebt_as_of) : null,
+      snapEbtSource: r.snap_ebt_source,
+      snapEbtSourceName: r.snap_ebt_source_name,
       isExpired: now > expiresAt,
       isConsumed: !!r.consumed_at,
       expiresAt,

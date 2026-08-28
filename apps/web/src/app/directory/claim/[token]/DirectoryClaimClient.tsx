@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import DirectoryClaimListingEditor from './DirectoryClaimListingEditor';
 import {
   Container,
   Card,
@@ -486,6 +487,14 @@ export default function DirectoryClaimClient() {
                 )}
               </Group>
             </Stack>
+
+            {summary && (
+              <DirectoryClaimListingEditor
+                token={token}
+                summary={summary}
+                onSaved={loadSummary}
+              />
+            )}
 
             <Divider />
 
