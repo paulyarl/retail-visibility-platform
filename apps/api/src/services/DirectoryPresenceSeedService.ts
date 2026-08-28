@@ -54,6 +54,7 @@ export interface CreateSeedInput {
   identityConfidence: 'high' | 'medium';
   categoryFit: 'verified' | 'probable';
   notes?: string;
+  businessHours?: any;
   provenance?: Array<{
     fieldKey: string;
     value?: string;
@@ -289,7 +290,7 @@ class DirectoryPresenceSeedService {
       INSERT INTO directory_listings_list (
         id, tenant_id, business_name, slug, address, city, state, zip_code,
         phone, website, primary_category, secondary_categories,
-        latitude, longitude, is_published, listing_origin, public_disclaimer,
+        latitude, longitude, business_hours, is_published, listing_origin, public_disclaimer,
         snap_ebt_reported, snap_ebt_as_of, snap_ebt_source, snap_ebt_source_name,
         subscription_tier, product_count, created_at, updated_at
       ) VALUES (
@@ -307,6 +308,7 @@ class DirectoryPresenceSeedService {
         ${input.secondaryCategories || []}::text[],
         ${input.latitude || null},
         ${input.longitude || null},
+        ${input.businessHours ? JSON.stringify(input.businessHours) : null}::jsonb,
         false,
         'directory_seed',
         'Listed from public directories / SNAP / news. Not a claimed profile.',

@@ -61,6 +61,7 @@ const createSeedSchema = z.object({
   identityConfidence: z.enum(['high', 'medium']),
   categoryFit: z.enum(['verified', 'probable']),
   notes: z.string().optional(),
+  businessHours: z.any().optional(),
   provenance: z.array(z.object({
     fieldKey: z.string(),
     value: z.string().optional(),
@@ -178,6 +179,7 @@ router.post('/presence-seeds', requirePlatformAdmin, async (req: Request, res: R
       identityConfidence: input.identityConfidence,
       categoryFit: input.categoryFit,
       notes: input.notes,
+      businessHours: input.businessHours,
       provenance: input.provenance?.map((p) => ({
         fieldKey: p.fieldKey,
         value: p.value,

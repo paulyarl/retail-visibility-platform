@@ -7,6 +7,8 @@ import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   CreateSeedRequest,
 } from '@/services/DirectoryPresenceAdminService';
+import { tenantManagementService } from '@/services/TenantManagementService';
+import { clientLogger } from '@/lib/client-logger';
 import { addressParser } from '@/lib/address-parser';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
@@ -49,6 +51,27 @@ const US_STATES = [
   'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
 ];
 
+const DAYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+
+interface DayHours {
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+const EMPTY_HOURS: Record<string, DayHours> = DAYS.reduce((acc, day) => {
+  acc[day] = { open: '09:00', close: '18:00', closed: true };
+  return acc;
+}, {} as Record<string, DayHours>);
+
 export default function NewPresenceSeedPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +87,11 @@ export default function NewPresenceSeedPage() {
   const [website, setWebsite] = useState('');
   const [primaryCategory, setPrimaryCategory] = useState('');
   const [secondaryCategories, setSecondaryCategories] = useState<string[]>([]);
+  const [businessHours, setBusinessHours] = useState<Record<string, DayHours>>({
+    ...EMPTY_HOURS,
+  });
+  const [businessHoursTimezone, setBusinessHoursTimezone] =
+    useState('America/New_York');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [seedBatch, setSeedBatch] = useState('');
@@ -221,6 +249,29 @@ export default function NewPresenceSeedPage() {
         setError('Seed was created but no id was returned.');
         return;
       }
+
+      // Delegate hours/timezone to the existing tenant business-hours services.
+      const hasHours = DAYS.some((day) => !businessHours[day].closed);
+      if (hasHours && seed.tenantId) {
+        const periods = DAYS.filter((day) => !businessHours[day].closed).map(
+          (day) => ({
+            day: day.toUpperCase(),
+            open: businessHours[day].open,
+            close: businessHours[day].close,
+          }),
+        );
+        try {
+          await tenantManagementService.updateBusinessHours(seed.tenantId, {
+            timezone: businessHoursTimezone,
+            periods,
+          });
+        } catch (hoursErr) {
+          clientLogger.warn('Failed to set seed business hours:', {
+            detail: hoursErr,
+          });
+        }
+      }
+
       router.push(
         `/settings/admin/directory/presence-seeds/${seed.id}`,
       );
@@ -384,6 +435,114 @@ export default function NewPresenceSeedPage() {
                 </div>
               )}
             </div>
+          </div>
+        </section>
+
+        {/* Business Hours */}
+        <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">Business Hours</h2>
+          <p className="text-xs text-gray-500">
+            Unsourced hours are omitted from the public listing. When set, hours
+            and timezone are sent to the tenant business-hours service so the
+            public place page is timezone aware.
+          </p>
+
+          <div className="mb-3">
+            <label className={labelClass}>Timezone</label>
+            <select
+              className={inputClass}
+              value={businessHoursTimezone}
+              onChange={(e) => setBusinessHoursTimezone(e.target.value)}
+            >
+              {[
+                'America/New_York',
+                'America/Chicago',
+                'America/Denver',
+                'America/Los_Angeles',
+                'America/Phoenix',
+                'America/Anchorage',
+                'Pacific/Honolulu',
+                'UTC',
+                'Europe/London',
+                'Europe/Paris',
+                'Europe/Berlin',
+                'Europe/Madrid',
+                'Asia/Tokyo',
+                'Asia/Hong_Kong',
+                'Asia/Singapore',
+                'Australia/Sydney',
+              ].map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            {DAYS.map((day) => {
+              const h = businessHours[day];
+              return (
+                <div
+                  key={day}
+                  className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
+                >
+                  <div className="md:col-span-3">
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={!h.closed}
+                        onChange={(e) =>
+                          setBusinessHours((prev) => ({
+                            ...prev,
+                            [day]: { ...prev[day], closed: !e.target.checked },
+                          }))
+                        }
+                      />
+                      <span className="capitalize">{day}</span>
+                    </label>
+                  </div>
+                  {!h.closed && (
+                    <>
+                      <div className="md:col-span-4">
+                        <input
+                          type="time"
+                          className={inputClass}
+                          value={h.open}
+                          onChange={(e) =>
+                            setBusinessHours((prev) => ({
+                              ...prev,
+                              [day]: { ...prev[day], open: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="md:col-span-1 text-center text-xs text-gray-400">
+                        to
+                      </div>
+                      <div className="md:col-span-4">
+                        <input
+                          type="time"
+                          className={inputClass}
+                          value={h.close}
+                          onChange={(e) =>
+                            setBusinessHours((prev) => ({
+                              ...prev,
+                              [day]: { ...prev[day], close: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  {h.closed && (
+                    <div className="md:col-span-9 text-sm text-gray-400">
+                      Closed
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 

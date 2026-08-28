@@ -155,6 +155,7 @@ export default function PresenceSeedDetailPage() {
   const [editHours, setEditHours] = useState<Record<string, DayHours>>({
     ...EMPTY_HOURS,
   });
+  const [editTimezone, setEditTimezone] = useState('America/New_York');
   const [editHoursSource, setEditHoursSource] = useState('');
   const [editHoursSourceUrl, setEditHoursSourceUrl] = useState('');
   const [editPrimaryCategory, setEditPrimaryCategory] = useState('');
@@ -330,6 +331,7 @@ export default function PresenceSeedDetailPage() {
       })),
     );
     setEditHours(parseHours(listing?.business_hours));
+    setEditTimezone(listing?.business_hours?.timezone || 'America/New_York');
     const hoursProv = provenance.find((p) => p.fieldKey === 'hours');
     setEditHoursSource(hoursProv?.sourceName ?? '');
     setEditHoursSourceUrl(hoursProv?.sourceUrl ?? '');
@@ -390,7 +392,7 @@ export default function PresenceSeedDetailPage() {
         for (const day of DAYS) {
           hoursObj[day] = editHours[day];
         }
-        fields.businessHours = hoursObj;
+        fields.businessHours = { ...hoursObj, timezone: editTimezone };
       } else {
         fields.businessHours = null;
       }
@@ -1235,6 +1237,37 @@ export default function PresenceSeedDetailPage() {
               Only set hours when sourced. Unsourced hours are omitted from the
               public listing per the directory presence contract.
             </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+              <select
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                value={editTimezone}
+                onChange={(e) => setEditTimezone(e.target.value)}
+              >
+                {[
+                  'America/New_York',
+                  'America/Chicago',
+                  'America/Denver',
+                  'America/Los_Angeles',
+                  'America/Phoenix',
+                  'America/Anchorage',
+                  'Pacific/Honolulu',
+                  'UTC',
+                  'Europe/London',
+                  'Europe/Paris',
+                  'Europe/Berlin',
+                  'Europe/Madrid',
+                  'Asia/Tokyo',
+                  'Asia/Hong_Kong',
+                  'Asia/Singapore',
+                  'Australia/Sydney',
+                ].map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2">
               {DAYS.map((day) => {
                 const h = editHours[day];

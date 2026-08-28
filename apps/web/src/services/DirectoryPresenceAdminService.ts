@@ -81,6 +81,7 @@ export interface CreateSeedRequest {
   identityConfidence: 'high' | 'medium';
   categoryFit: 'verified' | 'probable';
   notes?: string;
+  businessHours?: any;
   provenance?: Array<{
     fieldKey: string;
     value?: string;

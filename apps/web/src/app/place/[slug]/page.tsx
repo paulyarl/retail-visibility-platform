@@ -37,40 +37,31 @@ function normalizeListingBusinessHours(raw: any): any {
   });
 
   if (periods.length === 0) return null;
-  return { periods, ...fullDays };
+  return { periods, ...fullDays, timezone: raw.timezone };
 }
 
 async function getBusinessHours(listing: any) {
-  // For directory-seed listings, prefer the hours stored on the listing itself.
+  const tenantId = listing?.tenantId;
+
+  // Prefer the tenant's business_hours_list (same service /t/:tenantId/settings/hours uses).
+  if (tenantId) {
+    try {
+      const data = await directoryService.getBusinessHours(tenantId);
+      if (data?.data?.periods && Array.isArray(data.data.periods) && data.data.periods.length > 0) {
+        return data.data;
+      }
+    } catch (error) {
+      clientLogger.error('Error fetching tenant business hours:', { detail: error });
+    }
+  }
+
+  // Fallback to the hours stored on the listing itself for directory seeds.
   if (listing?.business_hours) {
     const listingHours = normalizeListingBusinessHours(listing.business_hours);
     if (listingHours) return listingHours;
   }
 
-  const tenantId = listing?.tenantId;
-  if (!tenantId) return null;
-
-  try {
-    const data = await directoryService.getBusinessHours(tenantId);
-    if (!data || !data.success || !data.data) return null;
-    const hoursData = data.data;
-    if (hoursData.periods && Array.isArray(hoursData.periods)) {
-      const { periods, timezone } = hoursData;
-      const hours: any = { timezone };
-      periods.forEach((period: any) => {
-        const dayName = period.day?.toUpperCase();
-        if (dayName && !hours[dayName]) {
-          hours[dayName] = { open: period.open, close: period.close };
-        }
-      });
-      if (periods.length > 0) hours.periods = periods;
-      return hours;
-    }
-    return hoursData;
-  } catch (error) {
-    clientLogger.error('Error fetching business hours:', { detail: error });
-    return null;
-  }
+  return null;
 }
 
 export default function PlacePage({ params }: PlacePageProps) {
