@@ -92,7 +92,9 @@ CATEGORY: {{category}}
 PLATFORM FOCUS: {{platform}}
 
 === OBJECTIVE ===
-Find 3-5 candidate businesses nationwide that exemplify the best-in-class profile for this category. Evaluate each candidate per platform against quality gates, branding standards, and expected fields. Derive the expected_fields and quality_gates from what the top candidates have in common.
+Find 3-5 candidate businesses that exemplify the best-in-class profile for this category. Evaluate each candidate per platform against quality gates, branding standards, and expected fields. Derive the expected_fields and quality_gates from what the top candidates have in common.
+
+The geographic search scope is specified in the SEARCH SCOPE section at the end of this prompt.
 
 The gold-standard profile will be used to:
 1. Benchmark business audits — compare a business's actual profile against the gold standard
@@ -113,7 +115,7 @@ Prioritize (in rough order):
 - Functional website and published hours
 - Recognizable branding (logo, photos)
 - Active community presence (reviews, social engagement, local recognition)
-- Geographic diversity — span at least 3 distinct states/regions when possible
+- Geographic diversity within the search scope (see SEARCH SCOPE section)
 
 Do NOT require a candidate to have every quality above before flagging them is_gold_standard. Flag the TOP candidates per platform (up to 4) relative to what the pool actually contains. A 6/10 Bing presence may be the best available benchmark for this category on Bing — flag it and let the quality_score and quality_gates_failed tell operators how strong the benchmark is.
 
@@ -160,7 +162,9 @@ CATEGORY: {{category}}
 PLATFORM FOCUS: {{platform}}
 
 === OBJECTIVE ===
-Find 3-5 ADDITIONAL candidate businesses nationwide that were NOT already captured in the establishment scan. Evaluate each candidate per platform against the established expected fields, quality gates, and branding standards (provided below in the GOLD STANDARD DISCOVERY CRITERIA section).
+Find 3-5 ADDITIONAL candidate businesses that were NOT already captured in the establishment scan. Evaluate each candidate per platform against the established expected fields, quality gates, and branding standards (provided below in the GOLD STANDARD DISCOVERY CRITERIA section).
+
+The geographic search scope is specified in the SEARCH SCOPE section at the end of this prompt.
 
 This is a DISCOVERY scan — the gold-standard profile has already been established by a prior establishment scan. Your job is to evaluate NEW candidates against that established bar, NOT to re-derive expected_fields or quality_gates.
 
@@ -184,7 +188,7 @@ Prioritize (in rough order):
 - Functional website and published hours
 - Recognizable branding (logo, photos)
 - Active community presence
-- Geographic diversity — span at least 3 distinct states/regions when possible
+- Geographic diversity within the search scope (see SEARCH SCOPE section)
 
 ${CANDIDATE_EVALUATION_SECTION}
 

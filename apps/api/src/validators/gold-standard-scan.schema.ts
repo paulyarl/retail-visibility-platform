@@ -317,7 +317,7 @@ Return a single JSON object with this structure (the Gold Standard Scan result):
 }
 
 Rules:
-- For establishment scans: find the best 3-5 candidate businesses nationwide
+- For establishment scans: find the best 3-5 candidate businesses
   for this category on the target platform(s). Derive expected_fields from
   what the top candidates have in common. Evaluate each candidate per platform
   with quality_score, is_gold_standard flag, and branding artifacts.
@@ -347,6 +347,6 @@ Rules:
   Each candidate MUST include ownership_type, location_count_estimate, and
   independence_rationale. A candidate with ownership_type "franchise" or "chain"
   cannot have is_gold_standard = true.
-- Aim for geographic diversity: select candidates across at least 3 distinct
-  states/regions when possible to avoid coastal/metro clustering.
+- Geographic scope is specified in the SEARCH SCOPE section at the end of this
+  prompt. Follow it — do not assume nationwide unless it says nationwide.
 `;
