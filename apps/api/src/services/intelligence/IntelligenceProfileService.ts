@@ -721,7 +721,8 @@ export class IntelligenceProfileService extends BaseService {
         }
 
         // 2. Retire any existing active version for this
-        //    (category_key, reference_city, focus) triple.
+        //    (category_key, reference_city, reference_state, focus,
+        //     reference_platform) scope tuple.
         //    Type-scoped (Migration 202): activating a competitive draft retires
         //    only the prior active competitive profile — the active emerging
         //    profile for the same category is untouched.
@@ -732,6 +733,12 @@ export class IntelligenceProfileService extends BaseService {
         //    State-scoped (Migration 229): reference_state is also matched so
         //    two profiles in the same city name across different states do
         //    not retire each other.
+        //    Platform-scoped (Migration 236): reference_platform is also matched
+        //    so activating a google-specific draft does not retire the
+        //    cross-platform profile for the same (category, city, state, focus).
+        //    This must match the partial unique index
+        //    idx_mkt_intel_profiles_active_scope (Migration 249) which enforces
+        //    one active profile per full scope tuple.
         const retireWhere: any = {
           category_key: draft.category_key,
           intelligence_focus: draft.intelligence_focus,
@@ -746,6 +753,11 @@ export class IntelligenceProfileService extends BaseService {
           retireWhere.reference_state = draft.reference_state;
         } else {
           retireWhere.reference_state = null;
+        }
+        if (draft.reference_platform) {
+          retireWhere.reference_platform = draft.reference_platform;
+        } else {
+          retireWhere.reference_platform = null;
         }
         await tx.mkt_intelligence_profiles.updateMany({
           where: retireWhere,

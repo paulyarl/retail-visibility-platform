@@ -4658,7 +4658,7 @@ router.get('/recovery/:campaignId/draft', async (req: any, res: Response) => {
       },
       orderBy: { generated_at: 'desc' },
       include: {
-        mkt_deliverable_sections: { orderBy: { section_index: 'asc' } },
+        mkt_deliverable_section: { orderBy: { section_index: 'asc' } },
       },
     });
 

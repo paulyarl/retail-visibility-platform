@@ -18,7 +18,7 @@ router.get('/:orgId/users', authenticateToken, requireOrgAdmin, async (req, res)
     const orgUsers = await prisma.user_organizations.findMany({
       where: { organization_id: orgId },
       include: {
-        user: {
+        users: {
           select: {
             id: true,
             email: true,
@@ -47,12 +47,12 @@ router.get('/:orgId/users', authenticateToken, requireOrgAdmin, async (req, res)
       role: uo.role,
       createdAt: uo.created_at,
       updatedAt: uo.updated_at,
-      email: uo.user.email,
-      firstName: uo.user.first_name,
-      lastName: uo.user.last_name,
-      picture: uo.user.picture,
-      lastLogin: uo.user.last_login,
-      tenants: uo.user.user_tenants.map((ut) => ({
+      email: uo.users.email,
+      firstName: uo.users.first_name,
+      lastName: uo.users.last_name,
+      picture: uo.users.picture,
+      lastLogin: uo.users.last_login,
+      tenants: uo.users.user_tenants.map((ut) => ({
         tenantId: ut.tenant_id,
         tenantName: ut.tenants?.name || ut.tenant_id,
         role: ut.role,
