@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory, DirectoryProfileEntry, IntelligenceProfile } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
@@ -157,10 +157,37 @@ const EMPTY_FORM: FormState = {
 
 export default function CampaignFormClient({ mode, campaignId }: { mode: 'create' | 'edit'; campaignId?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Deep-link pre-fill from search params ────────────────────────────
+  // The Coverage page links here with ?scope=intelligence&focus=emerging&
+  // kind=establishment&category=...&city=...&platform=... to pre-fill the
+  // form for a specific gap. Only applies in create mode. Runs once on mount.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const scope = searchParams.get('scope') as CampaignScope | null;
+    if (!scope) return;
+    const focus = searchParams.get('focus') as FormState['intelligence_focus'] | null;
+    const kind = searchParams.get('kind') as FormState['intelligence_campaign_kind'] | null;
+    const category = searchParams.get('category');
+    const city = searchParams.get('city');
+    const state = searchParams.get('state');
+    const platform = searchParams.get('platform');
+    setForm((prev) => ({
+      ...prev,
+      scope,
+      intelligence_focus: focus ?? prev.intelligence_focus,
+      intelligence_campaign_kind: kind ?? prev.intelligence_campaign_kind,
+      category: category ?? prev.category,
+      city: city ?? prev.city,
+      state: state ?? prev.state,
+      intelligence_platform: platform ?? prev.intelligence_platform,
+    }));
+  }, [mode, searchParams]);
   const [vocab, setVocab] = useState({
     categories: [] as string[],
     cities: [] as string[],
@@ -179,6 +206,15 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // reference_city/reference_state pre-populate the form so the operator
   // doesn't have to re-type them for each new campaign.
   const [goldStandardProfiles, setGoldStandardProfiles] = useState<IntelligenceProfile[]>([]);
+  // Profile-existence check for discovery prerequisite gating. When the
+  // operator selects scope=intelligence + focus + category (+ city for
+  // emerging/competitive, + platform for gold_standards), we resolve the
+  // active profile. If null, the "Discovery" radio is disabled with a
+  // message — the backend hard-blocks discovery creation without an
+  // active profile, so this prevents the operator from filling the form
+  // only to hit a validation error on submit.
+  const [activeProfileExists, setActiveProfileExists] = useState<boolean | null>(null);
+  const [profileCheckLoading, setProfileCheckLoading] = useState(false);
   // Tracks whether the operator has manually typed in the Title field. While
   // false, intelligence-scope campaigns auto-derive the title from Category,
   // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
@@ -246,6 +282,50 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       state: chosen.reference_state ?? '',
     }));
   }, [mode, form.scope, form.intelligence_focus, form.category, form.city, form.state, goldStandardProfiles]);
+
+  // ─── Discovery prerequisite check ─────────────────────────────────────
+  // When the operator has selected scope=intelligence + focus + category
+  // (and city for emerging/competitive, or platform for gold_standards),
+  // resolve the active profile. The result gates the "Discovery" radio:
+  // if no active profile exists, discovery is disabled with a message
+  // pointing to establishment. This mirrors the backend hard block in
+  // MarketingCampaignService.createCampaign — the operator sees the
+  // constraint before filling the rest of the form, not on submit.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    if (form.scope !== 'intelligence') { setActiveProfileExists(null); return; }
+    if (!form.intelligence_focus) { setActiveProfileExists(null); return; }
+    if (!form.category) { setActiveProfileExists(null); return; }
+    // emerging/competitive need city to resolve meaningfully; gold_standards needs platform
+    if ((form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && !form.city) {
+      setActiveProfileExists(null); return;
+    }
+    if (form.intelligence_focus === 'gold_standards' && !form.intelligence_platform) {
+      setActiveProfileExists(null); return;
+    }
+    let cancelled = false;
+    setProfileCheckLoading(true);
+    marketingOpsService.resolveIntelligenceProfile(
+      form.category,
+      form.intelligence_focus as any,
+      form.city || undefined,
+      form.intelligence_platform || undefined,
+      form.state || undefined,
+    )
+      .then((profile) => { if (!cancelled) setActiveProfileExists(!!profile); })
+      .catch(() => { if (!cancelled) setActiveProfileExists(null); })
+      .finally(() => { if (!cancelled) setProfileCheckLoading(false); });
+    return () => { cancelled = true; };
+  }, [mode, form.scope, form.intelligence_focus, form.category, form.city, form.state, form.intelligence_platform]);
+
+  // If discovery was selected but the profile check comes back false
+  // (no active profile), auto-switch to establishment so the form never
+  // sits in a state where the selected radio is disabled.
+  useEffect(() => {
+    if (activeProfileExists === false && form.intelligence_campaign_kind === 'discovery') {
+      handleChange('intelligence_campaign_kind', 'establishment');
+    }
+  }, [activeProfileExists, form.intelligence_campaign_kind]);
 
   const fetchCampaign = useCallback(async () => {
     if (mode !== 'edit' || !campaignId) return;
@@ -621,6 +701,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Core Fields */}
           <FormSection title="Business Information">
+            {form.scope !== 'intelligence' && (
+            <>
             <FormField label="Campaign Category" required>
               <select value={form.campaign_category} onChange={(e) => handleChange('campaign_category', e.target.value as CampaignCategory)}
                 className={inputClass}>
@@ -679,6 +761,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Initial diagnosis from audit signals. The track is confirmed later on the campaign detail page after triage analysis.</p>
               </FormField>
             )}
+            </>
+            )}
             <FormField label="Scope" required>
               <select value={form.scope} onChange={(e) => handleChange('scope', e.target.value as CampaignScope)}
                 className={inputClass}>
@@ -711,10 +795,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 </FormField>
                 <FormField label="Campaign Kind" required className="sm:col-span-2">
                   <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
+                    <label className={`flex items-center gap-2 ${activeProfileExists === false ? 'opacity-50' : ''}`}>
                       <input type="radio" name="intelligence_campaign_kind" value="discovery"
                         checked={form.intelligence_campaign_kind === 'discovery'}
-                        onChange={(e) => handleChange('intelligence_campaign_kind', e.target.value)} />
+                        onChange={(e) => handleChange('intelligence_campaign_kind', e.target.value)}
+                        disabled={activeProfileExists === false} />
                       <span className="text-sm">Discovery — market scanning to find prospects</span>
                     </label>
                     <label className="flex items-center gap-2">
@@ -724,6 +809,25 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                       <span className="text-sm">Establishment — bootstrap a category intelligence profile</span>
                     </label>
                   </div>
+                  {profileCheckLoading && (
+                    <p className="text-xs text-gray-400 mt-1">Checking for active profile…</p>
+                  )}
+                  {!profileCheckLoading && activeProfileExists === false && (
+                    <div className="mt-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-700 dark:text-amber-400">
+                      <p className="font-medium">No active profile found — discovery is blocked.</p>
+                      <p className="mt-1">
+                        An establishment campaign must be run and its profile activated before discovery can find businesses.
+                        {' '}
+                        <button type="button" className="underline font-medium"
+                          onClick={() => handleChange('intelligence_campaign_kind', 'establishment')}>
+                          Switch to Establishment →
+                        </button>
+                      </p>
+                    </div>
+                  )}
+                  {!profileCheckLoading && activeProfileExists === true && form.intelligence_campaign_kind === 'discovery' && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">✓ Active profile found — discovery is ready.</p>
+                  )}
                   <p className="text-xs text-gray-400 mt-1">Establishment campaigns appear in the Profile Establishment prompt workspace; discovery campaigns appear in the Emerging/Competitive discovery workspaces.</p>
                 </FormField>
                 {form.intelligence_focus === 'gold_standards' && (

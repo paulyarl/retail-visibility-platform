@@ -6000,6 +6000,20 @@ router.get('/intelligence-profiles/drafts', async (req, res) => {
   }
 });
 
+// GET /intelligence-profiles/coverage — aggregated coverage map of active + draft
+// profiles grouped by category, plus distinct cities from intelligence campaigns.
+// Used by the Coverage admin page to show which profile slots are filled, in
+// progress, or missing. NOTE: Must be registered BEFORE /:id/:version (same as
+// /resolve and /drafts — literal segments must precede param routes).
+router.get('/intelligence-profiles/coverage', async (req, res) => {
+  try {
+    const coverage = await IntelligenceProfileService.getInstance().getCoverage(getCtx(req));
+    res.json({ success: true, data: coverage });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // GET /intelligence-profiles/resolve/:category?focus=emerging|competitive&city=...&state=...&platform=...
 // NOTE: Must be registered BEFORE /:id/:version, otherwise the literal "resolve"
 // segment is captured as :id and the category is parsed as :version (→ "Invalid version").

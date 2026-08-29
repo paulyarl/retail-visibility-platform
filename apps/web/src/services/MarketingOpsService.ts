@@ -4946,6 +4946,27 @@ export interface IntelligenceProfileWithVersions extends IntelligenceProfile {
   versions: IntelligenceProfile[];
 }
 
+export interface CoverageSlot {
+  focus: IntelligenceFocus;
+  city: string | null;
+  state: string | null;
+  platform: string | null;
+  status: 'active' | 'draft';
+  profile_id: string;
+  version: number;
+}
+
+export interface CoverageCategory {
+  category_key: string;
+  category_name: string;
+  slots: CoverageSlot[];
+}
+
+export interface IntelligenceCoverage {
+  categories: CoverageCategory[];
+  cities: string[];
+}
+
 export interface IntelligenceRun {
   id: string;
   campaign_id: string;
@@ -4980,6 +5001,7 @@ interface MarketingOpsService {
   // Intelligence Profile + Run methods (Sprint 2 — Seek Intelligence Scope)
   listIntelligenceProfiles(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
   listIntelligenceProfileDrafts(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
+  getIntelligenceCoverage(): Promise<IntelligenceCoverage>;
   getIntelligenceProfile(id: string): Promise<IntelligenceProfileWithVersions>;
   getIntelligenceProfileVersion(id: string, version: number): Promise<IntelligenceProfile>;
   resolveIntelligenceProfile(category: string, focus?: IntelligenceFocus, city?: string, platform?: string, state?: string): Promise<IntelligenceProfile | null>;
@@ -5161,6 +5183,19 @@ MarketingOpsService.prototype.listIntelligenceProfileDrafts = async function (fo
   }
   const data = result.data?.data ?? result.data;
   return Array.isArray(data) ? data : (data?.items ?? []);
+};
+
+MarketingOpsService.prototype.getIntelligenceCoverage = async function (): Promise<IntelligenceCoverage> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/coverage`,
+    {},
+    'mkt-ops-intel-coverage',
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load intelligence coverage');
+  }
+  return result.data?.data ?? result.data;
 };
 
 MarketingOpsService.prototype.getIntelligenceProfile = async function (id: string): Promise<IntelligenceProfileWithVersions> {

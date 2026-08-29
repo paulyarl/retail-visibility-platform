@@ -2041,6 +2041,110 @@ export class IntelligenceProfileService extends BaseService {
 
     return lines.join('\n');
   }
+
+  // ─── Coverage aggregation ─────────────────────────────────────────────
+  // Returns a coverage map of active + draft profiles grouped by category,
+  // showing which profile slots are filled (active), in progress (draft),
+  // or missing. Used by the Coverage admin page to show gaps the operator
+  // needs to fill before discovery campaigns can run.
+  //
+  // Slot dimensions:
+  //   gold_standards: per platform (reference_platform), nationwide (city/state null)
+  //   emerging:       per city (reference_city)
+  //   competitive:    per city (reference_city)
+  //
+  // Also returns the distinct cities seen across all intelligence-scope
+  // campaigns (from mkt_campaigns_list) so the UI can show the city
+  // dimension even for categories that have no profiles yet.
+
+  async getCoverage(ctx?: RequestCtx): Promise<{
+    categories: Array<{
+      category_key: string;
+      category_name: string;
+      slots: Array<{
+        focus: IntelligenceFocus;
+        city: string | null;
+        state: string | null;
+        platform: string | null;
+        status: 'active' | 'draft';
+        profile_id: string;
+        version: number;
+      }>;
+    }>;
+    cities: string[];
+  }> {
+    try {
+      const [activeProfiles, draftProfiles, intelligenceCampaigns] = await Promise.all([
+        this.prisma.mkt_intelligence_profiles.findMany({
+          where: { status: 'active' },
+          select: {
+            id: true, version: true, category_key: true, category_name: true,
+            intelligence_focus: true, reference_city: true, reference_state: true,
+            reference_platform: true, status: true,
+          },
+        }),
+        this.prisma.mkt_intelligence_profiles.findMany({
+          where: { status: 'draft' },
+          select: {
+            id: true, version: true, category_key: true, category_name: true,
+            intelligence_focus: true, reference_city: true, reference_state: true,
+            reference_platform: true, status: true,
+          },
+        }),
+        this.prisma.mkt_campaigns_list.findMany({
+          where: { scope: 'intelligence', city: { not: '' } },
+          select: { city: true, category: true },
+          distinct: ['city', 'category'],
+        }),
+      ]);
+
+      // Group profiles by category_key, merging active + draft into slots.
+      const byCategory = new Map<string, { category_name: string; slots: any[] }>();
+      const ensureCategory = (key: string, name: string) => {
+        if (!byCategory.has(key)) byCategory.set(key, { category_name: name, slots: [] });
+        return byCategory.get(key)!;
+      };
+
+      for (const p of [...activeProfiles, ...draftProfiles]) {
+        const entry = ensureCategory(p.category_key, p.category_name);
+        entry.slots.push({
+          focus: p.intelligence_focus as IntelligenceFocus,
+          city: p.reference_city,
+          state: p.reference_state,
+          platform: p.reference_platform,
+          status: p.status as 'active' | 'draft',
+          profile_id: p.id,
+          version: p.version,
+        });
+      }
+
+      // Collect distinct cities from intelligence campaigns (for the city dimension).
+      const cities = [...new Set(intelligenceCampaigns.map((c) => c.city).filter(Boolean))].sort();
+
+      const categories = Array.from(byCategory.entries())
+        .map(([category_key, { category_name, slots }]) => ({
+          category_key,
+          category_name,
+          slots: slots.sort((a, b) => {
+            // Sort: gold_standards first, then emerging, then competitive;
+            // within each focus, by city/platform name.
+            const focusOrder = { gold_standards: 0, emerging: 1, competitive: 2 };
+            const fo = focusOrder[a.focus as keyof typeof focusOrder] ?? 3;
+            const fob = focusOrder[b.focus as keyof typeof focusOrder] ?? 3;
+            if (fo !== fob) return fo - fob;
+            const aLoc = a.city ?? a.platform ?? '';
+            const bLoc = b.city ?? b.platform ?? '';
+            return aLoc.localeCompare(bLoc);
+          }),
+        }))
+        .sort((a, b) => a.category_name.localeCompare(b.category_name));
+
+      return { categories, cities };
+    } catch (error) {
+      logger.error('IntelligenceProfileService.getCoverage failed', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
 }
 
 export default IntelligenceProfileService.getInstance();

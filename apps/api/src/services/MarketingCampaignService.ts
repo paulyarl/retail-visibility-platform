@@ -394,6 +394,31 @@ export class MarketingCampaignService extends BaseService {
       const initialStage = campaignCategory === 'recovery_management' ? 'audit_identified' : 'seek';
       // profile_repair starts in 'seek' (triage) — the track is decided later
 
+      // Intelligence discovery prerequisite: an active establishment profile
+      // must exist before a discovery campaign can be created. This enforces
+      // the "establishment before discovery" architecture rule — discovery
+      // without a profile runs in degraded/generic mode and produces poor
+      // results with no signal to the operator (ghost-bug class).
+      // See docs/LocalBiz/PLATFORM_OFFERING_ARCHITECTURE.md §1.1 + §4.2a.
+      if (input.scope === 'intelligence' && input.intelligenceCampaignKind === 'discovery') {
+        const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+        const profileService = IntelligenceProfileService.getInstance();
+        const hasProfile = input.intelligenceFocus === 'gold_standards'
+          ? await profileService.resolveGoldStandard(input.category, input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
+          : await profileService.resolve(input.category, input.intelligenceFocus as any, input.city || null, input.intelligencePlatform || null, ctx);
+        if (!hasProfile) {
+          const focusLabel = input.intelligenceFocus === 'gold_standards'
+            ? `gold standard${input.intelligencePlatform ? ` (${input.intelligencePlatform})` : ''}`
+            : `${input.intelligenceFocus}`;
+          const geoLabel = input.city ? ` in ${input.city}${input.state ? ', ' + input.state : ''}` : '';
+          throw new ValidationError(
+            `No active ${focusLabel} profile exists for "${input.category}"${geoLabel}. ` +
+            `Run and activate an establishment campaign first — discovery requires an active profile to know what to search for. ` +
+            `See the Coverage page to view profile gaps.`
+          );
+        }
+      }
+
       const campaign = await this.prisma.mkt_campaigns_list.create({
         data: {
           id,
