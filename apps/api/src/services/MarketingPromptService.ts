@@ -924,6 +924,8 @@ export class MarketingPromptService extends BaseService {
               intelligence_focus: true,
               intelligence_campaign_kind: true,
               intelligence_platform: true,
+              city: true,
+              state: true,
             },
           });
           campaignKind = campaign?.intelligence_campaign_kind || 'discovery';
@@ -936,7 +938,16 @@ export class MarketingPromptService extends BaseService {
             });
           } else {
             const focus = (campaign?.intelligence_focus || 'gold_standards') as 'emerging' | 'competitive' | 'gold_standards';
-            // Gold-standard profiles are city-agnostic — reference_city = null.
+            // Region scoping: if the establishment campaign carries a city
+            // and/or state, persist them as reference_city/reference_state so
+            // the profile is region-scoped. resolveGoldStandard walks
+            // city → state → nationwide, so a region-scoped profile resolves
+            // first for regional discovery campaigns (Layer 1/2) instead of
+            // falling back to the nationwide profile (Layer 3). A nationwide
+            // establishment campaign (no city/state) produces a nationwide
+            // profile as before.
+            const referenceCity = campaign?.city || null;
+            const referenceState = campaign?.state || null;
             // Platform scoping (Migration 236): if the scan's platform_focus
             // is a specific platform (not 'all'), persist it as
             // reference_platform so a platform-specific profile coexists
@@ -949,7 +960,8 @@ export class MarketingPromptService extends BaseService {
               categoryName: parsedJson.category_name,
               configurationJson: parsedJson,
               intelligenceFocus: focus,
-              referenceCity: null,
+              referenceCity,
+              referenceState,
               referencePlatform: scanPlatform,
             }, ctx);
             logger.info('Gold standard profile imported as draft', ctx, {
@@ -957,6 +969,8 @@ export class MarketingPromptService extends BaseService {
               version: profile.version,
               categoryKey: profile.category_key,
               intelligenceFocus: focus,
+              referenceCity,
+              referenceState,
               referencePlatform: scanPlatform,
               campaignId: input.campaignId,
             });

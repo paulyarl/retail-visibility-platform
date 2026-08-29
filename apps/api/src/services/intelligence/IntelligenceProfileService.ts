@@ -624,11 +624,16 @@ export class IntelligenceProfileService extends BaseService {
           nextVersion = existing[0].version + 1;
         }
       } else {
-        // Check if a profile with this (category_key, reference_city, focus,
-        // reference_platform) already exists. City AND platform are part of
-        // the identity tuple so a cross-platform establishment and a
-        // google-specific establishment for the same (category, focus) get
-        // distinct profile ids.
+        // Check if a profile with this (category_key, reference_city,
+        // reference_state, focus, reference_platform) already exists. City,
+        // state, AND platform are part of the identity tuple so a
+        // cross-platform establishment, a google-specific establishment, a
+        // state-scoped establishment, and a nationwide establishment for the
+        // same (category, focus) all get distinct profile ids. Without state
+        // in the tuple, a state-scoped import (city=null, state="TX") would
+        // match the nationwide profile (reference_city=null) and reuse its
+        // id — then activating the state profile would retire the nationwide
+        // one via activateDraft's "flip previous active to retired" logic.
         const findWhere: any = {
           category_key: categoryKey,
           intelligence_focus: intelligenceFocus,
@@ -637,6 +642,11 @@ export class IntelligenceProfileService extends BaseService {
           findWhere.reference_city = referenceCity;
         } else {
           findWhere.reference_city = null;
+        }
+        if (referenceState) {
+          findWhere.reference_state = referenceState;
+        } else {
+          findWhere.reference_state = null;
         }
         if (referencePlatform) {
           findWhere.reference_platform = referencePlatform;
