@@ -18,8 +18,8 @@ import { z } from 'zod';
 import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
-import slugSingletonService from '../services/SlugSingletonService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
+import { slugify } from '../utils/slug';
 import { prisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
@@ -1006,26 +1006,72 @@ router.get('/claim/:token/slug-patterns', async (req: Request, res: Response) =>
     if (summary.isExpired) return res.status(410).json({ error: 'token_expired' });
     if (summary.isConsumed) return res.status(409).json({ error: 'already_claimed' });
 
-    const patterns = await slugSingletonService.getAllSlugPatterns(
-      summary.businessName,
-      { city: summary.city, state: summary.state, country: 'US' },
-      summary.tenantId,
-    );
+    const baseSlug = slugify(summary.businessName);
+    const citySlug = summary.city ? slugify(summary.city) : '';
+    const stateSlug = summary.state ? summary.state.toLowerCase() : '';
 
-    // Cross-check against other directory listings so owners don't pick
-    // a public place slug already assigned to another listing.
-    const slugs = patterns.map((p) => p.slug);
-    const conflicting = await prisma.directory_listings_list.findMany({
-      where: { slug: { in: slugs }, NOT: { tenant_id: summary.tenantId } },
+    const rawPatterns: { pattern: string; slug: string; description: string }[] = [
+      { pattern: 'business_name', slug: baseSlug, description: 'Business name only (shortest, most memorable)' },
+    ];
+
+    if (citySlug) {
+      rawPatterns.push({
+        pattern: 'business_name_city',
+        slug: `${baseSlug}-${citySlug}`,
+        description: `${summary.businessName} in ${summary.city}`,
+      });
+    }
+    if (stateSlug) {
+      rawPatterns.push({
+        pattern: 'business_name_state',
+        slug: `${baseSlug}-${stateSlug}`,
+        description: `${summary.businessName} in ${summary.state}`,
+      });
+    }
+    if (citySlug && stateSlug) {
+      rawPatterns.push({
+        pattern: 'business_name_city_state',
+        slug: `${baseSlug}-${citySlug}-${stateSlug}`,
+        description: `${summary.businessName} in ${summary.city}, ${summary.state}`,
+      });
+    }
+
+    // Always add a unique-id pattern as a guaranteed-available fallback
+    const shortId = summary.tenantId.slice(-6).toLowerCase();
+    rawPatterns.push({
+      pattern: 'business_name_autoid',
+      slug: `${baseSlug}-${shortId}`,
+      description: `${summary.businessName} (unique ID)`,
+    });
+
+    const slugs = rawPatterns.map((p) => p.slug);
+    const [settingsRows, listingRows] = await Promise.all([
+      prisma.directory_settings_list.findMany({
+        where: { slug: { in: slugs }, NOT: { tenant_id: summary.tenantId } },
+        select: { slug: true, tenant_id: true },
+      }),
+      prisma.directory_listings_list.findMany({
+        where: { slug: { in: slugs }, NOT: { tenant_id: summary.tenantId } },
+        select: { slug: true, tenant_id: true },
+      }),
+    ]);
+    const takenSlugs = new Set([
+      ...settingsRows.map((r) => r.slug),
+      ...listingRows.map((r) => r.slug),
+    ]);
+
+    const currentListingSlug = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: summary.tenantId },
       select: { slug: true },
     });
-    const conflictSet = new Set(conflicting.map((r) => r.slug));
+    const ownSlug = currentListingSlug?.slug ?? undefined;
 
     res.json({
       success: true,
-      patterns: patterns.map((p) => ({
+      patterns: rawPatterns.map((p) => ({
         ...p,
-        isAvailable: p.isAvailable && !conflictSet.has(p.slug),
+        isAvailable: !takenSlugs.has(p.slug),
+        isOwnSlug: p.slug === ownSlug,
       })),
     });
   } catch (error: any) {
