@@ -41,7 +41,13 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
         setLoading(true);
         const [drafts, active] = await Promise.all([
           marketingOpsService.listIntelligenceProfileDrafts('gold_standards'),
-          marketingOpsService.resolveIntelligenceProfile(campaign.category, 'gold_standards', undefined, campaign.intelligence_platform ?? undefined),
+          marketingOpsService.resolveIntelligenceProfile(
+            campaign.category,
+            'gold_standards',
+            campaign.city || undefined,
+            campaign.intelligence_platform ?? undefined,
+            campaign.state || undefined,
+          ),
         ]);
         if (cancelled) return;
         // Filter drafts to this campaign's category using normalized
@@ -54,19 +60,35 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
           .replace(/[_-]+/g, ' ')
           .replace(/\s+/g, ' ');
         setDraftProfiles(
-          drafts.filter((p) => {
-            const normalizedKey = (p.category_key || '')
-              .trim()
-              .toLowerCase()
-              .replace(/[_-]+/g, ' ')
-              .replace(/\s+/g, ' ');
-            if (normalizedKey !== normalizedCategory) return false;
-            // Platform filter: show drafts that match the campaign's
-            // platform OR cross-platform drafts (reference_platform = null).
-            const campaignPlatform = campaign.intelligence_platform ?? null;
-            if (!campaignPlatform) return true;
-            return p.reference_platform === campaignPlatform || p.reference_platform === null;
-          }),
+          drafts
+            .filter((p) => {
+              const normalizedKey = (p.category_key || '')
+                .trim()
+                .toLowerCase()
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ');
+              if (normalizedKey !== normalizedCategory) return false;
+              // Platform filter: show drafts that match the campaign's
+              // platform OR cross-platform drafts (reference_platform = null).
+              const campaignPlatform = campaign.intelligence_platform ?? null;
+              if (!campaignPlatform) return true;
+              return p.reference_platform === campaignPlatform || p.reference_platform === null;
+            })
+            .sort((a, b) => {
+              // Prefer drafts whose region scope matches the campaign's
+              // city/state so the operator sees the most relevant draft first.
+              const campaignCity = (campaign.city || '').trim().toLowerCase();
+              const campaignState = (campaign.state || '').trim().toLowerCase();
+              const score = (p: typeof a) => {
+                const pCity = (p.reference_city || '').trim().toLowerCase();
+                const pState = (p.reference_state || '').trim().toLowerCase();
+                if (campaignCity && pCity === campaignCity && campaignState && pState === campaignState) return 3;
+                if (campaignState && pState === campaignState) return 2;
+                if (!campaignCity && !campaignState && !pCity && !pState) return 1;
+                return 0;
+              };
+              return score(b) - score(a);
+            }),
         );
         setActiveProfile(active);
       } catch (err: any) {
@@ -76,7 +98,7 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [campaign.category]);
+  }, [campaign.category, campaign.city, campaign.state]);
 
   const platformLabel = campaign.intelligence_platform
     ? campaign.intelligence_platform === 'all'
