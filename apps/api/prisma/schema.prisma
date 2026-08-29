@@ -3387,8 +3387,8 @@ model mkt_campaigns_list {
   mkt_campaign_triage_results                                                     mkt_campaign_triage_results?
   customers                                                                       customers?                           @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_customer")
   tenants_mkt_campaigns_list_demo_tenant_idTotenants                              tenants?                             @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
-  mkt_campaigns_list                                                              mkt_campaigns_list?                  @relation("mkt_campaigns_listTomkt_campaigns_list", fields: [parent_campaign_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_parent")
-  other_mkt_campaigns_list                                                        mkt_campaigns_list[]                 @relation("mkt_campaigns_listTomkt_campaigns_list")
+  parent                                                                          mkt_campaigns_list?                  @relation("mkt_campaigns_listTomkt_campaigns_list", fields: [parent_campaign_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_parent")
+  mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list                       mkt_campaigns_list[]                 @relation("mkt_campaigns_listTomkt_campaigns_list")
   tenants_mkt_campaigns_list_tenant_idTotenants                                   tenants?                             @relation("mkt_campaigns_list_tenant_idTotenants", fields: [tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_tenant")
   mkt_seek_batches                                                                mkt_seek_batches?                    @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
   mkt_deliverable_preview_tokens                                                  mkt_deliverable_preview_tokens[]
