@@ -474,12 +474,30 @@ export class MarketingExecutionService extends BaseService {
             resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
           };
         }
-        const amplified = baseRendered + '\n' + discoveryBlock;
+        // ─── Region-narrowing directive ───────────────────────────────
+        // When the campaign carries a city and/or state, narrow the candidate
+        // search to that region. The base template body says "nationwide" and
+        // "span at least 3 distinct states" — this directive overrides that
+        // for region-scoped campaigns. Also notes when the resolved profile
+        // came from a broader scope (nationwide fallback) so the analyst knows
+        // the benchmark is nationwide-grade but the search is region-narrowed.
+        const regionDirective = this.renderGoldStandardRegionDirective(
+          campaignCity,
+          campaignState,
+          { reference_city: goldStandard.reference_city, reference_state: goldStandard.reference_state },
+        );
+        const amplified = baseRendered
+          + (regionDirective ? '\n' + regionDirective + '\n' : '')
+          + '\n' + discoveryBlock;
         logger.info('Gold standard discovery profile injected', ctx, {
           campaignId: input.campaign.id,
           category,
           goldStandardProfileId: goldStandard.id,
           goldStandardProfileVersion: goldStandard.version,
+          regionScope: campaignCity || campaignState ? `${campaignCity || ''}${campaignCity && campaignState ? ', ' : ''}${campaignState || ''}` : 'nationwide',
+          profileScope: goldStandard.reference_city || goldStandard.reference_state
+            ? `${goldStandard.reference_city || ''}${goldStandard.reference_city && goldStandard.reference_state ? ', ' : ''}${goldStandard.reference_state || ''}`
+            : 'nationwide',
         });
         return {
           renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
@@ -1041,6 +1059,74 @@ competitive also-rans with identifiable gaps.`;
     }
 
     return '';
+  }
+
+  /**
+   * Render a region-narrowing directive for gold-standard discovery scans.
+   *
+   * When a discovery campaign carries a city and/or state, the candidate
+   * search must be narrowed to that region — NOT nationwide. The base
+   * discovery template body says "Find 3-5 ADDITIONAL candidate businesses
+   * nationwide" and "span at least 3 distinct states/regions", which is
+   * correct for nationwide campaigns but wrong for region-scoped ones.
+   * This directive overrides that language.
+   *
+   * The directive also notes when the resolved gold-standard profile came
+   * from a BROADER scope than the campaign (e.g. campaign is city-scoped
+   * but the profile fell back to nationwide). In that case the benchmark
+   * is nationwide-grade but the candidate search is still region-narrowed —
+   * the analyst evaluates regional candidates against the nationwide bar.
+   *
+   * Returns empty string when neither city nor state is present (nationwide
+   * campaign — no narrowing needed).
+   */
+  private renderGoldStandardRegionDirective(
+    city: string | null,
+    state: string | null,
+    profile: { reference_city: string | null; reference_state: string | null } | null,
+  ): string {
+    if (!city && !state) return '';
+
+    const scopeLabel = city && state
+      ? `${city}, ${state}`
+      : state
+      ? state
+      : city as string;
+
+    // Detect scope mismatch: campaign is region-scoped but the resolved
+    // profile is broader (nationwide or state-only when city was requested).
+    const profileCity = profile?.reference_city ?? null;
+    const profileState = profile?.reference_state ?? null;
+    const profileIsNationwide = !profileCity && !profileState;
+    const profileIsBroader = profileIsNationwide
+      || (city && !profileCity)
+      || (state && !profileState && !profileCity);
+
+    const scopeNote = profileIsBroader
+      ? profileIsNationwide
+        ? `\nNOTE: The gold-standard profile below was resolved from the NATIONWIDE\npool (no ${city ? 'city' : 'state'}-scoped profile exists yet for this category).\nThe benchmark bar is nationwide-grade — evaluate regional candidates\nagainst it without lowering the bar. The candidate SEARCH is region-narrowed\neven though the benchmark is nationwide.`
+        : `\nNOTE: The gold-standard profile below was resolved from a BROADER scope\nthan this campaign's search region. The benchmark bar remains the established\nstandard — evaluate regional candidates against it without lowering the bar.`
+      : '';
+
+    return `=== SEARCH SCOPE — REGION-NARROWED ===
+This discovery scan is REGION-NARROWED to ${scopeLabel}. This OVERRIDES the
+"nationwide" and "span at least 3 distinct states/regions" language in the
+base instructions above.
+
+CANDIDATE SEARCH BOUNDARY:
+- Search for additional candidate businesses PRIMARILY within ${scopeLabel}.
+- If the regional pool is thin (fewer than 3 strong independent candidates in
+  ${scopeLabel}), expand outward incrementally: first to the surrounding
+  metro area / county, then to adjacent regions within the same state. Do NOT
+  jump straight to nationwide — prefer regional depth over geographic breadth.
+- Geographic diversity WITHIN the region is preferred (different neighborhoods,
+  suburbs, or adjacent cities) but is secondary to finding strong candidates.
+  Do not force 3 distinct states — that directive applies to nationwide scans.
+- Candidates found outside ${scopeLabel} may be included only as overflow when
+  the regional pool is exhausted, and must be flagged in scan_metadata with
+  out_of_scope: true and a rationale.
+${scopeNote}
+=== END SEARCH SCOPE ===`;
   }
 
   /**
