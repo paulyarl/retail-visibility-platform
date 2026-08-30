@@ -68,7 +68,16 @@ from absence of evidence.
 === BUSINESS-AUDIT ROUTING ===
 For each qualifying business, assess whether it warrants a full business audit.
 Provide a recommended_for_business_audit[] list with business_seek_priority
-(high / medium / low / hold). "hold" = insufficient evidence to recommend.`,
+(high / medium / low / hold). "hold" = insufficient evidence to recommend.
+
+=== DISCOVERY SCOPE ===
+Discover ALL qualifying businesses in the target market — do not impose a fixed
+candidate cap. A thorough category audit for a city may surface 10, 20, or more
+qualifying businesses depending on market density. Do not stop at an arbitrary
+number like 5. Exhaust the discovery patterns in the Category Intelligence
+Profile and the sources you can access before finalizing the qualifying set.
+Every qualifying business is a potential prospect — omitting one because you
+reached a self-imposed limit loses a real opportunity.`,
     variables: ['category', 'city', 'state', 'zip_codes', 'search_radius_miles'],
     outputSchema: null,
     isDefault: false,
