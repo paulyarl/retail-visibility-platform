@@ -110,15 +110,20 @@ async function main() {
     process.exit(1);
   }
 
-  if (!existing.body.includes('## Output')) {
-    logger.info(`Template ${TEMPLATE_ID} already has no embedded ## Output section (suffix handles output shape). No changes made.`);
+  if (existing.body.includes(BRIEFING_MARKER)) {
+    logger.info(`Template ${TEMPLATE_ID} already has the operator briefing body (marker present). No changes made.`);
     process.exit(0);
   }
+
+  const bodyWithMarker = NEW_BODY.replace(
+    /^(You are a local business profile repair analyst producing an operator briefing\.\n)/,
+    `$1\n${BRIEFING_MARKER}\n`,
+  );
 
   await prisma.mkt_prompt_templates_list.update({
     where: { id: TEMPLATE_ID },
     data: {
-      body: NEW_BODY,
+      body: bodyWithMarker,
       updated_at: new Date(),
     },
   });

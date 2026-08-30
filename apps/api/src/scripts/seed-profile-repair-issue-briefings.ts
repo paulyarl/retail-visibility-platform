@@ -239,8 +239,8 @@ async function main() {
       continue;
     }
 
-    if (!existing.body.includes('## Output')) {
-      logger.info(`Template ${tmpl.id} already has no embedded ## Output section (suffix handles output shape). Skipping.`);
+    if (existing.body.includes(BRIEFING_MARKER)) {
+      logger.info(`Template ${tmpl.id} already has the issue-specific repair briefing body (marker present). Skipping.`);
       skipped++;
       continue;
     }
