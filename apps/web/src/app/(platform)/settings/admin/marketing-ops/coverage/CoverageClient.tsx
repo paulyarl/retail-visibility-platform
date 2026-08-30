@@ -106,7 +106,17 @@ export default function CoverageClient() {
       if (platform !== undefined) {
         const sPlat = s.platform ?? null;
         const wantPlat = platform ?? null;
-        if (sPlat !== wantPlat) return false;
+        // "All Platforms" (dimension value 'all') is the cross-platform slot.
+        // The backend stores cross-platform gold-standard profiles with
+        // reference_platform = NULL (see IntelligenceProfileService resolver
+        // fallback chain + importAsDraft scanPlatform normalization), so a
+        // null platform must match the 'all' slot — otherwise active
+        // cross-platform profiles never render as green.
+        if (wantPlat === 'all') {
+          if (sPlat !== null && sPlat !== 'all') return false;
+        } else if (sPlat !== wantPlat) {
+          return false;
+        }
       }
       return true;
     }) ?? null;
