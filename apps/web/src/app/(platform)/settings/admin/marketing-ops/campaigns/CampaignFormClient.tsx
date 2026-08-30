@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -220,6 +220,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
   // first keystroke in the Title field flips this to true and stops auto-fill.
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
+  // Tracks the last category + city/state the gold-standards autofill effect
+  // populated. When the category changes away from the autofilled one, the
+  // effect uses this to clear only the values it set — leaving any operator-
+  // edited city/state untouched. Null when no autofill has run (or after the
+  // autofilled values have been cleared).
+  const goldStandardAutofillRef = useRef<{ category: string; city: string; state: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -262,10 +268,34 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Only fires in create mode (not edit — edit preserves existing values).
   // If multiple scoped profiles exist for the same category, picks the most
   // specific (city-scoped > state-scoped). Nationwide-only → leaves empty.
+  //
+  // When the category is cleared or changed, the effect clears the city/state
+  // it previously autofilled — but only the values the operator hasn't
+  // manually edited (tracked via goldStandardAutofillRef). This prevents the
+  // "stuck autofill" where clearing the category left the old city/state
+  // behind with no way to blank them.
   useEffect(() => {
     if (mode !== 'create') return;
     if (form.scope !== 'intelligence') return;
     if (form.intelligence_focus !== 'gold_standards') return;
+
+    // If the category changed away from what we autofilled, clear the
+    // autofilled city/state — but only if the operator hasn't manually
+    // edited them (i.e., they still match what we set).
+    const last = goldStandardAutofillRef.current;
+    if (last && last.category !== form.category) {
+      const cityUntouched = form.city === last.city;
+      const stateUntouched = form.state === last.state;
+      if (cityUntouched || stateUntouched) {
+        setForm((prev) => ({
+          ...prev,
+          city: cityUntouched ? '' : prev.city,
+          state: stateUntouched ? '' : prev.state,
+        }));
+      }
+      goldStandardAutofillRef.current = null;
+    }
+
     if (!form.category) return;
     // Don't override if the operator already filled city or state.
     if (form.city || form.state) return;
@@ -276,11 +306,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     // Prefer city-scoped over state-scoped (most specific first).
     const cityScoped = matches.find((p) => p.reference_city);
     const chosen = cityScoped ?? matches[0];
+    const newCity = chosen.reference_city ?? '';
+    const newState = chosen.reference_state ?? '';
     setForm((prev) => ({
       ...prev,
-      city: chosen.reference_city ?? '',
-      state: chosen.reference_state ?? '',
+      city: newCity,
+      state: newState,
     }));
+    goldStandardAutofillRef.current = { category: form.category, city: newCity, state: newState };
   }, [mode, form.scope, form.intelligence_focus, form.category, form.city, form.state, goldStandardProfiles]);
 
   // ─── Discovery prerequisite check ─────────────────────────────────────

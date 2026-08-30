@@ -21,6 +21,7 @@ import { unifiedConfig } from '../config/unifiedConfig';
 import { getBillingNotificationService } from './subscription/BillingNotificationService';
 import { MarketingScorecardService } from './MarketingScorecardService';
 import MarketingServiceCategoryService from './MarketingServiceCategoryService';
+import { normalizeReferenceState } from './intelligence/IntelligenceProfileService.js';
 
 // ====================
 // TYPES
@@ -431,7 +432,7 @@ export class MarketingCampaignService extends BaseService {
           business_name: input.businessName || null,
           category: input.category,
           city: input.city || '',
-          state: input.state || null,
+          state: normalizeReferenceState(input.state) || null,
           neighborhood: input.neighborhood || null,
           contact_method: input.contactMethod || null,
           contact_info: input.contactInfo || null,
@@ -963,7 +964,7 @@ export class MarketingCampaignService extends BaseService {
     if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
     if (input.city !== undefined) data.city = input.city;
-    if (input.state !== undefined) data.state = input.state || null;
+    if (input.state !== undefined) data.state = normalizeReferenceState(input.state) || null;
     if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood || null;
     if (input.contactMethod !== undefined) data.contact_method = input.contactMethod || null;
     if (input.contactInfo !== undefined) data.contact_info = input.contactInfo || null;
