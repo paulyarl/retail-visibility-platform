@@ -221,11 +221,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // first keystroke in the Title field flips this to true and stops auto-fill.
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
   // Tracks the last category + city/state the gold-standards autofill effect
-  // populated. When the category changes away from the autofilled one, the
-  // effect uses this to clear only the values it set — leaving any operator-
-  // edited city/state untouched. Null when no autofill has run (or after the
-  // autofilled values have been cleared).
-  const goldStandardAutofillRef = useRef<{ category: string; city: string; state: string } | null>(null);
+  // populated, plus whether the operator has rejected the autofill for the
+  // current category (by clearing the autofilled values). When rejected, the
+  // effect won't re-fill for the same category — only when the category
+  // changes to a different one. This lets operators create regionless
+  // gold-standards campaigns even when scoped profiles exist.
+  const goldStandardAutofillRef = useRef<{ category: string; city: string; state: string; rejected: boolean } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -274,15 +275,20 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // manually edited (tracked via goldStandardAutofillRef). This prevents the
   // "stuck autofill" where clearing the category left the old city/state
   // behind with no way to blank them.
+  //
+  // If the operator clears the autofilled city/state (to create a regionless
+  // campaign), the effect marks the autofill as "rejected" for that category
+  // and won't re-fill. This lets operators intentionally create regionless
+  // gold-standards campaigns even when scoped profiles exist. Re-selecting a
+  // different category resets the rejection.
   useEffect(() => {
     if (mode !== 'create') return;
     if (form.scope !== 'intelligence') return;
     if (form.intelligence_focus !== 'gold_standards') return;
 
-    // If the category changed away from what we autofilled, clear the
-    // autofilled city/state — but only if the operator hasn't manually
-    // edited them (i.e., they still match what we set).
     const last = goldStandardAutofillRef.current;
+
+    // Category changed → clear autofilled values and reset rejection.
     if (last && last.category !== form.category) {
       const cityUntouched = form.city === last.city;
       const stateUntouched = form.state === last.state;
@@ -294,7 +300,21 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         }));
       }
       goldStandardAutofillRef.current = null;
+      return;
     }
+
+    // Same category as last autofill. If the operator cleared the autofilled
+    // values, mark as rejected — don't re-fill for this category.
+    if (last && last.category === form.category && !last.rejected) {
+      const wasCleared = (last.city && form.city === '') || (last.state && form.state === '');
+      if (wasCleared) {
+        goldStandardAutofillRef.current = { ...last, rejected: true };
+        return;
+      }
+    }
+
+    // Skip if the operator already rejected autofill for this category.
+    if (last && last.category === form.category && last.rejected) return;
 
     if (!form.category) return;
     // Don't override if the operator already filled city or state.
@@ -313,7 +333,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       city: newCity,
       state: newState,
     }));
-    goldStandardAutofillRef.current = { category: form.category, city: newCity, state: newState };
+    goldStandardAutofillRef.current = { category: form.category, city: newCity, state: newState, rejected: false };
   }, [mode, form.scope, form.intelligence_focus, form.category, form.city, form.state, goldStandardProfiles]);
 
   // ─── Discovery prerequisite check ─────────────────────────────────────
