@@ -86,6 +86,7 @@ export class PromptComposerService extends BaseService {
     category: string;
     focus: IntelligenceFocus;
     city?: string | null;
+    platform?: string | null;
   }, ctx?: RequestCtx): Promise<ComposedPrompt> {
     const promptService = MarketingPromptService.getInstance();
     const profileService = IntelligenceProfileService.getInstance();
@@ -109,12 +110,16 @@ export class PromptComposerService extends BaseService {
       throw new Error(`Focus fragment not found for focus="${input.focus}". Run: pnpm seed:intelligence-fragments`);
     }
 
-    // 2. Resolve active profile for the (category, focus, city) triple.
+    // 2. Resolve active profile for the (category, focus, city, platform) tuple.
     //    City-aware resolution (Migration 205): a Zionsville discovery
     //    campaign resolves to the Zionsville-established profile, not the
     //    Indianapolis one. Falls back to city-agnostic / category+focus
     //    profiles with logged warnings when no city-specific profile exists.
-    const profile = await profileService.resolve(input.category, input.focus, input.city, undefined, ctx);
+    //    Platform-aware resolution (Migration 236): a Google-targeted discovery
+    //    campaign resolves to the Google-specific profile first, falling back
+    //    to cross-platform. Falls back to city-agnostic / cross-platform with
+    //    logged warnings when no platform-specific profile exists.
+    const profile = await profileService.resolve(input.category, input.focus, input.city, input.platform, ctx);
 
     // 3. Build the profile block or generic fallback
     let profileSection: string;
@@ -148,10 +153,12 @@ export class PromptComposerService extends BaseService {
       category: input.category,
       focus: input.focus,
       city: input.city ?? 'none',
+      platform: input.platform ?? 'none',
       intelligenceMode: resolution.intelligence_mode,
       profileId: resolution.profile_id,
       profileVersion: resolution.profile_version,
       profileReferenceCity: (profile as any)?.reference_city ?? null,
+      profileReferencePlatform: (profile as any)?.reference_platform ?? null,
     });
 
     return { body, resolution, focus: input.focus };

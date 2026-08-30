@@ -8,6 +8,31 @@
 - `doppler run --config local -- pnpm prisma db pull` — Pull DB schema into `prisma/schema.prisma` (run from `apps/api`)
 - `doppler run --config local -- pnpm prisma generate` — Regenerate client with Doppler secrets
 
+## Seed Scripts — Re-run Discipline
+
+Seed scripts in `apps/api/src/scripts/seed-*.ts` are idempotent (update-in-place) but are **not** run automatically. After editing any seed file, you MUST re-run it against both `local` and `prd` Doppler configs, or the DB row will be stale and the rendered prompt will silently use the old body.
+
+**Run from `apps/api`:**
+```powershell
+# Intelligence cluster (has package.json script entries)
+doppler run --config local -- pnpm seed:intelligence-fragments
+doppler run --config local -- pnpm seed:intelligence-discovery-templates
+doppler run --config local -- pnpm seed:intelligence-profile-establishment-template
+doppler run --config local -- pnpm seed:intelligence-profile-auto-repair
+
+# Profile repair + marketing ops + gold standard (use npx tsx directly)
+doppler run --config local -- npx tsx src/scripts/seed-profile-repair-signals.ts
+doppler run --config local -- npx tsx src/scripts/seed-profile-repair-issue-briefings.ts
+doppler run --config local -- npx tsx src/scripts/seed-profile-repair-triage-briefing.ts
+doppler run --config local -- npx tsx src/scripts/seed-marketing-ops-templates.ts
+doppler run --config local -- npx tsx src/scripts/seed-gold-standard-scan-template.ts
+```
+Repeat each command with `--config prd` for production.
+
+**Verify after re-running:** query the live DB (or regenerate the `docs/api-response/seek-prompt-templates.md` dump) and confirm each template's `updated_at` is newer than the seed file's last git commit. A stale `updated_at` means the seed was not re-run after an edit.
+
+**Idempotency check pattern:** seed scripts must check for the **presence of the new marker** (e.g. `BRIEFING_MARKER`), NOT the absence of an old section (e.g. `!body.includes('## Output')`). The absence-of-old pattern is unsafe because old bodies may never have had the old section either, causing the seed to skip every time.
+
 ## Architecture
 
 - **Backend:** Node.js + Express + TypeScript in `apps/api`

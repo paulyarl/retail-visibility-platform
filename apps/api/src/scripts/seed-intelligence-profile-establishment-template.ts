@@ -30,6 +30,7 @@ const ESTABLISHMENT_TEMPLATE = {
 CATEGORY: {{category}}
 CITY (reference market): {{city}}
 STATE: {{state}}
+PLATFORM: {{platform}}
 
 === OBJECTIVE ===
 Produce a comprehensive Category Intelligence Profile that describes how to discover businesses in this category and what evidence ecosystems matter when auditing a business in this category.
@@ -37,6 +38,39 @@ Produce a comprehensive Category Intelligence Profile that describes how to disc
 The profile will be used to:
 1. Guide Intelligence-scope discovery audits (finding qualifying businesses)
 2. Amplify Business-scope audit prompts with category-specific evidence rules
+
+=== PLATFORM SCOPING ===
+{{platform}} is the platform this profile is scoped to. If the platform is "all"
+or empty, produce a cross-platform profile — the discovery patterns and
+specialized sources should work across all major platforms (Google, Yelp,
+Facebook, Apple Maps, Bing). If a specific platform is named, bias the
+discovery patterns toward that platform:
+
+- DISCOVERY PATTERNS: include platform-specific search strategies that surface
+  businesses on {{platform}} that mainstream search misses. For example, on
+  Google: search GBP category taxonomies for miscategorized businesses (e.g.,
+  "International Grocery" instead of "African Goods Store"), search Google
+  Maps for unmarked storefronts along commercial corridors, search for
+  platform-specific longtail queries (e.g., "fufu powder site:google.com/maps"
+  or "egusi near me" on {{platform}}). Name the concrete platform-specific
+  search strategies, not generic "search the platform" instructions.
+- SPECIALIZED SOURCES: when a platform is specified, include platform-specific
+  sources (e.g., GBP category taxonomy, {{platform}} review ecosystems,
+  platform-specific directory features) alongside the category's vertical and
+  community sources. The platform sources help the discovery analyst find
+  businesses that are present but miscategorized, or absent entirely, on the
+  target platform.
+- CATEGORY EVIDENCE RULES: include platform-specific evidence rules that
+  distinguish "not found on {{platform}} during discovery" from "does not exist
+  on {{platform}}" — a business may be active on other platforms but absent
+  from {{platform}}, and that absence is a discovery signal, not a negative
+  quality signal.
+
+Do NOT produce a platform-agnostic profile when a specific platform is named:
+the operator will run a separate establishment campaign for each platform they
+want a profile for, because a profile established for one platform's discovery
+is not safe to apply to a different platform's discovery campaign (the category
+taxonomy, search mechanics, and directory features will not match).
 
 === CITY SCOPING ===
 This profile is scoped to the reference market named above ({{city}}). The
@@ -91,7 +125,7 @@ Do NOT convert unavailable information into a negative signal. "Website not foun
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.`,
-  variables: ['category', 'city', 'state'],
+  variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,
     description: 'Category Intelligence Profile — §10 structure with terminology, specialized sources (capabilities + limitations), discovery patterns, evidence rules, prohibited inferences, and category signals.',

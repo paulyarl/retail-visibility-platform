@@ -853,18 +853,26 @@ export class MarketingPromptService extends BaseService {
           // market. Without this, a Zionsville establishment campaign would
           // produce a profile that later resolves for an Indianapolis
           // discovery campaign (cross-city contamination).
+          // Platform scoping: also read the campaign's intelligence_platform
+          // so the draft is scoped to the correct platform. Without this, a
+          // Google-specific establishment campaign would produce a profile
+          // that resolves for a Yelp discovery campaign (cross-platform
+          // contamination). Mirrors the gold standard import path which
+          // already reads intelligence_platform.
           const campaign = await this.prisma.mkt_campaigns_list.findUnique({
             where: { id: input.campaignId },
-            select: { intelligence_focus: true, city: true },
+            select: { intelligence_focus: true, city: true, intelligence_platform: true },
           });
           const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards';
           const referenceCity = campaign?.city || null;
+          const referencePlatform = campaign?.intelligence_platform || null;
           const profile = await IntelligenceProfileService.getInstance().importAsDraft({
             categoryKey: parsedJson.category_key,
             categoryName: parsedJson.category_name,
             configurationJson: parsedJson,
             intelligenceFocus: focus,
             referenceCity,
+            referencePlatform,
           }, ctx);
           logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
             profileId: profile.id,
@@ -872,6 +880,7 @@ export class MarketingPromptService extends BaseService {
             categoryKey: profile.category_key,
             intelligenceFocus: focus,
             referenceCity,
+            referencePlatform,
             campaignId: input.campaignId,
           });
         } catch (profileErr) {

@@ -548,8 +548,15 @@ export class MarketingExecutionService extends BaseService {
       // Pass the campaign's city so the composer resolves a city-scoped
       // profile (Migration 205) and emits a city retargeting directive
       // when the resolved profile's reference city differs.
+      // Pass the campaign's platform so the composer resolves a platform-
+      // scoped profile (Migration 236) — a Google-targeted discovery campaign
+      // resolves to the Google-specific intelligence profile first, falling
+      // back to cross-platform. Without this, platform-specific establishment
+      // profiles would never resolve and discovery would always use the
+      // cross-platform profile.
       const city = input.campaign.city || null;
-      const composed = await composer.composeIntelligencePrompt({ category, focus, city }, ctx);
+      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      const composed = await composer.composeIntelligencePrompt({ category, focus, city, platform: campaignPlatform }, ctx);
 
       // Apply variable substitution on the composed body (zip_codes, radius, etc.)
       // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
@@ -570,7 +577,7 @@ export class MarketingExecutionService extends BaseService {
       // The directive is focus-aware so the same platform produces opposite
       // discovery populations depending on the focus. When no platform is set,
       // this block is skipped (broad cross-platform discovery).
-      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      // (campaignPlatform was already declared above for the composer call.)
       if (campaignPlatform) {
         const platformDirective = this.renderPlatformDiscoveryDirective(campaignPlatform, focus);
         if (platformDirective) {
@@ -660,13 +667,15 @@ export class MarketingExecutionService extends BaseService {
     // context block so the AI tailors the profile to the campaign's focus.
     if (isProfileEstablishment && isSeek && campaignScope === 'intelligence') {
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
-      const focusBlock = this.renderEstablishmentFocusBlock(focus);
+      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      const focusBlock = this.renderEstablishmentFocusBlock(focus, campaignPlatform);
       const withFocus = focusBlock ? baseRendered + '\n' + focusBlock : baseRendered;
 
       logger.info('Intelligence Profile Establishment prompt resolved with focus', ctx, {
         campaignId: input.campaign.id,
         category,
         focus,
+        platform: campaignPlatform ?? 'none',
       });
 
       return {
@@ -914,12 +923,30 @@ export class MarketingExecutionService extends BaseService {
    * Intelligence-scope seek (which loads this profile via the composer) is
    * tuned for the right discovery posture.
    *
+   * When a platform is specified (non-empty, non-'all'), a platform bias
+   * section is appended so the analyst produces platform-specific discovery
+   * patterns — e.g., platform category taxonomy quirks, platform-specific
+   * longtail search strategies, and platform-specific absence-handling rules.
+   * This mirrors the gold standard's platform awareness: the gold standard
+   * captures what "excellent on Google" looks like; the intelligence profile
+   * captures how to find businesses on Google that mainstream search misses.
+   *
    * Returns an empty string for an unrecognized focus value (defensive — the
    * campaign column defaults to 'emerging' and is constrained to the
    * IntelligenceFocus union, but we never want to corrupt the establishment
    * prompt with a malformed focus label).
    */
-  private renderEstablishmentFocusBlock(focus: IntelligenceFocus): string {
+  private renderEstablishmentFocusBlock(focus: IntelligenceFocus, platform?: string | null): string {
+    const focusBlock = this.renderFocusBlockCore(focus);
+    if (!focusBlock) return '';
+    const platformBlock = this.renderEstablishmentPlatformBlock(platform);
+    return platformBlock ? focusBlock + '\n' + platformBlock : focusBlock;
+  }
+
+  /**
+   * Core focus block — emerging or competitive bias instructions.
+   */
+  private renderFocusBlockCore(focus: IntelligenceFocus): string {
     if (focus === 'emerging') {
       return `=== INTELLIGENCE FOCUS: EMERGING ===
 This profile will be used to power EMERGING discovery for this category — finding
@@ -985,6 +1012,47 @@ emerging-focus work.`;
     }
 
     return '';
+  }
+
+  /**
+   * Platform bias block for the establishment focus section. When a specific
+   * platform is named (not 'all' or empty), appends a section instructing the
+   * analyst to produce platform-specific discovery patterns. Returns empty
+   * string for 'all' / null / empty so cross-platform establishment prompts
+   * are unaffected.
+   */
+  private renderEstablishmentPlatformBlock(platform?: string | null): string {
+    const p = platform ? platform.trim().toLowerCase() : '';
+    if (!p || p === 'all') return '';
+
+    const cap = p.charAt(0).toUpperCase() + p.slice(1);
+    return `=== PLATFORM BIAS: ${cap} ===
+This profile is scoped to ${cap}. The discovery patterns and specialized sources
+you produce should include ${cap}-specific search strategies that surface
+businesses on ${cap} that mainstream search misses:
+
+- ${cap} CATEGORY TAXONOMY: identify the category labels ${cap} uses for this
+  business type, including generic/misleading labels that obscure specialization
+  (e.g., "Grocery Store" or "International Grocery" instead of a category-specific
+  label). Name the specific ${cap} categories and the miscategorization patterns.
+- ${cap} LONGTAIL SEARCH: include ${cap}-specific longtail search queries that
+  find businesses invisible to broad category searches (e.g., product-specific
+  queries, neighborhood-specific queries, community-specific queries on ${cap}).
+- ${cap} DIRECTORY FEATURES: identify ${cap}-specific directory or listing
+  features that can surface businesses (e.g., ${cap} Maps street view for
+  unmarked storefronts, ${cap} review ecosystems for hidden trust, ${cap}
+  category filters for miscategorized businesses).
+- ${cap} ABSENCE HANDLING: include an evidence rule distinguishing "not found
+  on ${cap} during discovery" from "does not exist on ${cap}" — a business may
+  be active on other platforms but absent from ${cap}, and that absence is a
+  discovery signal (INT_WEAK_MAINSTREAM_INDEXING or INT_SINGLE_SOURCE), not a
+  negative quality signal.
+
+The platform-specific discovery patterns are the PRIMARY mechanism set for
+platform-targeted discovery. The category's vertical and community sources
+remain in scope but should be evaluated through the lens of ${cap} presence —
+a business found via a community source that is absent from ${cap} is a
+high-value platform-gap prospect.`;
   }
 
   /**
