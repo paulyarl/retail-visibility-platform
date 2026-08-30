@@ -68,6 +68,20 @@ const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
   gold_standards: 'Gold Standards',
 };
 
+const PLATFORM_LABELS: Record<string, string> = {
+  all: 'All Platforms',
+  google: 'Google',
+  yelp: 'Yelp',
+  facebook: 'Facebook',
+  apple_maps: 'Apple Maps',
+  bing: 'Bing',
+  bbb: 'BBB',
+};
+
+function platformLabel(key: string): string {
+  return PLATFORM_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
 export default function IntelligenceProfilesClient() {
   const [activeProfiles, setActiveProfiles] = useState<IntelligenceProfile[]>([]);
   const [draftProfiles, setDraftProfiles] = useState<IntelligenceProfile[]>([]);
@@ -363,6 +377,11 @@ export default function IntelligenceProfilesClient() {
                   </Badge>
                 );
               })()}
+              {profile.reference_platform && (
+                <Badge size="xs" variant="dot" color="indigo">
+                  {platformLabel(profile.reference_platform)}
+                </Badge>
+              )}
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
