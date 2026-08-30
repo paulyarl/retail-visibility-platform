@@ -193,6 +193,8 @@ import { IntelligenceRunService } from '../services/intelligence/IntelligenceRun
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
+import PostalMailerService from '../services/marketing/PostalMailerService';
+import { generatePostcardPdf } from '../services/marketing/PostalMailerPdfService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
@@ -5643,6 +5645,33 @@ router.post('/campaigns/:id/send-claim-invite', async (req: any, res: Response) 
       emailSent: emailResult.sent,
       campaignCount: issued.campaignIds.length,
     });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * POST /campaigns/:id/mailer
+ *
+ * Generate a 4x6" triage-aware postcard PDF for a campaign.
+ * Uses the same archetype resolution, field extraction, and AI pipeline
+ * as the opener workspace. The QR destination depends on campaign stage:
+ *   - seek/preview_built/shown -> diagnostic gallery token
+ *   - paid + unclaimed         -> claim token
+ *   - claimed                  -> customer portal
+ */
+router.post('/campaigns/:id/mailer', async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const ctx = getCtx(req);
+
+    const payload = await PostalMailerService.getInstance().generate(id, ctx);
+    const { pdfBuffer, filename } = await generatePostcardPdf(payload);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -13,6 +13,16 @@ import type {
   NegativeReviewTheme,
   ArchetypeCode,
 } from './archetype-selection';
+import {
+  type SignalSeverity,
+  type TriggeredSignalEntry,
+  type TriggeredSignalContext,
+  computePrimarySignalSeverity,
+  buildTriggeredSignalContext,
+  getStrongestCoOccurringSignal,
+  hasMaterialDrift,
+} from './signal-magnitude';
+import type { SignalCode } from '../triage/signal-taxonomy';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -28,6 +38,21 @@ export interface CommonFields {
   state: string | null;
   phone: string | null;
   website_url: string | null;
+  // ── Signal magnitude context (generalized severity fix) ──
+  // All triggered signals ranked by severity, so every prompt knows what
+  // else is going on and can lead with the strongest signal when its
+  // primary is weak. Populated by the caller (OutreachOpenerService) from
+  // the signal extractor + audit data.
+  triggered_signals: TriggeredSignalEntry[];
+  // The severity of this archetype's primary signal — determines which
+  // preamble variant the prompt builder uses. Computed per-archetype by
+  // computePrimarySignalSeverity.
+  primary_signal_severity: SignalSeverity;
+  // The strongest co-occurring signal that is more severe than the
+  // archetype's primary signal. When non-null, the prompt should
+  // acknowledge/lead with this signal instead of its default hook.
+  // Null when the primary signal is already the strongest (or tied).
+  strongest_co_occurring: TriggeredSignalEntry | null;
 }
 
 export interface A1Fields extends CommonFields {
@@ -57,6 +82,32 @@ export interface A3Fields extends CommonFields {
   phone_variations: string[];
   platforms_with_listings: string[];
   overall_status: string;
+  /**
+   * True when at least one NAP variation type has genuinely different
+   * normalized values (not just formatting/cosmetic differences like
+   * "Rd" vs "Road" or "(317) 297-7036" vs "317-297-7036").
+   *
+   * When false, the A3 prompt uses a soft "consistency" framing instead
+   * of the crisis "wrong location / dead numbers" framing — because the
+   * audit's own `overall_status` is "consistent" and the variations are
+   * cosmetic. Asserting a crisis that the data contradicts destroys the
+   * opener's credibility.
+   */
+  material_drift: boolean;
+  /**
+   * True when the website audit reports a dead/timeout/dns_error/redirect_loop
+   * status. PB-01 (Profile Repair & Listing Drift) fires for WC_BROKEN_WEBSITE,
+   * and a broken website is a harder, more provable hook than cosmetic NAP
+   * formatting. When true AND material_drift is false, the A3 prompt leads
+   * with the broken website instead of the NAP variations.
+   */
+  website_broken: boolean;
+  /**
+   * True when the website has no detectable CTA (no call-to-action, no
+   * click-to-call, no booking). Surfaces WC_MISSING_CTA context so the
+   * prompt can fold it into the consequence line when relevant.
+   */
+  website_missing_cta: boolean;
 }
 
 export interface A4Fields extends CommonFields {
@@ -123,6 +174,27 @@ function pickMissingCta(website: NonNullable<BusinessAnalysisAuditData['website'
   return 'online_booking';
 }
 
+// ─── NAP normalization (material vs cosmetic drift) ─────────────────────
+//
+// hasMaterialDrift is imported from signal-magnitude.ts (shared with the
+// severity computation module). The local isDeadUrl/isMissingCta helpers
+// remain here for the A3 field extractor's website_broken/website_missing_cta
+// fields.
+
+function isDeadUrl(website: BusinessAnalysisAuditData['website']): boolean {
+  const status = website?.status?.toLowerCase();
+  return status === 'dead' || status === 'timeout' || status === 'dns_error' || status === 'redirect_loop';
+}
+
+function isMissingCta(website: BusinessAnalysisAuditData['website']): boolean {
+  if (!website) return false;
+  const hasCta =
+    website.call_to_action_present === 'yes' ||
+    website.click_to_call_available === 'yes' ||
+    website.has_booking === true;
+  return !hasCta;
+}
+
 // ─── Extractors ─────────────────────────────────────────────────────────
 
 export function extractA1Fields(
@@ -174,6 +246,7 @@ export function extractA3Fields(
   common: CommonFields,
 ): A3Fields {
   const nap = auditData.nap_consistency;
+  const website = auditData.website;
   return {
     ...common,
     canonical_name: nap?.canonical_name ?? null,
@@ -182,6 +255,9 @@ export function extractA3Fields(
     phone_variations: nap?.phone_variations ?? [],
     platforms_with_listings: platformLabels(auditData),
     overall_status: nap?.overall_status ?? 'unknown',
+    material_drift: nap ? hasMaterialDrift(nap) : false,
+    website_broken: isDeadUrl(website),
+    website_missing_cta: isMissingCta(website),
   };
 }
 
@@ -282,19 +358,37 @@ export function extractFields(
   common: CommonFields,
   theme?: NegativeReviewTheme,
 ): ArchetypeFields {
+  // Compute the archetype's primary signal severity + strongest co-occurring
+  // signal, and merge them into the common fields so every archetype's
+  // extracted fields carry the signal magnitude context. The prompt builder
+  // uses these to branch the preamble and acknowledge stronger signals.
+  const primarySeverity = computePrimarySignalSeverity(archetype, auditData);
+  const triggeredSignals = common.triggered_signals ?? [];
+  const strongestCoOccurring = triggeredSignals.length > 0
+    ? getStrongestCoOccurringSignal(
+        { signals: triggeredSignals, strongest: triggeredSignals[0] ?? null },
+        primarySeverity,
+      )
+    : null;
+  const commonWithSeverity: CommonFields = {
+    ...common,
+    primary_signal_severity: common.primary_signal_severity ?? primarySeverity,
+    strongest_co_occurring: common.strongest_co_occurring ?? strongestCoOccurring,
+  };
+
   switch (archetype) {
     case 'A1':
-      return extractA1Fields(auditData, common);
+      return extractA1Fields(auditData, commonWithSeverity);
     case 'A2':
       if (!theme) throw new Error('A2 requires a theme — selection function must provide one');
-      return extractA2Fields(auditData, common, theme);
+      return extractA2Fields(auditData, commonWithSeverity, theme);
     case 'A3':
-      return extractA3Fields(auditData, common);
+      return extractA3Fields(auditData, commonWithSeverity);
     case 'A4':
-      return extractA4Fields(auditData, common);
+      return extractA4Fields(auditData, commonWithSeverity);
     case 'A5':
-      return extractA5Fields(auditData, common);
+      return extractA5Fields(auditData, commonWithSeverity);
     case 'A6':
-      return extractA6Fields(auditData, common);
+      return extractA6Fields(auditData, commonWithSeverity);
   }
 }

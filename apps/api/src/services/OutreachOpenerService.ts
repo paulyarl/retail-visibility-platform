@@ -206,6 +206,12 @@ export class OutreachOpenerService extends BaseService {
    * Build the common fields (business_name, contact_name, tone, NAP) from a campaign.
    * NAP (Name, Address, Phone) context lets the AI agent identify the business
    * and cross-reference publicly available data when crafting the opener.
+   *
+   * The triggered_signals, primary_signal_severity, and strongest_co_occurring
+   * fields are defaulted here (empty/unknown) and populated by resolveOpener
+   * after computing the signal context from the audit data. extractFields
+   * also fills in primary_signal_severity + strongest_co_occurring if they're
+   * still defaulted.
    */
   private buildCommonFields(campaign: any): CommonFields {
     return {
@@ -216,6 +222,12 @@ export class OutreachOpenerService extends BaseService {
       state: campaign.state ?? null,
       phone: campaign.phone ?? null,
       website_url: campaign.website_url ?? null,
+      // Signal magnitude context — populated by resolveOpener from the
+      // signal extractor + audit data. Defaulted here so buildCommonFields
+      // can be called standalone (e.g. in tests) without the audit data.
+      triggered_signals: [],
+      primary_signal_severity: 'borderline' as any,
+      strongest_co_occurring: null,
     };
   }
 
@@ -254,6 +266,35 @@ export class OutreachOpenerService extends BaseService {
 
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const common = this.buildCommonFields(campaign);
+
+    // Compute the triggered signal context from the audit data + campaign
+    // fields, so every archetype prompt knows what signals actually fired
+    // and can lead with the strongest one when its primary signal is weak.
+    // This generalizes the A3 "material vs cosmetic drift" fix to all
+    // archetypes: the prompt's preamble matches the actual signal severity,
+    // not a hardcoded assumption.
+    try {
+      const { extractSignals } = await import('./triage/signal-extractor');
+      const { buildTriggeredSignalContext } = await import('./outreach-openers/signal-magnitude');
+      const signalCodes = extractSignals({
+        campaign: {
+          last_review_date: (campaign as any).last_review_date ?? null,
+          unaddressed_reviews: (campaign as any).unaddressed_reviews ?? 0,
+          nap_consistent: (campaign as any).nap_consistent ?? null,
+          has_website: (campaign as any).has_website ?? null,
+          website_url: (campaign as any).website_url ?? null,
+          gbp_claimed: (campaign as any).gbp_claimed ?? null,
+        },
+        auditData: auditResult.auditData,
+      });
+      const signalContext = buildTriggeredSignalContext(signalCodes, auditResult.auditData);
+      common.triggered_signals = signalContext.signals;
+    } catch {
+      // Signal extraction is best-effort — if it fails, the prompt still
+      // works with empty triggered_signals (the dispatcher fills in
+      // primary_signal_severity from the audit data directly).
+      common.triggered_signals = [];
+    }
 
     // Sprint 6: If the campaign has an accepted triage result, use the
     // triage-derived archetype (which may be A5 — the only archetype

@@ -469,6 +469,9 @@ export class OutreachFollowUpService extends BaseService {
       state: campaign.state ?? null,
       phone: campaign.phone ?? null,
       website_url: campaign.website_url ?? null,
+      triggered_signals: [],
+      primary_signal_severity: 'borderline' as any,
+      strongest_co_occurring: null,
     };
   }
 

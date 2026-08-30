@@ -26,6 +26,7 @@ export {
   extractA3Fields,
   extractA4Fields,
   extractA5Fields,
+  extractA6Fields,
   type CommonFields,
   type ArchetypeFields,
   type A1Fields,
@@ -33,6 +34,7 @@ export {
   type A3Fields,
   type A4Fields,
   type A5Fields,
+  type A6Fields,
 } from './field-extractors';
 
 export {
@@ -43,6 +45,21 @@ export {
 } from './archetype-prompts';
 
 export { runQualityGate, type QualityGateResult } from './quality-gate';
+
+export {
+  type SignalSeverity,
+  type TriggeredSignalEntry,
+  type TriggeredSignalContext,
+  computeSignalSeverity,
+  computePrimarySignalSeverity,
+  buildTriggeredSignalContext,
+  signalsStrongerThan,
+  getStrongestCoOccurringSignal,
+  hasMaterialDrift,
+  SEVERITY_RANK,
+  severityRank,
+  isStronger,
+} from './signal-magnitude';
 
 export {
   HOOK_LIBRARY,

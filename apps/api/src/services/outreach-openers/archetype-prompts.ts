@@ -67,31 +67,41 @@ export function buildArchetypePrompt(
   closeVariant: CloseVariant = DEFAULT_CLOSE_VARIANT,
 ): string {
   const closeLine = CLOSE_VARIANTS[closeVariant] ?? CLOSE_VARIANTS[DEFAULT_CLOSE_VARIANT];
+
+  // Parse the extracted fields to build the co-occurring signal instruction.
+  // This is injected into every prompt so the LLM knows when a stronger
+  // signal exists and should lead the hook.
+  let fields: any = {};
+  try {
+    fields = JSON.parse(extractedFieldsJson);
+  } catch {
+    // Malformed JSON — skip the co-occurring signal instruction
+  }
+  const coOccurringInstruction = buildCoOccurringSignalInstruction(fields);
+
   switch (archetype) {
     case 'A1':
       return A1_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine);
+        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
     case 'A2':
       return A2_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine);
+        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
     case 'A3':
-      return A3_PROMPT
-        .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine);
+      return buildA3Prompt(extractedFieldsJson, closeLine) + coOccurringInstruction;
     case 'A4':
       return A4_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine);
+        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
     case 'A5':
       return A5_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine);
+        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
     case 'A6':
       return A6_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine);
+        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
   }
 }
 
@@ -114,7 +124,10 @@ that fixes it — not a sales pitch. The tone is quiet, specific, and useful.
 You are not a vendor. You are someone who did the homework for them.`;
 
 /**
- * Listing-drift preamble for A3. Leads with NAP inconsistency, not reviews.
+ * Listing-drift preamble for A3 — material drift variant. Used when the NAP
+ * variations are genuinely different (distinct normalized phone numbers,
+ * addresses, or names), not just formatting differences. Leads with NAP
+ * inconsistency, not reviews.
  */
 const LISTING_DRIFT_PREAMBLE = `You are a local-business visibility auditor. You pulled this business's
 public listings across Google, Yelp, and Facebook, and found that the
@@ -127,6 +140,52 @@ owner. The goal: prove you actually looked at their listings, surface the
 specific inconsistency, and offer a concrete deliverable that fixes it —
 not a sales pitch. The tone is quiet, specific, and useful. You are not a
 vendor. You are someone who did the homework for them.`;
+
+/**
+ * Listing-drift preamble for A3 — cosmetic drift variant. Used when the NAP
+ * variations are formatting-only (e.g., "Rd" vs "Road", "(317) 297-7036" vs
+ * "317-297-7036", "LLC" suffix present/absent) and `overall_status` is
+ * "consistent." The crisis framing ("wrong location / dead numbers") would
+ * be false here and would destroy the opener's credibility — an owner who
+ * checks their listings finds one working number and dismisses everything
+ * else you say. The soft framing acknowledges the real consequence: search
+ * engines and directories hedge on which version to trust, which quietly
+ * dampens ranking.
+ */
+const LISTING_DRIFT_PREAMBLE_COSMETIC = `You are a local-business visibility auditor. You pulled this business's
+public listings across Google, Yelp, and Facebook. The core details are
+consistent — same business, same location, same number — but the listings
+show it in slightly different formats across platforms: abbreviated vs
+spelled-out street names, formatted vs unformatted phone numbers, a legal
+suffix (LLC) present on some directories and absent on others.
+
+You're writing a cold first-touch outreach opener to the small business
+owner. The goal: prove you actually looked at their listings, surface the
+specific formatting inconsistency honestly (without overstating it as a
+crisis), and offer a concrete deliverable that fixes it — not a sales pitch.
+The tone is quiet, specific, and useful. You are not a vendor. You are
+someone who did the homework for them. Do NOT claim customers are being sent
+to the wrong location or calling dead numbers — that is false for this
+business and will destroy your credibility.`;
+
+/**
+ * Broken-website preamble for A3 — used when PB-01 (Profile Repair & Listing
+ * Drift) fires with WC_BROKEN_WEBSITE and the NAP drift is cosmetic. A broken
+ * website is a harder, more provable, more felt problem than formatting-level
+ * NAP drift, so the opener leads with the dead URL and folds the NAP
+ * consistency note in as a secondary beat.
+ */
+const BROKEN_WEBSITE_PREAMBLE = `You are a local-business visibility auditor. You pulled this business's
+public listings and website, and found that the website link isn't loading —
+it's dead, timing out, or returning an error. Customers who search for the
+business, click through from Google or Yelp, and hit a dead page just move
+on to the next result.
+
+You're writing a cold first-touch outreach opener to the small business
+owner. The goal: prove you actually looked at their website and listings,
+surface the specific problem (the dead URL), and offer a concrete deliverable
+that fixes it — not a sales pitch. The tone is quiet, specific, and useful.
+You are not a vendor. You are someone who did the homework for them.`;
 
 /**
  * CTA-gap preamble for A4. Leads with conversion friction, not reviews.
@@ -178,16 +237,20 @@ specific, and useful. You are not a vendor. You are someone who did
 the homework for them.`;
 
 /**
- * Shared NAP context note appended to every archetype prompt. Tells the AI
- * that city/state/phone/website_url are available for business identification
- * and cross-referencing public data, but must NOT be dumped into the opener
- * body verbatim — they're for the AI's internal reference only.
+ * Shared NAP + signal magnitude context note appended to every archetype
+ * prompt. Tells the AI:
+ *   1. city/state/phone/website_url are for business identification only
+ *   2. The triggered_signals list shows ALL signals that fired, ranked by
+ *      severity — the prompt should match the actual severity, not assume
+ *      a crisis when the data is milder
+ *   3. If strongest_co_occurring is present, a stronger signal exists than
+ *      the archetype's primary — acknowledge it in the hook
  */
-const NAP_CONTEXT_NOTE = `
-Business identification context (for your internal reference only — do NOT
-dump these into the opener body verbatim):
+const SIGNAL_CONTEXT_NOTE = `
+Business identification + signal magnitude context (for your internal
+reference only — do NOT dump these into the opener body verbatim):
 - city, state, phone, website_url are provided in the inputs when available.
-- Use them to identify the business and match it against publicly available
+  Use them to identify the business and match it against publicly available
   information (Google Business Profile, Yelp listings, etc.) so you can write
   a hyper-specific opener that proves you've done your research.
 - The opener should read as if you already know this business — but never
@@ -195,7 +258,37 @@ dump these into the opener body verbatim):
   strengthens the hook (e.g., "the [city] location" when disambiguating a
   multi-location chain).
 - If phone or website_url is null, the business may not have a public
-  listing or site — don't fabricate one.`;
+  listing or site — don't fabricate one.
+- triggered_signals lists ALL signals detected for this business, ranked by
+  severity (crisis > material > cosmetic > borderline). primary_signal_severity
+  is the severity of THIS archetype's primary signal. Match your framing to
+  the actual severity — do NOT assert a crisis (wrong location, dead numbers,
+  lost customers) when the severity is "cosmetic" or "borderline." Overstating
+  the magnitude destroys credibility: an owner who checks and finds the claim
+  is false dismisses everything else you say.
+- If strongest_co_occurring is present, a signal with HIGHER severity than
+  this archetype's primary signal was also detected. Lead with or acknowledge
+  that stronger signal in the hook — it's the more felt problem and proves
+  deeper research. Do NOT ignore it.`;
+
+/**
+ * Build a dynamic instruction for acknowledging the strongest co-occurring
+ * signal. Injected into the prompt when strongest_co_occurring is non-null.
+ * Returns empty string when no stronger signal exists (the archetype's
+ * primary is already the strongest).
+ */
+function buildCoOccurringSignalInstruction(fields: any): string {
+  if (!fields?.strongest_co_occurring) return '';
+  const sig = fields.strongest_co_occurring;
+  return `
+
+IMPORTANT — STRONGER CO-OCCURRING SIGNAL DETECTED:
+The strongest signal for this business is "${sig.label}" (severity: ${sig.severity}),
+which is more severe than this archetype's primary signal (severity: ${fields.primary_signal_severity}).
+Lead with or prominently acknowledge this stronger signal in your hook — it is
+the more felt problem. You can still reference the archetype's primary signal
+as a secondary observation, but the stronger signal should dominate the opener.`;
+}
 
 // ─── A1: Review Response Gap ────────────────────────────────────────────
 
@@ -203,7 +296,7 @@ const A1_PROMPT = `${REVIEW_CENTRIC_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
-${NAP_CONTEXT_NOTE}
+${SIGNAL_CONTEXT_NOTE}
 
 Task: Write the opener in this exact structure, ~80 words max body:
 
@@ -232,7 +325,8 @@ Task: Write the opener in this exact structure, ~80 words max body:
 Forbidden: pricing, tier labels, "digital opportunity score",
 HTTPS/mobile/CTA positives, multiple stats stacked, generic phrasing
 ("your online presence"), exclamation points, emojis, naming more
-than one number in the hook.
+than one number in the hook, overstating the severity when
+primary_signal_severity is "borderline" or "cosmetic".
 
 Output the opener only — no preamble, no explanation, no JSON.`;
 
@@ -242,7 +336,7 @@ const A2_PROMPT = `${REVIEW_CENTRIC_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
-${NAP_CONTEXT_NOTE}
+${SIGNAL_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
@@ -286,41 +380,119 @@ Task: Write the opener, ~80 words max body:
 
 Forbidden: leading with the count before the theme, using the raw
 audit theme label verbatim, pricing/tier/opportunity-score jargon,
-HTTPS/mobile positives, exclamation points, emojis.
+HTTPS/mobile positives, exclamation points, emojis, overstating the
+severity when primary_signal_severity is "borderline" or "cosmetic".
 
 Output the opener only.`;
 
 // ─── A3: Listing Inconsistency ──────────────────────────────────────────
+//
+// A3 has three prompt variants selected at build time based on the extracted
+// fields:
+//   1. BROKEN_WEBSITE — when website_broken is true AND material_drift is
+//      false. A dead URL is a harder, more provable hook than cosmetic NAP
+//      formatting. The opener leads with the broken website and folds the
+//      NAP consistency note in as a secondary beat.
+//   2. COSMETIC — when material_drift is false (and website is not broken).
+//      The NAP variations are formatting-only (Rd vs Road, formatted vs
+//      unformatted phone, LLC suffix). The opener uses a soft "consistency"
+//      framing — the real consequence is search engines hedging on which
+//      version to trust, not customers going to the wrong location.
+//   3. MATERIAL (default) — when material_drift is true. The NAP variations
+//      are genuinely different (distinct normalized values). The opener uses
+//      the original crisis framing ("wrong pin" / "dead numbers").
 
-const A3_PROMPT = `${LISTING_DRIFT_PREAMBLE}
+const A3_MATERIAL_HOOK = `3. The hook: "Your business shows up [N] different ways across
+   [list 2-3 platforms from platforms_with_listings] — [name the
+   specific variation: different addresses / different names /
+   different phone numbers]."
+   Then the consequence: "customers are being sent to the wrong pin."
+   Pick the variation type that has the most SEMANTICALLY DIVERGENT
+   entries — normalize phone numbers (strip formatting), expand
+   address abbreviations (Rd → Road), and strip legal suffixes (LLC)
+   before comparing. If all phone variations normalize to the same
+   number, they are NOT "different phone numbers" — they're formatting
+   differences. Only count a variation type if the normalized values
+   are genuinely distinct.`;
+
+const A3_COSMETIC_HOOK = `3. The hook: "Your business shows up in a few different formats
+   across [list 2-3 platforms from platforms_with_listings] — [name
+   the specific formatting difference: abbreviated vs spelled-out
+   street name / formatted vs unformatted phone number / legal suffix
+   present on some directories and absent on others]."
+   Then the consequence: "it makes the directories hedge on which
+   version to trust, which quietly dampens your local search ranking."
+   Do NOT say "different addresses" or "different phone numbers" —
+   the underlying data is the same, only the formatting differs.
+   Name the actual formatting difference honestly.`;
+
+const A3_BROKEN_WEBSITE_HOOK = `3. The hook: "Your website link isn't loading — I clicked through
+   from [Google / Yelp] and hit a dead page."
+   Then the consequence: "anyone who searches for you and clicks
+   through just moves on to the next result."
+   If there are also NAP formatting differences across platforms, you
+   may append one clause: "And your listings show your info in a few
+   different formats across [platforms] — same details, just not
+   synced." Keep this secondary; the dead URL is the lead.`;
+
+function buildA3Prompt(
+  extractedFieldsJson: string,
+  closeLine: string,
+): string {
+  // Branch on material_drift + website_broken to select the right preamble
+  // and hook instructions. The LLM receives only the relevant variant — no
+  // conditional branching instructions for it to misinterpret.
+  let fields: { material_drift?: boolean; website_broken?: boolean };
+  try {
+    fields = JSON.parse(extractedFieldsJson);
+  } catch {
+    fields = {};
+  }
+  const materialDrift = fields.material_drift === true;
+  const websiteBroken = fields.website_broken === true;
+
+  let preamble: string;
+  let hook: string;
+  let previewLine: string;
+
+  if (websiteBroken && !materialDrift) {
+    preamble = BROKEN_WEBSITE_PREAMBLE;
+    hook = A3_BROKEN_WEBSITE_HOOK;
+    previewLine = '4. One line: "Three previews attached — the dead-link audit, the\n   corrected listing, and what a working presence looks like across\n   every platform."';
+  } else if (!materialDrift) {
+    preamble = LISTING_DRIFT_PREAMBLE_COSMETIC;
+    hook = A3_COSMETIC_HOOK;
+    previewLine = '4. One line: "Three previews attached — the directory diff, the\n   corrected listing, and what synced looks like across every\n   platform."';
+  } else {
+    preamble = LISTING_DRIFT_PREAMBLE;
+    hook = A3_MATERIAL_HOOK;
+    previewLine = '4. One line: "Three previews attached — the directory diff, the\n   corrected listing, and what synced looks like across every\n   platform."';
+  }
+
+  return `${preamble}
 
 Inputs (JSON):
-{{extracted_fields}}
-${NAP_CONTEXT_NOTE}
+${extractedFieldsJson}
+${SIGNAL_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
 1. Greeting as above.
 2. One sentence: "Pulled together a quick visibility snapshot for
    [business_name]."
-3. The hook: "Your business shows up [N] different ways across
-   [list 2-3 platforms from platforms_with_listings] — [name the
-   specific variation: different addresses / different names /
-   different phone numbers]."
-   Then the consequence: "customers are being sent to the wrong pin."
-   Pick the variation type that has the most entries
-   (address_variations vs name_variations vs phone_variations).
-4. One line: "Three previews attached — the directory diff, the
-   corrected listing, and what synced looks like across every
-   platform."
-5. Close: "{{close_line}}"
+${hook}
+${previewLine}
+5. Close: "${closeLine}"
 6. Signoff: "— [your name]"
 
 Forbidden: vague "your listings are inconsistent" without naming
 the platforms or the specific variation, pricing/tier jargon,
-exclamation points, emojis.
+exclamation points, emojis, overstating cosmetic formatting
+differences as a crisis (wrong location / dead numbers) when the
+underlying NAP data is actually consistent.
 
 Output the opener only.`;
+}
 
 // ─── A4: Conversion / CTA Gap ───────────────────────────────────────────
 
@@ -328,7 +500,7 @@ const A4_PROMPT = `${CTA_GAP_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
-${NAP_CONTEXT_NOTE}
+${SIGNAL_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
@@ -347,7 +519,8 @@ Task: Write the opener, ~80 words max body:
 6. Signoff: "— [your name]"
 
 Forbidden: listing every missing CTA — pick the one highest-impact
-gap, pricing/tier jargon, exclamation points, emojis.
+gap, pricing/tier jargon, exclamation points, emojis, overstating
+the severity when primary_signal_severity is "borderline" or "cosmetic".
 
 Output the opener only.`;
 
@@ -366,7 +539,7 @@ const A5_PROMPT = `${DUAL_TRIAGE_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
-${NAP_CONTEXT_NOTE}
+${SIGNAL_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
@@ -415,7 +588,8 @@ Task: Write the opener, ~80 words max body:
 Forbidden: stacking two stats in the hook, listing every repair signal,
 pricing/tier/opportunity-score jargon, HTTPS/mobile positives,
 exclamation points, emojis, naming more than one number anywhere in the
-opener body.
+opener body, overstating the severity when primary_signal_severity is
+"borderline" or "cosmetic".
 
 Output the opener only.`;
 
@@ -432,7 +606,7 @@ const A6_PROMPT = `${PRODUCT_VISIBILITY_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
-${NAP_CONTEXT_NOTE}
+${SIGNAL_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
@@ -464,6 +638,7 @@ Task: Write the opener, ~80 words max body:
 
 Forbidden: "online booking," "scheduling," "service menu," "project
 photos," pricing/tier jargon, exclamation points, emojis, stacking
-multiple gaps in the hook.
+multiple gaps in the hook, overstating the severity when
+primary_signal_severity is "borderline" or "cosmetic".
 
 Output the opener only.`;
