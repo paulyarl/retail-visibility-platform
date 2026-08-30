@@ -153,26 +153,62 @@ export function normalizeCategoryKey(s: string): string {
 }
 
 /**
- * Normalize a city string for exact-match lookup against reference_city.
- * Case/whitespace-insensitive. Empty/whitespace input returns null so the
- * resolver treats it as "no city requested" (legacy/business-scope path).
+ * Normalize a city string for storage as reference_city and for exact-match
+ * lookup. Title-cased (e.g. 'indianapolis' → 'Indianapolis', 'fort wayne'
+ * → 'Fort Wayne') so stored values are legible in the UI without a display
+ * transform. Whitespace-collapsed. Empty/whitespace input returns null so
+ * the resolver treats it as "no city requested" (legacy/business-scope path).
+ *
+ * Note: title-casing is word-boundary based and will not preserve unusual
+ * internal capitalization (e.g. 'McAllen' → 'Mcallen'). This is acceptable
+ * for the set of reference cities in use; if a city with internal capitals
+ * is added, store it directly via a raw query rather than through this helper.
  */
 export function normalizeReferenceCity(s: string | null | undefined): string | null {
   if (!s) return null;
-  const trimmed = s.trim().toLowerCase().replace(/\s+/g, ' ');
-  return trimmed.length > 0 ? trimmed : null;
+  const collapsed = s.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (collapsed.length === 0) return null;
+  return collapsed.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
- * Normalize a US state code for storage as reference_state. Uppercased,
- * whitespace-trimmed. Empty input returns null. Accepts 2-letter codes
- * (e.g. 'in' → 'IN'); does NOT validate against the state list — the
- * caller is responsible for sending a valid code.
+ * Map of full US state/territory names → 2-letter postal codes. Used by
+ * normalizeReferenceState to coerce full names (e.g. 'Indiana', 'indiana')
+ * to the canonical 2-letter code ('IN'). Keys are lowercase for lookup.
+ */
+const STATE_NAME_TO_CODE: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', 'district of columbia': 'DC',
+  florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL',
+  indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA',
+  maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN',
+  mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV',
+  'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+  'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK',
+  oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT',
+  virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI',
+  wyoming: 'WY',
+};
+
+/**
+ * Normalize a US state for storage as reference_state. Returns the canonical
+ * 2-letter uppercase postal code (e.g. 'in' → 'IN', 'Indiana' → 'IN',
+ * 'indiana' → 'IN'). Empty/whitespace input returns null. Unrecognized
+ * non-2-letter values are uppercased and returned as-is (preserves prior
+ * behavior for unknown inputs — the caller is responsible for validity).
  */
 export function normalizeReferenceState(s: string | null | undefined): string | null {
   if (!s) return null;
-  const trimmed = s.trim().toUpperCase();
-  return trimmed.length > 0 ? trimmed : null;
+  const trimmed = s.trim();
+  if (trimmed.length === 0) return null;
+  // Already a 2-letter code — uppercase and return.
+  if (/^[a-zA-Z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  // Full state name — map to 2-letter code.
+  const code = STATE_NAME_TO_CODE[trimmed.toLowerCase()];
+  if (code) return code;
+  // Unknown format — uppercase and return (legacy passthrough).
+  return trimmed.toUpperCase();
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
