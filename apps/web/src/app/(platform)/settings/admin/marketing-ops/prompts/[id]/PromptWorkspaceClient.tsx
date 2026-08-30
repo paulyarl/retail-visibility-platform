@@ -70,7 +70,13 @@ website, nap_consistency, operational_status, competitive_benchmarks,
 unanswered_negative_review_examples, negative_review_themes,
 digital_opportunity_score, high_attention, high_attention_reasons,
 recommended_tier, tier_rationale, estimated_monthly_service_fee,
-recommended_services, data_quality, sources.
+recommended_services, data_quality, sources, gap_analysis,
+quality_gate_results.
+
+When a GOLD STANDARD BENCHMARK section is present in the prompt, also
+populate gap_analysis (per-field gaps vs. expected values) and
+quality_gate_results (per-gate pass/fail), and capture
+platforms.{platform}.profile_url for each platform.
 
 CRITICAL JSON RULES:
 - Every element of a JSON array MUST be a bare JSON object "{ ... }" separated by
