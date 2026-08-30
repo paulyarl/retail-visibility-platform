@@ -89,7 +89,8 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
 
     // Migration 202 — focus is passed through to the resolver.
     // Migration 205 — city is passed through (undefined when not provided).
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('Auto Repair', 'emerging', undefined, undefined);
+    // Migration 236 — platform is passed through (undefined when not provided).
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('Auto Repair', 'emerging', undefined, undefined, undefined);
   });
 
   it('composes with competitive focus + active profile', async () => {
@@ -121,7 +122,8 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
 
     // Migration 202 — focus is passed through to the resolver.
     // Migration 205 — city is passed through (undefined when not provided).
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('Plumbing', 'competitive', undefined, undefined);
+    // Migration 236 — platform is passed through (undefined when not provided).
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('Plumbing', 'competitive', undefined, undefined, undefined);
   });
 
   it('Migration 205 — passes city through to the resolver and renderProfileBlock', async () => {
@@ -143,13 +145,38 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
     });
 
     expect(result.resolution.profile_id).toBe('african_grocery_zionsville');
-    // City is passed to resolve
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('African Grocery Store', 'competitive', 'Zionsville', undefined);
+    // City is passed to resolve (platform is undefined when not provided)
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('African Grocery Store', 'competitive', 'Zionsville', undefined, undefined);
     // City is passed to renderProfileBlock so it can emit a retargeting directive
     expect(mockProfileService.renderProfileBlock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'african_grocery_zionsville' }),
       'Zionsville',
     );
+  });
+
+  it('Migration 236 — passes platform through to the resolver', async () => {
+    mockProfileService.resolve.mockResolvedValueOnce({
+      id: 'african_grocery_indianapolis_google',
+      version: 1,
+      category_key: 'african grocery store',
+      category_name: 'African Grocery Store',
+      intelligence_focus: 'emerging',
+      reference_city: 'indianapolis',
+      reference_platform: 'google',
+      status: 'active',
+      configuration_json: {},
+    });
+
+    const result = await service.composeIntelligencePrompt({
+      category: 'African Grocery Store',
+      focus: 'emerging',
+      city: 'Indianapolis',
+      platform: 'google',
+    });
+
+    expect(result.resolution.profile_id).toBe('african_grocery_indianapolis_google');
+    // Platform is passed to resolve as the 4th arg (ctx is the 5th)
+    expect(mockProfileService.resolve).toHaveBeenCalledWith('African Grocery Store', 'emerging', 'Indianapolis', 'google', undefined);
   });
 
   it('composes with null profile → generic fallback + intelligence_mode none', async () => {

@@ -451,8 +451,8 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(resolution.gold_standard_profile_version).toBe(2);
       // serializeGoldStandard called with discovery_benchmark role
       expect(mockProfileService.serializeGoldStandard).toHaveBeenCalledWith(goldStandard, 'discovery_benchmark');
-      // resolveGoldStandard called with platform
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'google', undefined);
+      // resolveGoldStandard called with platform, city, state, ctx
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'google', 'Kansas City', 'MO', undefined);
     });
 
     it('appends degraded-mode note when no gold standard exists', async () => {
@@ -483,7 +483,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'yelp', undefined);
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', 'yelp', 'Kansas City', 'MO', undefined);
     });
 
     it('passes null platform when campaign has no intelligence_platform', async () => {
@@ -496,7 +496,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', null, undefined);
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('African Grocery Store', null, 'Kansas City', 'MO', undefined);
     });
 
     it('works for competitive focus (not just emerging)', async () => {
