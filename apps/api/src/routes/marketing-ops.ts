@@ -1518,9 +1518,13 @@ router.post('/:id/link-tenant', async (req: any, res: Response) => {
 // Derive a business-scope child campaign from a discovered competitor.
 // Seeds business_name + estimated_tier from the payload; inherits category,
 // city, neighborhood, tone, attributes from the parent. Child starts at `seek`.
+// `rating` accepts either scale: GBP's 0–5 (e.g. from google.rating) or the
+// intelligence-discovery audit's 0–10. Values > 5 are normalized to 0–5
+// (divided by 2) before reaching the service, whose tier inference + notes
+// display assume a 0–5 scale.
 const deriveBusinessSchema = z.object({
   business_name: z.string().min(1).max(255),
-  rating: z.number().min(0).max(5).optional(),
+  rating: z.number().min(0).max(10).optional(),
   review_count: z.number().int().min(0).optional(),
   location: z.string().max(500).optional(),
   detected_signals: z.array(z.string()).optional(),
@@ -1530,10 +1534,12 @@ const deriveBusinessSchema = z.object({
 router.post('/:id/derive-business', async (req: any, res: Response) => {
   try {
     const parsed = deriveBusinessSchema.parse(req.body);
+    const normalizedRating =
+      parsed.rating == null ? undefined : parsed.rating > 5 ? parsed.rating / 2 : parsed.rating;
     const campaign = await MarketingCampaignService.deriveBusinessCampaign({
       parentId: req.params.id,
       businessName: parsed.business_name,
-      rating: parsed.rating,
+      rating: normalizedRating,
       reviewCount: parsed.review_count,
       location: parsed.location,
       detectedSignals: parsed.detected_signals,
