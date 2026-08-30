@@ -11,7 +11,7 @@ out/
 
 # Build artifacts
 dist/
-coverage/
+/coverage/
 *.tsbuildinfo
 
 # Env & secrets
