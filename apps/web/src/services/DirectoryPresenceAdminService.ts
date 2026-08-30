@@ -504,6 +504,26 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data;
   }
 
+  /** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId */
+  async createSeedFromCampaign(
+    campaignId: string,
+    publish = true,
+  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/from-campaign/${encodeURIComponent(campaignId)}`,
+      { method: 'POST', body: JSON.stringify({ publish }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const message = typeof err === 'string' ? err : err?.message;
+      throw new Error(message || 'Failed to create seed from campaign');
+    }
+    const data = result.data?.data ?? result.data;
+    return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean };
+  }
+
   // ============================
   // Claim Requests (Migration 246)
   // ============================

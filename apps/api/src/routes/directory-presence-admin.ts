@@ -1036,4 +1036,46 @@ router.post('/claim-requests/:id/verify', requirePlatformAdmin, async (req: Requ
   }
 });
 
+/** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId — create a seed from a campaign audit */
+const fromCampaignSchema = z.object({
+  publish: z.boolean().optional().default(true),
+});
+
+router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const validation = fromCampaignSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.createFromCampaign(
+      campaignId,
+      { publish: validation.data.publish },
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.status(result.created ? 201 : 200).json({ success: true, ...result });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = {
+      campaign_not_found: 404,
+      business_analysis_audit_not_found: 400,
+      identity_mismatch: 409,
+      incomplete_nap: 400,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
 export default router;

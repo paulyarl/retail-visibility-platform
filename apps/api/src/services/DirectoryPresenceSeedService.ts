@@ -16,6 +16,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
+import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import {
   generateDirectoryListingId,
   generateDirectoryPresenceSeedId,
@@ -1181,6 +1182,146 @@ class DirectoryPresenceSeedService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * Create, publish, and link a directory presence seed from the latest
+   * business_analysis audit on a marketing campaign. Reuses createSeed,
+   * publishSeed, and DirectorySeedCampaignLinkService for the campaign bond.
+   *
+   * Idempotent: if a primary seed link already exists for this campaign,
+   * returns the existing seed without creating a new one.
+   */
+  async createFromCampaign(
+    campaignId: string,
+    opts: { publish?: boolean } = {},
+    ctx?: SeedAuditCtx,
+  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean }> {
+    const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+    });
+    if (!campaign) throw new Error('campaign_not_found');
+
+    const audit = await (prisma as any).mkt_audits_list.findFirst({
+      where: { campaign_id: campaignId, platform: 'business_analysis' },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!audit) throw new Error('business_analysis_audit_not_found');
+
+    const d = (audit.audit_data ?? {}) as any;
+    const meta = d.audit_metadata ?? {};
+    const nap = d.nap_consistency ?? {};
+    const website = d.website ?? {};
+    const google = d.google ?? {};
+    const dataQuality = d.data_quality ?? {};
+
+    if (meta.identity_status === 'mismatched') {
+      throw new Error('identity_mismatch');
+    }
+
+    const businessName =
+      campaign.business_name ||
+      meta.matched_business?.business_name ||
+      meta.requested_business?.business_name;
+    let address = campaign.address_line1 || nap.canonical_address;
+    const city =
+      campaign.address_city ||
+      meta.matched_business?.city ||
+      meta.requested_business?.city;
+    const state =
+      campaign.address_state ||
+      meta.matched_business?.state ||
+      meta.requested_business?.state;
+    const zipCode = campaign.address_zip || nap.canonical_zip;
+    const phone = campaign.phone || nap.canonical_phone;
+    const websiteUrl = campaign.website_url || website.url;
+
+    if (!businessName || !address || !city || !state) {
+      throw new Error('incomplete_nap');
+    }
+
+    // If we only have the canonical full address, use the first line as the street address.
+    if (!campaign.address_line1 && nap.canonical_address) {
+      address = nap.canonical_address.split(',')[0].trim();
+    }
+
+    // Idempotency: return an existing primary-linked seed
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT dscl.seed_id, dps.listing_id, dps.tenant_id, dl.slug
+      FROM directory_seed_campaign_links dscl
+      JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dscl.campaign_id = ${campaignId} AND dscl.link_role = 'primary'
+      LIMIT 1
+    `;
+    if (existing[0]) {
+      return {
+        seedId: existing[0].seed_id,
+        listingId: existing[0].listing_id,
+        tenantId: existing[0].tenant_id,
+        slug: existing[0].slug,
+        publicUrl: `/place/${existing[0].slug}`,
+        created: false,
+      };
+    }
+
+    const rawConfidence = String(meta.identity_confidence || dataQuality.confidence || 'medium').toLowerCase();
+    const identityConfidence: 'high' | 'medium' = ['high', 'medium'].includes(rawConfidence) ? (rawConfidence as 'high' | 'medium') : 'medium';
+    const categoryFit: 'verified' | 'probable' = meta.identity_status === 'confirmed' ? 'verified' : 'probable';
+
+    const accessedAt = audit.created_at ? new Date(audit.created_at) : new Date();
+    const sourceName = 'business_analysis_audit';
+    const sourceUrl = `/settings/admin/marketing-ops/campaigns/${campaignId}`;
+    const provenanceConfidence = ['high', 'medium', 'low'].includes(dataQuality.confidence)
+      ? (dataQuality.confidence as 'high' | 'medium' | 'low')
+      : 'high';
+
+    const seedInput: CreateSeedInput = {
+      businessName,
+      address,
+      city,
+      state,
+      zipCode: zipCode || undefined,
+      phone: phone || undefined,
+      website: websiteUrl || undefined,
+      primaryCategory: campaign.category,
+      secondaryCategories: google.additional_categories || [],
+      snapEbtReported: false,
+      seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
+      identityConfidence,
+      categoryFit,
+      notes: typeof d.summary === 'string' ? d.summary.substring(0, 1000) : undefined,
+      businessHours: d.business_hours || undefined,
+      provenance: [
+        { fieldKey: 'name', value: businessName, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'address', value: address, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'phone', value: phone || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!phone },
+        { fieldKey: 'website', value: websiteUrl || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!websiteUrl },
+        { fieldKey: 'primary_category', value: campaign.category, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+      ].filter((p) => p.value != null && p.value !== '') as any,
+    };
+
+    const seed = await this.createSeed(seedInput, ctx);
+
+    if (opts.publish !== false) {
+      await this.publishSeed(seed.id, ctx);
+    }
+
+    await DirectorySeedCampaignLinkService.linkCampaign(seed.id, campaignId, 'primary', ctx);
+
+    const listingRows = await prisma.$queryRaw<any[]>`
+      SELECT slug FROM directory_listings_list WHERE id = ${seed.listingId} LIMIT 1
+    `;
+    const slug = listingRows[0]?.slug || '';
+
+    return {
+      seedId: seed.id,
+      listingId: seed.listingId,
+      tenantId: seed.tenantId,
+      slug,
+      publicUrl: `/place/${slug}`,
+      created: true,
+    };
   }
 }
 

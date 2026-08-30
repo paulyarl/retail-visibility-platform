@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw, CheckCircle2, MapPin, ExternalLink } from 'lucide-react';
 import type { Audit } from '@/services/MarketingOpsService';
 import marketingOpsService from '@/services/MarketingOpsService';
+import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
 // ─── Helpers (shared with CityAnalysisAuditCard — duplicated for isolation) ───
@@ -86,6 +87,9 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const [copied, setCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [addingToPlace, setAddingToPlace] = useState(false);
+  const [placeResult, setPlaceResult] = useState<{ publicUrl: string; seedId: string; created: boolean } | null>(null);
+  const [placeError, setPlaceError] = useState<string | null>(null);
 
   const d = (audit.audit_data ?? {}) as any;
   const meta = d.audit_metadata ?? {};
@@ -141,6 +145,20 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
     }
   };
 
+  const handleAddToPlace = async () => {
+    setAddingToPlace(true);
+    setPlaceResult(null);
+    setPlaceError(null);
+    try {
+      const result = await directoryPresenceAdminService.createSeedFromCampaign(campaignId);
+      setPlaceResult(result);
+    } catch (e: any) {
+      setPlaceError(e.message || 'Failed to add place listing');
+    } finally {
+      setAddingToPlace(false);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
       {/* Header: identity verification */}
@@ -166,10 +184,34 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             <button onClick={handleSync} disabled={syncing} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50">
               {syncing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Sync to campaign
             </button>
+            <button
+              onClick={handleAddToPlace}
+              disabled={addingToPlace || identityStatus === 'mismatched'}
+              title={identityStatus === 'mismatched' ? 'Cannot seed: identity mismatch' : 'Create and publish place listing'}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50"
+            >
+              {addingToPlace ? <RefreshCw className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
+              {addingToPlace ? 'Adding...' : 'Add to place listing'}
+            </button>
           </div>
         </div>
         {syncResult && (
           <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">{syncResult}</p>
+        )}
+        {placeResult && (
+          <p className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-2 flex-wrap">
+            <CheckCircle2 className="h-3 w-3" />
+            {placeResult.created ? 'Added' : 'Already linked'}:
+            <a href={placeResult.publicUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline hover:text-green-700">
+              <ExternalLink className="h-3 w-3" /> {placeResult.publicUrl}
+            </a>
+            <a href={`/settings/admin/directory/presence-seeds/${placeResult.seedId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 underline ml-1">
+              seed
+            </a>
+          </p>
+        )}
+        {placeError && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">{placeError}</p>
         )}
         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           <span className="text-gray-400">Requested:</span> {requested.business_name} · {requested.city}, {requested.state} · {requested.category}
