@@ -168,9 +168,16 @@ export default function CoverageClient() {
             (nationwide), then emerging/competitive establishment per city, then discovery.
           </Text>
         </Box>
-        <Button variant="subtle" size="xs" onClick={fetchCoverage} leftSection={<IconRefresh size={14} />}>
-          Refresh
-        </Button>
+        <Group gap="xs">
+          <Link href={createCampaignLink({ focus: 'gold_standards', kind: 'establishment', platform: 'all' })}>
+            <Button variant="light" size="xs" leftSection={<IconPlus size={14} />}>
+              Add profile (new category)
+            </Button>
+          </Link>
+          <Button variant="subtle" size="xs" onClick={fetchCoverage} leftSection={<IconRefresh size={14} />}>
+            Refresh
+          </Button>
+        </Group>
       </Group>
 
       {/* ─── Dependency order guide ─── */}
