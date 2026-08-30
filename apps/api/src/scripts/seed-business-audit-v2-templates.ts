@@ -523,7 +523,7 @@ async function main() {
         },
       });
 
-      logger.info(`Wired both profiles into: ${task.label}`, {
+      logger.info(`Wired both profiles into: ${task.label}`, undefined, {
         templateId: task.id,
         oldLength: existing.body.length,
         newLength: newBody.length,
