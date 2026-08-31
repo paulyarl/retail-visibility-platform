@@ -246,6 +246,8 @@ export function StorefrontStatusPanel({
     return null;
   }
 
+  const businessName = tenant.profileData?.business_name || tenant.name || 'This business';
+
   // Capability-gated panel (storefront disabled by capability type)
   if (panelType === 'capability_gated') {
     return (
@@ -254,9 +256,12 @@ export function StorefrontStatusPanel({
           <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
             <Archive className="w-8 h-8 text-gray-600 dark:text-gray-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-            Online Storefront Unavailable
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+            {businessName}
           </h1>
+          <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            Online Storefront Unavailable
+          </p>
           <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
             This store does not currently offer an online storefront experience. Please visit the physical location or contact the store directly.
           </p>
@@ -282,9 +287,12 @@ export function StorefrontStatusPanel({
             <MapPin className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-            {config.title}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+            {businessName}
           </h1>
+          <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            {config.title}
+          </p>
 
           <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
             {config.description}
@@ -328,9 +336,12 @@ export function StorefrontStatusPanel({
           <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${config.bgClass}`}>
             <div className={config.textClass}>{config.icon}</div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-            {tenant.subscriptionStatusInfo.label || config.title}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+            {businessName}
           </h1>
+          <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            {tenant.subscriptionStatusInfo.label || config.title}
+          </p>
           <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
             {tenant.subscriptionStatusInfo.description || config.description}
           </p>
@@ -371,9 +382,12 @@ export function StorefrontStatusPanel({
         <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${config.bgClass}`}>
           <div className={config.textClass}>{config.icon}</div>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          {config.title}
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+          {businessName}
         </h1>
+        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">
+          {config.title}
+        </p>
         <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
           {config.getDescription(tenant.statusInfo, reopeningDate)}
         </p>
