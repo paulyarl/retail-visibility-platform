@@ -81,6 +81,7 @@ export interface CreateSeedRequest {
   identityConfidence: 'high' | 'medium';
   categoryFit: 'verified' | 'probable';
   notes?: string;
+  slug?: string;
   businessHours?: any;
   provenance?: Array<{
     fieldKey: string;
@@ -204,6 +205,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       zipCode?: string | null;
       latitude?: number | null;
       longitude?: number | null;
+      slug?: string | null;
     },
     provenanceUpdates?: Array<{
       fieldKey: string;

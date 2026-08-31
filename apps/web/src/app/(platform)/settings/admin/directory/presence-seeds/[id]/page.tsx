@@ -163,6 +163,7 @@ export default function PresenceSeedDetailPage() {
   const [editHoursSourceUrl, setEditHoursSourceUrl] = useState('');
   const [editPrimaryCategory, setEditPrimaryCategory] = useState('');
   const [editSecondaryCategories, setEditSecondaryCategories] = useState<string[]>([]);
+  const [editSlug, setEditSlug] = useState('');
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -342,6 +343,7 @@ export default function PresenceSeedDetailPage() {
     setEditSecondaryCategories(
       Array.isArray(listing?.secondary_categories) ? listing.secondary_categories : [],
     );
+    setEditSlug(listing?.slug ?? '');
     setEditAddress(listing?.address ?? '');
     setEditCity(listing?.city ?? '');
     setEditState(listing?.state ?? '');
@@ -418,6 +420,7 @@ export default function PresenceSeedDetailPage() {
         zipCode: editZipCode.trim() || null,
         latitude: editLatitude.trim() && !Number.isNaN(Number(editLatitude)) ? Number(editLatitude) : null,
         longitude: editLongitude.trim() && !Number.isNaN(Number(editLongitude)) ? Number(editLongitude) : null,
+        slug: editSlug.trim() || null,
       };
 
       // Business hours — only include if any day is not closed
@@ -1120,6 +1123,19 @@ export default function PresenceSeedDetailPage() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Public Slug</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={editSlug}
+                onChange={(e) => setEditSlug(e.target.value)}
+                maxLength={80}
+                placeholder="your-business-slug"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Used in the public URL (/place/your-slug). Left empty, the current slug is kept.
+              </p>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input

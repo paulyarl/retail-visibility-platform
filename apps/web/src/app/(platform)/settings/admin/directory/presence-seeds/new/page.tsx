@@ -79,6 +79,7 @@ export default function NewPresenceSeedPage() {
 
   // Core fields
   const [businessName, setBusinessName] = useState('');
+  const [slug, setSlug] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -205,6 +206,7 @@ export default function NewPresenceSeedPage() {
       phone: phone.trim() || undefined,
       website: website.trim() || undefined,
       primaryCategory: primaryCategory.trim(),
+      slug: slug.trim() || undefined,
       secondaryCategories: secondaryCategories.length > 0
         ? secondaryCategories
         : undefined,
@@ -321,6 +323,19 @@ export default function NewPresenceSeedPage() {
                 required
                 maxLength={200}
               />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass}>Public Slug</label>
+              <input
+                className={inputClass}
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                maxLength={80}
+                placeholder="kaura-international-food-market — auto-generated from business name if left blank"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Used in the public URL (/place/your-slug). Lowercase letters, numbers, and dashes only. Will be normalized and de-duplicated.
+              </p>
             </div>
             <div className="md:col-span-2">
               <label className={labelClass}>Street Address *</label>

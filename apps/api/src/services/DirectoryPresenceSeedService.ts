@@ -55,6 +55,7 @@ export interface CreateSeedInput {
   identityConfidence: 'high' | 'medium';
   categoryFit: 'verified' | 'probable';
   notes?: string;
+  slug?: string;
   businessHours?: any;
   provenance?: Array<{
     fieldKey: string;
@@ -254,6 +255,34 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Normalize and de-duplicate a directory listing slug. If the requested slug
+   * is already in use by another listing, appends an incrementing numeric suffix.
+   */
+  private async ensureUniqueSlug(rawSlug: string, excludeListingId?: string): Promise<string> {
+    let base = rawSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 80);
+    if (!base) base = 'listing';
+
+    let candidate = base;
+    let counter = 2;
+    while (true) {
+      const existing = await prisma.$queryRaw<any[]>`
+        SELECT id FROM directory_listings_list WHERE slug = ${candidate}
+      `;
+      if (
+        existing.length === 0 ||
+        (excludeListingId && existing.length === 1 && existing[0].id === excludeListingId)
+      ) {
+        return candidate;
+      }
+      candidate = `${base}-${counter++}`;
+    }
+  }
+
+  /**
    * Create a new presence seed: tenant + listing + seed record + provenance.
    * The tenant is created with org_standing_mode = 'directory_seed'.
    */
@@ -281,11 +310,7 @@ class DirectoryPresenceSeedService {
     `;
 
     // Create the directory listing
-    const slug = input.businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .substring(0, 80);
+    const slug = await this.ensureUniqueSlug(input.slug || input.businessName);
 
     await prisma.$executeRaw`
       INSERT INTO directory_listings_list (
@@ -580,8 +605,9 @@ class DirectoryPresenceSeedService {
       params.push(fields.longitude);
     }
     if (fields.slug !== undefined) {
+      const uniqueSlug = await this.ensureUniqueSlug(fields.slug, listingId);
       setClauses.push('slug = $' + (params.length + 1));
-      params.push(fields.slug);
+      params.push(uniqueSlug);
     }
 
     params.push(listingId);
