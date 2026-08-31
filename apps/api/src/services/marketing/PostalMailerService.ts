@@ -205,7 +205,7 @@ class PostalMailerService {
     // Diagnostic gallery: the cold-outreach default.
     const galleryStages = ['seek', 'preview_built', 'shown'];
     if (galleryStages.includes(campaign.stage)) {
-      const tokenRow = await MarketingDeliverableService.getInstance().generateCampaignToken(
+      const tokenRow = await MarketingDeliverableService.generateCampaignToken(
         campaign.id,
         'diagnostic_gallery',
         undefined,
