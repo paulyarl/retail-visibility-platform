@@ -35,8 +35,13 @@ const CATEGORY_INTEGRATED_ID = 'mpt-j9bbem3l';
 const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
 
 // ─── Markers (presence => already wired, skip) ───────────────────────────
-const GOLD_STANDARD_MARKER = 'Gold Standard Benchmark — Binding for This Audit';
-const CATEGORY_INTELLIGENCE_MARKER = 'Category Intelligence — Binding for This Audit';
+// Versioned marker — bump the version string when the seed's content changes
+// so already-wired templates get re-applied. The transforms are idempotent
+// (they skip insertions that are already present and only apply targeted
+// content updates), so re-running on an already-wired body is safe.
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-08-31 -->';
+const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
+const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 
 // ─── Shared binding-section text ─────────────────────────────────────────
 
@@ -267,8 +272,21 @@ const P2_OPERATIONAL_STATUS_SCHEMA = `  "operational_status": {
 
 // ─── Insertion helpers ───────────────────────────────────────────────────
 
+/**
+ * Extract a fingerprint from insertion text — the first 80 chars of the
+ * trimmed content. Used for idempotency: if the fingerprint is already in
+ * the body, the insertion is skipped (the section was already wired).
+ */
+function fingerprint(text: string): string {
+  return text.trim().slice(0, 80);
+}
+
 /** Insert `insertion` immediately after the first occurrence of `anchor`. */
 function insertAfter(body: string, anchor: string, insertion: string): string {
+  // Idempotent: skip if the insertion content is already present.
+  if (body.includes(fingerprint(insertion))) {
+    return body;
+  }
   const idx = body.indexOf(anchor);
   if (idx === -1) {
     throw new Error(`Anchor not found in body:\n  ${anchor.slice(0, 120)}...`);
@@ -278,6 +296,10 @@ function insertAfter(body: string, anchor: string, insertion: string): string {
 
 /** Insert `insertion` immediately before the first occurrence of `anchor`. */
 function insertBefore(body: string, anchor: string, insertion: string): string {
+  // Idempotent: skip if the insertion content is already present.
+  if (body.includes(fingerprint(insertion))) {
+    return body;
+  }
   const idx = body.indexOf(anchor);
   if (idx === -1) {
     throw new Error(`Anchor not found in body:\n  ${anchor.slice(0, 120)}...`);
@@ -285,11 +307,15 @@ function insertBefore(body: string, anchor: string, insertion: string): string {
   return body.slice(0, idx) + insertion + body.slice(idx);
 }
 
-/** Replace the first occurrence of `from` with `to`. Throws if not found. */
+/**
+ * Replace the first occurrence of `from` with `to`. Idempotent: if `from`
+ * is not found (already replaced or not present in this template variant),
+ * returns the body unchanged instead of throwing.
+ */
 function replaceFirst(body: string, from: string, to: string): string {
   const idx = body.indexOf(from);
   if (idx === -1) {
-    throw new Error(`Replacement target not found in body:\n  ${from.slice(0, 120)}...`);
+    return body;
   }
   return body.slice(0, idx) + to + body.slice(idx + from.length);
 }
@@ -308,12 +334,26 @@ function transformCategoryIntegrated(body: string): string {
 
   // 2. Add profile_url to each platform object in the embedded JSON schema.
   //    All four platform objects end with `"data_status": "unavailable"`.
-  out = out.split('"data_status": "unavailable"').join(PROFILE_URL_SCHEMA_LINE);
+  //    Idempotent: skip if profile_url is already present.
+  if (!out.includes('"profile_url"')) {
+    out = out.split('"data_status": "unavailable"').join(PROFILE_URL_SCHEMA_LINE);
+  }
 
   // 3. Add gap_analysis + quality_gate_results after the sources array
   //    (replacing the sources close + top-level close with sources close +
   //    comma + new fields + top-level close).
   out = replaceFirst(out, '  ]\n}', '  ],\n' + GAP_AND_GATES_SCHEMA + '\n}');
+
+  // 4. Targeted content update: delivery_model enum now includes 'unknown'.
+  out = out.replace(
+    'delivery_model: none / marketplace / direct / both\n',
+    'delivery_model: none / marketplace / direct / both / unknown\n',
+  );
+
+  // 5. Append seed version marker for idempotency tracking.
+  if (!out.includes(SEED_VERSION_MARKER)) {
+    out = out + '\n' + SEED_VERSION_MARKER;
+  }
 
   return out;
 }
@@ -430,7 +470,10 @@ function transformSignalAligned(body: string): string {
   );
 
   // 14. Add profile_url to each platform object in the schema.
-  out = out.split('"data_status": "unavailable"').join(PROFILE_URL_SCHEMA_LINE);
+  //     Idempotent: skip if profile_url is already present.
+  if (!out.includes('"profile_url"')) {
+    out = out.split('"data_status": "unavailable"').join(PROFILE_URL_SCHEMA_LINE);
+  }
 
   // 15. specialized_sources_audited — insert before combined_review_metrics.
   out = replaceFirst(
@@ -457,6 +500,17 @@ function transformSignalAligned(body: string): string {
 
   // 18. gap_analysis + quality_gate_results — after the sources array.
   out = replaceFirst(out, '  ]\n}', '  ],\n' + GAP_AND_GATES_SCHEMA + '\n}');
+
+  // 19. Targeted content update: delivery_model enum now includes 'unknown'.
+  out = out.replace(
+    'delivery_model: none / marketplace / direct / both\n',
+    'delivery_model: none / marketplace / direct / both / unknown\n',
+  );
+
+  // 20. Append seed version marker for idempotency tracking.
+  if (!out.includes(SEED_VERSION_MARKER)) {
+    out = out + '\n' + SEED_VERSION_MARKER;
+  }
 
   return out;
 }
