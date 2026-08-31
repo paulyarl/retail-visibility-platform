@@ -135,12 +135,12 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('HookSuggestionService.suggestForCampaign', () => {
-  it('returns all 12 hooks ranked', async () => {
+  it('returns all 14 hooks ranked', async () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
     expect(result.suggestions).toHaveLength(14);
-    // Ranks are 1–13, sequential
-    for (let i = 0; i < 13; i++) {
+    // Ranks are 1–14, sequential
+    for (let i = 0; i < 14; i++) {
       expect(result.suggestions[i].rank).toBe(i + 1);
     }
   });
@@ -168,13 +168,15 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     });
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
-    const top4 = result.suggestions.slice(0, 4).map((s) => s.angle);
+    const top5 = result.suggestions.slice(0, 5).map((s) => s.angle);
 
-    // All A3-affinity hooks should be in the top 4
-    expect(top4).toContain('gbp_verification');
-    expect(top4).toContain('nap_normalization');
-    expect(top4).toContain('hours_sync');
-    expect(top4).toContain('cross_platform_expansion');
+    // All A3-affinity hooks should be in the top 5
+    // (gbp_verification, nap_normalization, hours_sync, website_repair, cross_platform_expansion)
+    expect(top5).toContain('gbp_verification');
+    expect(top5).toContain('nap_normalization');
+    expect(top5).toContain('hours_sync');
+    expect(top5).toContain('website_repair');
+    expect(top5).toContain('cross_platform_expansion');
   });
 
   it('signal-match count breaks ties within archetype-affinity tier', async () => {
@@ -204,12 +206,13 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     mockGetTriageResult.mockResolvedValue(makeTriageResult(['RA_LOW_REVIEW_VOLUME']));
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
-    const topAngles = result.suggestions.slice(0, 3).map((s) => s.angle);
+    const topAngles = result.suggestions.slice(0, 4).map((s) => s.angle);
 
-    // A4-affinity hooks (gbp_verification, website_foundation, click_to_call)
+    // A4-affinity hooks (gbp_verification, website_foundation, website_repair, click_to_call)
     // should still rank above signal-matched non-affinity hooks
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
+    expect(topAngles).toContain('website_repair');
     expect(topAngles).toContain('click_to_call');
   });
 
@@ -372,15 +375,23 @@ describe('Emerging-archetype rank boost', () => {
     expect(result.suggestions[2].angle).toBe('cross_platform_expansion');
   });
 
-  it('boosts INVISIBLE_ANCHOR angles (zero_footprint first — it has A3 affinity + boost)', async () => {
+  it('boosts INVISIBLE_ANCHOR angles (website_repair + zero_footprint have A3 affinity + boost)', async () => {
     mockGetLatestAuditData.mockResolvedValue(makeV3Audit('INVISIBLE_ANCHOR', 'insufficient_evidence'));
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    // zero_footprint has A3 archetype affinity AND is boosted by INVISIBLE_ANCHOR (pos 2).
-    // local_seo is boosted (pos 0) but has NO A3 affinity — so it ranks after
-    // all A3-affinity hooks. The boost is applied AFTER archetype affinity.
-    expect(result.suggestions[0].angle).toBe('zero_footprint');
+    // INVISIBLE_ANCHOR boost list: ['local_seo', 'website_foundation', 'website_repair', 'zero_footprint']
+    // website_repair has A3 affinity + boost (pos 2) → ranks above zero_footprint
+    // zero_footprint has A3 affinity + boost (pos 3)
+    // local_seo is boosted (pos 0) but has NO A3 affinity — ranks after all A3 hooks.
+    // The boost is applied AFTER archetype affinity.
+    const websiteRepairRank = result.suggestions.find((s) => s.angle === 'website_repair')!.rank;
+    const zeroFootprintRank = result.suggestions.find((s) => s.angle === 'zero_footprint')!.rank;
+    expect(websiteRepairRank).toBeLessThan(zeroFootprintRank);
+
+    // Both should be in the top 5 (A3 affinity + boost)
+    expect(websiteRepairRank).toBeLessThanOrEqual(5);
+    expect(zeroFootprintRank).toBeLessThanOrEqual(5);
 
     // Among non-A3 hooks, local_seo (boost pos 0) should rank above
     // website_foundation (boost pos 1).

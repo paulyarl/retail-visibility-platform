@@ -342,11 +342,12 @@ describe('CallScriptService.assembleForCampaign', () => {
     });
 
     const result = await CallScriptService.assembleForCampaign('camp-001');
-    const topAngles = result.hookOptions.slice(0, 3).map((h) => h.angle);
+    const topAngles = result.hookOptions.slice(0, 4).map((h) => h.angle);
 
-    // A4-affinity: gbp_verification, website_foundation, click_to_call
+    // A4-affinity: gbp_verification, website_foundation, website_repair, click_to_call
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
+    expect(topAngles).toContain('website_repair');
     expect(topAngles).toContain('click_to_call');
   });
 
