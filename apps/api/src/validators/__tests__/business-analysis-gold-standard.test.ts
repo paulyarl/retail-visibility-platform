@@ -190,4 +190,57 @@ describe('businessAnalysisSchema — Gold Standard additive fields (Sprint 0)', 
     const result = businessAnalysisSchema.safeParse(audit);
     expect(result.success).toBe(true);
   });
+
+  it('accepts array expected/actual for multi-value fields (additional_categories)', () => {
+    const audit = baseAudit();
+    audit.gap_analysis = {
+      gaps: [
+        {
+          platform: 'google',
+          field: 'additional_categories',
+          expected: ['Grocery store', 'International grocery store', 'Caribbean grocery store'],
+          actual: null,
+          gap_description: 'Additional categories not verified',
+          severity: 'recommended',
+        },
+      ],
+      summary: '1 gap',
+    };
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('businessAnalysisSchema — competitive_benchmarks.delivery_model', () => {
+  it('accepts "unknown" delivery_model on competitive benchmarks', () => {
+    const audit = baseAudit();
+    audit.competitive_benchmarks = [
+      {
+        business_name: 'Kaura International Food Market',
+        store_format: 'grocery',
+        geographic_reach: 'Indianapolis',
+        product_breadth: 'broad',
+        prepared_food_component: false,
+        delivery_model: 'unknown',
+        regional_specialization: 'Nigerian and West African',
+        profile_completeness_score: 8,
+        format_context_note: 'Comparable',
+        specialization_evidence_direct: true,
+      },
+    ];
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
+
+  it('still accepts null delivery_model on competitive benchmarks', () => {
+    const audit = baseAudit();
+    audit.competitive_benchmarks = [
+      {
+        business_name: 'Safari Market',
+        delivery_model: null,
+      },
+    ];
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
 });

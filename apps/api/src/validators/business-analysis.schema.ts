@@ -205,7 +205,7 @@ const operationalStatusEnum = z.enum([
   'unable_to_verify',
 ]);
 const productBreadthEnum = z.enum(['narrow', 'moderate', 'broad']);
-const deliveryModelEnum = z.enum(['none', 'marketplace', 'direct', 'both']);
+const deliveryModelEnum = z.enum(['none', 'marketplace', 'direct', 'both', 'unknown']);
 
 /**
  * Normalize `data_status` synonyms agents commonly emit. "verified" and
@@ -480,9 +480,11 @@ const gapAnalysisEntrySchema = z.object({
   field: z.string(),
   // `expected`/`actual` may be a string (e.g. "African grocery store"), a
   // boolean (presence fields like hours_present/website_present), a number
-  // (count fields like photo_count), or null when not verifiable.
-  expected: z.union([z.string(), z.boolean(), z.number()]).nullable().optional(),
-  actual: z.union([z.string(), z.boolean(), z.number()]).nullable().optional(),
+  // (count fields like photo_count), an array of strings/numbers/booleans
+  // (multi-value fields like additional_categories), or null when not
+  // verifiable.
+  expected: z.union([z.string(), z.boolean(), z.number(), z.array(z.union([z.string(), z.boolean(), z.number()]))]).nullable().optional(),
+  actual: z.union([z.string(), z.boolean(), z.number(), z.array(z.union([z.string(), z.boolean(), z.number()]))]).nullable().optional(),
   gap_description: z.string().nullable().optional(),
   severity: z.enum(['non_negotiable', 'recommended']).optional(),
 }).passthrough();
@@ -670,7 +672,7 @@ Return your response as JSON matching this exact schema:
       "geographic_reach": "<string>",
       "product_breadth": "narrow|moderate|broad",
       "prepared_food_component": <boolean>,
-      "delivery_model": "none|marketplace|direct|both",
+      "delivery_model": "none|marketplace|direct|both|unknown",
       "regional_specialization": "<string|null>",
       "google_rating": <number|null>,
       "google_review_count": <number|null>,
@@ -718,7 +720,7 @@ Return your response as JSON matching this exact schema:
   "business_type": "service|product|hybrid|unable_to_verify" (classify the business: 'service' for service businesses like HVAC/plumbing/dental, 'product' for inventory businesses like grocery stores/bakeries/pharmacies, 'hybrid' for businesses with both service and product components like restaurants/caterers, 'unable_to_verify' when the business model is unclear),
   "gap_analysis": {
     "gaps": [
-      { "platform": "<string>", "field": "<string>", "expected": "<string|boolean|number|null>", "actual": "<string|boolean|number|null>", "gap_description": "<string>", "severity": "non_negotiable|recommended" }
+      { "platform": "<string>", "field": "<string>", "expected": "<string|boolean|number|<array>|null>", "actual": "<string|boolean|number|<array>|null>", "gap_description": "<string>", "severity": "non_negotiable|recommended" }
     ],
     "summary": "<string>"
   },
@@ -732,7 +734,7 @@ Return your response as JSON matching this exact schema:
 
 GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present in the prompt):
 - platforms.{platform}.profile_url: "<string|null>" — the LIVE profile URL on each platform (e.g. "https://www.google.com/maps/place/..."). Always capture this.
-- gap_analysis: compare the business's actual profile against the gold-standard expected fields. For each field where the business's actual value differs from the expected value, produce a gap entry with the platform, field name, expected value, actual value, gap description, and severity (non_negotiable or recommended). The expected and actual values may be a string (e.g. "African grocery store"), a boolean (presence fields like hours_present/website_present — use true/false), a number (count fields like photo_count), or null when not verifiable.
+- gap_analysis: compare the business's actual profile against the gold-standard expected fields. For each field where the business's actual value differs from the expected value, produce a gap entry with the platform, field name, expected value, actual value, gap description, and severity (non_negotiable or recommended). The expected and actual values may be a string (e.g. "African grocery store"), a boolean (presence fields like hours_present/website_present — use true/false), a number (count fields like photo_count), an array of strings/numbers/booleans (multi-value fields like additional_categories — use a JSON array such as ["Grocery store", "International grocery store"]), or null when not verifiable.
 - quality_gate_results: for each gold-standard quality gate, record whether the business passed or failed, with the platform, gate name, passed boolean, severity, and notes.
 
 PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types):

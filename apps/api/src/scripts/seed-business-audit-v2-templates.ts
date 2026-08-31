@@ -183,7 +183,7 @@ For each benchmark, record:
 * geographic_reach
 * product_breadth: narrow / moderate / broad
 * prepared_food_component: true/false
-* delivery_model: none / marketplace / direct / both
+* delivery_model: none / marketplace / direct / both / unknown
 * regional_specialization: null or a concise description
 * google_rating, google_review_count, yelp_rating, yelp_review_count (when available)
 * profile_completeness_score: 0–10 (your rubric: claimed status, hours, photos, description, website link, ordering link, posts, categories, attributes, NAP consistency)
