@@ -33,11 +33,12 @@ const NEW_CODES = [
 ] as const;
 
 describe('Sprint 1 — signal taxonomy: 7 new product-visibility codes', () => {
-  it('KNOWN_SIGNAL_CODES contains all 7 new codes (24 → 31)', () => {
+  it('KNOWN_SIGNAL_CODES contains all 7 new codes', () => {
     for (const code of NEW_CODES) {
       expect(KNOWN_SIGNAL_CODES).toContain(code);
     }
-    expect(KNOWN_SIGNAL_CODES.length).toBe(31);
+    // 24 original + 7 sprint-1 product-visibility + 6 OX outreach-state = 37
+    expect(KNOWN_SIGNAL_CODES.length).toBe(37);
   });
 
   it('every new code has a human-readable label in SIGNAL_LABELS', () => {
@@ -96,8 +97,8 @@ describe('Sprint 1 — family predicate updates', () => {
   });
 });
 
-describe('Sprint 1 — SIGNAL_FAMILIES unchanged', () => {
-  it('SIGNAL_FAMILIES still has exactly 5 families (no new family added)', () => {
-    expect(SIGNAL_FAMILIES).toEqual(['RA', 'DS', 'WC', 'CP', 'VP']);
+describe('Sprint 1 — SIGNAL_FAMILIES', () => {
+  it('SIGNAL_FAMILIES has 6 families (OX added post-Sprint-1 for outreach-state)', () => {
+    expect(SIGNAL_FAMILIES).toEqual(['RA', 'DS', 'WC', 'CP', 'VP', 'OX']);
   });
 });

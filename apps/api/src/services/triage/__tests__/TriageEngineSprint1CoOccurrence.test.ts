@@ -127,20 +127,20 @@ describe('Sprint 1 — PB-07/PB-02 co-occurrence cascade fix', () => {
     // - low review volume (<15) → RA_LOW_REVIEW_VOLUME fires
     // Without the PB-02 none extension, PB-02 (rank 4) would win.
     // With the extension, PB-02 is excluded and PB-07 (rank 5) wins.
-    const signals = new Set(['RA_LOW_REVIEW_VOLUME', 'DS_MISSING_PRODUCT_CATALOG']);
+    const signals = ['RA_LOW_REVIEW_VOLUME', 'DS_MISSING_PRODUCT_CATALOG'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-07');
     expect(rec.archetype).toBe('A6');
   });
 
   it('grocery store with review drought + missing product catalog → PB-07 (not PB-02)', () => {
-    const signals = new Set(['RA_REVIEW_DROUGHT', 'DS_MISSING_PRODUCT_CATALOG']);
+    const signals = ['RA_REVIEW_DROUGHT', 'DS_MISSING_PRODUCT_CATALOG'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-07');
   });
 
   it('grocery store with product browsing gap + low review volume → PB-07', () => {
-    const signals = new Set(['RA_LOW_REVIEW_VOLUME', 'WC_MISSING_PRODUCT_BROWSING']);
+    const signals = ['RA_LOW_REVIEW_VOLUME', 'WC_MISSING_PRODUCT_BROWSING'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-07');
   });
@@ -148,32 +148,32 @@ describe('Sprint 1 — PB-07/PB-02 co-occurrence cascade fix', () => {
   it('service business with only low review volume (no product gap) → PB-02 (unchanged)', () => {
     // Additive guarantee: service businesses without product-visibility codes
     // still route to PB-02 exactly as before Sprint 1.
-    const signals = new Set(['RA_LOW_REVIEW_VOLUME']);
+    const signals = ['RA_LOW_REVIEW_VOLUME'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-02');
     expect(rec.archetype).toBe('A1');
   });
 
   it('service business with review drought only → PB-02 (unchanged)', () => {
-    const signals = new Set(['RA_REVIEW_DROUGHT']);
+    const signals = ['RA_REVIEW_DROUGHT'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-02');
   });
 
   it('product business with ONLY product-visibility codes (no review gap) → PB-07', () => {
-    const signals = new Set(['DS_MISSING_PRODUCT_CATALOG', 'WC_MISSING_PRODUCT_BROWSING']);
+    const signals = ['DS_MISSING_PRODUCT_CATALOG', 'WC_MISSING_PRODUCT_BROWSING'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-07');
   });
 
   it('product business with availability inquiry gap only → PB-07', () => {
-    const signals = new Set(['WC_MISSING_AVAILABILITY_INQUIRY']);
+    const signals = ['WC_MISSING_AVAILABILITY_INQUIRY'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-07');
   });
 
   it('product business with pickup/delivery gap only → PB-07', () => {
-    const signals = new Set(['WC_MISSING_PICKUP_DELIVERY']);
+    const signals = ['WC_MISSING_PICKUP_DELIVERY'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-07');
   });
@@ -185,13 +185,13 @@ describe('Sprint 1 — PB-07 none guard: BBB crisis still wins', () => {
   const cascade = sprint1Cascade();
 
   it('BBB grade suppression + product gap → PB-04 (not PB-07)', () => {
-    const signals = new Set(['RA_BBB_GRADE_SUPPRESSION', 'DS_MISSING_PRODUCT_CATALOG']);
+    const signals = ['RA_BBB_GRADE_SUPPRESSION', 'DS_MISSING_PRODUCT_CATALOG'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-04');
   });
 
   it('unanswered complaints + product gap → PB-04 (not PB-07)', () => {
-    const signals = new Set(['RA_UNANSWERED_COMPLAINTS', 'WC_MISSING_PRODUCT_BROWSING']);
+    const signals = ['RA_UNANSWERED_COMPLAINTS', 'WC_MISSING_PRODUCT_BROWSING'];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-04');
   });
@@ -203,9 +203,9 @@ describe('Sprint 1 — PB-05 dual triage still wins over PB-07 when both fire', 
   const cascade = sprint1Cascade();
 
   it('NAP drift + review drought + product gap → PB-05 (dual, rank 2)', () => {
-    const signals = new Set([
+    const signals = [
       'CP_NAP_NAME_DRIFT', 'RA_REVIEW_DROUGHT', 'DS_MISSING_PRODUCT_CATALOG',
-    ]);
+    ];
     const rec = evaluateTriage(signals, cascade);
     expect(rec.playbookCode).toBe('PB-05');
     expect(rec.archetype).toBe('A5');
