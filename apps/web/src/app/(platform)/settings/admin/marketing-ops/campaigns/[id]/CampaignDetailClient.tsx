@@ -211,6 +211,12 @@ export default function CampaignDetailClient({
   const [readinessDialog, setReadinessDialog] = useState<{ toStage: CampaignStage } | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
   const [readinessEnriching, setReadinessEnriching] = useState(false);
+  // Postal mailer dual-mode: AI execute vs import (headline/body).
+  const [mailerMode, setMailerMode] = useState<'ai' | 'import'>('ai');
+  const [importHeadline, setImportHeadline] = useState('');
+  const [importBody, setImportBody] = useState('');
+  const [mailerLoading, setMailerLoading] = useState(false);
+  const [mailerError, setMailerError] = useState<string | null>(null);
   // Soft gate for incomplete required checklist steps — operator may acknowledge and proceed.
   const [checklistIncompleteDialog, setChecklistIncompleteDialog] = useState<{
     toStage: CampaignStage;
@@ -1132,27 +1138,115 @@ export default function CampaignDetailClient({
                 {campaign.scope === 'business' && (campaign.stage === 'seek' || campaign.stage === 'preview_built') && (
                   <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Postal Mailer</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Generate a 4x6" triage-aware postcard with a scannable QR code.
-                      </span>
-                      <button
-                        onClick={async () => {
-                          try {
-                            const result = await marketingOpsService.generateMailer(campaignId);
-                            if (!result.success || !result.pdfUrl) {
-                              throw new Error(result.error || 'Failed to generate mailer');
-                            }
-                            window.open(result.pdfUrl, '_blank');
-                          } catch (err) {
-                            alert('Failed to generate mailer: ' + (err instanceof Error ? err.message : 'unknown error'));
-                          }
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        <Download className="w-3 h-3" />
-                        Generate Postcard PDF
-                      </button>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setMailerMode('ai'); setMailerError(null); }}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
+                            mailerMode === 'ai'
+                              ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300'
+                              : 'border-gray-300 text-gray-600 dark:border-neutral-600 dark:text-gray-400'
+                          }`}
+                        >
+                          Generate with AI
+                        </button>
+                        <button
+                          onClick={() => { setMailerMode('import'); setMailerError(null); }}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
+                            mailerMode === 'import'
+                              ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300'
+                              : 'border-gray-300 text-gray-600 dark:border-neutral-600 dark:text-gray-400'
+                          }`}
+                        >
+                          Import copy
+                        </button>
+                      </div>
+
+                      {mailerMode === 'ai' ? (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            Runs triage archetype resolution + AI copy generation.
+                          </p>
+                          <button
+                            onClick={async () => {
+                              setMailerLoading(true);
+                              setMailerError(null);
+                              try {
+                                const result = await marketingOpsService.generateMailer(campaignId);
+                                if (!result.success || !result.pdfUrl) {
+                                  throw new Error(result.error || 'Failed to generate mailer');
+                                }
+                                window.open(result.pdfUrl, '_blank');
+                              } catch (err) {
+                                setMailerError(err instanceof Error ? err.message : 'Failed to generate mailer');
+                              } finally {
+                                setMailerLoading(false);
+                              }
+                            }}
+                            disabled={mailerLoading}
+                            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                          >
+                            <Download className="w-3 h-3" />
+                            {mailerLoading ? 'Generating...' : 'Generate Postcard PDF'}
+                          </button>
+                          {mailerError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{mailerError}</p>}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Paste a headline and body. To resolve the prompt for an external AI, use the{' '}
+                            <Link
+                              href={`/settings/admin/marketing-ops/openers?campaign=${campaignId}`}
+                              target="_blank"
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              Openers workspace
+                            </Link>
+                            .
+                          </p>
+                          <input
+                            value={importHeadline}
+                            onChange={(e) => setImportHeadline(e.target.value)}
+                            placeholder="Headline (5-10 words)"
+                            maxLength={120}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
+                          />
+                          <textarea
+                            value={importBody}
+                            onChange={(e) => setImportBody(e.target.value)}
+                            placeholder="Body (25-45 words)"
+                            rows={3}
+                            maxLength={400}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
+                          />
+                          <button
+                            onClick={async () => {
+                              setMailerLoading(true);
+                              setMailerError(null);
+                              try {
+                                const result = await marketingOpsService.generateMailer(campaignId, {
+                                  headline: importHeadline.trim(),
+                                  body: importBody.trim(),
+                                });
+                                if (!result.success || !result.pdfUrl) {
+                                  throw new Error(result.error || 'Failed to generate mailer');
+                                }
+                                window.open(result.pdfUrl, '_blank');
+                              } catch (err) {
+                                setMailerError(err instanceof Error ? err.message : 'Failed to generate mailer');
+                              } finally {
+                                setMailerLoading(false);
+                              }
+                            }}
+                            disabled={mailerLoading || !importHeadline.trim() || !importBody.trim()}
+                            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                          >
+                            <Download className="w-3 h-3" />
+                            {mailerLoading ? 'Generating...' : 'Generate PDF from imported copy'}
+                          </button>
+                          {mailerError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{mailerError}</p>}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

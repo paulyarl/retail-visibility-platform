@@ -214,6 +214,7 @@ export function evaluateTriage(
     if (ruleMatches(rules, signalSet)) {
       return {
         playbookCode: playbook.code,
+        playbookName: playbook.name,
         category: playbook.category,
         archetype: playbook.archetype,
         confidence: rules.confidence,
@@ -266,6 +267,7 @@ export function evaluateAllMatchingPlaybooks(
     if (ruleMatches(rules, signalSet)) {
       matches.push({
         playbookCode: playbook.code,
+        playbookName: playbook.name,
         category: playbook.category,
         archetype: playbook.archetype,
         confidence: rules.confidence,
@@ -292,6 +294,7 @@ export function fallbackRecommendation(
   const signalSet = new Set(signals);
   return {
     playbookCode: fallback.code,
+    playbookName: fallback.name,
     category: fallback.category,
     archetype: fallback.archetype,
     confidence: fallback.matchingRules.confidence,

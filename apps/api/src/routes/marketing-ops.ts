@@ -5654,18 +5654,20 @@ router.post('/campaigns/:id/send-claim-invite', async (req: any, res: Response) 
  * POST /campaigns/:id/mailer
  *
  * Generate a 4x6" triage-aware postcard PDF for a campaign.
- * Uses the same archetype resolution, field extraction, and AI pipeline
- * as the opener workspace. The QR destination depends on campaign stage:
- *   - seek/preview_built/shown -> diagnostic gallery token
- *   - paid + unclaimed         -> claim token
- *   - claimed                  -> customer portal
+ * Dual path (mirrors opener execute/import):
+ *   - Path 1 (execute): no body → platform AI generates headline + body.
+ *   - Path 2 (import): body { headline, body } → uses operator-provided copy.
+ * If platform AI is unavailable, Path 1 returns 503 with code `ai_unavailable`.
  */
 router.post('/campaigns/:id/mailer', async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const ctx = getCtx(req);
+    const headline = req.body?.headline as string | undefined;
+    const body = req.body?.body as string | undefined;
+    const importCopy = headline && body ? { headline, body } : undefined;
 
-    const payload = await PostalMailerService.getInstance().generate(id, ctx);
+    const payload = await PostalMailerService.getInstance().generate(id, ctx, importCopy);
     const { pdfBuffer, filename } = await generatePostcardPdf(payload);
 
     res.setHeader('Content-Type', 'application/pdf');

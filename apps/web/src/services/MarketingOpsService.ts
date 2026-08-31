@@ -4497,11 +4497,19 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async generateMailer(campaignId: string): Promise<{ success: boolean; pdfUrl?: string; error?: string }> {
+  async generateMailer(
+    campaignId: string,
+    importCopy?: { headline: string; body: string },
+  ): Promise<{ success: boolean; pdfUrl?: string; error?: string }> {
     try {
+      const options: RequestInit = { method: 'POST' };
+      if (importCopy) {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(importCopy);
+      }
       const result = await this.makeDefaultRequest<Blob>(
         `/api/admin/marketing-ops/campaigns/${campaignId}/mailer`,
-        { method: 'POST' },
+        options,
         `mkt-ops-mailer-${campaignId}`,
         0,
         { responseType: ResponseType.BLOB },

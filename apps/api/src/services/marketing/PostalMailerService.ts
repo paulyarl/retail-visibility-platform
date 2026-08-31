@@ -15,7 +15,7 @@ import { prisma } from '../../prisma';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { unifiedConfig } from '../../config/unifiedConfig';
-import { NotFoundError, ValidationError } from '../../middleware/errorHandler';
+import { HttpError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { OutreachOpenerService } from '../OutreachOpenerService';
 import aiProviderFactory from '../ai-providers';
 import MarketingCustomerService from '../MarketingCustomerService';
@@ -50,7 +50,11 @@ class PostalMailerService {
   /**
    * Build a signal-aware postcard payload for a campaign.
    */
-  async generate(campaignId: string, ctx?: RequestCtx): Promise<PostalMailerPayload> {
+  async generate(
+    campaignId: string,
+    ctx?: RequestCtx,
+    importCopy?: { headline: string; body: string },
+  ): Promise<PostalMailerPayload> {
     const campaign = await prisma.mkt_campaigns_list.findUnique({
       where: { id: campaignId },
       select: {
@@ -90,8 +94,8 @@ class PostalMailerService {
       ctx,
     );
 
-    // Generate postcard copy with a short AI pass.
-    const { headline, body } = await this.generateCopy(resolvedPrompt, ctx);
+    // Generate postcard copy: import wins over AI.
+    const { headline, body } = await this.generateCopy(resolvedPrompt, importCopy, ctx);
 
     // Pick the QR destination and mint the right token.
     const { qrUrl, qrDestination, token } = await this.resolveQrDestination(campaign, ctx);
@@ -141,24 +145,46 @@ class PostalMailerService {
    * Run a short AI pass over the resolved opener prompt to produce a
    * headline + body that fit on a 4x6" postcard.
    */
-  private async generateCopy(resolvedPrompt: string, ctx?: RequestCtx): Promise<{ headline: string; body: string }> {
+  private async generateCopy(
+    resolvedPrompt: string,
+    importCopy?: { headline: string; body: string },
+    ctx?: RequestCtx,
+  ): Promise<{ headline: string; body: string }> {
+    // Path 2: operator-imported copy (external AI or hand-written).
+    if (importCopy?.headline?.trim() && importCopy?.body?.trim()) {
+      return {
+        headline: importCopy.headline.trim(),
+        body: importCopy.body.trim(),
+      };
+    }
+
+    // Path 1: platform AI generation.
     const systemPrompt = `You are writing the front of a 4x6 inch postcard for a local business owner. The user prompt contains the research and signal context. Output ONLY a valid JSON object with two keys: "headline" (5-10 words) and "body" (25-45 words). No markdown, no URLs, no pricing, no text outside the JSON. The tone is quiet, specific, and useful — prove you did the homework.`;
 
-    const result = await aiProviderFactory.generateChatCompletion({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: resolvedPrompt },
-      ],
-      maxTokens: 400,
-      temperature: 0.7,
-    });
+    try {
+      const result = await aiProviderFactory.generateChatCompletion({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: resolvedPrompt },
+        ],
+        maxTokens: 400,
+        temperature: 0.7,
+      });
 
-    const raw = result.content.trim();
-    const parsed = this.parsePostcardJson(raw);
-    return {
-      headline: parsed.headline || 'We found a visibility gap for your business',
-      body: parsed.body || 'Local customers are searching, but your public profile is missing key details. Scan the code to see what we found and how to fix it.',
-    };
+      const raw = (result.content ?? '').trim();
+      const parsed = this.parsePostcardJson(raw);
+      return {
+        headline: parsed.headline || 'We found a visibility gap for your business',
+        body: parsed.body || 'Local customers are searching, but your public profile is missing key details. Scan the code to see what we found and how to fix it.',
+      };
+    } catch (error) {
+      logger.error('PostalMailerService AI copy generation failed', undefined, { error: (error as Error).message });
+      throw new HttpError(
+        503,
+        'ai_unavailable',
+        'Platform AI is unavailable. Provide headline and body to import, or try again later.',
+      );
+    }
   }
 
   private parsePostcardJson(raw: string): { headline: string; body: string } {

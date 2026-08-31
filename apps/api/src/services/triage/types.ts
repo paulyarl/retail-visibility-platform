@@ -86,6 +86,7 @@ export interface DetectedSignal {
  */
 export interface TriageRecommendation {
   playbookCode: PlaybookCode;
+  playbookName: string;
   category: PlaybookCategory;
   archetype: ArchetypeCodeWithA6;
   confidence: number;
