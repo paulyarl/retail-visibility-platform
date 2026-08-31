@@ -141,10 +141,10 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           <div className="space-y-6">
             <div className="space-y-6">
               {/* Store Header */}
-              {tenantLogo && canShowLogo && (
+              {listing.businessName && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex items-start gap-6">
-                    {listing.logoUrl && (
+                    {listing.logoUrl && canShowLogo && (
                       <img src={listing.logoUrl} alt={listing.businessName} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
                     )}
                     <div className="flex-1">
