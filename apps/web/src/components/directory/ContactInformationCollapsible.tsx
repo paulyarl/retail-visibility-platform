@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Mail, MapPin, Phone } from "lucide-react";
 
-import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
-import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 interface ContactInformationCollapsibleProps {
 
@@ -36,8 +34,6 @@ export default function ContactInformationCollapsible({
     fullAddress?.fullAddress && isRetailStore
   ].filter(Boolean).length;
 
-  const { status: hoursStatus } = useStoreStatus(tenant?.id, true); // Public scope
-
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
       {/* Collapsible Header */}
@@ -63,13 +59,6 @@ export default function ContactInformationCollapsible({
       {/* Collapsible Content */}
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
-          {isRetailStore && (
-            <><div className="flex items-center gap-4 mb-2">
-              <HoursStatusBadge status={hoursStatus} size="lg" />
-            </div><div className="flex items-center gap-2 mb-3">
-                {hoursStatus?.label}
-              </div></>
-          )}
           <div id="contact-section" className="flex w-full  mb-4 h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
           {fullAddress && showMap && (
             <div className="flex items-start gap-2 mb-3">

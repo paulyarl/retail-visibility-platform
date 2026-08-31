@@ -279,7 +279,7 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
         zipCode: data.zipCode,
         latitude: data.latitude,
         longitude: data.longitude,
-        slug: data.slug,
+        slug: data.slug || undefined,
       },
       data.provenanceUpdates?.map((p) => ({
         fieldKey: p.fieldKey,
