@@ -15,6 +15,7 @@ import { prisma } from '../../prisma';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { OutreachOpenerService } from '../OutreachOpenerService';
 import aiProviderFactory from '../ai-providers';
 import MarketingCustomerService from '../MarketingCustomerService';
@@ -62,6 +63,7 @@ class PostalMailerService {
         address_zip: true,
         address_country: true,
         email: true,
+        scope: true,
         stage: true,
         date_paid: true,
         customer_id: true,
@@ -69,11 +71,16 @@ class PostalMailerService {
     });
 
     if (!campaign) {
-      throw Object.assign(new Error('Campaign not found'), { code: 'not_found' });
+      throw new NotFoundError('Campaign not found');
+    }
+
+    const allowedStages = ['seek', 'preview_built'];
+    if (campaign.scope !== 'business' || !allowedStages.includes(campaign.stage)) {
+      throw new ValidationError('Mailer is only available for business-scope campaigns in seek or preview_built stage');
     }
 
     if (!this.hasMailingAddress(campaign)) {
-      throw Object.assign(new Error('Campaign has no mailing address'), { code: 'no_address' });
+      throw new ValidationError('Campaign has no mailing address');
     }
 
     // Resolve archetype + extracted fields using the same pipeline as openers.

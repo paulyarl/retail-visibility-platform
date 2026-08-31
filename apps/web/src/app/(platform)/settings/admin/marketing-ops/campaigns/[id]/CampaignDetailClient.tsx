@@ -1128,32 +1128,34 @@ export default function CampaignDetailClient({
                   )}
                 </div>
 
-                {/* Postal Mailer */}
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Postal Mailer</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Generate a 4x6" triage-aware postcard with a scannable QR code.
-                    </span>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const result = await marketingOpsService.generateMailer(campaignId);
-                          if (!result.success || !result.pdfUrl) {
-                            throw new Error(result.error || 'Failed to generate mailer');
+                {/* Postal Mailer — business-scope seek/preview_built only */}
+                {campaign.scope === 'business' && (campaign.stage === 'seek' || campaign.stage === 'preview_built') && (
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Postal Mailer</h3>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Generate a 4x6" triage-aware postcard with a scannable QR code.
+                      </span>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const result = await marketingOpsService.generateMailer(campaignId);
+                            if (!result.success || !result.pdfUrl) {
+                              throw new Error(result.error || 'Failed to generate mailer');
+                            }
+                            window.open(result.pdfUrl, '_blank');
+                          } catch (err) {
+                            alert('Failed to generate mailer: ' + (err instanceof Error ? err.message : 'unknown error'));
                           }
-                          window.open(result.pdfUrl, '_blank');
-                        } catch (err) {
-                          alert('Failed to generate mailer: ' + (err instanceof Error ? err.message : 'unknown error'));
-                        }
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      <Download className="w-3 h-3" />
-                      Generate Postcard PDF
-                    </button>
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <Download className="w-3 h-3" />
+                        Generate Postcard PDF
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Conversion (Tenant Prospecting Channel) */}
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
