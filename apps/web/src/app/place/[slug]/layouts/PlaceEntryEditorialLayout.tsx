@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Info, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Info, ShieldCheck, Tag } from 'lucide-react';
+import { getCategoryUrl } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
@@ -107,6 +108,16 @@ export default function PlaceEntryEditorialLayout({
             <Link href="/directory" className="inline-flex items-center text-sm text-neutral-300 hover:text-white mb-8 transition-colors">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Directory
             </Link>
+            {listing.primaryCategory && (
+              <Link
+                href={getCategoryUrl({ name: listing.primaryCategory })}
+                className="inline-flex items-center gap-2 -mt-4 mb-6 text-sm font-medium text-neutral-300 hover:text-white transition-colors"
+              >
+                <Tag className="w-4 h-4" />
+                Browse {listing.primaryCategory} stores
+                <span aria-hidden="true">→</span>
+              </Link>
+            )}
             <div className="space-y-6">
               <div className="flex items-center gap-4">
                 {listing.logoUrl && (dirEntryOpts?.canShowLogo ?? true) && (
@@ -260,6 +271,21 @@ export default function PlaceEntryEditorialLayout({
                 sourceLabel="Place Claim Request"
                 showFaqs={false}
               />
+            </div>
+          </div>
+        )}
+
+        {listing.primaryCategory && (
+          <div className="bg-white border-t">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+              <Link
+                href={getCategoryUrl({ name: listing.primaryCategory })}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                <Tag className="w-5 h-5" />
+                Browse {listing.primaryCategory} stores in the directory
+                <span aria-hidden="true">→</span>
+              </Link>
             </div>
           </div>
         )}

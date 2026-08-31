@@ -308,6 +308,7 @@ export default function CategoryViewClient({
             listings={data?.listings || []}
             loading={loading}
             pagination={data?.pagination}
+            baseUrl="/directory/categories"
             categorySlug={categorySlug}
           />
         )}
