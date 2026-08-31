@@ -16,7 +16,7 @@
  * See: docs/LocalBiz/marketing_ops_outreach_pitch_construction_sprint_plan.md §1, §5
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Play,
   Upload,
@@ -279,7 +279,7 @@ function StarterExamples({ examples, onPick, archetype }: StarterExamplesProps) 
       </summary>
       <div className="px-3 pb-3 pt-1 space-y-1.5">
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
-          Unpersonalized starters — edit the <code className="font-mono">{'{{placeholders}}'}</code> after loading. AI Generate personalizes for the prospect automatically.
+          Unpersonalized starters — fill the Construction Variables panel above to auto-resolve <code className="font-mono">{'{{placeholders}}'}</code> on click, or edit them manually after loading. AI Generate personalizes for the prospect automatically.
         </p>
         {examples.map((ex, i) => (
           <button
@@ -428,6 +428,33 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const closerStarters = CLOSER_STARTERS[effectiveArchetype] ?? CLOSER_STARTERS.A1;
   const contactStarters = CONTACT_STARTERS[effectiveArchetype] ?? CONTACT_STARTERS.A1;
   const slotConfig = PREVIEW_SLOT_CONFIGS[effectiveArchetype] ?? PREVIEW_SLOT_CONFIGS.A1;
+
+  // ─── Construction Variables ─────────────────────────────────────────
+  // Operator-entered values for the {{placeholders}} used in the convertable
+  // starters. When a starter is clicked, the placeholders are resolved with
+  // whatever values the operator has entered here; unfilled variables are
+  // left as {{placeholder}} so the operator can see what still needs filling.
+  // The variable set is detected dynamically from the current archetype's
+  // starters so the operator only sees inputs for variables that actually
+  // appear in the offered starters.
+  const [constructionVars, setConstructionVars] = useState<Record<string, string>>({});
+
+  const usedVars = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of [...headerStarters, ...closerStarters, ...contactStarters]) {
+      for (const m of s.matchAll(/\{\{(\w+)\}\}/g)) set.add(m[1]);
+    }
+    return Array.from(set);
+  }, [headerStarters, closerStarters, contactStarters]);
+
+  const resolveVariables = useCallback(
+    (text: string): string =>
+      text.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
+        const value = constructionVars[key];
+        return value && value.trim() ? value : match;
+      }),
+    [constructionVars],
+  );
 
   // Stamp the renderer labels onto a review pair. The labels are read from
   // the first pair by the backend renderer, so we only need them on pair[0],
@@ -815,6 +842,48 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   // ─── Render ─────────────────────────────────────────────────────────
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-6">
+      {/* ─── Construction Variables ───────────────────────────────────
+          Operator-entered values for the {{placeholders}} in the convertable
+          starters below. When a starter is clicked, the placeholders are
+          resolved with these values; unfilled variables stay as
+          {{placeholder}} so the operator can fill them in the import field. */}
+      {usedVars.length > 0 && (
+        <details className="group rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-900/10">
+          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              Construction Variables
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                {usedVars.length}
+              </span>
+            </span>
+            <span className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 group-open:hidden">
+              Fill to auto-resolve starter placeholders
+            </span>
+          </summary>
+          <div className="px-3 pb-3 pt-1">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+              Enter values once and they'll be substituted into the <code className="font-mono">{'{{placeholders}}'}</code> when you click a convertable starter below. Unfilled variables are left as-is for manual editing.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {usedVars.map((varName) => (
+                <label key={varName} className="block">
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{`{{${varName}}}`}</span>
+                  <input
+                    type="text"
+                    value={constructionVars[varName] ?? ''}
+                    onChange={(e) =>
+                      setConstructionVars((prev) => ({ ...prev, [varName]: e.target.value }))
+                    }
+                    placeholder={varName}
+                    className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
+
       {/* ─── Suggested Hooks (Sprint 2 — Light-Score Hook Library) ──── */}
       <section className="rounded-lg border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-900/10 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -992,7 +1061,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
             {headerError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{headerError}</p>}
             <StarterExamples
               examples={headerStarters}
-              onPick={(text) => setHeaderImportText(text)}
+              onPick={(text) => setHeaderImportText(resolveVariables(text))}
               archetype={archetype}
             />
           </section>
@@ -1273,7 +1342,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
             {closerError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{closerError}</p>}
             <StarterExamples
               examples={closerStarters}
-              onPick={(text) => setCloserImportText(text)}
+              onPick={(text) => setCloserImportText(resolveVariables(text))}
               archetype={archetype}
             />
           </section>
@@ -1334,7 +1403,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
             {contactError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{contactError}</p>}
             <StarterExamples
               examples={contactStarters}
-              onPick={(text) => setContactText(text)}
+              onPick={(text) => setContactText(resolveVariables(text))}
               archetype={archetype}
             />
           </section>
