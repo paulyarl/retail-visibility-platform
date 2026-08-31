@@ -21,7 +21,7 @@ interface ContactInformationCollapsibleProps {
 
 
 export default function ContactInformationCollapsible({
-  tenant, fullAddress, initialExpanded = false, isRetailStore = true,showMap=true
+  tenant, fullAddress, initialExpanded = false, isRetailStore = true, showMap = true
 }: ContactInformationCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   // console.log(`[ContactInformationCollapsible] tenant:`, tenant);
@@ -30,8 +30,8 @@ export default function ContactInformationCollapsible({
   const contactCount = [
     tenant?.phone,
     tenant?.email,
-    tenant?.address && isRetailStore,
-    fullAddress?.fullAddress && isRetailStore
+    tenant?.address,
+    fullAddress?.fullAddress
   ].filter(Boolean).length;
 
   return (
