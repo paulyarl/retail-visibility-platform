@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle, Phone, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
@@ -211,6 +211,16 @@ export default function CampaignDetailClient({
   const [readinessDialog, setReadinessDialog] = useState<{ toStage: CampaignStage } | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
   const [readinessEnriching, setReadinessEnriching] = useState(false);
+  // Operating status verification — operator phone-verifies a prospect when
+  // an audit / Google surfaces a "permanently closed" label. On
+  // confirmed_closed the campaign transitions to `dead`; other outcomes
+  // only record a timestamped note.
+  const [showVerifyStatus, setShowVerifyStatus] = useState(false);
+  const [verifyOutcome, setVerifyOutcome] = useState<OperatingStatusOutcome | ''>('');
+  const [verifySourceUrl, setVerifySourceUrl] = useState('');
+  const [verifyNotes, setVerifyNotes] = useState('');
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   // Postal mailer dual-mode: AI execute vs import (headline/body).
   const [mailerMode, setMailerMode] = useState<'ai' | 'import'>('ai');
   const [importHeadline, setImportHeadline] = useState('');
@@ -470,6 +480,31 @@ export default function CampaignDetailClient({
     if (!checklistIncompleteDialog) return;
     await runTransition(checklistIncompleteDialog.toStage, true);
     setChecklistIncompleteDialog(null);
+  };
+
+  const handleVerifyOperatingStatus = async () => {
+    if (!verifyOutcome) {
+      setVerifyError('Select a call outcome.');
+      return;
+    }
+    setVerifyBusy(true);
+    setVerifyError(null);
+    try {
+      await marketingOpsService.verifyOperatingStatus(campaignId, {
+        outcome: verifyOutcome,
+        source_url: verifySourceUrl.trim() || undefined,
+        notes: verifyNotes.trim() || undefined,
+      });
+      setShowVerifyStatus(false);
+      setVerifyOutcome('');
+      setVerifySourceUrl('');
+      setVerifyNotes('');
+      await fetchCampaign();
+    } catch (err: any) {
+      setVerifyError(err.message || 'Failed to record operating status verification');
+    } finally {
+      setVerifyBusy(false);
+    }
   };
 
   const handleEnrichFromDialog = async () => {
@@ -929,6 +964,129 @@ export default function CampaignDetailClient({
                 {/* Business Contact card — visible before preview_built so the
                     operator has the right outreach channel at hand. */}
                 <BusinessContactCard campaign={campaign} onEnriched={fetchCampaign} />
+                {/* Operating Status Verification — surfaces when an audit /
+                    Google reports the business as "permanently closed" and the
+                    analyst couldn't verify. Operator calls the phone number on
+                    file, records the outcome, and on "confirmed closed" the
+                    campaign transitions to `dead`. Only shown for business-scope
+                    campaigns in pre-paid stages (a paid campaign that turns out
+                    to be closed needs a refund flow, not a kill switch). */}
+                {campaign.scope === 'business'
+                  && ['seek', 'preview_built', 'shown'].includes(campaign.stage)
+                  && (
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-900/10 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                            Operating Status Verification
+                          </h4>
+                          <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                            Use when an audit or Google reports this business as &quot;permanently closed.&quot; Call the phone number to verify before proceeding.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowVerifyStatus((v) => !v)}
+                        className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        Verify Operating Status
+                      </button>
+                    </div>
+                    {showVerifyStatus && (
+                      <div className="mt-3 border-t border-amber-200 dark:border-amber-900/40 pt-3 space-y-3">
+                        {campaign.phone ? (
+                          <p className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5" />
+                            Call:
+                            <a href={`tel:${campaign.phone}`} className="font-mono font-semibold underline">
+                              {campaign.phone}
+                            </a>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-red-600 dark:text-red-400">
+                            No phone number on file. Enrich from GBP on the Business Contact card above, or verify via another channel and record the outcome below.
+                          </p>
+                        )}
+                        <div>
+                          <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Call outcome</span>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {([
+                              { value: 'confirmed_closed', label: 'Confirmed permanently closed', hint: 'Transitions campaign to Dead' },
+                              { value: 'still_open', label: 'Still open (Google label wrong)', hint: 'Records a note only' },
+                              { value: 'no_answer', label: 'No answer', hint: 'Records a note only' },
+                            ] as { value: OperatingStatusOutcome; label: string; hint: string }[]).map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setVerifyOutcome(opt.value)}
+                                title={opt.hint}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                                  verifyOutcome === opt.value
+                                    ? 'bg-amber-600 text-white border-amber-600'
+                                    : 'bg-white dark:bg-neutral-800 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="block">
+                            <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Source URL (optional)</span>
+                            <input
+                              type="url"
+                              value={verifySourceUrl}
+                              onChange={(e) => setVerifySourceUrl(e.target.value)}
+                              placeholder="https://www.google.com/maps/place/..."
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-amber-300 dark:border-amber-800 rounded-md bg-white dark:bg-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Notes (optional)</span>
+                            <input
+                              type="text"
+                              value={verifyNotes}
+                              onChange={(e) => setVerifyNotes(e.target.value)}
+                              placeholder="e.g. Voicemail full, neighbor confirmed closed"
+                              className="mt-0.5 w-full px-2 py-1.5 text-sm border border-amber-300 dark:border-amber-800 rounded-md bg-white dark:bg-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                          </label>
+                        </div>
+                        {verifyError && (
+                          <p className="text-xs text-red-600 dark:text-red-400">{verifyError}</p>
+                        )}
+                        {verifyOutcome === 'confirmed_closed' && (
+                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                            This will transition the campaign to <strong>Dead</strong> and stamp a timestamped note. The campaign can be resurrected later if the business reopens.
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleVerifyOperatingStatus}
+                            disabled={verifyBusy || !verifyOutcome}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                          >
+                            {verifyBusy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Phone className="w-3.5 h-3.5" />}
+                            Record outcome
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowVerifyStatus(false); setVerifyError(null); }}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* Channel Readiness — shows email/phone/social/website availability
                     + cascade readiness indicator. */}
                 <ChannelReadinessWidget campaignId={campaign.id} />

@@ -1193,6 +1193,35 @@ router.post('/:id/transition', async (req: any, res: Response) => {
   }
 });
 
+// Operating status verification — operator phone-verifies a prospect's
+// operating status when an audit / Google surfaces a "permanently closed"
+// label. On confirmed_closed the campaign transitions to `dead` with a
+// timestamped note; still_open / no_answer only record a note.
+const verifyOperatingStatusSchema = z.object({
+  outcome: z.enum(['confirmed_closed', 'still_open', 'no_answer']),
+  source_url: z.string().url().optional(),
+  notes: z.string().optional(),
+});
+
+router.post('/:id/verify-operating-status', async (req: any, res: Response) => {
+  try {
+    const parsed = verifyOperatingStatusSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.verifyOperatingStatus({
+      campaignId: req.params.id,
+      outcome: parsed.outcome,
+      sourceUrl: parsed.source_url,
+      notes: parsed.notes,
+      changedBy: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Profile Repair — switch track (standard ↔ escalated) with stage remap
 const switchTrackSchema = z.object({
   to_track: z.enum(['standard', 'escalated']),

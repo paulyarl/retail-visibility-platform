@@ -1350,6 +1350,14 @@ export interface StageTransitionInput {
   acknowledge_incomplete?: boolean;
 }
 
+export type OperatingStatusOutcome = 'confirmed_closed' | 'still_open' | 'no_answer';
+
+export interface VerifyOperatingStatusInput {
+  outcome: OperatingStatusOutcome;
+  source_url?: string;
+  notes?: string;
+}
+
 export interface ChecklistIncompleteError {
   code: 'checklist_incomplete';
   incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
@@ -1693,6 +1701,20 @@ class MarketingOpsService extends AdminApiSingleton {
         throw checklistErr;
       }
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async verifyOperatingStatus(id: string, input: VerifyOperatingStatusInput): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/verify-operating-status`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-campaign-verify-status-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to verify operating status');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;

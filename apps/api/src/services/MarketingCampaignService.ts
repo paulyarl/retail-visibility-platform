@@ -69,7 +69,10 @@ export type CampaignScope = 'business' | 'category' | 'city' | 'intelligence';
 const REVIEW_TRANSITIONS: Record<string, string[]> = {
   seek:           ['preview_built', 'dead'],
   preview_built:  ['shown', 'dead'],
-  shown:          ['paid', 'lost', 'tenant_onboarded'],
+  // 'dead' is reachable from shown so an operator can kill a campaign when a
+  // permanently-closed business is discovered mid-outreach (verify-operating-
+  // status flow). 'lost' remains the no-response auto-advance target.
+  shown:          ['paid', 'lost', 'dead', 'tenant_onboarded'],
   paid:           ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
   delivered:      ['retainer_pitched', 'closed', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
   // Registry-driven intake submitted stages — flow back to delivered for
@@ -1195,6 +1198,78 @@ export class MarketingCampaignService extends BaseService {
       return updated;
     } catch (error) {
       logger.error('Failed to transition campaign stage', ctx, { error: (error as Error).message, campaignId, toStage });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // OPERATING STATUS VERIFICATION
+  // ====================
+
+  /**
+   * Record the result of an operator phone-verification of a prospect's
+   * operating status (triggered when an audit / Google surfaces a
+   * "permanently closed" label that the analyst couldn't verify).
+   *
+   * - confirmed_closed: appends a timestamped note to the campaign and
+   *   transitions to `dead` (resurrection path exists if the business
+   *   reopens). Only allowed from pre-paid review-pipeline stages and all
+   *   pre-intake recovery-pipeline stages; throws on invalid transition.
+   * - still_open / no_answer: appends a timestamped note only (no stage
+   *   change) so the operator has a record that the Google label was
+   *   checked and disproved / couldn't be confirmed.
+   */
+  async verifyOperatingStatus(input: {
+    campaignId: string;
+    outcome: 'confirmed_closed' | 'still_open' | 'no_answer';
+    sourceUrl?: string;
+    notes?: string;
+    changedBy?: string;
+  }, ctx?: RequestCtx): Promise<any> {
+    const { campaignId, outcome, sourceUrl, notes, changedBy } = input;
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+      if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
+
+      const stamp = new Date().toISOString();
+      const sourcePart = sourceUrl ? ` Source: ${sourceUrl}.` : '';
+      const notesPart = notes ? ` ${notes}` : '';
+      const verificationNote =
+        outcome === 'confirmed_closed'
+          ? `[${stamp}] Permanently closed verified via phone call.${sourcePart}${notesPart}`
+          : outcome === 'still_open'
+          ? `[${stamp}] Operating status verified via phone call: still open (Google "permanently closed" label was wrong).${sourcePart}${notesPart}`
+          : `[${stamp}] Phone verification attempted — no answer.${sourcePart}${notesPart}`;
+
+      // Append to the campaign notes field (preserve any existing notes).
+      const existingNotes = (campaign.notes as string | null) ?? '';
+      const updatedNotes = existingNotes
+        ? `${existingNotes}\n${verificationNote}`
+        : verificationNote;
+
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { notes: updatedNotes },
+      });
+
+      if (outcome === 'confirmed_closed') {
+        // Transition to dead. The transition map allows seek/preview_built/
+        // shown → dead (review) and all pre-intake recovery stages → dead.
+        // An invalid transition (e.g. already paid) throws here — the
+        // operator should handle paid campaigns via refund + manual stage.
+        return await this.transitionStage({
+          campaignId,
+          toStage: 'dead',
+          notes: verificationNote,
+          triggerType: 'manual',
+          changedBy,
+        }, ctx);
+      }
+
+      logger.info('Operating status verification recorded', ctx, { campaignId, outcome });
+      return await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+    } catch (error) {
+      logger.error('Failed to record operating status verification', ctx, { error: (error as Error).message, campaignId, outcome });
       throw this.handleError(error, ctx);
     }
   }
