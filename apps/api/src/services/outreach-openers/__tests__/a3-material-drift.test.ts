@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { buildArchetypePrompt } from '../archetype-prompts';
 import {
   extractA3Fields,
+  extractFields,
   type A3Fields,
   type CommonFields,
 } from '../field-extractors';
@@ -210,6 +211,58 @@ describe('extractA3Fields — website status fields', () => {
     });
     const fields = extractA3Fields(audit, common);
     expect(fields.website_missing_cta).toBe(false);
+  });
+
+  it('returns website_broken=true when WC_BROKEN_WEBSITE is in triggered_signals even if website status is not "dead"', () => {
+    // Regression: the signal may be model-emitted (from audit_data.detected_signals[])
+    // even when the website.status field doesn't use the exact "dead"/"timeout"
+    // strings. The field extractor must check the triggered signals too.
+    const audit = baseAudit({ website: { url: 'https://example.com', status: 'error' } });
+    const commonWithSignal: CommonFields = {
+      ...common,
+      triggered_signals: [
+        { code: 'WC_BROKEN_WEBSITE', label: 'Broken Website (dead URL)', severity: 'crisis' },
+      ],
+    };
+    const fields = extractA3Fields(audit, commonWithSignal);
+    expect(fields.website_broken).toBe(true);
+  });
+
+  it('returns website_missing_cta=true when WC_MISSING_CTA is in triggered_signals even if website audit says CTA present', () => {
+    // Same regression pattern: model-emitted signal vs raw field disagreement.
+    const audit = baseAudit({
+      website: { url: 'https://example.com', status: 'working', call_to_action_present: 'yes' },
+    });
+    const commonWithSignal: CommonFields = {
+      ...common,
+      triggered_signals: [
+        { code: 'WC_MISSING_CTA', label: 'Missing Call-to-Action', severity: 'material' },
+      ],
+    };
+    const fields = extractA3Fields(audit, commonWithSignal);
+    expect(fields.website_missing_cta).toBe(true);
+  });
+});
+
+// ─── extractFields dispatcher — primary_signal_severity override ─────────
+
+describe('extractFields dispatcher — primary_signal_severity', () => {
+  it('always uses the computed severity, not the buildCommonFields default', () => {
+    // Regression: buildCommonFields defaults primary_signal_severity to
+    // 'borderline'. The dispatcher must override it with the computed value
+    // (e.g., 'cosmetic' for A3 with cosmetic drift), not keep the default.
+    const audit = baseAudit({
+      nap_consistency: {
+        overall_status: 'consistent',
+        phone_variations: ['(317) 297-7036', '317-297-7036'],
+      },
+    });
+    const commonWithDefault: CommonFields = {
+      ...common,
+      primary_signal_severity: 'borderline', // the buildCommonFields default
+    };
+    const fields = extractFields('A3', audit, commonWithDefault) as A3Fields;
+    expect(fields.primary_signal_severity).toBe('cosmetic');
   });
 });
 

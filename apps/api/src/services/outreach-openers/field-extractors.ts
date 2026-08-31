@@ -247,6 +247,13 @@ export function extractA3Fields(
 ): A3Fields {
   const nap = auditData.nap_consistency;
   const website = auditData.website;
+  // website_broken: check both the raw website status AND the triggered
+  // signals. The signal may be model-emitted (from audit_data.detected_signals[])
+  // even when the website.status field doesn't use the exact "dead"/"timeout"
+  // strings — the audit LLM may have used a different status value but still
+  // flagged the URL as broken in its detected_signals array.
+  const triggeredCodes = new Set((common.triggered_signals ?? []).map((s) => s.code));
+  const websiteBroken = isDeadUrl(website) || triggeredCodes.has('WC_BROKEN_WEBSITE');
   return {
     ...common,
     canonical_name: nap?.canonical_name ?? null,
@@ -256,8 +263,8 @@ export function extractA3Fields(
     platforms_with_listings: platformLabels(auditData),
     overall_status: nap?.overall_status ?? 'unknown',
     material_drift: nap ? hasMaterialDrift(nap) : false,
-    website_broken: isDeadUrl(website),
-    website_missing_cta: isMissingCta(website),
+    website_broken: websiteBroken,
+    website_missing_cta: isMissingCta(website) || triggeredCodes.has('WC_MISSING_CTA'),
   };
 }
 
@@ -372,7 +379,11 @@ export function extractFields(
     : null;
   const commonWithSeverity: CommonFields = {
     ...common,
-    primary_signal_severity: common.primary_signal_severity ?? primarySeverity,
+    // Always use the computed primary severity — buildCommonFields defaults
+    // to 'borderline' as a placeholder, but the dispatcher has the audit data
+    // and computes the real severity. Using ?? here would keep the placeholder
+    // since 'borderline' is a valid string (not null/undefined).
+    primary_signal_severity: primarySeverity,
     strongest_co_occurring: common.strongest_co_occurring ?? strongestCoOccurring,
   };
 
