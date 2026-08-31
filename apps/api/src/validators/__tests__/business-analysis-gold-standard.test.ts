@@ -165,4 +165,29 @@ describe('businessAnalysisSchema — Gold Standard additive fields (Sprint 0)', 
     const result = businessAnalysisSchema.safeParse(audit);
     expect(result.success).toBe(true);
   });
+
+  it('accepts boolean expected/actual for presence fields (hours_present, website_present)', () => {
+    const audit = baseAudit();
+    audit.gap_analysis = {
+      gaps: [
+        { platform: 'universal', field: 'hours_present', expected: true, actual: null, gap_description: 'Hours not verified', severity: 'non_negotiable' },
+        { platform: 'universal', field: 'website_present', expected: true, actual: null, gap_description: 'No website', severity: 'recommended' },
+      ],
+      summary: '2 gaps',
+    };
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts numeric expected/actual for count fields (photo_count)', () => {
+    const audit = baseAudit();
+    audit.gap_analysis = {
+      gaps: [
+        { platform: 'google', field: 'photo_count', expected: 15, actual: 3, gap_description: 'Too few photos', severity: 'recommended' },
+      ],
+      summary: '1 gap',
+    };
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+  });
 });

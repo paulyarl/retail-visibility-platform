@@ -344,3 +344,97 @@ describe('Sprint 1 — DS_PHOTO_DEFICIT business-type-sensitive threshold', () =
     expect(extractSignals(i)).not.toContain('DS_PHOTO_DEFICIT');
   });
 });
+
+// ─── WC_* website-absence authority (§W1) ────────────────────────────────
+//
+// Regression for the Mwamba case: the analyst could not verify a website
+// (status none_found / unable_to_verify, url null) but the campaign row
+// carried a stale has_website='yes' ingested from a directory. The audit's
+// direct absence finding must be authoritative and emit WC_MISSING_WEBSITE
+// regardless of the stale campaign column. Conversion-friction WC_* signals
+// must NOT fire for a non-existent website.
+
+describe('Sprint 1 — WC_MISSING_WEBSITE absence authority', () => {
+  it('fires when status=none_found + no url, even with stale has_website=yes', () => {
+    const i = input(
+      { website: { url: null, status: 'none_found' } as any },
+      { has_website: 'yes', website_url: 'https://stale-directory-hint.example' },
+    );
+    expect(extractSignals(i)).toContain('WC_MISSING_WEBSITE');
+  });
+
+  it('fires when status=unable_to_verify + no url, even with stale has_website=yes', () => {
+    const i = input(
+      { website: { url: null, status: 'unable_to_verify' } as any },
+      { has_website: 'yes', website_url: 'https://stale-directory-hint.example' },
+    );
+    expect(extractSignals(i)).toContain('WC_MISSING_WEBSITE');
+  });
+
+  it('does NOT fire when the website exists (status working + url)', () => {
+    const i = input(
+      { website: { url: 'https://example.com', status: 'working' } as any },
+      { has_website: 'yes', website_url: 'https://example.com' },
+    );
+    expect(extractSignals(i)).not.toContain('WC_MISSING_WEBSITE');
+  });
+
+  it('fires when no website block + campaign has_website=no (legacy fallback preserved)', () => {
+    const i = input({ website: undefined }, { has_website: 'no', website_url: null });
+    expect(extractSignals(i)).toContain('WC_MISSING_WEBSITE');
+  });
+
+  it('does NOT fire when no website block + campaign has_website=yes (legacy preserved)', () => {
+    const i = input({ website: undefined }, { has_website: 'yes', website_url: 'https://example.com' });
+    expect(extractSignals(i)).not.toContain('WC_MISSING_WEBSITE');
+  });
+});
+
+describe('Sprint 1 — WC_* conversion-friction gated by website existence (§W1)', () => {
+  // When the audit confirms NO website, the friction signals are noise.
+  const absentWebsite = { url: null, status: 'none_found' } as any;
+  const absentCases: Array<[string, any]> = [
+    ['WC_MISSING_CTA', { call_to_action_present: null, click_to_call_available: null, has_booking: false }],
+    ['WC_MISSING_SERVICE_PAGES', { conversion_opportunities: [] }],
+    ['WC_MOBILE_FRICTION', { mobile_friendly: 'no' }],
+    ['WC_MISSING_PRODUCT_BROWSING', { has_product_browsing: false }],
+    ['WC_MISSING_AVAILABILITY_INQUIRY', { has_availability_inquiry: false }],
+    ['WC_MISSING_PICKUP_DELIVERY', { has_pickup_ordering: false, has_delivery_option: false }],
+  ];
+
+  for (const [code, defect] of absentCases) {
+    it(`does NOT emit ${code} when no website was confirmed (status=none_found)`, () => {
+      const i = input(
+        { website: { ...absentWebsite, ...defect } as any },
+        { has_website: 'yes', website_url: null },
+      );
+      expect(extractSignals(i)).not.toContain(code);
+    });
+  }
+
+  it('regression: friction signals still fire when a website exists but is defective', () => {
+    const i = input({
+      website: {
+        url: 'https://example.com',
+        status: 'working',
+        call_to_action_present: null,
+        click_to_call_available: null,
+        has_booking: false,
+        conversion_opportunities: [],
+        mobile_friendly: 'no',
+        has_product_browsing: false,
+        has_availability_inquiry: false,
+        has_pickup_ordering: false,
+        has_delivery_option: false,
+      } as any,
+    });
+    const signals = extractSignals(i);
+    expect(signals).toContain('WC_MISSING_CTA');
+    expect(signals).toContain('WC_MISSING_SERVICE_PAGES');
+    expect(signals).toContain('WC_MOBILE_FRICTION');
+    expect(signals).toContain('WC_MISSING_PRODUCT_BROWSING');
+    expect(signals).toContain('WC_MISSING_AVAILABILITY_INQUIRY');
+    expect(signals).toContain('WC_MISSING_PICKUP_DELIVERY');
+    expect(signals).not.toContain('WC_MISSING_WEBSITE');
+  });
+});

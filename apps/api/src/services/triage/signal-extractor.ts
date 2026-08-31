@@ -310,74 +310,101 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
   }
 
   // WC_* — website & conversion signals
+  //
+  // §W1: A website "exists" only when the audit confirms one — a url is
+  // present OR status is working/broken/social_media_only. status
+  // `none_found` or `unable_to_verify` means NO website was confirmed, so
+  // the only valid WC_* signal in that case is WC_MISSING_WEBSITE. The
+  // conversion-friction signals (WC_MISSING_CTA, WC_MISSING_SERVICE_PAGES,
+  // WC_MOBILE_FRICTION, ...) describe defects ON an existing website and
+  // must NOT fire for a non-existent website — "missing CTA on no website"
+  // is noise that dilutes the headline WC_MISSING_WEBSITE signal.
   if (auditData?.website) {
     const website = auditData.website;
+    const status = website.status?.toLowerCase();
+    const websiteExists =
+      !!website.url ||
+      status === 'working' ||
+      status === 'broken' ||
+      status === 'social_media_only';
+    // Explicit absence determination by the analyst. This is authoritative
+    // and overrides a stale campaign.has_website='yes' that may have been
+    // ingested from a directory listing which the audit later could not
+    // verify (the Mwamba case: directory hinted a site, audit found none).
+    const websiteAbsent = !website.url && (status === 'none_found' || status === 'unable_to_verify');
 
     // WC_MISSING_WEBSITE — no website detected
     if (!signals.has('WC_MISSING_WEBSITE')) {
-      if (!website.url && (!campaign.has_website || campaign.has_website === 'no')) {
+      if (
+        websiteAbsent ||
+        (!websiteExists && (!campaign.has_website || campaign.has_website === 'no'))
+      ) {
         signals.add('WC_MISSING_WEBSITE');
       }
     }
 
-    // WC_BROKEN_WEBSITE — dead URL
-    if (!signals.has('WC_BROKEN_WEBSITE')) {
-      if (isDeadUrl(website)) {
-        signals.add('WC_BROKEN_WEBSITE');
+    // The remaining WC_* signals describe friction ON an existing website.
+    // Skip them entirely when no website was confirmed.
+    if (websiteExists) {
+      // WC_BROKEN_WEBSITE — dead URL
+      if (!signals.has('WC_BROKEN_WEBSITE')) {
+        if (isDeadUrl(website)) {
+          signals.add('WC_BROKEN_WEBSITE');
+        }
       }
-    }
 
-    // WC_URL_MISMATCH — audit URL differs from campaign URL
-    if (!signals.has('WC_URL_MISMATCH')) {
-      if (isUrlMismatch(website, campaign.website_url)) {
-        signals.add('WC_URL_MISMATCH');
+      // WC_URL_MISMATCH — audit URL differs from campaign URL
+      if (!signals.has('WC_URL_MISMATCH')) {
+        if (isUrlMismatch(website, campaign.website_url)) {
+          signals.add('WC_URL_MISMATCH');
+        }
       }
-    }
 
-    // WC_MISSING_CTA — no call-to-action / click-to-call / booking
-    if (!signals.has('WC_MISSING_CTA')) {
-      const hasCta =
-        isYesLike(website.call_to_action_present) ||
-        isYesLike(website.click_to_call_available) ||
-        website.has_booking === true;
-      if (!hasCta) {
-        signals.add('WC_MISSING_CTA');
+      // WC_MISSING_CTA — no call-to-action / click-to-call / booking
+      if (!signals.has('WC_MISSING_CTA')) {
+        const hasCta =
+          isYesLike(website.call_to_action_present) ||
+          isYesLike(website.click_to_call_available) ||
+          website.has_booking === true;
+        if (!hasCta) {
+          signals.add('WC_MISSING_CTA');
+        }
       }
-    }
 
-    // WC_MISSING_SERVICE_PAGES — no dedicated service pages
-    if (!signals.has('WC_MISSING_SERVICE_PAGES')) {
-      const conv = website.conversion_opportunities ?? [];
-      if (conv.length === 0) {
-        signals.add('WC_MISSING_SERVICE_PAGES');
+      // WC_MISSING_SERVICE_PAGES — no dedicated service pages
+      if (!signals.has('WC_MISSING_SERVICE_PAGES')) {
+        const conv = website.conversion_opportunities ?? [];
+        if (conv.length === 0) {
+          signals.add('WC_MISSING_SERVICE_PAGES');
+        }
       }
-    }
 
-    // WC_MOBILE_FRICTION — not mobile-friendly
-    if (!signals.has('WC_MOBILE_FRICTION')) {
-      if (website.mobile_friendly && isNoLike(website.mobile_friendly)) {
-        signals.add('WC_MOBILE_FRICTION');
+      // WC_MOBILE_FRICTION — not mobile-friendly
+      if (!signals.has('WC_MOBILE_FRICTION')) {
+        if (website.mobile_friendly && isNoLike(website.mobile_friendly)) {
+          signals.add('WC_MOBILE_FRICTION');
+        }
       }
-    }
 
-    // WC_MISSING_PRODUCT_BROWSING — website exists but no product/category browsing
-    if (!signals.has('WC_MISSING_PRODUCT_BROWSING')) {
-      if (website.has_product_browsing === false) {
-        signals.add('WC_MISSING_PRODUCT_BROWSING');
+      // WC_MISSING_PRODUCT_BROWSING — website exists but no product/category browsing
+      if (!signals.has('WC_MISSING_PRODUCT_BROWSING')) {
+        if (website.has_product_browsing === false) {
+          signals.add('WC_MISSING_PRODUCT_BROWSING');
+        }
       }
-    }
 
-    // WC_MISSING_AVAILABILITY_INQUIRY — no way to check stock before visiting
-    if (!signals.has('WC_MISSING_AVAILABILITY_INQUIRY')) {
-      if (website.has_availability_inquiry === false) {
-        signals.add('WC_MISSING_AVAILABILITY_INQUIRY');
+      // WC_MISSING_AVAILABILITY_INQUIRY — no way to check stock before visiting
+      if (!signals.has('WC_MISSING_AVAILABILITY_INQUIRY')) {
+        if (website.has_availability_inquiry === false) {
+          signals.add('WC_MISSING_AVAILABILITY_INQUIRY');
+        }
       }
-    }
 
-    // WC_MISSING_PICKUP_DELIVERY — no pickup or delivery option surfaced online
-    if (!signals.has('WC_MISSING_PICKUP_DELIVERY')) {
-      if (website.has_pickup_ordering === false && website.has_delivery_option === false) {
-        signals.add('WC_MISSING_PICKUP_DELIVERY');
+      // WC_MISSING_PICKUP_DELIVERY — no pickup or delivery option surfaced online
+      if (!signals.has('WC_MISSING_PICKUP_DELIVERY')) {
+        if (website.has_pickup_ordering === false && website.has_delivery_option === false) {
+          signals.add('WC_MISSING_PICKUP_DELIVERY');
+        }
       }
     }
   } else if (!signals.has('WC_MISSING_WEBSITE')) {
