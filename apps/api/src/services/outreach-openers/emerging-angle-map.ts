@@ -40,7 +40,7 @@ export type ChannelHint = 'phone_first' | null;
 
 export const EMERGING_ANGLE_MAP: Record<EmergingArchetype, HookAngle[]> = {
   DIRECTORY_GHOST:              ['zero_footprint', 'gbp_verification', 'cross_platform_expansion'],
-  INVISIBLE_ANCHOR:             ['local_seo', 'website_foundation', 'zero_footprint'],
+  INVISIBLE_ANCHOR:             ['local_seo', 'website_foundation', 'website_repair', 'zero_footprint'],
   SINGLE_PLATFORM:              ['cross_platform_expansion', 'photo_content_setup'],
   MISCATEGORIZED_OR_MISLABELED: ['nap_normalization', 'local_seo'],
   INSUFFICIENT_EVIDENCE:        ['zero_footprint'],

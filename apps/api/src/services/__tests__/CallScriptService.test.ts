@@ -199,11 +199,11 @@ describe('CallScriptService.assembleForCampaign', () => {
       .rejects.toThrow('phone_required');
   });
 
-  it('returns all 13 ranked hook options', async () => {
+  it('returns all 14 ranked hook options', async () => {
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    expect(result.hookOptions).toHaveLength(13);
-    for (let i = 0; i < 13; i++) {
+    expect(result.hookOptions).toHaveLength(14);
+    for (let i = 0; i < 14; i++) {
       expect(result.hookOptions[i].rank).toBe(i + 1);
     }
   });

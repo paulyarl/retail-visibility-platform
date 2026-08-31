@@ -18,6 +18,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import type { RequestCtx } from '../context';
+import { unifiedConfig } from '../config/unifiedConfig';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import MarketingCampaignService from './MarketingCampaignService';
 import { resolveCampaignArchetype } from './OutreachOpenerService';
@@ -53,6 +54,8 @@ import {
   type ChannelHint,
 } from './outreach-openers/emerging-angle-map';
 import type { ArchetypeCode } from './outreach-openers/archetype-selection';
+import { computeSignalSeverity, severityRank, type SignalSeverity } from './outreach-openers/signal-magnitude';
+import type { BusinessAnalysisAuditData } from './outreach-openers/archetype-selection';
 import type { DetectedSignal } from './triage/types';
 import BusinessContextService from './deliverable/BusinessContextService';
 
@@ -178,6 +181,7 @@ export class CallScriptService extends BaseService {
     const category = rawCategory ? rawCategory.toLowerCase() : null;
     const address = this.formatAddress(campaign);
     const operatorName = await this.resolveOperatorName(campaign, ctx);
+    const claimUrl = await this.resolveClaimUrl(campaignId, ctx);
 
     const mergeContext: PhoneMergeContext = {
       business: businessName,
@@ -185,6 +189,7 @@ export class CallScriptService extends BaseService {
       category,
       city,
       operator_name: operatorName,
+      claim_url: claimUrl,
     };
 
     // 4. Read worksheet for call context
@@ -208,9 +213,11 @@ export class CallScriptService extends BaseService {
     // 5b. Extract V3 emerging archetype + channel hint (best-effort)
     let emergingAngles: HookAngle[] = [];
     let channelHint: ChannelHint = null;
+    let auditDataForSeverity: BusinessAnalysisAuditData | null = null;
     try {
       const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
       if (auditResult) {
+        auditDataForSeverity = auditResult.auditData;
         const emergingArchetype = extractEmergingArchetype(auditResult.auditData, businessName);
         if (emergingArchetype) {
           emergingAngles = getEmergingAngles(emergingArchetype);
@@ -227,8 +234,18 @@ export class CallScriptService extends BaseService {
       // No audit data — rank without emerging boost
     }
 
-    // 6. Rank + resolve all 13 hooks (with emerging-archetype boost)
-    const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles);
+    // 5c. Compute severity for each detected signal — same severity-weighted
+    // ranking as HookSuggestionService. Prevents cosmetic NAP drift (3
+    // signals) from outranking a crisis broken-website signal (1 signal).
+    const signalSeverity = new Map<string, SignalSeverity>();
+    for (const code of signalCodes) {
+      signalSeverity.set(code, auditDataForSeverity
+        ? computeSignalSeverity(code, auditDataForSeverity)
+        : 'borderline');
+    }
+
+    // 6. Rank + resolve all 14 hooks (with emerging-archetype boost + severity weighting)
+    const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles, signalSeverity);
 
     // 7. Select the hook for Stage 2
     const selectedAngle: HookAngle = (angle && isValidHookAngle(angle))
@@ -512,7 +529,7 @@ export class CallScriptService extends BaseService {
   // ─── Ranking (phone hooks) ────────────────────────────────────────────
 
   /**
-   * Rank all 13 hooks for the phone channel. Same ranking logic as
+   * Rank all 14 hooks for the phone channel. Same ranking logic as
    * HookSuggestionService but resolves phone_hook instead of email body.
    * Emerging-archetype boost applied after archetype affinity, before
    * signal-match tie-break.
@@ -522,6 +539,7 @@ export class CallScriptService extends BaseService {
     signalCodes: Set<string>,
     mergeContext: PhoneMergeContext,
     emergingAngles: HookAngle[] = [],
+    signalSeverity: Map<string, SignalSeverity> = new Map(),
   ): RankedPhoneHook[] {
     const emergingBoostPos = new Map<HookAngle, number>();
     emergingAngles.forEach((a, idx) => emergingBoostPos.set(a, idx));
@@ -532,12 +550,20 @@ export class CallScriptService extends BaseService {
       const emergingBoost = emergingBoostPos.has(template.angle)
         ? emergingBoostPos.get(template.angle)!
         : -1;
+      // Severity-weighted scoring (same logic as HookSuggestionService)
+      const matchedSeverities = matchedSignals.map((s) => signalSeverity.get(s) ?? 'borderline');
+      const maxSeverityRank = matchedSeverities.length > 0
+        ? Math.max(...matchedSeverities.map(severityRank))
+        : 0;
+      const severitySum = matchedSeverities.reduce((sum, sev) => sum + severityRank(sev), 0);
       return {
         template,
         hasArchetypeAffinity,
         hasEmergingBoost: emergingBoost >= 0,
         emergingBoost,
         signalCount: matchedSignals.length,
+        maxSeverityRank,
+        severitySum,
         catalogIdx,
         matchedSignals,
       };
@@ -553,9 +579,13 @@ export class CallScriptService extends BaseService {
       if (a.hasEmergingBoost && b.hasEmergingBoost) {
         return a.emergingBoost - b.emergingBoost;
       }
-      // 3. Signal-match tie-break
-      if (a.signalCount !== b.signalCount) {
-        return b.signalCount - a.signalCount;
+      // 3a. Max severity among matched signals — crisis > material > cosmetic
+      if (a.maxSeverityRank !== b.maxSeverityRank) {
+        return b.maxSeverityRank - a.maxSeverityRank;
+      }
+      // 3b. Severity-weighted sum (within same max tier)
+      if (a.severitySum !== b.severitySum) {
+        return b.severitySum - a.severitySum;
       }
       // 4. Catalog order (deterministic)
       return a.catalogIdx - b.catalogIdx;
@@ -583,7 +613,8 @@ export class CallScriptService extends BaseService {
       .replace(/\{\{address\}\}/g, ctx.address ?? '{{address}}')
       .replace(/\{\{category\}\}/g, ctx.category ?? '{{category}}')
       .replace(/\{\{city\}\}/g, ctx.city ?? '{{city}}')
-      .replace(/\{\{operator_name\}\}/g, ctx.operator_name ?? '{{operator_name}}');
+      .replace(/\{\{operator_name\}\}/g, ctx.operator_name ?? '{{operator_name}}')
+      .replace(/\{\{claim_url\}\}/g, ctx.claim_url ?? '{{claim_url}}');
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────
@@ -651,6 +682,40 @@ export class CallScriptService extends BaseService {
       }
     }
     return 'your team';
+  }
+
+  /**
+   * Resolve the directory claim URL for a campaign. Same logic as
+   * HookSuggestionService.resolveClaimUrl — looks up the seed linked to
+   * this campaign, finds an active claim token, builds the public URL.
+   * Best-effort: returns null on any failure.
+   */
+  private async resolveClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
+    try {
+      const links = await this.prisma.$queryRaw<any[]>`
+        SELECT seed_id FROM directory_seed_campaign_links
+        WHERE campaign_id = ${campaignId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      if (!links[0]?.seed_id) return null;
+      const seedId = links[0].seed_id;
+
+      const tokens = await this.prisma.$queryRaw<any[]>`
+        SELECT token FROM directory_claim_tokens
+        WHERE seed_id = ${seedId}
+          AND consumed_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      if (!tokens[0]?.token) return null;
+
+      const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || '';
+      return `${baseUrl}/directory/claim/${tokens[0].token}`;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -769,6 +834,7 @@ interface PhoneMergeContext {
   category: string | null;
   city: string | null;
   operator_name: string | null;
+  claim_url: string | null;
 }
 
 // ─── Re-exports for route layer ─────────────────────────────────────────

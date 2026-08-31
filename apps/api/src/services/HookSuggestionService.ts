@@ -19,6 +19,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
+import { unifiedConfig } from '../config/unifiedConfig';
 import { resolveCampaignArchetype } from './OutreachOpenerService';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCampaignService from './MarketingCampaignService';
@@ -26,8 +27,10 @@ import OutreachIntelligenceService, { resolveSalutation } from './OutreachIntell
 import { HOOK_LIBRARY, type HookAngle, type HookTemplate } from './outreach-openers/hook-library';
 import { getEmergingAngles, extractEmergingArchetype } from './outreach-openers/emerging-angle-map';
 import type { ArchetypeCode } from './outreach-openers/archetype-selection';
+import type { BusinessAnalysisAuditData } from './outreach-openers/archetype-selection';
 import type { DetectedSignal } from './triage/types';
 import BusinessContextService from './deliverable/BusinessContextService';
+import { computeSignalSeverity, severityRank, type SignalSeverity } from './outreach-openers/signal-magnitude';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -89,6 +92,27 @@ export class HookSuggestionService extends BaseService {
     }
     const signalCodes = new Set(detectedSignals.map((s) => s.code));
 
+    // 2b. Compute severity for each detected signal — the ranking weights
+    // signal matches by severity (crisis > material > cosmetic > borderline),
+    // not raw count. This prevents 3 cosmetic NAP-drift signals from
+    // outranking 1 crisis broken-website signal. Best-effort: if audit data
+    // can't be loaded, fall back to 'borderline' for all signals.
+    let auditData: BusinessAnalysisAuditData | null = null;
+    try {
+      const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+      if (auditResult) {
+        auditData = auditResult.auditData;
+      }
+    } catch {
+      // No audit data — severity defaults to 'borderline'
+    }
+    const signalSeverity = new Map<string, SignalSeverity>();
+    for (const sig of detectedSignals) {
+      signalSeverity.set(sig.code, auditData
+        ? computeSignalSeverity(sig.code, auditData)
+        : 'borderline');
+    }
+
     // 3. Load campaign for merge fields
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const businessName = campaign.business_name ?? null;
@@ -124,12 +148,18 @@ export class HookSuggestionService extends BaseService {
     const senderName = await this.resolveSenderName(campaign, ctx);
 
     // 6. Build merge context
+    // 6a. Resolve claim URL — looks up the directory seed linked to this
+    //     campaign and finds an active claim token. Best-effort: if no seed
+    //     or no token exists, the placeholder stays visible so the operator
+    //     sees what's unresolved (same pattern as other merge fields).
+    const claimUrl = await this.resolveClaimUrl(campaignId, ctx);
     const mergeContext: MergeContext = {
       salutation,
       business: businessName,
       city,
       category: category ? category.toLowerCase() : null,
       sender_name: senderName,
+      claim_url: claimUrl,
     };
 
     // 7. Extract V3 emerging archetype for rank boost (after archetype affinity,
@@ -148,7 +178,7 @@ export class HookSuggestionService extends BaseService {
     }
 
     // 8. Rank + resolve
-    const ranked = this.rankHooks(resolved.archetype, signalCodes, emergingAngles);
+    const ranked = this.rankHooks(resolved.archetype, signalCodes, emergingAngles, signalSeverity);
     const suggestions: RankedHook[] = ranked.map((entry, idx) => ({
       ...entry.template,
       rank: idx + 1,
@@ -170,13 +200,27 @@ export class HookSuggestionService extends BaseService {
 
   /**
    * Rank all 13 hooks: archetype-affinity first, emerging-archetype boost
-   * (ordered by list position), signal-match tie-break, catalog order as
-   * the final deterministic fallback.
+   * (ordered by list position), signal-match severity-weighted tie-break,
+   * catalog order as the final deterministic fallback.
+   *
+   * Signal-match tie-break uses SEVERITY-WEIGHTED score, not raw count.
+   * A single crisis signal (severity weight 4) outranks three cosmetic
+   * signals (3 × 2 = 6... wait, 4 < 6). Actually the weights are:
+   *   crisis=4, material=3, cosmetic=2, borderline=1
+   * So 3 cosmetic = 6 > 1 crisis = 4. That's still wrong.
+   *
+   * To fix this properly, crisis signals must always outrank any number of
+   * cosmetic signals. We use a two-tier tie-break:
+   *   3a. Max severity among matched signals (crisis > material > cosmetic)
+   *   3b. Sum of severity weights (quantity-quality hybrid)
+   * This ensures a crisis-matching hook always ranks above a cosmetic-only
+   * hook, regardless of how many cosmetic signals match.
    */
   private rankHooks(
     archetype: ArchetypeCode,
     signalCodes: Set<string>,
     emergingAngles: HookAngle[] = [],
+    signalSeverity: Map<string, SignalSeverity> = new Map(),
   ): { template: HookTemplate; matchedSignals: string[] }[] {
     // Precompute emerging boost positions (lower = stronger boost)
     const emergingBoostPos = new Map<HookAngle, number>();
@@ -188,6 +232,14 @@ export class HookSuggestionService extends BaseService {
       const emergingBoost = emergingBoostPos.has(template.angle)
         ? emergingBoostPos.get(template.angle)!
         : -1;
+      // Severity-weighted scoring: max severity + sum of severity weights.
+      // Max severity ensures crisis-matching hooks always outrank cosmetic-only
+      // hooks. Sum breaks ties within the same max severity tier.
+      const matchedSeverities = matchedSignals.map((s) => signalSeverity.get(s) ?? 'borderline');
+      const maxSeverityRank = matchedSeverities.length > 0
+        ? Math.max(...matchedSeverities.map(severityRank))
+        : 0;
+      const severitySum = matchedSeverities.reduce((sum, sev) => sum + severityRank(sev), 0);
       return {
         template,
         matchedSignals,
@@ -195,6 +247,8 @@ export class HookSuggestionService extends BaseService {
         hasEmergingBoost: emergingBoost >= 0,
         emergingBoost,
         signalCount: matchedSignals.length,
+        maxSeverityRank,
+        severitySum,
         catalogIdx,
       };
     }).sort((a, b) => {
@@ -209,9 +263,13 @@ export class HookSuggestionService extends BaseService {
       if (a.hasEmergingBoost && b.hasEmergingBoost) {
         return a.emergingBoost - b.emergingBoost;
       }
-      // 3. Signal-match tie-break
-      if (a.signalCount !== b.signalCount) {
-        return b.signalCount - a.signalCount;
+      // 3a. Max severity among matched signals — crisis > material > cosmetic
+      if (a.maxSeverityRank !== b.maxSeverityRank) {
+        return b.maxSeverityRank - a.maxSeverityRank;
+      }
+      // 3b. Severity-weighted sum (quantity-quality hybrid within same max tier)
+      if (a.severitySum !== b.severitySum) {
+        return b.severitySum - a.severitySum;
       }
       // 4. Catalog order (deterministic)
       return a.catalogIdx - b.catalogIdx;
@@ -233,7 +291,8 @@ export class HookSuggestionService extends BaseService {
       .replace(/\{\{business\}\}/g, ctx.business ?? '{{business}}')
       .replace(/\{\{city\}\}/g, ctx.city ?? '{{city}}')
       .replace(/\{\{category\}\}/g, ctx.category ?? '{{category}}')
-      .replace(/\{\{sender_name\}\}/g, ctx.sender_name ?? '{{sender_name}}');
+      .replace(/\{\{sender_name\}\}/g, ctx.sender_name ?? '{{sender_name}}')
+      .replace(/\{\{claim_url\}\}/g, ctx.claim_url ?? '{{claim_url}}');
   }
 
   // ─── Sender name resolution ───────────────────────────────────────────
@@ -274,6 +333,47 @@ export class HookSuggestionService extends BaseService {
     // Platform default — matches the opener workspace's operator-name prefill
     return 'your team';
   }
+
+  /**
+   * Resolve the directory claim URL for a campaign. Looks up the directory
+   * seed linked to this campaign via directory_seed_campaign_links, then
+   * finds an active (unconsumed) claim token for that seed. Returns the
+   * public claim URL or null if no seed/token exists.
+   *
+   * Best-effort: any failure returns null, which renders as the visible
+   * {{claim_url}} placeholder so the operator sees what's unresolved.
+   */
+  private async resolveClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
+    try {
+      // 1. Find the seed linked to this campaign
+      const links = await this.prisma.$queryRaw<any[]>`
+        SELECT seed_id FROM directory_seed_campaign_links
+        WHERE campaign_id = ${campaignId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      if (!links[0]?.seed_id) return null;
+      const seedId = links[0].seed_id;
+
+      // 2. Find an active claim token for that seed
+      const tokens = await this.prisma.$queryRaw<any[]>`
+        SELECT token FROM directory_claim_tokens
+        WHERE seed_id = ${seedId}
+          AND consumed_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      if (!tokens[0]?.token) return null;
+
+      // 3. Build the public claim URL
+      const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || '';
+      return `${baseUrl}/directory/claim/${tokens[0].token}`;
+    } catch {
+      // Any failure — return null, placeholder stays visible
+      return null;
+    }
+  }
 }
 
 // ─── Internal types ─────────────────────────────────────────────────────
@@ -284,6 +384,7 @@ interface MergeContext {
   city: string | null;
   category: string | null;
   sender_name: string | null;
+  claim_url: string | null;
 }
 
 // ─── Export singleton ───────────────────────────────────────────────────

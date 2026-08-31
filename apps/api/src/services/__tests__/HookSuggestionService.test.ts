@@ -138,7 +138,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
   it('returns all 12 hooks ranked', async () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(13);
+    expect(result.suggestions).toHaveLength(14);
     // Ranks are 1–13, sequential
     for (let i = 0; i < 13; i++) {
       expect(result.suggestions[i].rank).toBe(i + 1);
@@ -218,7 +218,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(13);
+    expect(result.suggestions).toHaveLength(14);
     // All matchedSignals should be empty
     for (const s of result.suggestions) {
       expect(s.matchedSignals).toEqual([]);
@@ -230,7 +230,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(13);
+    expect(result.suggestions).toHaveLength(14);
   });
 });
 
@@ -415,7 +415,7 @@ describe('Emerging-archetype rank boost', () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
     // Without boost, the ranking should match the Sprint 1 logic
-    expect(result.suggestions).toHaveLength(13);
+    expect(result.suggestions).toHaveLength(14);
     // gbp_verification has A3 archetype affinity — should be #1
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
@@ -425,7 +425,7 @@ describe('Emerging-archetype rank boost', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(13);
+    expect(result.suggestions).toHaveLength(14);
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
 });

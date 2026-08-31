@@ -39,6 +39,7 @@ export type HookAngle =
   | 'nap_normalization'
   | 'hours_sync'
   | 'website_foundation'
+  | 'website_repair'
   | 'product_category_pages'
   | 'review_acquisition'
   | 'testimonial_amplification'
@@ -107,6 +108,8 @@ Honestly, most local shops are in that range, so nothing to worry about.
 
 But an incomplete listing usually means you're missing out on 20-30% of the "near me" searches that should be finding you first — people who are already looking for exactly what you sell.
 
+Good news — you're already listed in our directory, so most of the groundwork is done. You can verify and correct your info here: {{claim_url}}
+
 I do quick Google Listing Audits that show exactly what's missing and what to fix first. Takes me about a day, and it's yours to keep either way.
 
 Want me to send over what I found?
@@ -116,10 +119,10 @@ Want me to send over what I found?
       score_hook: 'Google listing probably sitting around a C-minus for completeness',
       reassurance: 'Most local shops are in that range, so nothing to worry about.',
       quantified_upside: 'Missing out on 20-30% of "near me" searches',
-      audit_offer: 'Quick Google Listing Audit — takes about a day, yours to keep',
+      audit_offer: 'Quick Google Listing Audit + directory claim link — takes about a day, yours to keep',
       soft_cta: 'Want me to send over what I found?',
     },
-    phone_hook: 'I was looking up {{category}} in {{city}} earlier and noticed your Google listing is probably sitting around a C-minus for completeness — hours, categories, photos, that kind of thing. Most local shops are in that range, so nothing to worry about. But an incomplete listing usually means you\'re missing out on 20-30% of the "near me" searches that should be finding you first. I do quick Google Listing Audits that show exactly what\'s missing — takes about a day, yours to keep either way. Want me to send over what I found?',
+    phone_hook: 'I was looking up {{category}} in {{city}} earlier and noticed your Google listing is probably sitting around a C-minus for completeness — hours, categories, photos, that kind of thing. Most local shops are in that range, so nothing to worry about. But an incomplete listing usually means you\'re missing out on 20-30% of the "near me" searches that should be finding you first. Good news — you\'re already listed in our directory, so most of the groundwork is done. You can verify and correct your info through the link I\'ll send. I do quick Google Listing Audits that show exactly what\'s missing — takes about a day, yours to keep either way. Want me to send over what I found?',
   },
 
   // 2. nap_normalization
@@ -178,12 +181,12 @@ Want me to send it?
     phone_hook: 'I noticed your posted hours aren\'t quite the same across your listings — one place says open, another\'s a little different. Most local shops have this somewhere, so don\'t sweat it. But it\'s one of the top reasons customers show up to a locked door — and leave a review about it instead of coming back. I can run a quick Hours Accuracy Check across your main listings and hand you a simple fix list. Want me to send it?',
   },
 
-  // 4. website_foundation
+  // 4. website_foundation — for missing website (no URL found at all)
   {
     angle: 'website_foundation',
     label: 'Website creation or modernization',
     archetypes: ['A4'],
-    signals: ['WC_MISSING_WEBSITE', 'WC_BROKEN_WEBSITE', 'EF_ZERO_INDEXED_PRESENCE'],
+    signals: ['WC_MISSING_WEBSITE', 'EF_ZERO_INDEXED_PRESENCE'],
     subject: 'quick question about your website',
     body: `{{salutation}} I went looking for your website earlier and had a hard time finding one — or if it's there, it's not showing up where customers would expect.
 
@@ -191,7 +194,7 @@ Totally normal for a lot of great local shops.
 
 But it means a chunk of people checking you out online just stop looking the moment they can't find one — customers you'd otherwise have walking in the door.
 
-I do simple Website Foundation builds for shops like yours — nothing fancy, just something that shows up, loads fast, and gets people in.
+I do simple storefront website builds for shops like yours — nothing fancy, just something that shows up, loads fast, shows off what you carry, and gets people in.
 
 Want me to sketch out what that could look like for you, no obligation?
 
@@ -200,10 +203,38 @@ Want me to sketch out what that could look like for you, no obligation?
       score_hook: 'Hard time finding your website — or it\'s not showing up where customers expect',
       reassurance: 'Totally normal for a lot of great local shops.',
       quantified_upside: 'Customers stop looking the moment they can\'t find one',
-      audit_offer: 'Website Foundation build — shows up, loads fast, gets people in',
+      audit_offer: 'Storefront website build — shows up, loads fast, shows off what you carry',
       soft_cta: 'Want me to sketch out what that could look like, no obligation?',
     },
-    phone_hook: 'I went looking for your website earlier and had a hard time finding one — or if it\'s there, it\'s not showing up where customers would expect. Totally normal for a lot of great local shops. But it means a chunk of people checking you out online just stop looking the moment they can\'t find one. I do simple Website Foundation builds for shops like yours — nothing fancy, just something that shows up, loads fast, and gets people in. Want me to sketch out what that could look like, no obligation?',
+    phone_hook: 'I went looking for your website earlier and had a hard time finding one — or if it\'s there, it\'s not showing up where customers would expect. Totally normal for a lot of great local shops. But it means a chunk of people checking you out online just stop looking the moment they can\'t find one. I do simple storefront website builds for shops like yours — nothing fancy, just something that shows up, loads fast, shows off what you carry, and gets people in. Want me to sketch out what that could look like, no obligation?',
+  },
+
+  // 4b. website_repair — for broken website (URL exists but doesn't load)
+  {
+    angle: 'website_repair',
+    label: 'Broken website repair',
+    archetypes: ['A3', 'A4'],
+    signals: ['WC_BROKEN_WEBSITE'],
+    subject: 'your website link isn\'t loading',
+    body: `{{salutation}} I clicked through to your website from Google earlier and hit a dead page — the link's there but it isn't loading.
+
+Not uncommon — links break quietly and nobody notices for weeks.
+
+But anyone who searches for you, clicks through, and hits a dead page just moves on to the next result. That's customers you'd already have walking in the door.
+
+I can run a quick Website Health Check that pinpoints what's broken — and if it's time for a fresh start, I build simple storefront sites that load fast, show off what you carry, and actually get people in the door. Takes about a day, yours to keep either way.
+
+Want me to send over what I found?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Clicked through from Google and hit a dead page — link isn\'t loading',
+      reassurance: 'Not uncommon — links break quietly and nobody notices for weeks.',
+      quantified_upside: 'Anyone who clicks through and hits a dead page just moves on',
+      audit_offer: 'Website Health Check + storefront site option — loads fast, shows off what you carry',
+      soft_cta: 'Want me to send over what I found?',
+    },
+    phone_hook: 'I clicked through to your website from Google earlier and hit a dead page — the link\'s there but it isn\'t loading. Not uncommon — links break quietly and nobody notices for weeks. But anyone who searches for you, clicks through, and hits a dead page just moves on to the next result. I can run a quick Website Health Check that pinpoints what\'s broken — and if it\'s time for a fresh start, I build simple storefront sites that load fast, show off what you carry, and actually get people in the door. Takes about a day, yours to keep either way. Want me to send over what I found?',
   },
 
   // 5. product_category_pages
