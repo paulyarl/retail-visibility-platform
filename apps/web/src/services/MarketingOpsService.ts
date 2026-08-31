@@ -9,6 +9,8 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { ResponseType } from '../providers/base/FlexibleApiSingleton';
+import { clientLogger } from '../lib/client-logger';
 
 // ====================
 // TYPES
@@ -4493,6 +4495,32 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) throw new Error(typeof result.error === 'string' ? result.error : 'Failed to send claim invite');
     return result.data?.data ?? result.data;
+  }
+
+  async generateMailer(campaignId: string): Promise<{ success: boolean; pdfUrl?: string; error?: string }> {
+    try {
+      const result = await this.makeDefaultRequest<Blob>(
+        `/api/admin/marketing-ops/campaigns/${campaignId}/mailer`,
+        { method: 'POST' },
+        `mkt-ops-mailer-${campaignId}`,
+        0,
+        { responseType: ResponseType.BLOB },
+      );
+      if (!result.success) {
+        return {
+          success: false,
+          error: typeof result.error === 'string' ? result.error : 'Failed to generate mailer PDF',
+        };
+      }
+      const pdfUrl = URL.createObjectURL(result.data!);
+      return { success: true, pdfUrl };
+    } catch (error) {
+      clientLogger.error('Error generating mailer PDF:', { detail: error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate mailer PDF',
+      };
+    }
   }
 
   async listMarketingAlertCustomers(search?: string): Promise<MarketingAlertCustomer[]> {
