@@ -67,6 +67,11 @@ export default function CampaignListClient() {
   const [attributeFilter, setAttributeFilter] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('');
   const [showClosed, setShowClosed] = useState(false);
+  // Three-way view toggle: Active (excludes closed stages), Archived (only
+  // closed stages — lost/dead/resolved_and_closed), All (everything). Replaces
+  // the old "Show closed" checkbox with a dedicated Archived view so closed
+  // campaigns are browsable without cluttering the active list.
+  const [closedView, setClosedView] = useState<'active' | 'archived' | 'all'>('active');
   const [presetTones, setPresetTones] = useState<string[]>([]);
   const staffUsers = useStaffUsers();
 
@@ -119,10 +124,18 @@ export default function CampaignListClient() {
   );
 
   const campaignsByStage = (stage: CampaignStage) => campaigns.filter((c) => c.stage === stage);
+  // All terminal stages across both pipelines, for the Archived view.
+  const ALL_CLOSED_STAGES = [...CLOSED_STAGES, ...RECOVERY_CLOSED_STAGES];
+  const isClosedCampaign = (c: Campaign): boolean => ALL_CLOSED_STAGES.includes(c.stage);
   const filteredCampaigns = useMemo(
     () => campaigns.filter((c) => matchesFollowUpFilter(c, followUpFilter))
-      .filter((c) => showClosed || !CLOSED_STAGES.includes(c.stage)),
-    [campaigns, followUpFilter, showClosed],
+      .filter((c) => {
+        if (closedView === 'active') return !isClosedCampaign(c);
+        if (closedView === 'archived') return isClosedCampaign(c);
+        return true; // 'all'
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [campaigns, followUpFilter, closedView],
   );
 
   // Kanban view: business-scope campaigns only, split by the selected pipeline
@@ -139,10 +152,11 @@ export default function CampaignListClient() {
       const pipeline = pipelineForCampaign(c.campaign_category, c.repair_track);
       if (pipeline !== kanbanPipeline) return false;
       const closedStages = kanbanPipeline === 'recovery' ? RECOVERY_CLOSED_STAGES : CLOSED_STAGES;
-      if (!showClosed && closedStages.includes(c.stage)) return false;
-      return true;
+      if (closedView === 'active') return !closedStages.includes(c.stage);
+      if (closedView === 'archived') return closedStages.includes(c.stage);
+      return true; // 'all'
     }),
-    [campaigns, followUpFilter, showClosed, kanbanPipeline],
+    [campaigns, followUpFilter, closedView, kanbanPipeline],
   );
   const kanbanColumns = kanbanPipeline === 'recovery' ? RECOVERY_PIPELINE_STAGES : PIPELINE_STAGES;
   const kanbanClosedStages = kanbanPipeline === 'recovery' ? RECOVERY_CLOSED_STAGES : CLOSED_STAGES;
@@ -155,7 +169,8 @@ export default function CampaignListClient() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Campaigns</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {filteredCampaigns.length} of {campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}{!showClosed && campaigns.some((c) => CLOSED_STAGES.includes(c.stage)) ? ' (closed hidden)' : ''}
+              {filteredCampaigns.length} {closedView === 'archived' ? 'archived' : closedView === 'all' ? '' : 'active'} campaign{filteredCampaigns.length !== 1 ? 's' : ''}
+              {closedView === 'active' && campaigns.some((c) => isClosedCampaign(c)) ? ` · ${campaigns.filter(isClosedCampaign).length} archived` : ''}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -264,10 +279,17 @@ export default function CampaignListClient() {
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
-          <label className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700">
-            <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} className="rounded" />
-            Show closed
-          </label>
+          <div className="flex items-center rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
+            {(['active', 'archived', 'all'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => { setClosedView(v); setShowClosed(v !== 'active'); }}
+                className={`px-3 py-2 text-xs font-medium capitalize ${closedView === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 dark:bg-neutral-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Follow-up quick filter chips */}
@@ -328,7 +350,11 @@ export default function CampaignListClient() {
                   {filteredCampaigns.length === 0 ? (
                     <tr>
                       <td colSpan={14} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
-                        No campaigns found. Create one to get started.
+                        {closedView === 'archived'
+                          ? 'No archived campaigns. Lost and Dead campaigns will appear here.'
+                          : closedView === 'active'
+                          ? 'No active campaigns. Create one to get started, or check the Archived view.'
+                          : 'No campaigns found. Create one to get started.'}
                       </td>
                     </tr>
                   ) : (
@@ -428,7 +454,7 @@ export default function CampaignListClient() {
             </div>
             <div className="overflow-x-auto pb-4">
               <div className="flex gap-4 min-w-max">
-                {kanbanColumns.filter((stage) => showClosed || !kanbanClosedStages.includes(stage)).map((stage) => {
+                {kanbanColumns.filter((stage) => closedView === 'all' || closedView === 'archived' || !kanbanClosedStages.includes(stage)).map((stage) => {
                   const items = kanbanCampaigns.filter((c) => c.stage === stage);
                   return (
                     <div key={stage} className="w-72 flex-shrink-0">
