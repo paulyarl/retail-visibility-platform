@@ -152,9 +152,41 @@ router.post('/submissions', optionalCustomerAuth, async (req: Request, res: Resp
       return res.status(result.statusCode).json({ error: result.error });
     }
 
-    res.status(201).json({ success: true, seed: result.seed });
+    if (result.seed) {
+      res.status(201).json({ success: true, seed: result.seed });
+    } else {
+      res.status(202).json({
+        success: true,
+        pending: true,
+        message: 'Please check your email to confirm the submission.',
+        email: result.pending?.email,
+      });
+    }
   } catch (error) {
     logger.error('[POST /api/public/directory/submissions] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/public/directory/submissions/verify — confirm an email-verified owner submission */
+router.post('/submissions/verify', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'token_required' });
+    }
+
+    const result = await DirectoryOwnerSubmissionService.verifyToken(token);
+
+    if (result.error) {
+      return res.status(result.statusCode).json({ error: result.error });
+    }
+
+    res.status(201).json({ success: true, seed: result.seed });
+  } catch (error) {
+    logger.error('[POST /api/public/directory/submissions/verify] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

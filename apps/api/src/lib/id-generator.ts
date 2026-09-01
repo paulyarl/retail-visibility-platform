@@ -1276,6 +1276,16 @@ export function generateDirectoryPresenceSuggestionId(): string {
 }
 
 /**
+ * Generate a directory owner submission verification ID.
+ * Format: dpsv-{nanoid12}
+ * URL-safe, readable, unique, global (not tenant-scoped)
+ */
+export function generateDirectoryPresenceSubmissionVerificationId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `dpsv-${nanoid()}`;
+}
+
+/**
  * Generate a seek batch ID.
  * Format: sb-{nanoid12}
  */

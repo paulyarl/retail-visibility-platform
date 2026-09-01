@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Store, ArrowLeft, Send, CheckCircle, AlertCircle, Building2 } from 'lucide-react';
+import { Store, ArrowLeft, Send, CheckCircle, AlertCircle, Building2, Mail } from 'lucide-react';
 import { Button, TextInput, Textarea } from '@mantine/core';
 import DirectorySubmissionPublicService from '@/services/DirectorySubmissionPublicService';
 
@@ -35,8 +35,9 @@ export default function AddBusinessClient({
     sourcePage: '',
     honeyPot: '',
   });
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'pending' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [existing, setExisting] = useState<{ slug: string | null; businessName: string; city: string | null; state: string | null } | null>(null);
 
   useEffect(() => {
@@ -61,6 +62,12 @@ export default function AddBusinessClient({
     setExisting(null);
 
     const result = await DirectorySubmissionPublicService.submitBusiness(form);
+
+    if (result.success && result.pending) {
+      setStatus('pending');
+      setPendingEmail(result.email || form.ownerEmail);
+      return;
+    }
 
     if (result.success) {
       setStatus('success');
@@ -132,6 +139,22 @@ export default function AddBusinessClient({
               </h2>
               <p className="text-neutral-600 dark:text-neutral-400 mb-6">
                 We&apos;ll review your business details and publish the listing once verified.
+              </p>
+              <Button component={Link} href="/directory" variant="light">
+                Back to Directory
+              </Button>
+            </div>
+          ) : status === 'pending' ? (
+            <div className="text-center py-8">
+              <Mail className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
+                Check your email
+              </h2>
+              <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
+                We sent a confirmation link to <strong>{pendingEmail}</strong>. Click it to submit your business for review.
+              </p>
+              <p className="text-sm text-neutral-500 mb-6">
+                Didn&apos;t receive it? Check your spam folder or try again in a few minutes.
               </p>
               <Button component={Link} href="/directory" variant="light">
                 Back to Directory

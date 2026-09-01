@@ -2,7 +2,8 @@
  * DirectorySubmissionPublicService — owner-driven "Add my business" submissions.
  *
  * Extends PublicApiSingleton.
- * Requires the customer JWT to be present (owner must be signed in).
+ * Authenticated customers create a seed immediately; anonymous owners receive
+ * an email verification token and must confirm before the seed is created.
  */
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
@@ -25,7 +26,10 @@ export interface SubmissionInput {
 
 export interface SubmissionResult {
   success: boolean;
+  pending?: boolean;
   seedId?: string;
+  message?: string;
+  email?: string;
   error?: string;
   existing?: {
     id: string;
@@ -70,18 +74,20 @@ export class DirectorySubmissionPublicService extends PublicApiSingleton {
       }
 
       const data = result.data?.data ?? result.data;
-      return {
-        success: data?.success ?? false,
-        seedId: data?.seed?.id,
-        error: data?.error,
-      };
+
+      if (data?.seed) {
+        return { success: true, seedId: data.seed.id };
+      }
+
+      if (data?.pending) {
+        return { success: true, pending: true, message: data.message, email: data.email };
+      }
+
+      return { success: data?.success ?? false, error: data?.error };
     } catch (err: any) {
       const status = err?.status;
       const body = err?.data || err?.body || {};
 
-      if (status === 401) {
-        return { success: false, error: 'customer_auth_required' };
-      }
       if (status === 409) {
         return {
           success: false,
@@ -90,6 +96,33 @@ export class DirectorySubmissionPublicService extends PublicApiSingleton {
         };
       }
       return { success: false, error: err?.message || 'unknown' };
+    }
+  }
+
+  /** POST /api/public/directory/submissions/verify */
+  async verifyToken(token: string): Promise<SubmissionResult> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/public/directory/submissions/verify',
+        {
+          method: 'POST',
+          body: JSON.stringify({ token }),
+        },
+        undefined,
+        0,
+      );
+
+      if (!result.success) {
+        const error = typeof result.error === 'string' ? result.error : 'unknown';
+        return { success: false, error };
+      }
+
+      const data = result.data?.data ?? result.data;
+      return { success: data?.success ?? false, seedId: data?.seed?.id, error: data?.error };
+    } catch (err: any) {
+      const status = err?.status;
+      const body = err?.data || err?.body || {};
+      return { success: false, error: body?.error || err?.message || 'unknown' };
     }
   }
 

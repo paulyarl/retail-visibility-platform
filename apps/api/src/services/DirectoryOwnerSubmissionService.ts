@@ -2,13 +2,19 @@
  * DirectoryOwnerSubmissionService — owner-driven "Add my business" submissions.
  *
  * Creates a directory_presence_seed in 'draft' status from an owner's own input.
- * The listing is not published until an operator reviews and publishes it.
+ * If the submitter is not authenticated as a customer, a verification token is
+ * sent to the owner email and the seed is created only after they confirm.
+ *
+ * If the submitter is authenticated as a customer, the seed is created immediately
+ * (customer account substitutes for email verification).
  */
 
+import { randomBytes } from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
-import { audit } from '../audit';
+import { emailService } from './email-service';
 import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
+import { generateDirectoryPresenceSubmissionVerificationId } from '../lib/id-generator';
 import { z } from 'zod';
 
 export const ownerSubmissionInputSchema = z.object({
@@ -40,27 +46,27 @@ export interface DuplicateMatch {
   seedStatus: string | null;
 }
 
-interface OwnerSubmissionContext {
-  actorType: 'customer' | 'user' | 'system';
+export interface SubmissionContext {
+  actorType: 'customer' | 'user';
   actorId: string;
   ip?: string;
   userAgent?: string;
 }
 
+interface OwnerSubmissionResult {
+  seed?: any;
+  pending?: any;
+  duplicate?: DuplicateMatch;
+  error?: string;
+  statusCode: number;
+}
+
 class DirectoryOwnerSubmissionService {
   /**
-   * Submit a business as its owner. Creates a directory_presence_seed in draft
-   * status. Returns the created seed summary, or the existing match if duplicate.
+   * Submit a business as its owner. Authenticated customers get an immediate
+   * draft seed; anonymous owners receive an email verification token first.
    */
-  async submit(
-    input: OwnerSubmissionInput,
-    ctx: OwnerSubmissionContext,
-  ): Promise<{
-    seed?: any;
-    duplicate?: DuplicateMatch;
-    error?: string;
-    statusCode: number;
-  }> {
+  async submit(input: OwnerSubmissionInput, ctx: SubmissionContext): Promise<OwnerSubmissionResult> {
     if (input.honeyPot && input.honeyPot.trim().length > 0) {
       return { error: 'suspected_bot', statusCode: 400 };
     }
@@ -70,7 +76,89 @@ class DirectoryOwnerSubmissionService {
       return { duplicate, statusCode: 409 };
     }
 
-    const seedInput: CreateSeedInput = {
+    const seedInput = this.buildSeedInput(input);
+
+    // Authenticated customer: create seed immediately
+    if (ctx.actorType === 'customer') {
+      const seed = await DirectoryPresenceSeedService.createSeed(seedInput, {
+        actorType: 'customer',
+        actorId: ctx.actorId,
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+      logger.info('[DirectoryOwnerSubmissionService] Customer submitted business', undefined, {
+        seedId: seed.id,
+        businessName: input.businessName,
+        customerId: ctx.actorId,
+      });
+      return { seed, statusCode: 201 };
+    }
+
+    // Anonymous owner: create a verification token and send email
+    const verification = await this.createVerification(input, seedInput, ctx);
+    await this.sendVerificationEmail(input.ownerEmail.trim().toLowerCase(), verification.token, input.businessName);
+
+    logger.info('[DirectoryOwnerSubmissionService] Anonymous owner submission pending verification', undefined, {
+      verificationId: verification.id,
+      businessName: input.businessName,
+      ownerEmail: input.ownerEmail,
+    });
+
+    return { pending: verification, statusCode: 202 };
+  }
+
+  /**
+   * Confirm an owner submission by token. Creates the directory_presence_seed
+   * and marks the verification as consumed.
+   */
+  async verifyToken(token: string): Promise<OwnerSubmissionResult> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, submitter_email, business_name, payload, verified, expires_at
+      FROM directory_presence_submission_verifications
+      WHERE token = ${token}
+      LIMIT 1
+    `;
+
+    if (!rows[0]) {
+      return { error: 'token_not_found', statusCode: 404 };
+    }
+
+    const v = rows[0];
+    if (v.verified) {
+      return { error: 'token_already_verified', statusCode: 410 };
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(v.expires_at);
+    if (expiresAt < now) {
+      return { error: 'token_expired', statusCode: 410 };
+    }
+
+    const seedInput: CreateSeedInput = v.payload;
+    const seed = await DirectoryPresenceSeedService.createSeed(seedInput, {
+      actorType: 'user',
+      actorId: 'anonymous',
+      ip: undefined,
+      userAgent: undefined,
+    });
+
+    await prisma.$executeRaw`
+      UPDATE directory_presence_submission_verifications
+      SET verified = TRUE, verified_at = now(), updated_at = now()
+      WHERE id = ${v.id}
+    `;
+
+    logger.info('[DirectoryOwnerSubmissionService] Verified owner submission', undefined, {
+      verificationId: v.id,
+      seedId: seed.id,
+      businessName: v.business_name,
+    });
+
+    return { seed, statusCode: 201 };
+  }
+
+  private buildSeedInput(input: OwnerSubmissionInput): CreateSeedInput {
+    return {
       businessName: input.businessName.trim(),
       address: input.address.trim(),
       city: input.city.trim(),
@@ -90,22 +178,6 @@ class DirectoryOwnerSubmissionService {
       publicDisclaimer: 'Submitted by the owner. Pending review before publishing.',
       provenance: this.buildProvenance(input),
     };
-
-    const seed = await DirectoryPresenceSeedService.createSeed(seedInput, {
-      actorType: ctx.actorType,
-      actorId: ctx.actorId,
-      ip: ctx.ip,
-      userAgent: ctx.userAgent,
-    });
-
-    logger.info('[DirectoryOwnerSubmissionService] Owner submitted business', undefined, {
-      seedId: seed.id,
-      tenantId: seed.tenantId,
-      businessName: input.businessName,
-      ownerEmail: input.ownerEmail,
-    });
-
-    return { seed, statusCode: 201 };
   }
 
   private buildProvenance(input: OwnerSubmissionInput): CreateSeedInput['provenance'] {
@@ -150,6 +222,69 @@ class DirectoryOwnerSubmissionService {
     `;
 
     return result[0] || null;
+  }
+
+  private async createVerification(
+    input: OwnerSubmissionInput,
+    seedInput: CreateSeedInput,
+    ctx: SubmissionContext,
+  ) {
+    const id = generateDirectoryPresenceSubmissionVerificationId();
+    const token = randomBytes(32).toString('hex');
+    const email = input.ownerEmail.trim().toLowerCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    await prisma.$executeRaw`
+      INSERT INTO directory_presence_submission_verifications (
+        id, token, submitter_email, business_name, payload,
+        verified, expires_at, created_at, updated_at
+      ) VALUES (
+        ${id},
+        ${token},
+        ${email},
+        ${input.businessName.trim()},
+        ${JSON.stringify(seedInput)}::jsonb,
+        FALSE,
+        ${expiresAt}::timestamptz,
+        now(),
+        now()
+      )
+    `;
+
+    return { id, token, email, businessName: input.businessName };
+  }
+
+  private async sendVerificationEmail(to: string, token: string, businessName: string) {
+    const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+    const verifyUrl = `${baseUrl}/directory/add-business/verify?token=${encodeURIComponent(token)}`;
+
+    const html = `
+      <h1>Verify your business submission</h1>
+      <p>You submitted <strong>${businessName}</strong> to be added to the directory.</p>
+      <p>Click the link below to confirm your email and submit the listing for review:</p>
+      <p><a href="${verifyUrl}" style="padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">Confirm my submission</a></p>
+      <p>Or copy and paste this URL into your browser:</p>
+      <p><code>${verifyUrl}</code></p>
+      <p>This link expires in 24 hours.</p>
+    `;
+
+    const text = `Verify your submission for ${businessName}: ${verifyUrl} (expires in 24 hours)`;
+
+    try {
+      await emailService.sendEmail({
+        to,
+        subject: 'Confirm your business submission',
+        html,
+        text,
+      });
+    } catch (error) {
+      logger.error('[DirectoryOwnerSubmissionService] Failed to send verification email:', undefined, {
+        error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+        to,
+        token,
+      });
+      throw new Error('failed_to_send_verification_email');
+    }
   }
 }
 
