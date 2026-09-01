@@ -18,6 +18,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectorySuggestionService, { suggestionInputSchema } from '../services/DirectorySuggestionService';
+import DirectoryOwnerSubmissionService, { ownerSubmissionInputSchema } from '../services/DirectoryOwnerSubmissionService';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { slugify } from '../utils/slug';
@@ -102,6 +103,58 @@ router.post('/suggestions', async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/suggestions] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/public/directory/submissions — owner submits their own business to be listed */
+router.post('/submissions', optionalCustomerAuth, async (req: Request, res: Response) => {
+  try {
+    const parse = ownerSubmissionInputSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return res.status(400).json({
+        error: 'invalid_input',
+        issues: parse.error.flatten().fieldErrors,
+      });
+    }
+
+    const customer = (req as any).customer;
+    const forwarded = req.headers['x-forwarded-for'] as string | undefined;
+    const submitterIp = forwarded || req.socket?.remoteAddress || (req as any).ip;
+
+    const actorType = customer?.id ? 'customer' : 'user';
+    const actorId = customer?.id || 'anonymous';
+
+    const result = await DirectoryOwnerSubmissionService.submit(parse.data, {
+      actorType,
+      actorId,
+      ip: submitterIp,
+      userAgent: req.headers['user-agent'] as string | undefined,
+    });
+
+    if (result.duplicate) {
+      return res.status(409).json({
+        error: 'already_listed',
+        message: 'This business appears to already be in the directory.',
+        existing: {
+          id: result.duplicate.id,
+          businessName: result.duplicate.businessName,
+          slug: result.duplicate.slug,
+          city: result.duplicate.city,
+          state: result.duplicate.state,
+        },
+      });
+    }
+
+    if (result.error) {
+      return res.status(result.statusCode).json({ error: result.error });
+    }
+
+    res.status(201).json({ success: true, seed: result.seed });
+  } catch (error) {
+    logger.error('[POST /api/public/directory/submissions] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

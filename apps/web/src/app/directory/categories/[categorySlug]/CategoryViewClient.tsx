@@ -12,6 +12,7 @@ import { Button } from '@mantine/core';
 import { useSearchParams } from 'next/navigation';
 import { slugsMatch } from '@/utils/slug';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
+import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
@@ -333,8 +334,12 @@ export default function CategoryViewClient({
         )}
       </div>
 
-      {/* Suggest a missing business */}
-      <div className="container mx-auto px-4 pb-8">
+      {/* Add / Suggest CTAs */}
+      <div className="container mx-auto px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <AddBusinessCta
+          category={category?.name || categorySlug}
+          source={`/directory/categories/${categorySlug}`}
+        />
         <SuggestBusinessCta
           category={category?.name || categorySlug}
           source={`/directory/categories/${categorySlug}`}

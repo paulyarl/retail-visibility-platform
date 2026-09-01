@@ -57,6 +57,13 @@ export interface CreateSeedInput {
   notes?: string;
   slug?: string;
   businessHours?: any;
+  /** Owner-submitted seeds can carry owner identity for faster claim handoff. */
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
+  /** Override listing_origin and disclaimer for owner or campaign sources. */
+  listingOrigin?: string;
+  publicDisclaimer?: string;
   provenance?: Array<{
     fieldKey: string;
     value?: string;
@@ -338,8 +345,8 @@ class DirectoryPresenceSeedService {
         ${input.longitude || null},
         ${input.businessHours ? JSON.stringify(input.businessHours) : null}::jsonb,
         false,
-        'directory_seed',
-        'Listed from public directories / SNAP / news. Not a claimed profile.',
+        ${input.listingOrigin || 'directory_seed'},
+        ${input.publicDisclaimer || 'Listed from public directories / SNAP / news. Not a claimed profile.'},
         ${input.snapEbtReported || false},
         ${input.snapEbtAsOf || null},
         ${input.snapEbtSource || null},
@@ -355,6 +362,7 @@ class DirectoryPresenceSeedService {
       INSERT INTO directory_presence_seeds (
         id, tenant_id, listing_id, category, city, state,
         seed_batch, status, identity_confidence, category_fit, notes,
+        owner_name, owner_email, owner_phone,
         created_at, updated_at
       ) VALUES (
         ${seedId},
@@ -368,6 +376,9 @@ class DirectoryPresenceSeedService {
         ${input.identityConfidence},
         ${input.categoryFit},
         ${input.notes || null},
+        ${input.ownerName || null},
+        ${input.ownerEmail || null},
+        ${input.ownerPhone || null},
         now(), now()
       )
     `;

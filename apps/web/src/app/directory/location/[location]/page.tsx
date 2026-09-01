@@ -5,6 +5,7 @@ import { ArrowLeft, MapPin } from 'lucide-react';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
+import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -206,7 +207,12 @@ export default async function LocationPage({ params, searchParams }: LocationPag
             />
           )}
 
-          <div className="mt-8">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <AddBusinessCta
+              city={city}
+              state={state}
+              source={`/directory/location/${location}`}
+            />
             <SuggestBusinessCta
               city={city}
               state={state}

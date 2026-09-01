@@ -14,6 +14,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
+import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
@@ -324,7 +325,13 @@ export default function PlaceEntryEditorialLayout({
 
         <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Places" />
         <LastViewed />
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <AddBusinessCta
+            category={listing.primaryCategory || listing.category}
+            city={listing.city}
+            state={listing.state}
+            source={currentUrl}
+          />
           <SuggestBusinessCta
             category={listing.primaryCategory || listing.category}
             city={listing.city}
