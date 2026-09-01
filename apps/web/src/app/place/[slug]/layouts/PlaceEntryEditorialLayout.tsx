@@ -130,7 +130,7 @@ export default function PlaceEntryEditorialLayout({
                   )}
                 </div>
               </div>
-              <p className="text-neutral-300 text-lg max-w-2xl leading-relaxed">
+              <p className="text-sm text-neutral-400 max-w-2xl leading-relaxed">
                 {disclaimer}
               </p>
               <div className="flex flex-wrap items-center gap-4">
@@ -168,7 +168,7 @@ export default function PlaceEntryEditorialLayout({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
               <div className="lg:col-span-2">
                 <h2 className="text-2xl font-bold text-neutral-900 mb-3">About this listing</h2>
-                <p className="text-neutral-600 leading-relaxed text-lg">
+                <p className="text-neutral-600 leading-relaxed">
                   {disclaimer}
                 </p>
                 <p className="text-neutral-500 leading-relaxed mt-3">
@@ -292,7 +292,9 @@ export default function PlaceEntryEditorialLayout({
 
         <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Places" />
         <LastViewed />
-        <PoweredByFooter />
+        <PoweredByFooter
+          note={`${listing.businessName} is listed from public information. This is not a claimed profile and may be incomplete.`}
+        />
       </div>
     </>
   );
