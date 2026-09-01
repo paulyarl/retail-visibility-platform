@@ -9,6 +9,7 @@
  *   - POST /api/public/directory/claim/:token/accept (bind owner, requires auth)
  */
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import type { UpgradeOptions, UpgradeTierOption } from './DirectoryPresenceUpgradeService';
 
 export interface DirectoryClaimSummary {
   seedId: string;
@@ -48,6 +49,10 @@ export interface DirectoryClaimAcceptResult {
   requiresPasswordSetup?: boolean;
   /** The platform user ID that was created or linked */
   platformUserId?: string;
+  /** Gateway upgrade preview (claim handoff spec) — embedded by the accept response so the success screen can render Entry Presence mode cards without a platform (Auth0) session */
+  currentTier?: UpgradeOptions['currentTier'];
+  isGatewayUpgrade?: boolean;
+  upgradeOptions?: UpgradeTierOption[];
 }
 
 export interface DirectoryClaimInitiateResult {

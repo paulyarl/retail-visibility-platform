@@ -208,7 +208,7 @@ export class SubscriptionStatusService {
   }
 
   /**
-   * Handle grace period expiry - downgrade to presence (free baseline)
+   * Handle grace period expiry - downgrade to directory_presence (free gateway)
    * Called by the scheduled job after 30 days of past_due
    */
   async handleGracePeriodExpiry(tenantId: string): Promise<StatusTransitionResult> {
@@ -219,13 +219,13 @@ export class SubscriptionStatusService {
     await trialService.downgradeToExpired(tenantId);
 
     // Log the transition
-    await this.logStatusTransition(tenantId, current.status, 'active', current.tier, 'presence', 'grace_period_expired');
+    await this.logStatusTransition(tenantId, current.status, 'active', current.tier, 'directory_presence', 'grace_period_expired');
 
     return {
       previousStatus: current.status,
       newStatus: 'active',
       previousTier: current.tier,
-      newTier: 'presence',
+      newTier: 'directory_presence',
       changedAt: new Date(),
       reason: 'grace_period_expired',
     };

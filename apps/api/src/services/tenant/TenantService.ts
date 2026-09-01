@@ -152,36 +152,42 @@ class TenantService {
 
     const now = new Date();
 
-    // Auto-set trial_ends_at if missing
-    if (tenant.subscription_status === 'trial' && !tenant.trial_ends_at) {
-      const trial_ends_at = new Date();
-      trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
+    // Gateway tenants (directory_presence) are free forever by design — never
+    // enroll them in the paid-trial machinery below. A 'trial' status on a
+    // gateway tenant would get a 14-day clock stamped on first load and then
+    // be auto-expired onto a paid tier.
+    if (tenant.subscription_tier !== 'directory_presence') {
+      // Auto-set trial_ends_at if missing
+      if (tenant.subscription_status === 'trial' && !tenant.trial_ends_at) {
+        const trial_ends_at = new Date();
+        trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
 
-      tenant = await prisma.tenants.update({
-        where: { id: tenant.id },
-        data: { trial_ends_at, subscription_status: 'trial' },
-      });
-    }
+        tenant = await prisma.tenants.update({
+          where: { id: tenant.id },
+          data: { trial_ends_at, subscription_status: 'trial' },
+        });
+      }
 
-    // Auto-expire trial if past trial_ends_at
-    // Reverts to presence (free baseline) so the tenant keeps its free place
-    // entry. The presence tier has no capability privileges, so the capability
-    // resolver naturally strips paid features. The tenant can renew into any
-    // paid tier later and all platform data is restored.
-    if (
-      tenant.subscription_status === 'trial' &&
-      tenant.trial_ends_at &&
-      tenant.trial_ends_at < now
-    ) {
-      const hasStripeSubscription = !!tenant.stripe_subscription_id;
+      // Auto-expire trial if past trial_ends_at
+      // Reverts to directory_presence (free gateway baseline) so the tenant
+      // keeps its free directory entry. The capability resolver strips paid
+      // features on that tier. The tenant can renew into any paid tier later
+      // and all platform data is restored.
+      if (
+        tenant.subscription_status === 'trial' &&
+        tenant.trial_ends_at &&
+        tenant.trial_ends_at < now
+      ) {
+        const hasStripeSubscription = !!tenant.stripe_subscription_id;
 
-      tenant = await prisma.tenants.update({
-        where: { id: tenant.id },
-        data: {
-          subscription_status: 'active',
-          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : 'presence',
-        },
-      });
+        tenant = await prisma.tenants.update({
+          where: { id: tenant.id },
+          data: {
+            subscription_status: 'active',
+            subscription_tier: hasStripeSubscription ? tenant.subscription_tier : 'directory_presence',
+          },
+        });
+      }
     }
 
     const statusInfo = getLocationStatusInfo(tenant.location_status);

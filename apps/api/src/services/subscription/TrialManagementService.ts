@@ -5,7 +5,7 @@
  * - Start trial (requires payment method)
  * - Trial end: auto-charge payment method
  * - Grace period: retry payment, send reminders
- * - Grace expiry: downgrade to presence (free baseline tier)
+ * - Grace expiry: downgrade to directory_presence (free gateway tier)
  */
 
 import { prisma } from '../../prisma';
@@ -161,7 +161,7 @@ export class TrialManagementService {
 
     const selectedTier = tenant.trial_selected_tier as TrialEligibleTier;
     if (!selectedTier) {
-      // No selected tier - downgrade to presence (free baseline)
+      // No selected tier - downgrade to directory_presence (free gateway)
       await this.downgradeToExpired(tenantId);
       return {
         success: false,
@@ -318,9 +318,10 @@ export class TrialManagementService {
   }
 
   /**
-   * Downgrade tenant to presence (free baseline tier)
-   * Tenant retains its free place entry; paid capabilities are stripped by the
-   * capability resolver since the presence tier has no capability privileges.
+   * Downgrade tenant to directory_presence (free gateway tier)
+   * Tenant retains its free directory entry; paid capabilities are stripped by the
+   * capability resolver since the directory_presence gateway tier carries only the
+   * free directory-entry features.
    * The tenant can renew into any paid tier later and all platform data is restored.
    */
   async downgradeToExpired(tenantId: string): Promise<void> {
@@ -345,7 +346,7 @@ export class TrialManagementService {
     await prisma.tenants.update({
       where: { id: tenantId },
       data: {
-        subscription_tier: 'presence',
+        subscription_tier: 'directory_presence',
         subscription_status: 'active',
         trial_ends_at: null,
         trial_selected_tier: null,

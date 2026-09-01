@@ -291,7 +291,9 @@ class DirectoryPresenceSeedService {
     const listingId = generateDirectoryListingId(tenantId);
     const seedId = generateDirectoryPresenceSeedId(tenantId);
 
-    // Create the tenant (unclaimed directory seed)
+    // Create the tenant (unclaimed directory seed). Status is 'active', not
+    // 'trial' — the gateway tier is free forever and must never enter the
+    // paid-trial machinery (which stamps a 14-day clock and auto-expires).
     await prisma.$executeRaw`
       INSERT INTO tenants (
         id, name, subscription_tier, subscription_status, org_standing_mode,
@@ -300,7 +302,7 @@ class DirectoryPresenceSeedService {
         ${tenantId},
         ${input.businessName},
         'directory_presence',
-        'trial',
+        'active',
         'directory_seed',
         true,
         'self_service',

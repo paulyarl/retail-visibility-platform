@@ -200,7 +200,7 @@ router.post('/cancel', async (req, res) => {
       });
     }
 
-    // Cancel the trial (downgrade to presence — free baseline)
+    // Cancel the trial (downgrade to directory_presence — free gateway)
     const billingService = getTrialManagementService();
     await billingService.downgradeToExpired(tenantId);
 
@@ -212,7 +212,7 @@ router.post('/cancel', async (req, res) => {
       payload: {
         reason,
         previousTier: currentTenant.subscription_tier,
-        newTier: 'presence',
+        newTier: 'directory_presence',
         adminUserId: req.user?.userId,
         adminEmail: req.user?.email,
       },

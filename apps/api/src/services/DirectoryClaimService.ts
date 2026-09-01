@@ -22,6 +22,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
+import { buildTenantUpgradeOptions, UpgradeOptionsPayload } from './DirectoryPresenceUpgradeOptionsService';
 
 /** Audit context for claim operations */
 interface ClaimAuditCtx {
@@ -85,6 +86,10 @@ export interface ClaimResult {
   requiresPasswordSetup?: boolean;
   /** The platform user ID that was created or linked */
   platformUserId?: string;
+  /** Gateway upgrade preview (claim handoff spec) — embedded so the success screen can render Entry Presence mode cards without a platform (Auth0) session */
+  currentTier?: UpgradeOptionsPayload['currentTier'];
+  isGatewayUpgrade?: boolean;
+  upgradeOptions?: UpgradeOptionsPayload['upgradeOptions'];
 }
 
 export interface InitiateClaimResult {
@@ -585,10 +590,14 @@ Review at Settings → Directory → Presence Seeds.`,
       WHERE id = ${r.token_id}
     `;
 
-    // Convert tenant from directory_seed to independent
+    // Convert tenant from directory_seed to independent. The gateway tier is
+    // free forever — set status 'active' so the tenant never enters the
+    // paid-trial machinery (which stamps a 14-day clock and auto-expires).
     await prisma.$executeRaw`
       UPDATE tenants
-      SET org_standing_mode = 'independent', updated_at = now()
+      SET org_standing_mode = 'independent',
+          subscription_status = 'active',
+          updated_at = now()
       WHERE id = ${r.tenant_id}
     `;
 
@@ -638,6 +647,19 @@ Review at Settings → Directory → Presence Seeds.`,
       await this.provisionGbpBridge(gbpBridgeCustomerId, r.tenant_id);
     }
 
+    // Embed the gateway upgrade preview so the claim success screen can
+    // render the Entry Presence mode cards without a platform (Auth0)
+    // session (claim handoff spec). A failure here must never fail the claim.
+    let upgradePreview: UpgradeOptionsPayload | null = null;
+    try {
+      upgradePreview = await buildTenantUpgradeOptions(r.tenant_id);
+    } catch (err: any) {
+      logger.warn('DirectoryClaimService.acceptClaim — upgrade preview build failed', undefined, {
+        tenantId: r.tenant_id,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+    }
+
     audit({
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
@@ -668,6 +690,11 @@ Review at Settings → Directory → Presence Seeds.`,
       userTokens,
       requiresPasswordSetup,
       platformUserId,
+      ...(upgradePreview ? {
+        currentTier: upgradePreview.currentTier,
+        isGatewayUpgrade: upgradePreview.isGatewayUpgrade,
+        upgradeOptions: upgradePreview.upgradeOptions,
+      } : {}),
     };
   }
 
@@ -824,10 +851,14 @@ Review at Settings → Directory → Presence Seeds.`,
       WHERE id = ${r.token_id}
     `;
 
-    // Convert tenant from directory_seed to independent
+    // Convert tenant from directory_seed to independent. The gateway tier is
+    // free forever — set status 'active' so the tenant never enters the
+    // paid-trial machinery (which stamps a 14-day clock and auto-expires).
     await prisma.$executeRaw`
       UPDATE tenants
-      SET org_standing_mode = 'independent', updated_at = now()
+      SET org_standing_mode = 'independent',
+          subscription_status = 'active',
+          updated_at = now()
       WHERE id = ${r.tenant_id}
     `;
 

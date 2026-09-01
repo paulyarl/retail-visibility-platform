@@ -15,6 +15,7 @@ import {
   ThemeIcon,
   Center,
   Group,
+  Grid,
   Loader,
   Badge,
   Divider,
@@ -37,12 +38,31 @@ import {
 } from '@tabler/icons-react';
 import directoryClaimPublicService, {
   DirectoryClaimSummary,
+  DirectoryClaimAcceptResult,
 } from '@/services/DirectoryClaimPublicService';
+import directoryPresenceUpgradeService from '@/services/DirectoryPresenceUpgradeService';
+import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
-import { useAuth } from '@/contexts/AuthContext';
 
 type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'success' | 'otp_sent' | 'pending_approval';
+
+/**
+ * Best-effort platform (Auth0) session detection for success-screen CTAs.
+ * Auth0's real session cookie (appSession) is httpOnly and invisible to
+ * document.cookie; the SDK sets non-httpOnly auth0_email / auth0_id marker
+ * cookies at login (lib/auth0.ts onCallback). A false negative is benign —
+ * /auth/login bounces an authenticated user straight back to the returnTo
+ * target (see .devin/skills/fix-auth0-redirect-loop.md).
+ */
+function detectPlatformSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    document.cookie.includes('auth0_email=') ||
+    document.cookie.includes('auth0_id=') ||
+    document.cookie.includes('auth0.')
+  );
+}
 
 export default function DirectoryClaimClient() {
   const params = useParams();
@@ -57,11 +77,10 @@ export default function DirectoryClaimClient() {
   const [error, setError] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
-  const [claimResult, setClaimResult] = useState<{
-    tenantId?: string;
-    requiresPasswordSetup?: boolean;
-    userTokens?: { accessToken: string; refreshToken: string };
-  } | null>(null);
+  const [claimResult, setClaimResult] = useState<DirectoryClaimAcceptResult | null>(null);
+  // Best-effort platform (Auth0) session presence — drives the session-aware
+  // success-screen CTAs (see detectPlatformSession).
+  const [hasPlatformSession, setHasPlatformSession] = useState(false);
 
   // Claimant verification fields (for operator-approval claims)
   const [claimantFirstName, setClaimantFirstName] = useState('');
@@ -110,6 +129,31 @@ export default function DirectoryClaimClient() {
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  // Refresh the teaser cards from the authenticated options endpoint when a
+  // platform session exists (e.g., an existing platform user claiming from a
+  // logged-in browser). Skipped otherwise — that endpoint requires an Auth0
+  // session and the options embedded in the accept response are already
+  // fresh (claim handoff spec — Data source).
+  const refreshTenantId = claimResult?.tenantId;
+  useEffect(() => {
+    if (state !== 'success' || !hasPlatformSession || !refreshTenantId) return;
+    let cancelled = false;
+    (async () => {
+      const opts = await directoryPresenceUpgradeService.getUpgradeOptions(refreshTenantId);
+      if (!cancelled && opts && Array.isArray(opts.upgradeOptions) && opts.upgradeOptions.length > 0) {
+        setClaimResult((prev) => prev ? {
+          ...prev,
+          currentTier: opts.currentTier,
+          isGatewayUpgrade: opts.isGatewayUpgrade,
+          upgradeOptions: opts.upgradeOptions,
+        } : prev);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state, hasPlatformSession, refreshTenantId]);
 
   const handleInitiate = async () => {
     setInitiating(true);
@@ -168,13 +212,7 @@ export default function DirectoryClaimClient() {
       if (result.success) {
         await refreshCustomer();
 
-        if (result.userTokens) {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('platform_access_token', result.userTokens.accessToken);
-            localStorage.setItem('platform_refresh_token', result.userTokens.refreshToken);
-          }
-        }
-
+        setHasPlatformSession(detectPlatformSession());
         setClaimResult(result);
         setState('success');
       } else {
@@ -212,13 +250,11 @@ export default function DirectoryClaimClient() {
     try {
       const result = await customerAuthService.setupPlatformPassword(platformPassword);
       if (result.success && result.userTokens) {
-        // Store platform tokens so the dashboard is immediately accessible
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('platform_access_token', result.userTokens.accessToken);
-          localStorage.setItem('platform_refresh_token', result.userTokens.refreshToken);
-        }
         setPasswordSet(true);
-        // Update claimResult so the dashboard button uses the new tokens
+        // Keep the platform tokens on claimResult so the success screen knows
+        // a platform account exists. The tokens themselves are not consumed
+        // by the web app — platform auth is Auth0 cookie-based (claim
+        // handoff spec), so they are no longer written to localStorage.
         setClaimResult((prev) => prev ? {
           ...prev,
           requiresPasswordSetup: false,
@@ -520,37 +556,36 @@ export default function DirectoryClaimClient() {
 
   if (state === 'success') {
     const tenantId = claimResult?.tenantId;
-    const hasPlatformTokens = !!claimResult?.userTokens;
     const needsPasswordSetup = claimResult?.requiresPasswordSetup && !passwordSet;
-    const upgradeHref = tenantId
-      ? `/t/${tenantId}/settings/subscription/upgrade`
-      : null;
+    const slug = summary?.slug;
 
-    // If the claim returned platform JWTs (customer was promoted), the tokens
-    // are already in localStorage — go straight to the dashboard. Otherwise
-    // (existing platform user), route through /login which will detect the
-    // existing session and redirect.
-    const dashboardHref = tenantId
-      ? `/t/${tenantId}/dashboard?welcome=true`
-      : '/account';
-    const loginRedirect = tenantId
-      ? `/login?redirect=${encodeURIComponent(`/t/${tenantId}/dashboard?welcome=true`)}`
-      : '/login';
-    const goToDashboardHref = hasPlatformTokens ? dashboardHref : loginRedirect;
+    // Session-aware hrefs (claim handoff spec): /t/{tenantId}/* pages are
+    // server-gated on a platform (Auth0) session. A freshly-claimed owner
+    // usually has none (customer JWT only), so route through /auth/login
+    // preserving the destination — the /t/[tenantId] layout hardcodes its
+    // own returnTo to the dashboard and would drop the upgrade context.
+    const upgradePath = tenantId ? `/t/${tenantId}/settings/subscription/upgrade` : null;
+    const dashboardPath = tenantId ? `/t/${tenantId}/dashboard` : '/account';
+    const withReturnTo = (path: string) => `/auth/login?returnTo=${encodeURIComponent(path)}`;
+    const upgradeHref = upgradePath
+      ? (hasPlatformSession ? upgradePath : withReturnTo(upgradePath))
+      : null;
+    const dashboardHref = hasPlatformSession ? dashboardPath : withReturnTo(dashboardPath);
 
     return (
-      <Container size="sm" className="py-12">
+      <Container size="lg" className="py-12">
         <Card withBorder shadow="sm" padding="xl" radius="md">
-          <Stack align="center" gap="md" ta="center">
-            <ThemeIcon size={56} radius="xl" color="green">
-              <IconCheck size={28} />
-            </ThemeIcon>
-            <Title order={3}>Listing Claimed!</Title>
-            <Text>
-              You now own the directory listing for{' '}
-              <strong>{summary?.businessName}</strong>. Your business owner
-              account has been created.
-            </Text>
+          <Stack gap="lg">
+            <Stack align="center" gap="md" ta="center">
+              <ThemeIcon size={56} radius="xl" color="green">
+                <IconCheck size={28} />
+              </ThemeIcon>
+              <Title order={3}>You own the listing for {summary?.businessName}</Title>
+              <Text>
+                Your free directory listing is live. Shoppers can find you, but it&apos;s still a
+                basic listing. Choose a Presence Mode to unlock your full directory entry.
+              </Text>
+            </Stack>
 
             {/* Password setup for OAuth-only customers who were promoted */}
             {needsPasswordSetup && (
@@ -603,28 +638,31 @@ export default function DirectoryClaimClient() {
                   </Alert>
                 )}
 
-                <Group>
-                  <Button component={Link} href={goToDashboardHref} leftSection={<IconCheck size={16} />}>
+                {/* Entry Presence mode teaser (claim handoff spec §2/§4) */}
+                <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} />
+
+                <Group justify="center">
+                  {upgradeHref && (
+                    <Button component={Link} href={upgradeHref} leftSection={<IconSparkles size={16} />}>
+                      Upgrade to Starter
+                    </Button>
+                  )}
+                  <Button
+                    component={Link}
+                    href={dashboardHref}
+                    variant="light"
+                    leftSection={<IconCheck size={16} />}
+                  >
                     Go to Dashboard
                   </Button>
-                  {summary?.slug && (
+                  {slug && (
                     <Button
                       component={Link}
-                      href={`/directory/${summary.slug}`}
+                      href={`/directory/${slug}`}
                       variant="light"
                       leftSection={<IconMapPin size={16} />}
                     >
                       View Listing
-                    </Button>
-                  )}
-                  {upgradeHref && (
-                    <Button
-                      component={Link}
-                      href={upgradeHref}
-                      variant="light"
-                      leftSection={<IconSparkles size={16} />}
-                    >
-                      Choose Your Presence Mode
                     </Button>
                   )}
                   <Button
@@ -638,8 +676,8 @@ export default function DirectoryClaimClient() {
                 </Group>
 
                 <Text size="xs" c="dimmed" ta="center">
-                  You&apos;ll sign in with the same email ({summary?.businessName ? 'your account email' : ''}).
-                  Your dashboard is at <strong>{tenantId ? `/t/${tenantId}/dashboard` : 'your account'}</strong>.
+                  You&apos;ll sign in with your account email. Your dashboard is at{' '}
+                  <strong>{tenantId ? `/t/${tenantId}/dashboard` : 'your account'}</strong>.
                 </Text>
               </>
             )}
@@ -804,5 +842,125 @@ export default function DirectoryClaimClient() {
         </Stack>
       </Card>
     </Container>
+  );
+}
+
+// ─── Claim upgrade teaser (claim handoff spec §2/§4) ──────────────────────
+//
+// Renders the three Entry Presence mode cards on the claim success screen.
+// Live values come from the upgradeOptions embedded in the claim accept
+// response (or the authenticated refresh when a platform session exists);
+// the static fallback below renders only when no options are available.
+const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
+  {
+    tierKey: 'presence',
+    name: 'Starter',
+    displayName: 'Starter',
+    description: null,
+    priceMonthly: 19,
+    priceAnnual: 228,
+    sortOrder: 10,
+    billingType: 'subscription',
+    mode: 'directory',
+    tagline: 'Own your directory listing',
+    isPrimary: true,
+    newFeatures: [],
+  },
+  {
+    tierKey: 'discovery',
+    name: 'Discovery',
+    displayName: 'Discovery',
+    description: null,
+    priceMonthly: 29,
+    priceAnnual: 348,
+    sortOrder: 20,
+    billingType: 'subscription',
+    mode: 'google',
+    tagline: 'Get found on Google',
+    isPrimary: false,
+    newFeatures: [],
+  },
+  {
+    tierKey: 'storefront',
+    name: 'Storefront',
+    displayName: 'Storefront',
+    description: null,
+    priceMonthly: 59,
+    priceAnnual: 708,
+    sortOrder: 30,
+    billingType: 'subscription',
+    mode: 'platform',
+    tagline: 'Open your platform store',
+    isPrimary: false,
+    newFeatures: [],
+  },
+];
+
+// Curated per-mode unlock copy — must stay within each tier's actual feature
+// set (spec copy accuracy rules: no premium layout, no featured products, no
+// cart/checkout language; hours/map/contact/QR/SNAP are already free).
+const MODE_UNLOCK_COPY: Record<string, string> = {
+  presence:
+    'Business logo, about/bio, photo gallery, social links, and richer directory layouts (classic / editorial / immersive).',
+  discovery:
+    'Google Shopping / Search / Maps visibility for your products and store, plus thin directory chrome.',
+  storefront:
+    'A full, branded /shops/{slug} browse experience with product catalog and Google inherit — browsing only; checkout arrives with Commerce tiers.',
+};
+
+function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
+  const isFallback = !options || options.length === 0;
+  const modes = isFallback ? FALLBACK_PRESENCE_MODES : options;
+  // Primary (presence) first — mirrors the upgrade page's gateway sort
+  const sorted = [...modes].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+
+  return (
+    <Stack gap="xs">
+      <Text ta="center" fw={500}>
+        Choose your Presence Mode
+      </Text>
+      <Grid gap="md">
+        {sorted.map((mode) => (
+          <Grid.Col key={mode.tierKey} span={{ base: 12, md: 6, lg: 4 }}>
+            <Card withBorder radius="md" padding="md" h="100%" style={{ minHeight: 220 }}>
+              <Stack gap="xs" align="center" ta="center">
+                <Group gap="xs" justify="center">
+                  {mode.mode && (
+                    <Badge variant="light" color={mode.isPrimary ? 'blue' : 'gray'}>
+                      {mode.mode}
+                    </Badge>
+                  )}
+                  {mode.isPrimary && (
+                    <Text size="xs" fw={500} c="blue">
+                      Recommended
+                    </Text>
+                  )}
+                </Group>
+                <Text fw={700} size="lg">
+                  {mode.displayName || mode.name}
+                </Text>
+                {mode.tagline && (
+                  <Text size="sm" fw={500}>
+                    {mode.tagline}
+                  </Text>
+                )}
+                <Text fw={700}>
+                  {isFallback ? `from $${mode.priceMonthly}/mo` : `$${mode.priceMonthly}/mo`}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {MODE_UNLOCK_COPY[mode.tierKey] ?? ''}
+                </Text>
+              </Stack>
+            </Card>
+          </Grid.Col>
+        ))}
+      </Grid>
+      <Text size="xs" c="dimmed" ta="center">
+        Start with a Presence Mode. Later, add checkout with <strong>Commitment</strong>,{' '}
+        <strong>E-commerce</strong>, or <strong>Omnichannel</strong>, then scale with{' '}
+        <strong>Professional</strong>, <strong>Organization</strong>, or <strong>Enterprise</strong>{' '}
+        tools. You can also buy individual features à la carte from the Feature Store at any time.
+      </Text>
+    </Stack>
   );
 }

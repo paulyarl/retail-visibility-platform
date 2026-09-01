@@ -12,6 +12,11 @@
  * GET handler returns the Entry Presence triad — `presence`, `discovery`,
  * `storefront` — as peer visibility modes with mode labels, instead of a flat
  * sort_order ladder. Presence (display: "Starter") is the primary CTA.
+ *
+ * The option-building logic lives in DirectoryPresenceUpgradeOptionsService
+ * and is shared with the claim accept response (claim handoff spec — the
+ * claimant has no platform session, so the accept response embeds the
+ * gateway upgrade preview directly).
  */
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
@@ -19,20 +24,9 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import { authenticateToken } from '../middleware/auth';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
+import { buildTenantUpgradeOptions } from '../services/DirectoryPresenceUpgradeOptionsService';
 
 const router = Router();
-
-/**
- * V3.1 Entry Presence mode metadata.
- * When the gateway tenant asks for upgrade options, these three peer modes
- * are returned with surface labels so the frontend can render a mode picker
- * instead of a linear tier ladder.
- */
-const ENTRY_PRESENCE_MODES: Record<string, { mode: string; surface: string; tagline: string; primary: boolean }> = {
-  presence:   { mode: 'directory', surface: 'Platform in-house directory',     tagline: 'Own your directory listing',  primary: true  },
-  discovery:  { mode: 'google',    surface: 'Third-party (Google)',            tagline: 'Get found on Google',        primary: false },
-  storefront: { mode: 'platform',  surface: 'Platform in-house marketplace',   tagline: 'Open your platform store',   primary: false },
-};
 
 /**
  * GET /api/tenant/:tenantId/upgrade/options
@@ -46,16 +40,10 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
       return res.status(401).json({ error: 'authentication_required' });
     }
 
-    // Load the tenant
+    // Load the tenant (existence check)
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      select: {
-        id: true,
-        name: true,
-        subscription_tier: true,
-        subscription_status: true,
-        org_standing_mode: true,
-      },
+      select: { id: true },
     });
 
     if (!tenant) {
@@ -70,137 +58,13 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
       return res.status(403).json({ error: 'no_tenant_access' });
     }
 
-    const currentTierKey = tenant.subscription_tier;
-
-    if (!currentTierKey) {
-      return res.json({
-        success: true,
-        currentTier: null,
-        upgradeOptions: [],
-      });
-    }
-
-    // Load current tier details
-    const currentTier = await prisma.subscription_tiers_list.findUnique({
-      where: { tier_key: currentTierKey },
-      select: {
-        id: true,
-        tier_key: true,
-        name: true,
-        display_name: true,
-        description: true,
-        price_monthly: true,
-        sort_order: true,
-      },
-    });
-
-    if (!currentTier) {
-      return res.json({
-        success: true,
-        currentTier: null,
-        upgradeOptions: [],
-      });
-    }
-
-    // Load current tier's feature keys
-    const currentFeatures = await prisma.tier_features_list.findMany({
-      where: { tier_id: currentTier.id, is_enabled: true },
-      select: { feature_key: true, feature_name: true },
-    });
-    const currentFeatureKeys = new Set(currentFeatures.map((f) => f.feature_key));
-
-    // V3.1: Gateway special-case — when current tier is directory_presence,
-    // return the Entry Presence triad (presence, discovery, storefront) as
-    // peer visibility modes with mode labels, not a flat sort_order ladder.
-    const isGateway = currentTierKey === 'directory_presence';
-
-    // Load upgrade-eligible tiers
-    let upgradeTiers;
-    if (isGateway) {
-      // Gateway: return exactly the three Entry Presence modes
-      upgradeTiers = await prisma.subscription_tiers_list.findMany({
-        where: {
-          is_active: true,
-          tier_key: { in: ['presence', 'discovery', 'storefront'] },
-        },
-        orderBy: { sort_order: 'asc' },
-        select: {
-          id: true,
-          tier_key: true,
-          name: true,
-          display_name: true,
-          description: true,
-          price_monthly: true,
-          sort_order: true,
-          billing_type: true,
-        },
-      });
-    } else {
-      // Non-gateway: return tiers with sort_order > current (flat ladder)
-      upgradeTiers = await prisma.subscription_tiers_list.findMany({
-        where: {
-          is_active: true,
-          sort_order: { gt: currentTier.sort_order },
-          price_monthly: { gt: 0 },
-        },
-        orderBy: { sort_order: 'asc' },
-        select: {
-          id: true,
-          tier_key: true,
-          name: true,
-          display_name: true,
-          description: true,
-          price_monthly: true,
-          sort_order: true,
-          billing_type: true,
-        },
-      });
-    }
-
-    // Load features for each upgrade tier and compute deltas
-    const upgradeOptions = await Promise.all(
-      upgradeTiers.map(async (t) => {
-        const tierFeatures = await prisma.tier_features_list.findMany({
-          where: { tier_id: t.id, is_enabled: true },
-          select: { feature_key: true, feature_name: true },
-        });
-        const newFeatures = tierFeatures
-          .filter((f) => !currentFeatureKeys.has(f.feature_key))
-          .map((f) => ({ featureKey: f.feature_key, featureName: f.feature_name }));
-
-        const modeMeta = isGateway ? ENTRY_PRESENCE_MODES[t.tier_key] : undefined;
-
-        return {
-          tierKey: t.tier_key,
-          name: t.name,
-          displayName: t.display_name,
-          description: t.description,
-          priceMonthly: Number(t.price_monthly),
-          priceAnnual: Number(t.price_monthly) * 12,
-          sortOrder: t.sort_order,
-          billingType: t.billing_type,
-          // V3.1 mode metadata (only present for gateway upgrades)
-          mode: modeMeta?.mode,
-          surface: modeMeta?.surface,
-          tagline: modeMeta?.tagline,
-          isPrimary: modeMeta?.primary ?? false,
-          newFeatures,
-        };
-      }),
-    );
+    const payload = await buildTenantUpgradeOptions(tenantId);
 
     res.json({
       success: true,
-      currentTier: {
-        tierKey: currentTier.tier_key,
-        name: currentTier.name,
-        displayName: currentTier.display_name,
-        description: currentTier.description,
-        priceMonthly: Number(currentTier.price_monthly),
-      },
-      // V3.1: flag so frontend knows to render a mode picker vs a ladder
-      isGatewayUpgrade: isGateway,
-      upgradeOptions,
+      currentTier: payload.currentTier,
+      isGatewayUpgrade: payload.isGatewayUpgrade,
+      upgradeOptions: payload.upgradeOptions,
     });
   } catch (error) {
     logger.error('[GET /api/tenant/:tenantId/upgrade/options] Error:', undefined, {

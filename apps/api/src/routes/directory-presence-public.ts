@@ -216,6 +216,12 @@ router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (r
       userTokens: result.userTokens,
       requiresPasswordSetup: result.requiresPasswordSetup,
       platformUserId: result.platformUserId,
+      // Gateway upgrade preview (claim handoff spec) — embedded so the
+      // success screen can render Entry Presence mode cards without a
+      // platform (Auth0) session.
+      currentTier: result.currentTier,
+      isGatewayUpgrade: result.isGatewayUpgrade,
+      upgradeOptions: result.upgradeOptions,
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/claim/:token/accept] Error:', undefined, {

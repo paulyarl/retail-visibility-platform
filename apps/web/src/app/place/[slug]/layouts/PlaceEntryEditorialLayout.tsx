@@ -130,9 +130,6 @@ export default function PlaceEntryEditorialLayout({
                   )}
                 </div>
               </div>
-              <p className="text-sm text-neutral-400 max-w-2xl leading-relaxed">
-                {disclaimer}
-              </p>
               <div className="flex flex-wrap items-center gap-4">
                 {hasClaimToken ? (
                   <Link
