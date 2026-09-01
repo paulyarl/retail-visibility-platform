@@ -617,6 +617,8 @@ class DirectorySingletonService extends PublicApiSingleton {
     category?: string;
     city?: string;
     state?: string;
+    minRating?: string;
+    openNow?: boolean;
     lat?: number;
     lng?: number;
     sort?: string;
@@ -628,6 +630,8 @@ class DirectorySingletonService extends PublicApiSingleton {
     if (params.category) searchParams.append('category', params.category);
     if (params.city) searchParams.append('city', params.city);
     if (params.state) searchParams.append('state', params.state);
+    if (params.minRating) searchParams.append('minRating', params.minRating);
+    if (params.openNow) searchParams.append('openNow', 'true');
     if (params.lat && params.lng) {
       searchParams.append('lat', params.lat.toString());
       searchParams.append('lng', params.lng.toString());

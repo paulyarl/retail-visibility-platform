@@ -69,6 +69,58 @@ Three CTAs must coexist on the directory surfaces. Each serves a different lifec
 - On an unclaimed entry, the claim banner is the dominant CTA. The other two must be visually subordinate so the owner does not mistake them for the claim path.
 - On browse pages, "Add your business" and "Suggest a business" should not be the visual center but should be easy to find at the bottom of the results or in a dedicated bottom-of-page card.
 
+## Iconography
+
+Public directory surfaces use `lucide-react` components; admin/Mantine surfaces use `@tabler/icons-react` icons. Assign an appropriate icon to each CTA, form field, and suggestion status so the intent is immediately recognizable.
+
+### CTA icons
+
+| CTA | Icon (lucide) | Icon (tabler) | Rationale |
+|---|---|---|---|
+| **Claim this listing** | `ShieldCheck` | `IconShieldCheck` | Ownership, trust, and verification. Keeps it visually distinct from the plus/lightbulb icons. |
+| **Add your business** | `Store` or `Building2` | `IconBuildingStore` | The actor is the business owner; the icon should read as "my business." |
+| **Suggest a business** | `Lightbulb` | `IconBulb` | A public idea or tip, not an ownership action. Soft and inviting. |
+
+**Placement rules:**
+- Keep the claim CTA icon at `size={18}` inside `UnclaimedDirectoryBanner` (Mantine `Alert`) so it matches the existing `IconInfoCircle` pattern.
+- Use `CirclePlus` as a secondary accent for "Add your business" on browse-page cards, paired with the `Store`/`Building2` icon in the form header.
+- Use `Lightbulb` for the suggestion CTA at the bottom of category/city listings; do not use `Send` there, because the form still requires review before anything is "sent" to the directory.
+
+### Form field icons
+
+| Field | Icon (lucide) | Icon (tabler) |
+|---|---|---|
+| Business name | `Building` | `IconBuilding` |
+| Address | `MapPin` | `IconMapPin` |
+| City | `MapPin` (with a city label) or `Landmark` | `IconMapPin` |
+| State | `Flag` | `IconFlag` |
+| ZIP code | `Mailbox` | `IconMailbox` |
+| Phone | `Phone` | `IconPhone` |
+| Email | `Mail` | `IconMail` |
+| Primary category | `Tag` or `Package` | `IconTag` |
+| Comment / why this business | `MessageSquare` | `IconMessage` |
+| Source page (read-only) | `Link` | `IconLink` |
+
+### Suggestion status icons (admin queue)
+
+| Status | Icon (lucide) | Icon (tabler) | Color hint |
+|---|---|---|---|
+| `submitted` | `Inbox` | `IconInbox` | blue |
+| `under_review` | `Search` | `IconSearch` | yellow |
+| `approved` | `CheckCircle` | `IconCircleCheck` | green |
+| `rejected` | `XCircle` | `IconCircleX` | red |
+| `duplicate` | `Copy` | `IconCopy` | neutral |
+
+### Admin action icons
+
+| Action | Icon (lucide) | Icon (tabler) |
+|---|---|---|
+| Approve + create seed | `Check` | `IconCheck` |
+| Reject | `X` | `IconX` |
+| Mark duplicate | `Copy` | `IconCopy` |
+| View on map | `Map` | `IconMap` |
+| Contact submitter | `Mail` | `IconMail` |
+
 ## Lifecycle and Statuses
 
 The existing `directory_presence_seeds` lifecycle is `draft → published → invited → claimed → suppressed`. This spec adds two upstream sources, not new statuses.

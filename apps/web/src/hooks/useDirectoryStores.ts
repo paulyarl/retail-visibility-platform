@@ -16,6 +16,8 @@ export interface UseDirectoryStoresOptions {
   category?: string;
   city?: string;
   state?: string;
+  minRating?: string;
+  openNow?: boolean;
   lat?: number;
   lng?: number;
   sort?: string;
@@ -47,6 +49,8 @@ export const useDirectoryStores = (
     category,
     city,
     state,
+    minRating,
+    openNow,
     lat,
     lng,
     sort = 'activity',
@@ -92,6 +96,8 @@ export const useDirectoryStores = (
         category,
         city,
         state,
+        minRating,
+        openNow,
         lat,
         lng,
         sort,
@@ -147,7 +153,7 @@ export const useDirectoryStores = (
     } finally {
       setLoading(false);
     }
-  }, [search, category, city, state, lat, lng, sort, page, limit, cacheTTL]);
+  }, [search, category, city, state, minRating, openNow, lat, lng, sort, page, limit, cacheTTL]);
 
   const refetch = useCallback(() => {
     return fetchDirectoryStores();

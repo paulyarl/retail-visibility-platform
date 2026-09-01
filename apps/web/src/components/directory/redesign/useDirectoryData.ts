@@ -197,6 +197,8 @@ export function useDirectoryData(): DirectoryData {
     category: activeCategory || undefined,
     city: activeCity || undefined,
     state: activeState || undefined,
+    minRating: searchParams.get('minRating') || undefined,
+    openNow: searchParams.get('openNow') === 'true' || undefined,
     lat:
       activeSort === 'distance' && latParam
         ? parseFloat(latParam)
@@ -235,9 +237,7 @@ export function useDirectoryData(): DirectoryData {
     const derived = Array.from(byKey.values()).sort(
       (a, b) => b.count - a.count || a.city.localeCompare(b.city),
     );
-    if (derived.length > 0 || !hasLocationFilter) {
-      setLocations(derived);
-    }
+    setLocations(derived);
   }, [stores, hasLocationFilter]);
 
   // --- User location ---
@@ -427,6 +427,8 @@ export function useDirectoryData(): DirectoryData {
     activeCity ||
     activeState ||
     searchParams.get('storeType') ||
+    searchParams.get('minRating') ||
+    searchParams.get('openNow') === 'true' ||
     searchParams.get('q') ||
     searchParams.get('search')
   );

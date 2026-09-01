@@ -10,6 +10,7 @@ import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import tenantSingletonService from '../services/TenantSingletonService';
 import { logger } from '../logger';
+import { computeStoreStatus } from '../lib/hours-utils';
 
 const router = Router();
 
@@ -48,6 +49,54 @@ function calculateActivityScore(lastUpdated: string, firstAdded: string): number
   return Math.min(100, activityScore); // Cap at 100
 }
 
+function to24Hour(hh: string, mm: string, amPm: string): string {
+  let hours = parseInt(hh, 10) % 12;
+  if (amPm.toUpperCase() === 'PM') hours += 12;
+  return `${String(hours).padStart(2, '0')}:${mm}`;
+}
+
+/**
+ * Normalize a listing's business_hours JSON into the day-object shape that
+ * computeStoreStatus understands. Directory listings mix two formats:
+ *   - structured: { monday: { open: "10:30", close: "19:00", closed: false }, timezone }
+ *   - legacy strings: { friday: "9:00 AM - 8:00 PM", sunday: "Closed" }
+ */
+function normalizeListingHours(businessHours: any): any | null {
+  if (!businessHours || typeof businessHours !== 'object') return null;
+  const normalized: any = {};
+  if (typeof businessHours.timezone === 'string') {
+    normalized.timezone = businessHours.timezone;
+  }
+  for (const [day, entry] of Object.entries(businessHours)) {
+    if (['timezone', 'special', 'periods'].includes(day)) continue;
+    if (typeof entry === 'string') {
+      const m = entry.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (m) {
+        normalized[day] = {
+          open: to24Hour(m[1], m[2], m[3]),
+          close: to24Hour(m[4], m[5], m[6]),
+        };
+      }
+    } else if (entry && typeof entry === 'object') {
+      const hours = entry as { open?: string; close?: string; closed?: boolean };
+      if (hours.open && hours.close && !hours.closed) {
+        normalized[day] = { open: hours.open, close: hours.close };
+      }
+    }
+  }
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+/**
+ * Derive open-now from a listing's own businessHours (no per-tenant lookups).
+ * Returns null when the listing has no usable hours data.
+ */
+function computeIsOpenFromHours(businessHours: any): boolean | null {
+  const normalized = normalizeListingHours(businessHours);
+  if (!normalized) return null;
+  return computeStoreStatus(normalized)?.isOpen ?? null;
+}
+
 /**
  * GET /api/directory/mv/search
  * Search directory listings using materialized views
@@ -55,7 +104,7 @@ function calculateActivityScore(lastUpdated: string, firstAdded: string): number
  */
 router.get('/search', async (req: Request, res: Response) => {
   try {
-    const { category, city, state, sort = 'rating', page = '1', limit = '12', q: searchQuery, lat, lng, search } = req.query;
+    const { category, city, state, sort = 'rating', page = '1', limit = '12', q: searchQuery, lat, lng, search, minRating, openNow } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
@@ -119,6 +168,16 @@ router.get('/search', async (req: Request, res: Response) => {
       conditions.push(`LOWER(dll.state) = LOWER($${paramIndex}::text)`);
       params.push(state);
       paramIndex++;
+    }
+
+    // Minimum rating filter
+    if (minRating) {
+      const minRatingNum = Number(minRating);
+      if (!isNaN(minRatingNum) && minRatingNum > 0) {
+        conditions.push(`dll.rating_avg >= $${paramIndex}::numeric`);
+        params.push(minRatingNum);
+        paramIndex++;
+      }
     }
 
     // Determine ORDER BY clause (uses indexed columns)
@@ -281,7 +340,7 @@ router.get('/search', async (req: Request, res: Response) => {
     
     //console.log('[Directory MV Search] Query:', listingsQuery);
     //console.log('[Directory MV Search] Params:', [...params, limitNum, skip]);
-    
+
     const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
 
     // Get total count (using same source as search) - count distinct tenants
@@ -295,10 +354,22 @@ router.get('/search', async (req: Request, res: Response) => {
     const countResult = await getDirectPool().query(countQuery, params);
 
     const total = parseInt(countResult.rows[0]?.count || '0');
-    const totalPages = Math.ceil(total / limitNum);
+
+    // Open-now filter — derived from each listing's own businessHours
+    // (handles both "9:00 AM - 5:00 PM" strings and {open, close, closed} objects)
+    const wantsOpenNow = openNow === 'true';
+    let resultRows = listingsResult.rows;
+    if (wantsOpenNow) {
+      resultRows = resultRows.filter(
+        (row: any) => computeIsOpenFromHours(row.business_hours) === true,
+      );
+    }
+
+    const effectiveTotal = wantsOpenNow ? resultRows.length : total;
+    const totalPages = Math.ceil(effectiveTotal / limitNum);
 
     // Transform to camelCase for frontend - simplified since we only have primary_category
-    const listings = await Promise.all(listingsResult.rows.map(async (row: any) => {
+    const listings = await Promise.all(resultRows.map(async (row: any) => {
       const slug = row.slug || await tenantSingletonService.getTenantSlug(row.tenant_id);
       return {
         id: row.id,
@@ -324,6 +395,7 @@ router.get('/search', async (req: Request, res: Response) => {
         useCustomWebsite: false,
         canUseExternalLink: row.can_use_external_link || false,
         businessHours: row.business_hours,
+        isOpen: computeIsOpenFromHours(row.business_hours),
         directoryPublished: row.directory_published || false, // Add directory publish status
         isDemo: row.is_demo || false,
         demoExpiresAt: row.demo_expires_at || null,

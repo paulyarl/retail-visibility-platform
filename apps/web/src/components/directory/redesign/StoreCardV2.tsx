@@ -224,18 +224,18 @@ export default function StoreCardV2({
             <HoursStatusBadge status={hoursStatus} size="xs" />
           </div>
 
-          {/* Product count + CTA */}
+          {/* Product count + CTA — hide the stat when the store has no products */}
           <div className="flex items-center justify-between pt-2">
-            <span className="flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400">
-              <Package className="w-3.5 h-3.5" />
-              {typeof store.productCount === 'number'
-                ? store.productCount
-                : store.productCount}{' '}
-              {Number(store.productCount) === 1 ? 'product' : 'products'}
-            </span>
+            {Number(store.productCount) > 0 && (
+              <span className="flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400">
+                <Package className="w-3.5 h-3.5" />
+                {store.productCount}{' '}
+                {Number(store.productCount) === 1 ? 'product' : 'products'}
+              </span>
+            )}
             <button
               onClick={handleDirectoryClick}
-              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             >
               Visit Store
               <ExternalLink className="w-3.5 h-3.5" />
