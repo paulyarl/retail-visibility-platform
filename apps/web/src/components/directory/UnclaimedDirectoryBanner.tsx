@@ -1,15 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { IconInfoCircle } from '@tabler/icons-react';
-import { Alert, Text } from '@mantine/core';
+import { IconShieldCheck } from '@tabler/icons-react';
+import { Alert, Button, Text } from '@mantine/core';
 
 /**
- * UnclaimedDirectoryBanner — shown on directory listing pages for
- * listings with listing_origin = 'directory_seed' (unclaimed presence seeds).
- *
- * Renders a non-intrusive alert explaining this is a public-information
- * listing that the owner can claim.
+ * UnclaimedDirectoryBanner — primary "Claim this listing" CTA for
+ * directory presence seeds. Uses the ShieldCheck icon to distinguish
+ * the claim action from suggest/add CTAs elsewhere.
  */
 export interface UnclaimedDirectoryBannerProps {
   businessName: string;
@@ -22,7 +20,8 @@ export default function UnclaimedDirectoryBanner({
   claimToken,
   publicDisclaimer,
 }: UnclaimedDirectoryBannerProps) {
-  const claimHref = claimToken
+  const hasToken = !!claimToken;
+  const claimHref = hasToken
     ? `/place/claim/${claimToken}`
     : '/directory';
 
@@ -30,20 +29,33 @@ export default function UnclaimedDirectoryBanner({
     <Alert
       color="blue"
       variant="light"
-      icon={<IconInfoCircle size={18} />}
+      icon={<IconShieldCheck size={20} />}
       radius="md"
       className="mb-4"
     >
-      <Text size="sm" c="blue.9">
-        <strong>{businessName}</strong> is listed from public information (address, phone, and SNAP
-        where reported). This is not a claimed profile.{' '}
-        <Link href={claimHref} className="underline font-medium">
-          Are you the owner? Claim this listing
-        </Link>
-        .
+      <Text size="sm" c="blue.9" className="mb-2">
+        <strong>{businessName}</strong> is listed from public information. This is not a claimed profile.
       </Text>
+
+      {hasToken ? (
+        <Button
+          component={Link}
+          href={claimHref}
+          size="xs"
+          leftSection={<IconShieldCheck size={16} />}
+          color="blue"
+          variant="filled"
+        >
+          Claim this listing
+        </Button>
+      ) : (
+        <Text size="sm" c="blue.9">
+          Are you the owner? <Link href="/directory" className="underline font-medium">Contact us</Link> to claim this listing.
+        </Text>
+      )}
+
       {publicDisclaimer && (
-        <Text size="xs" c="dimmed" mt={4}>
+        <Text size="xs" c="dimmed" mt={8}>
           {publicDisclaimer}
         </Text>
       )}

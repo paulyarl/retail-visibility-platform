@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MapPin, Phone, ArrowLeft, Info } from 'lucide-react';
+import { MapPin, Phone, ArrowLeft, Info, ShieldCheck } from 'lucide-react';
 
 /**
  * PlaceCard — minimal shopper-facing card for directory presence seeds
@@ -100,9 +100,9 @@ export default function PlaceCard({
           <div className="px-6 py-6 sm:px-8 bg-gray-50 border-t border-gray-100">
             <Link
               href={claimHref}
-              className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              className="inline-flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
             >
-              Are you the owner? Claim this listing
+              <ShieldCheck className="w-5 h-5" /> Claim this listing
             </Link>
             <p className="mt-3 text-xs text-gray-500 text-center">
               Claiming is free and lets you update hours, add a photo, and verify your details.

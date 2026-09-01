@@ -11,6 +11,7 @@ import {
   Info,
   Tag,
   ShoppingBasket,
+  ShieldCheck,
 } from 'lucide-react';
 import placesBrowsePublicService, {
   PlaceListing,
@@ -326,9 +327,10 @@ function PlaceCard({
           {place.claimToken && (
             <Link
               href={claimHref}
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
             >
-              Is this your business?
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Claim this listing
             </Link>
           )}
         </div>
