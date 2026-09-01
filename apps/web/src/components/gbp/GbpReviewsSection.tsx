@@ -3,23 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Star, MessageSquare } from 'lucide-react';
 import { GoogleSourceBadge } from './GoogleSourceBadge';
-
-interface GbpReview {
-  id: string;
-  reviewerName: string;
-  starRating: number;
-  comment: string | null;
-  reviewReply: string | null;
-  createTime: string | null;
-}
-
-interface GbpReviewsData {
-  enabled: boolean;
-  aggregateRating: number | null;
-  totalReviewCount: number;
-  businessName: string | null;
-  reviews: GbpReview[];
-}
+import gbpPublicService, { GbpReview, GbpReviewsData } from '@/services/GbpPublicService';
 
 interface GbpReviewsSectionProps {
   slug: string;
@@ -31,19 +15,11 @@ export function GbpReviewsSection({ slug }: GbpReviewsSectionProps) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/public/directory/${encodeURIComponent(slug)}/gbp-reviews`);
-        const json = await res.json();
-        if (!cancelled && json.success) {
-          setData(json.data);
-        }
-      } catch {
-        // Silent fail — component renders nothing
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    gbpPublicService.getGbpReviews(slug).then((data) => {
+      if (!cancelled) setData(data);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => { cancelled = true; };
   }, [slug]);
 

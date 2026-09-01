@@ -7678,6 +7678,23 @@ model directory_presence_suggestions {
   @@index([submitter_ip], map: "idx_dpsg_submitter_ip")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_presence_submission_verifications {
+  id              String    @id
+  token           String    @unique
+  submitter_email String
+  business_name   String
+  payload         Json      @default("{}")
+  verified        Boolean   @default(false)
+  verified_at     DateTime? @db.Timestamptz(6)
+  expires_at      DateTime  @default(dbgenerated("(now() + '24:00:00'::interval)")) @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([submitter_email], map: "idx_dir_submission_verifications_email")
+  @@index([token], map: "idx_dir_submission_verifications_token")
+}
+
 enum action {
   create
   update

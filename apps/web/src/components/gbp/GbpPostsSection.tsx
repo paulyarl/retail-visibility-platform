@@ -3,27 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, Tag, Calendar, ArrowRight } from 'lucide-react';
 import { GoogleSourceBadge } from './GoogleSourceBadge';
-
-interface GbpPost {
-  id: string;
-  topicType: string | null;
-  summary: string;
-  mediaUrl: string | null;
-  callToActionType: string | null;
-  callToActionUrl: string | null;
-  eventTitle: string | null;
-  eventStartDate: string | null;
-  eventEndDate: string | null;
-  offerCouponCode: string | null;
-  offerRedeemUrl: string | null;
-  offerTerms: string | null;
-  publishedAt: string | null;
-}
-
-interface GbpPostsData {
-  enabled: boolean;
-  posts: GbpPost[];
-}
+import gbpPublicService, { GbpPost, GbpPostsData } from '@/services/GbpPublicService';
 
 interface GbpPostsSectionProps {
   slug: string;
@@ -35,19 +15,11 @@ export function GbpPostsSection({ slug }: GbpPostsSectionProps) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/public/directory/${encodeURIComponent(slug)}/gbp-posts`);
-        const json = await res.json();
-        if (!cancelled && json.success) {
-          setData(json.data);
-        }
-      } catch {
-        // Silent fail
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    gbpPublicService.getGbpPosts(slug).then((data) => {
+      if (!cancelled) setData(data);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => { cancelled = true; };
   }, [slug]);
 

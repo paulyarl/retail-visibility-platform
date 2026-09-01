@@ -3,19 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Camera } from 'lucide-react';
 import { GoogleSourceBadge } from './GoogleSourceBadge';
-
-interface GbpPhoto {
-  id: string;
-  category: string | null;
-  sourceUrl: string | null;
-  googleUrl: string | null;
-  description: string | null;
-}
-
-interface GbpPhotosData {
-  enabled: boolean;
-  photos: GbpPhoto[];
-}
+import gbpPublicService, { GbpPhoto, GbpPhotosData } from '@/services/GbpPublicService';
 
 interface GbpPhotoGallerySectionProps {
   slug: string;
@@ -41,19 +29,11 @@ export function GbpPhotoGallerySection({ slug }: GbpPhotoGallerySectionProps) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/public/directory/${encodeURIComponent(slug)}/gbp-photos`);
-        const json = await res.json();
-        if (!cancelled && json.success) {
-          setData(json.data);
-        }
-      } catch {
-        // Silent fail
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    gbpPublicService.getGbpPhotos(slug).then((data) => {
+      if (!cancelled) setData(data);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => { cancelled = true; };
   }, [slug]);
 

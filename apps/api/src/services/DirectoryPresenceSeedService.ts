@@ -16,6 +16,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
+import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import {
   generateDirectoryListingId,
@@ -505,6 +506,64 @@ class DirectoryPresenceSeedService {
     logger.info('DirectoryPresenceSeedService.inviteSeed', undefined, { seedId, tokenId, verificationRequired });
 
     return { token, expiresAt };
+  }
+
+  /**
+   * Approve a seed: publish it, mint a claim token, and email the owner/submitter
+   * the claim link. Used for public suggestions and owner-submitted seeds.
+   */
+  async approveAndInvite(seedId: string, ctx?: SeedAuditCtx): Promise<{ token: string; expiresAt: Date; claimUrl: string }> {
+    await this.publishSeed(seedId, ctx);
+    const { token, expiresAt } = await this.inviteSeed(seedId, 90, ctx);
+
+    const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+    const claimUrl = `${baseUrl}/place/claim/${token}`;
+
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT
+        dps.owner_email,
+        dps.owner_name,
+        dps.category,
+        dps.city,
+        dps.state,
+        dl.business_name,
+        dl.slug
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+
+    if (seed[0]?.owner_email) {
+      const html = `
+        <h1>Your business listing is ready to claim</h1>
+        <p><strong>${seed[0].business_name}</strong> in ${seed[0].city}, ${seed[0].state} has been added to the directory.</p>
+        <p>Click the link below to claim and manage your listing:</p>
+        <p><a href="${claimUrl}" style="padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">Claim my listing</a></p>
+        <p>Or copy and paste this URL into your browser:</p>
+        <p><code>${claimUrl}</code></p>
+        <p>This link expires in 90 days.</p>
+        <p>If you did not request this, please ignore this email.</p>
+      `;
+      const text = `Claim your listing for ${seed[0].business_name}: ${claimUrl} (expires in 90 days)`;
+
+      try {
+        await emailService.sendEmail({
+          to: seed[0].owner_email,
+          subject: `Claim your ${seed[0].business_name} listing`,
+          html,
+          text,
+        });
+      } catch (error) {
+        logger.error('[DirectoryPresenceSeedService.approveAndInvite] Failed to send claim invite:', undefined, {
+          error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+          seedId,
+          to: seed[0].owner_email,
+        });
+      }
+    }
+
+    return { token, expiresAt, claimUrl };
   }
 
   /**

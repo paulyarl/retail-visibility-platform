@@ -13,6 +13,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { generateDirectoryPresenceSuggestionId } from '../lib/id-generator';
+import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
 import { z } from 'zod';
 
 export const suggestionInputSchema = z.object({
@@ -222,8 +223,79 @@ class DirectorySuggestionService {
   }
 
   /**
+   * Approve a public suggestion: convert it into a published directory seed,
+   * mint a claim token, and email the submitter the claim link.
+   */
+  async approve(
+    id: string,
+    actorId: string,
+  ): Promise<{ suggestion: SuggestionRecord; seed: any; token: string; expiresAt: Date; claimUrl: string } | null> {
+    const suggestion = await this.getSuggestion(id);
+    if (!suggestion) return null;
+
+    const seedInput: CreateSeedInput = {
+      businessName: suggestion.businessName.trim(),
+      address: suggestion.address?.trim() || '',
+      city: suggestion.city?.trim() || '',
+      state: suggestion.state?.trim() || '',
+      zipCode: suggestion.zipCode?.trim() || undefined,
+      phone: suggestion.phone?.trim() || undefined,
+      primaryCategory: suggestion.primaryCategory?.trim() || 'Local Business',
+      seedBatch: 'public_suggestion',
+      identityConfidence: 'medium',
+      categoryFit: 'probable',
+      notes: suggestion.submitterComment?.trim() || undefined,
+      ownerEmail: suggestion.submitterEmail?.trim().toLowerCase() || undefined,
+      listingOrigin: 'public_suggestion',
+      publicDisclaimer: 'Suggested by a visitor. Owner may claim and verify this listing.',
+      provenance: this.buildProvenance(suggestion),
+    };
+
+    const seed = await DirectoryPresenceSeedService.createSeed(seedInput, {
+      actorType: 'user',
+      actorId,
+    });
+
+    const { token, expiresAt, claimUrl } = await DirectoryPresenceSeedService.approveAndInvite(seed.id, {
+      actorType: 'user',
+      actorId,
+    });
+
+    await prisma.$executeRaw`
+      UPDATE directory_presence_suggestions
+      SET
+        status = 'approved',
+        reviewed_by = ${actorId},
+        reviewed_at = NOW(),
+        seed_id = ${seed.id},
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
+
+    logger.info('[DirectorySuggestionService] Approved and invited', undefined, {
+      suggestionId: id,
+      seedId: seed.id,
+      token,
+    });
+
+    const updated = await this.getSuggestion(id);
+    return updated ? { suggestion: updated, seed, token, expiresAt, claimUrl } : null;
+  }
+
+  private buildProvenance(suggestion: SuggestionRecord): CreateSeedInput['provenance'] {
+    const submittedAt = new Date();
+    return [
+      { fieldKey: 'name', value: suggestion.businessName.trim(), sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+      { fieldKey: 'address', value: suggestion.address?.trim() || null, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+      { fieldKey: 'phone', value: suggestion.phone?.trim() || null, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+      { fieldKey: 'primary_category', value: suggestion.primaryCategory?.trim() || null, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+    ];
+  }
+
+  /**
    * Update the status of a suggestion (operator review action).
    * Allowed status values: submitted, under_review, approved, rejected, duplicate.
+   * Note: use approve() to convert an approved suggestion into a seed.
    */
   async updateStatus(
     id: string,

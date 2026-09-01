@@ -6,6 +6,7 @@
  *   POST   /api/admin/directory/presence-seeds           — create seed
  *   POST   /api/admin/directory/presence-seeds/:id/publish — publish listing
  *   POST   /api/admin/directory/presence-seeds/:id/invite — mint claim token
+ *   POST   /api/admin/directory/presence-seeds/:id/approve — publish + mint + email claim token
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
  *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
  *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
@@ -246,6 +247,27 @@ router.post('/presence-seeds/:id/invite', requirePlatformAdmin, async (req: Requ
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'seed_already_claimed') return res.status(409).json({ error: 'seed_already_claimed' });
     logger.error('[POST /api/admin/directory/presence-seeds/:id/invite] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/approve — publish, mint, and email claim token */
+router.post('/presence-seeds/:id/approve', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await DirectoryPresenceSeedService.approveAndInvite(id, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true, token: result.token, expiresAt: result.expiresAt, claimUrl: result.claimUrl });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    if (error?.message === 'seed_already_claimed') return res.status(409).json({ error: 'seed_already_claimed' });
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/approve] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
@@ -1143,6 +1165,22 @@ router.post('/suggestions/:id/status', requirePlatformStaff, async (req: Request
     }
 
     const actorId = (req as any).user?.id || 'system';
+
+    if (parse.data.status === 'approved') {
+      const result = await DirectorySuggestionService.approve(id, actorId);
+      if (!result) {
+        return res.status(404).json({ error: 'suggestion_not_found' });
+      }
+      return res.json({
+        success: true,
+        suggestion: result.suggestion,
+        seed: result.seed,
+        token: result.token,
+        expiresAt: result.expiresAt,
+        claimUrl: result.claimUrl,
+      });
+    }
+
     const suggestion = await DirectorySuggestionService.updateStatus(
       id,
       parse.data.status,

@@ -174,6 +174,26 @@ export class DiagnosticGalleryPublicService extends PublicApiSingleton {
   }
 
   /**
+   * Track batch with keepalive for page-unload beacons.
+   */
+  async trackEventBatchKeepalive(token: string, events: GalleryEventPayload[]): Promise<void> {
+    try {
+      await this.makeDefaultRequest<any>(
+        `/api/public/marketing/gallery/${encodeURIComponent(token)}/events/batch`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ events }),
+          keepalive: true,
+        },
+        undefined,
+        0,
+      );
+    } catch {
+      // Fire-and-forget
+    }
+  }
+
+  /**
    * Resolve a multi-gallery token and return all sibling gallery data.
    * Used by the MultiGalleryPage frontend component.
    */

@@ -72,17 +72,16 @@ export function useGalleryTracking({ token, active, totalScreenshots }: UseGalle
   const sendSessionEnd = useCallback(() => {
     if (!active) return;
     const dwell = Date.now() - sessionStartRef.current;
-    const payload = JSON.stringify({
-      events: [
-        {
-          sessionId: sessionIdRef.current,
-          eventType: 'session_end',
-          dwellMs: dwell,
-          clientWidth: typeof window !== 'undefined' ? window.innerWidth : undefined,
-          clientHeight: typeof window !== 'undefined' ? window.innerHeight : undefined,
-        },
-      ],
-    });
+    const events = [
+      {
+        sessionId: sessionIdRef.current,
+        eventType: 'session_end',
+        dwellMs: dwell,
+        clientWidth: typeof window !== 'undefined' ? window.innerWidth : undefined,
+        clientHeight: typeof window !== 'undefined' ? window.innerHeight : undefined,
+      },
+    ];
+    const payload = JSON.stringify({ events });
 
     const url = `/api/public/marketing/gallery/${encodeURIComponent(token)}/events/batch`;
 
@@ -93,19 +92,10 @@ export function useGalleryTracking({ token, active, totalScreenshots }: UseGalle
       if (sent) return;
     }
 
-    // Fallback: fetch with keepalive
-    try {
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-        keepalive: true,
-      }).catch(() => {
-        // fire-and-forget
-      });
-    } catch {
+    // Fallback: singleton-backed keepalive request
+    diagnosticGalleryPublicService.trackEventBatchKeepalive(token, events).catch(() => {
       // fire-and-forget
-    }
+    });
   }, [token, active]);
 
   // gallery_opened on mount
