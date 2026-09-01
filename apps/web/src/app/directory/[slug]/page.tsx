@@ -22,7 +22,6 @@ import ProductCategoriesCollapsible from '@/components/directory/ProductCategori
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { externalApiService } from '@/services/ExternalApiService';
-import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
 import { tenantPublicService } from '@/services/TenantPublicService';
 
@@ -38,7 +37,6 @@ import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { PublicCrmOptionsFlags, type FeaturedOptionsState, type DirectoryEntryOptionsState, type DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
-import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
@@ -78,7 +76,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 // shopping cart
 import { useMultiCart } from '@/hooks/useMultiCart';
-import { useRouter } from 'next/navigation';
+
 
 // store status
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
@@ -404,7 +402,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const [directoryEntryOptions, setDirectoryEntryOptions] = useState<DirectoryEntryOptionsState | null>(null);
   const [layoutPreview, setLayoutPreview] = useState<DirectoryEntryLayoutKey | null>(null);
 
-  const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const { status: hoursStatus } = useStoreStatus(consolidatedData?.listing?.tenantId || '', true); // Public scope
 
@@ -604,19 +601,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/${identifier}`;
 
-  // Server-side check: show panel for google_only tier, non-active status, or subscription issues
-  const showStatusPanel = tenantInfo ? (
-    tenantInfo.subscriptionTier === 'google_only' ||
-    tenantInfo.subscriptionTier === 'discovery' ||
-    (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
-    (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
-    tenantInfo.showSubscriptionPanel === true
-  ) : false;
-
-  // Handle view cart
-  const handleViewCart = () => {
-    router.push('/carts');
-  };
+  if (listing.listingOrigin === 'directory_seed' || !directoryEntryOptions?.enabled) {
+    return <DirectoryNotAvailable listing={listing} identifier={identifier} />;
+  }
 
   const effectiveLayout: DirectoryEntryLayoutKey = layoutPreview
     ?? directoryEntryOptions?.effectiveLayout
@@ -634,7 +621,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     relatedProducts,
     tenantInfo,
     slugForRelated,
-    showStatusPanel,
+    showStatusPanel: false,
     hoursStatus,
     isRetailStore,
     isOnlineStore,
@@ -657,14 +644,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     isStorefrontEnabled,
   };
 
-  const unclaimedBanner = consolidatedData?.listing?.listingOrigin === 'directory_seed' ? (
-    <UnclaimedDirectoryBanner
-      businessName={listing.businessName}
-      claimToken={consolidatedData.listing.activeClaimToken}
-      publicDisclaimer={consolidatedData.listing.publicDisclaimer}
-    />
-  ) : null;
-
   switch (effectiveLayout) {
     case 'editorial':
       return (
@@ -676,7 +655,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryEditorialLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
             <GbpReviewsSection slug={identifier} />
@@ -700,7 +678,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryImmersiveLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
             <GbpReviewsSection slug={identifier} />
@@ -724,7 +701,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryPremiumLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
             <GbpReviewsSection slug={identifier} />
@@ -749,7 +725,6 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             trialEndsAt={tenantInfo?.trialEndsAt ?? null}
             subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
           />
-          {unclaimedBanner}
           <DirectoryEntryClassicLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
             <GbpReviewsSection slug={identifier} />
@@ -766,6 +741,48 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   }
 
   /* === OLD JSX REMOVED === */
+}
+
+function DirectoryNotAvailable({ listing, identifier }: { listing: any; identifier: string }) {
+  const isSeed = listing.listingOrigin === 'directory_seed';
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-6">
+          <MapPin className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+        </div>
+
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+          {listing.businessName}
+        </h1>
+
+        <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+          {isSeed
+            ? 'This listing is not yet in the directory. View the place page for public listing details.'
+            : 'This directory entry is not currently published.'}
+        </p>
+
+        {isSeed && (
+          <Link
+            href={`/place/${identifier}`}
+            className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors mb-4"
+          >
+            <MapPin className="w-5 h-5 mr-2" />
+            View Place Page
+          </Link>
+        )}
+
+        <Link
+          href="/directory"
+          className="inline-flex items-center justify-center w-full px-6 py-3 bg-neutral-600 hover:bg-neutral-700 text-white font-semibold rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Browse Directory
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function StoreComingSoon({ tenantId }: { tenantId: string }) {
