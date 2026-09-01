@@ -265,34 +265,36 @@ export function StoreCard({
           </div>
 
           {/* Product Stats */}
-          <div className="mb-4 p-3 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="text-center">
-                <div className="text-lg font-semibold text-neutral-900 dark:text-white">
-                  {totalProducts}
+          {(totalProducts > 0 || categories.length > 0) && (
+            <div className="mb-4 p-3 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-neutral-900 dark:text-white">
+                    {totalProducts}
+                  </div>
+                  <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                    Total Products
+                  </div>
                 </div>
-                <div className="text-xs text-neutral-600 dark:text-neutral-400">
-                  Total Products
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    {inStockCount}
+                  </div>
+                  <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                    In Stock
+                  </div>
                 </div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                  {inStockCount}
-                </div>
-                <div className="text-xs text-neutral-600 dark:text-neutral-400">
-                  In Stock
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                  {categories.length}
-                </div>
-                <div className="text-xs text-neutral-600 dark:text-neutral-400">
-                  Categories
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                    {categories.length}
+                  </div>
+                  <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                    Categories
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Popular Categories */}
           {showCategories && displayCategories.length > 0 && (

@@ -109,7 +109,17 @@ router.get('/search', async (req: Request, res: Response) => {
       paramIndex += 5;
     }
 
-    // Location filters are now handled directly in the query
+    // Location filters — case-insensitive exact match on city / state
+    if (city && typeof city === 'string') {
+      conditions.push(`LOWER(dll.city) = LOWER($${paramIndex}::text)`);
+      params.push(city);
+      paramIndex++;
+    }
+    if (state && typeof state === 'string') {
+      conditions.push(`LOWER(dll.state) = LOWER($${paramIndex}::text)`);
+      params.push(state);
+      paramIndex++;
+    }
 
     // Determine ORDER BY clause (uses indexed columns)
     let orderByClause = 'rating_avg DESC NULLS LAST, rating_count DESC';

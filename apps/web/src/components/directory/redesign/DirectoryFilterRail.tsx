@@ -3,7 +3,8 @@
 /**
  * DirectoryFilterRail — sticky left column on desktop, Mantine Drawer on mobile.
  *
- * Sections: Categories (radio list with counts), Store Types, Min Rating, Open Now.
+ * Sections: Location (city/state with counts), Categories (radio list with
+ * counts), Store Types, Min Rating, Open Now.
  * Each change updates URL params via router.push, resets page.
  * Shows active-filter count badge + "Clear all".
  */
@@ -11,12 +12,13 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Drawer, Button as MantineButton } from '@mantine/core';
-import { SlidersHorizontal, X, Star } from 'lucide-react';
-import type { DirectoryCategory, DirectoryStoreType } from './types';
+import { SlidersHorizontal, X, Star, MapPin } from 'lucide-react';
+import type { DirectoryCategory, DirectoryStoreType, DirectoryLocation } from './types';
 
 interface DirectoryFilterRailProps {
   categories: DirectoryCategory[];
   storeTypes: DirectoryStoreType[];
+  locations?: DirectoryLocation[];
   mobileOpen: boolean;
   onMobileClose: () => void;
 }
@@ -27,23 +29,30 @@ const RATING_OPTIONS = [
   { value: '2', label: '2.0 & up' },
 ];
 
+const INITIAL_VISIBLE_LOCATIONS = 5;
+
 export default function DirectoryFilterRail({
   categories,
   storeTypes,
+  locations = [],
   mobileOpen,
   onMobileClose,
 }: DirectoryFilterRailProps) {
+  const [showAllLocations, setShowAllLocations] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const activeCategory = searchParams.get('category') || '';
   const activeStoreType = searchParams.get('storeType') || '';
+  const activeCity = searchParams.get('city') || '';
+  const activeState = searchParams.get('state') || '';
   const minRating = searchParams.get('minRating') || '';
   const openNow = searchParams.get('openNow') === 'true';
 
   const activeFilterCount = [
     activeCategory,
     activeStoreType,
+    activeCity || activeState,
     minRating,
     openNow ? 'true' : '',
   ].filter(Boolean).length;
@@ -59,15 +68,48 @@ export default function DirectoryFilterRail({
     router.push(`/directory?${params.toString()}`);
   };
 
+  const updateLocation = (city: string | null, state: string | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (city && state) {
+      params.set('city', city);
+      params.set('state', state);
+    } else {
+      params.delete('city');
+      params.delete('state');
+    }
+    params.delete('page');
+    router.push(`/directory?${params.toString()}`);
+  };
+
   const handleClearAll = () => {
     const params = new URLSearchParams(searchParams);
     params.delete('category');
     params.delete('storeType');
+    params.delete('city');
+    params.delete('state');
     params.delete('minRating');
     params.delete('openNow');
     params.delete('page');
     router.push(`/directory?${params.toString()}`);
   };
+
+  const isActiveLocation = (loc: DirectoryLocation) =>
+    activeCity.toLowerCase() === loc.city.toLowerCase() &&
+    activeState.toLowerCase() === loc.state.toLowerCase();
+
+  // Show the first few locations; "+ more" expands the full list.
+  // The active location is always kept visible.
+  const visibleLocations = (() => {
+    if (locations.length <= INITIAL_VISIBLE_LOCATIONS || showAllLocations) {
+      return locations;
+    }
+    const initial = locations.slice(0, INITIAL_VISIBLE_LOCATIONS);
+    const activeLoc = locations.find(isActiveLocation);
+    if (activeLoc && !initial.includes(activeLoc)) {
+      return [...initial, activeLoc];
+    }
+    return initial;
+  })();
 
   const railContent = (
     <div className="space-y-6">
@@ -91,6 +133,67 @@ export default function DirectoryFilterRail({
           </button>
         )}
       </div>
+
+      {/* Location (city / state) */}
+      {locations.length > 0 && (
+        <FilterSection title="Location">
+          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            <label className="flex items-center gap-2 cursor-pointer text-sm py-1 px-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+              <input
+                type="radio"
+                name="location"
+                checked={!activeCity && !activeState}
+                onChange={() => updateLocation(null, null)}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-neutral-700 dark:text-neutral-300">
+                All locations
+              </span>
+            </label>
+            {visibleLocations.map((loc) => (
+              <label
+                key={`${loc.city}-${loc.state}`}
+                className="flex items-center justify-between gap-2 cursor-pointer text-sm py-1 px-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <span className="flex items-center gap-2 truncate">
+                  <input
+                    type="radio"
+                    name="location"
+                    checked={isActiveLocation(loc)}
+                    onChange={() => updateLocation(loc.city, loc.state)}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  <span className="text-neutral-700 dark:text-neutral-300 truncate">
+                    {loc.city}, {loc.state}
+                  </span>
+                </span>
+                {loc.count > 0 && (
+                  <span className="text-xs text-neutral-400 shrink-0">
+                    {loc.count}
+                  </span>
+                )}
+              </label>
+            ))}
+            {locations.length > visibleLocations.length && (
+              <button
+                onClick={() => setShowAllLocations(true)}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium py-1 px-2"
+              >
+                + {locations.length - visibleLocations.length} more
+              </button>
+            )}
+            {showAllLocations && locations.length > INITIAL_VISIBLE_LOCATIONS && (
+              <button
+                onClick={() => setShowAllLocations(false)}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium py-1 px-2"
+              >
+                Show less
+              </button>
+            )}
+          </div>
+        </FilterSection>
+      )}
 
       {/* Categories */}
       {categories.length > 0 && (

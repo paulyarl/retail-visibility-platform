@@ -615,6 +615,8 @@ class DirectorySingletonService extends PublicApiSingleton {
   async searchDirectoryStores(params: {
     search?: string;
     category?: string;
+    city?: string;
+    state?: string;
     lat?: number;
     lng?: number;
     sort?: string;
@@ -624,6 +626,8 @@ class DirectorySingletonService extends PublicApiSingleton {
     const searchParams = new URLSearchParams();
     if (params.search) searchParams.append('search', params.search);
     if (params.category) searchParams.append('category', params.category);
+    if (params.city) searchParams.append('city', params.city);
+    if (params.state) searchParams.append('state', params.state);
     if (params.lat && params.lng) {
       searchParams.append('lat', params.lat.toString());
       searchParams.append('lng', params.lng.toString());

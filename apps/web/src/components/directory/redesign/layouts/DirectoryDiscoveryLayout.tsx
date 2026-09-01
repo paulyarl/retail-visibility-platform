@@ -93,6 +93,7 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
           <DirectoryFilterRail
             categories={data.categories}
             storeTypes={data.storeTypes}
+            locations={data.locations}
             mobileOpen={mobileFiltersOpen}
             onMobileClose={() => setMobileFiltersOpen(false)}
           />

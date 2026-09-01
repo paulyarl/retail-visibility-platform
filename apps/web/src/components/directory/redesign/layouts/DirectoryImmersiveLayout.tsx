@@ -184,6 +184,7 @@ export default function DirectoryImmersiveLayout({ data }: DirectoryLayoutProps)
         <DirectoryFilterRail
           categories={data.categories}
           storeTypes={data.storeTypes}
+          locations={data.locations}
           mobileOpen={mobileFiltersOpen}
           onMobileClose={() => setMobileFiltersOpen(false)}
         />

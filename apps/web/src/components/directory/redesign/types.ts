@@ -81,6 +81,12 @@ export interface DirectoryStoreType {
   description?: string;
 }
 
+export interface DirectoryLocation {
+  city: string;
+  state: string;
+  count: number;
+}
+
 export interface DirectoryUserLocation {
   latitude: number;
   longitude: number;
@@ -121,6 +127,7 @@ export interface DirectoryData {
   // Filter / browse data
   categories: DirectoryCategory[];
   storeTypes: DirectoryStoreType[];
+  locations: DirectoryLocation[];
   userLocation: DirectoryUserLocation | null;
 
   // UI state

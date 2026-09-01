@@ -14,6 +14,8 @@ export interface DirectoryStoresResponse extends DirectorySearchResult {}
 export interface UseDirectoryStoresOptions {
   search?: string;
   category?: string;
+  city?: string;
+  state?: string;
   lat?: number;
   lng?: number;
   sort?: string;
@@ -43,6 +45,8 @@ export const useDirectoryStores = (
   const {
     search,
     category,
+    city,
+    state,
     lat,
     lng,
     sort = 'activity',
@@ -86,6 +90,8 @@ export const useDirectoryStores = (
       const result = await directoryService.searchDirectoryStores({
         search,
         category,
+        city,
+        state,
         lat,
         lng,
         sort,
@@ -141,7 +147,7 @@ export const useDirectoryStores = (
     } finally {
       setLoading(false);
     }
-  }, [search, category, lat, lng, sort, page, limit, cacheTTL]);
+  }, [search, category, city, state, lat, lng, sort, page, limit, cacheTTL]);
 
   const refetch = useCallback(() => {
     return fetchDirectoryStores();

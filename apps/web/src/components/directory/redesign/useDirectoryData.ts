@@ -27,6 +27,7 @@ import type {
   DirectoryData,
   DirectoryViewMode,
   DirectoryStoreType,
+  DirectoryLocation,
   DirectoryUserLocation,
   DirectoryPaginationInfo,
   DirectoryCounts,
@@ -171,6 +172,8 @@ export function useDirectoryData(): DirectoryData {
   const searchQuery =
     searchParams.get('q') || searchParams.get('search') || null;
   const activeCategory = searchParams.get('category') || null;
+  const activeCity = searchParams.get('city');
+  const activeState = searchParams.get('state');
   const activeSort = searchParams.get('sort') || 'activity';
   const latParam = searchParams.get('lat');
   const lngParam = searchParams.get('lng');
@@ -192,6 +195,8 @@ export function useDirectoryData(): DirectoryData {
   } = useDirectoryStores({
     search: searchQuery || undefined,
     category: activeCategory || undefined,
+    city: activeCity || undefined,
+    state: activeState || undefined,
     lat:
       activeSort === 'distance' && latParam
         ? parseFloat(latParam)
@@ -208,6 +213,32 @@ export function useDirectoryData(): DirectoryData {
   // --- Categories & store types ---
   const [categories, setCategories] = useState<DirectoryCategory[]>([]);
   const [storeTypes, setStoreTypes] = useState<DirectoryStoreType[]>([]);
+
+  // --- Locations derived from the current listings (MV data) ---
+  // Recomputed only while no city/state filter is active, so the option list
+  // persists while a location filter narrows the result set.
+  const [locations, setLocations] = useState<DirectoryLocation[]>([]);
+  const hasLocationFilter = !!(activeCity || activeState);
+  useEffect(() => {
+    if (hasLocationFilter) return;
+    const byKey = new Map<string, DirectoryLocation>();
+    for (const store of stores) {
+      if (!store.city || !store.state) continue;
+      const key = `${store.city}|${store.state}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        byKey.set(key, { city: store.city, state: store.state, count: 1 });
+      }
+    }
+    const derived = Array.from(byKey.values()).sort(
+      (a, b) => b.count - a.count || a.city.localeCompare(b.city),
+    );
+    if (derived.length > 0 || !hasLocationFilter) {
+      setLocations(derived);
+    }
+  }, [stores, hasLocationFilter]);
 
   // --- User location ---
   const [userLocation, setUserLocation] =
@@ -393,6 +424,8 @@ export function useDirectoryData(): DirectoryData {
   const hasActiveQuery = !!(
     searchQuery ||
     activeCategory ||
+    activeCity ||
+    activeState ||
     searchParams.get('storeType') ||
     searchParams.get('q') ||
     searchParams.get('search')
@@ -420,6 +453,7 @@ export function useDirectoryData(): DirectoryData {
     pagination: normalizedPagination,
     categories,
     storeTypes,
+    locations,
     userLocation,
     viewMode,
     pageSize,
