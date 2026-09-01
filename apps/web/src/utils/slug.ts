@@ -151,3 +151,23 @@ export function getCityUrl(
 ): string {
   return `${basePath}/${slugify(city)}-${slugify(state)}`;
 }
+
+/**
+ * Generate navigation URL for a directory listing.
+ * Tier-aware: unclaimed "directory_presence" listings live at /place/{slug},
+ * while subscribed platform tenants live at /directory/{slug}.
+ *
+ * @param listing - Listing with slug/tenantId/id and subscriptionTier
+ * @returns Public URL path for the directory entry
+ */
+export function getDirectoryListingUrl(listing: {
+  slug?: string | null;
+  tenantId?: string | null;
+  id?: string | null;
+  subscriptionTier?: string | null;
+  listingOrigin?: string | null;
+}): string {
+  const identifier = listing.slug || listing.tenantId || listing.id || '';
+  const isPlace = listing.subscriptionTier === 'directory_presence' || listing.listingOrigin === 'directory_seed';
+  return isPlace ? `/place/${identifier}` : `/directory/${identifier}`;
+}

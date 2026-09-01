@@ -11,6 +11,7 @@ import HoursStatusBadge from '../storefront/HoursStatusBadge';
 import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 import DemoBadge from '@/components/shared/DemoBadge';
+import { getDirectoryListingUrl } from '@/utils/slug';
 
 export interface DirectoryListing {
   id: string;
@@ -119,9 +120,9 @@ export function UnifiedStoreCard({
   }, [isPromoted, listing.tenantId]);
 
   // Determine link destination based on linkType
-  const linkHref = linkType === 'storefront' 
+  const linkHref = linkType === 'storefront'
     ? `/tenant/${listing.slug || listing.tenantId}`
-    : `/directory/${listing.slug || listing.tenantId}`;
+    : getDirectoryListingUrl(listing);
 
   // Prioritize category display: enhancedStats → contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
   // const displayCategory = categories.length > 0 

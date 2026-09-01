@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress, validateCoordinates } from '@/lib/geocoding';
 import { directorySingletonService } from '@/services/DirectorySingletonService';
 import { clientLogger } from '@/lib/client-logger';
+import { getDirectoryListingUrl } from '@/utils/slug';
 
 // Google Maps type declarations
 declare global {
@@ -62,6 +63,7 @@ interface DirectoryListing {
   productCount: number | string; // API may return string
   isPromoted?: boolean;
   promotionTier?: string;
+  subscriptionTier?: string;
 }
 
 interface DirectoryMapGoogleProps {
@@ -350,7 +352,7 @@ export default function DirectoryMapGoogle({
             </p>
           ` : ''}
           <a 
-            href="/directory/${listing.slug}" 
+            href="${getDirectoryListingUrl(listing)}" 
             style="display: inline-block; margin-top: 8px; padding: 6px 12px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;"
           >
             View Store

@@ -15,6 +15,7 @@ import { MapPin, Package, Star, ExternalLink, Navigation } from 'lucide-react';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
+import { getDirectoryListingUrl } from '@/utils/slug';
 import type { DirectoryStore } from '@/services/DirectorySingletonService';
 import type { DirectoryLayoutKey } from './types';
 
@@ -37,7 +38,7 @@ export default function StoreCardV2({
   const canUseExternal = store.canUseExternalLink && !!store.website;
   const destinationUrl = canUseExternal
     ? (store.website as string)
-    : `/directory/${store.slug || store.tenantId}`;
+    : getDirectoryListingUrl(store);
   const isExternalLink = canUseExternal;
 
   const formatRating = (rating: number) =>
@@ -49,14 +50,14 @@ export default function StoreCardV2({
   const handleDirectoryClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/directory/${store.slug || store.tenantId}`);
+    router.push(getDirectoryListingUrl(store));
   };
 
   // Compact layout for immersive — always links to directory entry page
   if (isImmersive) {
     return (
       <Link
-        href={`/directory/${store.slug || store.tenantId}`}
+        href={getDirectoryListingUrl(store)}
         className="block group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 rounded-xl"
       >
         <div className="flex items-start gap-3 p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:shadow-md transition-all duration-200">

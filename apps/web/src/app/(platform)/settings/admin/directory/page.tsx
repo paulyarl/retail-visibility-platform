@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp } from 'lucide-react';
+import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +71,13 @@ export default function DirectoryPanelPage() {
       description: 'Choose the layout variant for the public directory home page. Platform-wide setting.',
       icon: Palette,
       gradient: 'from-teal-500 to-cyan-500',
+    },
+    {
+      href: '/settings/admin/directory/suggestions',
+      title: 'Public Suggestions',
+      description: 'Review businesses suggested by visitors. Convert approved suggestions into directory listings.',
+      icon: Lightbulb,
+      gradient: 'from-yellow-500 to-amber-500',
     },
   ];
 

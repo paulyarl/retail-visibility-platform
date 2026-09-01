@@ -8,6 +8,7 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
+import { getDirectoryListingUrl } from '@/utils/slug';
 
 // ==================== TYPES ====================
 
@@ -111,13 +112,11 @@ export function StoreCard({
   const remainingCategories = categories.length - maxCategories;
 
   // Determine link destination
-  // Directory presence seeds (unclaimed listings) live at /place/{slug};
+  // Directory presence (unclaimed listings) live at /place/{slug};
   // subscribed platform tenants live at /directory/{slug}.
   const linkHref = linkType === LinkType.Storefront
     ? `/shops/${store.slug || store.tenantId}`
-    : store.listingOrigin === 'directory_seed'
-      ? `/place/${store.slug || store.tenantId}`
-      : `/directory/${store.slug || store.tenantId}`;
+    : getDirectoryListingUrl(store);
 
   // console.log(`linkType: ${linkType}`);
   // console.log(`linkHref: ${linkHref}`);
