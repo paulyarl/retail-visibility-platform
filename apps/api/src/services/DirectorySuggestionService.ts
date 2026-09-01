@@ -286,9 +286,9 @@ class DirectorySuggestionService {
     const submittedAt = new Date();
     return [
       { fieldKey: 'name', value: suggestion.businessName.trim(), sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
-      { fieldKey: 'address', value: suggestion.address?.trim() || null, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
-      { fieldKey: 'phone', value: suggestion.phone?.trim() || null, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
-      { fieldKey: 'primary_category', value: suggestion.primaryCategory?.trim() || null, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+      { fieldKey: 'address', value: suggestion.address?.trim() || undefined, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+      { fieldKey: 'phone', value: suggestion.phone?.trim() || undefined, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
+      { fieldKey: 'primary_category', value: suggestion.primaryCategory?.trim() || undefined, sourceName: 'public_suggestion', accessedAt: submittedAt, confidence: 'medium' as const, showOnPublic: false },
     ];
   }
 
