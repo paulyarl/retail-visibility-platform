@@ -23,7 +23,7 @@ This skill covers the seed/claim workflow: creating seed tenants, publishing lis
 Seed tenants use real tenant rows (not demo flags):
 - `org_standing_mode = 'directory_seed'`
 - `subscription_tier = 'directory_presence'`
-- `subscription_status = 'trial'`
+- `subscription_status = 'active'` (free-forever gateway — never 'trial', which would enter the paid-trial 14-day auto-expiry machinery)
 - `directory_visible = true`
 - `tenants.is_demo` is NOT set (reserved for demo-store clones)
 
@@ -64,7 +64,9 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 
 - `apps/api/src/lib/id-generator.ts` — `generateDirectoryListingId`, `generateDirectoryPresenceSeedId`, `generateDirectoryFieldProvenanceId`, `generateDirectoryClaimTokenId`, `generateDirectoryClaimTokenString`
 - `apps/api/src/services/DirectoryPresenceSeedService.ts` — admin seed CRUD, publish, invite, update fields
-- `apps/api/src/services/DirectoryClaimService.ts` — public claim token summary + accept
+- `apps/api/src/services/DirectoryClaimService.ts` — public claim token summary + accept (accept embeds the gateway upgrade preview)
+- `apps/api/src/services/DirectoryPresenceUpgradeOptionsService.ts` — shared builder for the Entry Presence gateway triad / tier-ladder options (used by both the upgrade-options route and the claim accept response)
+- `apps/api/src/routes/directory-presence-upgrade.ts` — `GET/POST /api/tenant/:tenantId/upgrade(/options)` (GET is a thin auth + membership wrapper around the shared builder)
 - `apps/api/src/routes/directory-presence-admin.ts` — admin routes at `/api/admin/directory-presence`
 - `apps/api/src/routes/directory-presence-public.ts` — public routes at `/api/public/directory`
 - `apps/api/src/services/resolvers/DirectoryEntryOptionsResolver.ts` — SNAP badge resolution
@@ -72,7 +74,8 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 
 ### Frontend
 
-- `apps/web/src/services/DirectoryClaimPublicService.ts` — public claim service
+- `apps/web/src/services/DirectoryClaimPublicService.ts` — public claim service (accept result carries the embedded upgrade preview)
+- `apps/web/src/services/DirectoryPresenceUpgradeService.ts` — authenticated upgrade options/upgrade wrapper (only usable with a platform Auth0 session)
 - `apps/web/src/services/DirectoryPresenceAdminService.ts` — admin seed management service
 - `apps/web/src/app/directory/claim/[token]/` — public claim page
 - `apps/web/src/app/(platform)/settings/admin/directory/presence-seeds/` — admin seeds page
@@ -94,7 +97,7 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 ### Public (no auth for GET, auth for POST)
 
 - `GET /api/public/directory/claim/:token` — public token summary
-- `POST /api/public/directory/claim/:token/accept` — bind owner (requires customer auth)
+- `POST /api/public/directory/claim/:token/accept` — bind owner (requires customer auth). Response embeds the gateway upgrade preview (`currentTier`, `isGatewayUpgrade`, `upgradeOptions[]`) so the success screen can render Entry Presence mode cards without a platform (Auth0) session.
 
 ## Seed Statuses
 
@@ -123,8 +126,8 @@ A field must not render publicly without a provenance row with `show_on_public =
 4. Owner visits the claim page, sees the listing summary
 5. Owner registers/logs in
 6. Owner accepts the claim
-7. Backend consumes the token, flips `org_standing_mode` to `independent`, sets seed status to `claimed`
-8. Owner can now manage the listing from their dashboard and upgrade tiers
+7. Backend consumes the token, flips `org_standing_mode` to `independent`, sets `subscription_status = 'active'` (free-forever gateway), sets seed status to `claimed`, and embeds the gateway upgrade preview in the accept response
+8. Owner sees the claim success screen: free-state heading, three Entry Presence mode cards (live from the embedded options; static fallback with "from $X/mo" pricing), and a primary "Upgrade to Starter" CTA with session-aware hrefs (routes through `/auth/login?returnTo=` when no platform session exists — see `docs/LocalBiz/directory_presence_claim_handoff_spec.md`)
 
 ## Post-Claim GBP Public Surfacing
 
