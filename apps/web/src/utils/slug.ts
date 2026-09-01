@@ -128,9 +128,26 @@ export function getCategoryUrl(
  * @returns Full URL path for store type navigation
  */
 export function getStoreTypeUrl(
-  storeType: string, 
+  storeType: string,
   basePath: string = "/directory/stores"
 ): string {
   const slug = getStoreTypeSlug(storeType);
   return `${basePath}/${slug}`;
+}
+
+/**
+ * Generate navigation URL for city/location directory pages
+ * Centralizes city URL generation logic
+ *
+ * @param city - City name
+ * @param state - State name or abbreviation
+ * @param basePath - Base path (default: "/directory/location")
+ * @returns Full URL path for city navigation
+ */
+export function getCityUrl(
+  city: string,
+  state: string,
+  basePath: string = "/directory/location"
+): string {
+  return `${basePath}/${slugify(city)}-${slugify(state)}`;
 }
