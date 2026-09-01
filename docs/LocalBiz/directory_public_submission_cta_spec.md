@@ -150,7 +150,7 @@ Proposed schema:
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | text | `dps-` prefix generated via `generateDirectoryPresenceSuggestionId` |
+| `id` | text | `dsug-` prefix generated via `generateDirectoryPresenceSuggestionId` |
 | `business_name` | text | Required. Suggested business name. |
 | `address` | text | Optional. Street address. |
 | `city` | text | Optional. Filter for city browse. |
@@ -319,8 +319,8 @@ The `directory_presence` skill requires every field rendered publicly to have a 
 ### New `directory_presence_suggestions`
 
 - Proposed schema above.
-- Add migration `210_directory_presence_suggestions.sql`.
-- Use `dps-` IDs from `id-generator.ts`.
+- Add migration `251_directory_presence_suggestions.sql`.
+- Use `dsug-` IDs from `id-generator.ts`.
 
 ### `directory_field_provenance`
 
@@ -347,7 +347,7 @@ The `directory_presence` skill requires every field rendered publicly to have a 
 
 ## Migration and Verification
 
-1. Add migration `210_directory_presence_suggestions.sql`.
+1. Add migration `251_directory_presence_suggestions.sql`.
 2. Run `doppler run --config local -- pnpm prisma db pull` and `pnpm prisma generate`.
 3. Add `generateDirectoryPresenceSuggestionId` to `apps/api/src/lib/id-generator.ts`.
 4. Run `pnpm checkapi` and `pnpm checkweb`.

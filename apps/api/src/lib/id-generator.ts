@@ -1266,6 +1266,16 @@ export function generateDirectorySeedCampaignLinkId(tenantId: string): string {
 }
 
 /**
+ * Generate a directory public suggestion ID.
+ * Format: dsug-{nanoid12}
+ * URL-safe, readable, unique, global (not tenant-scoped)
+ */
+export function generateDirectoryPresenceSuggestionId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `dsug-${nanoid()}`;
+}
+
+/**
  * Generate a seek batch ID.
  * Format: sb-{nanoid12}
  */

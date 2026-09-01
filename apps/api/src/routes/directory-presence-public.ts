@@ -17,6 +17,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import DirectoryClaimService from '../services/DirectoryClaimService';
+import DirectorySuggestionService, { suggestionInputSchema } from '../services/DirectorySuggestionService';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { slugify } from '../utils/slug';
@@ -54,6 +55,53 @@ router.get('/claim/:token', async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/claim/:token] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/public/directory/suggestions — suggest a missing business */
+router.post('/suggestions', async (req: Request, res: Response) => {
+  try {
+    const parse = suggestionInputSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return res.status(400).json({
+        error: 'invalid_input',
+        issues: parse.error.flatten().fieldErrors,
+      });
+    }
+
+    const forwarded = req.headers['x-forwarded-for'] as string | undefined;
+    const submitterIp = forwarded || req.socket?.remoteAddress || (req as any).ip;
+
+    const result = await DirectorySuggestionService.createSuggestion(parse.data, submitterIp);
+
+    if (result.duplicate) {
+      return res.status(409).json({
+        error: 'already_listed',
+        message: 'This business appears to already be in the directory.',
+        existing: {
+          id: result.duplicate.id,
+          businessName: result.duplicate.businessName,
+          slug: result.duplicate.slug,
+          city: result.duplicate.city,
+          state: result.duplicate.state,
+        },
+      });
+    }
+
+    if (result.error) {
+      return res.status(result.statusCode).json({ error: result.error });
+    }
+
+    res.status(201).json({
+      success: true,
+      suggestionId: result.suggestion?.id,
+      message: 'Suggestion received. It will be reviewed before publishing.',
+    });
+  } catch (error) {
+    logger.error('[POST /api/public/directory/suggestions] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

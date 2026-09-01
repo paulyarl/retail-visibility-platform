@@ -11,6 +11,7 @@ import { Pagination } from '@/components/ui';
 import { Button } from '@mantine/core';
 import { useSearchParams } from 'next/navigation';
 import { slugsMatch } from '@/utils/slug';
+import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
@@ -330,6 +331,14 @@ export default function CategoryViewClient({
             />
           </>
         )}
+      </div>
+
+      {/* Suggest a missing business */}
+      <div className="container mx-auto px-4 pb-8">
+        <SuggestBusinessCta
+          category={category?.name || categorySlug}
+          source={`/directory/categories/${categorySlug}`}
+        />
       </div>
 
                   {/* Platform Branding Footer */}

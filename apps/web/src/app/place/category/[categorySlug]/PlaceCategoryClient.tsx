@@ -15,6 +15,7 @@ import {
 import placesBrowsePublicService, {
   PlaceListing,
 } from '@/services/PlacesBrowsePublicService';
+import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface PlaceCategoryClientProps {
@@ -211,6 +212,13 @@ export default function PlaceCategoryClient({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 pb-8">
+        <SuggestBusinessCta
+          category={categoryName}
+          source={`/place/category/${categorySlug}`}
+        />
       </div>
 
       <PoweredByFooter />

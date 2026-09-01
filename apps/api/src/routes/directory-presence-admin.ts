@@ -20,6 +20,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
 import DirectoryClaimService from '../services/DirectoryClaimService';
+import DirectorySuggestionService from '../services/DirectorySuggestionService';
 import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
 import { logger } from '../logger';
@@ -1079,6 +1080,84 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
       });
     }
     res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/* ====================
+   Suggestions queue (public submissions)
+   ==================== */
+
+/** GET /api/admin/directory-presence/suggestions — list public suggestions */
+router.get('/suggestions', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { status, city, state, primaryCategory, limit, offset } = req.query;
+    const result = await DirectorySuggestionService.listSuggestions({
+      status: (status as string) || undefined,
+      city: (city as string) || undefined,
+      state: (state as string) || undefined,
+      primaryCategory: (primaryCategory as string) || undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      offset: offset ? parseInt(offset as string, 10) : undefined,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/suggestions] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory-presence/suggestions/:id — suggestion detail */
+router.get('/suggestions/:id', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const suggestion = await DirectorySuggestionService.getSuggestion(id);
+    if (!suggestion) {
+      return res.status(404).json({ error: 'suggestion_not_found' });
+    }
+    res.json({ success: true, suggestion });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/suggestions/:id] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+const updateSuggestionStatusSchema = z.object({
+  status: z.enum(['submitted', 'under_review', 'approved', 'rejected', 'duplicate']),
+  seedId: z.string().optional(),
+});
+
+/** POST /api/admin/directory-presence/suggestions/:id/status — review action */
+router.post('/suggestions/:id/status', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const parse = updateSuggestionStatusSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return res.status(400).json({
+        error: 'invalid_input',
+        issues: parse.error.flatten().fieldErrors,
+      });
+    }
+
+    const actorId = (req as any).user?.id || 'system';
+    const suggestion = await DirectorySuggestionService.updateStatus(
+      id,
+      parse.data.status,
+      actorId,
+      parse.data.seedId,
+    );
+    if (!suggestion) {
+      return res.status(404).json({ error: 'suggestion_not_found' });
+    }
+    res.json({ success: true, suggestion });
+  } catch (error) {
+    logger.error('[POST /api/admin/directory-presence/suggestions/:id/status] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 

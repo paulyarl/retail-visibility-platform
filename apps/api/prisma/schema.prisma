@@ -1825,36 +1825,37 @@ model directory_places_sitemap_log {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_presence_seeds {
-  id                            String                          @id @db.VarChar(60)
-  tenant_id                     String                          @unique(map: "uq_dps_tenant") @db.VarChar(255)
-  listing_id                    String                          @unique(map: "uq_dps_listing") @db.VarChar(255)
-  category                      String                          @db.VarChar(100)
-  city                          String                          @db.VarChar(100)
-  state                         String                          @db.VarChar(50)
-  seed_batch                    String                          @db.VarChar(100)
-  status                        String                          @default("draft") @db.VarChar(20)
-  identity_confidence           String                          @default("medium") @db.VarChar(10)
-  category_fit                  String                          @default("probable") @db.VarChar(20)
-  notes                         String?
-  created_at                    DateTime                        @default(now()) @db.Timestamptz(6)
-  updated_at                    DateTime                        @default(now()) @db.Timestamptz(6)
-  published_at                  DateTime?                       @db.Timestamptz(6)
-  invited_at                    DateTime?                       @db.Timestamptz(6)
-  claimed_at                    DateTime?                       @db.Timestamptz(6)
-  outreach_status               String                          @default("unverified") @db.VarChar(20)
-  outreach_notes                String?
-  owner_name                    String?                         @db.VarChar(255)
-  owner_email                   String?                         @db.VarChar(255)
-  owner_phone                   String?                         @db.VarChar(40)
-  seek_batch_id                 String?                         @db.VarChar(60)
-  directory_claim_requests      directory_claim_requests[]
-  directory_claim_tokens        directory_claim_tokens[]
-  directory_enrichment_tokens   directory_enrichment_tokens[]
-  directory_field_provenance    directory_field_provenance[]
-  mkt_seek_batches              mkt_seek_batches?               @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
-  directory_listings_list       directory_listings_list         @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
-  tenants                       tenants                         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
-  directory_seed_campaign_links directory_seed_campaign_links[]
+  id                             String                           @id @db.VarChar(60)
+  tenant_id                      String                           @unique(map: "uq_dps_tenant") @db.VarChar(255)
+  listing_id                     String                           @unique(map: "uq_dps_listing") @db.VarChar(255)
+  category                       String                           @db.VarChar(100)
+  city                           String                           @db.VarChar(100)
+  state                          String                           @db.VarChar(50)
+  seed_batch                     String                           @db.VarChar(100)
+  status                         String                           @default("draft") @db.VarChar(20)
+  identity_confidence            String                           @default("medium") @db.VarChar(10)
+  category_fit                   String                           @default("probable") @db.VarChar(20)
+  notes                          String?
+  created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  published_at                   DateTime?                        @db.Timestamptz(6)
+  invited_at                     DateTime?                        @db.Timestamptz(6)
+  claimed_at                     DateTime?                        @db.Timestamptz(6)
+  outreach_status                String                           @default("unverified") @db.VarChar(20)
+  outreach_notes                 String?
+  owner_name                     String?                          @db.VarChar(255)
+  owner_email                    String?                          @db.VarChar(255)
+  owner_phone                    String?                          @db.VarChar(40)
+  seek_batch_id                  String?                          @db.VarChar(60)
+  directory_claim_requests       directory_claim_requests[]
+  directory_claim_tokens         directory_claim_tokens[]
+  directory_enrichment_tokens    directory_enrichment_tokens[]
+  directory_field_provenance     directory_field_provenance[]
+  mkt_seek_batches               mkt_seek_batches?                @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
+  directory_listings_list        directory_listings_list          @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_listing")
+  tenants                        tenants                          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dps_tenant")
+  directory_presence_suggestions directory_presence_suggestions[]
+  directory_seed_campaign_links  directory_seed_campaign_links[]
 
   @@index([category], map: "idx_dps_category")
   @@index([city, state], map: "idx_dps_city_state")
@@ -3260,22 +3261,22 @@ model mkt_campaign_checklist_progress {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_campaign_triage_results {
-  id                                                                                             String                @id @db.VarChar(255)
-  campaign_id                                                                                    String                @unique @db.VarChar(255)
-  recommended_playbook_id                                                                        String                @db.VarChar(255)
-  confidence_score                                                                               Decimal               @db.Decimal(4, 3)
-  triage_reasoning                                                                               String?
-  detected_signals                                                                               Json                  @default("[]")
-  is_operator_accepted                                                                           Boolean?
-  overridden_playbook_id                                                                         String?               @db.VarChar(255)
-  evaluated_at                                                                                   DateTime              @default(now()) @db.Timestamptz(6)
-  created_at                                                                                     DateTime              @default(now()) @db.Timestamptz(6)
-  updated_at                                                                                     DateTime              @default(now()) @db.Timestamptz(6)
-  source_audit_id                                                                                String?               @db.VarChar(255)
-  mkt_campaigns_list                                                                             mkt_campaigns_list    @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_campaign_triage_campaign")
-  overridden_playbook                                                                            mkt_playbook_catalog? @relation("mkt_campaign_triage_results_overridden_playbook_idTomkt_playbook_catalog", fields: [overridden_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_override_playbook")
-  playbook                                                                                       mkt_playbook_catalog  @relation("mkt_campaign_triage_results_recommended_playbook_idTomkt_playbook_catalog", fields: [recommended_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_playbook")
-  mkt_audits_list                                                                                mkt_audits_list?      @relation(fields: [source_audit_id], references: [id], onUpdate: NoAction, map: "fk_campaign_triage_source_audit")
+  id                      String                @id @db.VarChar(255)
+  campaign_id             String                @unique @db.VarChar(255)
+  recommended_playbook_id String                @db.VarChar(255)
+  confidence_score        Decimal               @db.Decimal(4, 3)
+  triage_reasoning        String?
+  detected_signals        Json                  @default("[]")
+  is_operator_accepted    Boolean?
+  overridden_playbook_id  String?               @db.VarChar(255)
+  evaluated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  created_at              DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime              @default(now()) @db.Timestamptz(6)
+  source_audit_id         String?               @db.VarChar(255)
+  mkt_campaigns_list      mkt_campaigns_list    @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_campaign_triage_campaign")
+  overridden_playbook     mkt_playbook_catalog? @relation("mkt_campaign_triage_results_overridden_playbook_idTomkt_playbook_catalog", fields: [overridden_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_override_playbook")
+  playbook                mkt_playbook_catalog  @relation("mkt_campaign_triage_results_recommended_playbook_idTomkt_playbook_catalog", fields: [recommended_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_playbook")
+  mkt_audits_list         mkt_audits_list?      @relation(fields: [source_audit_id], references: [id], onUpdate: NoAction, map: "fk_campaign_triage_source_audit")
 
   @@index([campaign_id], map: "idx_mkt_campaign_triage_campaign")
 }
@@ -7643,6 +7644,38 @@ model webhook_events {
   @@index([event_id], map: "idx_webhook_events_event_id")
   @@index([event_type], map: "idx_webhook_events_event_type")
   @@index([processed], map: "idx_webhook_events_processed")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_presence_suggestions {
+  id                       String                    @id @db.VarChar(60)
+  business_name            String                    @db.VarChar(255)
+  address                  String?                   @db.VarChar(255)
+  city                     String?                   @db.VarChar(100)
+  state                    String?                   @db.VarChar(50)
+  zip_code                 String?                   @db.VarChar(20)
+  phone                    String?                   @db.VarChar(40)
+  primary_category         String?                   @db.VarChar(120)
+  submitter_email          String?                   @db.VarChar(255)
+  submitter_ip             String?                   @db.VarChar(64)
+  submitter_comment        String?                   @db.VarChar(1000)
+  source_page              String?                   @db.VarChar(500)
+  status                   String                    @default("submitted") @db.VarChar(32)
+  reviewed_by              String?                   @db.VarChar(255)
+  reviewed_at              DateTime?                 @db.Timestamptz(6)
+  seed_id                  String?                   @db.VarChar(60)
+  created_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds? @relation(fields: [seed_id], references: [id], onUpdate: NoAction, map: "fk_dpsg_seed")
+
+  @@index([primary_category], map: "idx_dpsg_category")
+  @@index([city], map: "idx_dpsg_city")
+  @@index([created_at], map: "idx_dpsg_created_at")
+  @@index([state], map: "idx_dpsg_state")
+  @@index([status], map: "idx_dpsg_status")
+  @@index([submitter_email], map: "idx_dpsg_submitter_email")
+  @@index([submitter_ip], map: "idx_dpsg_submitter_ip")
 }
 
 enum action {

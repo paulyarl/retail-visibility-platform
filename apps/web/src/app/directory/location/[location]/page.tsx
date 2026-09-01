@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, MapPin } from 'lucide-react';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
+import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -204,6 +205,14 @@ export default async function LocationPage({ params, searchParams }: LocationPag
               categorySlug={location}
             />
           )}
+
+          <div className="mt-8">
+            <SuggestBusinessCta
+              city={city}
+              state={state}
+              source={`/directory/location/${location}`}
+            />
+          </div>
         </div>
 
         {/* Nearby Locations */}

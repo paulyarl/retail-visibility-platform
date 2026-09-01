@@ -13,6 +13,7 @@ import ContactInformationCollapsible from '@/components/directory/ContactInforma
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
@@ -323,6 +324,14 @@ export default function PlaceEntryEditorialLayout({
 
         <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Places" />
         <LastViewed />
+        <div className="container mx-auto px-4 py-8">
+          <SuggestBusinessCta
+            category={listing.primaryCategory || listing.category}
+            city={listing.city}
+            state={listing.state}
+            source={currentUrl}
+          />
+        </div>
         <PoweredByFooter
           note={`${listing.businessName} is listed from public information. This is not a claimed profile and may be incomplete.`}
         />
