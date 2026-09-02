@@ -27,6 +27,7 @@ import { NotFoundError, ConflictError } from '../middleware/errorHandler';
 import { generateProspectQueueId } from '../lib/id-generator';
 import MarketingCampaignService from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
+import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -528,6 +529,41 @@ class MarketingProspectQueueServiceClass extends BaseService {
         if (!derivedBusinessName) {
           throw new ConflictError('Cannot derive business campaign: queue entry has no business_name');
         }
+
+        // Migration 253 — GAP-E3: build discovery context from the queue entry
+        // for intelligence_seek entries. The context carries discovery signals,
+        // provenance, seek priority, category fit, and run lineage onto the
+        // child business campaign so the audit prompt can render a "Discovery
+        // leads" block as verification hypotheses (spec §8.3).
+        //
+        // Validation boundary (spec §6): invalid context is logged and dropped
+        // here at handoff time — never blocks campaign creation. The
+        // render-time check in renderDiscoveryLeadsBlock is cheap defense only.
+        let discoveryContext: DiscoveryContext | null = null;
+        let intelligenceRunId: string | undefined;
+        if (entry.source_kind === 'intelligence_seek') {
+          intelligenceRunId = entry.intelligence_run_id ?? undefined;
+          const focus = await this.resolveRunFocus(entry.intelligence_run_id, ctx);
+          const rawContext = {
+            focus,
+            discovered_at: entry.created_at?.toISOString?.() ?? (entry.created_at as any) ?? undefined,
+            business_seek_priority: entry.business_seek_priority ?? undefined,
+            category_fit: entry.category_fit ?? undefined,
+            identity_confidence: entry.identity_confidence ?? undefined,
+            location_status: entry.location_status ?? undefined,
+            seek_batch_id: entry.seek_batch_id ?? undefined,
+            discovery_signals: (entry.discovery_signals as string[]) ?? [],
+            discovery_provenance: (entry.discovery_provenance as any[]) ?? [],
+          };
+          discoveryContext = validateDiscoveryContext(rawContext);
+          if (!discoveryContext) {
+            logger.warn('createCampaignFromQueue: discovery context invalid or empty — dropped (non-fatal)', ctx, {
+              queueEntryId: input.queueEntryId,
+              intelligenceRunId: intelligenceRunId ?? null,
+            });
+          }
+        }
+
         const campaign = await MarketingCampaignService.deriveBusinessCampaign({
           parentId: entry.source_campaign_id,
           businessName: derivedBusinessName,
@@ -538,6 +574,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
           detectedSignals: (entry.detected_signals as string[]) ?? undefined,
           assignedTo: assignee ?? undefined,
           note: entry.note ?? undefined,
+          // Migration 253 — GAP-E3 discovery context handoff
+          discoveryContext: discoveryContext ?? undefined,
+          intelligenceRunId,
         }, ctx);
         result = { campaign, created: true };
       }
@@ -566,6 +605,35 @@ class MarketingProspectQueueServiceClass extends BaseService {
         queueEntryId: input.queueEntryId,
       });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Resolve the intelligence focus ('emerging' | 'competitive') from the
+   * source run row (Migration 253 — GAP-E3, spec §8.3). Focus is not a queue
+   * column — it lives on mkt_intelligence_runs. Returns undefined when the
+   * run row is missing or the column is unset, so the leads block renders
+   * without the focus parenthetical (graceful degradation).
+   */
+  private async resolveRunFocus(
+    intelligenceRunId: string | null | undefined,
+    ctx?: RequestCtx,
+  ): Promise<'emerging' | 'competitive' | undefined> {
+    if (!intelligenceRunId) return undefined;
+    try {
+      const run = await this.prisma.mkt_intelligence_runs.findUnique({
+        where: { id: intelligenceRunId },
+        select: { focus: true },
+      });
+      const focus = run?.focus;
+      if (focus === 'emerging' || focus === 'competitive') return focus;
+      return undefined;
+    } catch (error) {
+      logger.warn('resolveRunFocus: failed to load run row (non-fatal)', ctx, {
+        intelligenceRunId,
+        error: (error as Error).message,
+      });
+      return undefined;
     }
   }
 

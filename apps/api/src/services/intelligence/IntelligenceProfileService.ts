@@ -132,6 +132,10 @@ export interface PromptResolution {
   // discovery scans). Null when no gold standard was resolved.
   gold_standard_profile_id?: string | null;
   gold_standard_profile_version?: number | null;
+  // Migration 253 — GAP-E3: true only when a "Discovery leads" block was
+  // appended to the rendered prompt. Additive/optional — existing consumers
+  // of resolution ignore unknown keys.
+  discovery_leads_injected?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

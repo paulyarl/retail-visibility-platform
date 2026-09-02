@@ -42,7 +42,9 @@ const ownershipTypeEnum = z.enum([
 
 // ─── Discovery Provenance ────────────────────────────────────────────────
 
-const discoveryProvenanceSchema = z.object({
+// Exported (Migration 253 — GAP-E3): reused by discoveryContextSchema below
+// for the per-campaign discovery context handoff. Previously file-local.
+export const discoveryProvenanceSchema = z.object({
   source: z.string(),
   role: z.string(),
   evidence_types: z.array(z.string()).optional(),
@@ -401,3 +403,54 @@ Rules:
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 `;
+
+// ─── Discovery Context (Migration 253 — GAP-E3) ──────────────────────────
+//
+// Stored on mkt_campaigns_list.discovery_context (JSONB, nullable). Carries
+// the discovery context from the queue entry onto the child business campaign
+// so the business analysis audit prompt can render a "Discovery leads" block
+// as verification hypotheses (never findings — §S1 guardrail preserved).
+//
+// All fields optional/nullable — old campaigns and non-intelligence-derived
+// children have null discovery_context and render audit prompts byte-identical
+// to the pre-feature baseline.
+//
+// Validation boundary (spec §6): validation happens at handoff time
+// (createCampaignFromQueue → deriveBusinessCampaign → createCampaign). Invalid
+// context is logged and dropped, never blocking campaign creation, so invalid
+// context is never persisted. The render-time check in renderDiscoveryLeadsBlock
+// is cheap defense (try/catch), not a second validation boundary.
+
+export const discoveryContextSchema = z.object({
+  focus: z.enum(['emerging', 'competitive']).nullable().optional(),
+  discovered_at: z.string().nullable().optional(),
+  business_seek_priority: z.enum(['high', 'medium', 'low', 'hold']).nullable().optional(),
+  category_fit: z.enum(['verified', 'probable', 'insufficient']).nullable().optional(),
+  identity_confidence: z.enum(['high', 'medium', 'low']).nullable().optional(),
+  location_status: z.string().nullable().optional(),
+  seek_batch_id: z.string().nullable().optional(),
+  discovery_signals: z.array(z.string().regex(/^INT_/)).optional(),
+  discovery_provenance: z.array(discoveryProvenanceSchema).optional(),
+}).passthrough();
+
+export type DiscoveryContext = z.infer<typeof discoveryContextSchema>;
+
+/**
+ * Validate a discovery context payload at the handoff boundary (spec §6).
+ * Returns the parsed context on success, or null on validation failure
+ * (caller logs a warning and drops — never blocks campaign creation).
+ */
+export function validateDiscoveryContext(raw: unknown): DiscoveryContext | null {
+  try {
+    const parsed = discoveryContextSchema.parse(raw);
+    // Drop empty context (no signals AND no provenance AND no priority/fit) —
+    // nothing to render, so treat as absent to keep the campaign row clean.
+    const hasSignals = Array.isArray(parsed.discovery_signals) && parsed.discovery_signals.length > 0;
+    const hasProvenance = Array.isArray(parsed.discovery_provenance) && parsed.discovery_provenance.length > 0;
+    const hasMeta = parsed.business_seek_priority || parsed.category_fit || parsed.identity_confidence;
+    if (!hasSignals && !hasProvenance && !hasMeta) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}

@@ -22,6 +22,29 @@ import { getBillingNotificationService } from './subscription/BillingNotificatio
 import { MarketingScorecardService } from './MarketingScorecardService';
 import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 import { normalizeReferenceState } from './intelligence/IntelligenceProfileService.js';
+import type { DiscoveryContext } from '../validators/intelligence-discovery.schema';
+
+// ─── INT signal labels (Migration 253 — GAP-E3) ──────────────────────────
+// Hardcoded label map for the INT_* discovery signal family. The intelligence
+// sprint's proposed registry seed (migration 199, GAP-S1) was never delivered:
+// no INT_* rows exist in mkt_signal_registry. INT_* is a closed, spec-defined
+// 11-code family, so a static map avoids a DB dependency in the notes/leads
+// render path. If the INT family is ever registered in mkt_signal_registry,
+// this map can be retired in favor of registry lookup.
+// Spec: docs/LocalBiz/marketing_ops_discovery_leads_handoff_spec.md §8.4
+const INT_SIGNAL_LABELS: Record<string, string> = {
+  INT_LOW_VISIBILITY: 'Low Visibility',
+  INT_WEAK_MAINSTREAM_INDEXING: 'Weak Mainstream Indexing',
+  INT_SINGLE_SOURCE: 'Single Source Only',
+  INT_HIDDEN_TRUST: 'Strong Hidden Trust',
+  INT_RECENT_BUSINESS_EVIDENCE: 'Recently Established',
+  INT_POSSIBLE_CATEGORY_MISALIGNMENT: 'Possible Category Misalignment',
+  INT_VERTICAL_SOURCE_DISCOVERY: 'Vertical Source Discovery',
+  INT_MULTISOURCE_IDENTITY: 'Multisource Identity',
+  INT_ACTIVE_OPERATIONAL_EVIDENCE: 'Active Operational Evidence',
+  INT_CATEGORY_SPECIALIZATION: 'Category Specialization',
+  INT_UNDEREXPOSED_CREDENTIAL: 'Underexposed Credential',
+};
 
 // ====================
 // TYPES
@@ -217,6 +240,12 @@ export interface CampaignInput {
   // Migration 204 — diaspora / heritage-origin categorization
   businessOriginCountry?: string;
   businessOriginRegion?: string;
+  // Migration 253 — GAP-E3 discovery context handoff (nullable; additive).
+  // Carries discovery signals/provenance/seek-priority from the queue entry
+  // onto the child business campaign for the audit prompt's "Discovery leads"
+  // block. See docs/LocalBiz/marketing_ops_discovery_leads_handoff_spec.md.
+  discoveryContext?: DiscoveryContext | null;
+  intelligenceRunId?: string;
 }
 
 export interface CampaignUpdateInput {
@@ -481,6 +510,9 @@ export class MarketingCampaignService extends BaseService {
           intelligence_platform: input.intelligencePlatform || null,
           business_origin_country: input.businessOriginCountry || null,
           business_origin_region: input.businessOriginRegion || null,
+          // Migration 253 — GAP-E3 discovery context handoff
+          discovery_context: (input.discoveryContext ?? null) as any,
+          intelligence_run_id: input.intelligenceRunId || null,
         },
       });
 
@@ -695,6 +727,9 @@ export class MarketingCampaignService extends BaseService {
     detectedSignals?: string[];
     assignedTo?: string;
     note?: string;
+    // Migration 253 — GAP-E3 discovery context handoff
+    discoveryContext?: DiscoveryContext | null;
+    intelligenceRunId?: string;
   }, ctx?: RequestCtx): Promise<any> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -731,7 +766,29 @@ export class MarketingCampaignService extends BaseService {
         input.detectedSignals?.length ? `Detected signals: ${input.detectedSignals.join(', ')}` : null,
         input.note ? `Operator note: ${input.note}` : null,
       ].filter(Boolean);
-      const notes = noteParts.join('\n');
+
+      // Migration 253 — GAP-E3: append a human-readable discovery context
+      // section to notes so the context is visible in the existing campaign
+      // UI with zero frontend work. Mirrors the spec §8.2 notes format.
+      if (input.discoveryContext) {
+        const dc = input.discoveryContext;
+        const discoveredAt = dc.discovered_at
+          ? new Date(dc.discovered_at).toISOString().slice(0, 10)
+          : 'unknown date';
+        const signalLabels = (dc.discovery_signals ?? [])
+          .map((code) => INT_SIGNAL_LABELS[code] ?? code)
+          .join(', ');
+        const sourceLabels = (dc.discovery_provenance ?? [])
+          .map((p) => `${p.source} (${p.role})`)
+          .join(', ');
+        noteParts.push(
+          `Discovery context (intelligence run ${input.intelligenceRunId ?? 'unknown'}, discovered ${discoveredAt}):`,
+          `  Seek priority: ${dc.business_seek_priority ?? 'unknown'} · Category fit: ${dc.category_fit ?? 'unknown'} · Identity confidence: ${dc.identity_confidence ?? 'unknown'}`,
+          signalLabels ? `  Signals: ${signalLabels}` : null,
+          sourceLabels ? `  Sources: ${sourceLabels}` : null,
+        );
+      }
+      const notes = noteParts.filter(Boolean).join('\n');
 
       const child = await this.createCampaign({
         scope: 'business',
@@ -747,6 +804,9 @@ export class MarketingCampaignService extends BaseService {
         assignedTo: input.assignedTo,
         notes,
         parentCampaignId: input.parentId,
+        // Migration 253 — GAP-E3 discovery context handoff
+        discoveryContext: input.discoveryContext,
+        intelligenceRunId: input.intelligenceRunId,
       }, ctx);
 
       // If the caller passed detected_signals (from the category audit's

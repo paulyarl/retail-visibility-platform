@@ -20,6 +20,28 @@ import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { discoveryContextSchema, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
+
+// ─── INT signal labels (Migration 253 — GAP-E3, spec §8.4) ───────────────
+// Hardcoded label map for the INT_* discovery signal family. The intelligence
+// sprint's proposed registry seed (migration 199, GAP-S1) was never delivered:
+// no INT_* rows exist in mkt_signal_registry. INT_* is a closed, spec-defined
+// 11-code family, so a static map avoids a DB dependency in the prompt-render
+// path. If the INT family is ever registered in mkt_signal_registry, this map
+// can be retired in favor of registry lookup.
+const INT_SIGNAL_LABELS: Record<string, string> = {
+  INT_LOW_VISIBILITY: 'Low Visibility',
+  INT_WEAK_MAINSTREAM_INDEXING: 'Weak Mainstream Indexing',
+  INT_SINGLE_SOURCE: 'Single Source Only',
+  INT_HIDDEN_TRUST: 'Strong Hidden Trust',
+  INT_RECENT_BUSINESS_EVIDENCE: 'Recently Established',
+  INT_POSSIBLE_CATEGORY_MISALIGNMENT: 'Possible Category Misalignment',
+  INT_VERTICAL_SOURCE_DISCOVERY: 'Vertical Source Discovery',
+  INT_MULTISOURCE_IDENTITY: 'Multisource Identity',
+  INT_ACTIVE_OPERATIONAL_EVIDENCE: 'Active Operational Evidence',
+  INT_CATEGORY_SPECIALIZATION: 'Category Specialization',
+  INT_UNDEREXPOSED_CREDENTIAL: 'Underexposed Credential',
+};
 
 // Re-export for backward compatibility (tests + existing imports).
 export { ScopeMismatchError, assertScopeCompatible };
@@ -837,11 +859,17 @@ export class MarketingExecutionService extends BaseService {
       if (goldStandardOnly) {
         const gsBlock = profileService.serializeGoldStandard(goldStandardOnly, 'benchmark');
         if (gsBlock) {
-          const gsAmplified = baseRendered + '\n' + gsBlock;
+          let gsAmplified = baseRendered + '\n' + gsBlock;
+          // Migration 253 — GAP-E3: inject discovery leads block (spec §8.4).
+          const leadsBlock = this.renderDiscoveryLeadsBlock(input.campaign);
+          if (leadsBlock) {
+            gsAmplified = gsAmplified + '\n' + leadsBlock;
+          }
           logger.info('Gold standard benchmark injected (no intelligence profile)', ctx, {
             campaignId: input.campaign.id,
             category,
             goldStandardProfileId: goldStandardOnly.id,
+            discoveryLeadsInjected: !!leadsBlock,
           });
           return {
             renderedPrompt: this.appendPromptSuffix(gsAmplified, promptSuffix),
@@ -849,14 +877,25 @@ export class MarketingExecutionService extends BaseService {
               profile_id: goldStandardOnly.id,
               profile_version: goldStandardOnly.version,
               intelligence_mode: 'profile',
+              discovery_leads_injected: !!leadsBlock,
             },
           };
         }
       }
-      // No active profile and no gold standard — return byte-identical base render (plus suffix).
+      // No active profile and no gold standard — inject discovery leads block
+      // if present (independent of profile amplification), then return.
+      const leadsBlockNoProfile = this.renderDiscoveryLeadsBlock(input.campaign);
+      const noProfileAmplified = leadsBlockNoProfile
+        ? baseRendered + '\n' + leadsBlockNoProfile
+        : baseRendered;
       return {
-        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
-        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        renderedPrompt: this.appendPromptSuffix(noProfileAmplified, promptSuffix),
+        resolution: {
+          profile_id: null,
+          profile_version: null,
+          intelligence_mode: 'none',
+          discovery_leads_injected: !!leadsBlockNoProfile,
+        },
       };
     }
 
@@ -884,6 +923,13 @@ export class MarketingExecutionService extends BaseService {
       }
     }
 
+    // Migration 253 — GAP-E3: inject discovery leads block (spec §8.4).
+    // After the gold-standard benchmark injection and before appendPromptSuffix.
+    const leadsBlock = this.renderDiscoveryLeadsBlock(input.campaign);
+    if (leadsBlock) {
+      amplified = amplified + '\n' + leadsBlock;
+    }
+
     logger.info('Profile-aware prompt resolved (§1B)', ctx, {
       campaignId: input.campaign.id,
       category,
@@ -892,6 +938,7 @@ export class MarketingExecutionService extends BaseService {
       profileVersion: profile.version,
       profileReferenceCity: (profile as any).reference_city ?? null,
       intelligenceMode: 'profile',
+      discoveryLeadsInjected: !!leadsBlock,
     });
 
     return {
@@ -900,6 +947,7 @@ export class MarketingExecutionService extends BaseService {
         profile_id: profile.id,
         profile_version: profile.version,
         intelligence_mode: 'profile',
+        discovery_leads_injected: !!leadsBlock,
       },
     };
   }
@@ -912,6 +960,118 @@ export class MarketingExecutionService extends BaseService {
   private appendPromptSuffix(rendered: string, suffix: string): string {
     if (!suffix || !suffix.trim()) return rendered;
     return rendered + '\n' + suffix;
+  }
+
+  /**
+   * Render the "Discovery Leads" block for a campaign (Migration 253 — GAP-E3,
+   * spec §8.4/§8.5). Returns '' when the campaign has no discovery_context
+   * (byte-identical render — campaigns without context are unaffected).
+   *
+   * The block is framed as verification HYPOTHESES, never as findings — this
+   * preserves the §S1 guardrail (INT_* codes never enter detected_signals /
+   * triage / playbook evaluation). The audit treats each lead as a hypothesis
+   * to verify; confirmed leads become audit-family signals the audit emits
+   * itself; refuted leads are discarded.
+   *
+   * Validation: the primary validation boundary is at handoff time
+   * (createCampaignFromQueue → validateDiscoveryContext). The render-time
+   * try/catch here is cheap defense against hand-mutated DB rows — it is NOT
+   * a second validation boundary (spec §6).
+   *
+   * Provenance is capped at 6 sources (`… +N more`).
+   */
+  private renderDiscoveryLeadsBlock(campaign: any): string {
+    const rawContext = campaign?.discovery_context;
+    if (!rawContext || (typeof rawContext !== 'object')) return '';
+
+    let ctx: DiscoveryContext;
+    try {
+      ctx = discoveryContextSchema.parse(rawContext);
+    } catch {
+      // Hand-mutated or corrupted row — drop silently (spec §8.4).
+      return '';
+    }
+
+    // Drop if no signals AND no provenance AND no priority/fit/identity meta
+    // (nothing to render as leads).
+    const signals = Array.isArray(ctx.discovery_signals) ? ctx.discovery_signals : [];
+    const provenance = Array.isArray(ctx.discovery_provenance) ? ctx.discovery_provenance : [];
+    const hasMeta = ctx.business_seek_priority || ctx.category_fit || ctx.identity_confidence;
+    if (signals.length === 0 && provenance.length === 0 && !hasMeta) return '';
+
+    // ─── Focus parenthetical ───────────────────────────────────────────
+    const focusLabel =
+      ctx.focus === 'emerging' ? 'emerging focus'
+      : ctx.focus === 'competitive' ? 'competitive focus'
+      : 'focus not recorded';
+
+    // ─── Discovered-at date ────────────────────────────────────────────
+    let discoveredAtStr = 'unknown date';
+    if (ctx.discovered_at) {
+      try {
+        discoveredAtStr = new Date(ctx.discovered_at).toISOString().slice(0, 10);
+      } catch {
+        discoveredAtStr = String(ctx.discovered_at);
+      }
+    }
+
+    // ─── Build the block (spec §8.5 normative text) ───────────────────
+    const lines: string[] = [
+      '=== DISCOVERY LEADS (VERIFY — NOT FINDINGS) ===',
+      `This business was surfaced by an intelligence discovery scan`,
+      `(${focusLabel})`,
+      `on ${discoveredAtStr}. The observations below are scan-time HYPOTHESES, not audit`,
+      `findings. For each lead: independently verify against current evidence.`,
+      `A lead you confirm becomes an audit signal in your own output contract; a`,
+      `lead you refute is discarded. Do not copy these codes into detected_signals —`,
+      `emit only your own audit-family signals (RA/DS/WC/CP/VP). Do not treat an`,
+      `unconfirmed lead as evidence of activity, inactivity, or quality.`,
+      '',
+    ];
+
+    // Seek priority / category fit / identity confidence line
+    const metaParts: string[] = [];
+    if (ctx.business_seek_priority) metaParts.push(`Seek priority at discovery: ${ctx.business_seek_priority}`);
+    if (ctx.category_fit) metaParts.push(`Category fit: ${ctx.category_fit}`);
+    if (ctx.identity_confidence) metaParts.push(`Identity confidence: ${ctx.identity_confidence}`);
+    if (metaParts.length > 0) {
+      lines.push(metaParts.join(' · '));
+      lines.push('');
+    }
+
+    // Discovery signals (labeled)
+    if (signals.length > 0) {
+      lines.push('Discovery signals (hypotheses):');
+      for (const code of signals) {
+        const label = INT_SIGNAL_LABELS[code] ?? code;
+        lines.push(`- ${code} — ${label}`);
+      }
+      lines.push('');
+    }
+
+    // Discovery provenance (capped at 6)
+    if (provenance.length > 0) {
+      lines.push('Discovery provenance (where the scan found this business):');
+      const cap = 6;
+      for (let i = 0; i < Math.min(provenance.length, cap); i++) {
+        const p = provenance[i];
+        const evidence = Array.isArray(p.evidence_types) && p.evidence_types.length > 0
+          ? ` — evidence: ${p.evidence_types.join(', ')}`
+          : '';
+        lines.push(`- ${p.source ?? 'Unknown source'} (${p.role ?? 'unknown'})${evidence}`);
+      }
+      if (provenance.length > cap) {
+        lines.push(`… +${provenance.length - cap} more`);
+      }
+      lines.push('');
+    }
+
+    // Absence rules paragraph (mandatory — spec §8.5)
+    lines.push('Absence rules: "not found on a platform during discovery" is a discovery');
+    lines.push('signal, not proof of absence. Re-verify platform absence yourself before');
+    lines.push('emitting DS_MISSING_PROFILE or similar.');
+
+    return lines.join('\n');
   }
 
   /**

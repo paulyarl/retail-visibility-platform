@@ -3381,6 +3381,8 @@ model mkt_campaigns_list {
   seek_batch_id                                                                   String?                              @db.VarChar(60)
   repair_triage_briefing                                                          Json?
   intelligence_platform                                                           String?                              @db.VarChar(20)
+  discovery_context                                                               Json?
+  intelligence_run_id                                                             String?                              @db.VarChar(64)
   directory_seed_campaign_links                                                   directory_seed_campaign_links[]
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
