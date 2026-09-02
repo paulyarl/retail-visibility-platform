@@ -83,17 +83,21 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.created_at,
           dll.updated_at,
           dll.keywords,
+          dll.same_as,
           t.is_demo,
           t.demo_expires_at,
           dll.listing_origin,
           dll.public_disclaimer,
+          dps.seo_enrichment->>'meta_title' as meta_title,
+          dps.seo_enrichment->>'schema_type_hint' as schema_type_hint,
           (SELECT dct.token FROM directory_claim_tokens dct
-           JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
-           WHERE dps.listing_id = dll.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
+           JOIN directory_presence_seeds dps2 ON dps2.id = dct.seed_id
+           WHERE dps2.listing_id = dll.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
            LIMIT 1) as active_claim_token
          FROM directory_listings_list dll
          LEFT JOIN tenants t ON t.id = dll.tenant_id
          LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
+         LEFT JOIN directory_presence_seeds dps ON dps.listing_id = dll.id
          WHERE dll.slug = $1 AND dll.is_published = true
          LIMIT 1`,
         [slug]
@@ -388,6 +392,9 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,
       keywords: listing.keywords,
+      sameAs: listing.same_as || [],
+      metaTitle: listing.meta_title || null,
+      schemaTypeHint: listing.schema_type_hint || null,
       categories: categories
     } : null;
 

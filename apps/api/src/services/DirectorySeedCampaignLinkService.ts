@@ -20,6 +20,11 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import { generateDirectorySeedCampaignLinkId } from '../lib/id-generator';
+import {
+  buildSeedSeoPacket,
+  buildSeoEnrichmentJson,
+} from './directory/SeedSeoComposer';
+import IntelligenceProfileService from './intelligence/IntelligenceProfileService';
 
 interface LinkAuditCtx {
   actorType?: 'user' | 'system' | 'integration' | 'customer';
@@ -419,9 +424,12 @@ class DirectorySeedCampaignLinkService {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
         dps.tenant_id, dps.listing_id,
-        dl.keywords,
+        dl.keywords, dl.business_name,
         mc.phone AS camp_phone, mc.website_url AS camp_website,
+        mc.business_name AS camp_business_name,
         mc.category AS camp_category, mc.neighborhood AS camp_neighborhood,
+        mc.address_city AS camp_city, mc.address_state AS camp_state,
+        mc.intelligence_focus,
         mc.business_origin_country, mc.business_origin_region,
         mc.directory_profiles, mc.notes AS camp_notes
       FROM directory_presence_seeds dps
@@ -475,13 +483,94 @@ class DirectorySeedCampaignLinkService {
           // Campaign doesn't carry secondary categories directly; skip
           skipped.push(field);
           break;
-        case 'description':
-          if (r.camp_notes) {
-            addSet('description', r.camp_notes);
-            provenanceRows.push({ fieldKey: 'description', value: r.camp_notes });
-            projected.push(field);
-          } else skipped.push(field);
+        case 'description': {
+          // Spec §5.4: replace raw notes projection with composer output.
+          // When the composer degrades (no audit, no profile), write nothing
+          // rather than falling back to notes — the notes-leak path is
+          // closed unconditionally, not conditionally.
+          const auditRow = await (prisma as any).mkt_audits_list.findFirst({
+            where: { campaign_id: campaignId, platform: 'business_analysis' },
+            orderBy: { created_at: 'desc' },
+          }).catch(() => null);
+
+          if (auditRow) {
+            const ad = (auditRow.audit_data ?? {}) as any;
+            const ameta = ad.audit_metadata ?? {};
+            const agoogle = ad.platforms?.google ?? {};
+            const platformsObj = ad.platforms ?? {};
+            const platformProfileUrls: Array<{ platform: string; url: string }> = [];
+            for (const pkey of ['google', 'yelp', 'facebook', 'bbb']) {
+              const pdata = (platformsObj as any)[pkey];
+              if (pdata?.profile_url && typeof pdata.profile_url === 'string') {
+                platformProfileUrls.push({ platform: pkey, url: pdata.profile_url });
+              }
+            }
+
+            const seoFocus = (r.intelligence_focus === 'gold_standards'
+              ? 'competitive'
+              : r.intelligence_focus || 'competitive') as 'emerging' | 'competitive';
+            const ipProfile = await IntelligenceProfileService.resolve(
+              r.camp_category || '',
+              seoFocus,
+              r.camp_city ?? null,
+              null,
+            ).catch(() => null);
+
+            const packet = buildSeedSeoPacket({
+              campaign: {
+                businessName: r.camp_business_name || r.business_name,
+                category: r.camp_category || '',
+                addressCity: r.camp_city ?? null,
+                addressState: r.camp_state ?? null,
+                neighborhood: r.camp_neighborhood ?? null,
+                businessOriginCountry: r.business_origin_country ?? null,
+                businessOriginRegion: r.business_origin_region ?? null,
+                directoryProfiles: Array.isArray(r.directory_profiles) ? r.directory_profiles : null,
+                socialProfiles: null,
+              },
+              audit: {
+                auditId: auditRow.id,
+                storeFormat: ameta.matched_business?.store_format ?? null,
+                googleAdditionalCategories: agoogle.additional_categories ?? null,
+                platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
+              },
+              intelligenceProfile: ipProfile
+                ? {
+                    profileId: ipProfile.id,
+                    synonyms: ipProfile.configuration_json?.synonyms ?? undefined,
+                    subcategories: ipProfile.configuration_json?.subcategories ?? undefined,
+                    prohibitedKeywords: ipProfile.configuration_json?.prohibited_keywords ?? undefined,
+                    schemaOrgType: ipProfile.configuration_json?.schema_org_type ?? null,
+                  }
+                : null,
+              goldStandard: null,
+            });
+
+            if (packet.description) {
+              addSet('description', packet.description);
+              addSet('keywords', packet.keywords);
+              addSet('same_as', packet.sameAs);
+              provenanceRows.push({ fieldKey: 'description', value: packet.description });
+              provenanceRows.push({ fieldKey: 'keywords', value: packet.keywords.join(', ') });
+              if (packet.sameAs.length > 0) {
+                provenanceRows.push({ fieldKey: 'same_as', value: packet.sameAs.join(', ') });
+              }
+              // Update seo_enrichment on the seed row
+              await prisma.$executeRaw`
+                UPDATE directory_presence_seeds
+                SET seo_enrichment = ${JSON.stringify(buildSeoEnrichmentJson(packet))}::jsonb, updated_at = now()
+                WHERE id = ${seedId}
+              `;
+              projected.push(field);
+            } else {
+              skipped.push(field);
+            }
+          } else {
+            // No audit → composer degrades → write nothing (NOT notes)
+            skipped.push(field);
+          }
           break;
+        }
         case 'originCountry':
           if (r.business_origin_country) {
             const kw = this.mergeKeyword(r.keywords, `origin_country:${r.business_origin_country}`);
