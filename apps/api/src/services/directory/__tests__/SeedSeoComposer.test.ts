@@ -121,7 +121,7 @@ describe('SeedSeoComposer', () => {
       expect(packet.metaTitle).toContain('IN');
     });
 
-    it('uses store_format for category label when present', () => {
+    it('prefers campaign category over store_format for category label', () => {
       const packet = buildSeedSeoPacket({
         campaign: fullCampaign,
         audit: fullAudit,
@@ -129,8 +129,22 @@ describe('SeedSeoComposer', () => {
         goldStandard: null,
       });
 
-      // store_format = "grocery" → "grocery" appears in title
-      expect(packet.metaTitle.toLowerCase()).toContain('grocery');
+      // campaign.category = "African Grocery Store" wins over store_format = "grocery"
+      expect(packet.metaTitle).toContain('African Grocery Store');
+      expect(packet.metaTitle).not.toContain('grocery_plus');
+    });
+
+    it('humanizes store_format slug when category is empty', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: { ...fullCampaign, category: '' },
+        audit: { ...fullAudit, storeFormat: 'grocery_plus_prepared_foods' },
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      // store_format slug is humanized: underscores → spaces
+      expect(packet.metaTitle).toContain('grocery plus prepared foods');
+      expect(packet.metaTitle).not.toContain('grocery_plus_prepared_foods');
     });
 
     it('truncates at word boundary when exceeding 70 chars', () => {
@@ -192,7 +206,7 @@ describe('SeedSeoComposer', () => {
       });
 
       expect(packet.description).toContain('Sahel African Market');
-      // store_format = "grocery" → "grocery" in description
+      // category label = "African Grocery Store" → "grocery" in description
       expect(packet.description.toLowerCase()).toContain('grocery');
     });
 

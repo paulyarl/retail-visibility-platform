@@ -387,11 +387,17 @@ function resolveCategoryLabel(
   campaign: CampaignSeoFields,
   audit: AuditSeoFields | null,
 ): string {
-  // Use store_format when present and not "unknown"
+  // Prefer the human-readable campaign category (e.g. "African Grocery Store")
+  // over the machine store_format slug (e.g. "grocery_plus_prepared_foods").
+  // store_format is only used as a last-resort fallback when category is empty,
+  // and is humanized (underscores → spaces) so it never appears as a raw slug.
+  const category = campaign.category?.trim();
+  if (category) return category;
+
   if (audit?.storeFormat && audit.storeFormat !== 'unknown') {
-    return audit.storeFormat;
+    return audit.storeFormat.replace(/_/g, ' ');
   }
-  return campaign.category?.trim() || '';
+  return '';
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────
