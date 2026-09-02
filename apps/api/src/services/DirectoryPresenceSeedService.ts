@@ -374,6 +374,53 @@ class DirectoryPresenceSeedService {
       )
     `;
 
+    // Make the directory listing options page work for unclaimed seeds by
+    // seeding the two tables the page validates (business name / category).
+    await prisma.$executeRaw`
+      INSERT INTO directory_settings_list (
+        id, tenant_id, is_published, primary_category, secondary_categories,
+        seo_description, seo_keywords, slug, updated_at
+      ) VALUES (
+        ${tenantId},
+        ${tenantId},
+        false,
+        ${input.primaryCategory},
+        ${input.secondaryCategories || []}::text[],
+        ${input.description || null},
+        ${input.keywords || []}::text[],
+        ${slug},
+        now()
+      )
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    await prisma.$executeRaw`
+      INSERT INTO tenant_business_profiles_list (
+        tenant_id, business_name, address_line1, city, state, postal_code,
+        country_code, phone_number, website, logo_url, business_description,
+        hours, latitude, longitude, display_map, map_privacy_mode, updated_at
+      ) VALUES (
+        ${tenantId},
+        ${input.businessName},
+        ${input.address},
+        ${input.city},
+        ${input.state},
+        ${input.zipCode || ''},
+        'US',
+        ${input.phone || null},
+        ${input.website || null},
+        null,
+        ${input.description || null},
+        ${input.businessHours ? JSON.stringify(input.businessHours) : null}::jsonb,
+        ${input.latitude || null},
+        ${input.longitude || null},
+        false,
+        'precise',
+        now()
+      )
+      ON CONFLICT (tenant_id) DO NOTHING
+    `;
+
     // Create the seed record
     await prisma.$executeRaw`
       INSERT INTO directory_presence_seeds (
@@ -465,6 +512,35 @@ class DirectoryPresenceSeedService {
     await prisma.$executeRaw`
       UPDATE directory_presence_seeds SET status = 'published', published_at = now(), updated_at = now()
       WHERE id = ${seedId}
+    `;
+
+    // Keep the tenant directory settings in sync so the listing options page
+    // shows the correct published state / category for the published seed.
+    await prisma.$executeRaw`
+      INSERT INTO directory_settings_list (
+        id, tenant_id, is_published, primary_category, secondary_categories,
+        seo_description, seo_keywords, slug, updated_at
+      )
+      SELECT
+        ${seed[0].tenant_id},
+        ${seed[0].tenant_id},
+        true,
+        dl.primary_category,
+        dl.secondary_categories,
+        dl.description,
+        dl.keywords,
+        dl.slug,
+        now()
+      FROM directory_listings_list dl
+      WHERE dl.id = ${seed[0].listing_id}
+      ON CONFLICT (id) DO UPDATE SET
+        is_published = true,
+        primary_category = EXCLUDED.primary_category,
+        secondary_categories = EXCLUDED.secondary_categories,
+        seo_description = EXCLUDED.seo_description,
+        seo_keywords = EXCLUDED.seo_keywords,
+        slug = EXCLUDED.slug,
+        updated_at = now()
     `;
 
     audit({
