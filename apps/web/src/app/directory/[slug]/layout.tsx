@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import React from 'react';
 import { permanentRedirect } from 'next/navigation';
-import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { directoryService } from '@/services/DirectorySingletonService';
 
 interface LayoutProps {
@@ -13,24 +12,28 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
 
   try {
-    const item = await publicDirectoryService.getDirectoryItem(slug);
+    // Use the consolidated route (same as /place) so we get the seed-scoped
+    // meta_title and composed description. Falls back to publicDirectoryService
+    // for claimed tenants whose listing_origin is not 'directory_seed'.
+    const data = await directoryService.getDirectoryConsolidated(slug);
+    const listing = data?.listing;
 
-    if (!item) {
-      return {
-        title: 'Store Not Found',
-      };
+    if (!listing) {
+      return { title: 'Store Not Found' };
     }
 
-    const businessName = item.businessName || item.name || 'Local Business';
+    const businessName = listing.businessName || 'Local Business';
     const description =
-      item.description ||
+      listing.description ||
+      listing.publicDisclaimer ||
       `Visit ${businessName} on VisibleShelf to browse products, hours, and contact information.`;
     const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
-    const image = item.logoUrl || item.bannerUrl || `${baseUrl}/favicon.ico`;
+    const image = listing.logoUrl || `${baseUrl}/favicon.ico`;
+    const title = listing.metaTitle || `${businessName} - VisibleShelf Directory`;
 
     return {
       metadataBase: new URL(baseUrl),
-      title: `${businessName} - VisibleShelf Directory`,
+      title,
       description,
       openGraph: {
         title: businessName,

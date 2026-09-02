@@ -52,7 +52,15 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
 
   return (
     <>
-      <LocalBusinessStructuredData listing={listing} url={currentUrl} />
+      <LocalBusinessStructuredData
+        listing={{
+          ...listing,
+          description: listing.description,
+          sameAs: listing.sameAs,
+          schemaType: listing.schemaTypeHint,
+        }}
+        url={currentUrl}
+      />
       <BreadcrumbStructuredData items={[
         { name: 'Home', url: baseUrl },
         { name: 'Directory', url: `${baseUrl}/directory` },
@@ -128,12 +136,19 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-12">
               {/* About */}
-              {(canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
+              {canShowAbout && (listing.description || businessProfile?.business_description || businessProfile?.businessDescription) && (
                 <section className="border-l-2 border-amber-500 pl-6">
                   <h2 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3">About</h2>
-                  <p className="text-stone-800 leading-relaxed text-lg whitespace-pre-wrap">
-                    {businessProfile.business_description || businessProfile.businessDescription}
-                  </p>
+                  {listing.description && (
+                    <p className="text-stone-800 leading-relaxed text-lg mb-3">
+                      {listing.description}
+                    </p>
+                  )}
+                  {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                    <p className="text-stone-800 leading-relaxed text-lg whitespace-pre-wrap">
+                      {businessProfile.business_description || businessProfile.businessDescription}
+                    </p>
+                  )}
                 </section>
               )}
 

@@ -53,7 +53,15 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
 
   return (
     <>
-      <LocalBusinessStructuredData listing={listing} url={currentUrl} />
+      <LocalBusinessStructuredData
+        listing={{
+          ...listing,
+          description: listing.description,
+          sameAs: listing.sameAs,
+          schemaType: listing.schemaTypeHint,
+        }}
+        url={currentUrl}
+      />
       <BreadcrumbStructuredData items={[
         { name: 'Home', url: baseUrl },
         { name: 'Directory', url: `${baseUrl}/directory` },
@@ -133,10 +141,15 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div className="lg:col-span-2 space-y-10">
               {/* Description */}
-              {(canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
+              {canShowAbout && (listing.description || businessProfile?.business_description || businessProfile?.businessDescription) && (
                 <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
                   <h2 className="text-2xl font-bold mb-4">About</h2>
-                  <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">{businessProfile.business_description || businessProfile.businessDescription}</p>
+                  {listing.description && (
+                    <p className="text-gray-200 leading-relaxed text-lg mb-3">{listing.description}</p>
+                  )}
+                  {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                    <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">{businessProfile.business_description || businessProfile.businessDescription}</p>
+                  )}
                 </div>
               )}
 

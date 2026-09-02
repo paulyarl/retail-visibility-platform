@@ -38,7 +38,6 @@ async function backfillSeedSeo() {
       dl.website,
       dl.primary_category,
       dl.secondary_categories,
-      dl.neighborhood,
       dl.business_hours,
       dscl.campaign_id,
       dscl.link_role

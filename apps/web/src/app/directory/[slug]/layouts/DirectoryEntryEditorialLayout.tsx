@@ -52,7 +52,15 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
 
   return (
     <>
-      <LocalBusinessStructuredData listing={listing} url={currentUrl} />
+      <LocalBusinessStructuredData
+        listing={{
+          ...listing,
+          description: listing.description,
+          sameAs: listing.sameAs,
+          schemaType: listing.schemaTypeHint,
+        }}
+        url={currentUrl}
+      />
       <BreadcrumbStructuredData items={[
         { name: 'Home', url: baseUrl },
         { name: 'Directory', url: `${baseUrl}/directory` },
@@ -126,12 +134,19 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             {/* Main Column */}
             <div className="lg:col-span-8 space-y-10">
               {/* About */}
-              {(canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
+              {canShowAbout && (listing.description || businessProfile?.business_description || businessProfile?.businessDescription) && (
                 <section>
                   <h2 className="text-2xl font-bold text-neutral-900 mb-4">About</h2>
-                  <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-wrap">
-                    {businessProfile.business_description || businessProfile.businessDescription}
-                  </p>
+                  {listing.description && (
+                    <p className="text-neutral-700 leading-relaxed text-lg mb-3">
+                      {listing.description}
+                    </p>
+                  )}
+                  {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                    <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-wrap">
+                      {businessProfile.business_description || businessProfile.businessDescription}
+                    </p>
+                  )}
                 </section>
               )}
 

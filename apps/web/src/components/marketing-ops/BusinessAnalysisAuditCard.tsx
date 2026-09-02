@@ -88,7 +88,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [addingToPlace, setAddingToPlace] = useState(false);
-  const [placeResult, setPlaceResult] = useState<{ publicUrl: string; seedId: string; created: boolean } | null>(null);
+  const [placeResult, setPlaceResult] = useState<{ publicUrl: string; seedId: string; created: boolean; seoEnriched: boolean } | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
 
   const d = (audit.audit_data ?? {}) as any;

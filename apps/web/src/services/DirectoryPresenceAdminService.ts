@@ -523,7 +523,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       throw new Error(message || 'Failed to create seed from campaign');
     }
     const data = result.data?.data ?? result.data;
-    return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean };
+    return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean };
   }
 
   // ============================

@@ -74,7 +74,15 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
 
   return (
     <>
-      <LocalBusinessStructuredData listing={listing} url={currentUrl} />
+      <LocalBusinessStructuredData
+        listing={{
+          ...listing,
+          description: listing.description,
+          sameAs: listing.sameAs,
+          schemaType: listing.schemaTypeHint,
+        }}
+        url={currentUrl}
+      />
       <BreadcrumbStructuredData
         items={[
           { name: 'Home', url: baseUrl },
@@ -328,15 +336,22 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
               )}
 
               {/* Business Description */}
-              {(!showStatusPanel && canShowAbout && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
+              {(!showStatusPanel && canShowAbout && (listing.description || businessProfile?.business_description || businessProfile?.businessDescription)) && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
                   <div className="prose prose-gray max-w-none">
-                    <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
-                      {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200
-                        ? `${(businessProfile.business_description || businessProfile.businessDescription)?.substring(0, 200)}...`
-                        : (businessProfile.business_description || businessProfile.businessDescription)}
-                    </p>
+                    {listing.description && (
+                      <p className="text-gray-800 leading-relaxed text-base mb-3">
+                        {listing.description}
+                      </p>
+                    )}
+                    {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                      <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
+                        {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200
+                          ? `${(businessProfile.business_description || businessProfile.businessDescription)?.substring(0, 200)}...`
+                          : (businessProfile.business_description || businessProfile.businessDescription)}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
