@@ -28,6 +28,12 @@ import {
   generateDirectoryEnrichmentTokenString,
   generateTenantId,
 } from '../lib/id-generator';
+import {
+  buildSeedSeoPacket,
+  buildSeoEnrichmentJson,
+  type SeedSeoPacket,
+} from './directory/SeedSeoComposer';
+import IntelligenceProfileService from './intelligence/IntelligenceProfileService';
 /** Audit context for seed/claim operations */
 interface SeedAuditCtx {
   actorType?: 'user' | 'system' | 'integration' | 'customer';
@@ -65,6 +71,12 @@ export interface CreateSeedInput {
   /** Override listing_origin and disclaimer for owner or campaign sources. */
   listingOrigin?: string;
   publicDisclaimer?: string;
+  /** SEO enrichment fields (composed by SeedSeoComposer, spec §5.1). */
+  description?: string;
+  keywords?: string[];
+  sameAs?: string[];
+  /** Stored on the seed's seo_enrichment JSON, not the listing. */
+  seoEnrichment?: any;
   provenance?: Array<{
     fieldKey: string;
     value?: string;
@@ -328,7 +340,8 @@ class DirectoryPresenceSeedService {
         phone, website, primary_category, secondary_categories,
         latitude, longitude, business_hours, is_published, listing_origin, public_disclaimer,
         snap_ebt_reported, snap_ebt_as_of, snap_ebt_source, snap_ebt_source_name,
-        subscription_tier, product_count, created_at, updated_at
+        subscription_tier, product_count, description, keywords, same_as,
+        created_at, updated_at
       ) VALUES (
         ${listingId},
         ${tenantId},
@@ -354,6 +367,9 @@ class DirectoryPresenceSeedService {
         ${input.snapEbtSourceName || null},
         'directory_presence',
         0,
+        ${input.description || null},
+        ${input.keywords || []}::text[],
+        ${input.sameAs || []}::text[],
         now(), now()
       )
     `;
@@ -363,7 +379,7 @@ class DirectoryPresenceSeedService {
       INSERT INTO directory_presence_seeds (
         id, tenant_id, listing_id, category, city, state,
         seed_batch, status, identity_confidence, category_fit, notes,
-        owner_name, owner_email, owner_phone,
+        owner_name, owner_email, owner_phone, seo_enrichment,
         created_at, updated_at
       ) VALUES (
         ${seedId},
@@ -380,6 +396,7 @@ class DirectoryPresenceSeedService {
         ${input.ownerName || null},
         ${input.ownerEmail || null},
         ${input.ownerPhone || null},
+        ${input.seoEnrichment ? JSON.stringify(input.seoEnrichment) : null}::jsonb,
         now(), now()
       )
     `;
@@ -414,7 +431,14 @@ class DirectoryPresenceSeedService {
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'directory_presence_seed.create',
-      payload: { seedId, tenantId, listingId, businessName: input.businessName },
+      payload: {
+        seedId,
+        tenantId,
+        listingId,
+        businessName: input.businessName,
+        seoEnriched: !!input.seoEnrichment,
+        composerVersion: input.seoEnrichment?.composer_version ?? null,
+      },
     });
 
     logger.info('DirectoryPresenceSeedService.createSeed', undefined, { seedId, tenantId, listingId });
@@ -1294,7 +1318,7 @@ class DirectoryPresenceSeedService {
     campaignId: string,
     opts: { publish?: boolean } = {},
     ctx?: SeedAuditCtx,
-  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean }> {
+  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean }> {
     const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
       where: { id: campaignId },
     });
@@ -1310,7 +1334,7 @@ class DirectoryPresenceSeedService {
     const meta = d.audit_metadata ?? {};
     const nap = d.nap_consistency ?? {};
     const website = d.website ?? {};
-    const google = d.google ?? {};
+    const google = d.platforms?.google ?? {};
     const dataQuality = d.data_quality ?? {};
 
     if (meta.identity_status === 'mismatched') {
@@ -1360,6 +1384,7 @@ class DirectoryPresenceSeedService {
         slug: existing[0].slug,
         publicUrl: `/place/${existing[0].slug}`,
         created: false,
+        seoEnriched: false,
       };
     }
 
@@ -1374,6 +1399,80 @@ class DirectoryPresenceSeedService {
       ? (dataQuality.confidence as 'high' | 'medium' | 'low')
       : 'high';
 
+    // ── SEO enrichment (spec §5.1, §4.2) ────────────────────────────────
+    // Resolve intelligence profile with explicit non-gold_standards focus.
+    const seoFocus = (campaign.intelligence_focus === 'gold_standards'
+      ? 'competitive'
+      : campaign.intelligence_focus || 'competitive') as 'emerging' | 'competitive';
+    const profile = await IntelligenceProfileService.resolve(
+      campaign.category,
+      seoFocus,
+      campaign.address_city ?? null,
+      campaign.intelligence_platform ?? null,
+    ).catch(() => null);
+
+    const goldStandard = await IntelligenceProfileService.resolveGoldStandard(
+      campaign.category,
+      campaign.intelligence_platform ?? 'google',
+      campaign.address_city ?? null,
+      campaign.address_state ?? null,
+    ).catch(() => null);
+
+    // Build composer inputs from explicit fields only (never the raw blob)
+    const platformsObj = d.platforms ?? {};
+    const platformProfileUrls: Array<{ platform: string; url: string }> = [];
+    for (const pkey of ['google', 'yelp', 'facebook', 'bbb']) {
+      const pdata = (platformsObj as any)[pkey];
+      if (pdata?.profile_url && typeof pdata.profile_url === 'string') {
+        platformProfileUrls.push({ platform: pkey, url: pdata.profile_url });
+      }
+    }
+
+    const seoPacket: SeedSeoPacket | null = buildSeedSeoPacket({
+      campaign: {
+        businessName,
+        category: campaign.category,
+        addressCity: campaign.address_city ?? null,
+        addressState: campaign.address_state ?? null,
+        neighborhood: campaign.neighborhood ?? null,
+        businessOriginCountry: campaign.business_origin_country ?? null,
+        businessOriginRegion: campaign.business_origin_region ?? null,
+        directoryProfiles: Array.isArray(campaign.directory_profiles)
+          ? campaign.directory_profiles
+          : null,
+        socialProfiles: Array.isArray(campaign.social_profiles)
+          ? campaign.social_profiles
+          : null,
+      },
+      audit: {
+        auditId: audit.id,
+        storeFormat: meta.matched_business?.store_format ?? null,
+        googleAdditionalCategories: google.additional_categories ?? null,
+        platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
+      },
+      intelligenceProfile: profile
+        ? {
+            profileId: profile.id,
+            synonyms: profile.configuration_json?.synonyms ?? undefined,
+            subcategories: profile.configuration_json?.subcategories ?? undefined,
+            prohibitedKeywords: profile.configuration_json?.prohibited_keywords ?? undefined,
+            schemaOrgType: profile.configuration_json?.schema_org_type ?? null,
+          }
+        : null,
+      goldStandard: goldStandard
+        ? {
+            profileId: goldStandard.id,
+            expectedFieldNames: goldStandard.configuration_json?.expected_fields
+              ? (goldStandard.configuration_json.expected_fields as any[]).map((f: any) =>
+                  typeof f === 'string' ? f : f?.field || f?.name,
+                ).filter(Boolean)
+              : undefined,
+          }
+        : null,
+    });
+
+    const seoEnrichmentJson = buildSeoEnrichmentJson(seoPacket);
+
     const seedInput: CreateSeedInput = {
       businessName,
       address,
@@ -1383,19 +1482,30 @@ class DirectoryPresenceSeedService {
       phone: phone || undefined,
       website: websiteUrl || undefined,
       primaryCategory: campaign.category,
-      secondaryCategories: google.additional_categories || [],
+      secondaryCategories: seoPacket.secondaryCategories.length > 0
+        ? seoPacket.secondaryCategories
+        : (google.additional_categories || []),
       snapEbtReported: false,
       seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
       identityConfidence,
       categoryFit,
       notes: typeof d.summary === 'string' ? d.summary.substring(0, 1000) : undefined,
       businessHours: d.business_hours || undefined,
+      description: seoPacket.description,
+      keywords: seoPacket.keywords,
+      sameAs: seoPacket.sameAs,
+      seoEnrichment: seoEnrichmentJson,
       provenance: [
         { fieldKey: 'name', value: businessName, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'address', value: address, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'phone', value: phone || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!phone },
         { fieldKey: 'website', value: websiteUrl || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!websiteUrl },
         { fieldKey: 'primary_category', value: campaign.category, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        // SEO provenance rows (spec §4.4.6)
+        { fieldKey: 'description', value: seoPacket.description, sourceName: 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: profile ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName: 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
+        { fieldKey: 'secondary_categories', value: seoPacket.secondaryCategories.join(', '), sourceName: profile ? 'intelligence_profile' : 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.secondaryCategories.length > 0 },
       ].filter((p) => p.value != null && p.value !== '') as any,
     };
 
@@ -1419,6 +1529,7 @@ class DirectoryPresenceSeedService {
       slug,
       publicUrl: `/place/${slug}`,
       created: true,
+      seoEnriched: true,
     };
   }
 }

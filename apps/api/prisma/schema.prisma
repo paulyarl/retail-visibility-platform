@@ -1764,6 +1764,7 @@ model directory_listings_list {
   snap_ebt_source_name     String?
   listing_origin           String?                   @default("claimed") @db.VarChar(32)
   public_disclaimer        String?
+  same_as                  String[]                  @default([])
   directory_photos         directory_photos[]
   directory_presence_seeds directory_presence_seeds?
 
@@ -1847,6 +1848,7 @@ model directory_presence_seeds {
   owner_email                    String?                          @db.VarChar(255)
   owner_phone                    String?                          @db.VarChar(40)
   seek_batch_id                  String?                          @db.VarChar(60)
+  seo_enrichment                 Json?
   directory_claim_requests       directory_claim_requests[]
   directory_claim_tokens         directory_claim_tokens[]
   directory_enrichment_tokens    directory_enrichment_tokens[]
