@@ -910,7 +910,13 @@ describe('MarketingProspectQueueService', () => {
         source_kind: 'category_analysis',
         verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
       });
-      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      // First findUnique: resolveVerification sees the verify row.
+      // Second findUnique: createCampaignFromQueue (called internally after
+      // the flip update) must see status='queued' so its guard passes.
+      const queuedRow = { ...verifyRow, status: 'queued' };
+      mockQueue.findUnique
+        .mockResolvedValueOnce(verifyRow)
+        .mockResolvedValueOnce(queuedRow);
       // First update: flip to queued + stamp verification. Second update
       // (inside createCampaignFromQueue): mark campaign_created.
       mockQueue.update.mockImplementation(({ data }: any) =>

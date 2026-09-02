@@ -256,6 +256,44 @@ describe('SeedSeoComposer', () => {
       expect(packet.description.length).toBeLessThanOrEqual(300);
     });
 
+    it('uses public_narrative from audit when present, with disclosure appended', () => {
+      const narrative = 'An active, community-anchored Central African grocery and prepared-foods hybrid in Kansas City\'s Historic Northeast corridor, specializing in imported African staples and prepared regional dishes.';
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: { ...fullAudit, publicNarrative: narrative },
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.description).toContain('community-anchored Central African grocery');
+      expect(packet.description).toContain('Listed on VisibleShelf from public information');
+      expect(packet.description).toContain('Claim this listing');
+    });
+
+    it('falls back to deterministic template when public_narrative is absent', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: { ...fullAudit, publicNarrative: null },
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      // Template format: "Sahel African Market is a African Grocery Store in..."
+      expect(packet.description).toContain('Sahel African Market is a');
+      expect(packet.description).not.toContain('community-anchored');
+    });
+
+    it('falls back to deterministic template when public_narrative is empty string', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: { ...fullAudit, publicNarrative: '' },
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.description).toContain('Sahel African Market is a');
+    });
+
     it('never contains review, score, tier, or deficiency language', () => {
       const packet = buildSeedSeoPacket({
         campaign: fullCampaign,

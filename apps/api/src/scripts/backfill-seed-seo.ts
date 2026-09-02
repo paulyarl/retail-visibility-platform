@@ -111,6 +111,7 @@ async function backfillSeedSeo() {
             auditId: audit.id,
             storeFormat: (audit.audit_data?.audit_metadata?.matched_business?.store_format) ?? null,
             googleAdditionalCategories: (audit.audit_data?.platforms?.google?.additional_categories) ?? null,
+            publicNarrative: (audit.audit_data?.public_narrative) ?? null,
             platformProfileUrls: (() => {
               const platforms = audit.audit_data?.platforms ?? {};
               const urls: Array<{ platform: string; url: string }> = [];

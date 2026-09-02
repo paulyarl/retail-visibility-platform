@@ -39,7 +39,7 @@ const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-08-31 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-01 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 
@@ -76,6 +76,36 @@ If the Gold Standard block is missing or empty, omit gap_analysis and quality_ga
 // ─── Schema fragment: profile_url (inserted before data_status in each
 //     platform object) ────────────────────────────────────────────────────
 const PROFILE_URL_SCHEMA_LINE = '"profile_url": null,\n      "data_status": "unavailable"';
+
+// ─── Schema fragment: public_narrative (inserted after "summary": "" in the
+//     top-level JSON schema). This field is the public-safe description that
+//     will appear on the place listing page — no internal assessment content.
+const PUBLIC_NARRATIVE_SCHEMA_LINE = '"summary": "",\n  "public_narrative": ""';
+
+// ─── Directive: public_narrative instruction (inserted after the Summary
+//     instruction section in the prompt body). Tells the analyst to write a
+//     public-safe, factual description of the business for the directory
+//     listing page. Must exclude all Tier C / internal assessment content.
+const PUBLIC_NARRATIVE_DIRECTIVE = `
+### Public Narrative (required)
+
+Write a factual, public-safe description of the business for the \`public_narrative\` field. This text will appear on a public directory listing page that visitors and the business owner will see.
+
+Include:
+* What the business is (category, format, specialization)
+* Where it is located (neighborhood, corridor, or district context)
+* What it is known for (signature products, services, or community role)
+* Community or cultural context when verifiable
+
+Exclude (these are internal assessment content — never public):
+* Digital Opportunity Score, tier classifications, or alignment labels
+* Review response rates, unanswered review counts, or deficiency language
+* Recommended services, pricing, or upsell language
+* Competitive benchmark comparisons
+* Any language that could embarrass the business owner or signal weakness
+
+Length: 1-3 sentences, max 300 characters. Write in third person. Be specific and vivid — this is the first thing a visitor reads on the listing page. Do not invent details; use only verified public information. If the business is too thinly sourced for a rich narrative, write a shorter factual sentence using what is verified.
+`;
 
 // ─── Schema fragment: gap_analysis + quality_gate_results (inserted before
 //     the final closing brace, after the sources array) ───────────────────
@@ -350,6 +380,27 @@ function transformCategoryIntegrated(body: string): string {
     'delivery_model: none / marketplace / direct / both / unknown\n',
   );
 
+  // 4b. Add public_narrative to the JSON schema (after "summary": "").
+  //     Idempotent: skip if public_narrative is already present.
+  if (!out.includes('"public_narrative"')) {
+    out = out.replace('"summary": ""', PUBLIC_NARRATIVE_SCHEMA_LINE);
+  }
+
+  // 4c. Add the public_narrative directive section after the Summary
+  //     instruction section. Try "## Summary" heading first, then fall back
+  //     to the Gold Standard binding section end (which was inserted in step 1
+  //     and exists in all templates that have the Gold Standard block).
+  try {
+    out = insertAfter(out, '## Summary', PUBLIC_NARRATIVE_DIRECTIVE);
+  } catch {
+    // Fallback: insert after the Gold Standard binding section's last line.
+    out = insertAfter(
+      out,
+      'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
+      '\n' + PUBLIC_NARRATIVE_DIRECTIVE,
+    );
+  }
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -506,6 +557,16 @@ function transformSignalAligned(body: string): string {
     'delivery_model: none / marketplace / direct / both\n',
     'delivery_model: none / marketplace / direct / both / unknown\n',
   );
+
+  // 19b. Add public_narrative to the JSON schema (after "summary": "").
+  //      Idempotent: skip if public_narrative is already present.
+  if (!out.includes('"public_narrative"')) {
+    out = out.replace('"summary": ""', PUBLIC_NARRATIVE_SCHEMA_LINE);
+  }
+
+  // 19c. Add the public_narrative directive section after the Summary
+  //      instruction section.
+  out = insertAfter(out, '## Summary', PUBLIC_NARRATIVE_DIRECTIVE);
 
   // 20. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {

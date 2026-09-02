@@ -972,6 +972,83 @@ class DirectoryPresenceSeedService {
     logger.info('DirectoryPresenceSeedService.revokeToken', undefined, { seedId, tokenId });
   }
 
+  /**
+   * Permanently delete a seed and its tenant. Seeds are backed by a real
+   * tenant row (org_standing_mode = 'directory_seed'), so deletion follows
+   * the tenant-delete pattern: tear down seed-scoped children, the listing,
+   * tenant-scoped rows, then the tenant itself.
+   *
+   * Refuses to delete a seed whose status is 'claimed' — a claimed seed has
+   * been promoted to a real customer relationship and deleting it would
+   * destroy customer data. Suppress or re-create unclaimed seeds instead.
+   *
+   * Returns { deleted: true } on success, or { deleted: false, reason } when
+   * the seed is missing or claimed.
+   */
+  async deleteSeed(
+    seedId: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ deleted: boolean; reason?: string }> {
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id, listing_id, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) return { deleted: false, reason: 'seed_not_found' };
+    if (seed[0].status === 'claimed') return { deleted: false, reason: 'seed_already_claimed' };
+
+    const tenantId = seed[0].tenant_id;
+    const listingId = seed[0].listing_id;
+
+    // directory_presence_suggestions.seed_id has no ON DELETE cascade — null
+    // it out so the suggestion rows survive (they keep their own identity).
+    await prisma.$executeRaw`
+      UPDATE directory_presence_suggestions SET seed_id = NULL, updated_at = now()
+      WHERE seed_id = ${seedId}
+    `;
+
+    // Seed-scoped children (cascades exist on most, but delete explicitly for
+    // safety — mirrors the DemoTenantService tenant-delete pattern).
+    await prisma.$executeRaw`DELETE FROM directory_claim_tokens WHERE seed_id = ${seedId}`;
+    await prisma.$executeRaw`DELETE FROM directory_enrichment_tokens WHERE seed_id = ${seedId}`;
+    await prisma.$executeRaw`DELETE FROM directory_field_provenance WHERE seed_id = ${seedId}`;
+    await prisma.$executeRaw`DELETE FROM directory_seed_campaign_links WHERE seed_id = ${seedId}`;
+    // claim_requests cascade from seed (fk_dcr_seed) and from tokens
+    // (fk_dcr_token); deleting the tokens above already cascades their
+    // claim_requests, but delete explicitly in case a request references a
+    // already-consumed token that was not removed.
+    await prisma.$executeRaw`DELETE FROM directory_claim_requests WHERE seed_id = ${seedId}`;
+
+    // The seed row itself.
+    await prisma.$executeRaw`DELETE FROM directory_presence_seeds WHERE id = ${seedId}`;
+
+    // The listing — directory_listings_list has no tenant FK cascade in the
+    // schema, so delete it directly. Cascades directory_photos.
+    await prisma.$executeRaw`DELETE FROM directory_listings_list WHERE id = ${listingId}`;
+
+    // Tenant-scoped rows (most cascade from tenants, but explicit for safety).
+    await prisma.$executeRaw`DELETE FROM directory_settings_list WHERE tenant_id = ${tenantId}`.catch(() => {});
+    await prisma.$executeRaw`DELETE FROM tenant_business_profiles_list WHERE tenant_id = ${tenantId}`.catch(() => {});
+    await prisma.$executeRaw`DELETE FROM business_hours_list WHERE tenant_id = ${tenantId}`.catch(() => {});
+    await prisma.$executeRaw`DELETE FROM business_hours_special_list WHERE tenant_id = ${tenantId}`.catch(() => {});
+    await prisma.$executeRaw`DELETE FROM user_tenants WHERE tenant_id = ${tenantId}`.catch(() => {});
+
+    // Finally, the tenant row. Cascades any remaining tenant-scoped tables.
+    await prisma.$executeRaw`DELETE FROM tenants WHERE id = ${tenantId}`;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.delete',
+      payload: { seedId, tenantId, listingId },
+    });
+    logger.info('DirectoryPresenceSeedService.deleteSeed', undefined, {
+      seedId,
+      tenantId,
+      listingId,
+    });
+
+    return { deleted: true };
+  }
+
   // ============================
   // Batch operations (Sprint 4)
   // ============================
@@ -1525,6 +1602,7 @@ class DirectoryPresenceSeedService {
         storeFormat: meta.matched_business?.store_format ?? null,
         googleAdditionalCategories: google.additional_categories ?? null,
         platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
+        publicNarrative: d.public_narrative ?? null,
       },
       intelligenceProfile: profile
         ? {

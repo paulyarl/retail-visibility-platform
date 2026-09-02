@@ -23,7 +23,7 @@ export default function UnclaimedDirectoryBanner({
   const hasToken = !!claimToken;
   const claimHref = hasToken
     ? `/place/claim/${claimToken}`
-    : '/directory';
+    : '#claim-inquiry';
 
   return (
     <Alert
@@ -50,13 +50,7 @@ export default function UnclaimedDirectoryBanner({
         </Button>
       ) : (
         <Text size="sm" c="blue.9">
-          Are you the owner? <Link href="/directory" className="underline font-medium">Contact us</Link> to claim this listing.
-        </Text>
-      )}
-
-      {publicDisclaimer && (
-        <Text size="xs" c="dimmed" mt={8}>
-          {publicDisclaimer}
+          Are you the owner? <Link href="#claim-inquiry" className="underline font-medium">Contact us</Link> to claim this listing.
         </Text>
       )}
     </Alert>

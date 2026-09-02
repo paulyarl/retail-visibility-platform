@@ -52,6 +52,8 @@ export interface AuditSeoFields {
   googleAdditionalCategories?: string[] | null;
   /** Profile URLs from platforms.{google,yelp,facebook,bbb}.profile_url */
   platformProfileUrls?: Array<{ platform: string; url: string }> | null;
+  /** Public-safe narrative from audit_data.public_narrative (Phase 1.2) */
+  publicNarrative?: string | null;
 }
 
 /**
@@ -209,13 +211,24 @@ function composeMetaTitle(campaign: CampaignSeoFields, categoryLabel: string): s
 function composeDescription(
   campaign: CampaignSeoFields,
   categoryLabel: string,
+  audit: AuditSeoFields | null,
 ): string {
+  const disclosure = ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+
+  // Prefer the analyst-composed public narrative when present (Phase 1.2).
+  // This is a rich, public-safe description written by the audit analyst.
+  if (audit?.publicNarrative && audit.publicNarrative.trim()) {
+    const narrative = audit.publicNarrative.trim();
+    return truncateAtWordBoundary(narrative + disclosure, DESCRIPTION_MAX);
+  }
+
+  // Fall back to the deterministic template
   const cityClause = campaign.addressCity
     ? ` in ${campaign.addressCity}${campaign.neighborhood ? `, ${campaign.neighborhood}` : ''}`
     : '';
   const stateClause = campaign.addressState ? `, ${campaign.addressState}` : '';
 
-  const template = `${campaign.businessName} is a ${categoryLabel}${cityClause}${stateClause}. Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.`;
+  const template = `${campaign.businessName} is a ${categoryLabel}${cityClause}${stateClause}.${disclosure}`;
 
   return truncateAtWordBoundary(template, DESCRIPTION_MAX);
 }
@@ -423,7 +436,7 @@ export function buildSeedSeoPacket(input: SeedSeoInput): SeedSeoPacket {
   const categoryLabel = resolveCategoryLabel(campaign, audit);
 
   const metaTitle = composeMetaTitle(campaign, categoryLabel);
-  const description = composeDescription(campaign, categoryLabel);
+  const description = composeDescription(campaign, categoryLabel, audit);
   const keywords = composeKeywords(
     campaign,
     audit,

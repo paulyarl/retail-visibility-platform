@@ -207,9 +207,11 @@ export default function PlaceEntryEditorialLayout({
                     {listing.description}
                   </p>
                 )}
-                <p className="text-neutral-600 leading-relaxed mt-3">
-                  {disclaimer}
-                </p>
+                {!listing.description && (
+                  <p className="text-neutral-600 leading-relaxed">
+                    {disclaimer}
+                  </p>
+                )}
                 <p className="text-neutral-500 leading-relaxed mt-3">
                   Claiming is free and lets the business owner verify details, update hours, add a photo,
                   and connect with customers on VisibleShelf.

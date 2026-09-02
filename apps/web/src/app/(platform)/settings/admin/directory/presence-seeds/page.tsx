@@ -8,7 +8,7 @@ import directoryPresenceAdminService, {
   DirectoryClaimRequest,
 } from '@/services/DirectoryPresenceAdminService';
 import PresenceSeedsBulkUploadModal from '@/components/directory/PresenceSeedsBulkUploadModal';
-import { List, Plus, Upload, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText } from 'lucide-react';
+import { List, Plus, Upload, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +48,8 @@ export default function DirectoryPresenceSeedsPage() {
   }>>([]);
   const [verifyAttachmentsLoading, setVerifyAttachmentsLoading] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DirectoryPresenceSeedSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchSeeds = useCallback(async () => {
     try {
@@ -124,6 +126,23 @@ export default function DirectoryPresenceSeedsPage() {
       fetchSeeds();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to generate invite');
+    }
+  };
+
+  const handleDeleteSeed = async () => {
+    if (!deleteTarget) return;
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setDeleting(true);
+      await directoryPresenceAdminService.deleteSeed(deleteTarget.id);
+      setActionSuccess(`Deleted seed "${deleteTarget.businessName}".`);
+      setDeleteTarget(null);
+      fetchSeeds();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete seed');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -844,12 +863,60 @@ export default function DirectoryPresenceSeedsPage() {
                       >
                         <Eye className="inline w-4 h-4" />
                       </Link>
+                      {seed.status !== 'claimed' && (
+                        <button
+                          onClick={() => setDeleteTarget(seed)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium"
+                          title="Delete seed"
+                        >
+                          <Trash2 className="inline w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Delete this seed?</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              This permanently deletes the seed, its directory listing, the seed
+              tenant, and all related claim tokens, provenance, and campaign
+              links. This cannot be undone.
+            </p>
+            <p className="mt-2 text-sm text-gray-900 font-medium">
+              {deleteTarget.businessName}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              {deleteTarget.category} · {deleteTarget.city}, {deleteTarget.state}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSeed}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

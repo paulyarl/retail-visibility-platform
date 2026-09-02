@@ -225,6 +225,8 @@ export default function PresenceSeedDetailPage() {
   const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null);
   const [generatingEnrichmentToken, setGeneratingEnrichmentToken] = useState(false);
   const [enrichmentTokenLink, setEnrichmentTokenLink] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleStatusChange = async () => {
     if (!statusDraft || statusDraft === status) return;
@@ -297,6 +299,29 @@ export default function PresenceSeedDetailPage() {
     }
   };
 
+  const handleDeleteSeed = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setDeleting(true);
+      await directoryPresenceAdminService.deleteSeed(seedId);
+      setActionSuccess('Seed deleted. Redirecting to seed list…');
+      // Redirect to the seed list after a short delay so the success message is visible.
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/settings/admin/directory/presence-seeds';
+        }
+      }, 800);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to delete seed',
+      );
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  };
+
   const seed = detail?.seed as any;
   const listing = detail?.listing as any;
   const provenance = detail?.provenance ?? [];
@@ -307,6 +332,9 @@ export default function PresenceSeedDetailPage() {
     (status === 'published' || status === 'invited') &&
     !claimTokens.some((t) => !t.consumedAt);
   const canEdit = status !== 'claimed';
+  // Claimed seeds have been promoted to a real customer relationship — refuse
+  // to delete them from the UI to prevent destroying customer data.
+  const canDelete = status !== 'claimed';
 
   const handleGetCoordinates = async () => {
     if (!editAddress.trim() || !editCity.trim() || !editZipCode.trim()) {
@@ -701,7 +729,53 @@ export default function PresenceSeedDetailPage() {
             </button>
           </>
         )}
+        {canDelete && !editing && (
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            disabled={deleting}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+            title="Permanently delete this seed and its tenant"
+          >
+            <Trash2 className="w-4 h-4" /> Delete Seed
+          </button>
+        )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Delete this seed?</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              This permanently deletes the seed, its directory listing, the seed
+              tenant, and all related claim tokens, provenance, and campaign
+              links. This cannot be undone.
+            </p>
+            <p className="mt-2 text-sm text-gray-900 font-medium">
+              {listing?.business_name ?? seed.id}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSeed}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Listing summary */}

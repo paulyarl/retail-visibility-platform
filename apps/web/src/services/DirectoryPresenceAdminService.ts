@@ -10,6 +10,7 @@
  *   - POST   /api/admin/directory-presence/presence-seeds/:id/invite
  *   - PATCH  /api/admin/directory-presence/presence-seeds/:id/fields
  *   - PATCH  /api/admin/directory-presence/presence-seeds/:id/status
+ *   - DELETE /api/admin/directory-presence/presence-seeds/:id
  *   - POST   /api/admin/directory-presence/presence-seeds/:id/tokens/:tokenId/revoke
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
@@ -229,6 +230,16 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/status`,
       { method: 'PATCH', body: JSON.stringify({ status }) },
+      undefined,
+      0,
+    );
+  }
+
+  /** DELETE /api/admin/directory-presence/presence-seeds/:id — permanently delete a seed and its tenant */
+  async deleteSeed(id: string): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
       undefined,
       0,
     );

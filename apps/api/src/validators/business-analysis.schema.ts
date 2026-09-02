@@ -520,6 +520,9 @@ export const businessAnalysisSchema = z.object({
   // Product-visibility classification (Sprint 1 — Universal Recalibration)
   business_type: z.enum(['service', 'product', 'hybrid', 'unable_to_verify']).nullable().optional(),
   summary: z.string(),
+  // Public-safe narrative for directory listing pages (Phase 1.2 — SEO enrichment)
+  // Excludes all Tier C content (scores, tiers, deficiencies, recommendations).
+  public_narrative: z.string().nullable().optional(),
   platforms: platformsSchema,
   specialized_sources_audited: z.array(specializedSourceSchema).optional(),
   combined_review_metrics: combinedReviewMetricsSchema.optional(),

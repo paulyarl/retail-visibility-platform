@@ -9,6 +9,7 @@
  *   POST   /api/admin/directory/presence-seeds/:id/approve — publish + mint + email claim token
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
  *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
+ *   DELETE /api/admin/directory/presence-seeds/:id — permanently delete a seed and its tenant
  *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
  *   GET    /api/admin/directory/claim-requests           — list claim requests
  *   POST   /api/admin/directory/claim-requests/:id/approve — approve claim request
@@ -350,6 +351,33 @@ router.patch('/presence-seeds/:id/status', requirePlatformAdmin, async (req: Req
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'invalid_status') return res.status(400).json({ error: 'invalid_status' });
     logger.error('[PATCH /api/admin/directory/presence-seeds/:id/status] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** DELETE /api/admin/directory/presence-seeds/:id — permanently delete a seed and its tenant */
+router.delete('/presence-seeds/:id', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await DirectoryPresenceSeedService.deleteSeed(id, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+
+    if (!result.deleted) {
+      const statusMap: Record<string, number> = {
+        seed_not_found: 404,
+        seed_already_claimed: 409,
+      };
+      return res.status(statusMap[result.reason || ''] || 400).json({ error: result.reason });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[DELETE /api/admin/directory/presence-seeds/:id] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
