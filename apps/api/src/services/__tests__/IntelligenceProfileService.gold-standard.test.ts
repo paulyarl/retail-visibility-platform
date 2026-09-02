@@ -184,7 +184,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
     const cityScopedProfile = {
       ...nationwideProfile,
       id: 'gs-atlanta-001',
-      reference_city: 'atlanta',
+      reference_city: 'Atlanta',
       reference_state: 'GA',
     };
 
@@ -197,7 +197,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
 
     it('resolves city-specific profile first when city+state provided', async () => {
       mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
-        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA') {
+        if (args?.where?.reference_city === 'Atlanta' && args?.where?.reference_state === 'GA') {
           return Promise.resolve(cityScopedProfile);
         }
         return Promise.resolve(null);
@@ -209,7 +209,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
 
     it('falls back to state-specific when city-specific not found', async () => {
       mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
-        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA') {
+        if (args?.where?.reference_city === 'Atlanta' && args?.where?.reference_state === 'GA') {
           return Promise.resolve(null); // no city-specific
         }
         if (args?.where?.reference_city === null && args?.where?.reference_state === 'GA') {
@@ -224,7 +224,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
 
     it('falls back to nationwide when no city or state profile exists', async () => {
       mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
-        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA') {
+        if (args?.where?.reference_city === 'Atlanta' && args?.where?.reference_state === 'GA') {
           return Promise.resolve(null);
         }
         if (args?.where?.reference_city === null && args?.where?.reference_state === 'GA') {
@@ -273,7 +273,7 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
     it('prefers platform-specific at each geographic layer', async () => {
       const platformProfile = { ...cityScopedProfile, reference_platform: 'google' };
       mockPrisma.mkt_intelligence_profiles.findFirst.mockImplementation((args: any) => {
-        if (args?.where?.reference_city === 'atlanta' && args?.where?.reference_state === 'GA' && args?.where?.reference_platform === 'google') {
+        if (args?.where?.reference_city === 'Atlanta' && args?.where?.reference_state === 'GA' && args?.where?.reference_platform === 'google') {
           return Promise.resolve(platformProfile);
         }
         return Promise.resolve(null);
