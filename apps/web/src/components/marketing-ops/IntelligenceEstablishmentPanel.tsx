@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MarketingOpsService, type IntelligenceProfile, type Campaign } from '@/services/MarketingOpsService';
-import GoldStandardProfileView from './GoldStandardProfileView';
+import { MarketingOpsService, type IntelligenceProfile, type IntelligenceFocus, type Campaign } from '@/services/MarketingOpsService';
+import GoldStandardProfileView, { isGoldStandardProfile } from './GoldStandardProfileView';
+import CategoryProfileView from './CategoryProfileView';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
 const marketingOpsService = MarketingOpsService.getInstance();
@@ -11,20 +12,85 @@ interface Props {
   campaign: Campaign;
 }
 
+// Focus-specific copy + styling. Gold-standards keeps the amber treatment and
+// the slot-coverage card; emerging/competitive use blue/violet and skip the
+// slot card (it counts gold-standard-flagged candidates, which is a
+// gold-standard-only concept).
+const FOCUS_THEME: Record<
+  IntelligenceFocus,
+  {
+    label: string;
+    headerBg: string;
+    headerBorder: string;
+    headerTitleClass: string;
+    headerBodyClass: string;
+    establishmentNoun: string;
+    produces: string;
+    downstream: string;
+  }
+> = {
+  gold_standards: {
+    label: 'Gold Standard',
+    headerBg: 'bg-amber-50 dark:bg-amber-900/10',
+    headerBorder: 'border-amber-200 dark:border-amber-700',
+    headerTitleClass: 'text-amber-900 dark:text-amber-300',
+    headerBodyClass: 'text-amber-800 dark:text-amber-400',
+    establishmentNoun: 'gold-standard profile parameters',
+    produces:
+      'The establishment scan produces expected fields, quality gates, and pattern exemplars.',
+    downstream:
+      'The resulting profile is imported as a draft and must be reviewed and activated by an operator before downstream campaigns (discovery, audit, fulfill) can consume it.',
+  },
+  emerging: {
+    label: 'Emerging',
+    headerBg: 'bg-blue-50 dark:bg-blue-900/10',
+    headerBorder: 'border-blue-200 dark:border-blue-700',
+    headerTitleClass: 'text-blue-900 dark:text-blue-300',
+    headerBodyClass: 'text-blue-800 dark:text-blue-400',
+    establishmentNoun: 'category intelligence profile',
+    produces:
+      'The establishment scan produces terminology, specialized sources (with capabilities and limitations), discovery patterns, evidence rules, prohibited inferences, and category signals for low-visibility, hard-to-find businesses.',
+    downstream:
+      'The resulting profile is imported as a draft and must be reviewed and activated by an operator before emerging discovery campaigns can consume it as their discovery criteria.',
+  },
+  competitive: {
+    label: 'Competitive',
+    headerBg: 'bg-violet-50 dark:bg-violet-900/10',
+    headerBorder: 'border-violet-200 dark:border-violet-700',
+    headerTitleClass: 'text-violet-900 dark:text-violet-300',
+    headerBodyClass: 'text-violet-800 dark:text-violet-400',
+    establishmentNoun: 'category intelligence profile',
+    produces:
+      'The establishment scan produces terminology, specialized sources (with capabilities and limitations), discovery patterns, evidence rules, prohibited inferences, and category signals for analyzing established competitors.',
+    downstream:
+      'The resulting profile is imported as a draft and must be reviewed and activated by an operator before competitive discovery campaigns can consume it as their evaluation criteria.',
+  },
+};
+
 /**
- * Gold Standard Establishment Panel
+ * Intelligence Establishment Panel
  *
- * Shown on the campaign detail Overview tab for gold-standard establishment
- * campaigns. Explains that the establishment campaign creates the profile
- * parameters (expected_fields, quality_gates, pattern exemplars) and requires
- * operator review + activation before downstream consumption.
+ * Shown on the campaign detail Overview tab for intelligence-scope
+ * establishment campaigns (any focus: gold_standards, emerging, competitive).
+ * Explains that the establishment campaign creates the profile parameters for
+ * its focus and requires operator review + activation before downstream
+ * consumption.
  *
- * If a draft gold-standard profile was imported from the establishment scan,
- * shows a link to review and activate it in the Intelligence Profiles page.
- * If an active gold-standard profile already exists for this category, shows
- * its version and last-activated date.
+ * - If a draft profile was imported from the establishment scan, shows a link
+ *   to review and activate it in the Intelligence Profiles page.
+ * - If an active profile already exists for this category/focus/scope, shows
+ *   its version, last-activated date, and an operator-friendly structured view
+ *   (GoldStandardProfileView for gold-standard-shaped configs,
+ *   CategoryProfileView for the §10 Category Intelligence Profile shape used
+ *   by emerging/competitive establishment scans).
+ * - For gold_standards, additionally renders the per-platform gold-standard
+ *   slot coverage card (counts analyst-flagged gold-standard candidates).
  */
-export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
+export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
+  const focus: IntelligenceFocus = (campaign.intelligence_focus as IntelligenceFocus) || 'emerging';
+  const theme = FOCUS_THEME[focus] ?? FOCUS_THEME.emerging;
+  const isGoldStandard = focus === 'gold_standards';
+
   const [draftProfiles, setDraftProfiles] = useState<IntelligenceProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<IntelligenceProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,10 +106,10 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
       try {
         setLoading(true);
         const [drafts, active] = await Promise.all([
-          marketingOpsService.listIntelligenceProfileDrafts('gold_standards'),
+          marketingOpsService.listIntelligenceProfileDrafts(focus),
           marketingOpsService.resolveIntelligenceProfile(
             campaign.category,
-            'gold_standards',
+            focus,
             campaign.city || undefined,
             campaign.intelligence_platform ?? undefined,
             campaign.state || undefined,
@@ -92,13 +158,13 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
         );
         setActiveProfile(active);
       } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load gold-standard profiles');
+        if (!cancelled) setError(err.message || 'Failed to load intelligence profiles');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [campaign.category, campaign.city, campaign.state]);
+  }, [campaign.category, campaign.city, campaign.state, campaign.intelligence_platform, focus]);
 
   const platformLabel = campaign.intelligence_platform
     ? campaign.intelligence_platform === 'all'
@@ -111,9 +177,8 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
   };
 
   // Per-platform gold-standard slot counts + occupants from the active
-  // profile's candidates. Mirrors the slot card on the discovery overview so
-  // the establishment report states how many of the up-to-4 slots per
-  // platform are filled by the analyst-flagged establishment candidates.
+  // profile's candidates. Gold-standards-only — emerging/competitive profiles
+  // do not carry is_gold_standard candidate flags.
   const profileSlotCounts: Record<string, number> = (() => {
     const counts: Record<string, number> = {};
     if (!activeProfile?.configuration_json) return counts;
@@ -159,18 +224,16 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2">
-          Gold Standard Establishment
+      <div className={`${theme.headerBg} border ${theme.headerBorder} rounded-lg p-4`}>
+        <h4 className={`text-sm font-semibold ${theme.headerTitleClass} mb-2`}>
+          {theme.label} Establishment
         </h4>
-        <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
-          This campaign establishes the gold-standard profile parameters for
+        <p className={`text-xs ${theme.headerBodyClass} leading-relaxed`}>
+          This campaign establishes the {theme.establishmentNoun} for
           <span className="font-medium"> {campaign.category || 'this category'}</span> on
           <span className="font-medium"> {platformLabel}</span>.
-          The establishment scan produces expected fields, quality gates, and pattern exemplars.
-          The resulting profile is imported as a <span className="font-medium">draft</span> and must be
-          reviewed and activated by an operator before downstream campaigns (discovery, audit, fulfill)
-          can consume it.
+          {' '}{theme.produces}{' '}
+          {theme.downstream}
         </p>
       </div>
 
@@ -204,12 +267,14 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
         </div>
       </div>
 
-      {/* Active gold-standard profile — operator-friendly structured view */}
+      {/* Active profile — operator-friendly structured view. Gold-standard
+          shapes render GoldStandardProfileView; the §10 Category Intelligence
+          Profile shape (emerging/competitive) renders CategoryProfileView. */}
       {!loading && activeProfile && (
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Active Gold Standard Profile Details
+              Active {theme.label} Profile Details
             </h5>
             <a
               href="/settings/admin/marketing-ops/intelligence-profiles"
@@ -218,15 +283,19 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
               Manage in Intelligence Profiles →
             </a>
           </div>
-          <GoldStandardProfileView profile={activeProfile} />
+          {isGoldStandardProfile(activeProfile) ? (
+            <GoldStandardProfileView profile={activeProfile} />
+          ) : (
+            <CategoryProfileView profile={activeProfile} />
+          )}
         </div>
       )}
 
-      {/* Per-platform gold-standard slot coverage — mirrors the discovery
-          overview's slot card so the establishment report states how many of
-          the up-to-4 slots per platform are filled by the analyst-flagged
-          establishment candidates. */}
-      {!loading && activeProfile && (
+      {/* Per-platform gold-standard slot coverage — gold-standards only.
+          Mirrors the discovery overview's slot card so the establishment
+          report states how many of the up-to-4 slots per platform are filled
+          by the analyst-flagged establishment candidates. */}
+      {isGoldStandard && !loading && activeProfile && (
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Gold Standard Slots
@@ -300,8 +369,8 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
             Draft Profiles Awaiting Review ({draftProfiles.length})
           </h5>
           <p className="text-xs text-blue-800 dark:text-blue-400 mb-3">
-            The establishment scan produced a draft gold-standard profile. Review and activate it
-            in the Intelligence Profiles page before running discovery campaigns.
+            The establishment scan produced a draft {theme.establishmentNoun}. Review and activate it
+            in the Intelligence Profiles page before running {isGoldStandard ? 'discovery campaigns' : `${theme.label.toLowerCase()} discovery campaigns`}.
           </p>
           <div className="space-y-2">
             {draftProfiles.map((p) => (
@@ -330,7 +399,7 @@ export default function GoldStandardEstablishmentPanel({ campaign }: Props) {
       {!loading && !activeProfile && draftProfiles.length === 0 && (
         <div className="bg-gray-50 dark:bg-neutral-800/50 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            No gold-standard profile has been established yet. Run the establishment prompt
+            No {theme.label.toLowerCase()} profile has been established yet. Run the establishment prompt
             in the Prompts tab, then import the result to create a draft profile.
           </p>
         </div>

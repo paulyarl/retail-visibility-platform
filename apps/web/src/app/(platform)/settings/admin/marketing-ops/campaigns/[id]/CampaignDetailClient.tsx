@@ -13,7 +13,7 @@ import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCatego
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
-import GoldStandardEstablishmentPanel from '@/components/marketing-ops/GoldStandardEstablishmentPanel';
+import IntelligenceEstablishmentPanel from '@/components/marketing-ops/IntelligenceEstablishmentPanel';
 import GoldStandardDiscoveryPanel from '@/components/marketing-ops/GoldStandardDiscoveryPanel';
 import AuditImportMetadataBadge from '@/components/marketing-ops/AuditImportMetadataBadge';
 import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
@@ -1165,13 +1165,11 @@ export default function CampaignDetailClient({
                       </div>
                     )}
                   </>
+                ) : campaign.scope === 'intelligence' && campaign.intelligence_campaign_kind === 'establishment' ? (
+                  <IntelligenceEstablishmentPanel campaign={campaign} />
                 ) : campaign.scope === 'intelligence' && campaign.intelligence_focus === 'gold_standards' ? (
                   <div className="space-y-4">
-                    {campaign.intelligence_campaign_kind === 'establishment' ? (
-                      <GoldStandardEstablishmentPanel campaign={campaign} />
-                    ) : (
-                      <GoldStandardDiscoveryPanel campaign={campaign} audits={campaign.audits ?? []} />
-                    )}
+                    <GoldStandardDiscoveryPanel campaign={campaign} audits={campaign.audits ?? []} />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

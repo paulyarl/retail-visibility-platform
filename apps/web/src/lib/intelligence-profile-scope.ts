@@ -9,7 +9,7 @@
  * Used by:
  *   - IntelligenceProfilesClient (list cards, view modal)
  *   - GoldStandardProfileView (detail header)
- *   - GoldStandardEstablishmentPanel (active + draft list)
+ *   - IntelligenceEstablishmentPanel (active + draft list)
  *   - GoldStandardDiscoveryPanel (profile ref grid)
  *   - PromptWorkspaceClient (profile selection)
  *   - PromptLibraryClient (profile badges — scope key prevents collisions)

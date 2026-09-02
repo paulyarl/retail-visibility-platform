@@ -755,6 +755,43 @@ New role added to `IntelligenceProfileService.serializeGoldStandard()`:
 ### `PromptResolution` type
 Extended with optional `gold_standard_profile_id?: string | null` and `gold_standard_profile_version?: number | null`.
 
+## Discovery Leads Handoff (GAP-E3 — Migration 253)
+
+Spec: `docs/LocalBiz/marketing_ops_discovery_leads_handoff_spec.md`
+
+Closes the discovery→audit context cliff: child business campaigns born from intelligence-discovered prospects durably carry the discovery context (signals, provenance, seek priority, category fit, run lineage) so the business analysis audit prompt can render a "Discovery leads" block as verification hypotheses (never as findings — §S1 guardrail preserved).
+
+### Migration 253
+`database/migrations/253_campaign_discovery_context.sql` — additive `discovery_context JSONB` + `intelligence_run_id VARCHAR(64)` on `mkt_campaigns_list` + partial index on `intelligence_run_id`. Both nullable; no backfill.
+
+### Data contract — `DiscoveryContext`
+Stored on `mkt_campaigns_list.discovery_context` (JSONB, nullable). Validated by `discoveryContextSchema` in `apps/api/src/validators/intelligence-discovery.schema.ts`:
+- `focus: 'emerging' | 'competitive'` (source-run focus, NOT the campaign's own `intelligence_focus` column)
+- `discovered_at`, `business_seek_priority`, `category_fit`, `identity_confidence`, `location_status`, `seek_batch_id`
+- `discovery_signals: string[]` (INT_* only — `/^INT_/` regex enforced)
+- `discovery_provenance` (reuses the now-exported `discoveryProvenanceSchema`)
+- `validateDiscoveryContext(raw)` helper returns `DiscoveryContext | null` (drop + log on invalid — never blocks campaign creation)
+
+### Backend
+- `MarketingCampaignService.createCampaign()` + `deriveBusinessCampaign()` — accept optional `discoveryContext` + `intelligenceRunId`, persist to new columns, append human-readable "Discovery context" section to notes
+- `MarketingProspectQueueService.createCampaignFromQueue()` — builds discovery context from the queue entry for `source_kind = 'intelligence_seek'`, validates via `validateDiscoveryContext`, passes through to `deriveBusinessCampaign`. New private `resolveRunFocus(intelligenceRunId)` does PK lookup on `mkt_intelligence_runs.focus`
+- `MarketingExecutionService.resolvePrompt()` — `category_audit` path injects `renderDiscoveryLeadsBlock(campaign)` after gold-standard benchmark, before `appendPromptSuffix`. Block renders signals (labeled via hardcoded `INT_SIGNAL_LABELS` map) + provenance (capped at 6) + priority/fit + `discovered_at` + mandatory absence-rules paragraph. Returns `''` when context absent (byte-identical render). `resolution.discovery_leads_injected` stamps whether the block was appended.
+
+### INT label map (hardcoded)
+The intelligence sprint's proposed registry seed (migration 199, GAP-S1) was never delivered — no INT_* rows exist in `mkt_signal_registry`. INT_* is a closed, spec-defined 11-code family, so a static `INT_SIGNAL_LABELS` map is used in both `MarketingCampaignService` (notes) and `MarketingExecutionService` (leads block) to avoid a DB dependency in the render path.
+
+### Guardrails (§9)
+1. §S1 preserved — INT_* codes never enter `detected_signals`, the signal extractor, or playbook rule evaluation
+2. Verification framing mandatory — block always carries "hypotheses, not findings" framing + absence-rules paragraph
+3. Scope exclusions — block renders only for business-scope `seek` prompts with `promptRole === 'category_audit'` (never `fulfill`, `signal_triage`, or intelligence-scope)
+4. No triage coupling — discovery context does not auto-trigger triage or alter triage results
+
+### Tests
+- `apps/api/src/services/__tests__/DeriveBusinessCampaignDiscovery.test.ts` (7 tests) — T1 handoff with context, T2 legacy call, T7 invalid-context drop (4 cases)
+- `apps/api/src/services/__tests__/DiscoveryLeadsBlock.test.ts` (11 tests) — T3 block rendering (6 cases), T4 triage invariance, T5 role gating (4 cases)
+- `apps/api/src/services/__tests__/SignalExtractorIntFamily.test.ts` (5 tests, unchanged) — §S1 regression guard
+
+
 ### Output schema (`intelligence-discovery.schema.ts`)
 Per-candidate (all optional, forward-compatible via `.passthrough()`):
 - `gold_standard_match: z.boolean().nullable().optional()` — passes ALL non_negotiable gates

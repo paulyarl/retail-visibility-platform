@@ -9,8 +9,6 @@ import {
   Button,
   Stack,
   Divider,
-  Code,
-  ScrollArea,
   Alert,
   Loader,
   Modal,
@@ -43,6 +41,7 @@ import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus, Campaign, CampaignScope } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import GoldStandardProfileView, { isGoldStandardProfile, goldStandardSummary } from '@/components/marketing-ops/GoldStandardProfileView';
+import CategoryProfileView from '@/components/marketing-ops/CategoryProfileView';
 
 const STATUS_COLORS: Record<ProfileStatus, string> = {
   draft: 'orange',
@@ -864,11 +863,7 @@ export default function IntelligenceProfilesClient() {
             ) : isGoldStandardProfile(viewProfile) ? (
               <GoldStandardProfileView profile={viewProfile} />
             ) : (
-              <ScrollArea h={400} type="auto">
-                <Code block style={{ fontSize: 11 }}>
-                  {JSON.stringify(viewProfile.configuration_json, null, 2)}
-                </Code>
-              </ScrollArea>
+              <CategoryProfileView profile={viewProfile} />
             )}
           </Stack>
         )}
