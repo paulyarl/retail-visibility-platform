@@ -1185,14 +1185,29 @@ export class IntelligenceProfileService extends BaseService {
     // Determine the target profile: if scope is provided, resolve or create
     // a scoped profile from the nationwide one. Otherwise, use profileId
     // directly (nationwide promotion — backward compatible).
+    //
+    // Edge case: the caller may pass the id of an ALREADY-SCOPED profile
+    // (e.g. the frontend resolved the active profile for a city/state
+    // campaign and got back the scoped profile, not the nationwide one).
+    // In that case the scope hint is redundant — use the scoped profile
+    // directly instead of trying to derive a new scoped profile from it
+    // (which would fail because the id is not a nationwide profile).
     let targetProfileId = profileId;
     if (input.scope && (input.scope.city || input.scope.state)) {
-      const scopedProfile = await this.createScopedGoldStandardProfile({
-        nationwideProfileId: profileId,
-        city: input.scope.city,
-        state: input.scope.state,
-      }, ctx);
-      targetProfileId = scopedProfile.id;
+      const direct = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId, status: 'active', intelligence_focus: 'gold_standards' },
+      });
+      if (direct && (direct.reference_city || direct.reference_state)) {
+        // profileId is already a scoped profile — use it directly.
+        targetProfileId = profileId;
+      } else {
+        const scopedProfile = await this.createScopedGoldStandardProfile({
+          nationwideProfileId: profileId,
+          city: input.scope.city,
+          state: input.scope.state,
+        }, ctx);
+        targetProfileId = scopedProfile.id;
+      }
     }
 
     try {

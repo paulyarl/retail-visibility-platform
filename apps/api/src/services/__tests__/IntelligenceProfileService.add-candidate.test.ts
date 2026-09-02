@@ -360,6 +360,86 @@ describe('IntelligenceProfileService.addGoldStandardCandidate', () => {
     const yelpEval = config.candidates[0].platform_evaluations.find((pe: any) => pe.platform === 'yelp');
     expect(yelpEval.is_gold_standard).toBe(true);
   });
+
+  it('uses the scoped profile directly when scope is passed but profileId is already scoped', async () => {
+    // Reproduces the production bug: the frontend resolves the active profile
+    // for a Pittsburgh campaign and gets back the scoped Pittsburgh profile
+    // (not the nationwide one). It then promotes a candidate with
+    // scope: { city: 'Pittsburgh', state: 'PA' }. The backend must use the
+    // scoped profile directly instead of trying to derive from nationwide
+    // (which would throw "not found or not nationwide-scoped").
+    const scopedProfile = {
+      ...activeProfile,
+      id: 'mip-pittsburgh-scoped',
+      reference_city: 'Pittsburgh',
+      reference_state: 'PA',
+    };
+    // First findFirst: the scope-branch check (returns the scoped profile)
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(scopedProfile);
+    // Second findFirst: the active-profile load inside the try block
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(scopedProfile);
+    mockPrisma.mkt_intelligence_profiles.findMany.mockResolvedValue([scopedProfile]);
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ ...scopedProfile, version: 2 });
+    mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.addGoldStandardCandidate('mip-pittsburgh-scoped', {
+      candidate: newCandidate,
+      platform: 'google',
+      scope: { city: 'Pittsburgh', state: 'PA' },
+    });
+
+    expect(result.version).toBe(2);
+    // The new version should be created against the scoped profile id, not a
+    // newly-derived one.
+    const createCall = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0];
+    expect(createCall.data.id).toBe('mip-pittsburgh-scoped');
+    expect(createCall.data.reference_city).toBe('Pittsburgh');
+    expect(createCall.data.reference_state).toBe('PA');
+  });
+
+  it('derives a scoped profile from nationwide when scope is passed and profileId is nationwide', async () => {
+    // The original intended scope path: profileId is the nationwide profile,
+    // scope is provided → backend resolves/creates a scoped profile and
+    // promotes into it.
+    const nationwideProfile = {
+      ...activeProfile,
+      id: 'gs-nationwide-001',
+      reference_city: null,
+      reference_state: null,
+    };
+    const scopedProfile = {
+      ...nationwideProfile,
+      id: 'gs-pittsburgh-scoped',
+      reference_city: 'Pittsburgh',
+      reference_state: 'PA',
+      configuration_json: { ...nationwideProfile.configuration_json, candidates: [] },
+    };
+    // First findFirst: the scope-branch check (returns nationwide — not scoped)
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(nationwideProfile);
+    // createScopedGoldStandardProfile: load nationwide
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(nationwideProfile);
+    // createScopedGoldStandardProfile: check existing scoped (none)
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
+    // createScopedGoldStandardProfile: create the scoped profile
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValueOnce(scopedProfile);
+    // Active-profile load inside the try block
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(scopedProfile);
+    // Transaction findMany
+    mockPrisma.mkt_intelligence_profiles.findMany.mockResolvedValue([scopedProfile]);
+    // Transaction create (new version)
+    const promotedProfile = { ...scopedProfile, version: 2 };
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValueOnce(promotedProfile);
+    mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.addGoldStandardCandidate('gs-nationwide-001', {
+      candidate: newCandidate,
+      platform: 'google',
+      scope: { city: 'Pittsburgh', state: 'PA' },
+    });
+
+    expect(result.version).toBe(2);
+    expect(result.id).toBe('gs-pittsburgh-scoped');
+  });
 });
 
 describe('IntelligenceProfileService.removeGoldStandardCandidate', () => {

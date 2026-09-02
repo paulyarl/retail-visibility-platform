@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lightbulb, RefreshCw, Check, X, FileSearch, Copy, Loader2 } from 'lucide-react';
+import { Lightbulb, RefreshCw, Check, X, FileSearch, Copy, Loader2, Inbox, Users } from 'lucide-react';
 import { Badge, Button, Select, Table, Modal } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import directorySuggestionAdminService, { SuggestionRecord } from '@/services/DirectorySuggestionAdminService';
+import directorySuggestionAdminService, { SuggestionRecord, SuggestionAnalytics } from '@/services/DirectorySuggestionAdminService';
 import { formatDistanceToNow } from 'date-fns';
 
 const STATUS_OPTIONS = [
@@ -28,6 +28,7 @@ export default function SuggestionsQueueClient() {
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<SuggestionRecord | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
+  const [analytics, setAnalytics] = useState<SuggestionAnalytics | null>(null);
 
   const limit = 25;
 
@@ -48,8 +49,19 @@ export default function SuggestionsQueueClient() {
     }
   };
 
+  const fetchAnalytics = async () => {
+    try {
+      const data = await directorySuggestionAdminService.getAnalytics();
+      setAnalytics(data);
+    } catch (err: any) {
+      // Analytics are non-critical; don't block the queue on failure
+      setAnalytics(null);
+    }
+  };
+
   useEffect(() => {
     fetchSuggestions(true);
+    fetchAnalytics();
   }, [status]);
 
   useEffect(() => {
@@ -118,6 +130,55 @@ export default function SuggestionsQueueClient() {
       {error && (
         <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+        </div>
+      )}
+
+      {analytics && (
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm mb-1">
+              <Inbox className="w-4 h-4" />
+              Public suggestions
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.suggestions.total}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {(analytics.suggestions.byStatus.submitted || 0) + (analytics.suggestions.byStatus.under_review || 0)} pending
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm mb-1">
+              <Check className="w-4 h-4" />
+              Approved
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.suggestions.byStatus.approved || 0}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {analytics.suggestions.total
+                ? Math.round(((analytics.suggestions.byStatus.approved || 0) / analytics.suggestions.total) * 100)
+                : 0}% conversion
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm mb-1">
+              <X className="w-4 h-4" />
+              Rejected / duplicate
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {(analytics.suggestions.byStatus.rejected || 0) + (analytics.suggestions.byStatus.duplicate || 0)}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm mb-1">
+              <Users className="w-4 h-4" />
+              Owner submissions
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.ownerSubmissions.total}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {Object.values(analytics.ownerSubmissions.byStatus).reduce((a, b) => a + b, 0)} tracked
+            </div>
+          </div>
         </div>
       )}
 

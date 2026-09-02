@@ -7,6 +7,7 @@
  *   - GET  /api/admin/directory-presence/suggestions
  *   - GET  /api/admin/directory-presence/suggestions/:id
  *   - POST /api/admin/directory-presence/suggestions/:id/status
+ *   - GET  /api/admin/directory-presence/suggestions/analytics
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
@@ -34,6 +35,20 @@ export interface SuggestionRecord {
 export interface SuggestionListResult {
   suggestions: SuggestionRecord[];
   total: number;
+}
+
+export interface SuggestionAnalytics {
+  suggestions: {
+    total: number;
+    byStatus: Record<string, number>;
+    bySourcePage: { sourcePage: string | null; count: number }[];
+    byDay: { day: string; count: number }[];
+  };
+  ownerSubmissions: {
+    total: number;
+    byStatus: Record<string, number>;
+    byDay: { day: string; count: number }[];
+  };
 }
 
 export class DirectorySuggestionAdminService extends AdminApiSingleton {
@@ -106,6 +121,19 @@ export class DirectorySuggestionAdminService extends AdminApiSingleton {
     const error = typeof result.error === 'string' ? result.error : result.error?.message;
     const data = result.data?.data ?? result.data;
     return { success: result.success, error, suggestion: data?.suggestion };
+  }
+
+  /** GET /api/admin/directory-presence/suggestions/analytics */
+  async getAnalytics(): Promise<SuggestionAnalytics | null> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/admin/directory-presence/suggestions/analytics',
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as SuggestionAnalytics) ?? null;
   }
 }
 

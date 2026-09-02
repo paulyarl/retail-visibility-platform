@@ -282,6 +282,78 @@ class DirectorySuggestionService {
     return updated ? { suggestion: updated, seed, token, expiresAt, claimUrl } : null;
   }
 
+  /**
+   * Admin analytics for public suggestions and owner submissions.
+   * Aggregates counts by status, source page, and day without PII.
+   */
+  async getAnalytics(): Promise<{
+    suggestions: {
+      total: number;
+      byStatus: Record<string, number>;
+      bySourcePage: { sourcePage: string | null; count: number }[];
+      byDay: { day: string; count: number }[];
+    };
+    ownerSubmissions: {
+      total: number;
+      byStatus: Record<string, number>;
+      byDay: { day: string; count: number }[];
+    };
+  }> {
+    const totalSuggestions = await prisma.$queryRaw<{ total: number }[]>`
+      SELECT COUNT(*)::int AS total FROM directory_presence_suggestions
+    `;
+    const statusSuggestions = await prisma.$queryRaw<{ status: string; count: number }[]>`
+      SELECT status, COUNT(*)::int AS count
+      FROM directory_presence_suggestions
+      GROUP BY status
+    `;
+    const sourceSuggestions = await prisma.$queryRaw<{ source_page: string | null; count: number }[]>`
+      SELECT source_page, COUNT(*)::int AS count
+      FROM directory_presence_suggestions
+      GROUP BY source_page
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+    const daySuggestions = await prisma.$queryRaw<{ day: string; count: number }[]>`
+      SELECT DATE(created_at) AS day, COUNT(*)::int AS count
+      FROM directory_presence_suggestions
+      WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY day
+      ORDER BY day
+    `;
+
+    const totalOwners = await prisma.$queryRaw<{ total: number }[]>`
+      SELECT COUNT(*)::int AS total FROM directory_presence_seeds WHERE seed_batch = 'owner-submitted'
+    `;
+    const statusOwners = await prisma.$queryRaw<{ status: string; count: number }[]>`
+      SELECT status, COUNT(*)::int AS count
+      FROM directory_presence_seeds
+      WHERE seed_batch = 'owner-submitted'
+      GROUP BY status
+    `;
+    const dayOwners = await prisma.$queryRaw<{ day: string; count: number }[]>`
+      SELECT DATE(created_at) AS day, COUNT(*)::int AS count
+      FROM directory_presence_seeds
+      WHERE seed_batch = 'owner-submitted' AND created_at > NOW() - INTERVAL '30 days'
+      GROUP BY day
+      ORDER BY day
+    `;
+
+    return {
+      suggestions: {
+        total: totalSuggestions[0]?.total || 0,
+        byStatus: statusSuggestions.reduce((acc, r) => ({ ...acc, [r.status]: r.count }), {}),
+        bySourcePage: sourceSuggestions.map((r) => ({ sourcePage: r.source_page, count: r.count })),
+        byDay: daySuggestions.map((r) => ({ day: r.day, count: r.count })),
+      },
+      ownerSubmissions: {
+        total: totalOwners[0]?.total || 0,
+        byStatus: statusOwners.reduce((acc, r) => ({ ...acc, [r.status]: r.count }), {}),
+        byDay: dayOwners.map((r) => ({ day: r.day, count: r.count })),
+      },
+    };
+  }
+
   private buildProvenance(suggestion: SuggestionRecord): CreateSeedInput['provenance'] {
     const submittedAt = new Date();
     return [

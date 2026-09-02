@@ -1199,4 +1199,17 @@ router.post('/suggestions/:id/status', requirePlatformStaff, async (req: Request
   }
 });
 
+/** GET /api/admin/directory-presence/suggestions/analytics — submission counts and trends */
+router.get('/suggestions/analytics', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const analytics = await DirectorySuggestionService.getAnalytics();
+    res.json({ success: true, ...analytics });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/suggestions/analytics] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;

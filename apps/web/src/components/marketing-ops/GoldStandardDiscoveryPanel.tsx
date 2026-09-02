@@ -225,10 +225,11 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
   })();
 
   // Promote a discovered candidate into a platform's gold-standard slot.
-  // When the campaign has a city/state, the promotion targets a scoped
-  // profile (auto-created from the nationwide profile if needed) so
-  // regionally-narrowed discoveries fill regional slots without evicting
-  // nationwide exemplars.
+  // When the active profile is nationwide and the campaign has a
+  // city/state, the promotion targets a scoped profile (auto-created from
+  // the nationwide profile if needed) so regionally-narrowed discoveries
+  // fill regional slots without evicting nationwide exemplars. When the
+  // active profile is already scoped, promote directly into it.
   const handlePromote = async (candidate: Candidate, platform: string) => {
     if (!activeProfile) return;
     const key = `${candidate.business_name}|${platform}`;
@@ -236,7 +237,14 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
     setSuccessMessage(null);
     setError(null);
     try {
-      const scope = (campaign.city || campaign.state)
+      // The scope hint is only meaningful when the active profile is the
+      // NATIONWIDE profile — it tells the backend to derive/use a scoped
+      // profile for the campaign's city/state. When the active profile is
+      // already scoped (has reference_city/state), promote directly into
+      // it; passing scope with a scoped profile id would make the backend
+      // try to treat it as nationwide and fail.
+      const isNationwide = !activeProfile.reference_city && !activeProfile.reference_state;
+      const scope = isNationwide && (campaign.city || campaign.state)
         ? { city: campaign.city || null, state: campaign.state || null }
         : undefined;
       await marketingOpsService.addGoldStandardCandidate(activeProfile.id, {
