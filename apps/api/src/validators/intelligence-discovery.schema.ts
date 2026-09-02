@@ -46,8 +46,12 @@ const discoveryProvenanceSchema = z.object({
   source: z.string(),
   role: z.string(),
   evidence_types: z.array(z.string()).optional(),
-  url: z.string().optional(),
-  accessed_at: z.string().optional(),
+  // url/accessed_at are nullable (not just optional) to match the tolerance
+  // for `null` emissions on the parent business fields (address/phone/website/
+  // gbp_url). Models emit `null` when a source has no clean URL (e.g. a
+  // Facebook page discovered via social-first search without a canonical URL).
+  url: z.string().nullable().optional(),
+  accessed_at: z.string().nullable().optional(),
 }).passthrough();
 
 // ─── Discovered Business Candidate ───────────────────────────────────────

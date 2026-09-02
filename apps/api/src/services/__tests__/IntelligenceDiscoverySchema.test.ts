@@ -173,6 +173,36 @@ describe('intelligence_discovery schema', () => {
     const result = schema.safeParse(data);
     expect(result.success).toBe(true);
   });
+
+  // ─── Tolerant null handling for discovery_provenance.url (model emits null
+  //     when a source has no clean URL, e.g. a Facebook page discovered via
+  //     social-first search without a canonical URL) ───
+
+  it('accepts null url on discovery_provenance entries', () => {
+    const candidate = validCandidate({
+      discovery_provenance: [
+        { source: 'Facebook', role: 'social-first discovery', url: null, accessed_at: '2026-09-01' },
+      ],
+    });
+    const data = validDiscovery({
+      discovered_businesses: [candidate],
+      qualifying_businesses: [candidate],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts omitted url on discovery_provenance entries', () => {
+    const candidate = validCandidate({
+      discovery_provenance: [{ source: 'Google', role: 'directory' }],
+    });
+    const data = validDiscovery({
+      discovered_businesses: [candidate],
+      qualifying_businesses: [candidate],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
 });
 
 // ─── normalizeIntelligenceDiscoveryPayload: reference-style qualifying_businesses ───
