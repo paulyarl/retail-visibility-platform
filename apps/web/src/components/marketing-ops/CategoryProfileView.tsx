@@ -10,6 +10,7 @@ import {
   ScrollArea,
   ThemeIcon,
   Box,
+  Anchor,
 } from '@mantine/core';
 import {
   IconBook2,
@@ -21,6 +22,7 @@ import {
   IconAlertTriangle,
   IconBulb,
   IconTarget,
+  IconExternalLink,
 } from '@tabler/icons-react';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
@@ -30,6 +32,7 @@ import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 interface SpecializedSource {
   name: string;
   type: string;
+  url?: string | null;
   priority?: number | null;
   capabilities: string[];
   limitations: string[];
@@ -242,6 +245,20 @@ export default function CategoryProfileView({ profile }: Props) {
                           </Badge>
                           {typeof src.priority === 'number' && (
                             <Badge size="xs" variant="dot" color="gray">Priority {src.priority}</Badge>
+                          )}
+                          {src.url && (
+                            <Anchor
+                              href={src.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              size="xs"
+                              c="blue.6"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              title={`Open ${src.name}`}
+                            >
+                              <IconExternalLink size={12} />
+                              {src.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                            </Anchor>
                           )}
                         </Group>
                         {src.capabilities && src.capabilities.length > 0 && (

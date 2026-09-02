@@ -21,14 +21,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
     const businessName = listing.businessName || 'Local Business';
     const description =
+      listing.description ||
       listing.publicDisclaimer ||
       `${businessName} is listed on VisibleShelf from public information (address and phone). Claim this listing to verify and update details.`;
     const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
     const image = listing.logoUrl || `${baseUrl}/favicon.ico`;
+    const title = listing.metaTitle || `${businessName} - VisibleShelf Place`;
 
     return {
       metadataBase: new URL(baseUrl),
-      title: `${businessName} - VisibleShelf Place`,
+      title,
       description,
       openGraph: {
         title: businessName,

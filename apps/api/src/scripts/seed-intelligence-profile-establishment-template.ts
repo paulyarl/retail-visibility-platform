@@ -101,10 +101,11 @@ and international-business networks active in {{city}}.
 4. SPECIALIZED SOURCES — This is the most important section. Identify the category-specific sources that are useful for discovering and verifying businesses in this category. For each source:
    - Name: the source name
    - Type: service_history | certification | professional_network | mainstream_directory | vertical_directory | social_platform | other
+   - URL: the source's canonical web address (homepage, directory index, organization page, or store locator). Vertical directories, community organizations, professional networks, and official brand/chain websites should ALWAYS carry a URL — it is the operator's entry point to the source. Omit the URL only for sources that have no single canonical web address (e.g. "storefront photo evidence", "SNAP listings" as a class).
    - Priority: 1 (highest) to 5 (lowest)
    - Capabilities: what this source CAN tell you (list at least one)
    - Limitations: what this source CANNOT tell you or what it does NOT measure (list at least one)
-   
+
    CRITICAL: Limitations are as important as capabilities. A source's limitations define what inferences must NOT be made from its data. For example, "CARFAX service history is NOT a review system" is a limitation that prevents conflating service records with customer reviews.
 
 5. DISCOVERY PATTERNS — How should an analyst search for businesses in this category? What vertical directories, professional networks, or niche platforms should be searched? What search strategies surface businesses that are invisible to mainstream search?

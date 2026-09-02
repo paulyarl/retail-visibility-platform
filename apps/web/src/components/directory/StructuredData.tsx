@@ -20,6 +20,11 @@ interface LocalBusinessData {
   primary_category?: string;
   rating_avg?: number;
   rating_count?: number;
+  /** SEO enrichment fields (spec §5.3.4) — additive, all optional */
+  description?: string;
+  sameAs?: string[];
+  /** Composer-inferred schema.org type — overrides mapCategoryToSchemaType when present */
+  schemaType?: string | null;
 }
 
 interface StructuredDataProps {
@@ -28,16 +33,20 @@ interface StructuredDataProps {
 }
 
 export function LocalBusinessStructuredData({ listing, url }: StructuredDataProps) {
+  // schemaType (composer inference) wins over mapCategoryToSchemaType fallback
+  const resolvedType = listing.schemaType || mapCategoryToSchemaType(listing.primary_category || '');
+
   const structuredData = {
     '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
+    '@type': resolvedType,
     name: listing.business_name,
     url: url,
     ...(listing.logo_url && { image: listing.logo_url }),
     ...(listing.phone && { telephone: listing.phone }),
     ...(listing.email && { email: listing.email }),
     ...(listing.website && { url: listing.website }),
-    ...(listing.primary_category && { '@type': mapCategoryToSchemaType(listing.primary_category) }),
+    ...(listing.description && { description: listing.description }),
+    ...(listing.sameAs && listing.sameAs.length > 0 && { sameAs: listing.sameAs }),
     
     // Address
     ...(listing.address && {

@@ -90,7 +90,15 @@ export default function PlaceEntryEditorialLayout({
 
   return (
     <>
-      <LocalBusinessStructuredData listing={listing} url={currentUrl} />
+      <LocalBusinessStructuredData
+        listing={{
+          ...listing,
+          description: listing.description,
+          sameAs: listing.sameAs,
+          schemaType: listing.schemaTypeHint,
+        }}
+        url={currentUrl}
+      />
       <BreadcrumbStructuredData items={[
         { name: 'Home', url: baseUrl },
         { name: 'Directory', url: `${baseUrl}/directory` },
@@ -194,7 +202,12 @@ export default function PlaceEntryEditorialLayout({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
               <div className="lg:col-span-2">
                 <h2 className="text-2xl font-bold text-neutral-900 mb-3">About this listing</h2>
-                <p className="text-neutral-600 leading-relaxed">
+                {listing.description && (
+                  <p className="text-neutral-700 leading-relaxed">
+                    {listing.description}
+                  </p>
+                )}
+                <p className="text-neutral-600 leading-relaxed mt-3">
                   {disclaimer}
                 </p>
                 <p className="text-neutral-500 leading-relaxed mt-3">

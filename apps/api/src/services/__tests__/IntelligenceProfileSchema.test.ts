@@ -135,4 +135,43 @@ describe('intelligence_profile schema (GAP-P8)', () => {
     const result = intelligenceProfileSchema.safeParse(without);
     expect(result.success).toBe(false);
   });
+
+  it('specialized_source with valid url → pass', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      specialized_sources: [{
+        name: 'CARFAX',
+        type: 'service_history',
+        url: 'https://www.carfax.com',
+        priority: 1,
+        capabilities: ['Vehicle service history records'],
+        limitations: ['CARFAX is NOT a review system'],
+      }],
+    }));
+    expect(result.success).toBe(true);
+  });
+
+  it('specialized_source with invalid url → fail', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      specialized_sources: [{
+        name: 'CARFAX',
+        type: 'service_history',
+        url: 'not-a-url',
+        capabilities: ['Service history records'],
+        limitations: ['Not a review system'],
+      }],
+    }));
+    expect(result.success).toBe(false);
+  });
+
+  it('specialized_source without url → pass (optional)', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      specialized_sources: [{
+        name: 'Storefront Photo Evidence',
+        type: 'other',
+        capabilities: ['Corroborate physical identity'],
+        limitations: ['Photo does not establish current inventory'],
+      }],
+    }));
+    expect(result.success).toBe(true);
+  });
 });

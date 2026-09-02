@@ -28,6 +28,12 @@ export const INTELLIGENCE_PROFILE_SCHEMA_NAME = 'intelligence_profile';
 const specializedSourceSchema = z.object({
   name: z.string().min(1),
   type: z.string().min(1),
+  // URL of the source's homepage, landing page, or directory index. Optional
+  // so legacy imports without URLs still validate, but the establishment
+  // prompt instructs the agent to capture it for any source that has a
+  // canonical web address — vertical directories and community organizations
+  // especially, where the URL is the operator-actionable entry point.
+  url: z.string().url().optional(),
   priority: z.number().int().optional(),
   capabilities: z.array(z.string()).min(1),
   limitations: z.array(z.string()).min(1),
@@ -83,6 +89,7 @@ Return a single JSON object with this structure (the Category Intelligence Profi
     {
       "name": "<source name>",
       "type": "<source type: service_history | certification | professional_network | mainstream_directory | vertical_directory | social_platform | other>",
+      "url": "<source homepage or directory index URL, if the source has a canonical web address>",
       "priority": <number>,
       "capabilities": ["<what this source can do>", ...],
       "limitations": ["<what this source cannot do or what it does NOT measure>", ...]
@@ -105,6 +112,7 @@ Return a single JSON object with this structure (the Category Intelligence Profi
 
 Rules:
 - specialized_sources MUST have at least one entry with capabilities AND limitations.
+- For each specialized_source that has a canonical web address (a homepage, directory index, organization page, or store locator), include its "url". Vertical directories, community organizations, professional networks, and official brand/chain websites should always carry a url — it is the operator's entry point to the source. Omit "url" only for sources that have no single canonical web address (e.g. "storefront photo evidence", "SNAP listings" as a class).
 - limitations are critical — they describe what the source does NOT measure (e.g. "CARFAX service history is NOT a review system").
 - prohibited_inferences MUST list at least one inference that must not be made (e.g. "Absence from CARFAX does NOT mean the business is inactive").
 - category_signals MUST use INT_* codes only.

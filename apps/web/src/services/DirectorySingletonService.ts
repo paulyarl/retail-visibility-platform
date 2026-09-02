@@ -127,6 +127,9 @@ export interface DirectoryConsolidated {
     productCount?: number; // For product count display
     categories?: any[];
     keywords?: string[]; // For keyword tags
+    sameAs?: string[]; // SEO sameAs URLs (spec §5.3)
+    metaTitle?: string | null; // Seed-scoped meta title (spec §5.3)
+    schemaTypeHint?: string | null; // Composer-inferred schema.org type
     isVerified?: boolean;
     isFeatured?: boolean;
     coordinates?: {
