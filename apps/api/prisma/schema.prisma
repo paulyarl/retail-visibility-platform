@@ -4236,6 +4236,7 @@ model mkt_prospect_queue {
   business_seek_priority                                                          String?             @db.VarChar(20)
   intelligence_run_id                                                             String?             @db.VarChar(64)
   seek_batch_id                                                                   String?             @db.VarChar(60)
+  verification                                                                    Json?
   mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_campaigns_list? @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list", fields: [processed_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_processed_campaign")
   mkt_campaigns_list_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_campaigns_list? @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list", fields: [source_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_source_campaign")
   mkt_seek_batches                                                                mkt_seek_batches?   @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)

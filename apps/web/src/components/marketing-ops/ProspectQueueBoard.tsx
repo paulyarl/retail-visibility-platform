@@ -4,10 +4,11 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Plus, Loader2, Flame, Flag, Inbox, X, ChevronDown, ChevronRight,
-  UserPlus, UserX, Calendar, AlertTriangle,
+  UserPlus, UserX, Calendar, AlertTriangle, Phone,
 } from 'lucide-react';
 import marketingOpsService, {
   ProspectQueueEntry, ProspectPriority, ProspectDismissReason,
+  VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
 } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
@@ -26,7 +27,7 @@ const SIGNAL_FAMILY_COLORS: Record<string, string> = {
   CP: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   VP: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
 };
-const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'other'];
+const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other'];
 
 const STALE_AUDIT_DAYS = 14;
 
@@ -75,6 +76,25 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [checklistError, setChecklistError] = useState<{ campaignId: string; steps: { id: string; title: string; stage_tag?: string | null }[] } | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [resolveModalEntry, setResolveModalEntry] = useState<ProspectQueueEntry | null>(null);
+  const [resolveForm, setResolveForm] = useState<{
+    outcome: VerificationOutcome;
+    verifiedName: string;
+    verifiedPhone: string;
+    verifiedAddress: string;
+    verifiedCity: string;
+    verifiedState: string;
+    ownerReceptivity: OwnerReceptivity | '';
+    callNotes: string;
+    nextAction: VerificationNextAction;
+  }>({
+    outcome: 'operational',
+    verifiedName: '', verifiedPhone: '', verifiedAddress: '', verifiedCity: '', verifiedState: '',
+    ownerReceptivity: '', callNotes: '', nextAction: 'create_campaign',
+  });
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const staffUsers = useStaffUsers();
   const currentUserId = staffUsers[0]?.id ?? null;
@@ -89,6 +109,11 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   // the current pipeline mode). Dismissed entries are excluded from the board.
   const queuedEntries = useMemo(
     () => entries.filter((e) => e.status === 'queued'),
+    [entries],
+  );
+
+  const verifyEntries = useMemo(
+    () => entries.filter((e) => e.status === 'verify_then_outreach'),
     [entries],
   );
 
@@ -213,9 +238,78 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
     setChecklistError(null);
   };
 
+  // ─── Verify-then-outreach handlers ───────────────────────────────────
+
+  const handleRequestVerification = async (id: string) => {
+    setVerifyingId(id);
+    onError('');
+    try {
+      await marketingOpsService.requestVerification(id);
+      await onRefresh();
+    } catch (err: any) {
+      onError(err.message || 'Failed to request verification');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const openResolveModal = (entry: ProspectQueueEntry) => {
+    const snap = entry.business_snapshot ?? {};
+    const nap = snap.verified_nap ?? snap.nap ?? {};
+    setResolveForm({
+      outcome: 'operational',
+      verifiedName: nap.name ?? entry.business_name ?? '',
+      verifiedPhone: nap.phone ?? '',
+      verifiedAddress: nap.address ?? '',
+      verifiedCity: nap.city ?? entry.city ?? '',
+      verifiedState: nap.state ?? entry.state ?? '',
+      ownerReceptivity: '',
+      callNotes: '',
+      nextAction: 'create_campaign',
+    });
+    setResolveError(null);
+    setResolveModalEntry(entry);
+  };
+
+  const handleOutcomeChange = (outcome: VerificationOutcome) => {
+    // Auto-select nextAction based on outcome + receptivity heuristics.
+    let nextAction: VerificationNextAction = 'requeue';
+    if (outcome === 'closed' || outcome === 'wrong_business') nextAction = 'dismiss';
+    else if (outcome === 'unreachable') nextAction = 'dismiss';
+    else if (outcome === 'operational') nextAction = 'create_campaign';
+    else if (outcome === 'relocated') nextAction = 'requeue';
+    setResolveForm((f) => ({ ...f, outcome, nextAction }));
+  };
+
+  const handleResolve = async () => {
+    if (!resolveModalEntry) return;
+    setResolving(true);
+    setResolveError(null);
+    try {
+      const input: VerificationResolutionInput = {
+        outcome: resolveForm.outcome,
+        verifiedName: resolveForm.verifiedName || undefined,
+        verifiedPhone: resolveForm.verifiedPhone || undefined,
+        verifiedAddress: resolveForm.verifiedAddress || undefined,
+        verifiedCity: resolveForm.verifiedCity || undefined,
+        verifiedState: resolveForm.verifiedState || undefined,
+        ownerReceptivity: resolveForm.ownerReceptivity || undefined,
+        callNotes: resolveForm.callNotes || undefined,
+        nextAction: resolveForm.nextAction,
+      };
+      await marketingOpsService.resolveVerification(resolveModalEntry.id, input);
+      setResolveModalEntry(null);
+      await onRefresh();
+    } catch (err: any) {
+      setResolveError(err.message || 'Failed to resolve verification');
+    } finally {
+      setResolving(false);
+    }
+  };
+
   // ─── Render ────────────────────────────────────────────────────────────
 
-  const allColumns = ['__queued__', ...stageColumns, ...(showClosed ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed') : [])];
+  const allColumns = ['__queued__', '__verify__', ...stageColumns, ...(showClosed ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed') : [])];
 
   return (
     <div>
@@ -246,8 +340,17 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
         <div className="flex gap-3 min-w-max">
           {allColumns.map((colKey) => {
             const isQueued = colKey === '__queued__';
-            const colEntries = isQueued ? queuedEntries : (campaignEntriesByStage[colKey] ?? []);
-            const colLabel = isQueued ? 'Queued' : (STAGE_LABELS[colKey] ?? colKey);
+            const isVerify = colKey === '__verify__';
+            const colEntries = isQueued
+              ? queuedEntries
+              : isVerify
+                ? verifyEntries
+                : (campaignEntriesByStage[colKey] ?? []);
+            const colLabel = isQueued
+              ? 'Queued'
+              : isVerify
+                ? 'Verify'
+                : (STAGE_LABELS[colKey] ?? colKey);
             const isClosedCol = CLOSED_STAGES.includes(colKey);
             return (
               <div key={colKey} className="w-72 flex-shrink-0">
@@ -255,11 +358,14 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                 <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-b-2 ${
                   isQueued
                     ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-400'
-                    : isClosedCol
-                      ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
-                      : 'bg-gray-50 dark:bg-neutral-700/30 border-gray-200 dark:border-neutral-600'
+                    : isVerify
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400'
+                      : isClosedCol
+                        ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
+                        : 'bg-gray-50 dark:bg-neutral-700/30 border-gray-200 dark:border-neutral-600'
                 }`}>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 inline-flex items-center gap-1">
+                    {isVerify && <Phone className="w-3 h-3 text-amber-600 dark:text-amber-400" />}
                     {colLabel}
                   </span>
                   <span className="text-xs text-gray-400">{colEntries.length}</span>
@@ -275,6 +381,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       key={entry.id}
                       entry={entry}
                       isQueued={isQueued}
+                      isVerify={isVerify}
                       staffUsers={staffUsers}
                       currentUserId={currentUserId}
                       creating={creatingId === entry.id}
@@ -284,7 +391,8 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       transitioning={transitioningId === entry.processed_campaign_id}
                       menuOpen={openMenuId === entry.id}
                       dismissReasonOpen={dismissReasonOpen === entry.id}
-                      validNextStages={isQueued ? [] : (transitions[entry.campaign_stage ?? ''] ?? [])}
+                      verifying={verifyingId === entry.id}
+                      validNextStages={isQueued || isVerify ? [] : (transitions[entry.campaign_stage ?? ''] ?? [])}
                       onCreate={() => handleCreateCampaign(entry.id)}
                       onDismiss={(reason) => handleDismiss(entry.id, reason)}
                       onTogglePriority={() => handleTogglePriority(entry)}
@@ -293,6 +401,8 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       onToggleMenu={() => setOpenMenuId(openMenuId === entry.id ? null : entry.id)}
                       onTransition={(toStage) => entry.processed_campaign_id && handleTransition(entry.processed_campaign_id, toStage)}
                       onOpenDismissReason={() => setDismissReasonOpen(dismissReasonOpen === entry.id ? null : entry.id)}
+                      onRequestVerify={() => handleRequestVerification(entry.id)}
+                      onOpenResolve={() => openResolveModal(entry)}
                     />
                   ))}
                 </div>
@@ -340,6 +450,141 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
           </div>
         </div>
       )}
+
+      {/* Verify-then-outreach resolution modal */}
+      {resolveModalEntry && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 max-w-lg w-full max-h-[90vh] overflow-auto">
+            <div className="flex items-start gap-3 mb-4">
+              <Phone className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Resolve verification
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {resolveModalEntry.business_name ?? resolveModalEntry.title} · {resolveModalEntry.city ?? '—'}
+                </p>
+              </div>
+              <button onClick={() => setResolveModalEntry(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {resolveError && (
+              <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-3 py-2 text-xs text-red-800 dark:text-red-300">
+                {resolveError}
+              </div>
+            )}
+
+            {/* Outcome */}
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call outcome</label>
+            <select
+              value={resolveForm.outcome}
+              onChange={(e) => handleOutcomeChange(e.target.value as VerificationOutcome)}
+              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+            >
+              <option value="operational">Operational — open and reachable</option>
+              <option value="closed">Closed — out of business</option>
+              <option value="relocated">Relocated — moved to a new address</option>
+              <option value="unreachable">Unreachable — no answer after attempts</option>
+              <option value="wrong_business">Wrong business — not the target</option>
+            </select>
+
+            {/* Verified NAP — shown for operational + relocated */}
+            {(resolveForm.outcome === 'operational' || resolveForm.outcome === 'relocated') && (
+              <div className="mb-3 space-y-2">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Verified NAP</label>
+                <input
+                  type="text"
+                  placeholder="Business name"
+                  value={resolveForm.verifiedName}
+                  onChange={(e) => setResolveForm((f) => ({ ...f, verifiedName: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone"
+                  value={resolveForm.verifiedPhone}
+                  onChange={(e) => setResolveForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Street address"
+                  value={resolveForm.verifiedAddress}
+                  onChange={(e) => setResolveForm((f) => ({ ...f, verifiedAddress: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={resolveForm.verifiedCity}
+                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedCity: e.target.value }))}
+                    className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    value={resolveForm.verifiedState}
+                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedState: e.target.value }))}
+                    className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Owner receptivity */}
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Owner receptivity</label>
+            <select
+              value={resolveForm.ownerReceptivity}
+              onChange={(e) => setResolveForm((f) => ({ ...f, ownerReceptivity: e.target.value as OwnerReceptivity | '' }))}
+              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+            >
+              <option value="">—</option>
+              <option value="interested">Interested</option>
+              <option value="neutral">Neutral</option>
+              <option value="defensive">Defensive</option>
+              <option value="no_answer">No answer</option>
+            </select>
+
+            {/* Call notes */}
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call notes</label>
+            <textarea
+              rows={3}
+              value={resolveForm.callNotes}
+              onChange={(e) => setResolveForm((f) => ({ ...f, callNotes: e.target.value }))}
+              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+            />
+
+            {/* Next action */}
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Next action</label>
+            <select
+              value={resolveForm.nextAction}
+              onChange={(e) => setResolveForm((f) => ({ ...f, nextAction: e.target.value as VerificationNextAction }))}
+              disabled={resolveForm.outcome === 'closed' || resolveForm.outcome === 'wrong_business'}
+              className="w-full mb-4 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white disabled:opacity-60"
+            >
+              <option value="requeue">Re-queue (back to Queued with verified NAP)</option>
+              <option value="create_campaign">Create campaign (graduate immediately)</option>
+              <option value="dismiss">Dismiss (unverified_closed)</option>
+            </select>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setResolveModalEntry(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                Cancel
+              </button>
+              <button
+                onClick={handleResolve}
+                disabled={resolving}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
+              >
+                {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Resolve'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -349,6 +594,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
 interface BoardCardProps {
   entry: ProspectQueueEntry;
   isQueued: boolean;
+  isVerify?: boolean;
   staffUsers: ReturnType<typeof useStaffUsers>;
   currentUserId: string | null;
   creating: boolean;
@@ -358,6 +604,7 @@ interface BoardCardProps {
   transitioning: boolean;
   menuOpen: boolean;
   dismissReasonOpen: boolean;
+  verifying: boolean;
   validNextStages: string[];
   onCreate: () => void;
   onDismiss: (reason?: ProspectDismissReason) => void;
@@ -367,13 +614,16 @@ interface BoardCardProps {
   onToggleMenu: () => void;
   onTransition: (toStage: string) => void;
   onOpenDismissReason: () => void;
+  onRequestVerify: () => void;
+  onOpenResolve: () => void;
 }
 
 function BoardCard({
-  entry, isQueued, staffUsers, currentUserId,
+  entry, isQueued, isVerify, staffUsers, currentUserId,
   creating, dismissing, togglingPriority, assigning, transitioning,
-  menuOpen, dismissReasonOpen, validNextStages,
+  menuOpen, dismissReasonOpen, verifying, validNextStages,
   onCreate, onDismiss, onTogglePriority, onAssignToMe, onUnassign, onToggleMenu, onTransition, onOpenDismissReason,
+  onRequestVerify, onOpenResolve,
 }: BoardCardProps) {
   const signals = entry.detected_signals ?? [];
   const crisis = hasCrisis(signals);
@@ -382,6 +632,10 @@ function BoardCard({
   const stageDays = daysSince(entry.stage_entered_at);
   const isStaleAudit = auditDays != null && auditDays > STALE_AUDIT_DAYS;
   const isStaleStage = stageDays != null && stageDays > 14;
+  // Verify-then-outreach entries are editable (assign, priority, note) — same
+  // as queued. The card renders verify-specific action buttons instead of the
+  // Create/Dismiss pair.
+  const isEditable = isQueued || isVerify;
 
   return (
     <div className={`rounded-lg border p-3 bg-white dark:bg-neutral-800 ${
@@ -393,8 +647,9 @@ function BoardCard({
     }`}>
       {/* Header: name + hot/priority indicators */}
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
-        {isQueued ? (
-          <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
+        {isQueued || isVerify ? (
+          <span className="font-medium text-sm text-gray-900 dark:text-white truncate inline-flex items-center gap-1">
+            {isVerify && <Phone className="w-3 h-3 text-amber-500 flex-shrink-0" />}
             {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
           </span>
         ) : (
@@ -407,7 +662,7 @@ function BoardCard({
         )}
         <div className="flex items-center gap-1 flex-shrink-0">
           {entry.is_hot_prospect && <Flame className="w-3 h-3 text-orange-500" />}
-          {isQueued && entry.priority === 'high' && (
+          {isEditable && entry.priority === 'high' && (
             <button
               onClick={onTogglePriority}
               disabled={togglingPriority}
@@ -417,7 +672,7 @@ function BoardCard({
               {togglingPriority ? <Loader2 className="w-3 h-3 animate-spin" /> : <Flag className="w-3 h-3" />}
             </button>
           )}
-          {isQueued && entry.priority === 'normal' && (
+          {isEditable && entry.priority === 'normal' && (
             <button
               onClick={onTogglePriority}
               disabled={togglingPriority}
@@ -450,7 +705,7 @@ function BoardCard({
       </div>
 
       {/* Stage badge for campaign cards */}
-      {!isQueued && entry.campaign_stage && (
+      {!isQueued && !isVerify && entry.campaign_stage && (
         <div className="mb-1.5">
           <StageBadge stage={entry.campaign_stage} size="sm" />
           {stageDays != null && (
@@ -497,7 +752,7 @@ function BoardCard({
 
       {/* Assignee */}
       <div className="flex items-center gap-1 text-[10px] mb-2">
-        {isQueued ? (
+        {isEditable ? (
           <>
             <span className={assigneeLabel ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'}>
               {assigneeLabel ?? 'Unassigned'}
@@ -542,6 +797,50 @@ function BoardCard({
           >
             {creating ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Plus className="w-2.5 h-2.5" />}
             Create
+          </button>
+          {/* Verify-then-outreach: gate behind a phone call */}
+          <button
+            onClick={onRequestVerify}
+            disabled={verifying}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-50"
+            title="Move to Verify column — gate outreach on a phone call to confirm operational status"
+          >
+            {verifying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Phone className="w-2.5 h-2.5" />}
+            Verify
+          </button>
+          {dismissReasonOpen ? (
+            <div className="inline-flex items-center gap-1">
+              <select
+                onChange={(e) => onDismiss(e.target.value as ProspectDismissReason)}
+                value=""
+                autoFocus
+                className="text-[10px] px-1 py-0.5 border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+              >
+                <option value="" disabled>Reason…</option>
+                {DISMISS_REASONS.map((r) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+              </select>
+              <button onClick={onOpenDismissReason} className="text-gray-400 hover:text-gray-600"><X className="w-2.5 h-2.5" /></button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenDismissReason}
+              disabled={dismissing}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50"
+            >
+              {dismissing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : null}
+              Dismiss
+            </button>
+          )}
+        </div>
+      ) : isVerify ? (
+        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-neutral-700">
+          <button
+            onClick={onOpenResolve}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-amber-600 rounded hover:bg-amber-700"
+            title="Resolve verification — record call outcome and verified NAP"
+          >
+            <Phone className="w-2.5 h-2.5" />
+            Resolve
           </button>
           {dismissReasonOpen ? (
             <div className="inline-flex items-center gap-1">

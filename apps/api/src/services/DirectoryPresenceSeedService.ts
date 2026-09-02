@@ -1538,7 +1538,7 @@ class DirectoryPresenceSeedService {
       goldStandard: goldStandard
         ? {
             profileId: goldStandard.id,
-            expectedFieldNames: goldStandard.configuration_json?.expected_fields
+            expectedFieldNames: Array.isArray(goldStandard.configuration_json?.expected_fields)
               ? (goldStandard.configuration_json.expected_fields as any[]).map((f: any) =>
                   typeof f === 'string' ? f : f?.field || f?.name,
                 ).filter(Boolean)

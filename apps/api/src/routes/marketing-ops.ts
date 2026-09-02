@@ -4027,7 +4027,7 @@ router.post('/prospect-queue/:id/create-campaign', async (req: any, res: Respons
 });
 
 const prospectQueueDismissSchema = z.object({
-  reason: z.enum(['already_customer', 'bad_fit', 'duplicate', 'other']).optional(),
+  reason: z.enum(['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other']).optional(),
 });
 
 // POST /prospect-queue/:id/dismiss — mark entry dismissed (idempotent).
@@ -4039,6 +4039,66 @@ router.post('/prospect-queue/:id/dismiss', async (req: any, res: Response) => {
       reason: parsed.reason,
     }, getCtx(req));
     res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Verify-then-outreach (Migration 255) ───────────────────────────────
+// Prospects with unverified NAP + zero live listings are gated behind a
+// human phone call. The operator requests verification (moves the entry to
+// verify_then_outreach), calls the business, then resolves with the outcome
+// + verified NAP. Resolution branches to requeue / create_campaign / dismiss.
+
+// POST /prospect-queue/:id/request-verification — gate the entry behind a
+// phone call. Only callable from 'queued' status.
+router.post('/prospect-queue/:id/request-verification', async (req: any, res: Response) => {
+  try {
+    const updated = await MarketingProspectQueueService.requestVerification({
+      queueEntryId: req.params.id,
+      actingUserId: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+const verificationResolveSchema = z.object({
+  outcome: z.enum(['operational', 'closed', 'relocated', 'unreachable', 'wrong_business']),
+  verifiedName: z.string().max(255).optional(),
+  verifiedPhone: z.string().max(50).optional(),
+  verifiedAddress: z.string().max(500).optional(),
+  verifiedCity: z.string().max(255).optional(),
+  verifiedState: z.string().max(255).optional(),
+  ownerReceptivity: z.enum(['interested', 'neutral', 'defensive', 'no_answer']).optional(),
+  callNotes: z.string().max(2000).optional(),
+  nextAction: z.enum(['requeue', 'create_campaign', 'dismiss']),
+});
+
+// POST /prospect-queue/:id/resolve-verification — resolve after the phone
+// call. Branches on nextAction: requeue (back to queued with verified NAP),
+// create_campaign (stamp + graduate), or dismiss (unverified_closed).
+router.post('/prospect-queue/:id/resolve-verification', async (req: any, res: Response) => {
+  try {
+    const parsed = verificationResolveSchema.parse(req.body ?? {});
+    const result = await MarketingProspectQueueService.resolveVerification({
+      queueEntryId: req.params.id,
+      outcome: parsed.outcome,
+      verifiedName: parsed.verifiedName,
+      verifiedPhone: parsed.verifiedPhone,
+      verifiedAddress: parsed.verifiedAddress,
+      verifiedCity: parsed.verifiedCity,
+      verifiedState: parsed.verifiedState,
+      ownerReceptivity: parsed.ownerReceptivity,
+      callNotes: parsed.callNotes,
+      nextAction: parsed.nextAction,
+      actingUserId: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });

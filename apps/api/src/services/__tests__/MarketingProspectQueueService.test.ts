@@ -767,4 +767,227 @@ describe('MarketingProspectQueueService', () => {
       ).rejects.toThrow(/not found/i);
     });
   });
+
+  // ─── requestVerification (Migration 255) ──────────────────────────────
+
+  describe('requestVerification', () => {
+    it('moves a queued entry to verify_then_outreach and stamps verification.requested_at', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'queued' }));
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, status: 'verify_then_outreach' })),
+      );
+
+      const result = await MarketingProspectQueueService.requestVerification({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.status).toBe('verify_then_outreach');
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'pque-test-001' },
+          data: expect.objectContaining({
+            status: 'verify_then_outreach',
+            verification: expect.objectContaining({
+              requested_by: ACTING_USER_ID,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('throws ConflictError when the entry is already in verify_then_outreach (no double-request)', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'verify_then_outreach' }));
+
+      await expect(
+        MarketingProspectQueueService.requestVerification({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/cannot be moved to verify/i);
+    });
+
+    it('throws ConflictError when the entry is campaign_created', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'campaign_created' }));
+
+      await expect(
+        MarketingProspectQueueService.requestVerification({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/cannot be moved to verify/i);
+    });
+
+    it('throws ConflictError when the entry is dismissed', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'dismissed' }));
+
+      await expect(
+        MarketingProspectQueueService.requestVerification({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/cannot be moved to verify/i);
+    });
+
+    it('throws NotFoundError when the entry does not exist', async () => {
+      mockQueue.findUnique.mockResolvedValue(null);
+
+      await expect(
+        MarketingProspectQueueService.requestVerification({ queueEntryId: 'pque-missing' }),
+      ).rejects.toThrow(/not found/i);
+    });
+  });
+
+  // ─── resolveVerification (Migration 255) ───────────────────────────────
+
+  describe('resolveVerification', () => {
+    it('re-queues with verified NAP when nextAction=requeue', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      const result = await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedName: 'Daree Salam African Market',
+        verifiedPhone: '412-555-0100',
+        verifiedAddress: '123 Main St',
+        verifiedCity: 'Pittsburgh',
+        verifiedState: 'PA',
+        ownerReceptivity: 'neutral',
+        callNotes: 'Owner confirmed open; no website.',
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.queueEntry.status).toBe('queued');
+      expect(result.campaign).toBeNull();
+      // NAP fields written to top-level columns
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'queued',
+            business_name: 'Daree Salam African Market',
+            city: 'Pittsburgh',
+            state: 'PA',
+            business_snapshot: expect.objectContaining({
+              verified_nap: expect.objectContaining({
+                phone: '412-555-0100',
+                address: '123 Main St',
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('dismisses with reason=unverified_closed when nextAction=dismiss', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      }));
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, status: 'dismissed' })),
+      );
+
+      const result = await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'closed',
+        nextAction: 'dismiss',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.queueEntry.status).toBe('dismissed');
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'dismissed',
+            dismissed_reason: 'unverified_closed',
+          }),
+        }),
+      );
+    });
+
+    it('creates a campaign when nextAction=create_campaign (flips to queued first)', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        source_kind: 'category_analysis',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      // First update: flip to queued + stamp verification. Second update
+      // (inside createCampaignFromQueue): mark campaign_created.
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data }),
+      );
+      const mockCampaign = { id: 'mcamp-new-001', title: 'Joe Pizza — Review Recovery' };
+      (MarketingCampaignService.deriveBusinessCampaign as any).mockResolvedValue(mockCampaign);
+
+      const result = await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedName: 'Joe Pizza',
+        ownerReceptivity: 'interested',
+        nextAction: 'create_campaign',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.campaign).toEqual(mockCampaign);
+      expect(result.created).toBe(true);
+      // The first update should flip status to 'queued'
+      const firstCall = mockQueue.update.mock.calls[0][0];
+      expect(firstCall.data.status).toBe('queued');
+    });
+
+    it('throws ConflictError when the entry is not in verify_then_outreach', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'queued' }));
+
+      await expect(
+        MarketingProspectQueueService.resolveVerification({
+          queueEntryId: 'pque-test-001',
+          outcome: 'operational',
+          nextAction: 'requeue',
+        }),
+      ).rejects.toThrow(/not pending verification/i);
+    });
+
+    it('throws NotFoundError when the entry does not exist', async () => {
+      mockQueue.findUnique.mockResolvedValue(null);
+
+      await expect(
+        MarketingProspectQueueService.resolveVerification({
+          queueEntryId: 'pque-missing',
+          outcome: 'operational',
+          nextAction: 'requeue',
+        }),
+      ).rejects.toThrow(/not found/i);
+    });
+  });
+
+  // ─── update editability + createCampaign guard (Migration 255) ────────
+
+  describe('update — verify_then_outreach editability', () => {
+    it('allows updating priority on a verify_then_outreach entry', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'verify_then_outreach' }));
+      mockQueue.update.mockResolvedValue(queueRow({ status: 'verify_then_outreach', priority: 'high' }));
+
+      const result = await MarketingProspectQueueService.update('pque-test-001', { priority: 'high' });
+
+      expect(result.priority).toBe('high');
+    });
+
+    it('throws ConflictError when updating a campaign_created entry', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'campaign_created' }));
+
+      await expect(
+        MarketingProspectQueueService.update('pque-test-001', { priority: 'high' }),
+      ).rejects.toThrow(/not editable/i);
+    });
+  });
+
+  describe('createCampaignFromQueue — verify_then_outreach guard', () => {
+    it('throws ConflictError when the entry is in verify_then_outreach', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'verify_then_outreach' }));
+
+      await expect(
+        MarketingProspectQueueService.createCampaignFromQueue({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/pending verification/i);
+    });
+  });
 });

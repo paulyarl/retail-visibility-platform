@@ -39,8 +39,53 @@ export type ProspectSourceKind =
   | 'intelligence_seek'
   | 'directory_lead_gen';
 
-export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
+export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';
+
+// ─── Verify-then-outreach (Migration 255) ───────────────────────────────
+// When an audit cannot independently verify NAP and finds zero live listings,
+// the prospect is routed into a verification gate. The operator calls the
+// business to confirm operational status + capture a verified NAP before a
+// campaign is created. See docs spec: verify-then-outreach queue status.
+
+export type VerificationOutcome = 'operational' | 'closed' | 'relocated' | 'unreachable' | 'wrong_business';
+export type OwnerReceptivity = 'interested' | 'neutral' | 'defensive' | 'no_answer';
+export type VerificationNextAction = 'requeue' | 'create_campaign' | 'dismiss';
+
+export interface VerificationRequestInput {
+  queueEntryId: string;
+  actingUserId?: string;
+}
+
+export interface VerificationResolutionInput {
+  queueEntryId: string;
+  outcome: VerificationOutcome;
+  verifiedName?: string;
+  verifiedPhone?: string;
+  verifiedAddress?: string;
+  verifiedCity?: string;
+  verifiedState?: string;
+  ownerReceptivity?: OwnerReceptivity;
+  callNotes?: string;
+  nextAction: VerificationNextAction;
+  actingUserId?: string;
+}
+
+export interface VerificationRecord {
+  requested_at: string;
+  requested_by: string | null;
+  resolved_at?: string;
+  resolved_by?: string | null;
+  outcome?: VerificationOutcome;
+  verified_name?: string;
+  verified_phone?: string;
+  verified_address?: string;
+  verified_city?: string;
+  verified_state?: string;
+  owner_receptivity?: OwnerReceptivity;
+  call_notes?: string;
+  next_action?: VerificationNextAction;
+}
 
 export type ProspectCampaignScope = 'business' | 'category' | 'city' | 'intelligence';
 
@@ -117,7 +162,7 @@ export interface CreateCampaignInput {
 
 export interface DismissInput {
   queueEntryId: string;
-  reason?: 'already_customer' | 'bad_fit' | 'duplicate' | 'other';
+  reason?: 'already_customer' | 'bad_fit' | 'duplicate' | 'unverified_closed' | 'other';
 }
 
 // ─── Service ────────────────────────────────────────────────────────────
@@ -376,7 +421,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (!existing) {
         throw new NotFoundError(`Queue entry ${id} not found`);
       }
-      if (existing.status !== 'queued') {
+      if (existing.status !== 'queued' && existing.status !== 'verify_then_outreach') {
         throw new ConflictError(`Queue entry ${id} is not editable (status=${existing.status})`);
       }
 
@@ -433,6 +478,19 @@ class MarketingProspectQueueServiceClass extends BaseService {
           return { campaign: existingCampaign, created: false, queueEntry: entry };
         }
         // Campaign was deleted — fall through to re-create.
+      }
+
+      // Verify-then-outreach gate (Migration 255): an entry pending
+      // verification cannot graduate to a campaign via the direct
+      // create-campaign endpoint. The operator must resolve the
+      // verification first (resolveVerification with nextAction:
+      // 'create_campaign'), which calls createCampaignFromQueue internally
+      // after stamping the verification record. This prevents bypassing the
+      // human-call gate for prospects with unverified NAP.
+      if (entry.status === 'verify_then_outreach') {
+        throw new ConflictError(
+          `Queue entry ${input.queueEntryId} is pending verification — resolve verification before creating a campaign`,
+        );
       }
 
       const assignee = entry.assigned_to ?? input.actingUserId ?? null;
@@ -634,6 +692,198 @@ class MarketingProspectQueueServiceClass extends BaseService {
         error: (error as Error).message,
       });
       return undefined;
+    }
+  }
+
+  /**
+   * Move a queued entry into the verify_then_outreach status. The operator
+   * is signaling that the prospect needs a human phone call to confirm
+   * operational status and capture a verified NAP before a campaign is
+   * created. Only callable from the 'queued' status — prevents
+   * double-request and prevents moving already-graduated rows backward.
+   *
+   * The entry remains editable (assign, note, priority) while in
+   * verify_then_outreach — the verification task is itself assignable work.
+   */
+  async requestVerification(input: VerificationRequestInput, ctx?: RequestCtx): Promise<any> {
+    try {
+      const existing = await this.prisma.mkt_prospect_queue.findUnique({
+        where: { id: input.queueEntryId },
+      });
+      if (!existing) {
+        throw new NotFoundError(`Queue entry ${input.queueEntryId} not found`);
+      }
+      if (existing.status !== 'queued') {
+        throw new ConflictError(
+          `Queue entry ${input.queueEntryId} cannot be moved to verify (status=${existing.status})`,
+        );
+      }
+
+      const now = new Date().toISOString();
+      const verification: VerificationRecord = {
+        requested_at: now,
+        requested_by: input.actingUserId ?? null,
+      };
+
+      const updated = await this.prisma.mkt_prospect_queue.update({
+        where: { id: input.queueEntryId },
+        data: {
+          status: 'verify_then_outreach',
+          verification: verification as any,
+        },
+      });
+      logger.info('requestVerification: entry moved to verify_then_outreach', ctx, {
+        id: input.queueEntryId, requestedBy: input.actingUserId ?? null,
+      });
+      return updated;
+    } catch (error) {
+      logger.error('requestVerification failed', ctx, {
+        error: (error as Error).message,
+        queueEntryId: input.queueEntryId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Resolve a verify_then_outreach entry after the operator's phone call.
+   * Branches on nextAction:
+   *
+   *  - 'requeue': status → 'queued'. Verified NAP fields (when provided)
+   *    are written onto the row's top-level columns (business_name, city,
+   *    state) and into business_snapshot.verified_nap so the campaign
+   *    derive path picks them up.
+   *  - 'create_campaign': stamps the verification record, then calls
+   *    createCampaignFromQueue internally (the status is flipped back to
+   *    'queued' first so the create-campaign guard passes). The verified
+   *    NAP flows into the campaign via the snapshot.
+   *  - 'dismiss': status → 'dismissed', dismissed_reason = 'unverified_closed'.
+   *
+   * Only callable from 'verify_then_outreach'. Resolving an already-resolved
+   * row → 409 (except 'dismiss' which is idempotent, matching dismiss()).
+   */
+  async resolveVerification(input: VerificationResolutionInput, ctx?: RequestCtx): Promise<any> {
+    try {
+      const existing = await this.prisma.mkt_prospect_queue.findUnique({
+        where: { id: input.queueEntryId },
+      });
+      if (!existing) {
+        throw new NotFoundError(`Queue entry ${input.queueEntryId} not found`);
+      }
+      if (existing.status !== 'verify_then_outreach') {
+        throw new ConflictError(
+          `Queue entry ${input.queueEntryId} is not pending verification (status=${existing.status})`,
+        );
+      }
+
+      const prior = (existing.verification as any) ?? {};
+      const resolvedVerification: VerificationRecord = {
+        ...prior,
+        resolved_at: new Date().toISOString(),
+        resolved_by: input.actingUserId ?? null,
+        outcome: input.outcome,
+        verified_name: input.verifiedName,
+        verified_phone: input.verifiedPhone,
+        verified_address: input.verifiedAddress,
+        verified_city: input.verifiedCity,
+        verified_state: input.verifiedState,
+        owner_receptivity: input.ownerReceptivity,
+        call_notes: input.callNotes,
+        next_action: input.nextAction,
+      };
+
+      // Build the NAP patch — only apply verified fields when the operator
+      // captured them (operational / relocated outcomes). Empty strings are
+      // treated as "not captured" (null) so we don't overwrite existing
+      // values with blanks.
+      const napPatch: any = {};
+      if (input.verifiedName && input.verifiedName.trim()) napPatch.business_name = input.verifiedName.trim();
+      if (input.verifiedCity && input.verifiedCity.trim()) napPatch.city = input.verifiedCity.trim();
+      if (input.verifiedState && input.verifiedState.trim()) napPatch.state = input.verifiedState.trim();
+
+      // Merge verified NAP into the business_snapshot so the campaign derive
+      // path can pick it up. We preserve all existing snapshot fields.
+      const snapshot = (existing.business_snapshot as any) ?? {};
+      const verifiedNap: Record<string, string> = {};
+      if (input.verifiedName?.trim()) verifiedNap.name = input.verifiedName.trim();
+      if (input.verifiedPhone?.trim()) verifiedNap.phone = input.verifiedPhone.trim();
+      if (input.verifiedAddress?.trim()) verifiedNap.address = input.verifiedAddress.trim();
+      if (input.verifiedCity?.trim()) verifiedNap.city = input.verifiedCity.trim();
+      if (input.verifiedState?.trim()) verifiedNap.state = input.verifiedState.trim();
+      const updatedSnapshot = Object.keys(verifiedNap).length > 0
+        ? { ...snapshot, verified_nap: verifiedNap }
+        : snapshot;
+
+      if (input.nextAction === 'dismiss') {
+        const updated = await this.prisma.mkt_prospect_queue.update({
+          where: { id: input.queueEntryId },
+          data: {
+            status: 'dismissed',
+            dismissed_reason: 'unverified_closed',
+            processed_at: new Date(),
+            verification: resolvedVerification as any,
+            ...napPatch,
+            business_snapshot: updatedSnapshot as any,
+          },
+        });
+        logger.info('resolveVerification: dismissed (unverified_closed)', ctx, {
+          id: input.queueEntryId, outcome: input.outcome,
+        });
+        return { queueEntry: updated, campaign: null, created: false };
+      }
+
+      if (input.nextAction === 'requeue') {
+        const updated = await this.prisma.mkt_prospect_queue.update({
+          where: { id: input.queueEntryId },
+          data: {
+            status: 'queued',
+            verification: resolvedVerification as any,
+            ...napPatch,
+            business_snapshot: updatedSnapshot as any,
+          },
+        });
+        logger.info('resolveVerification: re-queued with verified NAP', ctx, {
+          id: input.queueEntryId, outcome: input.outcome,
+          napFields: Object.keys(napPatch),
+        });
+        return { queueEntry: updated, campaign: null, created: false };
+      }
+
+      // nextAction === 'create_campaign'
+      // Flip status back to 'queued' + stamp verification + write NAP, then
+      // delegate to createCampaignFromQueue. The create-campaign guard
+      // (which blocks verify_then_outreach) is satisfied because the row is
+      // now 'queued' again.
+      await this.prisma.mkt_prospect_queue.update({
+        where: { id: input.queueEntryId },
+        data: {
+          status: 'queued',
+          verification: resolvedVerification as any,
+          ...napPatch,
+          business_snapshot: updatedSnapshot as any,
+        },
+      });
+
+      const campaignResult = await this.createCampaignFromQueue({
+        queueEntryId: input.queueEntryId,
+        actingUserId: input.actingUserId,
+      }, ctx);
+
+      logger.info('resolveVerification: created campaign after verification', ctx, {
+        id: input.queueEntryId, campaignId: campaignResult.campaign.id,
+        outcome: input.outcome,
+      });
+      return {
+        queueEntry: campaignResult.queueEntry,
+        campaign: campaignResult.campaign,
+        created: campaignResult.created,
+      };
+    } catch (error) {
+      logger.error('resolveVerification failed', ctx, {
+        error: (error as Error).message,
+        queueEntryId: input.queueEntryId,
+      });
+      throw this.handleError(error, ctx);
     }
   }
 

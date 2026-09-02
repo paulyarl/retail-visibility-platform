@@ -905,9 +905,42 @@ export interface DeriveAllUnmatchedResult {
 // ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
 
 export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek';
-export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
+export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';
-export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'other';
+export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'unverified_closed' | 'other';
+
+// ─── Verify-then-outreach (Migration 255) ───────────────────────────────
+export type VerificationOutcome = 'operational' | 'closed' | 'relocated' | 'unreachable' | 'wrong_business';
+export type OwnerReceptivity = 'interested' | 'neutral' | 'defensive' | 'no_answer';
+export type VerificationNextAction = 'requeue' | 'create_campaign' | 'dismiss';
+
+export interface VerificationResolutionInput {
+  outcome: VerificationOutcome;
+  verifiedName?: string;
+  verifiedPhone?: string;
+  verifiedAddress?: string;
+  verifiedCity?: string;
+  verifiedState?: string;
+  ownerReceptivity?: OwnerReceptivity;
+  callNotes?: string;
+  nextAction: VerificationNextAction;
+}
+
+export interface VerificationRecord {
+  requested_at: string;
+  requested_by: string | null;
+  resolved_at?: string;
+  resolved_by?: string | null;
+  outcome?: VerificationOutcome;
+  verified_name?: string;
+  verified_phone?: string;
+  verified_address?: string;
+  verified_city?: string;
+  verified_state?: string;
+  owner_receptivity?: OwnerReceptivity;
+  call_notes?: string;
+  next_action?: VerificationNextAction;
+}
 
 export interface AddToQueueInput {
   // Required for business-scope entries; optional for category/city-scope.
@@ -1006,6 +1039,8 @@ export interface ProspectQueueEntry {
   discovery_signals?: string[] | null;
   business_seek_priority?: string | null;
   intelligence_run_id?: string | null;
+  // Verify-then-outreach (Migration 255)
+  verification?: VerificationRecord | null;
 }
 
 export interface LogContactInput {
@@ -4506,6 +4541,42 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-prospect-queue');
     return result.data?.data ?? result.data;
+  }
+
+  // ─── Verify-then-outreach (Migration 255) ──────────────────────────────
+
+  async requestVerification(id: string): Promise<ProspectQueueEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}/request-verification`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `mkt-ops-prospect-queue-verify-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to request verification');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    return result.data?.data ?? result.data;
+  }
+
+  async resolveVerification(id: string, input: VerificationResolutionInput): Promise<{ queueEntry: ProspectQueueEntry; campaign: Campaign | null; created: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}/resolve-verification`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-prospect-queue-resolve-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve verification');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    const data = result.data?.data ?? result.data;
+    return {
+      queueEntry: data?.queueEntry ?? data,
+      campaign: data?.campaign ?? null,
+      created: data?.created ?? false,
+    };
   }
 
   // ─── Customer Alerts (§8.3) ──────────────────────────────────────────────
