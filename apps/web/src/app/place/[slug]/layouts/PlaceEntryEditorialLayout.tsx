@@ -14,6 +14,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
+import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
@@ -144,6 +145,10 @@ export default function PlaceEntryEditorialLayout({
                   {listing.primaryCategory && (
                     <p className="text-neutral-300 mt-2 text-lg">{listing.primaryCategory}</p>
                   )}
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 mt-3 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-sm font-medium text-yellow-300">
+                    <span className="w-2 h-2 rounded-full bg-yellow-400" aria-hidden="true" />
+                    Unclaimed listing
+                  </span>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4">
@@ -173,6 +178,14 @@ export default function PlaceEntryEditorialLayout({
 
         <section className="max-w-6xl mx-auto px-6 -mt-4 relative z-20 mb-4">
           <CouponSpotlight tenantId={tenantId} variant="banner" />
+        </section>
+
+        <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
+          <UnclaimedDirectoryBanner
+            businessName={listing.businessName}
+            claimToken={claimToken}
+            publicDisclaimer={publicDisclaimer}
+          />
         </section>
 
         {/* Full-width provenance callout — the conversion pitch */}
