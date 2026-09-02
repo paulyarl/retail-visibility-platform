@@ -39,6 +39,10 @@ const PROVENANCE_FIELD_KEYS = [
   'snap_ebt',
   'hours',
   'specialty_line',
+  'description',
+  'keywords',
+  'same_as',
+  'secondary_categories',
 ] as const;
 
 const US_STATES = [

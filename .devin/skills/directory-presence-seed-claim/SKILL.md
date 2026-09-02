@@ -115,6 +115,10 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `snap_ebt`
 - `hours`
 - `specialty_line`
+- `description` — composed SEO description (SeedSeoComposer, spec §4.4.6)
+- `keywords` — composed SEO keywords (SeedSeoComposer, spec §4.4.6)
+- `same_as` — sameAs URLs from directory/social profiles + audit platforms
+- `secondary_categories` — union of audit additional_categories + profile subcategories
 
 A field must not render publicly without a provenance row with `show_on_public = true`. Hours are omitted unless sourced.
 

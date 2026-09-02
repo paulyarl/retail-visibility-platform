@@ -510,7 +510,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   async createSeedFromCampaign(
     campaignId: string,
     publish = true,
-  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean }> {
+  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean }> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/from-campaign/${encodeURIComponent(campaignId)}`,
       { method: 'POST', body: JSON.stringify({ publish }) },

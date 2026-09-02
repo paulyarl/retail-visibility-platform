@@ -201,7 +201,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
         {placeResult && (
           <p className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-2 flex-wrap">
             <CheckCircle2 className="h-3 w-3" />
-            {placeResult.created ? 'Added' : 'Already linked'}:
+            {placeResult.created ? 'Added' : 'Already linked'}{placeResult.seoEnriched ? ' (SEO enriched)' : ''}:
             <a href={placeResult.publicUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline hover:text-green-700">
               <ExternalLink className="h-3 w-3" /> {placeResult.publicUrl}
             </a>
