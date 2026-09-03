@@ -76,8 +76,11 @@ candidate cap. A thorough category audit for a city may surface 10, 20, or more
 qualifying businesses depending on market density. Do not stop at an arbitrary
 number like 5. Exhaust the discovery patterns in the Category Intelligence
 Profile and the sources you can access before finalizing the qualifying set.
-Every qualifying business is a potential prospect — omitting one because you
-reached a self-imposed limit loses a real opportunity.`,
+Every qualifying business is a discovery candidate — omitting one because you
+reached a self-imposed limit loses a real opportunity. Focus-specific routing
+still determines whether a candidate is a Business Seek prospect: EMERGING
+requires an evidence-backed emerging condition, while COMPETITIVE seeks
+established benchmark candidates.`,
     variables: ['category', 'city', 'state', 'zip_codes', 'search_radius_miles'],
     outputSchema: null,
     isDefault: false,
@@ -201,6 +204,17 @@ require hold status independently of gold-standard performance.
 Do not select established, highly visible leaders merely because they match the
 gold standard. In EMERGING focus, strong gold-standard performance is not the
 selection objective.
+
+For EMERGING focus, do not use gold_standard_match as a prospect-ranking field.
+A value of false or a failed gold-standard gate may represent a stronger
+outreach opportunity than a value of true. Rank emerging prospects by category
+validity, evidence-backed visibility gaps, and fixability—not by gold-standard
+similarity.
+
+Every qualifying business is a discovery candidate. Only candidates with at
+least one evidence-backed emerging condition should be routed as Business Seek
+prospects. Established leaders may remain in the discovery record for
+completeness or identity context, but they are not emerging prospects.
 
 === EMERGING × PROFILE INTEGRATION ===
 Apply each emerging-focus point above USING the Category Intelligence Profile
