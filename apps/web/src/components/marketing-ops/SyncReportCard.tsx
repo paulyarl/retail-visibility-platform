@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { CheckCircle2, Flame, Plus, RefreshCw, AlertCircle, Loader2, Inbox, Check, Phone } from 'lucide-react';
 import marketingOpsService, { type SyncReport } from '@/services/MarketingOpsService';
 
@@ -22,6 +23,8 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
   const [error, setError] = useState<string | null>(null);
   const [queueingIdx, setQueueingIdx] = useState<number | null>(null);
   const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'verify' | 'exists' | 'already' | 'error'>>({});
+  const [queuedEntryId, setQueuedEntryId] = useState<Record<number, string>>({});
+  const [createdCampaignId, setCreatedCampaignId] = useState<Record<number, string>>({});
 
   const fetchReport = async () => {
     setLoading(true);
@@ -66,14 +69,14 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
       const result = await marketingOpsService.deriveAllUnmatched(campaignId, executionId);
       const created = result.created.find((c) => c.businessName.toLowerCase() === businessName.toLowerCase());
       if (created) {
-        router.push(`/settings/admin/marketing-ops/campaigns/${created.campaignId}`);
+        setCreatedCampaignId((prev) => ({ ...prev, [idx]: created.campaignId }));
       } else {
         const failed = result.failed.find((f) => f.businessName.toLowerCase() === businessName.toLowerCase());
         setError(failed?.error || 'Campaign was not created (may already exist)');
-        setCreatingIdx(null);
       }
     } catch (e: any) {
       setError(e.message || 'Failed to create campaign');
+    } finally {
       setCreatingIdx(null);
     }
   };
@@ -121,6 +124,9 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
         ...prev,
         [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : successKind,
       }));
+      if (result.kind === 'created' || result.kind === 'already_queued') {
+        setQueuedEntryId((prev) => ({ ...prev, [idx]: result.entry.id }));
+      }
     } catch (e: any) {
       setQueuedFeedback((prev) => ({ ...prev, [idx]: 'error' }));
       setError(e.message || 'Failed to add to queue');
@@ -263,38 +269,77 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
                     <span className="text-gray-400 ml-2">— {u.reason}</span>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleQueueOne(i, u.businessName)}
-                      disabled={queueingIdx === i || queuedFeedback[i] === 'queued' || queuedFeedback[i] === 'verify'}
-                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/40 disabled:opacity-50"
-                      title={queuedFeedback[i] === 'queued' ? 'Added to queue' : `Add ${u.businessName} to the prospect queue for later`}
-                    >
-                      {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : queuedFeedback[i] === 'queued' ? <Check className="h-2.5 w-2.5 text-green-600" /> : <Inbox className="h-2.5 w-2.5" />}
-                      {queuedFeedback[i] === 'queued' ? 'Queued' : 'Queue'}
-                    </button>
-                    <button
-                      onClick={() => handleQueueOne(i, u.businessName, 'verify_then_outreach')}
-                      disabled={queueingIdx === i || queuedFeedback[i] === 'queued' || queuedFeedback[i] === 'verify'}
-                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 disabled:opacity-50"
-                      title={queuedFeedback[i] === 'verify' ? 'Sent to verification queue' : `Send ${u.businessName} to phone verification (NAP/digital presence unverified)`}
-                    >
-                      {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : queuedFeedback[i] === 'verify' ? <Check className="h-2.5 w-2.5 text-green-600" /> : <Phone className="h-2.5 w-2.5" />}
-                      {queuedFeedback[i] === 'verify' ? 'Sent' : 'Verify'}
-                    </button>
+                    {queuedFeedback[i] === 'queued' && queuedEntryId[i] ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=queued`}
+                        className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                        title="Added to queue — click to view in the prospect queue"
+                      >
+                        <Check className="h-2.5 w-2.5" />
+                        Queued
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleQueueOne(i, u.businessName)}
+                        disabled={queueingIdx === i || queuedFeedback[i] === 'verify'}
+                        className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/40 disabled:opacity-50"
+                        title={`Add ${u.businessName} to the prospect queue for later`}
+                      >
+                        {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Inbox className="h-2.5 w-2.5" />}
+                        Queue
+                      </button>
+                    )}
+                    {queuedFeedback[i] === 'verify' && queuedEntryId[i] ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=verify_then_outreach`}
+                        className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                        title="Sent to verification queue — click to view in the prospect queue"
+                      >
+                        <Check className="h-2.5 w-2.5" />
+                        Sent
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleQueueOne(i, u.businessName, 'verify_then_outreach')}
+                        disabled={queueingIdx === i || queuedFeedback[i] === 'queued'}
+                        className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 disabled:opacity-50"
+                        title={`Send ${u.businessName} to phone verification (NAP/digital presence unverified)`}
+                      >
+                        {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Phone className="h-2.5 w-2.5" />}
+                        Verify
+                      </button>
+                    )}
                     {queuedFeedback[i] === 'already' && (
-                      <span className="text-[9px] text-slate-400">already</span>
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=queued`}
+                        className="text-[9px] text-slate-400 hover:text-slate-600 hover:underline"
+                        title="Already in the queue — click to view"
+                      >
+                        already
+                      </Link>
                     )}
                     {queuedFeedback[i] === 'exists' && (
                       <span className="text-[9px] text-amber-600 dark:text-amber-400">campaign exists</span>
                     )}
-                    <button
-                      onClick={() => handleCreateOne(i, u.businessName)}
-                      disabled={creatingIdx === i || bulkCreating}
-                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50"
-                    >
-                      {creatingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />}
-                      Create
-                    </button>
+                    {createdCampaignId[i] ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/campaigns/${createdCampaignId[i]}`}
+                        className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                        title="Campaign created — click to view"
+                      >
+                        <Check className="h-2.5 w-2.5" />
+                        Created
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleCreateOne(i, u.businessName)}
+                        disabled={creatingIdx === i || bulkCreating}
+                        className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50"
+                      >
+                        {creatingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />}
+                        Create
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

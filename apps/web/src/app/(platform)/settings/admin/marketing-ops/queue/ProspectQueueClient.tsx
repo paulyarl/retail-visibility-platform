@@ -102,8 +102,17 @@ export default function ProspectQueueClient() {
     if (typeof window !== 'undefined') localStorage.setItem('prospectQueueView', mode);
   };
 
-  // Filters
-  const [statusTab, setStatusTab] = useState<ProspectStatus>('queued');
+  // Filters — status tab can be deep-linked via ?status= (e.g. from
+  // discovery surfaces that send a prospect straight to verify_then_outreach).
+  const initialStatus: ProspectStatus = (() => {
+    if (typeof window === 'undefined') return 'queued';
+    const param = new URLSearchParams(window.location.search).get('status');
+    if (param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed') {
+      return param as ProspectStatus;
+    }
+    return 'queued';
+  })();
+  const [statusTab, setStatusTab] = useState<ProspectStatus>(initialStatus);
   const [assignedToMe, setAssignedToMe] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [cityFilter, setCityFilter] = useState('');

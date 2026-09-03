@@ -39,7 +39,7 @@ const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-01 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 
@@ -106,6 +106,57 @@ Exclude (these are internal assessment content — never public):
 
 Length: 1-3 sentences, max 300 characters. Write in third person. Be specific and vivid — this is the first thing a visitor reads on the listing page. Do not invent details; use only verified public information. If the business is too thinly sourced for a rich narrative, write a shorter factual sentence using what is verified.
 `;
+
+// ─── Directive: Website Accessibility Verification (inserted at the end of
+//     the Website Assessment section, after the intrusive-testing line).
+//     Requires the analyst to actually load every discovered website URL as an
+//     ordinary public visitor before recording positive website attributes.
+//     A search-result snippet or indexed page is NOT proof of availability.
+//     Details (initial URL, final URL, redirect chain, access barriers) are
+//     routed into the existing `website.issues` string array — no schema change.
+const WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE = `
+### Website Accessibility Verification — REQUIRED
+
+For every non-null website URL discovered during the audit — whether surfaced by a discovery lead, a directory listing, a GBP/Yelp/Facebook profile, or any other source — attempt to load the URL as an ordinary public visitor BEFORE recording any positive website attribute. A search-result snippet, indexed page preview, or directory listing that displays a URL is NOT proof that the website loads; the URL itself must be visited.
+
+Website condition is a high-value opportunity target for this platform: a missing or unusable website is a gap the platform can confidently fill. Accurate website-status classification is therefore essential. Do not record positive website attributes (contact information, CTAs, ordering, category content, mobile usability, service information, HTTPS) unless the business website content actually loaded for an ordinary visitor.
+
+Record the following in \`website.issues\`:
+
+* the initial URL requested
+* the final URL after any redirects
+* whether the requested site content loaded
+* whether a bot-defense, CAPTCHA, notification-permission, login, or other access-blocking page appeared instead of business content
+* whether the business website content was observable
+* any HTTP, TLS, redirect, or browser errors that are publicly observable
+
+Do not grant notification permissions, bypass bot defenses, solve access controls, or perform intrusive testing.
+
+Distinguish four states and record them honestly:
+
+* URL discovered — a website link exists in a profile or directory (the URL is known but has not been confirmed to load).
+* Website reachable — the URL loads without an access-blocking challenge.
+* Website content verified — business content is actually visible on the loaded page.
+* Website conversion verified — CTAs, ordering, contact, and other conversion functions are observable on the loaded page.
+
+Only "website content verified" justifies positive website content fields. Only "website conversion verified" justifies positive conversion fields (\`call_to_action_present\`, \`click_to_call_available\`, \`conversion_opportunities\`).
+
+If the URL redirects to a bot-defense, notification-permission, login, or other access-blocking page and the business website content does not load:
+
+* classify \`website.status\` as \`broken\` when the visitor-facing URL is verified to be unusable;
+* otherwise classify \`website.status\` as \`unable_to_verify\` when the audit cannot distinguish a temporary challenge from a persistent failure;
+* set the website content and conversion fields (\`contact_information_visible\`, \`click_to_call_available\`, \`call_to_action_present\`, \`service_information_present\`, \`location_information_present\`, \`mobile_friendly\`, \`https\`) to \`unable_to_verify\`;
+* do not claim contact information, CTAs, ordering, category content, mobile usability, or service information;
+* add \`WC_BROKEN_WEBSITE\` to \`detected_signals\` ONLY when the public visitor path is verified to be inaccessible (\`status\` = \`broken\`) — do NOT add it for \`unable_to_verify\`;
+* record the redirect chain and access barrier in \`website.issues\` and \`gap_analysis.gaps\` (when a Gold Standard block is present).
+`;
+
+// ─── Targeted content update: broaden WC_BROKEN_WEBSITE signal definition to
+//     include access-blocking redirects (bot-defense / notification-permission /
+//     login walls), consistent with the Website Accessibility Verification
+//     directive above. Idempotent via replaceFirst (no-op if already updated).
+const WC_BROKEN_WEBSITE_DEFINITION_FROM = '* `WC_BROKEN_WEBSITE`: Website URL returns 404, SSL error, or dead domain.';
+const WC_BROKEN_WEBSITE_DEFINITION_TO = '* `WC_BROKEN_WEBSITE`: Website URL returns 404, SSL error, dead domain, or redirects to a bot-defense / notification-permission / login / access-blocking page that prevents an ordinary visitor from reaching business content (per the Website Accessibility Verification directive).';
 
 // ─── Schema fragment: gap_analysis + quality_gate_results (inserted before
 //     the final closing brace, after the sources array) ───────────────────
@@ -401,6 +452,28 @@ function transformCategoryIntegrated(body: string): string {
     );
   }
 
+  // 4d. Website Accessibility Verification directive — insert at the end of
+  //     the Website Assessment section (after the intrusive-testing line).
+  //     Idempotent via fingerprint. Fallback anchors cover variant bodies
+  //     where the intrusive-testing line may be absent or reworded.
+  try {
+    out = insertAfter(
+      out,
+      'Do not perform intrusive testing, vulnerability scanning, or security exploitation.',
+      WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE,
+    );
+  } catch {
+    try {
+      out = insertAfter(out, '* Conversion opportunities', WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE);
+    } catch {
+      out = insertAfter(out, '## Website Assessment', WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE);
+    }
+  }
+
+  // 4e. Broaden WC_BROKEN_WEBSITE signal definition to include access-blocking
+  //     redirects. Idempotent (no-op if already updated).
+  out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -567,6 +640,28 @@ function transformSignalAligned(body: string): string {
   // 19c. Add the public_narrative directive section after the Summary
   //      instruction section.
   out = insertAfter(out, '## Summary', PUBLIC_NARRATIVE_DIRECTIVE);
+
+  // 19d. Website Accessibility Verification directive — insert at the end of
+  //      the Website Assessment section (after the intrusive-testing line).
+  //      Idempotent via fingerprint. Fallback anchors cover variant bodies
+  //      where the intrusive-testing line may be absent or reworded.
+  try {
+    out = insertAfter(
+      out,
+      'Do not perform intrusive testing, vulnerability scanning, or security exploitation.',
+      WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE,
+    );
+  } catch {
+    try {
+      out = insertAfter(out, '* Conversion opportunities', WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE);
+    } catch {
+      out = insertAfter(out, '## Website Assessment', WEBSITE_ACCESSIBILITY_VERIFICATION_DIRECTIVE);
+    }
+  }
+
+  // 19e. Broaden WC_BROKEN_WEBSITE signal definition to include access-blocking
+  //      redirects. Idempotent (no-op if already updated).
+  out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
 
   // 20. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {

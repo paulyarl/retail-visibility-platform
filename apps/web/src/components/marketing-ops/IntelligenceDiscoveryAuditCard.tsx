@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Search, Plus, Loader2, Inbox, Check, ChevronDown, ChevronRight, MapPin, AlertTriangle, Phone } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Audit } from '@/services/MarketingOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
@@ -114,12 +114,13 @@ export default function IntelligenceDiscoveryAuditCard({
   const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
   const [queueingIdx, setQueueingIdx] = useState<number | null>(null);
   const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'verify' | 'exists' | 'already'>>({});
+  const [queuedEntryId, setQueuedEntryId] = useState<Record<number, string>>({});
+  const [derivedCampaignId, setDerivedCampaignId] = useState<Record<number, string>>({});
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<'all' | 'qualifying' | 'hold'>('all');
   const [expandedProvenance, setExpandedProvenance] = useState<Set<number>>(new Set());
   const [showNotes, setShowNotes] = useState<number | null>(null);
-  const router = useRouter();
 
   // Sort all discovered businesses: recommended first, then by priority, holds last.
   // `discovered_businesses` is the superset (includes qualifying + hold/low candidates);
@@ -162,9 +163,10 @@ export default function IntelligenceDiscoveryAuditCard({
         review_count: biz.review_count ?? undefined,
         location: biz.address || biz.location_status,
       });
-      router.push(`/settings/admin/marketing-ops/campaigns/${child.id}`);
+      setDerivedCampaignId((prev) => ({ ...prev, [idx]: child.id }));
     } catch (err: any) {
       setDeriveError(err.message || 'Failed to create campaign');
+    } finally {
       setDerivingIdx(null);
     }
   };
@@ -209,6 +211,9 @@ export default function IntelligenceDiscoveryAuditCard({
         ...prev,
         [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : successKind,
       }));
+      if (result.kind === 'created' || result.kind === 'already_queued') {
+        setQueuedEntryId((prev) => ({ ...prev, [idx]: result.entry.id }));
+      }
     } catch (err: any) {
       setDeriveError(err.message || 'Failed to add to queue');
     } finally {
@@ -413,39 +418,78 @@ export default function IntelligenceDiscoveryAuditCard({
                   </div>
                   {/* Action buttons */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => handleQueue(biz)}
-                      disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued' || queuedFeedback[idx] === 'verify'}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100 dark:bg-slate-900/20 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-900/40 disabled:opacity-50"
-                      title={queuedFeedback[idx] === 'queued' ? 'Added to queue' : `Add ${biz.business_name} to the prospect queue`}
-                    >
-                      {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : queuedFeedback[idx] === 'queued' ? <Check className="w-3 h-3 text-green-600" /> : <Inbox className="w-3 h-3" />}
-                      {queuedFeedback[idx] === 'queued' ? 'Queued' : 'Queue'}
-                    </button>
-                    <button
-                      onClick={() => handleQueue(biz, 'verify_then_outreach')}
-                      disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued' || queuedFeedback[idx] === 'verify'}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800 dark:hover:bg-amber-900/40 disabled:opacity-50"
-                      title={queuedFeedback[idx] === 'verify' ? 'Sent to verification queue' : `Send ${biz.business_name} to phone verification (NAP/digital presence unverified)`}
-                    >
-                      {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : queuedFeedback[idx] === 'verify' ? <Check className="w-3 h-3 text-green-600" /> : <Phone className="w-3 h-3" />}
-                      {queuedFeedback[idx] === 'verify' ? 'Sent' : 'Verify'}
-                    </button>
+                    {queuedFeedback[idx] === 'queued' && queuedEntryId[idx] ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=queued`}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40"
+                        title="Added to queue — click to view in the prospect queue"
+                      >
+                        <Check className="w-3 h-3" />
+                        Queued
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleQueue(biz)}
+                        disabled={queueingIdx !== null || queuedFeedback[idx] === 'verify'}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100 dark:bg-slate-900/20 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-900/40 disabled:opacity-50"
+                        title={`Add ${biz.business_name} to the prospect queue`}
+                      >
+                        {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Inbox className="w-3 h-3" />}
+                        Queue
+                      </button>
+                    )}
+                    {queuedFeedback[idx] === 'verify' && queuedEntryId[idx] ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=verify_then_outreach`}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40"
+                        title="Sent to verification queue — click to view in the prospect queue"
+                      >
+                        <Check className="w-3 h-3" />
+                        Sent
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleQueue(biz, 'verify_then_outreach')}
+                        disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued'}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800 dark:hover:bg-amber-900/40 disabled:opacity-50"
+                        title={`Send ${biz.business_name} to phone verification (NAP/digital presence unverified)`}
+                      >
+                        {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3" />}
+                        Verify
+                      </button>
+                    )}
                     {queuedFeedback[idx] === 'already' && (
-                      <span className="text-[10px] text-slate-400" title="Already in the queue">already</span>
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=queued`}
+                        className="text-[10px] text-slate-400 hover:text-slate-600 hover:underline"
+                        title="Already in the queue — click to view"
+                      >
+                        already
+                      </Link>
                     )}
                     {queuedFeedback[idx] === 'exists' && (
                       <span className="text-[10px] text-amber-600 dark:text-amber-400" title="A campaign already exists">exists</span>
                     )}
-                    <button
-                      onClick={() => handleDerive(biz)}
-                      disabled={derivingIdx !== null}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded hover:bg-cyan-100 dark:bg-cyan-900/20 dark:text-cyan-300 dark:border-cyan-800 dark:hover:bg-cyan-900/40 disabled:opacity-50"
-                      title={`Create a business-scope campaign for ${biz.business_name}`}
-                    >
-                      {derivingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                      Campaign
-                    </button>
+                    {derivedCampaignId[idx] ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/campaigns/${derivedCampaignId[idx]}`}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40"
+                        title="Campaign created — click to view"
+                      >
+                        <Check className="w-3 h-3" />
+                        Campaign
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleDerive(biz)}
+                        disabled={derivingIdx !== null}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded hover:bg-cyan-100 dark:bg-cyan-900/20 dark:text-cyan-300 dark:border-cyan-800 dark:hover:bg-cyan-900/40 disabled:opacity-50"
+                        title={`Create a business-scope campaign for ${biz.business_name}`}
+                      >
+                        {derivingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                        Campaign
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* Provenance (collapsible) */}
