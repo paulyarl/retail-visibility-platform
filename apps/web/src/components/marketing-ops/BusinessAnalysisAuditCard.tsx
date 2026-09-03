@@ -132,7 +132,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
       : requested.phone
         ? [requested.phone]
         : [];
-  const isOperationalBlocked = opStatus === 'inactive';
+  const isOperationalBlocked = opStatus !== 'active';
 
   const handleCopySummary = () => {
     const text = d.summary ?? `${requested.business_name ?? 'Business'} seek audit — score ${score}/10, tier ${tier}`;
@@ -212,7 +212,9 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
                     ? 'Already added to place listing'
                     : identityStatus === 'mismatched'
                       ? 'Cannot seed: identity mismatch'
-                      : 'Create and publish place listing'
+                      : isOperationalBlocked
+                        ? 'Call to verify operating status before creating place listing'
+                        : 'Create and publish place listing'
               }
               className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-default"
             >
