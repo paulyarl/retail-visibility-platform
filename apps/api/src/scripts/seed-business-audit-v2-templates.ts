@@ -39,7 +39,7 @@ const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03-seo-narrative -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 
@@ -89,13 +89,19 @@ const PUBLIC_NARRATIVE_SCHEMA_LINE = '"summary": "",\n  "public_narrative": ""';
 const PUBLIC_NARRATIVE_DIRECTIVE = `
 ### Public Narrative (required)
 
-Write a factual, public-safe description of the business for the \`public_narrative\` field. This text will appear on a public directory listing page that visitors and the business owner will see.
+Write a factual, public-safe, SEO-rich description of the business for the \`public_narrative\` field. This text will appear on a public directory listing page that visitors and the business owner will see, and it is the primary long-tail SEO surface for unclaimed listings — it must help the listing rank for the searches real customers actually type.
 
 Include:
-* What the business is (category, format, specialization)
-* Where it is located (neighborhood, corridor, or district context)
-* What it is known for (signature products, services, or community role)
-* Community or cultural context when verifiable
+* What the business is (category, format, specialization — use the specific category label, not a generic one)
+* Where it is located (neighborhood, corridor, district, city — use geo-modified phrasing a searcher would use, e.g. "African grocery in Kansas City's Northeast neighborhood")
+* What it is known for (signature products, services, dishes, or community role — name the specific items verified in the audit, not generic categories; e.g. "frozen cassava leaves, dried beans, frozen fish" beats "spices and grains")
+* Community, cultural, or ownership context when verifiable (e.g. "Central African-owned," "Congolese-style prepared foods")
+* Services offered (catering, in-store pickup, online ordering, tax service) when verified
+
+SEO guidance:
+* Surface category-defining terms (the niche/category label), culturally specific terms (regional cuisine, product names), and geo-modified terms (neighborhood + city + corridor) that a searcher would actually type.
+* Prefer concrete, verified product and service names over abstract category words — "frozen cassava leaves and dried beans" is stronger SEO than "spices and grains."
+* Weave keywords naturally into readable prose — do not keyword-stuff or list comma-separated terms without sentence flow.
 
 Exclude (these are internal assessment content — never public):
 * Digital Opportunity Score, tier classifications, or alignment labels
@@ -103,8 +109,9 @@ Exclude (these are internal assessment content — never public):
 * Recommended services, pricing, or upsell language
 * Competitive benchmark comparisons
 * Any language that could embarrass the business owner or signal weakness
+* Health inspection outcomes, license status, closure/suspension reports
 
-Length: 1-3 sentences, max 300 characters. Write in third person. Be specific and vivid — this is the first thing a visitor reads on the listing page. Do not invent details; use only verified public information. If the business is too thinly sourced for a rich narrative, write a shorter factual sentence using what is verified.
+Length: 2-4 sentences, 300-600 characters. Write in third person. Be specific and vivid — this is the first thing a visitor reads on the listing page and the primary text search engines will index. Do not invent details; use only verified public information. If the business is richly sourced, use the verified specifics to fill the range. If too thinly sourced for a rich narrative, write a shorter factual sentence using what is verified — but never pad with generic filler.
 `;
 
 // ─── Directive: Website Accessibility Verification (inserted at the end of
@@ -401,6 +408,25 @@ function replaceFirst(body: string, from: string, to: string): string {
   return body.slice(0, idx) + to + body.slice(idx + from.length);
 }
 
+/**
+ * Remove a section starting with `headingMarker` up to (but not including)
+ * the next markdown heading (`## ` or `### `). Used to strip a
+ * previously-inserted directive before re-inserting an updated version
+ * when the seed version marker is bumped.
+ */
+function removeSection(body: string, headingMarker: string): string {
+  const startIdx = body.indexOf(headingMarker);
+  if (startIdx === -1) return body;
+  const afterMarker = body.slice(startIdx + headingMarker.length);
+  const nextHeadingMatch = afterMarker.search(/\n#{2,3} /);
+  if (nextHeadingMatch === -1) {
+    // No next heading — trim to end.
+    return body.slice(0, startIdx).replace(/\s+$/, '');
+  }
+  const endIdx = startIdx + headingMarker.length + nextHeadingMatch;
+  return body.slice(0, startIdx) + body.slice(endIdx);
+}
+
 // ─── Prompt 1 (Category-Integrated) transformation ───────────────────────
 
 function transformCategoryIntegrated(body: string): string {
@@ -441,6 +467,8 @@ function transformCategoryIntegrated(body: string): string {
   //     instruction section. Try "## Summary" heading first, then fall back
   //     to the Gold Standard binding section end (which was inserted in step 1
   //     and exists in all templates that have the Gold Standard block).
+  //     Remove any prior version of the directive first (seed version bump).
+  out = removeSection(out, '### Public Narrative (required)');
   try {
     out = insertAfter(out, '## Summary', PUBLIC_NARRATIVE_DIRECTIVE);
   } catch {
@@ -638,7 +666,8 @@ function transformSignalAligned(body: string): string {
   }
 
   // 19c. Add the public_narrative directive section after the Summary
-  //      instruction section.
+  //      instruction section. Remove any prior version first (seed bump).
+  out = removeSection(out, '### Public Narrative (required)');
   out = insertAfter(out, '## Summary', PUBLIC_NARRATIVE_DIRECTIVE);
 
   // 19d. Website Accessibility Verification directive — insert at the end of
