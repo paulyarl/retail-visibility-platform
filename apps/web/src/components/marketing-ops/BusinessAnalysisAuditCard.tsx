@@ -85,6 +85,7 @@ interface BusinessAnalysisAuditCardProps {
 
 export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced }: BusinessAnalysisAuditCardProps) {
   const [copied, setCopied] = useState(false);
+  const [narrativeCopied, setNarrativeCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [addingToPlace, setAddingToPlace] = useState(false);
@@ -285,6 +286,27 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
         {d.summary && (
           <Section title="Summary">
             <p className="text-sm text-gray-700 dark:text-gray-300">{d.summary}</p>
+          </Section>
+        )}
+
+        {/* 2b. Public Narrative (customer-facing description) */}
+        {d.public_narrative && (
+          <Section title="Public Narrative">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-gray-700 dark:text-gray-300 italic">{d.public_narrative}</p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(d.public_narrative);
+                  setNarrativeCopied(true);
+                  setTimeout(() => setNarrativeCopied(false), 2000);
+                }}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-700 flex-shrink-0"
+                title="Copy public narrative"
+              >
+                <Copy className="h-3 w-3" /> {narrativeCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-gray-400">Customer-facing description suitable for listings, receipts, and outreach.</p>
           </Section>
         )}
 
