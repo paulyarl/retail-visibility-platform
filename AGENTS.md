@@ -26,6 +26,11 @@ doppler run --config local -- npx tsx src/scripts/seed-profile-repair-issue-brie
 doppler run --config local -- npx tsx src/scripts/seed-profile-repair-triage-briefing.ts
 doppler run --config local -- npx tsx src/scripts/seed-marketing-ops-templates.ts
 doppler run --config local -- npx tsx src/scripts/seed-gold-standard-scan-template.ts
+
+# Business Audit V2 (Category-Integrated mpt-j9bbem3l + Signal-Aligned mpt-6oeuiizo)
+# — wires Category Intelligence + Gold Standard + Website Accessibility Verification
+#   directive into both variants. Bump SEED_VERSION_MARKER in the script to re-apply.
+doppler run --config local -- npx tsx src/scripts/seed-business-audit-v2-templates.ts
 ```
 Repeat each command with `--config prd` for production.
 
