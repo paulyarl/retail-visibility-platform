@@ -178,6 +178,30 @@ For an EMERGING scan:
   padding the result with competitive leaders. Never invent or infer emerging
   deficiencies from unavailable evidence.
 
+=== GOLD STANDARD USE IN EMERGING DISCOVERY ===
+For EMERGING focus, the gold standard is an opportunity-gap reference, not a
+qualification filter and not a competitive ranking.
+
+A poor rating or failed gate against the gold standard is a positive prospect
+indicator when the business otherwise fits the category and market. Missing
+website, incomplete profiles, sparse photos or reviews, weak category labeling,
+NAP drift, and limited platform coverage may indicate fixable visibility
+opportunities.
+
+Do not disqualify or deprioritize an emerging business because it performs poorly
+against the gold standard. Do not require gold-standard match for
+business_seek_recommended = true. Use gold-standard gaps to explain why the
+business may benefit from Business Audit and outreach.
+
+Gold-standard weakness must still be based only on observed evidence. Do not
+convert unavailable information into a failed gate. A category-fit failure,
+identity conflict, or unresolved current-business-status conflict may still
+require hold status independently of gold-standard performance.
+
+Do not select established, highly visible leaders merely because they match the
+gold standard. In EMERGING focus, strong gold-standard performance is not the
+selection objective.
+
 === EMERGING × PROFILE INTEGRATION ===
 Apply each emerging-focus point above USING the Category Intelligence Profile
 that preceded this block. The profile is not category-neutral context — it is
