@@ -174,4 +174,34 @@ describe('intelligence_profile schema (GAP-P8)', () => {
     }));
     expect(result.success).toBe(true);
   });
+
+  it('specialized_source with null url → pass (coerced to undefined)', () => {
+    // Models frequently emit `"url": null` for sources with no canonical web
+    // address (e.g. "supplier sourcing-road network", "storefront corridor
+    // observation"). The schema must coerce null → undefined rather than fail.
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      specialized_sources: [
+        {
+          name: 'CARFAX',
+          type: 'service_history',
+          url: 'https://www.carfax.com',
+          priority: 1,
+          capabilities: ['Vehicle service history records'],
+          limitations: ['CARFAX is NOT a review system'],
+        },
+        {
+          name: 'Storefront Corridor Observation',
+          type: 'other',
+          url: null,
+          priority: 3,
+          capabilities: ['Photograph signage, hours windows, EBT decals'],
+          limitations: ['Field method — labor-intensive and point-in-time'],
+        },
+      ],
+    }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.specialized_sources[1].url).toBeUndefined();
+    }
+  });
 });

@@ -33,7 +33,16 @@ const specializedSourceSchema = z.object({
   // prompt instructs the agent to capture it for any source that has a
   // canonical web address — vertical directories and community organizations
   // especially, where the URL is the operator-actionable entry point.
-  url: z.string().url().optional(),
+  //
+  // Models frequently emit `"url": null` (rather than omitting the key) for
+  // sources with no canonical web address (e.g. "storefront corridor
+  // observation", "supplier sourcing-road network"). Coerce null → undefined
+  // so downstream consumers always see `url` as either a valid URL string or
+  // undefined, and so external imports don't fail validation on null URLs.
+  url: z.preprocess(
+    (v) => (v === null ? undefined : v),
+    z.string().url().optional(),
+  ),
   priority: z.number().int().optional(),
   capabilities: z.array(z.string()).min(1),
   limitations: z.array(z.string()).min(1),
