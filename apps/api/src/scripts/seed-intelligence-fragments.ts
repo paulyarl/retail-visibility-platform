@@ -307,6 +307,15 @@ context helps frame the emerging prospects' gaps relative to the competitive sta
 Note: competitive-focus businesses are generally NOT prospects for outreach
 (they already have strong digital presence). They are context for the emerging set.
 
+=== COMPETITIVE GOLD-STANDARD SELECTION ===
+For COMPETITIVE focus, select and identify the strongest category-qualified
+candidates relative to the established gold standard. Flag
+gold_standard_match = true only for candidates that are among the strongest
+matches per platform relative to the candidate pool and existing exemplars.
+Use gold-standard similarity, platform completeness, and observed digital
+strength to identify benchmark leaders. This selection logic belongs to
+COMPETITIVE focus only and must not be applied to EMERGING focus.
+
 === COMPETITIVE × PROFILE INTEGRATION ===
 Apply each competitive-focus point above USING the Category Intelligence Profile
 that preceded this block. The profile is not category-neutral context — it
