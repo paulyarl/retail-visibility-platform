@@ -3870,6 +3870,10 @@ const prospectQueueAddSchema = z.object({
   discovery_signals: z.array(z.string()).optional(),
   business_seek_priority: z.enum(['high', 'medium', 'low', 'hold']).optional(),
   intelligence_run_id: z.string().max(64).optional(),
+  // When 'verify_then_outreach', the entry is created directly in the
+  // verification state (skipping 'queued'). Used by discovery surfaces where
+  // the audit already flagged NAP/digital presence as unable_to_verify.
+  initial_status: z.enum(['queued', 'verify_then_outreach']).optional(),
 }).superRefine((data, ctx) => {
   if (data.source_kind !== 'manual' && !data.source_campaign_id) {
     ctx.addIssue({
@@ -3921,6 +3925,7 @@ router.post('/prospect-queue', async (req: any, res: Response) => {
       discovery_signals: parsed.discovery_signals,
       business_seek_priority: parsed.business_seek_priority,
       intelligence_run_id: parsed.intelligence_run_id,
+      initial_status: parsed.initial_status,
     }, getCtx(req));
 
     if (result.kind === 'campaign_exists') {

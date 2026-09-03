@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Flame, Plus, RefreshCw, AlertCircle, Loader2, Inbox, Check } from 'lucide-react';
+import { CheckCircle2, Flame, Plus, RefreshCw, AlertCircle, Loader2, Inbox, Check, Phone } from 'lucide-react';
 import marketingOpsService, { type SyncReport } from '@/services/MarketingOpsService';
 
 interface SyncReportCardProps {
@@ -21,7 +21,7 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
   const [bulkResult, setBulkResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [queueingIdx, setQueueingIdx] = useState<number | null>(null);
-  const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'exists' | 'already' | 'error'>>({});
+  const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'verify' | 'exists' | 'already' | 'error'>>({});
 
   const fetchReport = async () => {
     setLoading(true);
@@ -100,7 +100,7 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
     }
   };
 
-  const handleQueueOne = async (idx: number, businessName: string) => {
+  const handleQueueOne = async (idx: number, businessName: string, initialStatus?: 'queued' | 'verify_then_outreach') => {
     setQueueingIdx(idx);
     setError(null);
     try {
@@ -114,10 +114,12 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
         // review/signal data. The snapshot is intentionally thin; the
         // operator can enrich it from the campaign detail page later.
         business_snapshot: { business_name: businessName },
+        initial_status: initialStatus,
       });
+      const successKind = initialStatus === 'verify_then_outreach' ? 'verify' : 'queued';
       setQueuedFeedback((prev) => ({
         ...prev,
-        [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : 'queued',
+        [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : successKind,
       }));
     } catch (e: any) {
       setQueuedFeedback((prev) => ({ ...prev, [idx]: 'error' }));
@@ -263,12 +265,21 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => handleQueueOne(i, u.businessName)}
-                      disabled={queueingIdx === i || queuedFeedback[i] === 'queued'}
+                      disabled={queueingIdx === i || queuedFeedback[i] === 'queued' || queuedFeedback[i] === 'verify'}
                       className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/40 disabled:opacity-50"
                       title={queuedFeedback[i] === 'queued' ? 'Added to queue' : `Add ${u.businessName} to the prospect queue for later`}
                     >
                       {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : queuedFeedback[i] === 'queued' ? <Check className="h-2.5 w-2.5 text-green-600" /> : <Inbox className="h-2.5 w-2.5" />}
                       {queuedFeedback[i] === 'queued' ? 'Queued' : 'Queue'}
+                    </button>
+                    <button
+                      onClick={() => handleQueueOne(i, u.businessName, 'verify_then_outreach')}
+                      disabled={queueingIdx === i || queuedFeedback[i] === 'queued' || queuedFeedback[i] === 'verify'}
+                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 disabled:opacity-50"
+                      title={queuedFeedback[i] === 'verify' ? 'Sent to verification queue' : `Send ${u.businessName} to phone verification (NAP/digital presence unverified)`}
+                    >
+                      {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : queuedFeedback[i] === 'verify' ? <Check className="h-2.5 w-2.5 text-green-600" /> : <Phone className="h-2.5 w-2.5" />}
+                      {queuedFeedback[i] === 'verify' ? 'Verifying' : 'Verify'}
                     </button>
                     {queuedFeedback[i] === 'already' && (
                       <span className="text-[9px] text-slate-400">already</span>

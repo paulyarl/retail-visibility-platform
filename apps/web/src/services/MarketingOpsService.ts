@@ -973,6 +973,10 @@ export interface AddToQueueInput {
   discovery_signals?: string[];
   business_seek_priority?: 'high' | 'medium' | 'low' | 'hold';
   intelligence_run_id?: string;
+  // When 'verify_then_outreach', the entry is created directly in the
+  // verification state (skipping 'queued'). Used by discovery surfaces where
+  // the audit already flagged NAP/digital presence as unable_to_verify.
+  initial_status?: 'queued' | 'verify_then_outreach';
 }
 
 export type AddToQueueResult =

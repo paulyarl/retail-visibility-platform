@@ -315,6 +315,54 @@ describe('MarketingProspectQueueService', () => {
         }),
       );
     });
+
+    it('creates a verify_then_outreach entry directly when initial_status=verify_then_outreach', async () => {
+      mockQueue.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data })),
+      );
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Unverified Biz',
+        title: 'Unverified Biz',
+        source_kind: 'scan_unmatched',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: { business_name: 'Unverified Biz' },
+        initial_status: 'verify_then_outreach',
+      });
+
+      expect(result.kind).toBe('created');
+      expect(mockQueue.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'verify_then_outreach',
+            verification: expect.objectContaining({
+              requested_at: expect.any(String),
+              requested_by: null,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('dedups against existing verify_then_outreach rows when initial_status=verify_then_outreach', async () => {
+      // An existing verify_then_outreach row for the same business should be
+      // returned as already_queued rather than creating a duplicate.
+      mockQueue.findFirst.mockResolvedValue(
+        queueRow({ status: 'verify_then_outreach', business_name: 'Unverified Biz' }),
+      );
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Unverified Biz',
+        title: 'Unverified Biz',
+        source_kind: 'scan_unmatched',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: { business_name: 'Unverified Biz' },
+        initial_status: 'verify_then_outreach',
+      });
+
+      expect(result.kind).toBe('already_queued');
+      expect(mockQueue.create).not.toHaveBeenCalled();
+    });
   });
 
   // ─── list ──────────────────────────────────────────────────────────────

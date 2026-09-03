@@ -129,6 +129,12 @@ export interface ProspectQueueAddInput {
   discovery_signals?: string[];
   business_seek_priority?: 'high' | 'medium' | 'low' | 'hold';
   intelligence_run_id?: string;
+  // When 'verify_then_outreach', the entry is created directly in the
+  // verification state (skipping 'queued'). Used by discovery surfaces where
+  // the audit already flagged NAP/digital presence as unable_to_verify and the
+  // operator wants to send the prospect straight to phone verification.
+  // Defaults to 'queued' (legacy behavior).
+  initial_status?: 'queued' | 'verify_then_outreach';
 }
 
 export type AddToQueueResult =
@@ -224,7 +230,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // Business scope dedups on the full triple (business_name + city +
       // category). Category/city scope entries have no business_name, so they
       // dedup on city + category only (matching a null business_name row).
-      const dedupWhere: any = { status: 'queued' };
+      // Matches both 'queued' and 'verify_then_outreach' rows so that adding
+      // to verify when a queued row already exists returns the existing row
+      // (and vice versa) rather than creating a duplicate.
+      const initialStatus = input.initial_status === 'verify_then_outreach'
+        ? 'verify_then_outreach'
+        : 'queued';
+      const dedupWhere: any = { status: { in: ['queued', 'verify_then_outreach'] } };
       if (businessName) {
         dedupWhere.business_name = { equals: businessName, mode: 'insensitive' };
       } else {
@@ -236,8 +248,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
         where: dedupWhere,
       });
       if (existingQueued) {
-        logger.info('addToQueue: returning existing queued entry', ctx, {
+        logger.info('addToQueue: returning existing queue entry', ctx, {
           existingId: existingQueued.id, businessName: businessName || null,
+          existingStatus: existingQueued.status,
         });
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
@@ -293,10 +306,19 @@ class MarketingProspectQueueServiceClass extends BaseService {
           signal_count: signalCount,
           rating: rating != null ? rating : null,
           review_count: reviewCount ?? null,
-          status: 'queued',
+          status: initialStatus,
           priority: input.priority ?? 'normal',
           note: input.note ?? null,
           queued_by: input.queuedBy ?? null,
+          // When created directly in verify_then_outreach (from discovery
+          // surfaces), stamp the verification request metadata so the queue
+          // card can show who requested it and when.
+          verification: initialStatus === 'verify_then_outreach'
+            ? {
+                requested_at: new Date().toISOString(),
+                requested_by: input.queuedBy ?? null,
+              } as any
+            : undefined,
           // Intelligence discovery columns (Sprint §5.10). Populated when
           // source_kind = 'intelligence_seek'; null/undefined for other
           // source kinds (the columns are nullable).

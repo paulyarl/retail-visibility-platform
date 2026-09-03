@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Plus, Loader2, Inbox, Check, ChevronDown, ChevronRight, MapPin, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Loader2, Inbox, Check, ChevronDown, ChevronRight, MapPin, AlertTriangle, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Audit } from '@/services/MarketingOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
@@ -113,7 +113,7 @@ export default function IntelligenceDiscoveryAuditCard({
   const data = parseDiscovery(audit);
   const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
   const [queueingIdx, setQueueingIdx] = useState<number | null>(null);
-  const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'exists' | 'already'>>({});
+  const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'verify' | 'exists' | 'already'>>({});
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<'all' | 'qualifying' | 'hold'>('all');
@@ -169,7 +169,7 @@ export default function IntelligenceDiscoveryAuditCard({
     }
   };
 
-  const handleQueue = async (biz: DiscoveredBusiness) => {
+  const handleQueue = async (biz: DiscoveredBusiness, initialStatus?: 'queued' | 'verify_then_outreach') => {
     const idx = sortedBusinesses.indexOf(biz);
     setQueueingIdx(idx);
     setDeriveError(null);
@@ -202,10 +202,12 @@ export default function IntelligenceDiscoveryAuditCard({
         discovery_provenance: biz.discovery_provenance,
         discovery_signals: biz.discovery_signals,
         business_seek_priority: biz.business_seek_priority,
+        initial_status: initialStatus,
       } as any);
+      const successKind = initialStatus === 'verify_then_outreach' ? 'verify' : 'queued';
       setQueuedFeedback((prev) => ({
         ...prev,
-        [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : 'queued',
+        [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : successKind,
       }));
     } catch (err: any) {
       setDeriveError(err.message || 'Failed to add to queue');
@@ -413,12 +415,21 @@ export default function IntelligenceDiscoveryAuditCard({
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => handleQueue(biz)}
-                      disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued'}
+                      disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued' || queuedFeedback[idx] === 'verify'}
                       className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100 dark:bg-slate-900/20 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-900/40 disabled:opacity-50"
                       title={queuedFeedback[idx] === 'queued' ? 'Added to queue' : `Add ${biz.business_name} to the prospect queue`}
                     >
                       {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : queuedFeedback[idx] === 'queued' ? <Check className="w-3 h-3 text-green-600" /> : <Inbox className="w-3 h-3" />}
                       {queuedFeedback[idx] === 'queued' ? 'Queued' : 'Queue'}
+                    </button>
+                    <button
+                      onClick={() => handleQueue(biz, 'verify_then_outreach')}
+                      disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued' || queuedFeedback[idx] === 'verify'}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800 dark:hover:bg-amber-900/40 disabled:opacity-50"
+                      title={queuedFeedback[idx] === 'verify' ? 'Sent to verification queue' : `Send ${biz.business_name} to phone verification (NAP/digital presence unverified)`}
+                    >
+                      {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : queuedFeedback[idx] === 'verify' ? <Check className="w-3 h-3 text-green-600" /> : <Phone className="w-3 h-3" />}
+                      {queuedFeedback[idx] === 'verify' ? 'Verifying' : 'Verify'}
                     </button>
                     {queuedFeedback[idx] === 'already' && (
                       <span className="text-[10px] text-slate-400" title="Already in the queue">already</span>
