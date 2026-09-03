@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw, CheckCircle2, MapPin, ExternalLink } from 'lucide-react';
+import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw, CheckCircle2, MapPin, ExternalLink, Phone } from 'lucide-react';
 import type { Audit } from '@/services/MarketingOpsService';
 import marketingOpsService from '@/services/MarketingOpsService';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
@@ -41,6 +41,13 @@ function websiteStatusColor(status: string): string {
   if (s === 'working') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
   if (s === 'broken') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
   if (s === 'none_found') return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+  return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+}
+
+function operationalStatusColor(status: string): string {
+  const s = status.toLowerCase();
+  if (s === 'active') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+  if (s === 'inactive') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
   return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
 }
 
@@ -116,6 +123,16 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const fee = d.estimated_monthly_service_fee ?? {};
   const dq = d.data_quality ?? {};
   const sources = d.sources ?? [];
+  const operational = d.operational_status ?? {};
+  const opStatus = operational.status ?? 'unable_to_verify';
+  const opPhones = nap.phone_variations?.length
+    ? nap.phone_variations
+    : matched.phone
+      ? [matched.phone]
+      : requested.phone
+        ? [requested.phone]
+        : [];
+  const isOperationalBlocked = opStatus === 'inactive';
 
   const handleCopySummary = () => {
     const text = d.summary ?? `${requested.business_name ?? 'Business'} seek audit — score ${score}/10, tier ${tier}`;
@@ -187,13 +204,15 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             </button>
             <button
               onClick={handleAddToPlace}
-              disabled={addingToPlace || identityStatus === 'mismatched' || placeResult != null}
+              disabled={addingToPlace || identityStatus === 'mismatched' || placeResult != null || isOperationalBlocked}
               title={
-                placeResult != null
-                  ? 'Already added to place listing'
-                  : identityStatus === 'mismatched'
-                    ? 'Cannot seed: identity mismatch'
-                    : 'Create and publish place listing'
+                isOperationalBlocked
+                  ? 'Cannot seed: business reported as not operational'
+                  : placeResult != null
+                    ? 'Already added to place listing'
+                    : identityStatus === 'mismatched'
+                      ? 'Cannot seed: identity mismatch'
+                      : 'Create and publish place listing'
               }
               className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-default"
             >
@@ -309,6 +328,44 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             <p className="mt-1 text-[10px] text-gray-400">Customer-facing description suitable for listings, receipts, and outreach.</p>
           </Section>
         )}
+
+        {/* 2c. Operating Status Verification */}
+        <Section title="Operating Status Verification">
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <Badge cls={operationalStatusColor(opStatus)}>{opStatus.replace(/_/g, ' ')}</Badge>
+            {operational.last_activity_date && (
+              <span className="text-gray-500 dark:text-gray-400">Last evidence: {operational.last_activity_date}</span>
+            )}
+          </div>
+          {operational.last_activity_evidence && (
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{operational.last_activity_evidence}</p>
+          )}
+          {(opStatus === 'inactive' || opStatus === 'unable_to_verify') && (
+            <div className="mt-2 rounded bg-amber-50 dark:bg-amber-900/20 p-2 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>Do not proceed with listing or outreach work until operating status is confirmed by phone.</span>
+            </div>
+          )}
+          {opPhones.length > 0 ? (
+            <div className="mt-2">
+              <span className="text-[10px] text-gray-400">Call to verify:</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {opPhones.map((phone: string, i: number) => (
+                  <a
+                    key={i}
+                    href={`tel:${phone.replace(/\D/g, '')}`}
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300"
+                    title={`Call ${phone}`}
+                  >
+                    <Phone className="h-3 w-3" /> {phone}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No phone number available to verify operating status.</p>
+          )}
+        </Section>
 
         {/* 3. Platform ratings */}
         <Section title="Platform Ratings">
