@@ -429,7 +429,7 @@ export default function IntelligenceDiscoveryAuditCard({
                       title={queuedFeedback[idx] === 'verify' ? 'Sent to verification queue' : `Send ${biz.business_name} to phone verification (NAP/digital presence unverified)`}
                     >
                       {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : queuedFeedback[idx] === 'verify' ? <Check className="w-3 h-3 text-green-600" /> : <Phone className="w-3 h-3" />}
-                      {queuedFeedback[idx] === 'verify' ? 'Verifying' : 'Verify'}
+                      {queuedFeedback[idx] === 'verify' ? 'Sent' : 'Verify'}
                     </button>
                     {queuedFeedback[idx] === 'already' && (
                       <span className="text-[10px] text-slate-400" title="Already in the queue">already</span>

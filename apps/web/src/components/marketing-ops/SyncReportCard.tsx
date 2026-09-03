@@ -279,7 +279,7 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
                       title={queuedFeedback[i] === 'verify' ? 'Sent to verification queue' : `Send ${u.businessName} to phone verification (NAP/digital presence unverified)`}
                     >
                       {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : queuedFeedback[i] === 'verify' ? <Check className="h-2.5 w-2.5 text-green-600" /> : <Phone className="h-2.5 w-2.5" />}
-                      {queuedFeedback[i] === 'verify' ? 'Verifying' : 'Verify'}
+                      {queuedFeedback[i] === 'verify' ? 'Sent' : 'Verify'}
                     </button>
                     {queuedFeedback[i] === 'already' && (
                       <span className="text-[9px] text-slate-400">already</span>
