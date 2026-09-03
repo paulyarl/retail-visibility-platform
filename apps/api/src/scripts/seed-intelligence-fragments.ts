@@ -158,6 +158,26 @@ untapped opportunity. Specifically seek:
 The emerging focus builds the PROSPECT SET — businesses that need us. These are
 the businesses most likely to benefit from a Business Audit and outreach.
 
+=== EMERGING IS THE OPPOSITE OF COMPETITIVE ===
+This is NOT a market-leader, competitor, or benchmark scan. Do not optimize for
+businesses with the strongest digital presence, highest review counts, most press,
+most complete profiles, or broadest visibility. Those belong in COMPETITIVE focus.
+
+For an EMERGING scan:
+- Prioritize businesses with little, fragmented, stale, miscategorized, or
+  social-only/directory-only visibility, even when community trust is strong.
+- A business must have at least one evidence-backed emerging condition to be a
+  primary emerging prospect: thin footprint, weak mainstream indexing, single
+  source, hidden trust, recent establishment, or category misalignment.
+- Do not promote an established, highly visible category leader into the emerging
+  prospect set merely because it is easy to find or has strong benchmark scores.
+- If an established business is useful for identity or category verification, keep
+  it as reference context only and set business_seek_recommended to false; do not
+  use it to fill an emerging prospect quota.
+- If no emerging businesses can be verified, return fewer candidates rather than
+  padding the result with competitive leaders. Never invent or infer emerging
+  deficiencies from unavailable evidence.
+
 === EMERGING × PROFILE INTEGRATION ===
 Apply each emerging-focus point above USING the Category Intelligence Profile
 that preceded this block. The profile is not category-neutral context — it is
