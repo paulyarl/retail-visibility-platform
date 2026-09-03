@@ -157,11 +157,24 @@ export default function IntelligenceDiscoveryAuditCard({
       // Do NOT pass discovery_signals as detected_signals — INT_* codes must
       // not enter the triage engine (Sprint §5.11). The discovery context is
       // preserved in the campaign notes via the derive-business note field.
+      //
+      // NAP handoff (Migration 253 — GAP-E4): forward the discovery pass's
+      // phone/email/website/gbp_url/address onto the derived campaign so the
+      // operator doesn't have to re-key NAP the discovery already produced.
+      // The flat `address` string is sent as both `address` (→ addressLine1
+      // fallback) and `location` (notes line) for backward compatibility.
       const child = await service.deriveBusinessCampaign(campaignId, {
         business_name: biz.business_name,
         rating: biz.rating ?? undefined,
         review_count: biz.review_count ?? undefined,
         location: biz.address || biz.location_status,
+        phone: biz.phone ?? undefined,
+        email: biz.email ?? undefined,
+        website: biz.website ?? undefined,
+        gbp_url: biz.gbp_url ?? undefined,
+        address: biz.address ?? undefined,
+        address_city: biz.city ?? undefined,
+        address_state: biz.state ?? undefined,
       });
       setDerivedCampaignId((prev) => ({ ...prev, [idx]: child.id }));
     } catch (err: any) {
@@ -193,7 +206,9 @@ export default function IntelligenceDiscoveryAuditCard({
           location: biz.location_status,
           address: biz.address,
           phone: biz.phone,
+          email: biz.email,
           website: biz.website,
+          gbp_url: biz.gbp_url,
           ownership_type: biz.ownership_type,
         },
         priority: biz.business_seek_priority === 'high' ? 'high' : 'normal',

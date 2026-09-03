@@ -657,6 +657,20 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // Migration 253 — GAP-E3 discovery context handoff
           discoveryContext: discoveryContext ?? undefined,
           intelligenceRunId,
+          // Migration 253 — GAP-E4 NAP handoff: forward the discovery
+          // snapshot's contact + address fields so the derived campaign
+          // inherits NAP from the queue entry (set by the discovery card's
+          // Queue/Verify actions) instead of only business_name. The flat
+          // `address` string maps to addressLine1.
+          phone: (snapshot.phone as string) ?? undefined,
+          email: (snapshot.email as string) ?? undefined,
+          websiteUrl: (snapshot.website as string) ?? undefined,
+          gbpUrl: (snapshot.gbp_url as string) ?? undefined,
+          addressLine1: (snapshot.address as string) ?? undefined,
+          addressCity: (snapshot.address_city as string) ?? undefined,
+          addressState: (snapshot.address_state as string) ?? undefined,
+          addressZip: (snapshot.address_zip as string) ?? undefined,
+          addressCountry: (snapshot.address_country as string) ?? undefined,
         }, ctx);
         result = { campaign, created: true };
       }

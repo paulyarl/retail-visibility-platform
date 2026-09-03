@@ -1560,6 +1560,20 @@ const deriveBusinessSchema = z.object({
   location: z.string().max(500).optional(),
   detected_signals: z.array(z.string()).optional(),
   assigned_to: z.string().optional(),
+  // NAP handoff (Migration 253 — GAP-E4): discovery audits surface these
+  // per discovered business; forward them so the derived campaign is born
+  // with the discovery pass's NAP instead of just business_name.
+  phone: z.string().max(100).optional(),
+  email: z.string().max(320).optional(),
+  website: z.string().max(2000).optional(),
+  gbp_url: z.string().max(2000).optional(),
+  address: z.string().max(500).optional(),
+  address_line1: z.string().max(500).optional(),
+  address_line2: z.string().max(500).optional(),
+  address_city: z.string().max(200).optional(),
+  address_state: z.string().max(100).optional(),
+  address_zip: z.string().max(40).optional(),
+  address_country: z.string().max(100).optional(),
 });
 
 router.post('/:id/derive-business', async (req: any, res: Response) => {
@@ -1575,6 +1589,19 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
       location: parsed.location,
       detectedSignals: parsed.detected_signals,
       assignedTo: parsed.assigned_to ?? req.user?.id,
+      // NAP handoff — prefer explicit structured address fields, fall back
+      // to the flat `address` string into addressLine1 so a discovery
+      // payload that only carries a single address line still seeds NAP.
+      phone: parsed.phone,
+      email: parsed.email,
+      websiteUrl: parsed.website,
+      gbpUrl: parsed.gbp_url,
+      addressLine1: parsed.address_line1 ?? parsed.address,
+      addressLine2: parsed.address_line2,
+      addressCity: parsed.address_city,
+      addressState: parsed.address_state,
+      addressZip: parsed.address_zip,
+      addressCountry: parsed.address_country,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
   } catch (error) {

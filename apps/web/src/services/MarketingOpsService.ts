@@ -1678,6 +1678,20 @@ class MarketingOpsService extends AdminApiSingleton {
     location?: string;
     detected_signals?: string[];
     assigned_to?: string;
+    // NAP handoff (Migration 253 — GAP-E4): discovery audits surface these
+    // per discovered business; forward them so the derived campaign is born
+    // with the discovery pass's NAP instead of just business_name.
+    phone?: string;
+    email?: string;
+    website?: string;
+    gbp_url?: string;
+    address?: string;
+    address_line1?: string;
+    address_line2?: string;
+    address_city?: string;
+    address_state?: string;
+    address_zip?: string;
+    address_country?: string;
   }): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${parentId}/derive-business`,

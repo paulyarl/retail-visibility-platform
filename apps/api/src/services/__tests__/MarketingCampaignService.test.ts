@@ -402,4 +402,84 @@ describe('deriveBusinessCampaign', () => {
       })
     );
   });
+
+  // ─── NAP handoff (Migration 253 — GAP-E4) ─────────────────────────────
+  // Discovery audits surface phone/email/website/gbp_url/address per
+  // discovered business. deriveBusinessCampaign must forward these onto the
+  // child campaign so the operator doesn't have to re-key NAP that the
+  // discovery pass already produced. gbp_url is folded into a Google
+  // directoryProfiles entry when no explicit directoryProfiles payload is
+  // supplied, so gbp_claimed/unaddressed_reviews derive from it too.
+  it('forwards NAP fields (phone/email/website/address) onto the child campaign', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'NAP Biz',
+      phone: '(317) 555-0142',
+      email: 'owner@napbiz.example',
+      websiteUrl: 'https://napbiz.example',
+      addressLine1: '706 W Main St',
+      addressCity: 'Plainfield',
+      addressState: 'IN',
+      addressZip: '46168',
+    });
+
+    expect(mockCampaignsList.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          business_name: 'NAP Biz',
+          phone: '(317) 555-0142',
+          email: 'owner@napbiz.example',
+          website_url: 'https://napbiz.example',
+          address_line1: '706 W Main St',
+          address_city: 'Plainfield',
+          address_state: 'IN',
+          address_zip: '46168',
+        }),
+      })
+    );
+  });
+
+  it('folds gbp_url into a Google directoryProfiles entry', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'GBP Biz',
+      rating: 4.4,
+      reviewCount: 88,
+      gbpUrl: 'https://www.google.com/maps/place/?q=place_id:abc',
+    });
+
+    const createCall = mockCampaignsList.create.mock.calls[0][0];
+    const profiles = createCall.data.directory_profiles;
+    expect(Array.isArray(profiles)).toBe(true);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]).toMatchObject({
+      platform: 'google',
+      url: 'https://www.google.com/maps/place/?q=place_id:abc',
+      claim_status: 'unknown',
+      star_rating: 4.4,
+      review_count: 88,
+    });
+    // createCampaign derives unaddressed_reviews from the Google profile's
+    // review_count when directoryProfiles is supplied.
+    expect(createCall.data.unaddressed_reviews).toBe(88);
+  });
+
+  it('leaves NAP fields null when not supplied (legacy callers unchanged)', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'Legacy Biz',
+    });
+
+    const createCall = mockCampaignsList.create.mock.calls[0][0];
+    expect(createCall.data.phone).toBeNull();
+    expect(createCall.data.email).toBeNull();
+    expect(createCall.data.website_url).toBeNull();
+    expect(createCall.data.address_line1).toBeNull();
+  });
 });

@@ -730,6 +730,24 @@ export class MarketingCampaignService extends BaseService {
     // Migration 253 — GAP-E3 discovery context handoff
     discoveryContext?: DiscoveryContext | null;
     intelligenceRunId?: string;
+    // NAP handoff (Migration 253 — GAP-E4): discovery audits surface
+    // phone/email/website/address/gbp_url per discovered business. Without
+    // passing these through, the derived business campaign only inherits
+    // business_name from the payload + category/city from the parent, so the
+    // operator has to re-key NAP that the discovery pass already produced.
+    phone?: string;
+    email?: string;
+    websiteUrl?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    addressCity?: string;
+    addressState?: string;
+    addressZip?: string;
+    addressCountry?: string;
+    directoryProfiles?: DirectoryProfileEntry[];
+    gbpUrl?: string;
+    socialProfiles?: { platform: string; url: string }[];
+    ownerNames?: string[];
   }, ctx?: RequestCtx): Promise<any> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -807,6 +825,32 @@ export class MarketingCampaignService extends BaseService {
         // Migration 253 — GAP-E3 discovery context handoff
         discoveryContext: input.discoveryContext,
         intelligenceRunId: input.intelligenceRunId,
+        // Migration 253 — GAP-E4 NAP handoff: forward discovery-derived
+        // contact + address fields so the child campaign is born with the
+        // NAP the discovery pass already produced, instead of just the
+        // business name. gbp_url is folded into directoryProfiles (Google
+        // entry) when no explicit directoryProfiles payload is supplied.
+        phone: input.phone,
+        email: input.email,
+        websiteUrl: input.websiteUrl,
+        addressLine1: input.addressLine1,
+        addressLine2: input.addressLine2,
+        addressCity: input.addressCity,
+        addressState: input.addressState,
+        addressZip: input.addressZip,
+        addressCountry: input.addressCountry,
+        socialProfiles: input.socialProfiles,
+        ownerNames: input.ownerNames,
+        directoryProfiles: input.directoryProfiles ??
+          (input.gbpUrl
+            ? [{
+                platform: 'google',
+                url: input.gbpUrl,
+                claim_status: 'unknown',
+                star_rating: input.rating != null ? Number(input.rating) : null,
+                review_count: input.reviewCount ?? null,
+              }]
+            : undefined),
       }, ctx);
 
       // If the caller passed detected_signals (from the category audit's
