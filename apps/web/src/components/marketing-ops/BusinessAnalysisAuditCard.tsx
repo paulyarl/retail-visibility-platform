@@ -186,12 +186,24 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             </button>
             <button
               onClick={handleAddToPlace}
-              disabled={addingToPlace || identityStatus === 'mismatched'}
-              title={identityStatus === 'mismatched' ? 'Cannot seed: identity mismatch' : 'Create and publish place listing'}
-              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50"
+              disabled={addingToPlace || identityStatus === 'mismatched' || placeResult != null}
+              title={
+                placeResult != null
+                  ? 'Already added to place listing'
+                  : identityStatus === 'mismatched'
+                    ? 'Cannot seed: identity mismatch'
+                    : 'Create and publish place listing'
+              }
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-default"
             >
-              {addingToPlace ? <RefreshCw className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
-              {addingToPlace ? 'Adding...' : 'Add to place listing'}
+              {addingToPlace ? (
+                <RefreshCw className="h-3 w-3 animate-spin" />
+              ) : placeResult != null ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : (
+                <MapPin className="h-3 w-3" />
+              )}
+              {addingToPlace ? 'Adding...' : placeResult != null ? 'Added to place listing' : 'Add to place listing'}
             </button>
           </div>
         </div>
