@@ -40,7 +40,7 @@ const BUSINESS_AUDIT_V1_ID = 'mpt-je6m7ru6';
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03-requested-business -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03-business-identity-top -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -115,6 +115,30 @@ const FULL_BUSINESS_VARIABLES = [
   'business_name', 'city', 'state', 'category',
   'business_address', 'business_phone',
 ];
+
+// ─── Top-of-prompt business identity block. Inserted right after the intro
+//     cautions ("Never invent or assume data.") and BEFORE any Category
+//     Intelligence / Gold Standard binding sections. This ensures the model
+//     sees the business identity FIRST, before the 5000+ chars of binding
+//     instructions. Mirrors the original mpt-seed-seek-001 pattern which had
+//     the business name prominently at the top.
+const BUSINESS_IDENTITY_BLOCK = `
+
+---
+
+## Business to Audit
+
+| Field | Value |
+| --- | --- |
+| Business Name | {{business_name}} |
+| City | {{city}} |
+| State | {{state}} |
+| Category | {{category}} |
+| Address | {{business_address}} |
+| Phone | {{business_phone}} |
+
+Audit the business above. If address or phone is blank, the field was not provided — do not treat blank as a negative signal.
+`;
 
 // ─── Schema fragment: public_narrative (inserted after "summary": "" in the
 //     top-level JSON schema). This field is the public-safe description that
@@ -469,11 +493,16 @@ function removeSection(body: string, headingMarker: string): string {
 // ─── Prompt 1 (Category-Integrated) transformation ───────────────────────
 
 function transformCategoryIntegrated(body: string): string {
+  // 0. Insert business identity block at the top, right after the intro
+  //    cautions and BEFORE the Category Intelligence binding. This ensures
+  //    the model sees the business identity first.
+  let out = insertAfter(body, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
+
   // 1. Insert Gold Standard binding section after the Category Intelligence
   //    binding section (which ends with the "If the Category Intelligence
   //    block is missing or empty..." line).
-  let out = insertAfter(
-    body,
+  out = insertAfter(
+    out,
     'If the Category Intelligence block is missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations.',
     '\n' + GOLD_STANDARD_BINDING,
   );
@@ -560,11 +589,17 @@ function transformCategoryIntegrated(body: string): string {
 function transformSignalAligned(body: string): string {
   let out = body;
 
-  // 1. Insert both binding sections after the intro cautions, before the
-  //    first "---" separator.
+  // 0. Insert business identity block at the top, right after the intro
+  //    cautions and BEFORE any binding sections. This ensures the model
+  //    sees the business identity first.
+  out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
+
+  // 1. Insert both binding sections after the business identity block's
+  //    last line (the "do not treat blank as a negative signal" note).
+  //    This keeps the bindings AFTER the business identity, not before it.
   out = insertAfter(
     out,
-    'Never invent or assume data.',
+    'Audit the business above. If address or phone is blank, the field was not provided — do not treat blank as a negative signal.',
     '\n\n' + CATEGORY_INTELLIGENCE_BINDING + '\n' + GOLD_STANDARD_BINDING,
   );
 
@@ -767,6 +802,11 @@ function transformSignalAligned(body: string): string {
 
 function transformBusinessAuditV1(body: string): string {
   let out = body;
+
+  // 0. Insert business identity block at the top, right after the intro
+  //    cautions. V1 has no CI/GS bindings, so this goes right before the
+  //    existing "## Business" section deeper in the body.
+  out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
 
   // 1. Replace requested_business empty-string defaults with variable
   //    placeholders. Idempotent (no-op if already replaced).
