@@ -633,11 +633,18 @@ function transformSignalAligned(body: string): string {
   out = insertAfter(out, '* Reputation reporting', '\n' + CATEGORY_SERVICES_MD);
 
   // 11. Store format in Summary — after the alignment-classification line.
-  out = insertAfter(
-    out,
-    '* Alignment classification (e.g., ADMIN_NEGLECT, BALANCED_HEALTHY, etc.)',
-    '\n* Store format / hybrid role',
-  );
+  //     Wrapped in try/catch: the Signal-Aligned template's Summary section
+  //     has a different structure (heading-only, no bullet list) and may not
+  //     contain this anchor. Skip gracefully if not found.
+  try {
+    out = insertAfter(
+      out,
+      '* Alignment classification (e.g., ADMIN_NEGLECT, BALANCED_HEALTHY, etc.)',
+      '\n* Store format / hybrid role',
+    );
+  } catch {
+    // Summary section doesn't have the expected bullet list — skip.
+  }
 
   // ── Schema insertions ──────────────────────────────────────────────────
 
@@ -849,6 +856,8 @@ async function main() {
       });
       updated++;
     } catch (err) {
+      console.error(`[FAILED] ${task.label}:`, err instanceof Error ? err.message : String(err));
+      if (err instanceof Error && err.stack) console.error(err.stack);
       logger.error(`Failed to wire template: ${task.label}`, undefined, {
         templateId: task.id,
         error: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
