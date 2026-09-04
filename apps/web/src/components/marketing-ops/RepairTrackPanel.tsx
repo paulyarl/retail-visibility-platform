@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb, Copy, ClipboardPaste, FileText } from 'lucide-react';
 import marketingOpsService, { Campaign, RepairTrack, TriageRecommendation } from '@/services/MarketingOpsService';
 
 interface RepairTrackPanelProps {
@@ -26,6 +26,15 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
   // Opener-from-briefing state
   const [creatingOpener, setCreatingOpener] = useState(false);
   const [openerResult, setOpenerResult] = useState<{ created: boolean; warnings?: string[]; error?: string } | null>(null);
+
+  // External execute/import (copy-paste bridge) state
+  const [triageMode, setTriageMode] = useState<'ai' | 'external'>('ai');
+  const [rendering, setRendering] = useState(false);
+  const [renderedPrompt, setRenderedPrompt] = useState<string | null>(null);
+  const [pastedOutput, setPastedOutput] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ passed: boolean; errors?: string[] } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Rehydrate the briefing from the campaign row on mount/refresh. The backend
   // persists it at triage execution time (§2), so it survives page refresh and
@@ -73,6 +82,54 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
       setError(err.message || 'Failed to run triage analysis');
     } finally {
       setTriaging(false);
+    }
+  };
+
+  const handleRenderPrompt = async () => {
+    setRendering(true);
+    setError(null);
+    try {
+      const result = await marketingOpsService.renderRepairTriage(campaign.id, TRIAGE_TEMPLATE_ID);
+      setRenderedPrompt(result.renderedPrompt);
+    } catch (err: any) {
+      setError(err.message || 'Failed to render triage prompt');
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  const handleCopyPrompt = async () => {
+    if (!renderedPrompt) return;
+    try {
+      await navigator.clipboard.writeText(renderedPrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard may be unavailable; the textarea is selectable as fallback
+    }
+  };
+
+  const handleImportResult = async () => {
+    if (!pastedOutput.trim()) {
+      setError('Paste the external LLM output before importing');
+      return;
+    }
+    setImporting(true);
+    setError(null);
+    setImportResult(null);
+    try {
+      const result = await marketingOpsService.importRepairTriage(campaign.id, pastedOutput, TRIAGE_TEMPLATE_ID);
+      setImportResult({ passed: result.passed, errors: result.errors });
+      if (result.passed) {
+        // Briefing is persisted on the campaign row; onRefresh rehydrates it
+        // via the useEffect above. Clear the paste buffer on success.
+        setPastedOutput('');
+        onRefresh();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to import external triage result');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -201,24 +258,144 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleRunTriage}
-                disabled={triaging}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors shrink-0"
-              >
-                {triaging ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Run Triage Analysis
-                  </>
-                )}
-              </button>
+              {/* Segmented toggle: AI Run (sync OpenAI) vs External (copy-paste bridge) */}
+              <div className="inline-flex rounded-lg border border-amber-300 dark:border-amber-800/60 bg-white dark:bg-neutral-800 p-0.5 shrink-0">
+                <button
+                  onClick={() => setTriageMode('ai')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    triageMode === 'ai'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  AI Run
+                </button>
+                <button
+                  onClick={() => setTriageMode('external')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    triageMode === 'external'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                  }`}
+                >
+                  <ClipboardPaste className="w-3 h-3" />
+                  External
+                </button>
+              </div>
             </div>
+
+            {/* AI Run mode — synchronous OpenAI execution */}
+            {triageMode === 'ai' && (
+              <div className="flex justify-end">
+                <button
+                  onClick={handleRunTriage}
+                  disabled={triaging}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
+                >
+                  {triaging ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Run Triage Analysis
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* External mode — copy-paste bridge for any external LLM.
+                Renders the prompt text, then accepts pasted output and imports
+                it via /repair-triage/import. Bypasses the sync OpenAI path
+                (useful when credits are exhausted or a different model is
+                preferred). The imported briefing is persisted on the campaign
+                row and rehydrated by the useEffect above. */}
+            {triageMode === 'external' && (
+              <div className="space-y-3 p-3.5 rounded-lg border border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/10">
+                {/* Step 1: Render prompt */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      Step 1 — Render prompt
+                    </p>
+                    <button
+                      onClick={handleRenderPrompt}
+                      disabled={rendering}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg transition-colors"
+                    >
+                      {rendering ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                      {renderedPrompt ? 'Re-render' : 'Render Prompt'}
+                    </button>
+                  </div>
+                  {renderedPrompt ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={handleCopyPrompt}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-200/70 dark:hover:bg-purple-900/50 rounded-md transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                          {copied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <textarea
+                        readOnly
+                        value={renderedPrompt}
+                        rows={8}
+                        className="w-full text-xs font-mono bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-800/60 rounded-lg p-2.5 text-gray-700 dark:text-gray-300 resize-y"
+                        placeholder="Rendered prompt will appear here..."
+                      />
+                      <p className="text-[11px] text-purple-600 dark:text-purple-400">
+                        Copy this prompt into any external LLM, then paste the JSON response below.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      Click <span className="font-medium">Render Prompt</span> to generate the triage prompt text for an external LLM.
+                    </p>
+                  )}
+                </div>
+
+                {/* Step 2: Paste output + import */}
+                <div className="space-y-2 border-t border-purple-200/60 dark:border-purple-800/40 pt-2.5">
+                  <p className="text-xs font-medium text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                    Step 2 — Paste external output & import
+                  </p>
+                  <textarea
+                    value={pastedOutput}
+                    onChange={(e) => setPastedOutput(e.target.value)}
+                    rows={6}
+                    placeholder='Paste the external LLM JSON output here (must contain a "profile_repair_triage" object)...'
+                    className="w-full text-xs font-mono bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-600 rounded-lg p-2.5 text-gray-700 dark:text-gray-300 resize-y focus:ring-2 focus:ring-purple-500"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1">
+                      {importResult && (
+                        <p className={`text-[11px] ${importResult.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {importResult.passed
+                            ? 'Imported successfully — briefing saved.'
+                            : `Import failed: ${importResult.errors?.join('; ') ?? 'validation error'}`}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleImportResult}
+                      disabled={importing || !pastedOutput.trim()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
+                    >
+                      {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardPaste className="w-3.5 h-3.5" />}
+                      Import Result
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
