@@ -33,15 +33,17 @@ import { logger } from '../logger';
 // ─── Template IDs ────────────────────────────────────────────────────────
 const CATEGORY_INTEGRATED_ID = 'mpt-j9bbem3l';
 const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
+const BUSINESS_AUDIT_V1_ID = 'mpt-je6m7ru6';
 
 // ─── Markers (presence => already wired, skip) ───────────────────────────
 // Versioned marker — bump the version string when the seed's content changes
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03-seo-narrative -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03-requested-business -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
+const V1_MARKER = SEED_VERSION_MARKER;
 
 // ─── Shared binding-section text ─────────────────────────────────────────
 
@@ -76,6 +78,43 @@ If the Gold Standard block is missing or empty, omit gap_analysis and quality_ga
 // ─── Schema fragment: profile_url (inserted before data_status in each
 //     platform object) ────────────────────────────────────────────────────
 const PROFILE_URL_SCHEMA_LINE = '"profile_url": null,\n      "data_status": "unavailable"';
+
+// ─── Schema fragment: requested_business with variable placeholders.
+//     Replaces the empty-string defaults in the requested_business block so
+//     the rendered prompt pre-fills the requested business identity in the
+//     JSON schema template. The model sees both the "Business" instruction
+//     section (with the same substituted values) AND the requested_business
+//     schema block — no ambiguity about which business to audit.
+//
+//     The {{business_address}} / {{business_phone}} placeholders render as
+//     empty strings when the campaign has no address/phone on file. The
+//     model treats empty strings the same as null for optional fields.
+const REQUESTED_BUSINESS_PLACEHOLDERS_FROM = `"requested_business": {
+      "business_name": "",
+      "city": "",
+      "state": "",
+      "category": "",
+      "address": null,
+      "phone": null
+    }`;
+
+const REQUESTED_BUSINESS_PLACEHOLDERS_TO = `"requested_business": {
+      "business_name": "{{business_name}}",
+      "city": "{{city}}",
+      "state": "{{state}}",
+      "category": "{{category}}",
+      "address": "{{business_address}}",
+      "phone": "{{business_phone}}"
+    }`;
+
+// ─── Declared variables: all 6 business-scope variables referenced by the
+//     "Business" instruction section + requested_business schema. The
+//     previous declaration only listed 3 (business_name, city, category),
+//     omitting state, business_address, business_phone.
+const FULL_BUSINESS_VARIABLES = [
+  'business_name', 'city', 'state', 'category',
+  'business_address', 'business_phone',
+];
 
 // ─── Schema fragment: public_narrative (inserted after "summary": "" in the
 //     top-level JSON schema). This field is the public-safe description that
@@ -502,6 +541,12 @@ function transformCategoryIntegrated(body: string): string {
   //     redirects. Idempotent (no-op if already updated).
   out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
 
+  // 4f. Replace requested_business empty-string defaults with variable
+  //     placeholders so the rendered prompt pre-fills the requested business
+  //     identity in the JSON schema template. Idempotent (no-op if already
+  //     replaced — the FROM string won't be found).
+  out = replaceFirst(out, REQUESTED_BUSINESS_PLACEHOLDERS_FROM, REQUESTED_BUSINESS_PLACEHOLDERS_TO);
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -692,7 +737,35 @@ function transformSignalAligned(body: string): string {
   //      redirects. Idempotent (no-op if already updated).
   out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
 
+  // 19f. Replace requested_business empty-string defaults with variable
+  //      placeholders so the rendered prompt pre-fills the requested business
+  //      identity in the JSON schema template. Idempotent (no-op if already
+  //      replaced — the FROM string won't be found).
+  out = replaceFirst(out, REQUESTED_BUSINESS_PLACEHOLDERS_FROM, REQUESTED_BUSINESS_PLACEHOLDERS_TO);
+
   // 20. Append seed version marker for idempotency tracking.
+  if (!out.includes(SEED_VERSION_MARKER)) {
+    out = out + '\n' + SEED_VERSION_MARKER;
+  }
+
+  return out;
+}
+
+// ─── Prompt 3 (Business Audit V1) transformation ─────────────────────────
+// mpt-je6m7ru6 ("Seek: Business Audit V1") has the same "Business" instruction
+// section with 6 variable placeholders and the same requested_business schema
+// block with empty-string defaults, but does NOT have the Category Intelligence
+// or Gold Standard bindings (those are V2-only). This transform only aligns
+// the requested_business schema block with the V2 templates.
+
+function transformBusinessAuditV1(body: string): string {
+  let out = body;
+
+  // 1. Replace requested_business empty-string defaults with variable
+  //    placeholders. Idempotent (no-op if already replaced).
+  out = replaceFirst(out, REQUESTED_BUSINESS_PLACEHOLDERS_FROM, REQUESTED_BUSINESS_PLACEHOLDERS_TO);
+
+  // 2. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
   }
@@ -723,6 +796,12 @@ async function main() {
       label: 'Business Digital Audit - Alignment Scoring (Signal-Aligned)',
       marker: CATEGORY_INTELLIGENCE_MARKER,
       transform: transformSignalAligned,
+    },
+    {
+      id: BUSINESS_AUDIT_V1_ID,
+      label: 'Seek: Business Audit V1',
+      marker: V1_MARKER,
+      transform: transformBusinessAuditV1,
     },
   ];
 
@@ -758,6 +837,7 @@ async function main() {
         where: { id: task.id },
         data: {
           body: newBody,
+          variables: FULL_BUSINESS_VARIABLES,
           updated_at: new Date(),
         },
       });
