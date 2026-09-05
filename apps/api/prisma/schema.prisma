@@ -1849,6 +1849,9 @@ model directory_presence_seeds {
   owner_phone                    String?                          @db.VarChar(40)
   seek_batch_id                  String?                          @db.VarChar(60)
   seo_enrichment                 Json?
+  outreach_state                 String                           @default("not_started")
+  outreach_state_entered_at      DateTime?                        @db.Timestamptz(6)
+  outreach_scheduled_at          DateTime?                        @db.Timestamptz(6)
   directory_claim_requests       directory_claim_requests[]
   directory_claim_tokens         directory_claim_tokens[]
   directory_enrichment_tokens    directory_enrichment_tokens[]

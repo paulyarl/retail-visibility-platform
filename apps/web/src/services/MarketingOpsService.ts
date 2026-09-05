@@ -239,7 +239,7 @@ export interface CampaignDetail extends Campaign {
 }
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
-export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled' | 'wrong_number' | 'disconnected_number';
+export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled' | 'wrong_number' | 'disconnected_number' | 'seed_outreach_scheduled' | 'freshness_verified' | 'freshness_failed';
 
 export interface OutreachLogEntry {
   id: string;
@@ -525,6 +525,14 @@ export interface CallDetails {
   owner_name_confirmed?: string | null;
   team_signal_confirmed?: string | null;
   preferred_channel_confirmed?: string | null;
+  // Seed-outreach trigger fields
+  seed_outreach?: boolean | null;
+  seed_id?: string | null;
+  claim_url?: string | null;
+  place_url?: string | null;
+  hook_angle?: string | null;
+  trigger_source?: string | null;
+  profile_quality_findings?: Array<{ signal: string; severity: string; label: string }> | null;
 }
 
 // ─── Outreach Follow-Up Types ───────────────────────────────────────────

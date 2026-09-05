@@ -343,7 +343,7 @@ export class HookSuggestionService extends BaseService {
    * Best-effort: any failure returns null, which renders as the visible
    * {{claim_url}} placeholder so the operator sees what's unresolved.
    */
-  private async resolveClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
+  async resolveClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
     try {
       // 1. Find the seed linked to this campaign
       const links = await this.prisma.$queryRaw<any[]>`

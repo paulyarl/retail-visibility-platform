@@ -692,8 +692,11 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     );
   }
 
-  // Tier gate: Check backend access status (respects overrides)
-  if (tenant.access && !tenant.access.storefront) {
+  // Tier gate: hide storefront for tiers that don't include it.
+  // The old `tenant.access.storefront` check was dead code — PublicTenantInfo
+  // has no `access` field. Use the tier key instead.
+  const STOREFRONT_DISABLED_TIERS = ['google_only'];
+  if (tenant.subscriptionTier && STOREFRONT_DISABLED_TIERS.includes(tenant.subscriptionTier)) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-white dark:bg-neutral-800 rounded-lg shadow-lg p-8">

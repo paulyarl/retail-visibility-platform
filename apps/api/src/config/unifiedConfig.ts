@@ -214,6 +214,21 @@ class UnifiedConfig {
     };
   }
 
+  // ─── Seed Outreach Courtesy Window ────────────────────────────────────
+  // Config for the post-seed outreach trigger + no-response job.
+  get seedOutreachNoResponseDays(): number {
+    const parsed = parseInt(this.env.SEED_OUTREACH_NO_RESPONSE_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 14;
+  }
+  get disableSeedOutreachTrigger(): boolean {
+    const v = (this.env.DISABLE_SEED_OUTREACH_TRIGGER || '').toLowerCase();
+    return v === 'true' || v === '1';
+  }
+  get disableSeedOutreachNoResponseJob(): boolean {
+    const v = (this.env.DISABLE_SEED_OUTREACH_NO_RESPONSE_JOB || '').toLowerCase();
+    return v === 'true' || v === '1';
+  }
+
   // ─── Recovery Management (Recovery Engine Sprint 1) ────────────────────
   // Flat getters matching the marketingOps* pattern. The dispute intake
   // portal is token-gated (no account auth); these config keys drive token

@@ -387,6 +387,16 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start marketing ops auto-follow-up scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start seed outreach no-response job (daily) — marks stale
+      // outreach_scheduled seeds as no_response after the courtesy window
+      try {
+        const { startSeedOutreachNoResponseJob } = await import('./jobs/seed-outreach-no-response');
+        startSeedOutreachNoResponseJob();
+        logger.info('Seed outreach no-response job started');
+      } catch (err) {
+        logger.error('Failed to start seed outreach no-response job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start review response scheduler (every 6h) — checks gates, auto-advances
       // stages, closes stale threads, promotes closed pipelines to monitoring
       try {

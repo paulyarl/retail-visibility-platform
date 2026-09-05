@@ -18,6 +18,7 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
+import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
 import {
   generateDirectoryListingId,
   generateDirectoryPresenceSeedId,
@@ -1460,6 +1461,38 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Update the seed's outreach_state (courtesy-window state machine).
+   * This is separate from outreach_status (verification/enrichment lifecycle).
+   * See sprint plan §3.2 for the state machine and §7.2 for this method.
+   */
+  async setOutreachState(
+    seedId: string,
+    state: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<void> {
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET outreach_state = ${state},
+          outreach_state_entered_at = now(),
+          outreach_scheduled_at = CASE WHEN ${state} = 'outreach_scheduled' THEN now() ELSE outreach_scheduled_at END,
+          updated_at = now()
+      WHERE id = ${seedId}
+    `;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.outreach_state_change',
+      payload: { seedId, state },
+    });
+
+    logger.info('DirectoryPresenceSeedService.setOutreachState', undefined, {
+      seedId,
+      state,
+    });
+  }
+
+  /**
    * Create, publish, and link a directory presence seed from the latest
    * business_analysis audit on a marketing campaign. Reuses createSeed,
    * publishSeed, and DirectorySeedCampaignLinkService for the campaign bond.
@@ -1670,6 +1703,23 @@ class DirectoryPresenceSeedService {
     }
 
     await DirectorySeedCampaignLinkService.linkCampaign(seed.id, campaignId, 'primary', ctx);
+
+    // ★ Seed Outreach Courtesy Window: trigger campaign-aware outreach
+    // after the seed is created, published, and linked. Fire-and-forget —
+    // outreach trigger failure must not roll back seed creation.
+    try {
+      await SeedOutreachTriggerService.getInstance().onSeedCreated({
+        campaignId,
+        seedId: seed.id,
+        ctx,
+      });
+    } catch (err) {
+      logger.warn('SeedOutreachTriggerService.onSeedCreated failed', undefined, {
+        campaignId,
+        seedId: seed.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     const listingRows = await prisma.$queryRaw<any[]>`
       SELECT slug FROM directory_listings_list WHERE id = ${seed.listingId} LIMIT 1

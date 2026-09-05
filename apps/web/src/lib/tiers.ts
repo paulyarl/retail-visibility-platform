@@ -39,7 +39,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Directory Presence',
     price: 'Free / Invite-only',
     pricePerMonth: 0,
-    maxSkus: 0,
+    maxSkus: 5,
     maxLocations: 1,
     description: 'Lightweight directory listing for emerging local businesses',
     features: [

@@ -146,6 +146,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingOutreachService } from '../services/MarketingOutreachService';
+import { SeedOutreachStateSync } from '../services/SeedOutreachStateSync';
 import { MarketingHotProspectService } from '../services/MarketingHotProspectService';
 import MarketingAuditService from '../services/MarketingAuditService';
 import MarketingPromptService from '../services/MarketingPromptService';
@@ -320,7 +321,7 @@ const linkTenantSchema = z.object({
 
 // Outreach log schemas (Sprint 2)
 const contactChannelEnum = z.enum(['phone', 'email', 'website', 'social', 'in_person', 'other']);
-const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other', 'auto_follow_up_scheduled', 'wrong_number', 'disconnected_number']);
+const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other', 'auto_follow_up_scheduled', 'wrong_number', 'disconnected_number', 'seed_outreach_scheduled', 'freshness_verified', 'freshness_failed']);
 
 // ─── Call details schema (Sprint 1 — Cold Call Channel) ────────────────
 const callResultEnum = z.enum(['connected', 'voicemail', 'no_answer', 'wrong_number', 'disconnected_number']);
@@ -365,8 +366,8 @@ const CONTACT_RESULT_TO_OUTCOME: Record<string, string> = {
   met_staff: 'reached',
   not_available: 'no_answer',
   left_message_with_staff: 'left_message',
-  closed_permanently: 'disconnected_number',
-  wrong_location: 'wrong_number',
+  closed_permanently: 'freshness_failed',
+  wrong_location: 'freshness_failed',
 };
 
 // Per-channel allowed contact_result values.
@@ -393,6 +394,18 @@ const callDetailsSchema = z.object({
   owner_name_confirmed: z.string().max(255).nullable().default(null),
   team_signal_confirmed: z.enum(['sole_owner', 'family_team', 'small_staff', 'unknown']).nullable().default(null),
   preferred_channel_confirmed: z.string().max(50).nullable().default(null),
+  // Seed-outreach trigger fields
+  seed_outreach: z.boolean().nullable().default(null),
+  seed_id: z.string().max(60).nullable().default(null),
+  claim_url: z.string().max(500).nullable().default(null),
+  place_url: z.string().max(500).nullable().default(null),
+  hook_angle: z.string().max(60).nullable().default(null),
+  trigger_source: z.string().max(60).nullable().default(null),
+  profile_quality_findings: z.array(z.object({
+    signal: z.string().max(80),
+    severity: z.string().max(20),
+    label: z.string().max(200),
+  })).nullable().default(null),
 });
 
 const outreachLogBaseSchema = z.object({
@@ -1295,6 +1308,22 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
       callDetails: parsed.call_details ?? null,
       updateWorksheet: parsed.update_worksheet ?? false,
     }, getCtx(req));
+    // ★ Seed Outreach Courtesy Window: sync seed outreach_state from the
+    // logged outcome. Fire-and-forget — errors are logged but do not
+    // affect the 201 response.
+    try {
+      await SeedOutreachStateSync.getInstance().syncFromLog({
+        campaignId: req.params.id,
+        outcome: parsed.outcome,
+        callDetails: parsed.call_details ?? null,
+        ctx: getCtx(req),
+      });
+    } catch (syncErr) {
+      logger.warn('SeedOutreachStateSync.syncFromLog failed', undefined, {
+        campaignId: req.params.id,
+        error: syncErr instanceof Error ? syncErr.message : String(syncErr),
+      });
+    }
     res.status(201).json({ success: true, data: log });
   } catch (error) {
     if (error instanceof z.ZodError) {

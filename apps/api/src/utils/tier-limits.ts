@@ -40,7 +40,7 @@ export interface TierLimits {
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   directory_presence: {
     name: 'Directory Presence',
-    maxSkus: 0,
+    maxSkus: 5,
   },
   google_only: {
     name: 'Google-Only',

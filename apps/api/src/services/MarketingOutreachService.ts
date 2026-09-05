@@ -24,7 +24,7 @@ import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { generateOutreachLogId } from '../lib/id-generator';
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
-export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled' | 'wrong_number' | 'disconnected_number';
+export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled' | 'wrong_number' | 'disconnected_number' | 'seed_outreach_scheduled' | 'freshness_verified' | 'freshness_failed';
 export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'retrying';
 
 export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
@@ -82,6 +82,16 @@ export interface CallDetails {
   owner_name_confirmed?: string | null;
   team_signal_confirmed?: string | null;
   preferred_channel_confirmed?: string | null;
+  // Seed-outreach trigger fields (Seed Outreach Courtesy Window sprint).
+  // Used by SeedOutreachTriggerService to mark auto-created outreach logs
+  // and carry the claim/place URLs + profile-quality findings.
+  seed_outreach?: boolean | null;
+  seed_id?: string | null;
+  claim_url?: string | null;
+  place_url?: string | null;
+  hook_angle?: string | null;
+  trigger_source?: string | null;
+  profile_quality_findings?: Array<{ signal: string; severity: string; label: string }> | null;
 }
 
 export interface LogContactInput {

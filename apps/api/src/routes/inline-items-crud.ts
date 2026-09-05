@@ -6,6 +6,7 @@ import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
+import TierService from '../services/TierService';
 import { requireTenantAdmin } from '../middleware/permissions';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { isPlatformAdmin } from '../utils/platform-admin';
@@ -1191,7 +1192,34 @@ const createItemSchema = baseItemSchema.extend({
 
 const updateItemSchema = baseItemSchema.partial();
 
-router.post(["/api/items", "/api/inventory", "/items", "/inventory"], requireWritableSubscription, async (req, res) => {
+router.post(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, checkTenantAccess, requireWritableSubscription, async (req, res) => {
+  // SKU limit check: ensure tenant hasn't exceeded their tier's max_skus
+  try {
+    const tenantId = req.body?.tenantId || req.body?.tenant_id || req.params?.tenantId;
+    if (tenantId) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { subscription_tier: true, _count: { select: { inventory_items: true } } },
+      });
+      if (tenant) {
+        const skuLimit = tenant.subscription_tier
+          ? await TierService.getTierSKULimit(tenant.subscription_tier).catch(() => Infinity)
+          : Infinity;
+        if (skuLimit !== Infinity && tenant._count.inventory_items >= skuLimit) {
+          return res.status(403).json({
+            error: 'sku_limit_exceeded',
+            message: `You've reached the ${skuLimit}-product limit of your ${tenant.subscription_tier} tier.`,
+            current_count: tenant._count.inventory_items,
+            max_skus: skuLimit,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    // SKU check failure should not block creation — log and continue
+    console.warn('[POST /items] SKU limit check failed:', err instanceof Error ? err.message : String(err));
+  }
+
   console.log('[POST /items] Raw request body:', JSON.stringify(req.body, null, 2));
 
   const parsed = createItemSchema.safeParse(req.body ?? {});

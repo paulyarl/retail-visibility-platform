@@ -21,7 +21,7 @@ import type { RequestCtx } from '../context';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { MarketingOutreachService } from './MarketingOutreachService';
 
-const NO_RESPONSE_OUTCOMES = new Set(['no_answer', 'left_message']);
+const NO_RESPONSE_OUTCOMES = new Set(['no_answer', 'left_message', 'seed_outreach_scheduled']);
 
 export class MarketingAutoFollowUpScheduler extends BaseService {
   private static instance: MarketingAutoFollowUpScheduler;

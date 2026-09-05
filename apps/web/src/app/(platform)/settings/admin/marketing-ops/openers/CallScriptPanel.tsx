@@ -23,6 +23,9 @@ const OUTCOME_LABELS: Record<ContactOutcome, string> = {
   auto_follow_up_scheduled: 'Auto Follow-Up',
   wrong_number: 'Wrong Number',
   disconnected_number: 'Disconnected',
+  seed_outreach_scheduled: 'Seed Outreach Scheduled',
+  freshness_verified: 'Freshness Verified',
+  freshness_failed: 'Freshness Failed',
 };
 
 const OUTCOME_COLORS: Record<ContactOutcome, string> = {
@@ -36,6 +39,9 @@ const OUTCOME_COLORS: Record<ContactOutcome, string> = {
   auto_follow_up_scheduled: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
   wrong_number: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
   disconnected_number: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  seed_outreach_scheduled: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  freshness_verified: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  freshness_failed: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
 };
 
 interface CallScriptPanelProps {
