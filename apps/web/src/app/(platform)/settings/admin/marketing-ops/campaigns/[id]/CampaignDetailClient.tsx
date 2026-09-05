@@ -1639,6 +1639,11 @@ export default function CampaignDetailClient({
                       )}
                       {' '}and stage <span className="font-medium">{campaign.stage}</span>. Opening a workspace pre-selects this campaign.
                     </p>
+                    {campaign.scope === 'business' && !campaign.category && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">
+                        This campaign has no category yet. Prompts that require a category input (e.g., business audit) are hidden — run the Category Identification prompt first, then spawn a campaign with the identified category to access them.
+                      </p>
+                    )}
                   </div>
                   <Link
                     href={`/settings/admin/marketing-ops/prompts?campaignId=${campaignId}`}
@@ -1655,9 +1660,25 @@ export default function CampaignDetailClient({
                   </div>
                 ) : (() => {
                   const allowedTypes = STAGE_PROMPT_TYPES[campaign.stage] ?? [];
-                  const stageRelevant = allowedTypes.length
+                  let stageRelevant = allowedTypes.length
                     ? promptTemplates.filter((t) => allowedTypes.includes(t.prompt_type))
                     : promptTemplates;
+                  // Category-guard: a business-scope campaign without a category
+                  // (i.e., a category-identification campaign) cannot run prompts
+                  // that require a `category` input variable — those prompts
+                  // (business audit, category analysis, etc.) need the category
+                  // to be known. Only the category-identification prompt itself
+                  // (which deliberately omits `category` from its variables) and
+                  // other category-free prompts are compatible. The spawned
+                  // child campaigns WILL have a category and can run those prompts.
+                  const isCategorylessBusiness =
+                    campaign.scope === 'business' && !campaign.category;
+                  if (isCategorylessBusiness) {
+                    stageRelevant = stageRelevant.filter((t) => {
+                      const vars = Array.isArray(t.variables) ? t.variables : [];
+                      return !vars.includes('category');
+                    });
+                  }
                   if (stageRelevant.length === 0) {
                     return (
                       <div className="flex flex-col items-center justify-center py-10 text-center">

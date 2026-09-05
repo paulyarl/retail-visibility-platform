@@ -152,6 +152,20 @@ export class MarketingExecutionService extends BaseService {
 
       assertScopeCompatible(template, campaign);
 
+      // Category-guard (mirrors renderPrompt): a business-scope campaign
+      // without a category cannot run prompts that require `category`.
+      const execTemplateVars = Array.isArray(template.variables) ? template.variables : [];
+      const execCampaignCategory = (campaign.category ?? '').trim();
+      if (
+        execTemplateVars.includes('category')
+        && (campaign.scope ?? 'business').toLowerCase() === 'business'
+        && !execCampaignCategory
+      ) {
+        throw new Error(
+          `Template "${template.name}" requires a category input, but this campaign has no category. Run the Category Identification prompt first, then spawn a campaign with the identified category.`,
+        );
+      }
+
       // Resolve the prompt with profile-aware amplification (§1B, GAP-P7).
       // For non-seek or non-business-scope prompts, this returns the base
       // render byte-identical (no amplification).
@@ -256,6 +270,23 @@ export class MarketingExecutionService extends BaseService {
       throw new Error(`Campaign ${input.campaignId} not found`);
     }
     assertScopeCompatible(template, campaign);
+    // Category-guard: a business-scope campaign without a category (i.e., a
+    // category-identification campaign) cannot run prompts that declare
+    // `category` as a required variable. Those prompts (business audit,
+    // category analysis, etc.) would render with an empty category and
+    // produce broken/meaningless output. The spawned child campaigns have
+    // a category and can run these prompts.
+    const templateVars = Array.isArray(template.variables) ? template.variables : [];
+    const campaignCategory = (campaign.category ?? '').trim();
+    if (
+      templateVars.includes('category')
+      && (campaign.scope ?? 'business').toLowerCase() === 'business'
+      && !campaignCategory
+    ) {
+      throw new Error(
+        `Template "${template.name}" requires a category input, but this campaign has no category. Run the Category Identification prompt first, then spawn a campaign with the identified category.`,
+      );
+    }
     const { renderedPrompt } = await this.resolvePrompt({ template, campaign, variables: input.variables }, ctx);
     return renderedPrompt;
   }
