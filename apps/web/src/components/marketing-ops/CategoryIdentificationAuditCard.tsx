@@ -45,6 +45,25 @@ interface CategoryIdentificationData {
   primary_category: string;
   primary_category_confidence: 'high' | 'medium' | 'low';
   reasoning: string;
+  business_summary?: string | null;
+  public_narrative?: string | null;
+  digital_footprint?: {
+    platforms_found?: {
+      platform: string;
+      url?: string | null;
+      claimed?: boolean | null;
+      rating?: number | null;
+      review_count?: number | null;
+      has_website?: boolean | null;
+      notes?: string | null;
+    }[];
+    website_url?: string | null;
+    website_status?: 'working' | 'broken' | 'none_found' | 'unable_to_verify' | null;
+    social_profiles?: { platform: string; url?: string | null }[];
+    gbp_primary_category?: string | null;
+    years_in_business_estimate?: string | null;
+    signature_products_services?: string[];
+  };
   evidence_sources?: { source: string; url?: string | null; finding: string }[];
   data_quality?: {
     sources_consulted?: number;
@@ -282,6 +301,89 @@ export default function CategoryIdentificationAuditCard({
         <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Reasoning</p>
         <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{data.reasoning}</p>
       </div>
+
+      {/* Business summary */}
+      {data.business_summary && (
+        <div className="mb-3 rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 p-3">
+          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Business Summary</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{data.business_summary}</p>
+        </div>
+      )}
+
+      {/* Public narrative */}
+      {data.public_narrative && (
+        <div className="mb-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Public Narrative</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{data.public_narrative}</p>
+        </div>
+      )}
+
+      {/* Digital footprint */}
+      {data.digital_footprint && (
+        <details className="mb-3">
+          <summary className="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Digital Footprint
+          </summary>
+          <div className="mt-2 space-y-2">
+            {/* Platform presence */}
+            {data.digital_footprint.platforms_found && data.digital_footprint.platforms_found.length > 0 && (
+              <div>
+                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1">Platforms found</p>
+                <div className="space-y-1">
+                  {data.digital_footprint.platforms_found.map((p, i) => (
+                    <div key={i} className="text-[11px] text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{p.platform}</span>
+                      {p.claimed != null && <span className="text-gray-400">{p.claimed ? 'claimed' : 'unclaimed'}</span>}
+                      {p.rating != null && <span>{Number(p.rating).toFixed(1)} ★</span>}
+                      {p.review_count != null && <span>{p.review_count} reviews</span>}
+                      {p.url && <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-cyan-600 dark:text-cyan-400 underline">link</a>}
+                      {p.notes && <span className="text-gray-400">{p.notes}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Website */}
+            {data.digital_footprint.website_url && (
+              <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                <span className="font-medium">Website:</span>{' '}
+                <a href={data.digital_footprint.website_url} target="_blank" rel="noopener noreferrer" className="text-cyan-600 dark:text-cyan-400 underline">
+                  {data.digital_footprint.website_url}
+                </a>
+                {data.digital_footprint.website_status && (
+                  <span className="ml-2 text-gray-400">({data.digital_footprint.website_status})</span>
+                )}
+              </div>
+            )}
+            {/* GBP primary category */}
+            {data.digital_footprint.gbp_primary_category && (
+              <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                <span className="font-medium">GBP primary category:</span> {data.digital_footprint.gbp_primary_category}
+              </div>
+            )}
+            {/* Signature products/services */}
+            {data.digital_footprint.signature_products_services && data.digital_footprint.signature_products_services.length > 0 && (
+              <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                <span className="font-medium">Signature products/services:</span>{' '}
+                {data.digital_footprint.signature_products_services.join(', ')}
+              </div>
+            )}
+            {/* Social profiles */}
+            {data.digital_footprint.social_profiles && data.digital_footprint.social_profiles.length > 0 && (
+              <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                <span className="font-medium">Social:</span>{' '}
+                {data.digital_footprint.social_profiles.map((s, i) => (
+                  <span key={i}>
+                    {s.platform}
+                    {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-cyan-600 dark:text-cyan-400 underline ml-0.5">link</a>}
+                    {i < data.digital_footprint!.social_profiles!.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
 
       {/* Evidence sources */}
       {data.evidence_sources && data.evidence_sources.length > 0 && (

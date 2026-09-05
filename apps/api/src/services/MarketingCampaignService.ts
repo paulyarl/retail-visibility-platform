@@ -228,7 +228,11 @@ export interface CampaignInput {
   repairIssueType?: string;
   title?: string;
   businessName?: string;
-  category: string;
+  // Category is optional for business-scope campaigns — a category-identification
+  // campaign is created without knowing the category (the prompt identifies it).
+  // The service defaults to '' when absent. Non-business scopes enforce category
+  // at the route validation layer.
+  category?: string;
   // City is optional for gold_standards campaigns (city-agnostic / nationwide).
   // Non-gold_standards campaigns enforce city at the route validation layer.
   city?: string;

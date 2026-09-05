@@ -1329,7 +1329,7 @@ export interface CampaignCreateInput {
   repair_issue_type?: string;
   title?: string;
   business_name?: string;
-  category: string;
+  category?: string;
   city: string;
   state?: string;
   neighborhood?: string;

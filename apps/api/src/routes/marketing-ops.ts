@@ -214,7 +214,10 @@ const campaignBaseSchema = z.object({
   scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   title: z.string().max(255).optional(),
   business_name: z.string().max(255).optional(),
-  category: z.string().min(1).max(100),
+  // Category is optional for business-scope campaigns — a category-identification
+  // campaign is created without knowing the category (the prompt identifies it).
+  // The create schema's refine below enforces category for non-business scopes.
+  category: z.string().max(100).optional(),
   // City is optional in the base schema so gold_standards campaigns
   // (which are city-agnostic / nationwide) can omit it. The create
   // schema's refine below enforces city for non-gold_standards campaigns.
@@ -275,6 +278,10 @@ const campaignCreateSchema = campaignBaseSchema
     message: 'business_name is required for business-scoped campaigns',
     path: ['business_name'],
   })
+  .refine((data) => !data.scope || data.scope === 'business' || (data.category && data.category.trim().length > 0), {
+    message: 'category is required for non-business-scoped campaigns',
+    path: ['category'],
+  })
   .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus === 'gold_standards' || (data.state && data.state.trim().length > 0), {
     message: 'state is required for intelligence-scoped campaigns (except gold_standards)',
     path: ['state'],
@@ -303,6 +310,9 @@ const campaignUpdateSchema = campaignBaseSchema.partial().extend({
 }).refine((data) => !data.scope || data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
   message: 'business_name is required for business-scoped campaigns',
   path: ['business_name'],
+}).refine((data) => !data.scope || data.scope === 'business' || !data.category || data.category.trim().length > 0, {
+  message: 'category cannot be empty for non-business-scoped campaigns',
+  path: ['category'],
 }).refine((data) => !data.scope || data.scope !== 'intelligence' || (data.state && data.state.trim().length > 0), {
   message: 'state is required for intelligence-scoped campaigns',
   path: ['state'],

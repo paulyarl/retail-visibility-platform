@@ -62,6 +62,34 @@ const dataQualitySchema = z.object({
   overall_confidence: confidenceEnum.optional(),
 }).passthrough();
 
+// ---- Digital footprint (cross-platform presence snapshot) ----
+// The analyst already consults multiple platforms to identify the category.
+// This block captures what was found on each platform so the operator has
+// a richer context for the business without running a full business audit.
+
+const platformPresenceSchema = z.object({
+  platform: z.string(),
+  url: z.string().nullable().optional(),
+  claimed: z.boolean().nullable().optional(),
+  rating: z.number().nullable().optional(),
+  review_count: z.number().int().nullable().optional(),
+  has_website: z.boolean().nullable().optional(),
+  notes: z.string().nullable().optional(),
+}).passthrough();
+
+const digitalFootprintSchema = z.object({
+  platforms_found: z.array(platformPresenceSchema).optional(),
+  website_url: z.string().nullable().optional(),
+  website_status: z.enum(['working', 'broken', 'none_found', 'unable_to_verify']).nullable().optional(),
+  social_profiles: z.array(z.object({
+    platform: z.string(),
+    url: z.string().nullable().optional(),
+  })).optional(),
+  gbp_primary_category: z.string().nullable().optional(),
+  years_in_business_estimate: z.string().nullable().optional(),
+  signature_products_services: z.array(z.string()).optional(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const categoryIdentificationSchema = z.object({
@@ -72,6 +100,15 @@ export const categoryIdentificationSchema = z.object({
   primary_category: z.string(),
   primary_category_confidence: confidenceEnum,
   reasoning: z.string(),
+  // Operator-facing summary of the business's digital footprint — what the
+  // analyst found across platforms, written for the operator's context.
+  business_summary: z.string().nullable().optional(),
+  // Public-safe, SEO-rich description for directory listing pages. Excludes
+  // all internal assessment content (scores, tiers, deficiencies). Mirrors
+  // the public_narrative field in the business_analysis schema.
+  public_narrative: z.string().nullable().optional(),
+  // Structured cross-platform presence snapshot.
+  digital_footprint: digitalFootprintSchema.optional(),
   evidence_sources: z.array(evidenceSourceSchema).optional(),
   data_quality: dataQualitySchema.optional(),
 }).passthrough();
@@ -116,6 +153,29 @@ Return your response as JSON matching this exact schema:
   "primary_category": "<best-fit category label>",
   "primary_category_confidence": "high" | "medium" | "low",
   "reasoning": "<overall justification for the primary category choice>",
+  "business_summary": "<2-4 sentence operator-facing summary of the business's digital footprint across platforms>",
+  "public_narrative": "<public-safe, SEO-rich description for directory listing pages — what the business is, where it is, what it is known for. Exclude all internal assessment content.>",
+  "digital_footprint": {
+    "platforms_found": [
+      {
+        "platform": "<google|yelp|facebook|bbb|other>",
+        "url": "<string|null>",
+        "claimed": true | false | null,
+        "rating": <number|null>,
+        "review_count": <number|null>,
+        "has_website": true | false | null,
+        "notes": "<string|null>"
+      }
+    ],
+    "website_url": "<string|null>",
+    "website_status": "working" | "broken" | "none_found" | "unable_to_verify",
+    "social_profiles": [
+      { "platform": "<string>", "url": "<string|null>" }
+    ],
+    "gbp_primary_category": "<string|null>",
+    "years_in_business_estimate": "<string|null>",
+    "signature_products_services": ["<verified product/service names>"]
+  },
   "evidence_sources": [
     { "source": "<platform name>", "url": "<string|null>", "finding": "<what was found>" }
   ],

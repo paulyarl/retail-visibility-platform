@@ -954,10 +954,13 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               <input type="text" required={form.scope === 'business'} value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
                 className={inputClass} />
             </FormField>
-            <FormField label="Category" required>
-              <SuggestiveSelect required value={form.category} onChange={(v) => handleChange('category', v)}
+            <FormField label="Category" required={form.scope !== 'business'}>
+              <SuggestiveSelect required={form.scope !== 'business'} value={form.category} onChange={(v) => handleChange('category', v)}
                 options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
                 newInputPlaceholder="Enter new category" className={inputClass} />
+              {form.scope === 'business' && (
+                <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
+              )}
             </FormField>
             <FormField label="Origin Country">
               <SuggestiveSelect value={form.business_origin_country} onChange={(v) => handleChange('business_origin_country', v)}
