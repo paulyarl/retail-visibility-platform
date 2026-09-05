@@ -315,6 +315,19 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
+  // Normalize a website URL from platform_config.website. Analysts often
+  // emit bare domains (e.g. "phoeniciafoods.com") without a protocol scheme;
+  // without one the browser treats the value as a relative path and it
+  // resolves against the current page instead of opening the external site.
+  // Prepend https:// when no scheme is present. Returns null for empty input.
+  const normalizeWebsiteUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
   return (
     <div className="space-y-4">
       {/* Prerequisite warning — no active gold-standard profile */}
@@ -518,9 +531,11 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                       {/* NAP + website — pull from candidate.nap and first platform_config.website */}
                       {(() => {
                         const nap = candidate.nap;
-                        const website = (candidate.platform_evaluations ?? [])
-                          .map((pe) => pe.platform_config?.website)
-                          .find((w) => w);
+                        const website = normalizeWebsiteUrl(
+                          (candidate.platform_evaluations ?? [])
+                            .map((pe) => pe.platform_config?.website)
+                            .find((w) => w),
+                        );
                         const hasNap = nap?.address || nap?.phone;
                         if (!hasNap && !website) return null;
                         return (
@@ -594,14 +609,17 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                                 </span>
                               )}
                               {/* Links — website + profile URL, pushed right */}
-                              {(pe.platform_config?.website || pe.profile_url) && (
+                              {(normalizeWebsiteUrl(pe.platform_config?.website) || pe.profile_url) && (
                                 <div className="ml-auto flex items-center gap-2">
-                                  {pe.platform_config?.website && (
-                                    <a href={pe.platform_config.website} target="_blank" rel="noopener noreferrer"
-                                      className="text-blue-600 dark:text-blue-400 hover:underline">
-                                      Website ↗
-                                    </a>
-                                  )}
+                                  {(() => {
+                                    const siteUrl = normalizeWebsiteUrl(pe.platform_config?.website);
+                                    return siteUrl ? (
+                                      <a href={siteUrl} target="_blank" rel="noopener noreferrer"
+                                        className="text-blue-600 dark:text-blue-400 hover:underline">
+                                        Website ↗
+                                      </a>
+                                    ) : null;
+                                  })()}
                                   {pe.profile_url && (
                                     <a href={pe.profile_url} target="_blank" rel="noopener noreferrer"
                                       className="text-blue-600 dark:text-blue-400 hover:underline">
