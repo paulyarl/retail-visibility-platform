@@ -82,7 +82,8 @@ export type ConversionSource =
   | 'manual'
   | 'external'
   | 'portal_checkout'
-  | 'diagnostic_gallery';
+  | 'diagnostic_gallery'
+  | 'directory_claim';
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 

@@ -13,6 +13,7 @@
  * subscription_tier = 'directory_presence'.
  */
 
+import { randomUUID } from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
@@ -444,12 +445,17 @@ class DirectoryPresenceSeedService {
       ON CONFLICT (tenant_id) DO NOTHING
     `;
 
-    // Create the seed record
+    // Create the seed record. contact_status is derived at ingest per the
+    // seed-funnel analytics spec (§7 gap 1): contactable when any outreach
+    // route exists (listing phone or owner phone). Absence is recorded as
+    // contact_unverified — never as unreachable.
+    const contactStatus = input.phone || input.ownerPhone ? 'contactable' : 'contact_unverified';
     await prisma.$executeRaw`
       INSERT INTO directory_presence_seeds (
         id, tenant_id, listing_id, category, city, state,
         seed_batch, status, identity_confidence, category_fit, notes,
         owner_name, owner_email, owner_phone, seo_enrichment,
+        contact_status, contact_status_derived_at,
         created_at, updated_at
       ) VALUES (
         ${seedId},
@@ -467,6 +473,8 @@ class DirectoryPresenceSeedService {
         ${input.ownerEmail || null},
         ${input.ownerPhone || null},
         ${input.seoEnrichment ? JSON.stringify(input.seoEnrichment) : null}::jsonb,
+        ${contactStatus},
+        now(),
         now(), now()
       )
     `;
@@ -725,12 +733,39 @@ class DirectoryPresenceSeedService {
     ctx?: SeedAuditCtx
   ): Promise<void> {
     const seed = await prisma.$queryRaw<any[]>`
-      SELECT tenant_id, listing_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      SELECT dps.tenant_id, dps.listing_id, dps.status AS seed_status,
+             dl.phone, dl.address, dl.city, dl.state, dl.zip_code, dl.website
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId} LIMIT 1
     `;
     if (!seed[0]) throw new Error('seed_not_found');
 
     const listingId = seed[0].listing_id;
     const tenantId = seed[0].tenant_id;
+
+    // Pre-update NAP snapshot for owner-correction detection (seed-funnel
+    // analytics spec §7 gap 2): diffed against the submitted fields after the
+    // listing UPDATE below.
+    const napColumns = ['phone', 'address', 'city', 'state', 'zip_code', 'website'] as const;
+    const napFieldKeys: Record<string, keyof typeof fields> = {
+      phone: 'phone',
+      address: 'address',
+      city: 'city',
+      state: 'state',
+      zip_code: 'zipCode',
+      website: 'website',
+    };
+    const changedNapFields: Record<string, { from: string | null; to: string | null }> = {};
+    for (const column of napColumns) {
+      const submitted = (fields as any)[napFieldKeys[column]];
+      if (submitted === undefined) continue;
+      const before = seed[0][column] == null ? null : String(seed[0][column]).trim();
+      const after = submitted == null ? null : String(submitted).trim();
+      if (before !== after) {
+        changedNapFields[column] = { from: before, to: after };
+      }
+    }
 
     // Build dynamic UPDATE for listing
     const setClauses: string[] = ['updated_at = now()'];
@@ -810,6 +845,31 @@ class DirectoryPresenceSeedService {
       `UPDATE directory_listings_list SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       ...params
     );
+
+    // Owner-correction capture: when a CLAIMED seed's NAP fields change,
+    // persist the diff and flag the seed. The claim itself stamped
+    // nap_verified_at (owner confirmed the filed NAP); this records every
+    // later correction for the funnel's owner_corrected_nap signal.
+    if (seed[0].seed_status === 'claimed' && Object.keys(changedNapFields).length > 0) {
+      await prisma.$executeRaw`
+        INSERT INTO directory_seed_nap_verifications (
+          id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
+        ) VALUES (
+          ${randomUUID()},
+          ${seedId},
+          ${tenantId},
+          'owner_update',
+          ${JSON.stringify(changedNapFields)}::jsonb,
+          TRUE,
+          now()
+        )
+      `;
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET nap_owner_corrected = TRUE, nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
+        WHERE id = ${seedId}
+      `;
+    }
 
     // Sync seed hours into the canonical business_hours_list so the public
     // business-hours and status endpoints (which read that table) reflect them.
@@ -897,9 +957,17 @@ class DirectoryPresenceSeedService {
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'directory_presence_seed.update_fields',
-      payload: { seedId, tenantId, fields: Object.keys(fields) },
+      payload: {
+        seedId,
+        tenantId,
+        fields: Object.keys(fields),
+        napChanged: Object.keys(changedNapFields).length > 0,
+      },
     });
-    logger.info('DirectoryPresenceSeedService.updateFields', undefined, { seedId });
+    logger.info('DirectoryPresenceSeedService.updateFields', undefined, {
+      seedId,
+      napChanged: Object.keys(changedNapFields).length > 0,
+    });
   }
 
   /**

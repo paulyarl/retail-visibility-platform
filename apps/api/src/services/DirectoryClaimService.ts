@@ -606,10 +606,14 @@ Review at Settings → Directory → Presence Seeds.`,
     // Edit Business Profile modal produces via PATCH /api/tenant/profile).
     await this.populateTenantProfileFromListing(r.seed_id, r.tenant_id);
 
-    // Update seed status
+    // Update seed status. nap_verified_at is stamped here: the claim itself is
+    // the owner's confirmation of the seed-filed NAP (OTP-verified when the
+    // token is bound; operator-reviewed for approved claim requests). Later
+    // owner corrections are tracked separately via
+    // directory_seed_nap_verifications (seed-funnel analytics spec §7 gap 2).
     await prisma.$executeRaw`
       UPDATE directory_presence_seeds
-      SET status = 'claimed', claimed_at = now(), updated_at = now()
+      SET status = 'claimed', claimed_at = now(), nap_verified_at = now(), updated_at = now()
       WHERE id = ${r.seed_id}
     `;
 
@@ -867,10 +871,14 @@ Review at Settings → Directory → Presence Seeds.`,
     // Edit Business Profile modal produces via PATCH /api/tenant/profile).
     await this.populateTenantProfileFromListing(r.seed_id, r.tenant_id);
 
-    // Update seed status
+    // Update seed status. nap_verified_at is stamped here: the claim itself is
+    // the owner's confirmation of the seed-filed NAP (OTP-verified when the
+    // token is bound; operator-reviewed for approved claim requests). Later
+    // owner corrections are tracked separately via
+    // directory_seed_nap_verifications (seed-funnel analytics spec §7 gap 2).
     await prisma.$executeRaw`
       UPDATE directory_presence_seeds
-      SET status = 'claimed', claimed_at = now(), updated_at = now()
+      SET status = 'claimed', claimed_at = now(), nap_verified_at = now(), updated_at = now()
       WHERE id = ${r.seed_id}
     `;
 

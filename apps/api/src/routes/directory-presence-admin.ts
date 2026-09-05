@@ -2,6 +2,7 @@
  * Admin Directory Presence Seeds Routes
  *
  *   GET    /api/admin/directory/presence-seeds           — list seeds
+ *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
  *   GET    /api/admin/directory/presence-seeds/:id       — seed detail
  *   POST   /api/admin/directory/presence-seeds           — create seed
  *   POST   /api/admin/directory/presence-seeds/:id/publish — publish listing
@@ -25,6 +26,7 @@ import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectorySuggestionService from '../services/DirectorySuggestionService';
 import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
+import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -107,6 +109,45 @@ const updateFieldsSchema = z.object({
 
 const updateStatusSchema = z.object({
   status: z.enum(['draft', 'published', 'invited', 'claimed', 'suppressed']),
+});
+
+/**
+ * GET /api/admin/directory/presence-seeds/funnel/cohorts
+ *
+ * Cohort funnel metrics + benchmark gates for the seed → claim → paid motion
+ * (docs/LocalBiz/seed_funnel_benchmark_gates_and_analytics_spec.md §4–§6).
+ *
+ * Query params:
+ *   campaignIds — comma-separated campaign ids (combined cohort)
+ *   category    — case-insensitive contains match on campaign category
+ *   city        — case-insensitive contains match on campaign city
+ *   state       — case-insensitive contains match on campaign state
+ *   focus       — exact match on intelligence_focus (emerging | competitive)
+ *
+ * Returns per-campaign cohorts plus a combined aggregate (DISTINCT seeds),
+ * each with G1–G4 gate results graded directional vs. decision-grade.
+ */
+router.get('/presence-seeds/funnel/cohorts', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const campaignIdsParam = req.query.campaignIds as string | undefined;
+    const campaignIds = campaignIdsParam
+      ? campaignIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
+    const report = await SeedFunnelAnalyticsService.getCohortFunnel({
+      campaignIds,
+      category: req.query.category as string | undefined,
+      city: req.query.city as string | undefined,
+      state: req.query.state as string | undefined,
+      focus: req.query.focus as string | undefined,
+    });
+    res.json({ success: true, ...report });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory/presence-seeds/funnel/cohorts] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
 });
 
 /** GET /api/admin/directory/presence-seeds — list seeds */
