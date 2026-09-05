@@ -82,6 +82,25 @@ export interface PromptExecutionInput {
  * fails or the input is unchanged, the original is returned so JSON.parse can
  * surface the original parse error.
  */
+function normalizeExternalJsonText(raw: string): string {
+  let text = raw.trim();
+
+  // Some callers JSON.stringify the model output before JSON.stringify-ing the
+  // request body, leaving raw_output as a JSON string containing JSON. Unwrap
+  // that representation so schema validation sees the scan object itself.
+  for (let depth = 0; depth < 2 && text.startsWith('"'); depth++) {
+    try {
+      const decoded = JSON.parse(text);
+      if (typeof decoded !== 'string') break;
+      text = decoded.trim();
+    } catch {
+      break;
+    }
+  }
+
+  return text;
+}
+
 function stripLlmJsonArtifacts(raw: string): string {
   try {
     let text = raw;
@@ -692,7 +711,8 @@ export class MarketingPromptService extends BaseService {
         );
       }
 
-      const candidates = extractJsonCandidates(input.rawOutput);
+      const normalizedRawOutput = normalizeExternalJsonText(input.rawOutput);
+      const candidates = extractJsonCandidates(normalizedRawOutput);
       let parsedJson: any | null = null;
       let firstValidationIssues: string | null = null;
 
@@ -736,9 +756,9 @@ export class MarketingPromptService extends BaseService {
           throw new Error(`External result does not match the "${schemaName}" output schema: ${firstValidationIssues}`);
         }
         try {
-          JSON.parse(stripLlmJsonArtifacts(input.rawOutput));
+          JSON.parse(stripLlmJsonArtifacts(normalizedRawOutput));
         } catch (e) {
-          throw new Error(formatJsonParseError(e, input.rawOutput));
+          throw new Error(formatJsonParseError(e, normalizedRawOutput));
         }
         throw new Error(
           `External result does not match the "${schemaName}" output schema: no valid JSON found in raw_output`,
