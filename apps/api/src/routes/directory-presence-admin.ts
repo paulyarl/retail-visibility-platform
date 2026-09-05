@@ -120,6 +120,7 @@ router.get('/presence-seeds', requirePlatformStaff, async (req: Request, res: Re
     const identityConfidence = req.query.identityConfidence as string | undefined;
     const categoryFit = req.query.categoryFit as string | undefined;
     const hasClaimToken = req.query.hasClaimToken as string | undefined;
+    const outreachState = req.query.outreachState as string | undefined;
 
     const seeds = await DirectoryPresenceSeedService.listSeeds({
       seedBatch,
@@ -130,6 +131,7 @@ router.get('/presence-seeds', requirePlatformStaff, async (req: Request, res: Re
       identityConfidence,
       categoryFit,
       hasClaimToken,
+      outreachState,
     });
     res.json({ success: true, seeds });
   } catch (error) {

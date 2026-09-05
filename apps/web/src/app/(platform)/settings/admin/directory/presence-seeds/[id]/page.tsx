@@ -1108,6 +1108,33 @@ export default function PresenceSeedDetailPage() {
               {seed?.outreachStatus || 'unverified'}
             </span>
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Outreach State (Courtesy Window)
+            </label>
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+              seed?.outreach_state === 'outreach_scheduled' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' :
+              seed?.outreach_state === 'owner_contacted' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+              seed?.outreach_state === 'freshness_verified' ? 'bg-teal-50 text-teal-700 border border-teal-200' :
+              seed?.outreach_state === 'freshness_failed' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+              seed?.outreach_state === 'no_response' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+              seed?.outreach_state === 'claimed' ? 'bg-green-50 text-green-700 border border-green-200' :
+              seed?.outreach_state === 'suppressed' ? 'bg-red-50 text-red-700 border border-red-200' :
+              'bg-gray-50 text-gray-700 border border-gray-200'
+            }`}>
+              {(seed?.outreach_state || 'not_started').replace(/_/g, ' ')}
+            </span>
+            {seed?.outreach_scheduled_at && (
+              <p className="text-xs text-gray-500 mt-1">
+                Scheduled: {formatDate(seed.outreach_scheduled_at)}
+              </p>
+            )}
+            {seed?.outreach_state_entered_at && (
+              <p className="text-xs text-gray-500">
+                Entered: {formatDate(seed.outreach_state_entered_at)}
+              </p>
+            )}
+          </div>
           {seed?.ownerName && (
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">

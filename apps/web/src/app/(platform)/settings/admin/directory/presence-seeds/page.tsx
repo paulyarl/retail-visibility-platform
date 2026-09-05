@@ -32,6 +32,7 @@ export default function DirectoryPresenceSeedsPage() {
   const [filterConfidence, setFilterConfidence] = useState('');
   const [filterCategoryFit, setFilterCategoryFit] = useState('');
   const [filterClaimToken, setFilterClaimToken] = useState('');
+  const [filterOutreachState, setFilterOutreachState] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<{ seedId: string; token: string } | null>(null);
@@ -63,6 +64,7 @@ export default function DirectoryPresenceSeedsPage() {
         identityConfidence: filterConfidence || undefined,
         categoryFit: filterCategoryFit || undefined,
         hasClaimToken: filterClaimToken || undefined,
+        outreachState: filterOutreachState || undefined,
       });
       setSeeds(data);
     } catch (err) {
@@ -79,6 +81,7 @@ export default function DirectoryPresenceSeedsPage() {
     filterConfidence,
     filterCategoryFit,
     filterClaimToken,
+    filterOutreachState,
   ]);
 
   useEffect(() => {
@@ -737,6 +740,24 @@ export default function DirectoryPresenceSeedsPage() {
               <option value="no">No active token</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Outreach State</label>
+            <select
+              value={filterOutreachState}
+              onChange={(e) => setFilterOutreachState(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            >
+              <option value="">All</option>
+              <option value="not_started">Not Started</option>
+              <option value="outreach_scheduled">Outreach Scheduled</option>
+              <option value="owner_contacted">Owner Contacted</option>
+              <option value="freshness_verified">Freshness Verified</option>
+              <option value="freshness_failed">Freshness Failed</option>
+              <option value="no_response">No Response</option>
+              <option value="claimed">Claimed</option>
+              <option value="suppressed">Suppressed</option>
+            </select>
+          </div>
         </div>
         <div className="flex gap-2 items-center">
           <button
@@ -779,6 +800,7 @@ export default function DirectoryPresenceSeedsPage() {
                 <th className="py-3 px-4 font-medium">Confidence</th>
                 <th className="py-3 px-4 font-medium">SNAP/EBT</th>
                 <th className="py-3 px-4 font-medium">Claim Token</th>
+                <th className="py-3 px-4 font-medium">Outreach</th>
                 <th className="py-3 px-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -834,6 +856,20 @@ export default function DirectoryPresenceSeedsPage() {
                     ) : (
                       <span className="text-xs text-gray-400">None</span>
                     )}
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                      seed.outreachState === 'outreach_scheduled' ? 'bg-cyan-50 text-cyan-700' :
+                      seed.outreachState === 'owner_contacted' ? 'bg-blue-50 text-blue-700' :
+                      seed.outreachState === 'freshness_verified' ? 'bg-teal-50 text-teal-700' :
+                      seed.outreachState === 'freshness_failed' ? 'bg-rose-50 text-rose-700' :
+                      seed.outreachState === 'no_response' ? 'bg-amber-50 text-amber-700' :
+                      seed.outreachState === 'claimed' ? 'bg-green-50 text-green-700' :
+                      seed.outreachState === 'suppressed' ? 'bg-red-50 text-red-700' :
+                      'bg-gray-50 text-gray-500'
+                    }`}>
+                      {(seed.outreachState || 'not_started').replace(/_/g, ' ')}
+                    </span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">

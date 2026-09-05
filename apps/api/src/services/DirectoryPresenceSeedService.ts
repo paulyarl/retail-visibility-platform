@@ -111,6 +111,9 @@ export interface SeedSummary {
   publishedAt: Date | null;
   invitedAt: Date | null;
   claimedAt: Date | null;
+  outreachState?: string;
+  outreachStateEnteredAt?: Date | null;
+  outreachScheduledAt?: Date | null;
 }
 
 class DirectoryPresenceSeedService {
@@ -130,6 +133,7 @@ class DirectoryPresenceSeedService {
     identityConfidence?: string;
     categoryFit?: string;
     hasClaimToken?: string;
+    outreachState?: string;
   }): Promise<SeedSummary[]> {
     const conditions: string[] = [];
     const params: any[] = [];
@@ -174,6 +178,10 @@ class DirectoryPresenceSeedService {
         `NOT EXISTS (SELECT 1 FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL)`,
       );
     }
+    if (filters?.outreachState) {
+      conditions.push(`dps.outreach_state = $${paramIdx++}`);
+      params.push(filters.outreachState);
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -199,7 +207,10 @@ class DirectoryPresenceSeedService {
         dl.snap_ebt_source,
         dl.snap_ebt_source_name,
         (SELECT 1 FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL LIMIT 1) AS has_claim_token,
-        (SELECT dct.expires_at FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL ORDER BY dct.created_at DESC LIMIT 1) AS claim_token_expires_at
+        (SELECT dct.expires_at FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL ORDER BY dct.created_at DESC LIMIT 1) AS claim_token_expires_at,
+        dps.outreach_state,
+        dps.outreach_state_entered_at,
+        dps.outreach_scheduled_at
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       ${whereClause}
@@ -228,6 +239,9 @@ class DirectoryPresenceSeedService {
       publishedAt: s.published_at ? new Date(s.published_at) : null,
       invitedAt: s.invited_at ? new Date(s.invited_at) : null,
       claimedAt: s.claimed_at ? new Date(s.claimed_at) : null,
+      outreachState: s.outreach_state ?? 'not_started',
+      outreachStateEnteredAt: s.outreach_state_entered_at ? new Date(s.outreach_state_entered_at) : null,
+      outreachScheduledAt: s.outreach_scheduled_at ? new Date(s.outreach_scheduled_at) : null,
     }));
   }
 

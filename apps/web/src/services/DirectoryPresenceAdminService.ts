@@ -37,6 +37,9 @@ export interface DirectoryPresenceSeedSummary {
   publishedAt: string | null;
   invitedAt: string | null;
   claimedAt: string | null;
+  outreachState?: string;
+  outreachStateEnteredAt?: string | null;
+  outreachScheduledAt?: string | null;
 }
 
 export interface DirectoryPresenceSeedDetail {
@@ -123,6 +126,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     identityConfidence?: string;
     categoryFit?: string;
     hasClaimToken?: string;
+    outreachState?: string;
   }): Promise<DirectoryPresenceSeedSummary[]> {
     const params = new URLSearchParams();
     if (filters?.seedBatch) params.set('seedBatch', filters.seedBatch);
@@ -133,6 +137,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (filters?.identityConfidence) params.set('identityConfidence', filters.identityConfidence);
     if (filters?.categoryFit) params.set('categoryFit', filters.categoryFit);
     if (filters?.hasClaimToken) params.set('hasClaimToken', filters.hasClaimToken);
+    if (filters?.outreachState) params.set('outreachState', filters.outreachState);
     const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds${qs ? `?${qs}` : ''}`,

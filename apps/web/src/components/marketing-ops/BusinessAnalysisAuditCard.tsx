@@ -242,6 +242,11 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             <a href={`/settings/admin/directory/presence-seeds/${placeResult.seedId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 underline ml-1">
               seed
             </a>
+            {placeResult.created && (
+              <span className="text-cyan-600 dark:text-cyan-400 ml-1">
+                · outreach triggered
+              </span>
+            )}
           </p>
         )}
         {placeError && (
