@@ -446,7 +446,7 @@ export default function MultiCartPage() {
       </div>
 
       {/* Powered By Footer */}
-      <PoweredByFooter />
+      <PoweredByFooter showBusinessOwnersLink={false} />
     </div>
   );
 }

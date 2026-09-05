@@ -171,3 +171,25 @@ export function getDirectoryListingUrl(listing: {
   const isPlace = listing.subscriptionTier === 'directory_presence' || listing.listingOrigin === 'directory_seed';
   return isPlace ? `/place/${identifier}` : `/directory/${identifier}`;
 }
+
+/**
+ * Reserved slugs under /place/ that are used for static routes.
+ * Listings with these slugs would be shadowed by the static Next.js routes
+ * and become unreachable. These must be blacklisted in seed creation and
+ * slug validation to prevent collision.
+ */
+export const RESERVED_PLACE_SLUGS = new Set([
+  'about',
+  'claim',
+  'search',
+  'category',
+  'city',
+]);
+
+/**
+ * Check if a slug is reserved under /place/ and would collide with a
+ * static route. Returns true if the slug is in the reserved set.
+ */
+export function isReservedPlaceSlug(slug: string): boolean {
+  return RESERVED_PLACE_SLUGS.has(slug.toLowerCase());
+}

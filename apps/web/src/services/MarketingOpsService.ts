@@ -912,7 +912,7 @@ export interface DeriveAllUnmatchedResult {
 
 // ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
 
-export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek';
+export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek' | 'category_identification';
 export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';
 export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'unverified_closed' | 'other';
@@ -1700,6 +1700,11 @@ class MarketingOpsService extends AdminApiSingleton {
     address_state?: string;
     address_zip?: string;
     address_country?: string;
+    // Category identification overrides: when spawning from a category-ID
+    // campaign, the identified category/city/state may differ from the parent's.
+    category_override?: string;
+    city_override?: string;
+    state_override?: string;
   }): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${parentId}/derive-business`,
@@ -4491,6 +4496,43 @@ class MarketingOpsService extends AdminApiSingleton {
       kind: created ? 'created' : 'already_queued',
       entry: data,
       created,
+    };
+  }
+
+  /**
+   * Category Identification composite action — performs the full sequenced
+   * action in one server-side request:
+   *   1. If the category is new (is_known=false), registers it in the service
+   *      category vocab.
+   *   2. Routes the business to the chosen destination (queue / verify / campaign).
+   * Returns { kind, id, category_added, category_label }.
+   */
+  async categoryIdentificationAct(campaignId: string, input: {
+    category_label: string;
+    is_known: boolean;
+    destination: 'queue' | 'verify' | 'campaign';
+    business_name: string;
+    city?: string;
+    state?: string;
+    confidence?: 'high' | 'medium' | 'low';
+  }): Promise<{ kind: string; id?: string; category_added: boolean; category_label: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/category-identification/act`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-cat-id-act-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute category identification action');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    const data = result.data?.data ?? result.data;
+    return {
+      kind: data?.kind ?? 'unknown',
+      id: data?.id,
+      category_added: data?.category_added ?? false,
+      category_label: data?.category_label ?? input.category_label,
     };
   }
 

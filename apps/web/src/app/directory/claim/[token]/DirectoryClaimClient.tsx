@@ -641,6 +641,23 @@ export default function DirectoryClaimClient() {
                 {/* Entry Presence mode teaser (claim handoff spec §2/§4) */}
                 <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} />
 
+                {/* Directory Presence product allowance teaser (E5) */}
+                <Alert color="blue" variant="light" icon={<IconShoppingCart size={16} />} w="100%">
+                  <Stack gap="xs">
+                    <Text size="sm" fw={500}>
+                      Your Directory Presence listing includes 5 free product slots
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Add up to 5 signature products to your storefront — free with your claimed
+                      listing. It&apos;s enough to showcase your best offerings before upgrading to
+                      Discovery (75 products) or Storefront (200 products).{' '}
+                      <Link href="/place/about" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                        Learn more
+                      </Link>
+                    </Text>
+                  </Stack>
+                </Alert>
+
                 <Group justify="center">
                   {upgradeHref && (
                     <Button component={Link} href={upgradeHref} leftSection={<IconSparkles size={16} />}>

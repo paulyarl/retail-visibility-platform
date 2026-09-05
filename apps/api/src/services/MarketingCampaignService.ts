@@ -12,7 +12,7 @@ import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError, ValidationError } from '../middleware/errorHandler';
+import { NotFoundError, ValidationError, ConflictError } from '../middleware/errorHandler';
 import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId } from '../lib/id-generator';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
@@ -165,6 +165,42 @@ export function pipelineFor(
 }
 
 const RESURRECTION_STAGES = ['lost', 'dead'];
+
+// ─── Structural-duplicate guardrail ───────────────────────────────────────
+// Campaigns that are "done" / parked no longer appear in the operator's
+// active selection list, so they do NOT block a fresh campaign with the same
+// structural signature. A campaign in any other stage is considered active
+// and will trip the duplicate guardrail.
+//
+//   review track terminals:        lost, dead, closed
+//   recovery track terminals:      resolved_and_closed, dead
+//
+// Rationale (operator feedback): the operator should never see two
+// establishment / discovery campaigns with the same signature in the
+// campaign-selection list. Re-running an existing campaign produces a
+// versioned output instead of spawning a duplicate row.
+const INACTIVE_STAGES = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
+
+/**
+ * Normalizes a free-text geo / platform value for signature comparison.
+ * Returns null when the value is empty so it can be matched against DB NULL.
+ */
+function normalizeSignatureValue(value: string | null | undefined): string | null {
+  const v = (value ?? '').toString().trim().toLowerCase();
+  return v || null;
+}
+
+/**
+ * Normalizes the intelligence platform discriminator. Null / empty / "all"
+ * (and obvious "all platforms" spellings) collapse to 'all' so that a
+ * nationwide gold-standard campaign and one explicitly tagged "All
+ * Platforms" are treated as the same signature.
+ */
+function normalizePlatformValue(value: string | null | undefined): string {
+  const v = (value ?? '').toString().trim().toLowerCase();
+  if (!v || v === 'all' || v === 'all_platforms' || v === 'all platforms') return 'all';
+  return v;
+}
 
 const STAGE_DATE_FIELDS: Record<string, string> = {
   preview_built:    'date_preview_built',
@@ -411,6 +447,168 @@ export class MarketingCampaignService extends BaseService {
   }
 
   // ====================
+  // STRUCTURAL-DUPLICATE GUARDRAIL
+  // ====================
+
+  /**
+   * Builds the structural-signature Prisma `where` clause for a campaign
+   * based on its scope. Two campaigns with the same signature are considered
+   * duplicates and the second creation is blocked (hard 409).
+   *
+   * The signature is intentionally NOT keyed on campaign id — it is keyed on
+   * the structural attributes that define the campaign's identity:
+   *
+   *   intelligence scope → scope + category + intelligence_campaign_kind +
+   *                        intelligence_focus + intelligence_platform +
+   *                        city + state
+   *     (the "Indian Grocery / Establishment / Gold_standards / All
+   *      Platforms" case — city/state null = nationwide)
+   *
+   *   business scope     → scope + campaign_category + business_name +
+   *                        category + city + state
+   *     (a specific business engagement; business_name disambiguates two
+   *      different businesses in the same category/city)
+   *
+   *   category / city    → scope + campaign_category + category + city + state
+   *     (non-intelligence aggregate scopes)
+   *
+   * Inactive (terminal/parked) campaigns — lost, dead, closed,
+   * resolved_and_closed — are excluded so a fresh campaign can be created
+   * after the prior one was killed. Re-running an active campaign should
+   * produce a versioned output, not a duplicate row.
+   *
+   * Returns the existing active campaign if a duplicate signature is found,
+   * otherwise null.
+   */
+  async findDuplicateCampaign(input: CampaignInput, ctx?: RequestCtx): Promise<any | null> {
+    const scope = input.scope ?? 'business';
+    const category = input.category ?? '';
+    const city = normalizeSignatureValue(input.city);
+    const state = normalizeSignatureValue(input.state);
+    const campaignCategory = input.campaignCategory || CAMPAIGN_CATEGORY_DEFAULT;
+
+    // Build the active-stage filter: stage NOT IN the inactive set. Prisma
+    // `NOT` + `in` excludes both the listed stages and (because null stages
+    // are impossible — `stage` has a non-null default) keeps every active
+    // row.
+    const activeStageFilter = { NOT: { stage: { in: [...INACTIVE_STAGES] } } };
+
+    let where: any;
+
+    if (scope === 'intelligence') {
+      const kind = input.intelligenceCampaignKind || 'discovery';
+      const focus = input.intelligenceFocus || 'emerging';
+      // intelligence_platform is a nullable varchar; normalize null/empty/
+      // "all" to a single 'all' sentinel. Because the DB stores NULL for
+      // nationwide, we match either NULL or the literal 'all' (case-folded
+      // via equalsIgnoreCase is not available, so we compare against both).
+      const platform = normalizePlatformValue(input.intelligencePlatform);
+      const platformIsAll = platform === 'all';
+
+      where = {
+        scope: 'intelligence',
+        category,
+        intelligence_campaign_kind: kind,
+        intelligence_focus: focus,
+        city: city ?? null,
+        state: state ?? null,
+        ...(platformIsAll
+          ? { OR: [{ intelligence_platform: null }, { intelligence_platform: { in: ['all', 'All', 'ALL'] } }] }
+          : { intelligence_platform: input.intelligencePlatform }),
+        ...activeStageFilter,
+      };
+    } else if (scope === 'business') {
+      const businessName = normalizeSignatureValue(input.businessName);
+      where = {
+        scope: 'business',
+        campaign_category: campaignCategory,
+        category,
+        city: city ?? null,
+        state: state ?? null,
+        // business_name is nullable; match on the trimmed-lowercased value
+        // is not directly possible without a computed column, so we compare
+        // the raw value (operators enter business names consistently for the
+        // same business). Null business_name matches null.
+        business_name: input.businessName ?? null,
+        ...activeStageFilter,
+      };
+      // Suppress unused-var lint for the normalized form (kept for clarity).
+      void businessName;
+    } else {
+      // category / city scopes
+      where = {
+        scope,
+        campaign_category: campaignCategory,
+        category,
+        city: city ?? null,
+        state: state ?? null,
+        ...activeStageFilter,
+      };
+    }
+
+    try {
+      const existing = await this.prisma.mkt_campaigns_list.findFirst({
+        where,
+        select: {
+          id: true,
+          display_id: true,
+          scope: true,
+          campaign_category: true,
+          category: true,
+          city: true,
+          state: true,
+          business_name: true,
+          stage: true,
+          intelligence_campaign_kind: true,
+          intelligence_focus: true,
+          intelligence_platform: true,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+      return existing ?? null;
+    } catch (error) {
+      // The guardrail is best-effort on read failures — never block creation
+      // because the duplicate-check query itself errored. Log and proceed.
+      logger.warn('duplicate-campaign guardrail lookup failed (allowing create)', ctx, {
+        error: (error as Error).message,
+        scope,
+        category,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Renders a human-readable label for a duplicate campaign, used in the
+   * 409 response so the operator can locate the existing row.
+   */
+  private formatDuplicateLabel(existing: any): string {
+    const parts: string[] = [];
+    if (existing.scope === 'intelligence') {
+      parts.push(existing.category);
+      parts.push(existing.intelligence_campaign_kind);
+      parts.push(existing.intelligence_focus);
+      const plat = existing.intelligence_platform;
+      parts.push(plat ? `${plat} platform` : 'all platforms');
+      if (existing.city) parts.push(`${existing.city}${existing.state ? ', ' + existing.state : ''}`);
+      else if (existing.state) parts.push(existing.state);
+      else parts.push('nationwide');
+    } else if (existing.scope === 'business') {
+      if (existing.business_name) parts.push(existing.business_name);
+      parts.push(existing.category);
+      if (existing.city) parts.push(existing.city);
+      if (existing.state) parts.push(existing.state);
+      parts.push(`(${existing.campaign_category})`);
+    } else {
+      parts.push(`${existing.scope} scope`);
+      parts.push(existing.category);
+      if (existing.city) parts.push(existing.city);
+      if (existing.state) parts.push(existing.state);
+    }
+    return parts.join(' · ');
+  }
+
+  // ====================
   // CREATE
   // ====================
 
@@ -426,6 +624,26 @@ export class MarketingCampaignService extends BaseService {
       const campaignCategory = input.campaignCategory || CAMPAIGN_CATEGORY_DEFAULT;
       const initialStage = campaignCategory === 'recovery_management' ? 'audit_identified' : 'seek';
       // profile_repair starts in 'seek' (triage) — the track is decided later
+
+      // ─── Structural-duplicate guardrail ───────────────────────────────
+      // Block creation of a second active campaign with the same structural
+      // signature (scope + category + kind + focus + platform + geo, or the
+      // per-scope equivalent). Re-run the existing campaign to produce a
+      // versioned output instead. Inactive (dead/lost/closed) campaigns do
+      // not block. See findDuplicateCampaign for the signature definition.
+      // Runs before the intelligence-profile prerequisite so a duplicate
+      // short-circuits the heavier profile lookup.
+      const duplicate = await this.findDuplicateCampaign(input, ctx);
+      if (duplicate) {
+        const label = this.formatDuplicateLabel(duplicate);
+        const idPart = duplicate.display_id ? ` (display_id=${duplicate.display_id})` : ` (id=${duplicate.id})`;
+        throw new ConflictError(
+          `An active campaign with the same structural signature already exists: ${label}${idPart}, ` +
+          `currently in stage "${duplicate.stage}". Re-run that campaign to produce a versioned output ` +
+          `instead of creating a duplicate. If the existing campaign is no longer needed, transition it ` +
+          `to dead/lost first.`,
+        );
+      }
 
       // Intelligence discovery prerequisite: an active establishment profile
       // must exist before a discovery campaign can be created. This enforces
@@ -748,6 +966,13 @@ export class MarketingCampaignService extends BaseService {
     gbpUrl?: string;
     socialProfiles?: { platform: string; url: string }[];
     ownerNames?: string[];
+    // Category identification override: when the parent is a category-ID
+    // campaign, the identified category may differ from the parent's. These
+    // optional overrides replace the inherited values instead of the default
+    // parent-inheritance behavior.
+    categoryOverride?: string;
+    cityOverride?: string;
+    stateOverride?: string;
   }, ctx?: RequestCtx): Promise<any> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -812,9 +1037,9 @@ export class MarketingCampaignService extends BaseService {
         scope: 'business',
         businessName: input.businessName,
         title: input.title,
-        category: parent.category,
-        city: parent.city,
-        state: parent.state ?? undefined,
+        category: input.categoryOverride ?? parent.category,
+        city: input.cityOverride ?? parent.city,
+        state: input.stateOverride ?? parent.state ?? undefined,
         neighborhood: parent.neighborhood ?? undefined,
         tone: parent.tone ?? undefined,
         attributes: (parent.attributes as string[]) ?? undefined,

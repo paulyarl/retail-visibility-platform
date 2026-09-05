@@ -19,6 +19,7 @@ import { audit } from '../audit';
 import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
+import { isReservedPlaceSlug } from '../utils/slug';
 import {
   generateDirectoryListingId,
   generateDirectoryPresenceSeedId,
@@ -292,6 +293,8 @@ class DirectoryPresenceSeedService {
   /**
    * Normalize and de-duplicate a directory listing slug. If the requested slug
    * is already in use by another listing, appends an incrementing numeric suffix.
+   * Reserved /place/ slugs (about, claim, search, category, city) are suffixed
+   * to avoid collision with static Next.js routes.
    */
   private async ensureUniqueSlug(rawSlug: string, excludeListingId?: string): Promise<string> {
     let base = rawSlug
@@ -300,6 +303,11 @@ class DirectoryPresenceSeedService {
       .replace(/^-+|-+$/g, '')
       .substring(0, 80);
     if (!base) base = 'listing';
+
+    // Avoid collision with reserved /place/ static routes
+    if (isReservedPlaceSlug(base)) {
+      base = `${base}-listing`;
+    }
 
     let candidate = base;
     let counter = 2;

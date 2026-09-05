@@ -67,6 +67,12 @@ import {
   GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
   type GoldStandardScanOutput,
 } from './gold-standard-scan.schema';
+import {
+  categoryIdentificationSchema,
+  CATEGORY_IDENTIFICATION_SCHEMA_NAME,
+  CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
+  type CategoryIdentificationOutput,
+} from './category-identification.schema';
 
 export {
   profileRepairTriageSchema,
@@ -85,6 +91,10 @@ export {
   GOLD_STANDARD_SCAN_SCHEMA_NAME,
   GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
   type GoldStandardScanOutput,
+  categoryIdentificationSchema,
+  CATEGORY_IDENTIFICATION_SCHEMA_NAME,
+  CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
+  type CategoryIdentificationOutput,
 };
 
 // ============================================================================
@@ -291,6 +301,15 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: rawJsonSchema,
     auditPlatform: null, // permissive schema never creates an audit
     promptSuffix: RAW_JSON_PROMPT_SUFFIX,
+  },
+  [CATEGORY_IDENTIFICATION_SCHEMA_NAME]: {
+    validator: categoryIdentificationSchema,
+    // Category identification imports land in mkt_audits_list so the campaign's
+    // Audits tab can render the candidate categories and the operator can
+    // spawn/queue/verify from the identification result. The full validated
+    // payload is stored in audit_data.
+    auditPlatform: 'category_identification',
+    promptSuffix: CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
   },
 };
 

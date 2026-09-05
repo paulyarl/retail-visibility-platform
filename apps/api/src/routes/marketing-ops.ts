@@ -1603,6 +1603,11 @@ const deriveBusinessSchema = z.object({
   address_state: z.string().max(100).optional(),
   address_zip: z.string().max(40).optional(),
   address_country: z.string().max(100).optional(),
+  // Category identification overrides: when spawning from a category-ID
+  // campaign, the identified category/city/state may differ from the parent's.
+  category_override: z.string().max(255).optional(),
+  city_override: z.string().max(255).optional(),
+  state_override: z.string().max(255).optional(),
 });
 
 router.post('/:id/derive-business', async (req: any, res: Response) => {
@@ -1631,8 +1636,126 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
       addressState: parsed.address_state,
       addressZip: parsed.address_zip,
       addressCountry: parsed.address_country,
+      categoryOverride: parsed.category_override,
+      cityOverride: parsed.city_override,
+      stateOverride: parsed.state_override,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// CATEGORY IDENTIFICATION — composite action
+// ====================
+// When an operator identifies a business's category from a category-ID audit,
+// this endpoint performs the full sequenced action in one request:
+//   1. If the category is new (is_known=false), register it in the service
+//      category vocab so it appears in future campaign forms.
+//   2. Route the business to the chosen destination:
+//      - "queue"   → addToQueue with source_kind='category_identification'
+//      - "verify"  → addToQueue with initial_status='verify_then_outreach'
+//      - "campaign" → deriveBusinessCampaign with category/city/state overrides
+// The operator never has to think "add category first, then queue" — the
+// destination action absorbs vocab registration as a precondition step.
+
+const categoryIdentificationActSchema = z.object({
+  category_label: z.string().min(1).max(255),
+  is_known: z.boolean(),
+  destination: z.enum(['queue', 'verify', 'campaign']),
+  business_name: z.string().min(1).max(255),
+  city: z.string().max(255).optional(),
+  state: z.string().max(255).optional(),
+  confidence: z.enum(['high', 'medium', 'low']).optional(),
+});
+
+router.post('/:id/category-identification/act', async (req: any, res: Response) => {
+  try {
+    const parsed = categoryIdentificationActSchema.parse(req.body);
+    const ctx = getCtx(req);
+    const campaignId = req.params.id;
+
+    // Load the parent campaign to inherit city/state if not provided in the payload.
+    const parent = await MarketingCampaignService.getCampaign(campaignId, ctx);
+    if (!parent) {
+      return res.status(404).json({ success: false, error: 'campaign_not_found' });
+    }
+
+    const categoryLabel = parsed.category_label.trim();
+    const categorySlug = categoryLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const city = parsed.city ?? parent.city ?? undefined;
+    const state = parsed.state ?? parent.state ?? undefined;
+
+    // Step 1: Register the category in vocab if it's new.
+    let categoryAdded = false;
+    if (!parsed.is_known) {
+      await MarketingServiceCategoryService.upsertCategory({
+        value: categorySlug || categoryLabel,
+        label: categoryLabel,
+        isActive: true,
+      }, ctx);
+      categoryAdded = true;
+    }
+
+    // Step 2: Route to the chosen destination.
+    if (parsed.destination === 'campaign') {
+      // Spawn a business-scope child campaign with the identified category.
+      const child = await MarketingCampaignService.deriveBusinessCampaign({
+        parentId: campaignId,
+        businessName: parsed.business_name,
+        categoryOverride: categoryLabel,
+        cityOverride: city,
+        stateOverride: state,
+        assignedTo: req.user?.id,
+        note: `Category identified via category-ID campaign. Category: ${categoryLabel} (confidence: ${parsed.confidence ?? 'unknown'}).`,
+      }, ctx);
+      return res.status(201).json({
+        success: true,
+        data: {
+          kind: 'campaign_created',
+          id: child.id,
+          campaign: child,
+          category_added: categoryAdded,
+          category_label: categoryLabel,
+        },
+      });
+    }
+
+    // Queue or verify — both go through addToQueue.
+    const queueResult = await MarketingProspectQueueService.addToQueue({
+      business_name: parsed.business_name,
+      title: parsed.business_name,
+      category: categoryLabel,
+      city,
+      state,
+      source_kind: 'category_identification',
+      source_campaign_id: campaignId,
+      business_snapshot: {
+        identified_category: categoryLabel,
+        confidence: parsed.confidence,
+        category_added: categoryAdded,
+      },
+      priority: parsed.confidence === 'high' ? 'high' : 'normal',
+      initial_status: parsed.destination === 'verify' ? 'verify_then_outreach' : 'queued',
+      queuedBy: req.user?.id,
+    }, ctx);
+
+    // addToQueue returns { kind: 'created' | 'already_queued' | 'campaign_exists' }
+    return res.status(201).json({
+      success: true,
+      data: {
+        kind: queueResult.kind,
+        id: queueResult.kind === 'campaign_exists' ? queueResult.campaignId : queueResult.entry?.id,
+        entry: queueResult.kind !== 'campaign_exists' ? queueResult.entry : undefined,
+        campaignId: queueResult.kind === 'campaign_exists' ? queueResult.campaignId : undefined,
+        category_added: categoryAdded,
+        category_label: categoryLabel,
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
@@ -3903,7 +4026,7 @@ const prospectQueueAddSchema = z.object({
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
-  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek']),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification']),
   // source_campaign_id is required for audit-derived entries; optional for
   // manual entries added directly from the queue page (no parent campaign).
   source_campaign_id: z.string().min(1).optional(),

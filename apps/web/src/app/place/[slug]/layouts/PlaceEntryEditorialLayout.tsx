@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Info, MapPin, ShieldCheck, Tag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Info, MapPin, ShieldCheck, ShoppingBag, Tag } from 'lucide-react';
 import { getCategoryUrl, getCityUrl } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
@@ -233,6 +233,12 @@ export default function PlaceEntryEditorialLayout({
                     <Info className="w-5 h-5" /> Are you the owner?
                   </a>
                 )}
+                <Link
+                  href="/place/about"
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline mt-1"
+                >
+                  Learn what VisibleShelf offers
+                </Link>
                 {showsQr && (
                   <div className="flex flex-col items-center">
                     <TenantQRCode
@@ -250,6 +256,46 @@ export default function PlaceEntryEditorialLayout({
               </div>
             </div>
           </section>
+        </div>
+
+        {/* Product slot teaser — shows what claiming unlocks (E4) */}
+        <div className="max-w-6xl mx-auto px-6 mb-12">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl p-8 border border-blue-100 dark:border-blue-900/30">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium mb-4">
+                  <Tag className="w-3 h-3" />
+                  Free with your claimed listing
+                </div>
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
+                  List your first 5 products
+                </h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                  Claim this listing and add up to 5 signature products to your storefront —
+                  free with your Directory Presence tier. Showcase your best offerings and see
+                  how the platform works before upgrading.
+                </p>
+                <Link
+                  href="/place/about"
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline mt-3"
+                >
+                  Learn what VisibleShelf offers <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="flex justify-center">
+                <div className="grid grid-cols-3 gap-3">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <div
+                      key={i}
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-300 dark:text-blue-700"
+                    >
+                      <ShoppingBag className="w-5 h-5" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Balanced content grid — map on left (wider), NAP data on right */}

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock prisma + logger + id-generator + dependencies so we can test the
 // transition logic in isolation without a DB.
 const { mockCampaignsList, mockStageHistory } = vi.hoisted(() => ({
-  mockCampaignsList: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+  mockCampaignsList: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
   mockStageHistory: { create: vi.fn() },
 }));
 
@@ -257,6 +257,7 @@ describe('createCampaign sets initial stage by category', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStageHistory.create.mockResolvedValue({});
+    mockCampaignsList.findFirst.mockResolvedValue(null);
     mockCampaignsList.create.mockImplementation(({ data }: any) =>
       Promise.resolve({ ...data, id: data.id }),
     );
@@ -291,5 +292,186 @@ describe('createCampaign sets initial stage by category', () => {
         data: expect.objectContaining({ to_stage: 'audit_identified' }),
       }),
     );
+  });
+});
+
+// ====================
+// Structural-duplicate guardrail
+// ====================
+// The operator must not be able to create a second active campaign with the
+// same structural signature (scope + category + kind + focus + platform +
+// geo, or the per-scope equivalent). Re-running an existing campaign
+// produces a versioned output instead. Inactive (dead/lost/closed)
+// campaigns do not block.
+
+describe('createCampaign structural-duplicate guardrail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStageHistory.create.mockResolvedValue({});
+    mockCampaignsList.findFirst.mockResolvedValue(null);
+    mockCampaignsList.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...data, id: data.id }),
+    );
+  });
+
+  it('blocks a duplicate intelligence establishment / gold_standards campaign (all platforms, nationwide)', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-existing-001',
+      display_id: 'MC-0001',
+      scope: 'intelligence',
+      campaign_category: 'review_management',
+      category: 'Indian Grocery Store',
+      city: null,
+      state: null,
+      business_name: null,
+      stage: 'seek',
+      intelligence_campaign_kind: 'establishment',
+      intelligence_focus: 'gold_standards',
+      intelligence_platform: null,
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'intelligence',
+        category: 'Indian Grocery Store',
+        intelligenceCampaignKind: 'establishment',
+        intelligenceFocus: 'gold_standards',
+        intelligencePlatform: null,
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+
+    expect(mockCampaignsList.create).not.toHaveBeenCalled();
+  });
+
+  it('treats explicit "all" platform the same as null platform (nationwide signature match)', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-existing-002',
+      display_id: null,
+      scope: 'intelligence',
+      campaign_category: 'review_management',
+      category: 'Indian Grocery Store',
+      city: null,
+      state: null,
+      business_name: null,
+      stage: 'seek',
+      intelligence_campaign_kind: 'establishment',
+      intelligence_focus: 'gold_standards',
+      intelligence_platform: null,
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'intelligence',
+        category: 'Indian Grocery Store',
+        intelligenceCampaignKind: 'establishment',
+        intelligenceFocus: 'gold_standards',
+        intelligencePlatform: 'all',
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+  });
+
+  it('allows a campaign when the only existing match is inactive (dead)', async () => {
+    // findFirst returns null because the INACTIVE_STAGES filter excludes the
+    // dead campaign — simulate the post-filter result (no active match).
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    const result = await service.createCampaign({
+      scope: 'intelligence',
+      category: 'Indian Grocery Store',
+      intelligenceCampaignKind: 'establishment',
+      intelligenceFocus: 'gold_standards',
+      intelligencePlatform: null,
+    });
+
+    expect(result.stage).toBe('seek');
+    expect(mockCampaignsList.create).toHaveBeenCalled();
+  });
+
+  it('blocks a duplicate business-scope campaign (same business + category + city)', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-existing-003',
+      display_id: 'MC-0099',
+      scope: 'business',
+      campaign_category: 'review_management',
+      category: 'plumber',
+      city: 'Austin',
+      state: 'TX',
+      business_name: 'Joe Plumbing',
+      stage: 'shown',
+      intelligence_campaign_kind: null,
+      intelligence_focus: null,
+      intelligence_platform: null,
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'business',
+        businessName: 'Joe Plumbing',
+        category: 'plumber',
+        city: 'Austin',
+        state: 'TX',
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+
+    expect(mockCampaignsList.create).not.toHaveBeenCalled();
+  });
+
+  it('allows a business-scope campaign for a different business in the same category/city', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    const result = await service.createCampaign({
+      scope: 'business',
+      businessName: 'Another Plumbing Co',
+      category: 'plumber',
+      city: 'Austin',
+      state: 'TX',
+    });
+
+    expect(result.id).toBeDefined();
+    expect(mockCampaignsList.create).toHaveBeenCalled();
+  });
+
+  it('blocks a duplicate discovery campaign with the same focus + platform + geo', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-existing-004',
+      display_id: null,
+      scope: 'intelligence',
+      campaign_category: 'review_management',
+      category: 'Indian Grocery Store',
+      city: 'Jersey City',
+      state: 'NJ',
+      business_name: null,
+      stage: 'preview_built',
+      intelligence_campaign_kind: 'discovery',
+      intelligence_focus: 'emerging',
+      intelligence_platform: 'google',
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'intelligence',
+        category: 'Indian Grocery Store',
+        city: 'Jersey City',
+        state: 'NJ',
+        intelligenceCampaignKind: 'discovery',
+        intelligenceFocus: 'emerging',
+        intelligencePlatform: 'google',
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+  });
+
+  it('allows creation when the duplicate-check query itself errors (best-effort guardrail)', async () => {
+    mockCampaignsList.findFirst.mockRejectedValueOnce(new Error('db connection lost'));
+
+    const result = await service.createCampaign({
+      scope: 'intelligence',
+      category: 'Indian Grocery Store',
+      intelligenceCampaignKind: 'establishment',
+      intelligenceFocus: 'gold_standards',
+      intelligencePlatform: null,
+    });
+
+    expect(result.id).toBeDefined();
+    expect(mockCampaignsList.create).toHaveBeenCalled();
   });
 });

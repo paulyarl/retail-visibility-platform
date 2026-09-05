@@ -13,6 +13,7 @@ import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCatego
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
+import CategoryIdentificationAuditCard from '@/components/marketing-ops/CategoryIdentificationAuditCard';
 import IntelligenceEstablishmentPanel from '@/components/marketing-ops/IntelligenceEstablishmentPanel';
 import GoldStandardDiscoveryPanel from '@/components/marketing-ops/GoldStandardDiscoveryPanel';
 import AuditImportMetadataBadge from '@/components/marketing-ops/AuditImportMetadataBadge';
@@ -1466,6 +1467,8 @@ export default function CampaignDetailClient({
                         <CityAnalysisAuditCard key={audit.id} audit={audit} />
                       ) : audit.platform === 'intelligence_discovery' && audit.audit_data ? (
                         <IntelligenceDiscoveryAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : audit.platform === 'category_identification' && audit.audit_data ? (
+                        <CategoryIdentificationAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'gold_standard_scan' && audit.audit_data ? (
                         <div key={audit.id} className="border border-amber-200 dark:border-amber-700 rounded-lg p-4 bg-amber-50/50 dark:bg-amber-900/10">
                           <div className="flex items-center justify-between mb-2">

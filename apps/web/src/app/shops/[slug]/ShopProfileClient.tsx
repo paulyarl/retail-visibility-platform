@@ -888,7 +888,7 @@ export default function ShopProfileClient({
         </div>
       </div>
   {/* Platform Branding Footer */}
-            <PoweredByFooter />
+            <PoweredByFooter showBusinessOwnersLink={false} />
      
     </div>
   );

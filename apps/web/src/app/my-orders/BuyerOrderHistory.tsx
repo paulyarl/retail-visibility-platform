@@ -872,7 +872,7 @@ export default function BuyerOrderHistory() {
         </div>
 
         {/* Platform Branding Footer */}
-        <PoweredByFooter />
+        <PoweredByFooter showBusinessOwnersLink={false} />
       </div>
     );
   }

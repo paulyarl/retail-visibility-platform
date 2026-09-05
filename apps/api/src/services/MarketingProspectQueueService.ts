@@ -37,7 +37,8 @@ export type ProspectSourceKind =
   | 'scan_unmatched'
   | 'manual'
   | 'intelligence_seek'
-  | 'directory_lead_gen';
+  | 'directory_lead_gen'
+  | 'category_identification';
 
 export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed';
 export type ProspectPriority = 'high' | 'normal';

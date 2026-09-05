@@ -960,7 +960,7 @@ export default function FeaturedProductsPage() {
       <LastViewed />
 
       {/* Footer */}
-      <PoweredByFooter />
+      <PoweredByFooter showBusinessOwnersLink={false} />
     </div>
   );
 }

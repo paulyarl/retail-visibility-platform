@@ -34,6 +34,7 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
   scan_unmatched: 'Scan Unmatched',
   manual: 'Manual',
   intelligence_seek: 'Intelligence Seek',
+  category_identification: 'Category Identification',
 };
 
 const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other'];

@@ -3,7 +3,7 @@
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Link from 'next/link';
 
-export function PoweredByFooter({ note }: { note?: string }) {
+export function PoweredByFooter({ note, showBusinessOwnersLink = true }: { note?: string; showBusinessOwnersLink?: boolean }) {
   const { settings: platformSettings } = usePlatformSettings();
 
   return (
@@ -45,6 +45,11 @@ export function PoweredByFooter({ note }: { note?: string }) {
           <Link href="/legal" className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
             Legal
           </Link>
+          {showBusinessOwnersLink && (
+            <Link href="/place/about" className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              For Business Owners
+            </Link>
+          )}
         </div>
       </div>
     </div>
