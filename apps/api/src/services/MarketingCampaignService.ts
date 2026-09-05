@@ -621,7 +621,7 @@ export class MarketingCampaignService extends BaseService {
     try {
       let tone = input.tone;
       if (!tone) {
-        const preset = await MarketingCategoryToneService.getPresetByCategory(input.category);
+        const preset = await MarketingCategoryToneService.getPresetByCategory(input.category || '');
         tone = preset?.tone || undefined;
       }
 
@@ -659,8 +659,8 @@ export class MarketingCampaignService extends BaseService {
         const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
         const profileService = IntelligenceProfileService.getInstance();
         const hasProfile = input.intelligenceFocus === 'gold_standards'
-          ? await profileService.resolveGoldStandard(input.category, input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
-          : await profileService.resolve(input.category, input.intelligenceFocus as any, input.city || null, input.intelligencePlatform || null, ctx);
+          ? await profileService.resolveGoldStandard(input.category || '', input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
+          : await profileService.resolve(input.category || '', input.intelligenceFocus as any, input.city || null, input.intelligencePlatform || null, ctx);
         if (!hasProfile) {
           const focusLabel = input.intelligenceFocus === 'gold_standards'
             ? `gold standard${input.intelligencePlatform ? ` (${input.intelligencePlatform})` : ''}`
@@ -684,7 +684,7 @@ export class MarketingCampaignService extends BaseService {
           repair_issue_type: input.repairIssueType || null,
           title: input.title || null,
           business_name: input.businessName || null,
-          category: input.category,
+          category: input.category || '',
           city: input.city || '',
           state: normalizeReferenceState(input.state) || null,
           neighborhood: input.neighborhood || null,
