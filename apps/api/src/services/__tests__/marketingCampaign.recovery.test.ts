@@ -53,7 +53,7 @@ describe('review track transitions (regression)', () => {
     expect(map).toEqual({
       seek:             ['preview_built', 'dead'],
       preview_built:    ['shown', 'dead'],
-      shown:            ['paid', 'lost', 'tenant_onboarded'],
+      shown:            ['paid', 'lost', 'dead', 'tenant_onboarded'],
       paid:             ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
       delivered:        ['retainer_pitched', 'closed', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
       // Registry-driven intake submitted stages — flow back to delivered

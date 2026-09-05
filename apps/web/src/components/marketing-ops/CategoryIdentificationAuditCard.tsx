@@ -64,6 +64,24 @@ interface CategoryIdentificationData {
     years_in_business_estimate?: string | null;
     signature_products_services?: string[];
   };
+  nap?: {
+    canonical_name?: string | null;
+    address_line1?: string | null;
+    address_line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+    country_code?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    directory_profile_urls?: { platform: string; url: string }[];
+    field_confidence?: {
+      field: 'business_name' | 'address_line1' | 'address_line2' | 'city' | 'state' | 'postal_code' | 'country_code' | 'phone' | 'website';
+      confidence: 'high' | 'medium' | 'low';
+      source?: string | null;
+    }[];
+    provenance?: string | null;
+  };
   evidence_sources?: { source: string; url?: string | null; finding: string }[];
   data_quality?: {
     sources_consulted?: number;
@@ -381,6 +399,76 @@ export default function CategoryIdentificationAuditCard({
                 ))}
               </div>
             )}
+          </div>
+        </details>
+      )}
+
+      {/* NAP (Name / Address / Phone) */}
+      {data.nap && (
+        <details className="mb-3">
+          <summary className="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">
+            NAP (Name / Address / Phone)
+            {data.nap.provenance && (
+              <span className="ml-2 text-[10px] text-gray-400 font-normal">via {data.nap.provenance}</span>
+            )}
+          </summary>
+          <div className="mt-2 space-y-1.5">
+            {/* Build a confidence lookup for inline badges */}
+            {(() => {
+              const fcMap = new Map<string, 'high' | 'medium' | 'low'>();
+              for (const fc of (data.nap?.field_confidence ?? [])) {
+                fcMap.set(fc.field, fc.confidence);
+              }
+              const ConfBadge = ({ field }: { field: string }) => {
+                const conf = fcMap.get(field);
+                if (!conf) return null;
+                return (
+                  <span className={`ml-1.5 inline-flex px-1 py-0.5 rounded text-[9px] font-medium ${CONFIDENCE_STYLES[conf]}`}>
+                    {conf}
+                  </span>
+                );
+              };
+              const rows: { label: string; value?: string | null; field: string }[] = [
+                { label: 'Name', value: data.nap?.canonical_name, field: 'business_name' },
+                { label: 'Address 1', value: data.nap?.address_line1, field: 'address_line1' },
+                { label: 'Address 2', value: data.nap?.address_line2, field: 'address_line2' },
+                { label: 'City', value: data.nap?.city, field: 'city' },
+                { label: 'State', value: data.nap?.state, field: 'state' },
+                { label: 'Postal', value: data.nap?.postal_code, field: 'postal_code' },
+                { label: 'Country', value: data.nap?.country_code, field: 'country_code' },
+                { label: 'Phone', value: data.nap?.phone, field: 'phone' },
+                { label: 'Website', value: data.nap?.website, field: 'website' },
+              ];
+              return (
+                <>
+                  {rows.filter((r) => r.value).map((r) => (
+                    <div key={r.field} className="text-[11px] text-gray-600 dark:text-gray-400 flex items-start gap-1">
+                      <span className="font-medium min-w-[70px] text-gray-500 dark:text-gray-400">{r.label}</span>
+                      <span className="flex-1">
+                        {r.field === 'website' && r.value ? (
+                          <a href={r.value} target="_blank" rel="noopener noreferrer" className="text-cyan-600 dark:text-cyan-400 underline">{r.value}</a>
+                        ) : r.value}
+                        <ConfBadge field={r.field} />
+                      </span>
+                    </div>
+                  ))}
+                  {/* Directory profile URLs */}
+                  {data.nap?.directory_profile_urls && data.nap.directory_profile_urls.length > 0 && (
+                    <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Directory profiles:</span>
+                      <div className="mt-0.5 ml-2 space-y-0.5">
+                        {data.nap.directory_profile_urls.map((d, i) => (
+                          <div key={i}>
+                            <span className="text-gray-500">{d.platform}:</span>{' '}
+                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-cyan-600 dark:text-cyan-400 underline">{d.url}</a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </details>
       )}

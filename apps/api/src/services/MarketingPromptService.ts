@@ -834,6 +834,28 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
+      // Category-identification audit → best-effort NAP enrichment of the
+      // campaign. Syncs contact fields (business_name, phone, website_url,
+      // address) from the audit's structured `nap` block using a
+      // confidence-gated overwrite policy. No hotness derivation (the
+      // category-identification prompt doesn't produce scores/tiers).
+      if (result.audit && resolved.auditPlatform === 'category_identification' && unifiedConfig.marketingOpsHotProspectAutoSyncOnImport) {
+        try {
+          const { MarketingHotProspectService } = await import('./MarketingHotProspectService.js');
+          await MarketingHotProspectService.getInstance().syncFromCategoryIdentificationAudit(result.audit.id, ctx);
+          logger.info('Auto-sync of category_identification audit complete', ctx, {
+            auditId: result.audit.id,
+            campaignId: input.campaignId,
+          });
+        } catch (syncErr) {
+          logger.error('Auto-sync of category_identification audit failed (best-effort)', ctx, {
+            error: (syncErr as Error).message,
+            auditId: result.audit.id,
+            campaignId: input.campaignId,
+          });
+        }
+      }
+
       // GAP-P8: best-effort post-import hook for intelligence_profile schema.
       // When an operator imports an externally-generated profile via
       // /executions/external, the validated JSON is persisted as a DRAFT

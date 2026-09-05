@@ -42,6 +42,13 @@ The goal is to identify the SINGLE best-fit category label that would be used in
 === KNOWN CATEGORIES ===
 The platform maintains a vocabulary of known categories. Where possible, match the business to an existing known category label. If no known category fits, propose a new label — the operator can register it with one click.
 
+=== DIRECTORY HOSTING CONTEXT ===
+A category label is not a positioning statement — it becomes a public directory page that hosts every similar business in the market. Evaluate every candidate as a directory shelf:
+1. Population test: the label should naturally host multiple businesses in the same city/market — the identified business plus its actual peers. When research surfaces peer businesses, name them in the candidate's reasoning as the hosting population. If the local population would be only the identified business, go one level broader.
+2. No bespoke labels: never invent compound or hybrid labels tailored to one business (e.g., "Middle Eastern Restaurant & Market") and never narrow to a label only this business could fill (e.g., "Turkish Grocery Store" when it is the city's only Turkish market). Be as specific as possible while the shelf still holds more than one business.
+3. Hybrid businesses: classify by dominant customer intent / revenue line (a market with a lunch counter is a grocery, not a "restaurant & market"). Express the secondary facet as its own candidate category instead of fusing both into one label.
+4. Search-intent alignment: prefer labels a customer would type or browse ("middle eastern grocery", "halal market", "auto repair"), not marketing phrasing.
+
 === CATEGORY IDENTIFICATION RULES ===
 1. Consult at least 2 independent sources before assigning a category.
 2. Record the specific evidence (GBP primary category, Yelp category, website meta description, etc.) that supports each candidate.
@@ -49,7 +56,7 @@ The platform maintains a vocabulary of known categories. Where possible, match t
    - high: multiple sources agree on the category label
    - medium: sources agree on the general category but differ on specificity
    - low: conflicting or thin evidence; category is a best guess
-4. If the business is a subcategory of a broader category (e.g., "Transmission Repair" is a subcategory of "Auto Repair"), list both — the specific subcategory first, the broader category as an alternative.
+4. If the business is a subcategory of a broader category (e.g., "Transmission Repair" is a subcategory of "Auto Repair"), list both — the specific subcategory first, the broader category as an alternative. Specific beats broad only while the specific label still plausibly hosts multiple businesses in the market (see DIRECTORY HOSTING CONTEXT); otherwise rank the population-bearing broader label first.
 5. Classify the business type: "service" (sells labor/expertise), "product" (sells physical inventory), "hybrid" (both significantly), or "unable_to_verify".
 6. Do NOT invent a category that has no evidence. If you cannot determine the category, set confidence to "low" and explain what evidence is missing.
 
@@ -90,8 +97,25 @@ Capture a structured snapshot of what you found across platforms in the \`digita
 * gbp_primary_category: the Google Business Profile primary category label (often the strongest category signal)
 * signature_products_services: specific product or service names verified during research (e.g., "frozen cassava leaves", "transmission rebuild", "pediatric cleanings")
 
+=== NAP (required) ===
+Extract the canonical Name / Address / Phone / Website for the business from your cross-platform research and return it in the \`nap\` block. This data is used to automatically populate the business campaign's contact fields, so accuracy matters.
+
+Rules:
+* Use the most authoritative source available (GBP > official website > Yelp > other directories).
+* Set each field to null if you could not verify it from a public source — do NOT guess or fabricate.
+* canonical_name: the business's formal public name (from GBP or website, not a shortened nickname).
+* address_line1 / address_line2 / city / state / postal_code / country_code: the structured street address. Use address_line2 for suite/unit numbers only.
+* phone: the public-facing phone number (prefer GBP displayed phone).
+* website: the canonical website URL (prefer the official domain, not a directory link).
+* directory_profile_urls: URLs for each platform profile found (GBP, Yelp, Facebook, BBB, etc.).
+* field_confidence: for each NAP field you populated, record the confidence level and the source you used:
+  - high: verified from 2+ independent sources or the authoritative primary source (GBP/website)
+  - medium: found on a single reputable source but not cross-verified
+  - low: inferred or uncertain (e.g., partial address, outdated listing)
+* provenance: a short note on the primary source of the NAP (e.g., "GBP + official website cross-verified").
+
 === OUTPUT ===
-Return JSON matching the category_identification schema. The candidate_categories array must contain at least one entry. The primary_category must match the highest-confidence candidate. business_summary, public_narrative, and digital_footprint are required.`,
+Return JSON matching the category_identification schema. The candidate_categories array must contain at least one entry. The primary_category must match the highest-confidence candidate. business_summary, public_narrative, digital_footprint, and nap are required.`,
   variables: ['business_name', 'city', 'state'],
   outputSchema: {
     name: CATEGORY_IDENTIFICATION_SCHEMA_NAME,

@@ -793,6 +793,152 @@ export class MarketingHotProspectService extends BaseService {
   }
 
   /**
+   * Sync a `category_identification` audit onto its campaign. Unlike
+   * `syncFromAudit` (which handles `business_analysis` audits with pain
+   * scores, tiers, and hotness derivation), category-identification audits
+   * only produce NAP + category context — so this method syncs contact
+   * fields only (no metric fields, no hotness).
+   *
+   * NAP source priority (first non-null wins):
+   *   business_name : nap.canonical_name → business_name (top-level) → audit_metadata.requested_business.business_name
+   *   phone         : nap.phone → audit_metadata.requested_business.phone
+   *   website_url   : nap.website → digital_footprint.website_url
+   *   address       : nap.address_line1 (structured, no parsing needed)
+   *
+   * Overwrite policy (mirrors syncContactFields but uses nap.field_confidence
+   * instead of data_quality.verified_fields):
+   *   - If the field's confidence in `nap.field_confidence` is 'high', the
+   *     audit-derived value OVERWRITES the existing campaign value.
+   *   - Otherwise, the audit value only fills a NULL/empty campaign field.
+   *
+   * Best-effort: logs failures but does not throw to the caller (the import
+   * hook wraps this in a try/catch too).
+   */
+  async syncFromCategoryIdentificationAudit(auditId: string, ctx?: RequestCtx): Promise<AuditSyncReport> {
+    const report: AuditSyncReport = {
+      campaignId: '',
+      auditId,
+      fieldsSynced: [],
+      contactsSynced: [],
+      hotProspectMarked: false,
+      hotProspectReason: null,
+      identityStatus: null,
+      skipped: false,
+    };
+
+    try {
+      const audit = await this.prisma.mkt_audits_list.findUnique({
+        where: { id: auditId },
+        include: { mkt_campaigns_list: true },
+      });
+      if (!audit) throw new NotFoundError('Audit not found');
+      if (audit.platform !== 'category_identification') {
+        throw new Error(`Audit ${auditId} is not a category_identification audit (platform=${audit.platform})`);
+      }
+
+      const campaign = audit.mkt_campaigns_list;
+      if (!campaign) throw new NotFoundError('Campaign not found for audit');
+
+      report.campaignId = campaign.id;
+
+      const data = (audit.audit_data ?? {}) as any;
+      const nap = data.nap ?? {};
+      const requestedBusiness = data.audit_metadata?.requested_business ?? {};
+      const digitalFootprint = data.digital_footprint ?? {};
+
+      // Build a confidence lookup from nap.field_confidence
+      const fieldConfidence = new Map<string, 'high' | 'medium' | 'low'>();
+      for (const fc of (nap.field_confidence ?? [])) {
+        if (fc?.field && fc?.confidence) {
+          fieldConfidence.set(fc.field.toLowerCase(), fc.confidence);
+        }
+      }
+      const isHighConfidence = (field: string): boolean =>
+        fieldConfidence.get(field.toLowerCase()) === 'high';
+
+      const updateData: any = {};
+
+      // ── business_name ───────────────────────────────────────────────
+      const businessName =
+        nap.canonical_name
+        ?? data.business_name
+        ?? requestedBusiness.business_name
+        ?? null;
+      if (businessName) {
+        if (isHighConfidence('business_name') || !campaign.business_name) {
+          updateData.business_name = businessName;
+        }
+      }
+
+      // ── phone ───────────────────────────────────────────────────────
+      const phone = nap.phone ?? requestedBusiness.phone ?? null;
+      if (phone) {
+        if (isHighConfidence('phone') || !campaign.phone) {
+          updateData.phone = phone;
+        }
+      }
+
+      // ── website_url ─────────────────────────────────────────────────
+      const websiteUrl = nap.website ?? digitalFootprint.website_url ?? null;
+      if (websiteUrl) {
+        if (isHighConfidence('website') || !campaign.website_url) {
+          updateData.website_url = websiteUrl;
+          updateData.has_website = 'yes';
+        }
+      }
+
+      // ── address (structured — no parsing needed) ────────────────────
+      // Treat address as an all-or-nothing unit (same as syncContactFields):
+      // only sync if we can overwrite (high confidence) OR the campaign has
+      // no address_line1 yet (fill-null).
+      const addressLine1 = nap.address_line1 ?? null;
+      if (addressLine1) {
+        const canOverwrite = isHighConfidence('address_line1');
+        if (canOverwrite || !campaign.address_line1) {
+          updateData.address_line1 = addressLine1;
+          if (nap.address_line2) updateData.address_line2 = nap.address_line2;
+          if (nap.city) updateData.address_city = nap.city;
+          if (nap.state) updateData.address_state = nap.state;
+          if (nap.postal_code) updateData.address_zip = nap.postal_code;
+          if (nap.country_code) updateData.address_country = nap.country_code;
+        }
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const beforeContacts = {
+          business_name: campaign.business_name,
+          phone: campaign.phone,
+          website_url: campaign.website_url,
+          address_line1: campaign.address_line1,
+        };
+        await this.prisma.mkt_campaigns_list.update({
+          where: { id: campaign.id },
+          data: updateData,
+        });
+        // Report which contact fields changed
+        if (updateData.business_name && updateData.business_name !== beforeContacts.business_name) {
+          report.contactsSynced.push('business_name');
+        }
+        if (updateData.phone && updateData.phone !== beforeContacts.phone) {
+          report.contactsSynced.push('phone');
+        }
+        if (updateData.website_url && updateData.website_url !== beforeContacts.website_url) {
+          report.contactsSynced.push('website_url');
+        }
+        if (updateData.address_line1 && updateData.address_line1 !== beforeContacts.address_line1) {
+          report.contactsSynced.push('address');
+        }
+      }
+
+      logger.info('syncFromCategoryIdentificationAudit complete', ctx, report);
+      return report;
+    } catch (error) {
+      logger.error('syncFromCategoryIdentificationAudit failed', ctx, { error: (error as Error).message, auditId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
    * Sprint 5: Create a business-scope child campaign from an unmatched City
    * Pain Scan business, seeding all scan-derived fields + creating the
    * `city_analysis` audit on the child. The child starts at `seek` stage

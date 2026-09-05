@@ -40,6 +40,12 @@ Repeat each command with `--config prd` for production.
 
 ## Architecture
 
+- **Campaign structural-duplicate guardrail:** `MarketingCampaignService.createCampaign` blocks creation of a second *active* campaign with the same structural signature. Re-run the existing campaign to produce a versioned output instead. Inactive stages (`lost`, `dead`, `closed`, `resolved_and_closed`) do NOT block — a fresh campaign can be created after the prior one was killed. The check is keyed on structural attributes (NOT campaign id):
+  - **intelligence scope** → `scope + category + intelligence_campaign_kind + intelligence_focus + intelligence_platform + city + state` (null/empty/`all` platform + null city/state = nationwide; the "Indian Grocery / Establishment / Gold_standards / All Platforms" case)
+  - **business scope** → `scope + campaign_category + business_name + category + city + state`
+  - **category / city scope** → `scope + campaign_category + category + city + state`
+  - Implementation: `findDuplicateCampaign` in `apps/api/src/services/MarketingCampaignService.ts`; throws `ConflictError` (409 `conflict`) with the existing campaign's id + stage. Best-effort on lookup failure (logs + allows create). Tests: `apps/api/src/services/__tests__/marketingCampaign.recovery.test.ts` → "createCampaign structural-duplicate guardrail" (7 tests).
+
 - **Backend:** Node.js + Express + TypeScript in `apps/api`
   - Routes in `apps/api/src/routes/` (registered via `routeRegistry.ts`)
   - Services in `apps/api/src/services/`

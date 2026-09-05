@@ -90,6 +90,47 @@ const digitalFootprintSchema = z.object({
   signature_products_services: z.array(z.string()).optional(),
 }).passthrough();
 
+// ---- NAP (Name / Address / Phone) ----
+// Structured canonical NAP extracted from the cross-platform research.
+// The backend post-import hook uses this block to enrich the campaign's
+// contact fields (business_name, phone, website_url, address_*).
+// Per-field confidence drives the overwrite policy: 'high' confidence
+// overwrites existing campaign values; 'medium'/'low' only fill nulls.
+// `provenance` records the primary source of the NAP (e.g., "GBP + website").
+const napFieldConfidenceSchema = z.object({
+  field: z.enum([
+    'business_name',
+    'address_line1',
+    'address_line2',
+    'city',
+    'state',
+    'postal_code',
+    'country_code',
+    'phone',
+    'website',
+  ]),
+  confidence: confidenceEnum,
+  source: z.string().nullable().optional(),
+}).passthrough();
+
+const napSchema = z.object({
+  canonical_name: z.string().nullable().optional(),
+  address_line1: z.string().nullable().optional(),
+  address_line2: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  postal_code: z.string().nullable().optional(),
+  country_code: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
+  directory_profile_urls: z.array(z.object({
+    platform: z.string(),
+    url: z.string(),
+  })).optional(),
+  field_confidence: z.array(napFieldConfidenceSchema).optional(),
+  provenance: z.string().nullable().optional(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const categoryIdentificationSchema = z.object({
@@ -109,6 +150,9 @@ export const categoryIdentificationSchema = z.object({
   public_narrative: z.string().nullable().optional(),
   // Structured cross-platform presence snapshot.
   digital_footprint: digitalFootprintSchema.optional(),
+  // Structured NAP (Name / Address / Phone) extracted from the research.
+  // Used by the post-import hook to enrich the campaign's contact fields.
+  nap: napSchema.optional(),
   evidence_sources: z.array(evidenceSourceSchema).optional(),
   data_quality: dataQualitySchema.optional(),
 }).passthrough();
@@ -175,6 +219,24 @@ Return your response as JSON matching this exact schema:
     "gbp_primary_category": "<string|null>",
     "years_in_business_estimate": "<string|null>",
     "signature_products_services": ["<verified product/service names>"]
+  },
+  "nap": {
+    "canonical_name": "<string|null>",
+    "address_line1": "<string|null>",
+    "address_line2": "<string|null>",
+    "city": "<string|null>",
+    "state": "<string|null>",
+    "postal_code": "<string|null>",
+    "country_code": "<string|null>",
+    "phone": "<string|null>",
+    "website": "<string|null>",
+    "directory_profile_urls": [
+      { "platform": "<google|yelp|facebook|bbb|other>", "url": "<string>" }
+    ],
+    "field_confidence": [
+      { "field": "business_name|address_line1|address_line2|city|state|postal_code|country_code|phone|website", "confidence": "high|medium|low", "source": "<string|null>" }
+    ],
+    "provenance": "<string|null>"
   },
   "evidence_sources": [
     { "source": "<platform name>", "url": "<string|null>", "finding": "<what was found>" }
