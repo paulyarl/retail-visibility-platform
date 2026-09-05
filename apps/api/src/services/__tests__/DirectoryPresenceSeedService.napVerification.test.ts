@@ -74,6 +74,18 @@ vi.mock('../intelligence/IntelligenceProfileService', () => ({
 
 import DirectoryPresenceSeedService from '../DirectoryPresenceSeedService';
 
+// Prisma tagged-template literals (prisma.$executeRaw`...`) call the mock with
+// the cooked string fragments as an array in arg[0] and the interpolated values
+// as the remaining args. Plain $executeRawUnsafe calls pass a string in arg[0].
+// This helper normalizes either shape to the joined SQL string for substring
+// assertions.
+function sqlOf(call: any[]): string {
+  const first = call[0];
+  if (typeof first === 'string') return first;
+  if (Array.isArray(first)) return first.join('');
+  return '';
+}
+
 const claimedSeedRow = {
   tenant_id: 'tnt-test',
   listing_id: 'lst-test',
@@ -100,14 +112,14 @@ describe('updateFields — NAP owner-correction capture', () => {
     });
 
     const insertSql = mockExecuteRaw.mock.calls
-      .map((c: any[]) => (typeof c[0] === 'string' ? c[0] : ''))
+      .map((c: any[]) => sqlOf(c))
       .find((sql: string) => sql.includes('directory_seed_nap_verifications'));
     expect(insertSql).toBeDefined();
 
     // The diff JSON is bound as a parameter; locate it among the call args of
-    // the INSERT ($executeRaw template args follow the SQL string).
+    // the INSERT ($executeRaw template args follow the SQL string fragments).
     const insertCall = mockExecuteRaw.mock.calls.find((c: any[]) =>
-      typeof c[0] === 'string' && c[0].includes('directory_seed_nap_verifications'),
+      sqlOf(c).includes('directory_seed_nap_verifications'),
     );
     const diffArg = (insertCall as any[]).slice(1).find((a) => typeof a === 'string' && a.includes('"phone"'));
     expect(diffArg).toBeDefined();
@@ -122,7 +134,7 @@ describe('updateFields — NAP owner-correction capture', () => {
     await DirectoryPresenceSeedService.updateFields('seed-test', { phone: '555-9999' });
 
     const flagSql = mockExecuteRaw.mock.calls
-      .map((c: any[]) => (typeof c[0] === 'string' ? c[0] : ''))
+      .map((c: any[]) => sqlOf(c))
       .find((sql: string) => sql.includes('nap_owner_corrected = TRUE'));
     expect(flagSql).toBeDefined();
   });
@@ -133,7 +145,7 @@ describe('updateFields — NAP owner-correction capture', () => {
     await DirectoryPresenceSeedService.updateFields('seed-test', { snapEbtReported: true });
 
     const verificationSql = mockExecuteRaw.mock.calls
-      .map((c: any[]) => (typeof c[0] === 'string' ? c[0] : ''))
+      .map((c: any[]) => sqlOf(c))
       .find((sql: string) => sql.includes('directory_seed_nap_verifications'));
     expect(verificationSql).toBeUndefined();
   });
@@ -144,7 +156,7 @@ describe('updateFields — NAP owner-correction capture', () => {
     await DirectoryPresenceSeedService.updateFields('seed-test', { phone: '555-9999' });
 
     const verificationSql = mockExecuteRaw.mock.calls
-      .map((c: any[]) => (typeof c[0] === 'string' ? c[0] : ''))
+      .map((c: any[]) => sqlOf(c))
       .find((sql: string) => sql.includes('directory_seed_nap_verifications'));
     expect(verificationSql).toBeUndefined();
   });
@@ -155,7 +167,7 @@ describe('updateFields — NAP owner-correction capture', () => {
     await DirectoryPresenceSeedService.updateFields('seed-test', { phone: '555-0001' });
 
     const verificationSql = mockExecuteRaw.mock.calls
-      .map((c: any[]) => (typeof c[0] === 'string' ? c[0] : ''))
+      .map((c: any[]) => sqlOf(c))
       .find((sql: string) => sql.includes('directory_seed_nap_verifications'));
     expect(verificationSql).toBeUndefined();
   });
