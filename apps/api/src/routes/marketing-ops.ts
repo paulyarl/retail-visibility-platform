@@ -293,6 +293,20 @@ const campaignCreateSchema = campaignBaseSchema
   .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || (data.intelligence_platform && data.intelligence_platform.trim().length > 0), {
     message: 'intelligence_platform is required for gold_standards campaigns',
     path: ['intelligence_platform'],
+  })
+  // Gold-standard campaigns are nationwide-only — city/state scoping is
+  // redundant with the emerging & competitive scans that already run at
+  // those local scopes. Reject city/state on create so the nationwide
+  // constraint is enforced at the API too, not just the operator UI.
+  // (Update schema is intentionally left unguarded so legacy scoped
+  // gold-standard campaigns can still be edited without a 400.)
+  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || !data.city || data.city.trim().length === 0, {
+    message: 'city is not allowed for gold_standards campaigns (nationwide only)',
+    path: ['city'],
+  })
+  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || !data.state || data.state.trim().length === 0, {
+    message: 'state is not allowed for gold_standards campaigns (nationwide only)',
+    path: ['state'],
   });
 
 const campaignUpdateSchema = campaignBaseSchema.partial().extend({

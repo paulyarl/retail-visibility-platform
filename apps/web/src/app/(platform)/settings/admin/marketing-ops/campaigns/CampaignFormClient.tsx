@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory, DirectoryProfileEntry, IntelligenceProfile } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory, DirectoryProfileEntry } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
@@ -200,12 +200,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     originRegions: [] as string[],
   });
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
-  // Active gold-standard profiles, loaded once on mount. Used to autofill
-  // city/state when an operator selects a category for a gold-standards
-  // campaign — if a scoped profile exists for that category, its
-  // reference_city/reference_state pre-populate the form so the operator
-  // doesn't have to re-type them for each new campaign.
-  const [goldStandardProfiles, setGoldStandardProfiles] = useState<IntelligenceProfile[]>([]);
   // Profile-existence check for discovery prerequisite gating. When the
   // operator selects scope=intelligence + focus + category (+ city for
   // emerging/competitive, + platform for gold_standards), we resolve the
@@ -220,13 +214,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
   // first keystroke in the Title field flips this to true and stops auto-fill.
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
-  // Tracks the last category + city/state the gold-standards autofill effect
-  // populated, plus whether the operator has rejected the autofill for the
-  // current category (by clearing the autofilled values). When rejected, the
-  // effect won't re-fill for the same category — only when the category
-  // changes to a different one. This lets operators create regionless
-  // gold-standards campaigns even when scoped profiles exist.
-  const goldStandardAutofillRef = useRef<{ category: string; city: string; state: string; rejected: boolean } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -252,89 +239,30 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     marketingOpsService.getServiceCategories()
       .then(setServiceCategories)
       .catch(() => {});
-    // Load active gold-standard profiles for city/state autofill (below).
-    marketingOpsService.listIntelligenceProfiles('gold_standards')
-      .then(setGoldStandardProfiles)
-      .catch(() => {});
   }, []);
 
-  // ─── Gold-standards city/state autofill ───────────────────────────────
-  // When an operator selects a category for a gold-standards campaign (and
-  // they haven't already filled city/state), look up the active gold-standard
-  // profiles for that category. If a scoped profile exists (city or state
-  // set), pre-fill the form's city/state from the most specific one. This
-  // saves re-typing when an operator already has a scoped profile and is
-  // creating a new campaign for the same category/scope.
-  //
-  // Only fires in create mode (not edit — edit preserves existing values).
-  // If multiple scoped profiles exist for the same category, picks the most
-  // specific (city-scoped > state-scoped). Nationwide-only → leaves empty.
-  //
-  // When the category is cleared or changed, the effect clears the city/state
-  // it previously autofilled — but only the values the operator hasn't
-  // manually edited (tracked via goldStandardAutofillRef). This prevents the
-  // "stuck autofill" where clearing the category left the old city/state
-  // behind with no way to blank them.
-  //
-  // If the operator clears the autofilled city/state (to create a regionless
-  // campaign), the effect marks the autofill as "rejected" for that category
-  // and won't re-fill. This lets operators intentionally create regionless
-  // gold-standards campaigns even when scoped profiles exist. Re-selecting a
-  // different category resets the rejection.
+  // ─── Gold-standards nationwide-only guard ─────────────────────────────
+  // Gold-standard establishment/discovery campaigns are nationwide only —
+  // city/state/ZIP/radius scoping is redundant with the emerging & competitive
+  // scans that already run at those local scopes. When the operator selects
+  // focus=gold_standards in create mode, clear any geo-scoping fields they
+  // may have filled for a prior emerging/competitive selection so the
+  // submitted campaign is nationwide. Edit mode preserves existing values
+  // (the fields are hidden but not wiped) for backward compatibility with
+  // any legacy scoped gold-standard campaigns.
   useEffect(() => {
     if (mode !== 'create') return;
     if (form.scope !== 'intelligence') return;
     if (form.intelligence_focus !== 'gold_standards') return;
-
-    const last = goldStandardAutofillRef.current;
-
-    // Category changed → clear autofilled values and reset rejection.
-    if (last && last.category !== form.category) {
-      const cityUntouched = form.city === last.city;
-      const stateUntouched = form.state === last.state;
-      if (cityUntouched || stateUntouched) {
-        setForm((prev) => ({
-          ...prev,
-          city: cityUntouched ? '' : prev.city,
-          state: stateUntouched ? '' : prev.state,
-        }));
-      }
-      goldStandardAutofillRef.current = null;
-      return;
-    }
-
-    // Same category as last autofill. If the operator cleared the autofilled
-    // values, mark as rejected — don't re-fill for this category.
-    if (last && last.category === form.category && !last.rejected) {
-      const wasCleared = (last.city && form.city === '') || (last.state && form.state === '');
-      if (wasCleared) {
-        goldStandardAutofillRef.current = { ...last, rejected: true };
-        return;
-      }
-    }
-
-    // Skip if the operator already rejected autofill for this category.
-    if (last && last.category === form.category && last.rejected) return;
-
-    if (!form.category) return;
-    // Don't override if the operator already filled city or state.
-    if (form.city || form.state) return;
-    const matches = goldStandardProfiles.filter(
-      (p) => p.category_name === form.category && (p.reference_city || p.reference_state),
-    );
-    if (matches.length === 0) return;
-    // Prefer city-scoped over state-scoped (most specific first).
-    const cityScoped = matches.find((p) => p.reference_city);
-    const chosen = cityScoped ?? matches[0];
-    const newCity = chosen.reference_city ?? '';
-    const newState = chosen.reference_state ?? '';
+    if (!form.city && !form.state && !form.intelligence_zip_codes && form.intelligence_search_radius_miles === '') return;
     setForm((prev) => ({
       ...prev,
-      city: newCity,
-      state: newState,
+      city: '',
+      state: '',
+      intelligence_zip_codes: '',
+      intelligence_search_radius_miles: '',
     }));
-    goldStandardAutofillRef.current = { category: form.category, city: newCity, state: newState, rejected: false };
-  }, [mode, form.scope, form.intelligence_focus, form.category, form.city, form.state, goldStandardProfiles]);
+  }, [mode, form.scope, form.intelligence_focus]);
 
   // ─── Discovery prerequisite check ─────────────────────────────────────
   // When the operator has selected scope=intelligence + focus + category
@@ -462,7 +390,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Competitive, Discovery Emerging, Discovery Competitive), so deriving the
   // title from Category + Kind + Focus + City + State removes repetitive
   // typing. Format: "African Grocery Store - Discovery - Emerging - Indianapolis, IN".
-  // Gold-standard campaigns add the platform to the title:
+  // Gold-standard campaigns are nationwide-only — the platform replaces
+  // city/state as the focus dimension:
   // "African Grocery Store - Establishment - Gold Standards - Google".
   // Stops auto-filling once the operator manually edits the Title field.
   useEffect(() => {
@@ -472,10 +401,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     const kindLabel = cap(form.intelligence_campaign_kind);
     const focusLabel = cap(form.intelligence_focus);
     const headParts = [form.category, kindLabel, focusLabel].map((s) => (s ?? '').trim()).filter(Boolean);
-    // Gold-standard campaigns are nationwide by default — the platform
-    // replaces city as the focus dimension. Append the platform to the title.
-    // When city/state ARE filled (scoped gold-standards campaign), append
-    // them after the platform so the title reflects the geographic scope.
+    // Gold-standard campaigns are nationwide — the platform replaces city
+    // as the focus dimension. Append the platform to the title. (Legacy
+    // edit-mode campaigns that already have city/state will still include
+    // them via the locParts block below — preserved for backward compat.)
     // Emerging/competitive campaigns are city-scoped, but when a specific
     // platform is selected, append it to the title so the operator can
     // distinguish a platform-targeted discovery scan from a broad one.
@@ -899,7 +828,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     </select>
                     <p className="text-xs text-gray-400 mt-1">
                       The platform this gold-standard scan focuses on. &quot;All Platforms&quot; evaluates candidates across every major platform.
-                      Gold-standard campaigns are city-agnostic — the platform replaces city as the focus dimension.
+                      Gold-standard campaigns are <strong>nationwide only</strong> — the platform replaces city/state as the focus dimension.
+                      Local establishment &amp; discovery work happens via the Emerging and Competitive campaign archetypes.
                     </p>
                   </FormField>
                 )}
@@ -924,20 +854,24 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     </p>
                   </FormField>
                 )}
-                <FormField label="ZIP Codes (optional)">
-                  <input type="text" value={form.intelligence_zip_codes}
-                    onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
-                    placeholder="e.g. 46268, 46214 (comma-separated)"
-                    className={inputClass} />
-                  <p className="text-xs text-gray-400 mt-1">Restrict discovery to specific ZIP codes. Leave empty to use city-wide search.</p>
-                </FormField>
-                <FormField label="Search Radius (miles, optional)">
-                  <input type="number" min="0" step="1" value={form.intelligence_search_radius_miles}
-                    onChange={(e) => handleChange('intelligence_search_radius_miles', e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="e.g. 15"
-                    className={inputClass} />
-                  <p className="text-xs text-gray-400 mt-1">Radius around the city center for discovery. Leave empty for city-wide.</p>
-                </FormField>
+                {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+                  <FormField label="ZIP Codes (optional)">
+                    <input type="text" value={form.intelligence_zip_codes}
+                      onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
+                      placeholder="e.g. 46268, 46214 (comma-separated)"
+                      className={inputClass} />
+                    <p className="text-xs text-gray-400 mt-1">Restrict discovery to specific ZIP codes. Leave empty to use city-wide search.</p>
+                  </FormField>
+                )}
+                {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+                  <FormField label="Search Radius (miles, optional)">
+                    <input type="number" min="0" step="1" value={form.intelligence_search_radius_miles}
+                      onChange={(e) => handleChange('intelligence_search_radius_miles', e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="e.g. 15"
+                      className={inputClass} />
+                    <p className="text-xs text-gray-400 mt-1">Radius around the city center for discovery. Leave empty for city-wide.</p>
+                  </FormField>
+                )}
               </>
             )}
             <FormField label="Title" className="sm:col-span-2">
@@ -979,20 +913,21 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 options={vocab.tones} emptyLabel="-- Select tone --" newLabel="+ New tone..."
                 newInputPlaceholder="Enter new tone" className={inputClass} />
             </FormField>
+            {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="City" required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'}>
               <SuggestiveSelect required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'} value={form.city} onChange={(v) => handleChange('city', v)}
                 options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
                 newInputPlaceholder="Enter new city" className={inputClass} />
-              {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
-                <p className="text-xs text-gray-400 mt-1">Optional for gold-standard campaigns (city-agnostic). Leave empty for a nationwide scan.</p>
-              )}
             </FormField>
+            )}
+            {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="State" required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'}>
               <SuggestiveSelect required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'} value={form.state} onChange={(v) => handleChange('state', v)}
                 options={vocab.states} emptyLabel="-- Select state --" newLabel="+ New state..."
                 newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
               <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
             </FormField>
+            )}
             <FormField label="Neighborhood">
               <SuggestiveSelect value={form.neighborhood} onChange={(v) => handleChange('neighborhood', v)}
                 options={vocab.neighborhoods} emptyLabel="-- Select neighborhood --" newLabel="+ New neighborhood..."
