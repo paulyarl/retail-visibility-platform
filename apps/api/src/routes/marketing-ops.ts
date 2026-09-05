@@ -1700,6 +1700,35 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
     const city = parsed.city ?? parent.city ?? undefined;
     const state = parsed.state ?? parent.state ?? undefined;
 
+    // Load the most recent category_identification audit on this campaign
+    // to extract the structured NAP block. The NAP is forwarded to the
+    // spawned campaign / queue entry so the operator doesn't have to re-key
+    // contact info that the analyst already surfaced.
+    const latestCatIdAudit = await prisma.mkt_audits_list.findFirst({
+      where: { campaign_id: campaignId, platform: 'category_identification' },
+      orderBy: { created_at: 'desc' },
+      take: 1,
+    });
+    const auditNap = (latestCatIdAudit?.audit_data as any)?.nap ?? {};
+    const auditDigitalFootprint = (latestCatIdAudit?.audit_data as any)?.digital_footprint ?? {};
+
+    // NAP source priority mirrors syncFromCategoryIdentificationAudit:
+    //   business_name : nap.canonical_name → parsed.business_name
+    //   phone         : nap.phone
+    //   website       : nap.website → digital_footprint.website_url
+    //   address       : nap.address_line1 (structured)
+    const napBusinessName = auditNap.canonical_name ?? parsed.business_name;
+    const napPhone = auditNap.phone ?? null;
+    const napWebsite = auditNap.website ?? auditDigitalFootprint.website_url ?? null;
+    const napAddressLine1 = auditNap.address_line1 ?? null;
+    const napDirectoryProfiles = (auditNap.directory_profile_urls ?? []).map((d: any) => ({
+      platform: d.platform,
+      url: d.url,
+      claim_status: 'unknown' as const,
+      star_rating: null,
+      review_count: null,
+    }));
+
     // Step 1: Register the category in vocab if it's new.
     let categoryAdded = false;
     if (!parsed.is_known) {
@@ -1714,14 +1743,27 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
     // Step 2: Route to the chosen destination.
     if (parsed.destination === 'campaign') {
       // Spawn a business-scope child campaign with the identified category.
+      // NAP handoff: forward the audit's nap block so the child is born with
+      // phone / website / address / directory profiles — the operator should
+      // never have to spawn a campaign without the business's NAP.
       const child = await MarketingCampaignService.deriveBusinessCampaign({
         parentId: campaignId,
-        businessName: parsed.business_name,
+        businessName: napBusinessName,
         categoryOverride: categoryLabel,
         cityOverride: city,
         stateOverride: state,
         assignedTo: req.user?.id,
         note: `Category identified via category-ID campaign. Category: ${categoryLabel} (confidence: ${parsed.confidence ?? 'unknown'}).`,
+        // NAP handoff from the category-identification audit
+        phone: napPhone ?? undefined,
+        websiteUrl: napWebsite ?? undefined,
+        addressLine1: napAddressLine1 ?? undefined,
+        addressLine2: auditNap.address_line2 ?? undefined,
+        addressCity: auditNap.city ?? undefined,
+        addressState: auditNap.state ?? undefined,
+        addressZip: auditNap.postal_code ?? undefined,
+        addressCountry: auditNap.country_code ?? undefined,
+        directoryProfiles: napDirectoryProfiles.length > 0 ? napDirectoryProfiles : undefined,
       }, ctx);
       return res.status(201).json({
         success: true,
@@ -1736,18 +1778,32 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
     }
 
     // Queue or verify — both go through addToQueue.
+    // NAP handoff: include flat NAP fields in business_snapshot so the
+    // queue→campaign derive path (createCampaignFromQueue) can forward
+    // them to the spawned campaign without re-keying.
     const queueResult = await MarketingProspectQueueService.addToQueue({
-      business_name: parsed.business_name,
-      title: parsed.business_name,
+      business_name: napBusinessName,
+      title: napBusinessName,
       category: categoryLabel,
       city,
       state,
       source_kind: 'category_identification',
       source_campaign_id: campaignId,
+      source_audit_id: latestCatIdAudit?.id,
       business_snapshot: {
         identified_category: categoryLabel,
         confidence: parsed.confidence,
         category_added: categoryAdded,
+        // Flat NAP fields — read by createCampaignFromQueue's derive path
+        phone: napPhone,
+        website: napWebsite,
+        address: napAddressLine1,
+        address_city: auditNap.city ?? null,
+        address_state: auditNap.state ?? null,
+        address_zip: auditNap.postal_code ?? null,
+        address_country: auditNap.country_code ?? null,
+        // Structured NAP block for downstream consumers / UI display
+        nap: auditNap,
       },
       priority: parsed.confidence === 'high' ? 'high' : 'normal',
       initial_status: parsed.destination === 'verify' ? 'verify_then_outreach' : 'queued',
