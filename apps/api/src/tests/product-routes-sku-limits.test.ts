@@ -121,9 +121,13 @@ vi.mock('../lib/id-generator', () => ({
   generateTenantKey: vi.fn(() => 'tk-001'),
 }));
 
-vi.mock('../photos', () => ({
-  migrateTempPhotos: vi.fn().mockResolvedValue([]),
-}));
+vi.mock('../photos', () => {
+  const { Router } = require('express');
+  return {
+    default: Router(),
+    migrateTempPhotos: vi.fn().mockResolvedValue([]),
+  };
+});
 
 vi.mock('../storage-config', () => ({
   StorageBuckets: { PRODUCTS: 'products' },
