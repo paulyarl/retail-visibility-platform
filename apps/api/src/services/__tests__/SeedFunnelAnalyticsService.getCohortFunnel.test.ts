@@ -115,12 +115,22 @@ const categoryRow = {
 
 const medianRow = { median_days: 5.25 };
 
-/** Queue the four query results in execution order. */
+const duplicateRows = [
+  {
+    seed_ids: ['seed-a', 'seed-b'],
+    match_key: 'phone',
+    names: ['Istanbul Super Market', 'Istanbul Market'],
+  },
+];
+
+/** Queue the five query results in execution order:
+ *  1. per-campaign, 2. combined, 3. category rollups, 4. median, 5. duplicates. */
 function queueQueries({
   perCampaign = [perCampaignRow],
   combined = [combinedRow],
   categories = [categoryRow],
   median = [medianRow],
+  duplicates = duplicateRows,
 } = {}) {
   // mockReset (not clearAllMocks): clears queued mockResolvedValueOnce
   // implementations too, so a test-level re-queue replaces the beforeEach
@@ -130,7 +140,8 @@ function queueQueries({
     .mockResolvedValueOnce(perCampaign)
     .mockResolvedValueOnce(combined)
     .mockResolvedValueOnce(categories)
-    .mockResolvedValueOnce(median);
+    .mockResolvedValueOnce(median)
+    .mockResolvedValueOnce(duplicates);
 }
 
 beforeEach(() => {
@@ -205,6 +216,7 @@ describe('getCohortFunnel — SQL path', () => {
       combined: [{ ...combinedRow, converted: 0n }],
       categories: [],
       median: [],
+      duplicates: [],
     });
     const empty = await SeedFunnelAnalyticsService.getCohortFunnel();
     expect(empty.cohorts[0].metrics.cacEstimate).toBeNull();
@@ -240,7 +252,20 @@ describe('getCohortFunnel — SQL path', () => {
     expect(report.combined.scalingReadiness.note).toContain('Not yet');
   });
 
-  it('propagates filters as bound params to all four queries', async () => {
+  it('surfaces potential duplicate seeds with match key and names (W5)', async () => {
+    const report = await SeedFunnelAnalyticsService.getCohortFunnel();
+
+    expect(report.potentialDuplicateSeeds).toHaveLength(1);
+    expect(report.potentialDuplicateSeeds[0].seedIds).toEqual(['seed-a', 'seed-b']);
+    expect(report.potentialDuplicateSeeds[0].matchKey).toBe('phone');
+    expect(report.potentialDuplicateSeeds[0].names).toEqual([
+      'Istanbul Super Market',
+      'Istanbul Market',
+    ]);
+    expect(report.duplicateSeedCount).toBe(1);
+  });
+
+  it('propagates filters as bound params to all five queries', async () => {
     const filters = {
       campaignIds: ['camp-1', 'camp-2'],
       category: 'grocery',
@@ -250,7 +275,7 @@ describe('getCohortFunnel — SQL path', () => {
     };
     await SeedFunnelAnalyticsService.getCohortFunnel(filters);
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
     for (const call of mockQueryRawUnsafe.mock.calls) {
       const [sql, ...params] = call as [string, ...any[]];
       expect(sql).toContain('mc.id = ANY($1::text[])');
@@ -283,7 +308,7 @@ describe('getCohortFunnel — SQL path', () => {
   });
 
   it('returns a zeroed directional combined report for an empty cohort set', async () => {
-    queueQueries({ perCampaign: [], combined: [], categories: [], median: [] });
+    queueQueries({ perCampaign: [], combined: [], categories: [], median: [], duplicates: [] });
 
     const report = await SeedFunnelAnalyticsService.getCohortFunnel();
 

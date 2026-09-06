@@ -29,6 +29,11 @@ import DirectorySuggestionService from '../services/DirectorySuggestionService';
 import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
 import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
+import {
+  generateClaimInvitePng,
+  generateClaimInvitePostcard,
+  getClaimInviteKitMeta,
+} from '../services/ClaimInviteQrKitService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -1342,6 +1347,74 @@ router.get('/suggestions/analytics', requirePlatformStaff, async (req: Request, 
   } catch (error) {
     logger.error('[GET /api/admin/directory-presence/suggestions/analytics] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/* ====================
+   Claim-invite QR kit (W10)
+   ==================== */
+
+/** GET /api/admin/directory/presence-seeds/:id/qr-kit — kit metadata (token, URLs, expiry) */
+router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const kit = await getClaimInviteKitMeta(id);
+    if (!kit) return res.status(404).json({ error: 'no_active_claim_token' });
+    res.json({
+      success: true,
+      seedId: kit.seedId,
+      token: kit.token,
+      qrUrl: kit.qrUrl,
+      claimUrl: kit.claimUrl,
+      businessName: kit.businessName,
+      addressLines: kit.addressLines,
+      expiresAt: kit.expiresAt,
+    });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/qr-kit] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/qr-kit/png — downloadable QR PNG */
+router.get('/presence-seeds/:id/qr-kit/png', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { pngBuffer, filename } = await generateClaimInvitePng(id);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pngBuffer.length);
+    return res.send(pngBuffer);
+  } catch (error: any) {
+    if (error?.message === 'no_active_claim_token') {
+      return res.status(404).json({ error: 'no_active_claim_token' });
+    }
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/qr-kit/png] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/qr-kit/postcard — downloadable postcard PDF */
+router.get('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { pdfBuffer, filename } = await generateClaimInvitePostcard(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.send(pdfBuffer);
+  } catch (error: any) {
+    if (error?.message === 'no_active_claim_token') {
+      return res.status(404).json({ error: 'no_active_claim_token' });
+    }
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/qr-kit/postcard] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
   }

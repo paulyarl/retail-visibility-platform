@@ -304,6 +304,7 @@ import directoryPresenceAdminRoutes from '../routes/directory-presence-admin';
 import directoryPresencePublicRoutes from '../routes/directory-presence-public';
 import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade';
 import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-public';
+import directoryClaimQrRoutes from '../routes/directory-claim-qr';
 import growthEngineAdminRoutes from '../routes/growth-engine-admin';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
@@ -2081,6 +2082,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public directory enrichment (enrich/:token, lead-gen)',
+  },
+  {
+    path: '/api/public',
+    router: directoryClaimQrRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public claim-invite QR redirect (/qr/claim/:token → /place/claim/:token)',
   },
   {
     path: '/api/tenant',

@@ -1856,6 +1856,7 @@ model directory_presence_seeds {
   contact_status_derived_at        DateTime?                          @db.Timestamptz(6)
   nap_verified_at                  DateTime?                          @db.Timestamptz(6)
   nap_owner_corrected              Boolean                            @default(false)
+  name_variants                    String[]                           @default([])
   directory_claim_requests         directory_claim_requests[]
   directory_claim_tokens           directory_claim_tokens[]
   directory_enrichment_tokens      directory_enrichment_tokens[]
@@ -1866,7 +1867,6 @@ model directory_presence_seeds {
   directory_presence_suggestions   directory_presence_suggestions[]
   directory_seed_campaign_links    directory_seed_campaign_links[]
   directory_seed_nap_verifications directory_seed_nap_verifications[]
-  directory_seed_outreach_touches  directory_seed_outreach_touches[]
 
   @@index([category], map: "idx_dps_category")
   @@index([city, state], map: "idx_dps_city_state")
@@ -1874,6 +1874,7 @@ model directory_presence_seeds {
   @@index([seek_batch_id], map: "idx_dps_seek_batch")
   @@index([status], map: "idx_dps_status")
   @@index([contact_status], map: "idx_dps_contact_status")
+  @@index([name_variants], map: "idx_dps_name_variants", type: Gin)
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -7722,22 +7723,6 @@ model directory_seed_nap_verifications {
   directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([seed_id], map: "idx_dsnv_seed")
-}
-
-model directory_seed_outreach_touches {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  seed_id      String
-  tenant_id    String
-  channel      String
-  outcome      String?
-  notes        String?
-  operator_id  String?
-  occurred_at  DateTime @default(now()) @db.Timestamptz(6)
-  created_at   DateTime @default(now()) @db.Timestamptz(6)
-  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([seed_id, occurred_at(sort: Desc)], map: "idx_dsot_seed_occurred")
-  @@index([tenant_id], map: "idx_dsot_tenant")
 }
 
 enum action {

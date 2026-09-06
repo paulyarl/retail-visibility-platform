@@ -54,6 +54,9 @@ export interface CohortFunnelMetrics {
   paid: number;
   touches: number;
   cacEstimate: number | null;
+  /** v1.2 W10: seeds with ≥1 claim_invite QR scan / invited seeds (warm-lead signal) */
+  inviteScans: number;
+  inviteScanRate: number | null;
 }
 
 export interface ConversionScoreBreakdown {
@@ -106,6 +109,13 @@ export interface CategoryRollup {
   gates: GateResult[];
   grade: CohortGrade;
   conversionScoreBreakdown: ConversionScoreBreakdown;
+}
+
+/** v1.2 W5 — potential duplicate seed pair (spec §3.1 detection-only). */
+export interface PotentialDuplicateSeed {
+  seedIds: string[];
+  matchKey: 'phone' | 'address_city';
+  names: string[];
 }
 
 /** v1.2 W4 — scaling readiness surfacing (spec §10). */
@@ -240,6 +250,7 @@ interface CohortRow {
   w3_count: bigint | number;
   w4_count: bigint | number;
   touches: bigint | number;
+  invite_scans: bigint | number;
 }
 
 function buildFilterClauses(filters: CohortFilters, params: any[]): string {
@@ -417,7 +428,17 @@ const METRIC_SELECT = `
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w2, 0) > 0) AS w2_count,
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w3, 0) > 0) AS w3_count,
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w4, 0) > 0) AS w4_count,
-  COUNT(dsot.id) AS touches
+  COUNT(dsot.id) AS touches,
+  -- v1.2 W10: invite scans = distinct seeds with ≥1 claim_invite QR scan event
+  -- (qr_scan_events is keyed by tenant_id; seeds carry the same tenant_id post-claim,
+  --  and pre-claim scans are attributed to the seed's tenant_id via the QR redirect)
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'claim_invite'
+    )
+  ) AS invite_scans
 `;
 
 const FUNNEL_FROM = `
@@ -431,10 +452,12 @@ const FUNNEL_FROM = `
 function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
   const converted = Number(row.converted ?? 0);
   const touches = Number(row.touches ?? 0);
+  const inviteScans = Number(row.invite_scans ?? 0);
+  const invited = Number(row.invited ?? 0);
   return {
     seeds: Number(row.seeds ?? 0),
     contactable: Number(row.contactable ?? 0),
-    invited: Number(row.invited ?? 0),
+    invited,
     claimed: Number(row.claimed ?? 0),
     claimed30d: Number(row.claimed_30d ?? 0),
     napVerified: Number(row.nap_verified ?? 0),
@@ -445,6 +468,8 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
     paid: converted,
     touches,
     cacEstimate: converted > 0 ? Math.round((touches * COST_PER_TOUCH / converted) * 100) / 100 : null,
+    inviteScans,
+    inviteScanRate: invited > 0 ? Math.round((inviteScans / invited) * 10000) / 10000 : null,
   };
 }
 
@@ -483,6 +508,8 @@ function buildReport(
         paid: 0,
         touches: 0,
         cacEstimate: null,
+        inviteScans: 0,
+        inviteScanRate: null,
       };
   const { gates, grade } = gradeGates(metrics);
   const report: CohortFunnelReport = {
@@ -515,6 +542,7 @@ export class SeedFunnelAnalyticsService {
    *
    * v1.2 W4: also returns per-category rollups, median days-to-claim, and a
    * scaling-readiness block on the combined report.
+   * v1.2 W5: also returns potentialDuplicateSeeds (detection-only, spec §3.1).
    */
   async getCohortFunnel(filters: CohortFilters = {}): Promise<{
     generatedAt: string;
@@ -524,6 +552,8 @@ export class SeedFunnelAnalyticsService {
     categoryRollups: CategoryRollup[];
     medianDaysToClaim: number | null;
     scalingReadiness: ScalingReadiness;
+    potentialDuplicateSeeds: PotentialDuplicateSeed[];
+    duplicateSeedCount: number;
   }> {
     const params: any[] = [];
     const whereClause = buildFilterClauses(filters, params);
@@ -638,6 +668,63 @@ export class SeedFunnelAnalyticsService {
       ? Math.round(Number(medianRows[0].median_days) * 10) / 10
       : null;
 
+    // v1.2 W5 — duplicate-seed detection (spec §3.1, detection-only).
+    // Pairs seeds in the filtered set that share a normalized phone (digits,
+    // last 10) OR normalized address+city (lowercase, punctuation-stripped).
+    // Auto-merge is deferred to operator work; detection prevents silent
+    // double-counting in funnel denominators.
+    const dupParams = [...params];
+    const dupWhere = whereClause
+      || '';
+    const duplicateRows = await prisma.$queryRawUnsafe<Array<{
+      seed_ids: string[];
+      match_key: 'phone' | 'address_city';
+      names: string[];
+    }>>(
+      `WITH filtered_seeds AS (
+        SELECT dps.id, dps.tenant_id, dl.phone, dl.address, dl.city, dl.business_name,
+               dps.name_variants
+        ${FUNNEL_FROM.replace('LEFT JOIN directory_seed_outreach_touches dsot ON dsot.seed_id = dps.id\n', '').replace('LEFT JOIN LATERAL', 'LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id\n      LEFT JOIN LATERAL')}
+        ${dupWhere}
+      ),
+      phone_dups AS (
+        SELECT
+          ARRAY_AGG(fs.id ORDER BY fs.id) AS seed_ids,
+          'phone'::text AS match_key,
+          ARRAY_AGG(
+            COALESCE(fs.business_name, array_to_string(fs.name_variants, ' / '))
+            ORDER BY fs.id
+          ) AS names
+        FROM filtered_seeds fs
+        WHERE fs.phone IS NOT NULL
+        GROUP BY REGEXP_REPLACE(fs.phone, '[^0-9]', '', 'g')
+        HAVING COUNT(DISTINCT fs.id) > 1
+      ),
+      address_dups AS (
+        SELECT
+          ARRAY_AGG(fs.id ORDER BY fs.id) AS seed_ids,
+          'address_city'::text AS match_key,
+          ARRAY_AGG(
+            COALESCE(fs.business_name, array_to_string(fs.name_variants, ' / '))
+            ORDER BY fs.id
+          ) AS names
+        FROM filtered_seeds fs
+        WHERE fs.address IS NOT NULL AND fs.city IS NOT NULL
+        GROUP BY LOWER(REGEXP_REPLACE(fs.address || ' ' || fs.city, '[^a-zA-Z0-9 ]', '', 'g'))
+        HAVING COUNT(DISTINCT fs.id) > 1
+      )
+      SELECT * FROM phone_dups
+      UNION ALL
+      SELECT * FROM address_dups`,
+      ...dupParams,
+    );
+
+    const potentialDuplicateSeeds: PotentialDuplicateSeed[] = duplicateRows.map((row) => ({
+      seedIds: row.seed_ids,
+      matchKey: row.match_key,
+      names: row.names,
+    }));
+
     if (combined.metrics.seeds === 0) {
       logger.info('SeedFunnelAnalyticsService.getCohortFunnel — empty cohort set', undefined, {
         filters,
@@ -659,6 +746,8 @@ export class SeedFunnelAnalyticsService {
       categoryRollups,
       medianDaysToClaim,
       scalingReadiness,
+      potentialDuplicateSeeds,
+      duplicateSeedCount: potentialDuplicateSeeds.length,
     };
   }
 }

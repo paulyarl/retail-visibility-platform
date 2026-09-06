@@ -19,7 +19,7 @@ import { generateQrAnalyticsId, generateQrScanEventId } from '../lib/id-generato
 // TYPES
 // ====================
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
@@ -137,6 +137,7 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   promo: 'Promo QR',
   private_grant: 'Private Grant QR',
   general: 'General Purpose QR',
+  claim_invite: 'Claim Invite QR',
 };
 
 function getSurfaceLabel(surface: string): string {

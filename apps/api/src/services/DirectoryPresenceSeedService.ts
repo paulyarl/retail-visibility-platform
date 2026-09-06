@@ -456,6 +456,7 @@ class DirectoryPresenceSeedService {
         seed_batch, status, identity_confidence, category_fit, notes,
         owner_name, owner_email, owner_phone, seo_enrichment,
         contact_status, contact_status_derived_at,
+        name_variants,
         created_at, updated_at
       ) VALUES (
         ${seedId},
@@ -475,6 +476,7 @@ class DirectoryPresenceSeedService {
         ${input.seoEnrichment ? JSON.stringify(input.seoEnrichment) : null}::jsonb,
         ${contactStatus},
         now(),
+        ARRAY[${input.businessName}]::text[],
         now(), now()
       )
     `;
