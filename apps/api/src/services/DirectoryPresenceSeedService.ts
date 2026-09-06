@@ -1826,6 +1826,77 @@ class DirectoryPresenceSeedService {
       seoEnriched: true,
     };
   }
+
+  // ── Outreach touch log (spec §7 gap 4, sprint plan W1) ───────────────
+  // The 257 outreach_state machine tracks *state*; this tracks individual
+  // touches (call/email/sms/mail) with outcomes — the CAC numerator for G5.
+
+  async addOutreachTouch(
+    seedId: string,
+    input: {
+      channel: 'call' | 'email' | 'sms' | 'mail' | 'other';
+      outcome?: 'connected' | 'no_response' | 'voicemail' | 'bad_number' | 'claimed' | 'not_interested';
+      notes?: string;
+      occurredAt?: Date;
+    },
+    ctx?: SeedAuditCtx,
+  ): Promise<{ id: string }> {
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+
+    const touchId = randomUUID();
+    const occurredAt = input.occurredAt ?? new Date();
+
+    await prisma.$executeRaw`
+      INSERT INTO directory_seed_outreach_touches (
+        id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+      ) VALUES (
+        ${touchId}::uuid,
+        ${seedId},
+        ${seed[0].tenant_id},
+        ${input.channel},
+        ${input.outcome || null},
+        ${input.notes || null},
+        ${ctx?.actorId || null},
+        ${occurredAt},
+        now()
+      )
+    `;
+
+    if (ctx) {
+      await audit({
+        actor: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'directory_presence_seed.touch_logged',
+        payload: {
+          seedId,
+          tenantId: seed[0].tenant_id,
+          touchId,
+          channel: input.channel,
+          outcome: input.outcome || null,
+        },
+      });
+    }
+
+    logger.info('DirectoryPresenceSeedService.addOutreachTouch', undefined, {
+      seedId,
+      touchId,
+      channel: input.channel,
+    });
+
+    return { id: touchId };
+  }
+
+  async listOutreachTouches(seedId: string): Promise<any[]> {
+    return prisma.$queryRaw<any[]>`
+      SELECT id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+      FROM directory_seed_outreach_touches
+      WHERE seed_id = ${seedId}
+      ORDER BY occurred_at DESC
+    `;
+  }
 }
 
 export default new DirectoryPresenceSeedService();

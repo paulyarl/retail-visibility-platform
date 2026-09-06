@@ -234,6 +234,45 @@ Size: **M**.
 
 Size: **M**. Depends on: nothing for rollups/median/readiness; W2 for `retention_90d`.
 
+### W10 — Claim-invite QR kit (new — capability already exists)
+
+The claim token URL minted as a QR code, using the platform's existing QR
+subsystem end to end. **No new infrastructure** — this assembles existing parts:
+
+| Part | Existing component | Role in the kit |
+|---|---|---|
+| Styled QR + logo overlay | `apps/web/src/lib/qr-engine.ts` (logo overlay square/circle, gradients, templates) | Email-embeddable / downloadable branded QR; platform logo center (unclaimed seeds have no merchant logo — platform branding is the default; audit-sourced merchant logo is a post-claim option) |
+| Scan tracking | `QrAnalyticsService` + `qr_scan_events` | New `QrSurfaceType` value `'claim_invite'`; scans, unique visitors, device, geo per invite |
+| Physical mail artifact | `PostalMailerService.generate()` + `PostalMailerPdfService.generatePostcardPdf()` | 4×6" postcard: headline ("Your business is listed — claim it free"), body, QR to the claim URL, CTA label, mailing block. Gives the touch log's `mail` channel a real artifact |
+| General generation | `QRGeneratorClient` (`/settings/admin/qr-generator`) | Operator can mint ad-hoc invite QRs today; the kit productizes it per-seed |
+
+**Design:**
+
+- **Tracked redirect over param-encoding** — the QR encodes
+  `/qr/claim/{tokenId}` (a thin redirect route that records a
+  `qr_scan_events` row with `surface='claim_invite'`, `consumer='merchant'`,
+  then 302s to `/directory/claim/{token}`). Scan tracking stays out of the
+  claim flow entirely, and the existing `qr_landing` pattern is reused.
+  (Alternative — `?src=qr` on the claim URL + record-on-load — rejected: it
+  couples analytics to the claim page and misses scan-without-open events.)
+- **Deliverables per seed:** PNG download (email embed), postcard PDF (print/mail).
+- **New funnel signal:** `invite_scan_rate` = seeds with ≥1 `claim_invite` scan /
+  invited seeds. A scan with no claim is the **warm-lead signal** for the
+  follow-up cadence — the prospect saw the invite; the next touch is a
+  phone call, not another email. This slots between `invite_issued` and
+  `claim_accepted` in the §3 event spine.
+- **Touch-log tie-in (W1):** logging a mail touch can attach the postcard PDF;
+  a scan event on that seed surfaces in the touch history as an implicit
+  "they looked" outcome.
+
+**Acceptance:** scanning the QR lands on the claim page; the scan appears in
+`qr_scan_events` with `surface='claim_invite'`; funnel response gains
+`invite_scan_rate`; postcard PDF renders with the claim QR; styled logo QR
+downloads as PNG.
+
+Size: **S–M** (redirect route + surface value + PDF payload variant + funnel
+metric — all assembly).
+
 ---
 
 ## §5 Phase 2 — Tier 2 (spec correctness & hygiene)

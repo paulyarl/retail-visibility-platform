@@ -1,6 +1,8 @@
 # Seed Funnel Benchmark Gates & Tracking Analytics Spec
 
-Status: **DRAFT v1**
+Status: **v1.2** (v1.1 plumbing built; v1.2 closes §9 OQ4/OQ5, redefines
+"Paid" as conversion score with threshold gating, dispositions §3.1 dedup,
+marks §6/§10 as implemented)
 
 Scope: the directory-seed go-to-market motion — intelligence-discovery campaigns
 produce **seeds** (`/place/{slug}`), owners are invited to **claim** a free
@@ -58,7 +60,7 @@ system observed, never what it infers.
 | **Invite** | A `directory_claim_tokens` row created for the seed. Invites are only dispatched through the token path so the event is queryable. |
 | **Claim** | `directory_claim_tokens.consumed_at` is set (token consumed) and `listing_origin` flips to `claimed`. |
 | **NAP verified** | At claim accept, the owner-confirmed NAP is compared to the seed NAP. Any outcome (confirmed as-is, or corrected) produces a verification event with the field-level diff. |
-| **Paid** | The claimed tenant acquires its first paid subscription tier (`presence`, `discovery`, or `storefront`) — launch pricing $19 / $29 / $59 per month, DB-adjustable via `subscription_tiers_list`. |
+| **Paid** | **(v1.2 redefined — "converted"):** the claimed tenant's **conversion score** (weighted sum of 8 signals: 4 strong × weight 2 + 4 engagement × weight 1, max 12) meets a configurable threshold (default 4). The v1 "first paid subscription tier" definition was too narrow — the most common conversion path is staying on the free `directory_presence` tier and buying a BSaaS add-on or stocking products. See §11.2 for the full signal set and scoring. |
 | **Hold** | A seed with an unresolved conflict (identity conflict, category-fit insufficient, or open/closed status conflict). Holds are tracked as verification **tasks**, not prose notes, and are excluded from invite dispatch until resolved. |
 
 ---
@@ -67,15 +69,15 @@ system observed, never what it infers.
 
 | # | Stage | Event | Source (existing unless noted) | Captured today? |
 |---|---|---|---|---|
-| 1 | Seed published | `seed_published` | `directory_presence_seeds.status = 'published'` (+ creation timestamp) | Yes (verify published-at column; else use `created_at`) |
-| 2 | Contactable determined | `contactability_resolved` | Derived at ingest from campaign phone + audit `identity_confidence` | **Gap** — derive & store flag at `createFromCampaign` |
-| 3 | Invite issued | `invite_issued` | `directory_claim_tokens.created_at` | Yes |
+| 1 | Seed published | `seed_published` | `directory_presence_seeds.status = 'published'` + `published_at` (stamped in `publishSeed`) | Yes |
+| 2 | Contactable determined | `contactability_resolved` | Derived at ingest: `contactable` when phone or owner phone present; else `contact_unverified`. `identity_confidence` is clamped to high/medium at seed level (admin Zod schema + `createFromCampaign` clamp), so the `low`-confidence exclusion in §2 is unreachable through current create paths. | **Built (v1.1)** — `contact_status` column on seeds |
+| 3 | Invite issued | `invite_issued` | `directory_claim_tokens.created_at` (TTL 90 days, ≥ G2 window) | Yes |
 | 4 | Invite consumed (claim) | `claim_accepted` | `directory_claim_tokens.consumed_at` + `listing_origin` flip | Yes |
-| 5 | NAP verified / corrected | `nap_verified` (+ `owner_corrected_nap` flag) | **Gap** — capture field-level diff at claim accept | No — build |
-| 6 | Outreach touch | `outreach_touch` (call / email / mail) | **Gap** — lightweight task/touch log per seed | No |
-| 7 | Hold / verification task | `verification_task_opened` / `…_resolved` | **Gap** — hold-state as tracked status (e.g., "verify phone via DATCP", "resolve open/closed conflict") | No |
-| 8 | Paid conversion | `subscription_started` (paid tier) | Tenant subscription record (see `subscription_tiers_list` for tier pricing; verify table name) — attributed to the claim when first paid tier starts ≤ 60 days after `consumed_at` | Partial — needs claim-origin attribution |
-| 9 | Retention | `active_at_90d` | Derived from subscription status at `consumed_at + 90 days` | Derived |
+| 5 | NAP verified / corrected | `nap_verified` (+ `owner_corrected_nap` flag) | **Built (v1.1)** — `nap_verified_at` stamped at claim; field-level diff on later corrections via `directory_seed_nap_verifications` | Yes |
+| 6 | Outreach touch | `outreach_touch` (call / email / mail) | **Gap** — lightweight touch log per seed (Sprint 2 W1) | No |
+| 7 | Hold / verification task | `verification_task_opened` / `…_resolved` | **Gap** — hold-state as tracked status (partially covered by 255 prospect-queue `verify_then_outreach`) | No |
+| 8 | Conversion | `converted` | **(v1.2 redefined)** Conversion score ≥ threshold (default 4 of 12) within 60 days of `consumed_at`. Score = weighted sum of 8 signals (4 strong × 2 + 4 engagement × 1). See §11.2. | **Built (Sprint 2 W2)** |
+| 9 | Retention | `active_at_90d` | **(v1.2 redefined)** Conversion score ≥ threshold re-evaluated at query time (not at the 90-day mark — stricter, documented). | **Built (Sprint 2 W2)** |
 
 **Event spine:** `seed_published → contactability_determined → invite_issued →
 claim_token_consumed → nap_verified → first_paid → active_at_90d`, plus
@@ -83,11 +85,11 @@ side-channel events (`outreach_touch`, `verification_task_*`). All timestamps
 are system timestamps; time-to-claim and time-to-paid are derived by subtraction
 — no manual timers.
 
-**Attribution rule (paid):** the first paid subscription on the claimed tenant
-that starts within 60 days of `consumed_at` is attributed to the claim cohort.
-Seeds create fresh tenants, so pre-existing subscriptions are not expected;
-if one is found, attribute to `organic` and exclude from the funnel numerator
-(log, don't drop).
+**Attribution rule (converted — v1.2):** a claimed seed tenant is *converted*
+when its conversion score (§11.2) meets the threshold within 60 days of
+`consumed_at`. Seeds create fresh tenants, so pre-claim signals are not
+expected; if found, the signal timestamps predate `consumed_at` and the
+earliest-signal check excludes them from the 60-day window (log, don't drop).
 
 ---
 
@@ -109,6 +111,12 @@ competitive campaigns discovered the same ten businesses). At ingest:
 
 Without this, funnel denominators double-count across the emerging and
 competitive runs.
+
+**(v1.2 disposition):** The v1 spec specified this but never listed it as a
+build item in §7 — that omission was itself a spec bug. Sprint 2 builds
+**detection-only** (analytics query surfacing `potentialDuplicateSeeds` with
+normalized phone/address matching + `name_variants` column) and defers
+auto-merge to operator work. See the sprint plan §5 W5.
 
 ---
 
@@ -212,6 +220,10 @@ than denser, more digitally established categories. A category that fails G4
 on two consecutive decision-grade cohorts is deprioritized in the expansion
 matrix — the playbook is not category-portable until proven otherwise.
 
+**(v1.2 — implemented):** per-category cuts are returned as
+`categoryRollups[]` in the cohort funnel response (Sprint 2 W4), graded with
+the same small-n rules.
+
 ---
 
 ## §7 Capture gaps to build
@@ -249,8 +261,8 @@ all analytics derive from first-party events.
 1. **Task storage:** new `directory_seed_tasks` table vs. reusing `crm_support_tickets` with a task kind. Reuse avoids a table but couples GTM workflow to CRM semantics — decide at implementation.
 2. **CAC allocation:** simplest defensible v1 is `total outreach labor cost in cohort / paid count` (labor hours × loaded rate + per-invite costs). If outreach is operator-time only, track touches and apply a standard cost-per-touch until real cost data exists.
 3. **Multi-tenant edge:** if a claimed tenant later subscribes through a non-claim channel first, the 60-day attribution window may miss it. Decide whether the window extends on first *engagement* (dashboard login) rather than strictly `consumed_at + 60d`.
-4. **Token expiry vs. window:** confirm claim-token TTL ≥ the 30-day G2 window (or that re-issue is automatic), so expired tokens don't artificially depress claim rates.
-5. **Published-at column:** verify `directory_presence_seeds` exposes a publish timestamp distinct from `created_at` (seeds may be created unpublished); the G2 30-day clock should start at first invite, but seed-age reporting wants the publish timestamp.
+4. **~~Token expiry vs. window~~ — CLOSED (v1.2):** claim-token TTL is 90 days by default (`inviteSeed(seedId, expiresInDays = 90)`), ≥ the 30-day G2 window. Re-issue = mint a new token. Expired tokens cannot artificially depress G2.
+5. **~~Published-at column~~ — CLOSED (v1.2):** `directory_presence_seeds.published_at` exists (stamped in `publishSeed`). The G2 30-day clock starts at first invite (`token.created_at`), not at publish; seed-age reporting uses `published_at`.
 
 ---
 
@@ -265,6 +277,13 @@ decision-grade cohort:
 
 Until then, every new city/category wave is a *measurement* cohort: seed it,
 invite it, measure it — and let the gates, not enthusiasm, promote it.
+
+**(v1.2 — surfacing):** the cohort funnel response includes a
+`scalingReadiness` block on the combined report: `{ citiesPassing,
+categoriesPassing, ruleMet }` computed from decision-grade passing cohorts
+grouped by city and category, with the ≥2×≥2 rule evaluated and an
+explanatory note. Human judgment stays the decider; the system surfaces the
+threshold state (Sprint 2 W4).
 
 ---
 
@@ -308,12 +327,64 @@ the v1 spec text:
    `MarketingCampaignService` (not `SubscriptionBillingService` as §8
    assumed); the new value was added there.
 
-**Still open (from §7):** outreach touch log (partially covered by the 257
-`outreach_state` machine), hold-state verification tasks (partially covered by
-the 255 prospect-queue `verify_then_outreach` flow), operator-facing funnel UI
-(endpoint exists; no page yet), and CAC cost allocation.
+**Still open (from §7):** outreach touch log (Sprint 2 W1 — migration 259),
+hold-state verification tasks (partially covered by the 255 prospect-queue
+`verify_then_outreach` flow), operator-facing funnel UI (Sprint 2 W3), CAC
+cost allocation (Sprint 2 W1 — cost-per-touch placeholder), and duplicate-seed
+detection (Sprint 2 W5 — detection-only, auto-merge deferred).
 
 **Tests:** `apps/api/src/services/__tests__/SeedFunnelAnalyticsService.gradeGates.test.ts`
 (gate grading, thresholds, small-n rules) and
 `apps/api/src/services/__tests__/DirectoryPresenceSeedService.napVerification.test.ts`
 (owner-correction diff capture, claimed-only gating, no-op exclusion).
+
+---
+
+## §11.2 Implementation notes (v1.2 — conversion score + metric completion)
+
+**Deviation 1 retired — G4/G6 no longer use the paid-tier proxy.** The v1.1
+"on a paid tier now" proxy is replaced by a **conversion score** with
+threshold gating:
+
+**Signal set (8 signals, two tiers):**
+
+*Strong signals (weight 2 each):*
+
+| # | Signal | Source table | Condition |
+|---|---|---|---|
+| S1 | Paid tier upgrade | `tenants` + `subscription_tiers_list` | `subscription_tier` maps to `price_monthly > 0` |
+| S2 | BSaaS add-on purchase | `tenant_feature_purchases` | `status = 'active'` |
+| S3 | Revenue transaction | `platform_revenue_transactions` | `status <> 'failed'` AND `gross_amount_cents > 0` |
+| S4 | Customer order | `orders` | `order_status` not `draft` AND `payment_status` in (`paid`, `refunded`) |
+
+*Engagement signals (weight 1 each):*
+
+| # | Signal | Source table | Condition |
+|---|---|---|---|
+| W1 | Product stocking | `inventory_items` (COUNT per tenant) | `> 0` products created |
+| W2 | Owner platform access | `users.last_login_at` | `last_login_at` is not null |
+| W3 | Storefront customization | `inventory_items.custom_branding` / `landing_page_theme` / `tenant_storefront_options_settings` | any storefront config beyond defaults |
+| W4 | GBP sync / business hours | `tenants.google_sync_enabled` / `google_last_sync` / `business_hours_list` | owner connected GBP or set business hours |
+
+**Scoring:** `conversionScore = (Σ strong × 2) + (Σ engagement × 1)`, max = 12.
+**Threshold:** `CONVERSION_THRESHOLD = 4` (configurable — tune after first two
+cohorts, then freeze).
+
+- G4 = converted seeds where score ≥ threshold AND earliest signal timestamp
+  ≤ `claimed_at` + 60 days.
+- G6 = converted seeds where score ≥ threshold at query time (stricter than
+  spec's "active at the 90-day mark" — a tenant that churned after day 90
+  fails here; documented as deliberate).
+- The raw score and per-signal breakdown are surfaced as
+  `conversionScoreBreakdown` in the funnel response (leading indicator).
+- No migration, trigger, or backfill — all 8 source tables already exist.
+
+**Other v1.2 changes:**
+
+- §9 OQ4 closed (token TTL = 90 days ≥ G2 window).
+- §9 OQ5 closed (`published_at` exists; G2 clock = first invite).
+- §3.1 dispositioned (detection-only build in Sprint 2 W5; auto-merge deferred).
+- §6 per-category cuts implemented (Sprint 2 W4 — `categoryRollups[]`).
+- §10 scaling readiness surfaced (Sprint 2 W4 — `scalingReadiness` block).
+- Migration 261 fixes the `contact_status` column default from `'unverified'`
+  to `'contact_unverified'` (the evidence-safety contract state).

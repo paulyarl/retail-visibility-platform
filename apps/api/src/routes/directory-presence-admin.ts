@@ -3,6 +3,8 @@
  *
  *   GET    /api/admin/directory/presence-seeds           — list seeds
  *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
+ *   POST   /api/admin/directory/presence-seeds/:id/touches — log an outreach touch
+ *   GET    /api/admin/directory/presence-seeds/:id/touches — list outreach touches
  *   GET    /api/admin/directory/presence-seeds/:id       — seed detail
  *   POST   /api/admin/directory/presence-seeds           — create seed
  *   POST   /api/admin/directory/presence-seeds/:id/publish — publish listing
@@ -144,6 +146,68 @@ router.get('/presence-seeds/funnel/cohorts', requirePlatformStaff, async (req: R
     res.json({ success: true, ...report });
   } catch (error) {
     logger.error('[GET /api/admin/directory/presence-seeds/funnel/cohorts] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/touches
+ *
+ * Log an outreach touch (call / email / sms / mail / other) with optional
+ * outcome and notes. Feeds the CAC numerator for G5 (spec §7 gap 4, W1).
+ */
+const touchSchema = z.object({
+  channel: z.enum(['call', 'email', 'sms', 'mail', 'other']),
+  outcome: z.enum(['connected', 'no_response', 'voicemail', 'bad_number', 'claimed', 'not_interested']).optional(),
+  notes: z.string().max(2000).optional(),
+  occurredAt: z.string().datetime().optional(),
+});
+
+router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const parsed = touchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'validation_error', details: parsed.error.flatten() });
+    }
+    const ctx = {
+      actorId: (req as any).user?.id,
+      actorType: 'user' as const,
+    };
+    const result = await DirectoryPresenceSeedService.addOutreachTouch(
+      req.params.id,
+      {
+        channel: parsed.data.channel,
+        outcome: parsed.data.outcome,
+        notes: parsed.data.notes,
+        occurredAt: parsed.data.occurredAt ? new Date(parsed.data.occurredAt) : undefined,
+      },
+      ctx,
+    );
+    res.json({ success: true, touchId: result.id });
+  } catch (error) {
+    if ((error as Error).message === 'seed_not_found') {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/touches] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory/presence-seeds/:id/touches
+ *
+ * List outreach touches for a seed, newest first.
+ */
+router.get('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const touches = await DirectoryPresenceSeedService.listOutreachTouches(req.params.id);
+    res.json({ success: true, touches });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/touches] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

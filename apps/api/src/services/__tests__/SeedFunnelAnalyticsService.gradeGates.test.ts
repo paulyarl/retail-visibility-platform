@@ -2,11 +2,13 @@
  * SeedFunnelAnalyticsService.gradeGates tests
  *
  * Verifies the benchmark-gate grading logic (pure function):
- * - Decision-grade cohort passes all four gates at healthy metrics
+ * - Decision-grade cohort passes all gates at healthy metrics
  * - Small cohorts grade 'directional' even when rates pass
  * - Zero denominators produce pass = null (not evaluable, never a failure)
  * - Threshold boundaries are inclusive (value == threshold passes)
  * - G2 uses the 30-day claim window count, not the all-time claim count
+ * - v1.2: G4 uses `converted` (conversion score), not `paid` (tier proxy)
+ * - v1.2: G6 (retention_90d) is graded
  *
  * See: docs/LocalBiz/seed_funnel_benchmark_gates_and_analytics_spec.md §5–§6
  */
@@ -34,7 +36,11 @@ const baseMetrics = {
   claimed30d: 0,
   napVerified: 0,
   ownerCorrected: 0,
+  converted: 0,
+  retention90d: 0,
   paid: 0,
+  touches: 0,
+  cacEstimate: null,
 };
 
 beforeEach(() => {
@@ -42,7 +48,7 @@ beforeEach(() => {
 });
 
 describe('gradeGates', () => {
-  it('passes all four gates on a healthy decision-grade cohort', () => {
+  it('passes all gates on a healthy decision-grade cohort', () => {
     const { gates, grade } = gradeGates({
       ...baseMetrics,
       seeds: 25,
@@ -52,15 +58,18 @@ describe('gradeGates', () => {
       claimed30d: 6, // 0.33 ≥ 0.20
       napVerified: 9, // 0.90 ≥ 0.80
       ownerCorrected: 3,
-      paid: 2, // 0.20 ≥ 0.10
+      converted: 2, // 0.20 ≥ 0.10
+      retention90d: 2, // 1.0 ≥ 0.5
+      paid: 2,
     });
 
     expect(grade).toBe('decision_grade');
-    expect(gates.map((g) => g.pass)).toEqual([true, true, true, true]);
+    // G1–G4 + G6 all pass
+    expect(gates.map((g) => g.pass)).toEqual([true, true, true, true, true]);
   });
 
   it('grades directional when the cohort is below decision-grade minimums', () => {
-    // All rates pass, but paid (1) < decision minimum (2)
+    // All rates pass, but converted (1) < decision minimum (2)
     const { gates, grade } = gradeGates({
       ...baseMetrics,
       seeds: 8,
@@ -70,6 +79,8 @@ describe('gradeGates', () => {
       claimed30d: 2,
       napVerified: 3,
       ownerCorrected: 1,
+      converted: 1,
+      retention90d: 1,
       paid: 1,
     });
 
@@ -84,7 +95,8 @@ describe('gradeGates', () => {
     expect(gates.find((g) => g.gate === 'G1_contactable_rate')?.pass).toBeNull();
     expect(gates.find((g) => g.gate === 'G2_claim_rate_30d')?.pass).toBeNull();
     expect(gates.find((g) => g.gate === 'G3_nap_verified_rate')?.pass).toBeNull();
-    expect(gates.find((g) => g.gate === 'G4_paid_rate')?.pass).toBeNull();
+    expect(gates.find((g) => g.gate === 'G4_conversion_rate')?.pass).toBeNull();
+    expect(gates.find((g) => g.gate === 'G6_retention_90d')?.pass).toBeNull();
   });
 
   it('treats threshold boundaries as passing', () => {
@@ -97,14 +109,17 @@ describe('gradeGates', () => {
       claimed30d: 2, // exactly 0.20
       napVerified: 8, // exactly 0.80
       ownerCorrected: 0,
-      paid: 1, // exactly 0.10
+      converted: 1, // exactly 0.10
+      retention90d: 1, // 1.0 ≥ 0.5
+      paid: 1,
     });
 
     const byGate = Object.fromEntries(gates.map((g) => [g.gate, g.pass]));
     expect(byGate['G1_contactable_rate']).toBe(true);
     expect(byGate['G2_claim_rate_30d']).toBe(true);
     expect(byGate['G3_nap_verified_rate']).toBe(true);
-    expect(byGate['G4_paid_rate']).toBe(true);
+    expect(byGate['G4_conversion_rate']).toBe(true);
+    expect(byGate['G6_retention_90d']).toBe(true);
   });
 
   it('fails G1 when the contactable rate is below threshold', () => {
@@ -117,6 +132,8 @@ describe('gradeGates', () => {
       claimed30d: 1,
       napVerified: 1,
       ownerCorrected: 0,
+      converted: 1,
+      retention90d: 1,
       paid: 1,
     });
 
@@ -135,6 +152,8 @@ describe('gradeGates', () => {
       claimed30d: 1, // 30-day window fails (0.10 < 0.20)
       napVerified: 10,
       ownerCorrected: 2,
+      converted: 2,
+      retention90d: 2,
       paid: 2,
     });
 
@@ -143,12 +162,32 @@ describe('gradeGates', () => {
     expect(g2?.pass).toBe(false);
   });
 
+  it('fails G6 when retention_90d is below 50% of converted', () => {
+    const { gates } = gradeGates({
+      ...baseMetrics,
+      seeds: 25,
+      contactable: 20,
+      invited: 18,
+      claimed: 10,
+      claimed30d: 6,
+      napVerified: 9,
+      ownerCorrected: 3,
+      converted: 4,
+      retention90d: 1, // 0.25 < 0.50
+      paid: 4,
+    });
+
+    const g6 = gates.find((g) => g.gate === 'G6_retention_90d');
+    expect(g6?.pass).toBe(false);
+    expect(g6?.value).toBeCloseTo(0.25);
+  });
+
   it('exposes the frozen thresholds for reporting', () => {
     expect(FUNNEL_GATE_THRESHOLDS).toEqual({
       G1_contactable_rate: 0.4,
       G2_claim_rate_30d: 0.2,
       G3_nap_verified_rate: 0.8,
-      G4_paid_rate: 0.1,
+      G4_conversion_rate: 0.1,
     });
     expect(DECISION_GRADE_MINIMUMS).toEqual({ seeds: 20, claimed: 5, paid: 2 });
   });
