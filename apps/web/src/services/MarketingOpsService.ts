@@ -30,7 +30,9 @@ export type CampaignStage =
 
 // Recovery Management stages run on the same stage column; literals are
 // app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
-export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management'
+  // Migration 262 — city/category proving ground (spec §4.2)
+  | 'proving_ground';
 export type RepairTrack = 'standard' | 'escalated';
 
 export type ConversionSource =
@@ -236,6 +238,15 @@ export interface CampaignDetail extends Campaign {
   parent_campaign?: CampaignLineageEntry | null;
   children?: CampaignLineageEntry[];
   outreach_log?: OutreachLogEntry[];
+  // Migration 262 — proving-ground gap log (chronological incident record)
+  gap_log?: Array<{
+    timestamp: string;
+    field: string;
+    description: string;
+    severity: 'critical' | 'important' | 'minor';
+    resolver: 'self' | 'staff' | 'developer';
+    logged_by?: string;
+  }> | null;
 }
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
@@ -913,7 +924,9 @@ export interface DeriveAllUnmatchedResult {
 // ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
 
 export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek' | 'category_identification';
-export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed';
+export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed'
+  // Migration 262 — proving-ground cadence states
+  | 'hold' | 'in_thread';
 export type ProspectPriority = 'high' | 'normal';
 export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'unverified_closed' | 'other';
 
@@ -1000,6 +1013,9 @@ export interface ProspectQueueListFilters {
   assigned_to?: string; // 'me' | 'unassigned' | <userId>
   limit?: number;
   includeCampaigns?: boolean;
+  // Migration 262 — tree filter: queue rows whose source_campaign_id is any
+  // of these campaign ids (proving ground + its intelligence children).
+  source_campaign_ids?: string[];
 }
 
 export interface ProspectQueuePatch {
@@ -1053,6 +1069,17 @@ export interface ProspectQueueEntry {
   intelligence_run_id?: string | null;
   // Verify-then-outreach (Migration 255)
   verification?: VerificationRecord | null;
+  // Proving ground (Migration 262)
+  seed_id?: string | null;
+  channel_sequence?: Array<{
+    channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
+    contact?: string;
+    evidence?: string;
+    status?: 'verified' | 'unverified' | 'dead';
+  }> | null;
+  current_channel_index?: number;
+  next_touch_at?: string | null;
+  account_family?: string | null;
 }
 
 export interface LogContactInput {
@@ -1657,6 +1684,13 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch campaign');
     }
     return result.data?.data ?? result.data;
+  }
+
+  /** Proving-ground children come embedded on CampaignDetail (GET /:id)
+   *  (Migration 262) — this is a thin accessor for call-site clarity. */
+  async getCampaignChildren(id: string): Promise<CampaignLineageEntry[]> {
+    const campaign = await this.getCampaign(id);
+    return campaign.children ?? [];
   }
 
   async createCampaign(input: CampaignCreateInput): Promise<Campaign> {
@@ -4546,6 +4580,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.city) params.set('city', filters.city);
     if (filters?.source_kind) params.set('source_kind', filters.source_kind);
     if (filters?.assigned_to) params.set('assigned_to', filters.assigned_to);
+    if (filters?.source_campaign_ids?.length) params.set('source_campaign_ids', filters.source_campaign_ids.join(','));
     if (filters?.limit) params.set('limit', String(filters.limit));
     if (filters?.includeCampaigns) params.set('include', 'campaigns');
     const query = params.toString();
@@ -4645,6 +4680,70 @@ class MarketingOpsService extends AdminApiSingleton {
       campaign: data?.campaign ?? null,
       created: data?.created ?? false,
     };
+  }
+
+  // ─── Proving Ground (Migration 262) ────────────────────────────────────
+
+  /** POST /prospect-queue/:id/log-touch — canonical seed touch + cadence
+   *  advance + seed write-through (spec §4.7–§4.8). */
+  async logProspectTouch(id: string, input: {
+    channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
+    outcome?: 'connected' | 'no_response' | 'no_answer' | 'no_reply' | 'voicemail'
+      | 'bad_number' | 'bounce' | 'unread' | 'read_no_reply' | 'form_submitted'
+      | 'referral_asked' | 'claimed' | 'not_interested';
+    notes?: string;
+  }): Promise<{
+    touchId: string;
+    queueEntryId: string;
+    status: string;
+    currentChannelIndex: number;
+    nextTouchAt: string | null;
+    channelSequence: any[];
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}/log-touch`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-prospect-queue-touch-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to log touch');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    return result.data?.data ?? result.data;
+  }
+
+  /** POST /:id/children — attach an intelligence campaign under a proving
+   *  ground (409 on wrong parent/child or already parented). */
+  async attachProvingGroundChild(parentId: string, childId: string): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${parentId}/children`,
+      { method: 'POST', body: JSON.stringify({ child_campaign_id: childId }) },
+      `mkt-ops-pg-attach-${parentId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to attach child campaign');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    await this.invalidateCachePattern(`mkt-ops-campaign-${parentId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  /** DELETE /:id/children/:childId — release a child (breadcrumbs-only). */
+  async detachProvingGroundChild(parentId: string, childId: string): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${parentId}/children/${childId}`,
+      { method: 'DELETE' },
+      `mkt-ops-pg-detach-${parentId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to detach child campaign');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    await this.invalidateCachePattern(`mkt-ops-campaign-${parentId}`);
+    return result.data?.data ?? result.data;
   }
 
   // ─── Customer Alerts (§8.3) ──────────────────────────────────────────────
@@ -5773,6 +5872,9 @@ export const INTERNAL_LINK_TARGETS = [
   'campaign_tab',
   'recovery_detail',
   'intake_form',
+  // Migration 262 — proving-ground cockpit surfaces (spec §4.3)
+  'proving_ground_worklist',
+  'seed_claim_kit',
 ] as const;
 export type InternalLinkTarget = (typeof INTERNAL_LINK_TARGETS)[number];
 
@@ -5783,6 +5885,8 @@ export const INTERNAL_LINK_TARGET_LABELS: Record<InternalLinkTarget, string> = {
   campaign_tab: 'Campaign Tab',
   recovery_detail: 'Recovery Detail',
   intake_form: 'Intake Form',
+  proving_ground_worklist: 'Proving Ground Worklist',
+  seed_claim_kit: 'Seed Claim Kit / Worklist',
 };
 
 // ─── Outreach kind (bridge sprint) ───────────────────────────────────────

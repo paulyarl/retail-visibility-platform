@@ -719,7 +719,19 @@ export class SeedFunnelAnalyticsService {
       ...dupParams,
     );
 
-    const potentialDuplicateSeeds: PotentialDuplicateSeed[] = duplicateRows.map((row) => ({
+    // Migration 262 (spec §4.9) — exclude groups the operator has already
+    // resolved (mkt_prospect_dedup_verdicts, group-keyed on the sorted
+    // seed_ids set + match_key). duplicateSeedCount reports unannotated
+    // groups only; verdicts are the identity ledger.
+    const annotated = await prisma.$queryRaw<any[]>`
+      SELECT seed_ids, match_key FROM mkt_prospect_dedup_verdicts
+    `;
+    const annotatedKeys = new Set(annotated.map((v) => `${v.match_key}:${(v.seed_ids as string[]).join(',')}`));
+    const openDuplicateRows = duplicateRows.filter(
+      (g) => !annotatedKeys.has(`${g.match_key}:${[...g.seed_ids].sort().join(',')}`),
+    );
+
+    const potentialDuplicateSeeds: PotentialDuplicateSeed[] = openDuplicateRows.map((row) => ({
       seedIds: row.seed_ids,
       matchKey: row.match_key,
       names: row.names,

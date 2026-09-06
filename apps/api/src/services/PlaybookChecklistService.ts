@@ -375,6 +375,9 @@ export class PlaybookChecklistService extends BaseService {
     'campaign_tab',
     'recovery_detail',
     'intake_form',
+    // Migration 262 — proving-ground cockpit surfaces (spec §4.3)
+    'proving_ground_worklist',
+    'seed_claim_kit',
   ] as const;
   static readonly INTERNAL_LINK_TARGET_SET: ReadonlySet<string> = new Set(PlaybookChecklistService.INTERNAL_LINK_TARGETS);
 
@@ -561,11 +564,38 @@ export class PlaybookChecklistService extends BaseService {
       where: { campaign_id: campaignId },
       include: { playbook: true, overridden_playbook: true },
     });
-    if (!triage) return null;
+
+    // Migration 262 (spec §4.3) — proving-ground direct assignment.
+    // Aggregate campaigns never participate in business triage
+    // (assertBusinessScope rejects them), so a triage row can never carry
+    // their checklist. A city/category-scope campaign with
+    // campaign_category='proving_ground' resolves the PG-01 playbook
+    // directly by catalog code.
+    const resolveProvingGroundPlaybook = async () => {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { scope: true, campaign_category: true },
+      });
+      if (
+        campaign &&
+        (campaign.scope === 'city' || campaign.scope === 'category') &&
+        (campaign.campaign_category as string | null) === 'proving_ground'
+      ) {
+        const pg = await this.prisma.mkt_playbook_catalog.findFirst({
+          where: { code: 'PG-01', is_active: true },
+        });
+        if (pg) {
+          return { id: pg.id, code: pg.code, name: pg.name, category: pg.category, isOverride: false };
+        }
+      }
+      return null;
+    };
+
+    if (!triage) return resolveProvingGroundPlaybook();
 
     // Exposed only when operator has decided (accepted OR overridden)
     const hasDecision = triage.is_operator_accepted === true || triage.overridden_playbook_id != null;
-    if (!hasDecision) return null;
+    if (!hasDecision) return resolveProvingGroundPlaybook();
 
     const effectiveRow = triage.overridden_playbook ?? triage.playbook;
     if (!effectiveRow) return null;

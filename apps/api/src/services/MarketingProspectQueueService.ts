@@ -40,7 +40,10 @@ export type ProspectSourceKind =
   | 'directory_lead_gen'
   | 'category_identification';
 
-export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed';
+// Migration 262 — 'hold' parks the prospect (touch-cap / nurture; re-enters
+// at next_touch_at) and 'in_thread' marks a live conversation (the ladder is
+// done or interrupted — the thread drives next moves). See spec §4.6.
+export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed' | 'hold' | 'in_thread';
 export type ProspectPriority = 'high' | 'normal';
 
 // ─── Verify-then-outreach (Migration 255) ───────────────────────────────
@@ -148,6 +151,9 @@ export interface ListQueueFilters {
   category?: string;
   city?: string;
   source_kind?: ProspectSourceKind;
+  // Migration 262 — proving-ground tree scope: queue rows whose
+  // source_campaign_id is any of these (the parent's intelligence children).
+  source_campaign_ids?: string[];
   assigned_to?: string; // 'me' resolved to userId at route layer; 'unassigned' → null filter
   // When true, the assigned_to filter is OR'd with assigned_to IS NULL
   // (matches the "Assigned to me + unassigned" checkbox label on the queue page).
@@ -361,6 +367,11 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (filters.category) where.category = { equals: filters.category, mode: 'insensitive' };
       if (filters.city) where.city = { equals: filters.city, mode: 'insensitive' };
       if (filters.source_kind) where.source_kind = filters.source_kind;
+      // Migration 262 — proving-ground tree scope: the worklist queries
+      // `source_campaign_id IN (children of this proving ground)` (spec §5.2).
+      if (filters.source_campaign_ids?.length) {
+        where.source_campaign_id = { in: filters.source_campaign_ids };
+      }
       if (filters.assigned_to === 'unassigned') {
         where.assigned_to = null;
       } else if (filters.assigned_to && filters.include_unassigned) {

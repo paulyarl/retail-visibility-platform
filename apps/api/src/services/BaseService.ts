@@ -6,6 +6,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
+import { HttpError } from '../middleware/errorHandler';
 
 export abstract class BaseService {
   protected prisma = prisma;
@@ -15,6 +16,10 @@ export abstract class BaseService {
    * Handle common error patterns
    */
   protected handleError(error: unknown, context?: RequestCtx): Error {
+    // Typed HTTP errors (NotFoundError, ConflictError, ValidationError, ...)
+    // carry statusCode + code — pass them through so route handlers can
+    // respond with the correct status instead of collapsing to 500.
+    if (error instanceof HttpError) return error;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     this.logger.error('Service error: ' + errorMessage, undefined, { error: { name: 'Error', message: String(context) + ' ' + String({ error }) } });
     return new Error(errorMessage);

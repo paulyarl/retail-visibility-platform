@@ -75,6 +75,26 @@ function hasCrisis(signals: string[] | undefined): boolean {
   return !!signals?.some((s) => CRISIS_SIGNALS.includes(s));
 }
 
+/** next_touch_at → "due now" / "in Nd" label (proving-ground worklist). */
+function dueLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (diffMs <= 0) return 'due now';
+  const d = Math.floor(diffMs / 86400000);
+  if (d === 0) return 'today';
+  return `in ${d}d`;
+}
+
+const CHANNEL_CHIP: Record<string, string> = {
+  call: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  email: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
+  sms: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  mail: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  form: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  referral: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+};
+
 function rowBorderClass(entry: ProspectQueueEntry): string {
   if (entry.status !== 'queued') return 'border-gray-200 dark:border-neutral-700';
   const signals = entry.detected_signals ?? [];
@@ -108,7 +128,7 @@ export default function ProspectQueueClient() {
   const initialStatus: ProspectStatus = (() => {
     if (typeof window === 'undefined') return 'queued';
     const param = new URLSearchParams(window.location.search).get('status');
-    if (param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed') {
+    if (param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed' || param === 'in_thread' || param === 'hold') {
       return param as ProspectStatus;
     }
     return 'queued';
@@ -148,6 +168,13 @@ export default function ProspectQueueClient() {
   });
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
+
+  // Proving ground (Migration 262) — log-outcome modal state
+  const [logModalEntry, setLogModalEntry] = useState<ProspectQueueEntry | null>(null);
+  const [logChannel, setLogChannel] = useState<string>('call');
+  const [logOutcome, setLogOutcome] = useState<string>('');
+  const [logNotes, setLogNotes] = useState('');
+  const [loggingTouch, setLoggingTouch] = useState(false);
 
   // "Add to Queue" modal — lets operators capture a hot prospect discovered
   // during a deep dive, outside the audit "Add to queue" context.
@@ -279,6 +306,44 @@ export default function ProspectQueueClient() {
       setError(err.message || 'Failed to unassign');
     } finally {
       setAssigningId(null);
+    }
+  };
+
+  // ─── Proving ground: log outcome (Migration 262, spec §4.7–§4.8) ──────
+
+  const openLogModal = (entry: ProspectQueueEntry) => {
+    const ladder = entry.channel_sequence ?? [];
+    const idx = entry.current_channel_index ?? 0;
+    setLogChannel(ladder[idx]?.channel ?? 'call');
+    setLogOutcome('');
+    setLogNotes('');
+    setLogModalEntry(entry);
+  };
+
+  const handleLogTouch = async () => {
+    if (!logModalEntry) return;
+    setLoggingTouch(true);
+    setError(null);
+    try {
+      const res = await marketingOpsService.logProspectTouch(logModalEntry.id, {
+        channel: logChannel as any,
+        outcome: (logOutcome || undefined) as any,
+        notes: logNotes || undefined,
+      });
+      setEntries((prev) => prev.map((e) => e.id === logModalEntry.id ? {
+        ...e,
+        status: res.status as ProspectStatus,
+        current_channel_index: res.currentChannelIndex,
+        next_touch_at: res.nextTouchAt,
+        channel_sequence: res.channelSequence,
+      } : e));
+      setLogModalEntry(null);
+      await fetchQueue();
+    } catch (err: any) {
+      setError(err.message || 'Failed to log touch');
+      setLogModalEntry(null);
+    } finally {
+      setLoggingTouch(false);
     }
   };
 
@@ -437,9 +502,25 @@ export default function ProspectQueueClient() {
   const statusTabs: { key: ProspectStatus; label: string; count: number }[] = [
     { key: 'queued', label: 'Queued', count: queuedCount },
     { key: 'verify_then_outreach', label: 'Verify', count: entries.filter((e) => e.status === 'verify_then_outreach').length },
+    { key: 'in_thread', label: 'In Thread', count: entries.filter((e) => e.status === 'in_thread').length },
+    { key: 'hold', label: 'Hold', count: entries.filter((e) => e.status === 'hold').length },
     { key: 'campaign_created', label: 'Created', count: entries.filter((e) => e.status === 'campaign_created').length },
     { key: 'dismissed', label: 'Dismissed', count: entries.filter((e) => e.status === 'dismissed').length },
   ];
+
+  // Proving ground (Migration 262, spec §4.6): seeded rows sort by
+  // next_touch_at — the operator's "due today" worklist. Unseeded rows keep
+  // queue order after the seeded block.
+  const displayEntries = useMemo(() => {
+    const seeded = entries.filter((e) => e.seed_id);
+    const unseeded = entries.filter((e) => !e.seed_id);
+    seeded.sort((a, b) => {
+      const ta = a.next_touch_at ? new Date(a.next_touch_at).getTime() : 0;
+      const tb = b.next_touch_at ? new Date(b.next_touch_at).getTime() : 0;
+      return ta - tb;
+    });
+    return [...seeded, ...unseeded];
+  }, [entries]);
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -604,7 +685,7 @@ export default function ProspectQueueClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-neutral-700">
-                  {entries.map((entry) => {
+                  {displayEntries.map((entry) => {
                     const signals = entry.detected_signals ?? [];
                     const crisis = hasCrisis(signals);
                     const assigneeLabel = staffDisplayName(staffUsers, entry.assigned_to);
@@ -625,6 +706,26 @@ export default function ProspectQueueClient() {
                             <MapPin className="w-3 h-3" />
                             {[entry.city, entry.state].filter(Boolean).join(', ') || '—'}
                           </div>
+                          {/* Proving ground: channel ladder (Migration 262) */}
+                          {entry.seed_id && entry.channel_sequence && entry.channel_sequence.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-1" title="Channel ladder — current rung highlighted">
+                              {entry.channel_sequence.map((rung, i) => (
+                                <span
+                                  key={i}
+                                  className={`inline-block rounded px-1 py-0.5 text-[9px] font-medium ${
+                                    rung.status === 'dead'
+                                      ? 'bg-gray-100 text-gray-400 line-through dark:bg-neutral-700 dark:text-gray-500'
+                                      : i === (entry.current_channel_index ?? 0)
+                                        ? (CHANNEL_CHIP[rung.channel] ?? CHANNEL_CHIP.other) + ' ring-1 ring-current'
+                                        : 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400'
+                                  }`}
+                                  title={`${rung.channel}${rung.contact ? ` · ${rung.contact}` : ''}${rung.status === 'dead' ? ' (dead)' : ''}`}
+                                >
+                                  {rung.channel}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
 
                         {/* Signals */}
@@ -740,6 +841,15 @@ export default function ProspectQueueClient() {
                         {/* Queued */}
                         <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
                           {relativeTime(entry.created_at)}
+                          {entry.next_touch_at && (() => {
+                            const label = dueLabel(entry.next_touch_at);
+                            const due = new Date(entry.next_touch_at).getTime() <= Date.now();
+                            return (
+                              <div className={`text-[10px] mt-0.5 ${due ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-gray-400'}`}>
+                                {due ? '● due now' : `next: ${label}`}
+                              </div>
+                            );
+                          })()}
                           {entry.queued_by && (
                             <div className="text-[10px] text-gray-400">
                               by {staffDisplayName(staffUsers, entry.queued_by) ?? entry.queued_by.slice(0, 8)}
@@ -835,6 +945,21 @@ export default function ProspectQueueClient() {
                         {/* Actions */}
                         <td className="px-3 py-2 text-right">
                           <div className="inline-flex items-center gap-1.5">
+                            {/* Proving ground: log-outcome action on seeded rows
+                                (hold rows unlock when the hold date passes). */}
+                            {entry.seed_id && (
+                              entry.status === 'queued' || entry.status === 'in_thread' ||
+                              (entry.status === 'hold' && entry.next_touch_at && new Date(entry.next_touch_at) <= new Date())
+                            ) && (
+                              <button
+                                onClick={() => openLogModal(entry)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-700 rounded hover:bg-teal-100 dark:hover:bg-teal-900/50"
+                                title="Log an outreach outcome — the cadence advances the ladder and schedules the next touch"
+                              >
+                                <Phone className="w-3 h-3" />
+                                Log
+                              </button>
+                            )}
                             {entry.status === 'queued' ? (
                               <>
                                 <button
@@ -923,7 +1048,13 @@ export default function ProspectQueueClient() {
                               </Link>
                             ) : (
                               <span className="text-xs text-gray-400">
-                                {entry.dismissed_reason ? entry.dismissed_reason.replace(/_/g, ' ') : 'dismissed'}
+                                {entry.status === 'in_thread'
+                                  ? 'in thread'
+                                  : entry.status === 'hold'
+                                    ? `hold${entry.next_touch_at ? ` · ${dueLabel(entry.next_touch_at) ?? ''}` : ''}`
+                                    : entry.dismissed_reason
+                                      ? entry.dismissed_reason.replace(/_/g, ' ')
+                                      : 'dismissed'}
                               </span>
                             )}
                           </div>
@@ -946,6 +1077,130 @@ export default function ProspectQueueClient() {
           />
         )}
       </div>
+
+      {/* Proving ground: Log outcome modal (Migration 262, spec §4.7) */}
+      {logModalEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !loggingTouch && setLogModalEntry(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Log outcome — {logModalEntry.title || logModalEntry.business_name || 'prospect'}
+              </h2>
+              <button
+                onClick={() => !loggingTouch && setLogModalEntry(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                disabled={loggingTouch}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 space-y-3">
+              {/* Ladder context */}
+              {logModalEntry.channel_sequence && logModalEntry.channel_sequence.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  {logModalEntry.channel_sequence.map((rung, i) => (
+                    <span
+                      key={i}
+                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        rung.status === 'dead'
+                          ? 'bg-gray-100 text-gray-400 line-through dark:bg-neutral-700 dark:text-gray-500'
+                          : i === (logModalEntry.current_channel_index ?? 0)
+                            ? (CHANNEL_CHIP[rung.channel] ?? CHANNEL_CHIP.other)
+                            : 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {rung.channel}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Channel</label>
+                <select
+                  value={logChannel}
+                  onChange={(e) => setLogChannel(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                >
+                  {(['call', 'email', 'sms', 'mail', 'form', 'referral', 'other'] as const).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Outcome</label>
+                <select
+                  value={logOutcome}
+                  onChange={(e) => setLogOutcome(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                >
+                  <option value="">— logged only (no signal) —</option>
+                  <optgroup label="Live contact">
+                    <option value="connected">connected (live reply → in thread)</option>
+                    <option value="claimed">claimed</option>
+                  </optgroup>
+                  <optgroup label="Retry / advance">
+                    <option value="no_answer">no answer (retry +1d, max 2)</option>
+                    <option value="voicemail">voicemail (next rung +3bd)</option>
+                    <option value="no_reply">no reply — email (next rung +5bd)</option>
+                    <option value="unread">unread — text/DM (abandon +2d)</option>
+                    <option value="read_no_reply">read, no reply (next rung +5d)</option>
+                    <option value="form_submitted">form submitted (+7d)</option>
+                    <option value="referral_asked">referral asked (+14d)</option>
+                  </optgroup>
+                  <optgroup label="Dead channel">
+                    <option value="bad_number">bad number / disconnected</option>
+                    <option value="bounce">bounce (email dead)</option>
+                  </optgroup>
+                  <optgroup label="Terminal">
+                    <option value="not_interested">not interested (dismiss)</option>
+                  </optgroup>
+                </select>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                  Dead channels don&apos;t consume a touch slot. Cap: 3 consuming touches / 30 days → hold 60d.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
+                <textarea
+                  value={logNotes}
+                  onChange={(e) => setLogNotes(e.target.value)}
+                  rows={2}
+                  placeholder="What happened…"
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setLogModalEntry(null)}
+                  disabled={loggingTouch}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogTouch}
+                  disabled={loggingTouch}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {loggingTouch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Phone className="w-3.5 h-3.5" />}
+                  Log touch
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add to Queue modal — manual prospect capture */}
       {addModalOpen && (

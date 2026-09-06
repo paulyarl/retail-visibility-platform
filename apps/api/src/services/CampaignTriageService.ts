@@ -240,7 +240,12 @@ export class CampaignTriageService extends BaseService {
       signals = signals.filter((s) => !removeSet.has(s));
     }
 
-    const playbooks = await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx);
+    // Migration 262 (spec §4.3) — 'proving_ground' playbooks (e.g. PG-01)
+    // are aggregate-campaign checklists, not business triage candidates.
+    // Excluding them here also removes them from evaluateAllForCampaign
+    // (alternatives panel) since it flows through this loader.
+    const playbooks = (await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx))
+      .filter((p: any) => p.category !== 'proving_ground');
     return { signals, playbooks, sourceAuditId };
   }
 

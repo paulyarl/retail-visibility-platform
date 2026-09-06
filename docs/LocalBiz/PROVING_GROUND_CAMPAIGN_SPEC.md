@@ -2,6 +2,7 @@
 
 **Status:** Draft spec (v2 — consolidated with full-spectrum gap analysis; every reuse claim verified against code)
 **Companion docs:**
+- `docs/LocalBiz/proving_ground_sprint_plan.md` (phased implementation — Phase 1→6, dependencies, acceptance criteria)
 - `docs/campaigns/madison-proving-ground-operator-playbook.md` (the runbook this UX operationalizes)
 - `docs/campaigns/madison-east-washington-leadership-pitch.md`
 - `docs/campaigns/madison-middle-eastern-grocery-prospect-priority.md`
@@ -136,6 +137,7 @@ ALTER TABLE mkt_prospect_queue
 
 - Stamped at preflight step 2. Every downstream action is seed-keyed: QR kit, claim tokens, funnel metrics, seed outreach state, touch logging. Without `seed_id` the only join is fuzzy NAP matching — the exact problem dedup is trying to solve.
 - Cross-family FK precedent exists (`directory_seed_campaign_links` already FKs into `mkt_campaigns_list`).
+- **Seeding path:** `DirectoryPresenceSeedService.createSeedsFromBatch(queueEntryIds, seedBatch)` already converts queue entries → seeds in bulk, but for the *existing* flow it marks the row `campaign_created` (seeding was the end state there) and does not stamp a campaign link usable for tree-filtered funnel queries. For the proving ground, seeding is the *start* of outreach — the preflight action needs a sibling path (`createSeedsForProvingGround`, or a parameterized variant) that: (a) creates + publishes the seed, (b) links it to the **intelligence** campaign via `DirectorySeedCampaignLinkService` (required for the funnel's `directory_seed_campaign_links` join), (c) issues the seed claim token, (d) stamps `mkt_prospect_queue.seed_id`, and (e) leaves `status = 'queued'`.
 
 ### 4.5 `channel_sequence` on `mkt_prospect_queue`
 
@@ -214,26 +216,26 @@ One table, all signals from the playbook, business-day semantics explicit. This 
 
 ### 4.9 Identity ledger — dedup verdicts that persist and clear the signal
 
-- New table:
+- New table — **group-keyed**, not pairwise: `potentialDuplicateSeeds` emits `seedIds` as an array (a phone-shared cluster can exceed 2 seeds), so a pairwise key would force N-choose-2 annotations per cluster. One row per surfaced group:
 
 ```sql
 CREATE TABLE mkt_prospect_dedup_verdicts (
   id           VARCHAR(255) PRIMARY KEY,
-  seed_a_id    VARCHAR(60)  NOT NULL REFERENCES directory_presence_seeds(id) ON DELETE CASCADE,
-  seed_b_id    VARCHAR(60)  NOT NULL REFERENCES directory_presence_seeds(id) ON DELETE CASCADE,
+  seed_ids     VARCHAR(60)[] NOT NULL,          -- sorted canonical set (the group as surfaced)
   match_key    VARCHAR(20)  NOT NULL,          -- 'phone' | 'address_city'
   verdict      VARCHAR(20)  NOT NULL,          -- 'same_entity' | 'distinct'
+  merge_into   VARCHAR(60)  REFERENCES directory_presence_seeds(id),  -- surviving seed when same_entity
   rationale    TEXT,
   resolved_by  VARCHAR(255),
   resolved_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (seed_a_id, seed_b_id, match_key)
+  UNIQUE (seed_ids, match_key)
 );
 ```
 
-- `getCohortFunnel` excludes verdict-covered pairs from `potentialDuplicateSeeds`; `duplicateSeedCount` reports **unannotated** pairs only. Preflight step 1's completion (`= 0`) becomes programmatically checkable, and the pair never re-surfaces on weekly reviews.
-- A `same_entity` verdict also merges `name_variants` onto the surviving seed — the verdicts accumulate into a **canonical identity ledger** (Swagat/Krishna, Amal/Halal & Hijab). Distinct verdicts are permanent knowledge: future discovery runs that re-surface the same pair auto-resolve.
+- `getCohortFunnel` excludes groups whose `seed_ids` match a verdict row (same set, same match_key) from `potentialDuplicateSeeds`; `duplicateSeedCount` reports **unannotated** groups only. Preflight step 1's completion (`= 0`) becomes programmatically checkable, and the group never re-surfaces on weekly reviews.
+- A `same_entity` verdict also merges `name_variants` onto `merge_into` — the verdicts accumulate into a **canonical identity ledger** (Swagat/Krishna, Amal/Halal & Hijab). Distinct verdicts are permanent knowledge: future discovery runs that re-surface the same group auto-resolve.
 - v1's "checklist note suffices" is rejected: notes are unqueryable and the signal never clears.
 
 ### 4.10 Preflight gate enforcement — the worklist, not stage transitions
@@ -277,7 +279,7 @@ Extends the existing `ProspectQueueClient` (list + board views, filters, verific
 4. **Preflight gate banner** — §4.10.
 5. **Account-family grouping** — §4.12.
 6. **Per-row actions** — QR kit (PNG / postcard) download, gap-map PDF, claim-link copy — all resolving via `seed_id`.
-7. **Filters gain** — proving-ground tree scope (parent + children campaign ids); status tabs gain `hold` / `in_thread`.
+7. **Filters gain** — proving-ground tree scope and status `hold` / `in_thread`. The list API (`GET /prospect-queue`) needs a new `source_campaign_ids` filter (`ListQueueFilters` today has no campaign filter) — the worklist queries `source_campaign_id IN (children of this proving ground)`.
 
 ### 5.3 Checklist tab on the parent campaign
 
@@ -311,6 +313,8 @@ The proving ground's product purpose: the next city is configuration.
 
 ## 8. Migration, Seed & Rollout Plan
 
+**Build order:** phased — see `docs/LocalBiz/proving_ground_sprint_plan.md` (Phase 1→6 with dependencies + acceptance criteria).
+
 ### 8.1 Migration `262_proving_ground.sql`
 
 - `mkt_prospect_queue`: `+ channel_sequence JSONB NULL`, `+ current_channel_index SMALLINT NOT NULL DEFAULT 0`, `+ next_touch_at TIMESTAMPTZ NULL`, `+ seed_id VARCHAR(60) NULL FK → directory_presence_seeds`, `+ account_family VARCHAR(255) NULL`; extend `chk_prospect_queue_status` with `hold`, `in_thread`; indexes `(status, next_touch_at)`, `(seed_id)`, `(account_family)`.
@@ -324,6 +328,8 @@ The proving ground's product purpose: the next city is configuration.
 - `resolveEffectivePlaybook` direct-assignment branch (§4.3); triage-engine candidate exclusion for `proving_ground` playbooks.
 - `ProvingGroundCadenceService` (§4.7) + seed write-through + `mkt_outreach_log` mirror.
 - `getCohortFunnel` duplicate-exclusion join (§4.9).
+- `createSeedsForProvingGround` (or parameterized `createSeedsFromBatch` variant): seed + publish + link to intelligence campaign + issue claim token + stamp `seed_id`, leaving `status = 'queued'` (§4.4).
+- `GET /prospect-queue` gains `source_campaign_ids` filter (§5.2).
 - Frontend: cockpit page, worklist extensions, checklist tab resolution, `MarketingOpsService` client methods.
 
 ### 8.3 Seed script — `seed-proving-ground-preflight.ts`

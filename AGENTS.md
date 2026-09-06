@@ -962,3 +962,26 @@ Closes the gap where `DirectoryClaimService.initiateClaim` returned `operatorApp
 
 
 
+
+## Proving Ground Campaigns (Migration 262)
+
+Spec: `docs/LocalBiz/PROVING_GROUND_CAMPAIGN_SPEC.md` · Sprint plan: `docs/LocalBiz/proving_ground_sprint_plan.md`
+
+A proving ground is a `scope=city` + `campaign_category=proving_ground` aggregate campaign — the operator workspace for a city/category launch. One active PG per city/category signature (structural-duplicate guardrail).
+
+Backend:
+- `apps/api/src/services/ProvingGroundCadenceService.ts` — the authoritative signal->wait table (spec section 4.7): logTouch() writes the canonical touch on the seed (`directory_seed_outreach_touches`), advances the channel ladder, stamps `next_touch_at`, enforces the 3-consuming-touches/30d cap (hold +60d), exits to `in_thread` on live contact. Dead-channel signals (`bad_number`, `bounce`) do NOT consume a slot. Write-through keeps the seed outreach_state machine in sync; mirrors to `mkt_outreach_log` once `processed_campaign_id` exists.
+- `apps/api/src/services/ProvingGroundDedupService.ts` — group-keyed identity ledger (`mkt_prospect_dedup_verdicts`); `same_entity` merges identity into the survivor seed's `name_variants`; `getCohortFunnel` excludes resolved groups (duplicateSeedCount = unannotated only).
+- `DirectoryPresenceSeedService.createSeedsForProvingGround` — preflight seeding: seed+publish+link to source intelligence campaign+claim token+`queue.seed_id`; leaves status `queued` (seeding is the START of outreach, not graduation).
+- `PlaybookChecklistService.resolveEffectivePlaybook` — PG campaigns resolve PG-01 directly by catalog code (no triage row required; aggregate campaigns never triage). `CampaignTriageService` excludes `proving_ground`-category playbooks from candidates.
+- Routes: `POST /api/admin/marketing-ops/prospect-queue/:id/log-touch`; `POST/DELETE /:campaignId/children[/:childId]`; `POST /api/admin/directory-presence/presence-seeds/proving-ground-seed`; `POST/GET .../dedup-verdicts`; `GET /prospect-queue?source_campaign_ids=a,b,c` (tree filter).
+- `BaseService.handleError` passes `HttpError` subclasses through unchanged — do not wrap/re-create; guards must surface their real status codes (409/404).
+
+Seed script: `doppler run --config local -- pnpm seed:proving-ground-preflight` (idempotent; requires migration 262's CHECK extension first). Re-run for `prd` after edits.
+
+Frontend:
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/proving-grounds/[id]/` — cockpit (gates, tree funnel, preflight checklist embed, dedup panel, children attach/detach, due-today, gap log).
+- `ProspectQueueClient` — `in_thread`/`hold` tabs, next_touch_at due badges, channel-ladder chips (dead rungs struck through), Log-outcome modal.
+- Client: `MarketingOpsService.logProspectTouch` / `attachProvingGroundChild` / `detachProvingGroundChild` / `getCampaignChildren`; `DirectoryPresenceAdminService.provingGroundSeed` / `recordDedupVerdict` / `listDedupVerdicts`.
+
+Tests: `provingGround.test.ts` (guardrail + attach/detach), `provingGroundCadence.test.ts` (cadence map, cap, write-through, verdicts), PG-01 cases in `PlaybookChecklistService.test.ts`, verdict-exclusion cases in `SeedFunnelAnalyticsService.getCohortFunnel.test.ts`.

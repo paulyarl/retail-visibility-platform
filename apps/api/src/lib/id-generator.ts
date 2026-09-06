@@ -2102,6 +2102,16 @@ export function generateProspectQueueId(): string {
   return `pque-${nanoid()}`;
 }
 
+/**
+ * Generate prospect dedup verdict ID (proving-ground identity ledger,
+ * Migration 262)
+ * Format: mpv-{nanoid} (12 chars)
+ */
+export function generateDedupVerdictId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mpv-${nanoid()}`;
+}
+
 // ─── Outreach Intelligence Prep (Sprint 1) ──────────────────────────────
 // Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
 

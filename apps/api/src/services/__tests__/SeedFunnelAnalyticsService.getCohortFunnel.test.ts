@@ -16,13 +16,15 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockQueryRawUnsafe, mockLogger } = vi.hoisted(() => ({
+const { mockQueryRawUnsafe, mockQueryRaw, mockLogger } = vi.hoisted(() => ({
   mockQueryRawUnsafe: vi.fn(),
+  // Migration 262 — the dedup-verdict exclusion lookup runs through $queryRaw.
+  mockQueryRaw: vi.fn(),
   mockLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
-  prisma: { $queryRawUnsafe: mockQueryRawUnsafe },
+  prisma: { $queryRawUnsafe: mockQueryRawUnsafe, $queryRaw: mockQueryRaw },
 }));
 
 vi.mock('../../logger', () => ({ logger: mockLogger }));
@@ -127,13 +129,15 @@ const duplicateRows = [
 ];
 
 /** Queue the five query results in execution order:
- *  1. per-campaign, 2. combined, 3. category rollups, 4. median, 5. duplicates. */
+ *  1. per-campaign, 2. combined, 3. category rollups, 4. median, 5. duplicates.
+ *  The dedup-verdict lookup ($queryRaw) is set separately via `verdicts`. */
 function queueQueries({
   perCampaign = [perCampaignRow],
   combined = [combinedRow],
   categories = [categoryRow],
   median = [medianRow],
   duplicates = duplicateRows,
+  verdicts = [] as any[],
 } = {}) {
   // mockReset (not clearAllMocks): clears queued mockResolvedValueOnce
   // implementations too, so a test-level re-queue replaces the beforeEach
@@ -145,6 +149,8 @@ function queueQueries({
     .mockResolvedValueOnce(categories)
     .mockResolvedValueOnce(median)
     .mockResolvedValueOnce(duplicates);
+  mockQueryRaw.mockReset();
+  mockQueryRaw.mockResolvedValue(verdicts);
 }
 
 beforeEach(() => {
@@ -347,5 +353,37 @@ describe('getCohortFunnel — SQL path', () => {
     expect(report.combined.conversionScoreBreakdown?.threshold).toBe(CONVERSION_THRESHOLD);
     expect(report.medianDaysToClaim).toBeNull();
     expect(report.scalingReadiness.ruleMet).toBe(false);
+  });
+});
+
+
+describe('getCohortFunnel � dedup verdict exclusion (Migration 262)', () => {
+  it('excludes a surfaced group whose verdict was recorded (identity ledger)', async () => {
+    queueQueries({
+      verdicts: [{ seed_ids: ['seed-a', 'seed-b'], match_key: 'phone' }],
+    });
+
+    const report = await SeedFunnelAnalyticsService.getCohortFunnel();
+
+    expect(report.potentialDuplicateSeeds).toEqual([]);
+    expect(report.duplicateSeedCount).toBe(0);
+  });
+
+  it('still surfaces groups with no verdict (unannotated)', async () => {
+    queueQueries({ verdicts: [] });
+
+    const report = await SeedFunnelAnalyticsService.getCohortFunnel();
+
+    expect(report.potentialDuplicateSeeds).toHaveLength(1);
+    expect(report.duplicateSeedCount).toBe(1);
+  });
+
+  it('does not exclude a group on a different match_key', async () => {
+    queueQueries({
+      verdicts: [{ seed_ids: ['seed-a', 'seed-b'], match_key: 'address_city' }],
+    });
+
+    const report = await SeedFunnelAnalyticsService.getCohortFunnel();
+    expect(report.potentialDuplicateSeeds).toHaveLength(1);
   });
 });

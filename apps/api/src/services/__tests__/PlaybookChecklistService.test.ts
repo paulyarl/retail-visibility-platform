@@ -40,6 +40,7 @@ const {
   },
   mockPlaybook: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
   },
   mockCampaigns: {
     findUnique: vi.fn(),
@@ -1020,5 +1021,73 @@ describe('PlaybookChecklistService â€” suggestions', () => {
         }),
       );
     });
+  });
+});
+
+
+// ====================
+// Proving Ground — PG-01 direct resolution (Migration 262, spec §4.3)
+// ====================
+
+describe('PlaybookChecklistService — proving ground PG-01', () => {
+  const PG_CAMPAIGN = { scope: 'city', campaign_category: 'proving_ground', stage: 'seek' };
+  const PG_PLAYBOOK = { id: 'pbk-pg01', code: 'PG-01', name: 'Proving Ground Preflight', category: 'proving_ground' };
+
+  it('resolves PG-01 directly for a proving_ground campaign — no triage row needed', async () => {
+    mockTriage.findUnique.mockResolvedValue(null);
+    mockCampaigns.findUnique.mockResolvedValue(PG_CAMPAIGN);
+    mockPlaybook.findFirst.mockResolvedValue(PG_PLAYBOOK);
+    mockSteps.findMany.mockResolvedValue([
+      stepRow({ id: 'pstep-pg01-s1', playbook_id: 'pbk-pg01', title: 'Reconcile Seed Funnel', step_type: 'manual', stage_tag: 'seek' }),
+    ]);
+    mockProgress.findMany.mockResolvedValue([]);
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+    expect(mockPlaybook.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { code: 'PG-01', is_active: true } }),
+    );
+    expect(result.playbook).toMatchObject({ code: 'PG-01', category: 'proving_ground', isOverride: false });
+  });
+
+  it('resolves PG-01 even when an undecided triage row exists', async () => {
+    mockTriage.findUnique.mockResolvedValue(
+      triageAcceptedRow({ is_operator_accepted: null, overridden_playbook_id: null }),
+    );
+    mockCampaigns.findUnique.mockResolvedValue(PG_CAMPAIGN);
+    mockPlaybook.findFirst.mockResolvedValue(PG_PLAYBOOK);
+    mockSteps.findMany.mockResolvedValue([]);
+    mockProgress.findMany.mockResolvedValue([]);
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+    expect(result.playbook?.code).toBe('PG-01');
+  });
+
+  it('returns null playbook when the campaign is not proving_ground and no triage exists', async () => {
+    mockTriage.findUnique.mockResolvedValue(null);
+    mockCampaigns.findUnique.mockResolvedValue({ scope: 'business', campaign_category: 'review_management', stage: 'paid' });
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+    expect(result.playbook).toBeNull();
+  });
+
+  it('returns null when PG-01 is missing or inactive in the catalog', async () => {
+    mockTriage.findUnique.mockResolvedValue(null);
+    mockCampaigns.findUnique.mockResolvedValue(PG_CAMPAIGN);
+    mockPlaybook.findFirst.mockResolvedValue(null);
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+    expect(result.playbook).toBeNull();
+  });
+
+  it('does not consult PG-01 for business-scope campaigns', async () => {
+    mockTriage.findUnique.mockResolvedValue(null);
+    mockCampaigns.findUnique.mockResolvedValue({ scope: 'business', campaign_category: 'proving_ground', stage: 'seek' });
+    mockSteps.findMany.mockResolvedValue([]);
+    mockProgress.findMany.mockResolvedValue([]);
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+    expect(mockPlaybook.findFirst).not.toHaveBeenCalled();
+    expect(result.playbook).toBeNull();
   });
 });

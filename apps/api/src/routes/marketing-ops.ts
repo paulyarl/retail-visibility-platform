@@ -186,6 +186,7 @@ import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
+import ProvingGroundCadenceService from '../services/ProvingGroundCadenceService';
 import OutreachIntelligenceService, { UpsertInput } from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
@@ -212,6 +213,17 @@ router.use(requirePlatformAdmin);
 
 const campaignBaseSchema = z.object({
   scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
+  // Migration 262 — 'proving_ground' allows direct creation of the
+  // city/category-scope operator workspace (spec §4.1). Business-scope
+  // categories are still normally assigned by triage.
+  campaign_category: z.enum([
+    'review_management', 'recovery_management', 'profile_repair',
+    'triage_management', 'proving_ground',
+  ]).optional(),
+  // Migration 262 — proving-ground children normally attach via the guarded
+  // POST /:campaignId/children endpoint; this passthrough exists for explicit
+  // creation flows only.
+  parent_campaign_id: z.string().max(255).optional(),
   title: z.string().max(255).optional(),
   business_name: z.string().max(255).optional(),
   // Category is optional for business-scope campaigns — a category-identification
@@ -1070,6 +1082,8 @@ router.post('/', async (req: any, res: Response) => {
     const parsed = campaignCreateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.createCampaign({
       scope: parsed.scope,
+      campaignCategory: parsed.campaign_category,
+      parentCampaignId: parsed.parent_campaign_id,
       title: parsed.title,
       businessName: parsed.business_name,
       category: parsed.category,
@@ -1118,6 +1132,47 @@ router.post('/', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// PROVING GROUND — CHILD ATTACHMENT (Migration 262, spec §4.2)
+// ====================
+// Guarded attach/detach: parent must be campaign_category='proving_ground',
+// child must be scope='intelligence', one parent per child (409 on second
+// attach). Direct parent_campaign_id on create is a low-level passthrough;
+// this endpoint is the governed path.
+
+const attachChildSchema = z.object({
+  child_campaign_id: z.string().min(1),
+});
+
+router.post('/:campaignId/children', async (req: any, res: Response) => {
+  try {
+    const parsed = attachChildSchema.parse(req.body);
+    const result = await MarketingCampaignService.attachChildCampaign(
+      req.params.campaignId,
+      parsed.child_campaign_id,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.delete('/:campaignId/children/:childId', async (req: any, res: Response) => {
+  try {
+    const result = await MarketingCampaignService.detachChildCampaign(
+      req.params.childId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });
@@ -4230,11 +4285,19 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       assignedTo === 'unassigned' ? 'unassigned' :
       assignedTo;
 
+    // Migration 262 — proving-ground tree scope: comma-separated
+    // source_campaign_ids filters rows to the parent's intelligence children.
+    const sourceCampaignIdsRaw = req.query.source_campaign_ids as string | undefined;
+    const sourceCampaignIds = sourceCampaignIdsRaw
+      ? sourceCampaignIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
     const result = await MarketingProspectQueueService.list({
       status,
       category: req.query.category as string | undefined,
       city: req.query.city as string | undefined,
       source_kind: req.query.source_kind as any,
+      source_campaign_ids: sourceCampaignIds,
       assigned_to: resolvedAssignedTo,
       include_unassigned: isMeFilter,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
@@ -4263,6 +4326,39 @@ router.patch('/prospect-queue/:id', async (req: any, res: Response) => {
       assigned_to: parsed.assigned_to,
     }, getCtx(req));
     res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /prospect-queue/:id/log-touch — log an outreach outcome for a seeded
+// proving-ground prospect (Migration 262, spec §4.7–§4.8). The canonical
+// record is the seed touch; the cadence engine advances the ladder, stamps
+// next_touch_at, enforces the 3-touches/30d cap (→ hold +60d), writes through
+// to the seed outreach_state machine, and mirrors to mkt_outreach_log once
+// the prospect has graduated (processed_campaign_id set).
+const logTouchSchema = z.object({
+  channel: z.enum(['call', 'email', 'sms', 'mail', 'form', 'referral', 'other']),
+  outcome: z.enum([
+    'connected', 'no_response', 'no_answer', 'no_reply', 'voicemail',
+    'bad_number', 'bounce', 'unread', 'read_no_reply', 'form_submitted',
+    'referral_asked', 'claimed', 'not_interested',
+  ]).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+router.post('/prospect-queue/:id/log-touch', async (req: any, res: Response) => {
+  try {
+    const parsed = logTouchSchema.parse(req.body);
+    const result = await ProvingGroundCadenceService.logTouch(req.params.id, {
+      channel: parsed.channel,
+      outcome: parsed.outcome,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });

@@ -575,6 +575,59 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data;
   }
 
+  /** POST /api/admin/directory-presence/presence-seeds/proving-ground-seed
+   *  (Migration 262, spec §4.4) — seed + publish + link + claim-token +
+   *  queue.seed_id stamp; rows stay 'queued'. */
+  async provingGroundSeed(
+    queueEntryIds: string[],
+    seedBatch: string,
+  ): Promise<{
+    created: Array<{ queueEntryId: string; seedId: string; claimToken: string | null }>;
+    skipped: Array<{ queueEntryId: string; reason: string }>;
+    failed: Array<{ queueEntryId: string; error: string }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/proving-ground-seed`,
+      { method: 'POST', body: JSON.stringify({ queueEntryIds, seedBatch }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/dedup-verdicts
+   *  (Migration 262, spec §4.9) — record a group verdict; same_entity merges
+   *  identity into mergeInto. */
+  async recordDedupVerdict(input: {
+    seedIds: string[];
+    matchKey: 'phone' | 'address_city';
+    verdict: 'same_entity' | 'distinct';
+    mergeInto?: string;
+    rationale?: string;
+  }): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/dedup-verdicts`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.verdict ?? data;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/dedup-verdicts */
+  async listDedupVerdicts(): Promise<any[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/dedup-verdicts`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.verdicts ?? [];
+  }
+
   /** GET /api/admin/directory-presence/seek-batches */
   async listSeekBatches(status?: string): Promise<any[]> {
     const result = await this.makeDefaultRequest<any>(

@@ -76,6 +76,12 @@ function resolveInternalLinkUrl(
       const kind = params?.intakeKind ?? 'dispute';
       return `/recovery/intake?campaign=${campaignId}&kind=${kind}`;
     }
+    // Migration 262 — proving-ground cockpit surfaces (spec §4.3).
+    // Both resolve to the proving-ground page; fragments select the section.
+    case 'proving_ground_worklist':
+      return `${BASE}/proving-grounds/${campaignId}#worklist`;
+    case 'seed_claim_kit':
+      return `${BASE}/proving-grounds/${campaignId}#queue`;
     default:
       return `${BASE}/campaigns/${campaignId}`;
   }

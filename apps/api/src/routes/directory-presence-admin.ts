@@ -29,6 +29,7 @@ import DirectorySuggestionService from '../services/DirectorySuggestionService';
 import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
 import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
+import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import {
   generateClaimInvitePng,
   generateClaimInvitePostcard,
@@ -152,6 +153,58 @@ router.get('/presence-seeds/funnel/cohorts', requirePlatformStaff, async (req: R
   } catch (error) {
     logger.error('[GET /api/admin/directory/presence-seeds/funnel/cohorts] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ====================
+// PROVING GROUND — DEDUP VERDICTS (Migration 262, spec §4.9)
+// ====================
+
+/** POST /api/admin/directory/presence-seeds/dedup-verdicts — record a
+ *  same_entity / distinct verdict on a surfaced duplicate group. */
+const dedupVerdictSchema = z.object({
+  seedIds: z.array(z.string().min(1)).min(2),
+  matchKey: z.enum(['phone', 'address_city']),
+  verdict: z.enum(['same_entity', 'distinct']),
+  mergeInto: z.string().min(1).optional(),
+  rationale: z.string().max(2000).optional(),
+});
+
+router.post('/presence-seeds/dedup-verdicts', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = dedupVerdictSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+    const row = await ProvingGroundDedupService.recordVerdict({
+      seedIds: validation.data.seedIds,
+      matchKey: validation.data.matchKey,
+      verdict: validation.data.verdict,
+      mergeInto: validation.data.mergeInto,
+      rationale: validation.data.rationale,
+    }, {
+      userId: (req as any).user?.userId || (req as any).user?.id,
+      actorType: 'user',
+    } as any);
+    res.status(201).json({ success: true, verdict: row });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/dedup-verdicts] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/dedup-verdicts — audit view. */
+router.get('/presence-seeds/dedup-verdicts', requirePlatformStaff, async (_req: Request, res: Response) => {
+  try {
+    const rows = await ProvingGroundDedupService.listVerdicts();
+    res.json({ success: true, verdicts: rows });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/dedup-verdicts] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
   }
@@ -616,6 +669,37 @@ router.post('/presence-seeds/batch-create', requirePlatformAdmin, async (req: Re
     res.json({ success: true, ...result });
   } catch (error: any) {
     logger.error('[POST /api/admin/directory/presence-seeds/batch-create] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/proving-ground-seed — seed queue
+ *  entries for a proving-ground run (Migration 262, spec §4.4).
+ *  Unlike batch-create: links each seed to its source intelligence campaign,
+ *  mints a claim token, stamps queue.seed_id, and leaves the row 'queued'. */
+router.post('/presence-seeds/proving-ground-seed', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = batchCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.createSeedsForProvingGround(
+      validation.data.queueEntryIds,
+      validation.data.seedBatch,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/proving-ground-seed] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

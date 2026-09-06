@@ -1262,6 +1262,156 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Create seeds for proving-ground queue entries (Migration 262, spec §4.4).
+   *
+   * Sibling of createSeedsFromBatch with different lifecycle semantics: for
+   * the proving ground, seeding is the *start* of outreach, not graduation.
+   * Per entry it: creates + publishes the seed, links it to the entry's
+   * source (intelligence) campaign via directory_seed_campaign_links so the
+   * tree-filtered funnel sees it, mints a claim token (QR kits resolve
+   * through directory_claim_tokens), and stamps mkt_prospect_queue.seed_id —
+   * leaving status = 'queued' so the prospect stays on the worklist.
+   *
+   * Idempotent: entries with seed_id already set are skipped
+   * ('already_seeded'), and the same-business duplicate check from
+   * createSeedsFromBatch applies.
+   */
+  async createSeedsForProvingGround(
+    queueEntryIds: string[],
+    seedBatch: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{
+    created: Array<{ queueEntryId: string; seedId: string; claimToken: string | null }>;
+    skipped: Array<{ queueEntryId: string; reason: string }>;
+    failed: Array<{ queueEntryId: string; error: string }>;
+  }> {
+    const created: Array<{ queueEntryId: string; seedId: string; claimToken: string | null }> = [];
+    const skipped: Array<{ queueEntryId: string; reason: string }> = [];
+    const failed: Array<{ queueEntryId: string; error: string }> = [];
+
+    const entries = await prisma.$queryRaw<any[]>`
+      SELECT * FROM mkt_prospect_queue WHERE id = ANY(${queueEntryIds}::text[])
+    `;
+
+    for (const entry of entries) {
+      try {
+        if (entry.seed_id) {
+          skipped.push({ queueEntryId: entry.id, reason: 'already_seeded' });
+          continue;
+        }
+
+        // Same-business duplicate guard (mirrors createSeedsFromBatch).
+        const existing = await prisma.$queryRaw<any[]>`
+          SELECT id FROM directory_presence_seeds
+          WHERE city = ${entry.city} AND category = ${entry.category}
+          AND EXISTS (
+            SELECT 1 FROM directory_listings_list dl
+            WHERE dl.id = directory_presence_seeds.listing_id
+            AND LOWER(dl.business_name) = LOWER(${entry.business_name || entry.title})
+          )
+          LIMIT 1
+        `;
+        if (existing[0]) {
+          skipped.push({ queueEntryId: entry.id, reason: 'duplicate_seed' });
+          continue;
+        }
+
+        const snapshot = entry.business_snapshot || {};
+        const seedInput: CreateSeedInput = {
+          businessName: entry.business_name || entry.title || 'Unknown Business',
+          address: snapshot.address || 'Address not available',
+          city: entry.city || 'Unknown City',
+          state: entry.state || snapshot.state || 'IN',
+          zipCode: snapshot.zip_code || null,
+          phone: snapshot.phone || null,
+          website: snapshot.website || null,
+          primaryCategory: entry.category || 'Unknown Category',
+          secondaryCategories: snapshot.secondary_categories || null,
+          latitude: snapshot.latitude || null,
+          longitude: snapshot.longitude || null,
+          snapEbtReported: snapshot.snap_ebt_reported || false,
+          snapEbtAsOf: snapshot.snap_ebt_as_of || null,
+          snapEbtSource: snapshot.snap_ebt_source || null,
+          snapEbtSourceName: snapshot.snap_ebt_source_name || null,
+          seedBatch,
+          identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
+          categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
+          notes: entry.note || null,
+          provenance: entry.discovery_provenance || [],
+        };
+
+        const result = await this.createSeed(seedInput, ctx);
+        await this.publishSeed(result.id, ctx);
+
+        // Link to the entry's source (intelligence) campaign so the funnel's
+        // directory_seed_campaign_links join sees the seed for tree-filtered
+        // cohorts (spec §4.4/§6).
+        if (entry.source_campaign_id) {
+          await DirectorySeedCampaignLinkService.linkCampaign(
+            result.id, entry.source_campaign_id, 'primary', ctx,
+          );
+        }
+
+        // Mint the claim token — QR kits resolve through
+        // directory_claim_tokens (spec §3 row: ClaimInviteQrKitService).
+        let claimToken: string | null = null;
+        try {
+          const invite = await this.inviteSeed(result.id, 90, ctx);
+          claimToken = invite.token;
+        } catch (err) {
+          logger.warn('createSeedsForProvingGround: claim token mint failed', undefined, {
+            queueEntryId: entry.id, seedId: result.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        if (entry.seek_batch_id) {
+          await prisma.$executeRaw`
+            UPDATE directory_presence_seeds
+            SET seek_batch_id = ${entry.seek_batch_id}, updated_at = now()
+            WHERE id = ${result.id}
+          `;
+        }
+
+        // Stamp the keystone linkage; leave status='queued' — the prospect
+        // remains on the outreach worklist until claim or campaign creation.
+        await prisma.$executeRaw`
+          UPDATE mkt_prospect_queue
+          SET seed_id = ${result.id}, updated_at = now()
+          WHERE id = ${entry.id}
+        `;
+
+        created.push({ queueEntryId: entry.id, seedId: result.id, claimToken });
+      } catch (err) {
+        failed.push({ queueEntryId: entry.id, error: (err as Error).message });
+        logger.error('createSeedsForProvingGround — entry failed', undefined, {
+          queueEntryId: entry.id, error: (err as Error).message,
+        });
+      }
+    }
+
+    const foundIds = new Set(entries.map((e) => e.id));
+    for (const id of queueEntryIds) {
+      if (!foundIds.has(id)) {
+        failed.push({ queueEntryId: id, error: 'queue_entry_not_found' });
+      }
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.proving_ground_seed',
+      payload: { seedBatch, created: created.length, skipped: skipped.length, failed: failed.length },
+    });
+
+    logger.info('DirectoryPresenceSeedService.createSeedsForProvingGround', undefined, {
+      seedBatch, created: created.length, skipped: skipped.length, failed: failed.length,
+    });
+
+    return { created, skipped, failed };
+  }
+
+  /**
    * Publish multiple seeds in batch.
    */
   async publishBatch(
@@ -1836,8 +1986,16 @@ class DirectoryPresenceSeedService {
   async addOutreachTouch(
     seedId: string,
     input: {
-      channel: 'call' | 'email' | 'sms' | 'mail' | 'other';
-      outcome?: 'connected' | 'no_response' | 'voicemail' | 'bad_number' | 'claimed' | 'not_interested';
+      // Migration 262 — 'form' + 'referral' added for the proving-ground
+      // channel ladder (spec §4.8).
+      channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
+      // Migration 262 — extended with the full cadence signal set
+      // ('no_answer','no_reply','bounce','unread','read_no_reply',
+      // 'form_submitted','referral_asked'); 'no_response' remains as the
+      // legacy alias of 'no_answer'.
+      outcome?: 'connected' | 'no_response' | 'no_answer' | 'no_reply' | 'voicemail'
+        | 'bad_number' | 'bounce' | 'unread' | 'read_no_reply' | 'form_submitted'
+        | 'referral_asked' | 'claimed' | 'not_interested';
       notes?: string;
       occurredAt?: Date;
     },

@@ -1867,6 +1867,9 @@ model directory_presence_seeds {
   directory_presence_suggestions   directory_presence_suggestions[]
   directory_seed_campaign_links    directory_seed_campaign_links[]
   directory_seed_nap_verifications directory_seed_nap_verifications[]
+  directory_seed_outreach_touches  directory_seed_outreach_touches[]
+  mkt_prospect_dedup_verdicts      mkt_prospect_dedup_verdicts[]
+  mkt_prospect_queue               mkt_prospect_queue[]
 
   @@index([category], map: "idx_dps_category")
   @@index([city, state], map: "idx_dps_city_state")
@@ -4211,51 +4214,76 @@ model mkt_prompt_templates_list {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_prospect_queue {
-  id                                                                              String              @id @db.VarChar(255)
-  business_name                                                                   String?             @db.VarChar(255)
-  category                                                                        String?             @db.VarChar(255)
-  city                                                                            String?             @db.VarChar(255)
-  state                                                                           String?             @db.VarChar(255)
-  source_kind                                                                     String              @db.VarChar(30)
-  source_scope                                                                    String?             @db.VarChar(20)
-  source_campaign_id                                                              String?             @db.VarChar(255)
-  source_audit_id                                                                 String?             @db.VarChar(255)
-  source_execution_id                                                             String?             @db.VarChar(255)
-  audit_date                                                                      DateTime?           @db.Timestamptz(6)
-  business_snapshot                                                               Json                @default("{}")
-  detected_signals                                                                Json                @default("[]")
-  signal_count                                                                    Int                 @default(0)
-  rating                                                                          Decimal?            @db.Decimal(2, 1)
+  id                                                                              String                    @id @db.VarChar(255)
+  business_name                                                                   String?                   @db.VarChar(255)
+  category                                                                        String?                   @db.VarChar(255)
+  city                                                                            String?                   @db.VarChar(255)
+  state                                                                           String?                   @db.VarChar(255)
+  source_kind                                                                     String                    @db.VarChar(30)
+  source_scope                                                                    String?                   @db.VarChar(20)
+  source_campaign_id                                                              String?                   @db.VarChar(255)
+  source_audit_id                                                                 String?                   @db.VarChar(255)
+  source_execution_id                                                             String?                   @db.VarChar(255)
+  audit_date                                                                      DateTime?                 @db.Timestamptz(6)
+  business_snapshot                                                               Json                      @default("{}")
+  detected_signals                                                                Json                      @default("[]")
+  signal_count                                                                    Int                       @default(0)
+  rating                                                                          Decimal?                  @db.Decimal(2, 1)
   review_count                                                                    Int?
-  status                                                                          String              @default("queued") @db.VarChar(20)
-  priority                                                                        String              @default("normal") @db.VarChar(10)
+  status                                                                          String                    @default("queued") @db.VarChar(20)
+  priority                                                                        String                    @default("normal") @db.VarChar(10)
   note                                                                            String?
-  queued_by                                                                       String?             @db.VarChar(255)
-  assigned_to                                                                     String?             @db.VarChar(255)
-  assigned_at                                                                     DateTime?           @db.Timestamptz(6)
-  processed_campaign_id                                                           String?             @db.VarChar(255)
-  processed_at                                                                    DateTime?           @db.Timestamptz(6)
-  dismissed_reason                                                                String?             @db.VarChar(255)
-  created_at                                                                      DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at                                                                      DateTime            @default(now()) @db.Timestamptz(6)
-  title                                                                           String?             @db.VarChar(255)
-  category_fit                                                                    String?             @db.VarChar(20)
-  identity_confidence                                                             String?             @db.VarChar(20)
-  location_status                                                                 String?             @db.VarChar(20)
-  discovery_provenance                                                            Json?               @default("[]")
-  discovery_signals                                                               Json?               @default("[]")
-  business_seek_priority                                                          String?             @db.VarChar(20)
-  intelligence_run_id                                                             String?             @db.VarChar(64)
-  seek_batch_id                                                                   String?             @db.VarChar(60)
+  queued_by                                                                       String?                   @db.VarChar(255)
+  assigned_to                                                                     String?                   @db.VarChar(255)
+  assigned_at                                                                     DateTime?                 @db.Timestamptz(6)
+  processed_campaign_id                                                           String?                   @db.VarChar(255)
+  processed_at                                                                    DateTime?                 @db.Timestamptz(6)
+  dismissed_reason                                                                String?                   @db.VarChar(255)
+  created_at                                                                      DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                                                                      DateTime                  @default(now()) @db.Timestamptz(6)
+  title                                                                           String?                   @db.VarChar(255)
+  category_fit                                                                    String?                   @db.VarChar(20)
+  identity_confidence                                                             String?                   @db.VarChar(20)
+  location_status                                                                 String?                   @db.VarChar(20)
+  discovery_provenance                                                            Json?                     @default("[]")
+  discovery_signals                                                               Json?                     @default("[]")
+  business_seek_priority                                                          String?                   @db.VarChar(20)
+  intelligence_run_id                                                             String?                   @db.VarChar(64)
+  seek_batch_id                                                                   String?                   @db.VarChar(60)
   verification                                                                    Json?
-  mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_campaigns_list? @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list", fields: [processed_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_processed_campaign")
-  mkt_campaigns_list_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_campaigns_list? @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list", fields: [source_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_source_campaign")
-  mkt_seek_batches                                                                mkt_seek_batches?   @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
+  channel_sequence                                                                Json?
+  current_channel_index                                                           Int                       @default(0) @db.SmallInt
+  next_touch_at                                                                   DateTime?                 @db.Timestamptz(6)
+  seed_id                                                                         String?                   @db.VarChar(60)
+  account_family                                                                  String?                   @db.VarChar(255)
+  directory_presence_seeds                                                        directory_presence_seeds? @relation(fields: [seed_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mpq_seed")
+  mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_campaigns_list?       @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list", fields: [processed_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_processed_campaign")
+  mkt_campaigns_list_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_campaigns_list?       @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list", fields: [source_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_source_campaign")
+  mkt_seek_batches                                                                mkt_seek_batches?         @relation(fields: [seek_batch_id], references: [id], onUpdate: NoAction)
 
   @@index([assigned_to], map: "idx_mkt_prospect_queue_assigned")
   @@index([processed_campaign_id], map: "idx_mkt_prospect_queue_processed_campaign")
   @@index([status, priority(sort: Desc), signal_count(sort: Desc), created_at], map: "idx_mkt_prospect_queue_status_sort")
   @@index([seek_batch_id], map: "idx_mpq_seek_batch")
+  @@index([status, next_touch_at], map: "idx_mpq_next_touch")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_prospect_dedup_verdicts {
+  id                       String                    @id @db.VarChar(255)
+  seed_ids                 String[]                  @db.VarChar(60)
+  match_key                String                    @db.VarChar(20)
+  verdict                  String                    @db.VarChar(20)
+  merge_into               String?                   @db.VarChar(60)
+  rationale                String?
+  resolved_by              String?                   @db.VarChar(255)
+  resolved_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  created_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds? @relation(fields: [merge_into], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mpdv_merge_into")
+
+  @@unique([seed_ids, match_key], map: "uq_mpdv_group")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -7723,6 +7751,24 @@ model directory_seed_nap_verifications {
   directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([seed_id], map: "idx_dsnv_seed")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_seed_outreach_touches {
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seed_id                  String
+  tenant_id                String
+  channel                  String
+  outcome                  String?
+  notes                    String?
+  operator_id              String?
+  occurred_at              DateTime                 @default(now()) @db.Timestamptz(6)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([seed_id, occurred_at(sort: Desc)], map: "idx_dsot_seed_occurred")
+  @@index([tenant_id], map: "idx_dsot_tenant")
 }
 
 enum action {

@@ -66,7 +66,11 @@ export type CampaignStage =
 // column (VARCHAR(50), no DB enum). The literals are centralized in
 // recoveryStages.ts; the transition map is below. A campaign's
 // campaign_category determines which transition table governs it.
-export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management';
+// 'proving_ground' (Migration 262 / spec §4.1): city/category-scope operator
+// workspace for city-launch campaigns. Not a triage outcome — set directly at
+// creation; filtered out of triage candidate playbooks in
+// CampaignTriageService.loadSignalsAndPlaybooks.
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management' | 'proving_ground';
 
 export type RepairTrack = 'standard' | 'escalated';
 
@@ -136,6 +140,9 @@ const RECOVERY_TRANSITIONS: Record<string, string[]> = {
  * - triage_management → review machine (campaign stays in 'seek' until the
  *   operator accepts a triage recommendation, at which point the category is
  *   re-written to the playbook's category; see roadmap Risk 4)
+ * - proving_ground → review machine (the parent workspace stays at 'seek'
+ *   and never transitions; the machine exists so stage fields are well-formed,
+ *   not because the parent participates in the funnel — spec §2.1)
  * Defaults to review_management so every existing caller that does not
  * pass a category gets unchanged behavior.
  */
@@ -145,6 +152,7 @@ export function transitionsFor(
 ): Record<string, string[]> {
   if (category === 'recovery_management') return RECOVERY_TRANSITIONS;
   if (category === 'profile_repair' && repairTrack === 'escalated') return RECOVERY_TRANSITIONS;
+  // proving_ground and all other categories use the review machine.
   return REVIEW_TRANSITIONS;
 }
 
@@ -765,6 +773,88 @@ export class MarketingCampaignService extends BaseService {
   }
 
   // ====================
+  // PROVING GROUND — CHILD ATTACHMENT (spec §4.2)
+  // ====================
+
+  /**
+   * Attach an intelligence discovery campaign as a child of a proving-ground
+   * parent. Guards (spec §4.2):
+   * - parent must exist and have campaign_category = 'proving_ground'
+   * - child must exist and have scope = 'intelligence'
+   * - child must not already be parented — one proving ground owns the tree
+   */
+  async attachChildCampaign(
+    parentId: string,
+    childId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ attached: true; parentId: string; childId: string }> {
+    try {
+      const parent = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: parentId },
+      });
+      if (!parent) {
+        throw new NotFoundError(`Parent campaign ${parentId} not found`);
+      }
+      if ((parent.campaign_category as string | null) !== 'proving_ground') {
+        throw new ConflictError('parent_not_proving_ground');
+      }
+
+      const child = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: childId },
+      });
+      if (!child) {
+        throw new NotFoundError(`Child campaign ${childId} not found`);
+      }
+      if ((child.scope as string | null) !== 'intelligence') {
+        throw new ValidationError('child_not_intelligence_scope');
+      }
+      if (child.parent_campaign_id) {
+        throw new ConflictError('child_already_parented');
+      }
+
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: childId },
+        data: { parent_campaign_id: parentId },
+      });
+
+      logger.info('attachChildCampaign: attached', ctx, { parentId, childId });
+      return { attached: true, parentId, childId };
+    } catch (error) {
+      logger.error('Failed to attach child campaign', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Detach a child campaign from its proving-ground parent.
+   */
+  async detachChildCampaign(
+    childId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ detached: true; childId: string }> {
+    try {
+      const child = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: childId },
+      });
+      if (!child) {
+        throw new NotFoundError(`Child campaign ${childId} not found`);
+      }
+      if (!child.parent_campaign_id) {
+        throw new ConflictError('child_not_parented');
+      }
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: childId },
+        data: { parent_campaign_id: null },
+      });
+      logger.info('detachChildCampaign: detached', ctx, { childId, parentId: child.parent_campaign_id });
+      return { detached: true, childId };
+    } catch (error) {
+      logger.error('Failed to detach child campaign', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
   // READ
   // ====================
 
@@ -778,7 +868,10 @@ export class MarketingCampaignService extends BaseService {
           mkt_stage_history_list: { orderBy: { changed_at: 'desc' }, take: 20 },
           parent: { select: { id: true, business_name: true, category: true, city: true, scope: true, stage: true } },
           mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list: {
-            select: { id: true, business_name: true, scope: true, stage: true, created_at: true },
+            // Migration 262 — title/category/city added: proving-ground
+            // children are intelligence campaigns whose identity is
+            // title + category + city (business_name is null).
+            select: { id: true, business_name: true, title: true, category: true, city: true, scope: true, stage: true, created_at: true },
             orderBy: { created_at: 'desc' },
           },
           mkt_outreach_log: { orderBy: { contact_date: 'desc' }, take: 20 },
