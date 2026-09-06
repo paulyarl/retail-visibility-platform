@@ -103,6 +103,121 @@ export interface InviteResult {
   expiresAt: string;
 }
 
+// ============================
+// Seed Funnel Analytics (W3 UI — spec §6, §10)
+// ============================
+
+export interface CohortFunnelMetrics {
+  seeds: number;
+  contactable: number;
+  invited: number;
+  claimed: number;
+  claimed30d: number;
+  napVerified: number;
+  ownerCorrected: number;
+  converted: number;
+  retention90d: number;
+  paid: number;
+  touches: number;
+  cacEstimate: number | null;
+  inviteScans: number;
+  inviteScanRate: number | null;
+}
+
+export interface ConversionScoreBreakdown {
+  s1: number;
+  s2: number;
+  s3: number;
+  s4: number;
+  w1: number;
+  w2: number;
+  w3: number;
+  w4: number;
+  converted: number;
+  threshold: number;
+}
+
+export interface GateResult {
+  gate: string;
+  description: string;
+  value: number | null;
+  threshold: number;
+  pass: boolean | null;
+}
+
+export type CohortGrade = 'directional' | 'decision_grade';
+
+export interface ScalingReadiness {
+  citiesPassing: string[];
+  categoriesPassing: string[];
+  ruleMet: boolean;
+  note: string;
+}
+
+export interface PotentialDuplicateSeed {
+  seedIds: string[];
+  matchKey: 'phone' | 'address_city';
+  names: string[];
+}
+
+export interface CohortFunnelReport {
+  cohortKey: string;
+  campaignId?: string | null;
+  displayId?: string | null;
+  category?: string | null;
+  city?: string | null;
+  state?: string | null;
+  focus?: string | null;
+  metrics: CohortFunnelMetrics;
+  gates: GateResult[];
+  grade: CohortGrade;
+  deferredGates: Array<{ gate: string; reason: string }>;
+  conversionScoreBreakdown?: ConversionScoreBreakdown;
+  medianDaysToClaim?: number | null;
+  scalingReadiness?: ScalingReadiness;
+}
+
+export interface CategoryRollup {
+  category: string;
+  metrics: CohortFunnelMetrics;
+  gates: GateResult[];
+  grade: CohortGrade;
+  conversionScoreBreakdown: ConversionScoreBreakdown;
+}
+
+export interface CohortFunnelResponse {
+  generatedAt: string;
+  filters: Record<string, unknown>;
+  cohorts: CohortFunnelReport[];
+  combined: CohortFunnelReport;
+  categoryRollups: CategoryRollup[];
+  medianDaysToClaim: number | null;
+  scalingReadiness: ScalingReadiness;
+  potentialDuplicateSeeds: PotentialDuplicateSeed[];
+  duplicateSeedCount: number;
+}
+
+export interface OutreachTouch {
+  id: string;
+  seedId: string;
+  channel: string;
+  outcome: string | null;
+  notes: string | null;
+  operatorId: string | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export interface ClaimInviteQrKitMeta {
+  seedId: string;
+  token: string;
+  qrUrl: string;
+  claimUrl: string;
+  businessName: string;
+  addressLines: string[];
+  expiresAt: string | null;
+}
+
 export class DirectoryPresenceAdminService extends AdminApiSingleton {
   private static instance: DirectoryPresenceAdminService;
 
@@ -191,6 +306,118 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     );
     const data = result.data?.data ?? result.data;
     return { token: (data as any)?.token, expiresAt: (data as any)?.expiresAt };
+  }
+
+  // ============================
+  // Funnel analytics (W3 UI)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/funnel/cohorts */
+  async getCohortFunnel(filters?: {
+    campaignIds?: string[];
+    category?: string;
+    city?: string;
+    state?: string;
+    focus?: string;
+  }): Promise<CohortFunnelResponse | null> {
+    const params = new URLSearchParams();
+    if (filters?.campaignIds?.length) params.set('campaignIds', filters.campaignIds.join(','));
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.state) params.set('state', filters.state);
+    if (filters?.focus) params.set('focus', filters.focus);
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/funnel/cohorts${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    // The endpoint spreads the report at the top level: { success, cohorts, combined, ... }
+    return (data as any) ?? null;
+  }
+
+  // ============================
+  // Outreach touches (W1)
+  // ============================
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/touches */
+  async addOutreachTouch(
+    seedId: string,
+    input: {
+      channel: 'call' | 'email' | 'sms' | 'mail' | 'other';
+      outcome?: 'connected' | 'no_response' | 'voicemail' | 'bad_number' | 'claimed' | 'not_interested';
+      notes?: string;
+      occurredAt?: string;
+    },
+  ): Promise<{ touchId: string } | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/touches`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return { touchId: (data as any)?.touchId };
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/touches */
+  async listOutreachTouches(seedId: string): Promise<OutreachTouch[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/touches`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.touches ?? [];
+  }
+
+  // ============================
+  // Claim-invite QR kit (W10)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit */
+  async getClaimInviteQrKit(seedId: string): Promise<ClaimInviteQrKitMeta | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/png — returns a Blob */
+  async downloadClaimInvitePng(seedId: string): Promise<Blob | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/png`,
+      { method: 'GET' },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/postcard — returns a Blob */
+  async downloadClaimInvitePostcard(seedId: string): Promise<Blob | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/postcard`,
+      { method: 'GET' },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
   }
 
   async updateFields(

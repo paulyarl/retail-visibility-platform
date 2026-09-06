@@ -57,6 +57,7 @@ const perCampaignRow = {
   w3_count: 1n,
   w4_count: 2n,
   touches: 12n,
+  invite_scans: 5n,
 };
 
 const combinedRow = {
@@ -84,6 +85,7 @@ const combinedRow = {
   w3_count: 2n,
   w4_count: 3n,
   touches: 20n,
+  invite_scans: 8n,
 };
 
 const categoryRow = {
@@ -111,6 +113,7 @@ const categoryRow = {
   w3_count: 2n,
   w4_count: 3n,
   touches: 20n,
+  invite_scans: 8n,
 };
 
 const medianRow = { median_days: 5.25 };
@@ -220,6 +223,30 @@ describe('getCohortFunnel — SQL path', () => {
     });
     const empty = await SeedFunnelAnalyticsService.getCohortFunnel();
     expect(empty.cohorts[0].metrics.cacEstimate).toBeNull();
+  });
+
+  it('surfaces invite scan count and rate from claim_invite QR events (W10)', async () => {
+    const report = await SeedFunnelAnalyticsService.getCohortFunnel();
+    const cohort = report.cohorts[0];
+
+    // 5 invite scans / 18 invited = 0.2778 (4dp rounding)
+    expect(cohort.metrics.inviteScans).toBe(5);
+    expect(cohort.metrics.inviteScanRate).toBeCloseTo(0.2778, 4);
+
+    // Combined: 8 scans / 30 invited
+    expect(report.combined.metrics.inviteScans).toBe(8);
+    expect(report.combined.metrics.inviteScanRate).toBeCloseTo(0.2667, 4);
+
+    // Zero invited → null rate (no divide-by-zero)
+    queueQueries({
+      perCampaign: [{ ...perCampaignRow, invited: 0n, invite_scans: 0n }],
+      combined: [{ ...combinedRow, invited: 0n, invite_scans: 0n }],
+      categories: [],
+      median: [],
+      duplicates: [],
+    });
+    const noInvited = await SeedFunnelAnalyticsService.getCohortFunnel();
+    expect(noInvited.cohorts[0].metrics.inviteScanRate).toBeNull();
   });
 
   it('builds the combined report from the second query without campaign fields', async () => {
