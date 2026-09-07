@@ -15,7 +15,8 @@ import {
   ArrowUp,
   ArrowDown,
   Globe,
-  Store
+  Store,
+  Tag
 } from 'lucide-react';
 import { platformAnalyticsService } from '@/services/analytics/PlatformAnalyticsService';
 import { clientLogger } from '@/lib/client-logger';
@@ -121,11 +122,13 @@ export default function PageTrafficAnalytics({ filters }: PageTrafficAnalyticsPr
                 <div className={`p-2 rounded-lg ${
                   pageType.pageType === 'storefront' ? 'bg-blue-100' :
                   pageType.pageType === 'directory' ? 'bg-green-100' :
+                  pageType.pageType === 'directory_category' ? 'bg-indigo-100' :
                   pageType.pageType === 'product' ? 'bg-purple-100' :
                   'bg-gray-100'
                 }`}>
                   {pageType.pageType === 'storefront' ? <Store className="w-4 h-4 text-blue-600" /> :
                    pageType.pageType === 'directory' ? <Globe className="w-4 h-4 text-green-600" /> :
+                   pageType.pageType === 'directory_category' ? <Tag className="w-4 h-4 text-indigo-600" /> :
                    pageType.pageType === 'product' ? <BarChart3 className="w-4 h-4 text-purple-600" /> :
                    <Eye className="w-4 h-4 text-gray-600" />}
                 </div>

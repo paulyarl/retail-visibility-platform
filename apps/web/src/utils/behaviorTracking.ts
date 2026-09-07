@@ -140,7 +140,8 @@ const EVENT_PRIORITY_MAP: Record<string, CachedTrackingEvent['priority']> = {
   'dashboard_view': 'high',
   'platform_access': 'high',
   'admin_access': 'high',
-  
+  'directory_category': 'high',
+
   // Normal priority - standard batch timing
   'storefront_view': 'normal',
   'directory_detail': 'normal',
@@ -488,7 +489,7 @@ export interface TrackingData {
   entityId: string;
   entityName?: string;
   context?: any;
-  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog' | 'platform_home' | 'platform_dashboard' | 'tenant_dashboard' | 'onboarding_flow' | 'admin_panel';
+  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'directory_category' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog' | 'platform_home' | 'platform_dashboard' | 'tenant_dashboard' | 'onboarding_flow' | 'admin_panel';
   durationSeconds?: number;
 }
 

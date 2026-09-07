@@ -190,7 +190,13 @@ export default function CategoryViewClient({
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       {/* Client-side category tracking */}
-      <CategoryBrowseTracker categoryId={category?.id || categorySlug} categorySlug={categorySlug} />
+      <CategoryBrowseTracker
+        categoryId={category?.id || categorySlug}
+        categorySlug={categorySlug}
+        categoryName={category?.name}
+        pageType="directory_category"
+        surface="directory"
+      />
 
       {/* Page Title Section */}
       <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">

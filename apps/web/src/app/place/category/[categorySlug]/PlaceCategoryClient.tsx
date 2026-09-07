@@ -19,6 +19,7 @@ import placesBrowsePublicService, {
 } from '@/services/PlacesBrowsePublicService';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
+import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface PlaceCategoryClientProps {
@@ -112,6 +113,15 @@ export default function PlaceCategoryClient({
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <CategoryBrowseTracker
+        categoryId={categorySlug}
+        categorySlug={categorySlug}
+        categoryName={categoryName}
+        pageType="directory_category"
+        surface="place"
+        city={city}
+        state={state}
+      />
       {jsonLd && (
         <script
           type="application/ld+json"

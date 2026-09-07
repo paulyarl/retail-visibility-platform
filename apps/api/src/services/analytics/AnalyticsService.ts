@@ -374,15 +374,20 @@ export class AnalyticsService extends BaseService {
 
       const result: PageTrafficData = {
         pageTypeBreakdown: pageTypeBreakdownWithTrends,
-        topPages: filteredTopPages.map((page: any) => ({
-          path: `/${page.page_type}/${page.entity_id}`,
-          title: page.entity_name || 'Unknown',
-          views: page._count.id,
-          uniqueVisitors: page._count.user_id || 0,
-          entityType: page.entity_type || 'unknown',
-          entityId: page.entity_id!,
-          avgDuration: page._avg.duration_seconds || 0
-        }))
+        topPages: filteredTopPages.map((page: any) => {
+          const path = page.page_type === 'directory_category' && page.entity_id
+            ? `/${page.entity_id}`
+            : `/${page.page_type}/${page.entity_id}`;
+          return {
+            path,
+            title: page.entity_name || 'Unknown',
+            views: page._count.id,
+            uniqueVisitors: page._count.user_id || 0,
+            entityType: page.entity_type || 'unknown',
+            entityId: page.entity_id!,
+            avgDuration: page._avg.duration_seconds || 0
+          };
+        })
       };
 
       await this.cache.set(cacheKey, result, 300);
