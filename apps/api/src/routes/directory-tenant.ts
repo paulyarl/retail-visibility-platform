@@ -111,6 +111,14 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       }
     }
 
+    // Tenant subscription tier — the tier lives on the tenant row, not the
+    // listing. The frontend's getDirectoryListingUrl needs it to resolve
+    // /place/{slug} (directory_presence) vs /directory/{slug} (subscribed).
+    const tenantTier = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subscription_tier: true },
+    });
+
     // Transform snake_case to camelCase for frontend
     return res.json({
       id: settings.id,
@@ -127,6 +135,7 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       featuredUntil: activeFeatured?.featured_until,
       listingOrigin,
       publicDisclaimer,
+      subscriptionTier: tenantTier?.subscription_tier ?? null,
       businessProfile: businessProfile ? {
         businessName: businessProfile.business_name,
         city: businessProfile.city,

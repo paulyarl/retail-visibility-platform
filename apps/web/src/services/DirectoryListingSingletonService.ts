@@ -23,6 +23,7 @@ export interface DirectoryListing {
   slug?: string;
   createdAt: string;
   updatedAt: string;
+  subscriptionTier?: string | null;
   businessProfile?: {
     businessName: string;
     city?: string;

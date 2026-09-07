@@ -17,6 +17,7 @@ export interface DirectoryListing {
   slug?: string;
   createdAt: string;
   updatedAt: string;
+  subscriptionTier?: string | null;
   listingOrigin?: string | null;
   publicDisclaimer?: string | null;
   businessProfile?: {
