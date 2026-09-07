@@ -106,6 +106,11 @@ The funnel measures **seeds** (`directory_presence_seeds`): contactable, invited
   - parent must be `campaign_category = 'proving_ground'` (city/category scope);
   - child must be `scope = 'intelligence'`;
   - child must satisfy **`parent_campaign_id IS NULL` or already equal this parent** — 409 `conflict` with the existing parent id otherwise. The null-guard (not "proving-ground parent") is deliberate: the column is singular, and any future lineage use (e.g. a metro rollup) must not be silently clobbered.
+- **Originate vs. attach — kind/focus gating (verified against `promoteToProvingGround`):** only **discovery prospect runs** — `intelligence_campaign_kind = 'discovery'` AND `intelligence_focus ∈ {emerging, competitive}` — may *originate* a proving ground (the promote path and the cockpit "Promote" button). Rationale:
+  - Discovery runs carry the market's `discovered_businesses` → queue rows → seeds → funnel. They are the feed the proving ground exists to work.
+  - Establishment runs produce the *profile* (category definition, gates, gold standard), not prospects — attaching one contributes zero seeds and zero queue rows.
+  - Establishment and gold-standards runs are frequently **state-scoped or nationwide** (`city`/`state` null per the guardrail signature — "Indian Grocery / Establishment / Gold_standards / All Platforms"). A promote keyed on a null city would fail the non-empty `city` requirement or, worse, key the workspace to the wrong geography.
+  - Non-discovery intelligence campaigns may still be **attached** to an existing proving ground via `attachChildCampaign` as provenance children ("which profile established this market's benchmark") — they just cannot originate the workspace.
 - The campaign detail `children` include already selects `scope`, so mixed-scope children are discriminable; the cockpit renders intelligence children by focus/kind (competitive/emerging × discovery/establishment), **not** by stage pipeline. Business grandchildren stay under their intelligence parents — the proving ground does not flatten the tree.
 
 ### 4.3 `proving_ground_preflight` playbook + checklist attachment

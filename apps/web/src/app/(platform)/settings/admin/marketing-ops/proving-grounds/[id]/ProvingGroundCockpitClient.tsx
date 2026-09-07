@@ -9,13 +9,14 @@
  * resolution panel (preflight step 1 — duplicateSeedCount must reach 0).
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Loader2, RefreshCw, X, ListChecks, GitBranch, AlertTriangle,
-  ExternalLink, CheckCircle2, Circle, Link2, Unlink, Phone,
+  ExternalLink, CheckCircle2, Circle, Link2, Unlink, Phone, Users, Search,
 } from 'lucide-react';
 import marketingOpsService, {
+  type Audit,
   type CampaignDetail,
   type CampaignLineageEntry,
   type ProspectQueueEntry,
@@ -25,6 +26,7 @@ import directoryPresenceAdminService, {
   type PotentialDuplicateSeed,
 } from '@/services/DirectoryPresenceAdminService';
 import CampaignChecklistTab from '@/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignChecklistTab';
+import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 
 interface Props {
   campaignId: string;
@@ -65,6 +67,14 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [enrichBusy, setEnrichBusy] = useState(false);
   const [enrichResult, setEnrichResult] = useState<string | null>(null);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+
+  // Discovery prospects — loaded on demand from the attached intelligence
+  // campaigns' intelligence_discovery audits.
+  const [prospectsLoading, setProspectsLoading] = useState(false);
+  const [prospectsLoaded, setProspectsLoaded] = useState(false);
+  const [prospectsError, setProspectsError] = useState<string | null>(null);
+  const [discoveryAudits, setDiscoveryAudits] = useState<Array<{ childId: string; childTitle: string; audit: Audit }>>([]);
+  const gapLogRef = useRef<HTMLDivElement | null>(null);
 
   const treeIds = useMemo(
     () => [campaignId, ...children.map((c) => c.id)],
@@ -213,6 +223,58 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setGapBusy(false);
     }
   };
+
+  // Load the businesses the attached intelligence (discovery) campaigns found.
+  // Discovery results live on the child campaign as intelligence_discovery
+  // audits (audit_data.discovered_businesses) — fetch each child's detail and
+  // collect those audits, newest first.
+  const loadDiscoveryProspects = useCallback(async () => {
+    if (children.length === 0) return;
+    setProspectsLoading(true);
+    setProspectsError(null);
+    try {
+      const details = await Promise.all(children.map((c) => marketingOpsService.getCampaign(c.id)));
+      const found: Array<{ childId: string; childTitle: string; audit: Audit }> = [];
+      children.forEach((child, i) => {
+        const detail = details[i];
+        const audits = (detail?.audits ?? [])
+          .filter((a) => a.platform === 'intelligence_discovery' && a.audit_data && typeof a.audit_data === 'object' && 'discovered_businesses' in a.audit_data)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        for (const audit of audits) {
+          found.push({
+            childId: child.id,
+            childTitle: child.title || child.business_name || child.id,
+            audit,
+          });
+        }
+      });
+      setDiscoveryAudits(found);
+      setProspectsLoaded(true);
+      if (found.length === 0) {
+        setProspectsError('No discovery results on the attached intelligence campaign(s) — run the discovery prompt first, then reload.');
+      }
+    } catch (err: any) {
+      setProspectsError(err.message || 'Failed to load discovery prospects');
+    } finally {
+      setProspectsLoading(false);
+    }
+  }, [children]);
+
+  // Log a gap against a specific prospect: prefill the campaign gap form with
+  // the prospect identity so the entry lands on the proving ground's
+  // append-only gap log (spec §4.5) with full context.
+  const handleProspectGap = useCallback((bizName: string, bizCity?: string, bizState?: string) => {
+    const where = [bizCity, bizState].filter(Boolean).join(', ');
+    setGapForm({
+      field: `prospect.${bizName}`,
+      description: where ? `${bizName} (${where}) — ` : `${bizName} — `,
+      severity: 'important',
+      resolver: 'self',
+    });
+    setGapFormOpen(true);
+    setProspectsError(null);
+    requestAnimationFrame(() => gapLogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, []);
 
   if (loading && !campaign) {
     return (
@@ -494,8 +556,61 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         </div>
       </div>
 
-      {/* Gap log — append-only mid-run incident record (spec §4.5) */}
+      {/* Discovery prospects — loaded on demand from the attached intelligence campaigns */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <Users className="w-4 h-4" /> Discovery prospects
+          </h2>
+          <button
+            onClick={loadDiscoveryProspects}
+            disabled={prospectsLoading || children.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 disabled:opacity-50"
+            title={children.length === 0 ? 'Attach an intelligence campaign first' : 'Load the businesses the attached discovery campaign(s) found'}
+          >
+            {prospectsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            {prospectsLoaded ? 'Reload prospects' : 'Load prospects'}
+          </button>
+        </div>
+        {children.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            No intelligence campaigns attached — attach a discovery campaign above, then load its prospects here.
+          </p>
+        ) : prospectsLoading ? (
+          <p className="text-xs text-gray-400 flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading businesses from the attached discovery campaign{children.length !== 1 ? 's' : ''}…
+          </p>
+        ) : prospectsError ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400">{prospectsError}</p>
+        ) : discoveryAudits.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            Click "Load prospects" to pull the businesses the attached discovery campaign{children.length !== 1 ? 's' : ''} found into this panel.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {discoveryAudits.map(({ childId, childTitle, audit }) => (
+              <div key={audit.id}>
+                {discoveryAudits.length > 1 && (
+                  <p className="text-[10px] text-gray-400 mb-1">
+                    from{' '}
+                    <Link href={`/settings/admin/marketing-ops/campaigns/${childId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                      {childTitle}
+                    </Link>
+                  </p>
+                )}
+                <IntelligenceDiscoveryAuditCard
+                  audit={audit}
+                  campaignId={childId}
+                  onLogGap={(biz) => handleProspectGap(biz.business_name, biz.city, biz.state)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Gap log — append-only mid-run incident record (spec §4.5) */}
+      <div ref={gapLogRef} className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Gap log</h2>
           <button

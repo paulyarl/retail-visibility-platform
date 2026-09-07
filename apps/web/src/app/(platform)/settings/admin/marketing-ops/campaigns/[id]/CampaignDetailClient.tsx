@@ -877,7 +877,12 @@ export default function CampaignDetailClient({
                   <FileText className="w-4 h-4" />
                   Prompt Library
                 </Link>
-                {campaign.scope === 'intelligence' && !campaign.parent_campaign_id && (
+                {/* Only discovery prospect runs (emerging / competitive focus)
+                    may originate a proving ground — establishment and
+                    gold-standards runs produce profiles, not prospects. */}
+                {campaign.scope === 'intelligence' && !campaign.parent_campaign_id
+                  && (campaign.intelligence_campaign_kind ?? 'discovery') === 'discovery'
+                  && ['emerging', 'competitive'].includes(campaign.intelligence_focus ?? 'emerging') && (
                   <button
                     onClick={openPromoteModal}
                     title="Create (or merge into) a proving ground from this discovery run"

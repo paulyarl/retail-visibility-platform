@@ -733,9 +733,15 @@ export default function IntelligenceProfilesClient() {
                               >
                                 <IconEdit size={14} />
                               </ActionIcon>
-                              {/* PG: intelligence runs promote/merge into a proving ground;
-                                  existing proving grounds jump straight to the cockpit. */}
-                              {c.scope === 'intelligence' && !c.parent_campaign_id && (
+                              {/* PG: only discovery prospect runs (emerging / competitive
+                                  focus) may originate a proving ground — they carry the
+                                  candidate businesses and a real city. Establishment and
+                                  gold-standards runs produce profiles, not prospects, and
+                                  are often state/nationwide-scoped. Existing proving
+                                  grounds jump straight to the cockpit. */}
+                              {c.scope === 'intelligence' && !c.parent_campaign_id
+                                && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
+                                && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging') && (
                                 <ActionIcon
                                   variant="light"
                                   color="violet"

@@ -902,6 +902,19 @@ export class MarketingCampaignService extends BaseService {
       if (source.parent_campaign_id) {
         throw new ConflictError('source_already_parented');
       }
+      // Only discovery prospect runs (emerging / competitive focus) may
+      // *originate* a proving ground — they carry the market's candidate
+      // businesses and a real city. Establishment runs produce the profile,
+      // not prospects, and are often state/nationwide-scoped (city null),
+      // which would fail the city requirement below or key the proving
+      // ground to the wrong geography. Establishment campaigns can still be
+      // attached to an existing proving ground via attachChildCampaign as
+      // provenance children.
+      const sourceKind = (source.intelligence_campaign_kind as string | null) || 'discovery';
+      const sourceFocus = (source.intelligence_focus as string | null) || 'emerging';
+      if (sourceKind !== 'discovery' || (sourceFocus !== 'emerging' && sourceFocus !== 'competitive')) {
+        throw new ValidationError('source_not_discovery_prospect_run');
+      }
 
       const category = (input.category ?? source.category ?? '').trim();
       const city = (input.city ?? source.city ?? '').trim();

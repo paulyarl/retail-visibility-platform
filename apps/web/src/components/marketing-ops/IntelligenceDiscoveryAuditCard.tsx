@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Plus, Loader2, Inbox, Check, ChevronDown, ChevronRight, MapPin, AlertTriangle, Phone } from 'lucide-react';
+import { Search, Plus, Loader2, Inbox, Check, ChevronDown, ChevronRight, MapPin, AlertTriangle, Phone, Flag } from 'lucide-react';
 import Link from 'next/link';
 import type { Audit } from '@/services/MarketingOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
@@ -31,7 +31,7 @@ interface DiscoveryProvenance {
   [key: string]: any;
 }
 
-interface DiscoveredBusiness {
+export interface DiscoveredBusiness {
   business_name: string;
   category: string;
   city: string;
@@ -106,9 +106,14 @@ const CONFIDENCE_STYLES: Record<string, string> = {
 export default function IntelligenceDiscoveryAuditCard({
   audit,
   campaignId,
+  onLogGap,
 }: {
   audit: Audit;
   campaignId: string;
+  /** Optional per-business gap logging (proving-ground cockpit). When provided,
+   *  a "Gap" button renders next to Queue/Verify/Campaign so the operator can
+   *  log a data gap against a specific prospect on the parent campaign. */
+  onLogGap?: (biz: DiscoveredBusiness) => void;
 }) {
   const data = parseDiscovery(audit);
   const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
@@ -433,6 +438,16 @@ export default function IntelligenceDiscoveryAuditCard({
                   </div>
                   {/* Action buttons */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {onLogGap && (
+                      <button
+                        onClick={() => onLogGap(biz)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800 dark:hover:bg-violet-900/40"
+                        title={`Log a data gap for ${biz.business_name} on the proving ground gap log`}
+                      >
+                        <Flag className="w-3 h-3" />
+                        Gap
+                      </button>
+                    )}
                     {queuedFeedback[idx] === 'queued' && queuedEntryId[idx] ? (
                       <Link
                         href={`/settings/admin/marketing-ops/queue?status=queued`}
