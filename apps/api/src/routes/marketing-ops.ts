@@ -1018,6 +1018,7 @@ router.get('/', async (req: any, res: Response) => {
     const result = await MarketingCampaignService.listCampaigns({
       stage: req.query.stage,
       scope: req.query.scope,
+      campaignCategory: req.query.campaignCategory,
       category: req.query.category,
       city: req.query.city,
       assignedTo: req.query.assignedTo,
