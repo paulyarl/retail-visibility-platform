@@ -855,6 +855,111 @@ export class MarketingCampaignService extends BaseService {
   }
 
   /**
+   * Promote an intelligence discovery campaign into a proving-ground tree
+   * (spec §4.2 / §7 — the "Create" + "Attach" steps in one action).
+   *
+   * Creates the city-scope proving_ground parent — or reuses the existing
+   * active one when a matching city+category workspace already exists (the
+   * merge case: emerging + competitive discovery runs for the same market
+   * folding into one proving ground). The source campaign plus any
+   * mergeCampaignIds are attached via attachChildCampaign, so all its
+   * guards (intelligence scope, unparented) apply per child; failures are
+   * collected in `skipped` rather than aborting the whole promotion.
+   *
+   * `category` may be overridden to an umbrella value (e.g. 'Grocery') when
+   * the merge spans ethnic sub-categories; `city`/`state` default from the
+   * source campaign.
+   */
+  async promoteToProvingGround(
+    sourceId: string,
+    input: {
+      title?: string;
+      category?: string;
+      city?: string;
+      state?: string;
+      mergeCampaignIds?: string[];
+    } = {},
+    ctx?: RequestCtx,
+  ): Promise<{
+    provingGround: any;
+    reusedExisting: boolean;
+    attached: string[];
+    skipped: Array<{ id: string; reason: string }>;
+  }> {
+    try {
+      const source = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: sourceId },
+      });
+      if (!source) {
+        throw new NotFoundError(`Source campaign ${sourceId} not found`);
+      }
+      if ((source.scope as string | null) !== 'intelligence') {
+        throw new ValidationError('source_not_intelligence_scope');
+      }
+      if (source.parent_campaign_id) {
+        throw new ConflictError('source_already_parented');
+      }
+
+      const category = (input.category ?? source.category ?? '').trim();
+      const city = (input.city ?? source.city ?? '').trim();
+      const state = (input.state ?? source.state ?? '').trim();
+      if (!category) {
+        throw new ValidationError('category is required to create a proving ground');
+      }
+      if (!city) {
+        throw new ValidationError('city is required to create a proving ground');
+      }
+
+      // Reuse an existing active proving ground for this signature rather
+      // than tripping the structural-duplicate guardrail — promoting a
+      // second discovery run for the same market is a merge, not a
+      // duplicate create.
+      let provingGround = await this.findDuplicateCampaign(
+        { scope: 'city', campaignCategory: 'proving_ground', category, city, state },
+        ctx,
+      );
+      const reusedExisting = !!provingGround;
+      if (!provingGround) {
+        provingGround = await this.createCampaign({
+          scope: 'city',
+          campaignCategory: 'proving_ground',
+          category,
+          city,
+          state: state || undefined,
+          title: input.title || `${city} ${category} Proving Ground`,
+        }, ctx);
+      }
+
+      const attachIds = [
+        sourceId,
+        ...(input.mergeCampaignIds ?? []).filter((id) => id !== sourceId),
+      ];
+      const attached: string[] = [];
+      const skipped: Array<{ id: string; reason: string }> = [];
+      for (const childId of attachIds) {
+        try {
+          await this.attachChildCampaign(provingGround.id, childId, ctx);
+          attached.push(childId);
+        } catch (err: any) {
+          skipped.push({ id: childId, reason: err?.message || String(err) });
+        }
+      }
+
+      logger.info('promoteToProvingGround: completed', ctx, {
+        sourceId,
+        provingGroundId: provingGround.id,
+        reusedExisting,
+        attachedCount: attached.length,
+        skippedCount: skipped.length,
+      });
+      return { provingGround, reusedExisting, attached, skipped };
+    } catch (error) {
+      logger.error('Failed to promote campaign to proving ground', ctx, { error: (error as Error).message, sourceId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
    * Append a mid-run gap entry to the campaign's gap_log (Migration 262,
    * spec §4.5). The gap log is a chronological incident record — entries
    * are append-only; corrections are new entries, not edits.

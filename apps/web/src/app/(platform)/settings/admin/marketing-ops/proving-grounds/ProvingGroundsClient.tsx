@@ -108,7 +108,7 @@ export default function ProvingGroundsClient() {
             className="w-56 rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
           />
           <Link
-            href="/settings/admin/marketing-ops/campaigns/new"
+            href="/settings/admin/marketing-ops/campaigns/new?scope=city&campaignCategory=proving_ground"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -128,7 +128,7 @@ export default function ProvingGroundsClient() {
           <FlaskConical className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {campaigns.length === 0
-              ? <>No proving grounds yet — create a city-scope campaign with category <span className="font-mono">proving_ground</span>.</>
+              ? <>No proving grounds yet — use <span className="font-medium">+ New Campaign</span> above (it pre-fills city scope + the <span className="font-mono">proving_ground</span> category).</>
               : 'No proving grounds match the current filter.'}
           </p>
         </div>

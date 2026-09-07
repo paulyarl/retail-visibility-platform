@@ -4769,6 +4769,37 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /**
+   * POST /:campaignId/promote-to-proving-ground — flip an intelligence
+   * discovery campaign into a proving-ground tree in one action (Migration
+   * 262, spec §7). Creates the city-scope parent or merges into the
+   * existing active proving ground for the same city+category.
+   */
+  async promoteToProvingGround(sourceId: string, input: {
+    title?: string;
+    category?: string;
+    city?: string;
+    state?: string;
+    mergeCampaignIds?: string[];
+  } = {}): Promise<{
+    provingGround: Campaign;
+    reusedExisting: boolean;
+    attached: string[];
+    skipped: { id: string; reason: string }[];
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${sourceId}/promote-to-proving-ground`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-pg-promote-${sourceId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to promote to proving ground');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    return result.data?.data ?? result.data;
+  }
+
   // ─── Customer Alerts (§8.3) ──────────────────────────────────────────────
 
   async sendClaimInvite(campaignId: string): Promise<{ claimUrl: string; emailSent: boolean; campaignCount: number }> {

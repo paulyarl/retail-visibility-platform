@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle, Phone, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle, Phone, AlertTriangle, FlaskConical } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
+import { useRouter } from 'next/navigation';
+import marketingOpsService, { Campaign, CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
@@ -187,6 +188,7 @@ export default function CampaignDetailClient({
   // exactly which action to take next.
   focusStage?: string;
 }) {
+  const router = useRouter();
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const staffUsers = useStaffUsers();
   const [loading, setLoading] = useState(true);
@@ -245,6 +247,18 @@ export default function CampaignDetailClient({
   // Filtered by output_schema.name === 'profile_repair_audit' so any present
   // or future per-issue seek template is covered without hardcoding IDs.
   const [repairExecution, setRepairExecution] = useState<PromptExecution | null>(null);
+  // Proving-ground promotion (Migration 262, spec §7) — flip an intelligence
+  // discovery campaign into a city-scope proving_ground parent in one action,
+  // optionally folding in sibling discovery runs for the same market.
+  const [pgModalOpen, setPgModalOpen] = useState(false);
+  const [pgForm, setPgForm] = useState<{ title: string; category: string; city: string; state: string }>({
+    title: '', category: '', city: '', state: '',
+  });
+  const [pgCandidates, setPgCandidates] = useState<Campaign[]>([]);
+  const [pgMergeIds, setPgMergeIds] = useState<Set<string>>(new Set());
+  const [pgLoading, setPgLoading] = useState(false);
+  const [pgSubmitting, setPgSubmitting] = useState(false);
+  const [pgError, setPgError] = useState<string | null>(null);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
     templateId: '',
     deliverableType: 'review_responses',
@@ -421,6 +435,60 @@ export default function CampaignDetailClient({
       await fetchCampaign();
     } catch (err: any) {
       setError(err.message || 'Failed to clear deprioritization');
+    }
+  };
+
+  // ─── Proving-ground promotion ─────────────────────────────────────────
+  // Opens the promote modal: pre-fills the PG signature from this campaign
+  // and loads merge candidates — unparented intelligence campaigns in the
+  // same market (same city+state, any category — the PG umbrella can span
+  // ethnic sub-categories per spec §4.1).
+  const openPromoteModal = async () => {
+    if (!campaign) return;
+    setPgForm({
+      title: `${campaign.city || ''} ${campaign.category || ''} Proving Ground`.replace(/\s+/g, ' ').trim(),
+      category: campaign.category || '',
+      city: campaign.city || '',
+      state: campaign.state || '',
+    });
+    setPgMergeIds(new Set());
+    setPgError(null);
+    setPgModalOpen(true);
+    setPgLoading(true);
+    try {
+      const { items } = await marketingOpsService.listCampaigns({ scope: 'intelligence', limit: 200 });
+      const norm = (v?: string | null) => (v ?? '').trim().toLowerCase();
+      setPgCandidates(
+        items.filter((c) =>
+          c.id !== campaign.id &&
+          !c.parent_campaign_id &&
+          norm(c.city) === norm(campaign.city) &&
+          norm(c.state) === norm(campaign.state)
+        ),
+      );
+    } catch {
+      setPgCandidates([]);
+    } finally {
+      setPgLoading(false);
+    }
+  };
+
+  const handlePromoteToProvingGround = async () => {
+    if (!campaign) return;
+    setPgSubmitting(true);
+    setPgError(null);
+    try {
+      const res = await marketingOpsService.promoteToProvingGround(campaign.id, {
+        title: pgForm.title || undefined,
+        category: pgForm.category || undefined,
+        city: pgForm.city || undefined,
+        state: pgForm.state || undefined,
+        mergeCampaignIds: [...pgMergeIds],
+      });
+      router.push(`/settings/admin/marketing-ops/proving-grounds/${res.provingGround.id}`);
+    } catch (err: any) {
+      setPgError(err.message || 'Failed to promote to proving ground');
+      setPgSubmitting(false);
     }
   };
 
@@ -788,6 +856,27 @@ export default function CampaignDetailClient({
                   <FileText className="w-4 h-4" />
                   Prompt Library
                 </Link>
+                {campaign.scope === 'intelligence' && !campaign.parent_campaign_id && (
+                  <button
+                    onClick={openPromoteModal}
+                    title="Create (or merge into) a proving ground from this discovery run"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-violet-700 bg-white border border-violet-300 rounded-lg hover:bg-violet-50 dark:bg-neutral-800 dark:text-violet-400 dark:border-violet-800 dark:hover:bg-violet-900/20"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    Proving Ground
+                  </button>
+                )}
+                {campaign.scope === 'intelligence' && campaign.parent_campaign &&
+                  (campaign.parent_campaign.scope === 'city' || campaign.parent_campaign.scope === 'category') && (
+                  <Link
+                    href={`/settings/admin/marketing-ops/proving-grounds/${campaign.parent_campaign.id}`}
+                    title="This discovery run is attached to a proving ground"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-300 rounded-lg hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    View Proving Ground
+                  </Link>
+                )}
                 {!campaign.tenant_id && (
                   <button
                     onClick={handleLinkTenant}
@@ -2100,6 +2189,146 @@ export default function CampaignDetailClient({
                 className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {generating ? 'Generating...' : 'Generate PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promote to Proving Ground — flip this discovery run into a city-scope
+          proving_ground workspace (or merge into the existing one). */}
+      {pgModalOpen && campaign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5 text-violet-500" />
+                  Promote to Proving Ground
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Creates a city-scope workspace and attaches this discovery run. If an active
+                  proving ground already exists for the same city + category, this run merges into it.
+                </p>
+              </div>
+              <button
+                onClick={() => setPgModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={pgForm.title}
+                  onChange={(e) => setPgForm({ ...pgForm, title: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                  <input
+                    type="text"
+                    value={pgForm.category}
+                    onChange={(e) => setPgForm({ ...pgForm, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Umbrella value (e.g. Grocery) when merging sub-categories.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={pgForm.city}
+                    onChange={(e) => setPgForm({ ...pgForm, city: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
+                  <input
+                    type="text"
+                    value={pgForm.state}
+                    onChange={(e) => setPgForm({ ...pgForm, state: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Merge other discovery runs in this market
+                </p>
+                {pgLoading ? (
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                    <RefreshCw className="w-3 h-3 animate-spin" /> Loading candidates…
+                  </p>
+                ) : pgCandidates.length === 0 ? (
+                  <p className="text-xs text-gray-400">
+                    No other unparented intelligence campaigns in {[campaign.city, campaign.state].filter(Boolean).join(', ') || 'this market'}.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 p-2">
+                    {pgCandidates.map((c) => (
+                      <li key={c.id}>
+                        <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={pgMergeIds.has(c.id)}
+                            onChange={(e) => {
+                              setPgMergeIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                                return next;
+                              });
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="flex-1 truncate">
+                            {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {[c.category, c.intelligence_focus, c.intelligence_campaign_kind].filter(Boolean).join(' · ')}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {pgMergeIds.size > 0 && (
+                  <p className="text-[10px] text-violet-600 dark:text-violet-400 mt-1">
+                    {pgMergeIds.size + 1} campaign{pgMergeIds.size > 0 ? 's' : ''} will attach to the proving ground.
+                  </p>
+                )}
+              </div>
+
+              {pgError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-400">
+                  {pgError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setPgModalOpen(false)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePromoteToProvingGround}
+                disabled={pgSubmitting || !pgForm.category.trim() || !pgForm.city.trim()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {pgSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                {pgSubmitting ? 'Promoting…' : pgMergeIds.size > 0 ? `Promote + merge ${pgMergeIds.size}` : 'Promote'}
               </button>
             </div>
           </div>

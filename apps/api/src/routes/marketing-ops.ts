@@ -1178,6 +1178,38 @@ router.delete('/:campaignId/children/:childId', async (req: any, res: Response) 
   }
 });
 
+// POST /:campaignId/promote-to-proving-ground — flip an intelligence
+// discovery campaign into a proving-ground tree in one action (spec §7:
+// Create + Attach). Creates the city-scope proving_ground parent, or
+// attaches to the existing active one when the city+category signature
+// already has one (the multi-discovery merge case). mergeCampaignIds are
+// additional unparented intelligence campaigns folded in under the same
+// parent.
+const promoteToProvingGroundSchema = z.object({
+  title: z.string().max(255).optional(),
+  category: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+  mergeCampaignIds: z.array(z.string().min(1)).max(50).optional(),
+});
+
+router.post('/:campaignId/promote-to-proving-ground', async (req: any, res: Response) => {
+  try {
+    const parsed = promoteToProvingGroundSchema.parse(req.body ?? {});
+    const result = await MarketingCampaignService.promoteToProvingGround(
+      req.params.campaignId,
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // POST /:id/gap-log — append a mid-run gap entry (Migration 262, spec §4.5).
 // Append-only chronological record; the server stamps timestamp + logged_by.
 const gapLogEntrySchema = z.object({

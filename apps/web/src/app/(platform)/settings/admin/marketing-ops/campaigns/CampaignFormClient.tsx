@@ -177,9 +177,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     const city = searchParams.get('city');
     const state = searchParams.get('state');
     const platform = searchParams.get('platform');
+    const campaignCategory = searchParams.get('campaignCategory') as CampaignCategory | null;
     setForm((prev) => ({
       ...prev,
       scope,
+      campaign_category: campaignCategory ?? prev.campaign_category,
       intelligence_focus: focus ?? prev.intelligence_focus,
       intelligence_campaign_kind: kind ?? prev.intelligence_campaign_kind,
       category: category ?? prev.category,
@@ -570,7 +572,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           business_origin_region: strOrUndef(form.business_origin_region),
         };
         const created = await marketingOpsService.createCampaign(input);
-        router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
+        router.push(form.campaign_category === 'proving_ground'
+          ? `/settings/admin/marketing-ops/proving-grounds/${created.id}`
+          : `/settings/admin/marketing-ops/campaigns/${created.id}`);
       } else if (mode === 'edit' && campaignId) {
         // Edit-mode helpers: send real values (empty string / 0 / false / null
         // / []) instead of undefined so the backend's `if (input.X !== undefined)`
@@ -688,7 +692,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Campaign Category" required>
               <select value={form.campaign_category} onChange={(e) => handleChange('campaign_category', e.target.value as CampaignCategory)}
                 className={inputClass}>
-                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : 'Triage Management'}</option>)}
+                {(form.scope === 'city' || form.scope === 'category' || form.campaign_category === 'proving_ground'
+                  ? [...CATEGORIES, 'proving_ground' as CampaignCategory]
+                  : CATEGORIES
+                ).map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : cat === 'proving_ground' ? 'Proving Ground' : 'Triage Management'}</option>)}
               </select>
               <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
                 {form.campaign_category === 'review_management' ? (
@@ -714,6 +721,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     <p className="mt-1"><strong>Standard track:</strong> Uses the review pipeline (Seek → Preview → Shown → Paid → Delivered). For NAP drift, unclaimed profiles, missing categories. Pitched as a package.</p>
                     <p className="mt-1"><strong>Escalated track:</strong> Uses the recovery pipeline (Audit Identified → … → Resolved & Closed). For suspensions, hijacked/duplicate listings, ownership disputes. Evidence intake + appeal letter.</p>
                     <p className="mt-1"><strong>Switchable:</strong> Track can be switched mid-flight with guardrails (escalate freely before payment; de-escalate only before intake submission).</p>
+                  </>
+                ) : form.campaign_category === 'proving_ground' ? (
+                  <>
+                    <p className="font-medium">Proving Ground</p>
+                    <p className="mt-1"><strong>Workspace:</strong> City/category-scope operator surface for a market launch — aggregates the intelligence discovery campaigns that feed it. One active proving ground per city + category.</p>
+                    <p className="mt-1"><strong>Category:</strong> Use an umbrella value (e.g. <span className="font-mono">Grocery</span>) — the guardrail keys on city + category, and per-ethnic-category workspaces fragment the funnel.</p>
+                    <p className="mt-1"><strong>Checklist:</strong> PG-01 preflight attaches automatically — no triage step. Manage it from the cockpit at Marketing Ops → Proving Grounds.</p>
+                    <p className="mt-1"><strong>Stages:</strong> Created at seek and never transitions — funnel gates (G1–G4) are read off linked seed cohorts, not the campaign stage.</p>
                   </>
                 ) : (
                   <>
@@ -746,7 +761,16 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             </>
             )}
             <FormField label="Scope" required>
-              <select value={form.scope} onChange={(e) => handleChange('scope', e.target.value as CampaignScope)}
+              <select value={form.scope} onChange={(e) => {
+                const next = e.target.value as CampaignScope;
+                // proving_ground is only valid for city/category scope — reset
+                // if the operator switches away after selecting it.
+                if (next !== 'city' && next !== 'category' && form.campaign_category === 'proving_ground') {
+                  setForm((prev) => ({ ...prev, scope: next, campaign_category: 'review_management' }));
+                } else {
+                  handleChange('scope', next);
+                }
+              }}
                 className={inputClass}>
                 {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -914,15 +938,15 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 newInputPlaceholder="Enter new tone" className={inputClass} />
             </FormField>
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
-            <FormField label="City" required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'}>
-              <SuggestiveSelect required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'} value={form.city} onChange={(v) => handleChange('city', v)}
+            <FormField label="City" required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'}>
+              <SuggestiveSelect required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'} value={form.city} onChange={(v) => handleChange('city', v)}
                 options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
                 newInputPlaceholder="Enter new city" className={inputClass} />
             </FormField>
             )}
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
-            <FormField label="State" required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'}>
-              <SuggestiveSelect required={form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards'} value={form.state} onChange={(v) => handleChange('state', v)}
+            <FormField label="State" required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'}>
+              <SuggestiveSelect required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'} value={form.state} onChange={(v) => handleChange('state', v)}
                 options={vocab.states} emptyLabel="-- Select state --" newLabel="+ New state..."
                 newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
               <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
