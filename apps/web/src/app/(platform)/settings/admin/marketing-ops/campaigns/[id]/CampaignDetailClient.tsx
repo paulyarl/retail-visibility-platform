@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import marketingOpsService, { Campaign, CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
+import tenantDirectoryManagementService from '@/services/TenantDirectoryManagementService';
+import type { DirectoryListing } from '@/hooks/directory/useDirectoryListing';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
@@ -288,6 +290,24 @@ export default function CampaignDetailClient({
   useEffect(() => {
     fetchCampaign();
   }, [fetchCampaign]);
+
+  // Directory entry for the linked tenant — resolves the public listing slug
+  // so the operator can open the place/directory preview from here. Claimed
+  // tenants have no seed row, so the seed page's preview link is unavailable.
+  const linkedTenantId = campaign?.tenant_id;
+  const [linkedListing, setLinkedListing] = useState<DirectoryListing | null>(null);
+  useEffect(() => {
+    if (!linkedTenantId) {
+      setLinkedListing(null);
+      return;
+    }
+    let cancelled = false;
+    tenantDirectoryManagementService
+      .getDirectoryListing(linkedTenantId)
+      .then((listing) => { if (!cancelled) setLinkedListing(listing); })
+      .catch(() => { if (!cancelled) setLinkedListing(null); });
+    return () => { cancelled = true; };
+  }, [linkedTenantId]);
 
   // Focus-stage deep-link (e.g. ?focus=preview_built from the openers
   // workspace Next Steps). Once the campaign is loaded, scroll the pipeline
@@ -1514,6 +1534,18 @@ export default function CampaignDetailClient({
                               {campaign.tenant_id}
                             </Link>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                              {linkedListing?.slug && (
+                                <>
+                                  <Link
+                                    href={linkedListing.listingOrigin === 'directory_seed' ? `/place/${linkedListing.slug}` : `/directory/${linkedListing.slug}`}
+                                    className="inline-flex items-center gap-1 text-teal-600 dark:text-teal-400 hover:underline"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Place preview
+                                  </Link>
+                                  <span className="text-gray-300 dark:text-neutral-600">·</span>
+                                </>
+                              )}
                               <Link href={`/t/${campaign.tenant_id}/settings/directory`} className="text-blue-600 dark:text-blue-400 hover:underline">
                                 Directory categories
                               </Link>
