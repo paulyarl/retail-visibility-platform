@@ -191,6 +191,19 @@ class CategoryMarketEnrichmentService extends BaseService {
       ctx,
     );
 
+    // Recompute the city-level location SEO so category-page and location-page
+    // enrichment stay in sync whenever a category market is enriched.
+    try {
+      const { default: locationService } = await import('./LocationMarketEnrichmentService');
+      await locationService.enrichLocation(normalizedCity, normalizedState, { triggerSource, enrichedBy }, ctx);
+    } catch (locationErr) {
+      logger.warn('[CategoryMarketEnrichmentService] location enrichment failed', ctx, {
+        error: (locationErr as Error).message,
+        city: normalizedCity,
+        state: normalizedState,
+      });
+    }
+
     return {
       marketKey: { categoryKey, city: normalizedCity, state: normalizedState },
       categoryEnrichmentId: id,
