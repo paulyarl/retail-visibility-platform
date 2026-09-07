@@ -35,6 +35,8 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
   manual: 'Manual',
   intelligence_seek: 'Intelligence Seek',
   category_identification: 'Category Identification',
+  directory_lead_gen: 'Get Listed (Lead Gen)',
+  public_suggestion: 'Public Suggestion',
 };
 
 const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other'];

@@ -4216,9 +4216,10 @@ const prospectQueueAddSchema = z.object({
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
-  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification']),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion']),
   // source_campaign_id is required for audit-derived entries; optional for
-  // manual entries added directly from the queue page (no parent campaign).
+  // manual + public_suggestion entries (no parent campaign — the public
+  // suggestion is the origin).
   source_campaign_id: z.string().min(1).optional(),
   source_audit_id: z.string().optional(),
   source_execution_id: z.string().optional(),
@@ -4244,17 +4245,18 @@ const prospectQueueAddSchema = z.object({
   // the audit already flagged NAP/digital presence as unable_to_verify.
   initial_status: z.enum(['queued', 'verify_then_outreach']).optional(),
 }).superRefine((data, ctx) => {
-  if (data.source_kind !== 'manual' && !data.source_campaign_id) {
+  // manual + public_suggestion are parentless kinds — no source campaign.
+  if (!['manual', 'public_suggestion'].includes(data.source_kind) && !data.source_campaign_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['source_campaign_id'],
-      message: 'source_campaign_id is required for non-manual source kinds',
+      message: 'source_campaign_id is required for audit-derived source kinds',
     });
   }
-  // business_name is required for business-scope manual entries. For
+  // business_name is required for business-scope parentless entries. For
   // audit-derived entries the scope is inherited from the parent campaign, so
   // we can't validate here — the service enforces it after resolving scope.
-  const resolvedScope = data.source_kind === 'manual' && !data.source_campaign_id
+  const resolvedScope = !data.source_campaign_id
     ? (data.scope ?? 'business')
     : null;
   if (resolvedScope === 'business' && !(data.business_name && data.business_name.trim())) {

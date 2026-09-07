@@ -37,6 +37,7 @@ import {
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
 import IntelligenceProfileService from './intelligence/IntelligenceProfileService';
+import type { RequestCtx } from '../context';
 /** Audit context for seed/claim operations */
 interface SeedAuditCtx {
   actorType?: 'user' | 'system' | 'integration' | 'customer';

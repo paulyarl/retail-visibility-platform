@@ -38,7 +38,8 @@ export type ProspectSourceKind =
   | 'manual'
   | 'intelligence_seek'
   | 'directory_lead_gen'
-  | 'category_identification';
+  | 'category_identification'
+  | 'public_suggestion';
 
 // Migration 262 — 'hold' parks the prospect (touch-cap / nurture; re-enters
 // at next_touch_at) and 'in_thread' marks a live conversation (the ladder is
@@ -197,9 +198,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
   async addToQueue(input: ProspectQueueAddInput, ctx?: RequestCtx): Promise<AddToQueueResult> {
     try {
       // Load parent campaign to inherit scope/category/city/state defaults.
-      // Manual entries (added directly from the queue page) may have no parent
-      // campaign — fall back to the input values directly.
-      const isManual = input.source_kind === 'manual' && !input.source_campaign_id;
+      // Parentless entries (manual adds, public_suggestion, lead-gen) have no
+      // parent campaign — fall back to the input values directly.
+      const isManual = !input.source_campaign_id;
       let parent: any = null;
       if (!isManual) {
         parent = await this.prisma.mkt_campaigns_list.findUnique({

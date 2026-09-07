@@ -106,12 +106,23 @@ export class DirectorySuggestionAdminService extends AdminApiSingleton {
     return (data as any)?.suggestion ?? null;
   }
 
-  /** POST /api/admin/directory-presence/suggestions/:id/status */
+  /** POST /api/admin/directory-presence/suggestions/:id/status
+   *  'approved' converts the suggestion into a published seed + claim token —
+   *  the response then carries `seed`/`claimUrl`/`expiresAt` for the operator
+   *  to copy the claim link. 'duplicate' accepts `seedId` to link the
+   *  canonical (surviving) seed. */
   async updateStatus(
     id: string,
     status: SuggestionRecord['status'],
     seedId?: string,
-  ): Promise<{ success: boolean; error?: string; suggestion?: SuggestionRecord }> {
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    suggestion?: SuggestionRecord;
+    seed?: { id: string; [k: string]: any };
+    claimUrl?: string;
+    expiresAt?: string;
+  }> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/suggestions/${encodeURIComponent(id)}/status`,
       { method: 'POST', body: JSON.stringify({ status, seedId }) },
@@ -120,7 +131,14 @@ export class DirectorySuggestionAdminService extends AdminApiSingleton {
     );
     const error = typeof result.error === 'string' ? result.error : result.error?.message;
     const data = result.data?.data ?? result.data;
-    return { success: result.success, error, suggestion: data?.suggestion };
+    return {
+      success: result.success,
+      error,
+      suggestion: data?.suggestion,
+      seed: data?.seed,
+      claimUrl: data?.claimUrl,
+      expiresAt: data?.expiresAt,
+    };
   }
 
   /** GET /api/admin/directory-presence/suggestions/analytics */
