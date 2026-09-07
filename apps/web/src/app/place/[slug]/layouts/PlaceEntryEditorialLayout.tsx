@@ -87,9 +87,6 @@ export default function PlaceEntryEditorialLayout({
   const claimHref = hasClaimToken ? `/place/claim/${claimToken}` : '#claim-inquiry';
   const disclaimer = publicDisclaimer ||
     `${listing.businessName} is listed from public information (address and phone). This is not a claimed profile and may be incomplete.`;
-  const secondaryCategories = (Array.isArray(listing.secondaryCategories) ? listing.secondaryCategories : [])
-    .filter((c: unknown): c is string => !!c && c !== listing.primaryCategory);
-  const shelfCategories = [listing.primaryCategory, ...secondaryCategories].filter(Boolean);
 
   return (
     <>
@@ -122,20 +119,16 @@ export default function PlaceEntryEditorialLayout({
             <Link href="/directory" className="inline-flex items-center text-sm text-neutral-300 hover:text-white mb-8 transition-colors">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Directory
             </Link>
-            {shelfCategories.length > 0 && (
-              <div className="-mt-4 mb-2 space-y-1">
-                {shelfCategories.map((cat) => (
-                  <div key={cat}>
-                    <Link
-                      href={getCategoryUrl({ name: cat })}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors"
-                    >
-                      <Tag className="w-4 h-4" />
-                      Browse {cat} stores
-                      <span aria-hidden="true">→</span>
-                    </Link>
-                  </div>
-                ))}
+            {listing.primaryCategory && (
+              <div className="-mt-4 mb-2">
+                <Link
+                  href={getCategoryUrl({ name: listing.primaryCategory })}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors"
+                >
+                  <Tag className="w-4 h-4" />
+                  Browse {listing.primaryCategory} stores
+                  <span aria-hidden="true">→</span>
+                </Link>
               </div>
             )}
             {listing.city && listing.state && (
@@ -200,7 +193,6 @@ export default function PlaceEntryEditorialLayout({
             businessName={listing.businessName}
             claimToken={claimToken}
             publicDisclaimer={publicDisclaimer}
-            secondaryCategories={secondaryCategories}
           />
         </section>
 
@@ -283,12 +275,6 @@ export default function PlaceEntryEditorialLayout({
                   free with your Directory Presence tier. Showcase your best offerings and see
                   how the platform works before upgrading.
                 </p>
-                {secondaryCategories.length > 0 && (
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mt-3">
-                    Your listing also appears on every matching category shelf —{' '}
-                    {shelfCategories.join(', ')}. Claiming lets you manage the categories it shows under.
-                  </p>
-                )}
                 <Link
                   href="/place/about"
                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline mt-3"

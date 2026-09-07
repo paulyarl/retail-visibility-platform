@@ -756,7 +756,7 @@ export default function DirectoryClaimClient() {
                   ))}
                 </Group>
                 <Text size="xs" c="dimmed" mt="xs">
-                  Your listing will appear on {(summary?.secondaryCategories?.length ?? 0) + 1} category
+                  Once claimed, your listing will appear on {(summary?.secondaryCategories?.length ?? 0) + 1} category
                   shelves: {[summary?.category, ...(summary?.secondaryCategories || [])].filter(Boolean).join(' · ')}.
                 </Text>
               </>

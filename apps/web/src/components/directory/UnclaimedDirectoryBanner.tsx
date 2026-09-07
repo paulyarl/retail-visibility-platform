@@ -9,31 +9,27 @@ import { Alert, Button, Text } from '@mantine/core';
  * directory presence seeds. Uses the ShieldCheck icon to distinguish
  * the claim action from suggest/add CTAs elsewhere.
  *
- * When the seed has secondary categories, the copy adds the multi-shelf
- * claim incentive (multi-category shelf placement spec §3.3): claiming
- * lets the owner manage categories, and the listing appears on every
- * matching category shelf (post-claim /directory browse honors
- * secondary_categories; pre-claim /place shelves do since the shelf-match
- * update). Never renders a shelf promise when there are no secondaries.
+ * The shelf line is incentive copy only — it never renders the seed's
+ * secondary categories. Per the claim gate (multi-category shelf
+ * placement spec §3.7), secondaries do not render publicly until the
+ * listing is claimed; the promise of multi-shelf placement is the
+ * claim incentive itself.
  */
 export interface UnclaimedDirectoryBannerProps {
   businessName: string;
   claimToken?: string | null;
   publicDisclaimer?: string | null;
-  secondaryCategories?: string[];
 }
 
 export default function UnclaimedDirectoryBanner({
   businessName,
   claimToken,
   publicDisclaimer,
-  secondaryCategories,
 }: UnclaimedDirectoryBannerProps) {
   const hasToken = !!claimToken;
   const claimHref = hasToken
     ? `/place/claim/${claimToken}`
     : '#claim-inquiry';
-  const shelves = (secondaryCategories || []).filter(Boolean);
 
   return (
     <Alert
@@ -45,9 +41,7 @@ export default function UnclaimedDirectoryBanner({
     >
       <Text size="sm" c="blue.9" className="mb-2">
         <strong>{businessName}</strong> is listed from public information. This is not a claimed profile.
-        {shelves.length > 0 && (
-          <> Claim to verify your details and appear on every matching category shelf.</>
-        )}
+        Claim to verify your details and appear on every matching category shelf.
       </Text>
 
       {hasToken ? (

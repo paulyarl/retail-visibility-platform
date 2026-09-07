@@ -73,7 +73,9 @@ The claim CTA may therefore honestly promise *more shelf placement after claimin
 
 ### §3.1 Shelf membership rule (normative)
 
-A published seed listing is a member of shelf `S` (a category name resolved from `categorySlug`) iff:
+**Claim gate (normative, added v2):** secondary categories do **not** render publicly while a listing is unclaimed. Pre-claim, a seed renders on its **primary shelf only**; secondaries activate at claim. This gate falls out of the existing architecture — `/place/*` browse endpoints serve only `listing_origin = 'directory_seed'` (unclaimed) and stay primary-only; claimed listings render on `/directory/*` where the browse (`directory-mv.ts`) already honors `secondary_categories`. The only pre-claim surface that may show secondaries is the token-gated claim page (the incentive made concrete to the presumptive owner — never a public listing surface).
+
+A published **claimed** listing is a member of shelf `S` (a category name resolved from `categorySlug`) iff:
 
 ```sql
 LOWER(dps.category) = LOWER($shelfName)
@@ -90,42 +92,9 @@ Rules:
 - On multi-shelf surfaces (city grouped view, category index counts), a listing may legitimately appear under multiple category groups — each group is a shelf.
 - Shelf resolution order: `platform_categories.slug → name` first; fall back to name-slug normalization of `dps.category` only when no `platform_categories` row matches (preserves current behavior for unregistered categories).
 
-### §3.2 Backend changes — `directory-presence-public.ts`
+### §3.2 Backend — claimed-side browse (already shipped)
 
-No migration. All changes are query-level. Extract the shelf-match predicate into one shared helper (e.g., `buildShelfMatchClause(categorySlug, paramIdx)` in the same file or `apps/api/src/services/directory/shelfMatch.ts`) so it is unit-testable and consistent across endpoints.
-
-1. **`GET /places/:categorySlug`** (line 455): resolve slug → canonical name once (`SELECT name FROM platform_categories WHERE slug = $1`), then extend the WHERE clause:
-
-   ```sql
-   AND (
-     pc.slug = $n
-     OR LOWER(dps.category) = LOWER($shelfName)
-     OR EXISTS (SELECT 1 FROM unnest(dll.secondary_categories) sc WHERE LOWER(sc) = LOWER($shelfName))
-     OR LOWER(REPLACE(REPLACE(LOWER(dps.category), '[^a-z0-9 ]', ''), ' ', '-')) = LOWER($slug)
-   )
-   ```
-
-2. **`GET /places`** (index, line 379): count each listing under every shelf it matches. Replace the `GROUP BY dps.category` aggregation with a `LATERAL` union of primary + secondaries:
-
-   ```sql
-   SELECT shelf_name, pc.slug, pc.id, pc.icon_emoji, pc.parent_id, pc.level, dps.city, dps.state
-   FROM directory_presence_seeds dps
-   JOIN directory_listings_list dll ON dll.id = dps.listing_id
-   LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
-   CROSS JOIN LATERAL (
-     SELECT dps.category AS shelf_name
-     UNION SELECT unnest(dll.secondary_categories)
-   ) shelves(shelf_name)
-   LEFT JOIN platform_categories pc2 ON LOWER(pc2.name) = LOWER(shelves.shelf_name)
-   WHERE ...
-   GROUP BY shelves.shelf_name, ...
-   ```
-
-   (Secondaries should also join `platform_categories` for slug/icon resolution; unregistered secondary names fall back to name-slug like the primary path does.)
-
-3. **`GET /places/city/:citySlug`** (line 672): group each place under **every** matching shelf. Fetch secondaries in the row select (`dll.secondary_categories`), then in the grouping loop push the place into the primary group and every secondary group that resolves to a shelf. `total` stays listing-count (not shelf-membership-count) to keep pagination correct.
-
-4. **`GET /places-map`** (line 771): category filter becomes `LOWER(dps.category) = LOWER($n) OR EXISTS (SELECT 1 FROM unnest(dll.secondary_categories) sc WHERE LOWER(sc) = LOWER($n))`.
+No migration. The claimed-side engine (`directory-mv.ts`) already implements the shelf rule: category filter `dll.primary_category = $n OR $n = ANY(dll.secondary_categories)` (`:130`), index counts via `UNNEST` union (`:473-480`, `:585-594`), shelf queries (`:677`). The `/place` seed endpoints stay primary-only per the §3.1 claim gate (an earlier draft extended them to secondaries; reverted in v2 — see `directory-presence-public.ts`).
 
 ### §3.3 Claim CTA incentive copy (personalized, honest)
 
@@ -165,7 +134,7 @@ Render shelf memberships as links on the listing page so crawlers discover every
 ### §3.6 SEO notes
 
 - The listing URL is single (`/place/{slug}` → `/directory/{slug}` after claim). Shelves are the additive surfaces; each shelf page already carries enrichment metadata (CATEGORY_MARKET_ENRICHMENT_SPEC).
-- Net shelf-count change from claiming must be ≥ 1: pre-claim the seed shows on its `/place` shelves; post-claim it shows on `/directory` shelves for the same categories. Phase 1 guarantees the `/place` side honors secondaries so the pre-claim state is never richer than the post-claim state.
+- The claim gate makes the shelf delta strictly positive: pre-claim the seed renders on its primary `/place` shelf only; post-claim it renders on every matching `/directory` shelf. Claiming never reduces shelf placement.
 
 ---
 
@@ -188,20 +157,19 @@ Render shelf memberships as links on the listing page so crawlers discover every
 `apps/web/src/services/DirectoryPresenceAdminService.ts` (4):
 - 1017, 1030, 1067, 1080 — `new Error(result.error || '...')` where `result.error` is `string | { status; message; code }`. Normalize with a typed helper (e.g., extract `message` when object) or narrow the service return type.
 
-### Phase 1 — Browse engine honors secondaries (backend)
+### Phase 1 — Claimed-side shelf placement (backend — already shipped in `directory-mv.ts`)
 
-- Extract shared shelf-match helper; apply to the four endpoints in §3.2.
-- Unit test the helper (registered category, unregistered fallback, secondary match, no match) — extend the directory presence public route tests.
+- No change required: the claimed-side browse already honors secondaries (§3.2).
+- The `/place` seed endpoints remain primary-only per the §3.1 claim gate. (v1 of this spec extended them; reverted in v2 when the gate was adopted.)
 
 ### Phase 2 — Claim CTA incentive (frontend)
 
-- Copy changes in the five surfaces in §3.3, gated on `secondaryCategories` presence (never render an empty shelf promise).
+- Copy changes in the five surfaces in §3.3. Public unclaimed surfaces never render secondary names; the claim page (token-gated) renders the forward-looking shelf list.
 - Claim success screen shelf confirmation.
 
 ### Phase 3 — Polish
 
-- `/places` index + `/places/city/:citySlug` grouping + `/places-map` filter (if not already in Phase 1).
-- Listing-page shelf cross-links (§3.4).
+- Listing-page shelf cross-links on the claimed surface (§3.4) — the Classic layout already renders `/directory/categories/{slug}` chips; other claimed layouts may follow.
 - Optional: "Related shelves" cross-links on category pages from enrichment synonyms instead of thin secondaries.
 
 ---
@@ -213,12 +181,12 @@ pnpm checkapi
 pnpm checkweb
 ```
 
-Manual:
-- Seed a listing with `secondary_categories = ['International Grocery Store']` and primary `African Grocery Store`; verify it renders on both `/place/category/african-grocery-store` and `/place/category/international-grocery-store` (with and without `?city=`).
-- Verify `/places` index counts the listing under both categories; `/places/city/:city` groups it under both; `/places-map?category=` matches both.
-- Open `/place/claim/:token`: header shows secondary badges + shelf line; success screen lists shelf links.
-- `UnclaimedDirectoryBanner` renders category-aware copy only when secondaries exist; falls back cleanly.
-- Claim a seed; verify the listing leaves `/place` shelves and appears on the matching `/directory/categories/*` shelves.
+Manual (claim gate):
+- Seed a listing with `secondary_categories = ['International Grocery Store']` and primary `African Grocery Store`; verify it renders ONLY on `/place/category/african-grocery-store` (not the International shelf) while unclaimed — with and without `?city=`.
+- Verify `/places` index, `/places/city/:city`, `/places-map?category=`, and the sitemap all reflect primary-only placement for the unclaimed seed.
+- The unclaimed `/place/{slug}` page renders no secondary badges/links/names anywhere.
+- Open `/place/claim/:token`: header shows secondary badges + the "Once claimed, … N category shelves" line; success screen lists shelf links.
+- Claim a seed; verify the listing leaves `/place` shelves and appears on the matching `/directory/categories/*` shelves (primary + secondaries).
 
 ---
 
