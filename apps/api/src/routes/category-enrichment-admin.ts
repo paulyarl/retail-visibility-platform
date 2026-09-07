@@ -22,6 +22,15 @@ const enrichMarketSchema = z.object({
   state: z.string().min(1),
 });
 
+const overrideMarketSchema = z.object({
+  operator_override_description: z.string().max(1000).optional(),
+  operator_override_meta_title: z.string().max(70).optional(),
+  operator_override_keywords: z.array(z.string().max(50)).max(15).optional(),
+  reset_description: z.boolean().optional(),
+  reset_meta_title: z.boolean().optional(),
+  reset_keywords: z.boolean().optional(),
+});
+
 /**
  * GET /api/admin/directory/category-enrichment/markets
  * List enriched markets. Query params category/city/state are optional;
@@ -83,6 +92,61 @@ router.post(
         error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
       });
       res.status(500).json({ error: 'internal_error' });
+    }
+  },
+);
+
+/**
+ * PATCH /api/admin/directory/category-enrichment/markets/:categoryKey/:city/:state
+ * Operator override / reset for a category market.
+ */
+router.patch(
+  '/markets/:categoryKey/:city/:state',
+  authenticateToken,
+  requirePlatformAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const parsed = overrideMarketSchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'invalid_input',
+          issues: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const { categoryKey, city, state } = req.params;
+      const result = await CategoryMarketEnrichmentService.getInstance().overrideMarket(
+        categoryKey,
+        city,
+        state,
+        {
+          overrideDescription: parsed.data.operator_override_description,
+          overrideMetaTitle: parsed.data.operator_override_meta_title,
+          overrideKeywords: parsed.data.operator_override_keywords,
+          resetDescription: parsed.data.reset_description,
+          resetMetaTitle: parsed.data.reset_meta_title,
+          resetKeywords: parsed.data.reset_keywords,
+        },
+        (req as any).user?.id,
+        getCtx(req),
+      );
+
+      res.json({ success: true, result });
+    } catch (error: any) {
+      const statusMap: Record<string, number> = {
+        market_not_found: 404,
+        description_too_long: 400,
+        meta_title_too_long: 400,
+        keywords_too_long: 400,
+        invalid_market_key: 400,
+      };
+      const status = statusMap[error?.message] || 500;
+      if (status === 500) {
+        logger.error('[PATCH /admin/directory/category-enrichment/markets/:categoryKey/:city/:state] Error:', getCtx(req), {
+          error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+        });
+      }
+      res.status(status).json({ error: error?.message || 'internal_error' });
     }
   },
 );

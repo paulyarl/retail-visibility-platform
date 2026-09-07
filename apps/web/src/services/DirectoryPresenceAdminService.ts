@@ -430,6 +430,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       phone?: string;
       website?: string;
       businessHours?: any;
+      description?: string | null;
       primaryCategory?: string | null;
       secondaryCategories?: string[];
       address?: string;
@@ -988,6 +989,97 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (!result.success) return [];
     const data = result.data?.data ?? result.data;
     return (data?.markets ?? []) as EnrichedMarket[];
+  }
+
+  /** PATCH /api/admin/directory/category-enrichment/markets/:categoryKey/:city/:state */
+  async overrideMarket(
+    categoryKey: string,
+    city: string,
+    state: string,
+    input: {
+      operator_override_description?: string;
+      operator_override_meta_title?: string;
+      operator_override_keywords?: string[];
+      reset_description?: boolean;
+      reset_meta_title?: boolean;
+      reset_keywords?: boolean;
+    },
+  ): Promise<EnrichedMarket> {
+    const encodedKey = encodeURIComponent(categoryKey);
+    const encodedCity = encodeURIComponent(city);
+    const encodedState = encodeURIComponent(state);
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory/category-enrichment/markets/${encodedKey}/${encodedCity}/${encodedState}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(result.error || 'override_market_failed');
+    const data = result.data?.data ?? result.data;
+    return data?.result as EnrichedMarket;
+  }
+
+  /** GET /api/admin/directory/listings/:tenantId/seo */
+  async getTenantSeoState(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory/listings/${encodeURIComponent(tenantId)}/seo`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(result.error || 'get_tenant_seo_failed');
+    const data = result.data?.data ?? result.data;
+    return data?.state ?? data;
+  }
+
+  /** PATCH /api/admin/directory/listings/:tenantId/seo */
+  async overrideTenantSeo(
+    tenantId: string,
+    input: {
+      seo_description?: string;
+      seo_keywords?: string[];
+      reset_description?: boolean;
+      reset_keywords?: boolean;
+    },
+  ): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory/listings/${encodeURIComponent(tenantId)}/seo`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'override_tenant_seo_failed');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.state ?? data;
+  }
+
+  /** POST /api/admin/directory/presence-seeds/:id/compose */
+  async getSeedComposed(seedId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory/presence-seeds/${encodeURIComponent(seedId)}/compose`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(result.error || 'compose_seed_failed');
+    const data = result.data?.data ?? result.data;
+    return data?.result ?? data;
+  }
+
+  /** POST /api/admin/directory/presence-seeds/:id/reset */
+  async resetSeedOverride(seedId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory/presence-seeds/${encodeURIComponent(seedId)}/reset`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) throw new Error(result.error || 'reset_seed_failed');
+    const data = result.data?.data ?? result.data;
+    return data?.result ?? data;
   }
 }
 

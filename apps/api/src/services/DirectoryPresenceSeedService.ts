@@ -34,9 +34,14 @@ import {
 import {
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
+  DISCLOSURE_SENTENCE,
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
-import IntelligenceProfileService from './intelligence/IntelligenceProfileService';
+import IntelligenceProfileService, {
+  normalizeCategoryKey,
+  normalizeReferenceCity,
+  normalizeReferenceState,
+} from './intelligence/IntelligenceProfileService';
 import type { RequestCtx } from '../context';
 /** Audit context for seed/claim operations */
 interface SeedAuditCtx {
@@ -714,6 +719,7 @@ class DirectoryPresenceSeedService {
       email?: string | null;
       website?: string;
       businessHours?: any;
+      description?: string | null;
       primaryCategory?: string | null;
       secondaryCategories?: string[];
       address?: string;
@@ -804,6 +810,16 @@ class DirectoryPresenceSeedService {
     if (fields.businessHours !== undefined) {
       setClauses.push('business_hours = $' + (params.length + 1) + '::jsonb');
       params.push(JSON.stringify(fields.businessHours));
+    }
+    if (fields.description !== undefined) {
+      if (fields.description && fields.description.length > 500) {
+        throw new Error('description_too_long');
+      }
+      const withDisclosure = fields.description && !fields.description.endsWith(DISCLOSURE_SENTENCE)
+        ? fields.description + DISCLOSURE_SENTENCE
+        : fields.description;
+      setClauses.push('description = $' + (params.length + 1));
+      params.push(withDisclosure);
     }
     if (fields.primaryCategory !== undefined) {
       setClauses.push('primary_category = $' + (params.length + 1));
@@ -925,11 +941,15 @@ class DirectoryPresenceSeedService {
     // Upsert provenance rows
     if (provenanceUpdates) {
       for (const p of provenanceUpdates) {
+        const isOperatorOverride = p.sourceName === 'operator_override';
+        const overrideBy = isOperatorOverride ? (ctx?.actorId || null) : null;
+        const overrideAt = isOperatorOverride ? new Date() : null;
         const provenanceId = generateDirectoryFieldProvenanceId(tenantId);
         await prisma.$executeRaw`
           INSERT INTO directory_field_provenance (
             id, seed_id, tenant_id, field_key, value,
             source_name, source_url, accessed_at, confidence, show_on_public,
+            override_by, override_at,
             created_at, updated_at
           ) VALUES (
             ${provenanceId},
@@ -942,6 +962,8 @@ class DirectoryPresenceSeedService {
             ${p.accessedAt || null},
             ${p.confidence || 'medium'},
             ${p.showOnPublic || false},
+            ${overrideBy},
+            ${overrideAt},
             now(), now()
           )
           ON CONFLICT (seed_id, field_key) DO UPDATE SET
@@ -951,6 +973,8 @@ class DirectoryPresenceSeedService {
             accessed_at = EXCLUDED.accessed_at,
             confidence = EXCLUDED.confidence,
             show_on_public = EXCLUDED.show_on_public,
+            override_by = EXCLUDED.override_by,
+            override_at = EXCLUDED.override_at,
             updated_at = now()
         `;
       }
@@ -2319,6 +2343,216 @@ class DirectoryPresenceSeedService {
     });
 
     return { campaign };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Seed description override support (Phase 4)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async resolveProfileForMarket(
+    categoryKey: string,
+    city: string,
+    ctx?: RequestCtx,
+  ): Promise<{ id: string; category_name: string; configuration_json: any } | null> {
+    const service = IntelligenceProfileService;
+    const competitive = await service.resolve(categoryKey, 'competitive', city, null, ctx);
+    if (competitive) return competitive;
+    const emerging = await service.resolve(categoryKey, 'emerging', city, null, ctx);
+    return emerging ?? null;
+  }
+
+  private toIntelligenceProfileSeoFields(
+    profile: { id: string; configuration_json: any } | null,
+  ): any {
+    if (!profile) return null;
+    const cfg = profile.configuration_json || {};
+    return {
+      profileId: profile.id,
+      synonyms: cfg.synonyms ?? undefined,
+      subcategories: cfg.subcategories ?? undefined,
+      prohibitedKeywords: cfg.prohibited_keywords ?? undefined,
+      schemaOrgType: cfg.schema_org_type ?? null,
+    };
+  }
+
+  private toGoldStandardSeoFields(
+    gold: { id: string; configuration_json: any } | null,
+  ): any {
+    if (!gold) return null;
+    const cfg = gold.configuration_json || {};
+    const expected = Array.isArray(cfg.expected_fields)
+      ? (cfg.expected_fields as any[])
+          .map((f: any) => (typeof f === 'string' ? f : f?.field || f?.name))
+          .filter(Boolean)
+      : undefined;
+    return { profileId: gold.id, expectedFieldNames: expected };
+  }
+
+  async getComposedEnrichment(seedId: string, ctx?: RequestCtx): Promise<any> {
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT dps.*, dl.business_name, dl.primary_category, dl.city, dl.state, dl.description, dl.keywords
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+    const row = seed[0];
+
+    const category = row.primary_category || row.category || '';
+    const city = row.city || '';
+    const state = row.state || '';
+    const profile = await this.resolveProfileForMarket(
+      normalizeCategoryKey(category),
+      normalizeReferenceCity(city),
+      ctx,
+    );
+    const goldStandard = state
+      ? await IntelligenceProfileService.resolveGoldStandard(
+          normalizeCategoryKey(category),
+          null,
+          normalizeReferenceCity(city),
+          normalizeReferenceState(state),
+          ctx,
+        )
+      : null;
+
+    const campaign: any = {
+      businessName: row.business_name || 'Business',
+      category,
+      addressCity: city || null,
+      addressState: state || null,
+    };
+
+    const packet = buildSeedSeoPacket({
+      campaign,
+      audit: null,
+      intelligenceProfile: this.toIntelligenceProfileSeoFields(profile),
+      goldStandard: this.toGoldStandardSeoFields(goldStandard),
+    });
+
+    const provenance = await prisma.directory_field_provenance.findFirst({
+      where: { seed_id: seedId, field_key: 'description' },
+      select: { source_name: true, updated_at: true, value: true },
+    });
+
+    return {
+      seedId,
+      packet,
+      sourceName: provenance?.source_name || 'none',
+      composedAt: provenance?.updated_at || null,
+      currentDescription: row.description || null,
+      provenanceValue: provenance?.value || null,
+    };
+  }
+
+  async resetEnrichment(seedId: string, ctx?: SeedAuditCtx): Promise<any> {
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT dps.*, dl.id AS listing_id, dl.business_name, dl.primary_category, dl.city, dl.state
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+    const row = seed[0];
+
+    const composed = await this.getComposedEnrichment(seedId, ctx);
+    const packet = composed.packet as SeedSeoPacket;
+    const now = new Date();
+
+    await prisma.$executeRaw`
+      UPDATE directory_listings_list
+      SET description = ${packet.description},
+          keywords = ${packet.keywords}::text[],
+          updated_at = now()
+      WHERE id = ${row.listing_id}
+    `;
+
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET seo_enrichment = ${buildSeoEnrichmentJson(packet)}::jsonb,
+          updated_at = now()
+      WHERE id = ${seedId}
+    `;
+
+    const provenanceIdDesc = generateDirectoryFieldProvenanceId(row.tenant_id);
+    await prisma.$executeRaw`
+      INSERT INTO directory_field_provenance (
+        id, seed_id, tenant_id, field_key, value,
+        source_name, source_url, accessed_at, confidence, show_on_public,
+        override_by, override_at,
+        created_at, updated_at
+      ) VALUES (
+        ${provenanceIdDesc},
+        ${seedId},
+        ${row.tenant_id},
+        'description',
+        ${packet.description},
+        'market_enrichment',
+        null,
+        null,
+        'medium',
+        true,
+        null,
+        null,
+        now(), now()
+      )
+      ON CONFLICT (seed_id, field_key) DO UPDATE SET
+        value = EXCLUDED.value,
+        source_name = EXCLUDED.source_name,
+        source_url = EXCLUDED.source_url,
+        accessed_at = EXCLUDED.accessed_at,
+        confidence = EXCLUDED.confidence,
+        show_on_public = EXCLUDED.show_on_public,
+        override_by = null,
+        override_at = null,
+        updated_at = now()
+    `;
+
+    const provenanceIdKw = generateDirectoryFieldProvenanceId(row.tenant_id);
+    await prisma.$executeRaw`
+      INSERT INTO directory_field_provenance (
+        id, seed_id, tenant_id, field_key, value,
+        source_name, source_url, accessed_at, confidence, show_on_public,
+        override_by, override_at,
+        created_at, updated_at
+      ) VALUES (
+        ${provenanceIdKw},
+        ${seedId},
+        ${row.tenant_id},
+        'keywords',
+        ${packet.keywords.join(', ')},
+        'market_enrichment',
+        null,
+        null,
+        'medium',
+        true,
+        null,
+        null,
+        now(), now()
+      )
+      ON CONFLICT (seed_id, field_key) DO UPDATE SET
+        value = EXCLUDED.value,
+        source_name = EXCLUDED.source_name,
+        source_url = EXCLUDED.source_url,
+        accessed_at = EXCLUDED.accessed_at,
+        confidence = EXCLUDED.confidence,
+        show_on_public = EXCLUDED.show_on_public,
+        override_by = null,
+        override_at = null,
+        updated_at = now()
+    `;
+
+    audit({
+      action: 'directory_enrichment.operator_reset',
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType || 'user',
+      target: seedId,
+      payload: { seedId, listingId: row.listing_id, category: packet.inputs.intelligenceProfileId },
+    });
+
+    return composed;
   }
 }
 

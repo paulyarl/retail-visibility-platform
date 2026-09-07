@@ -97,6 +97,7 @@ const updateFieldsSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   businessHours: z.any().optional(),
+  description: z.string().max(500).optional(),
   primaryCategory: z.string().nullable().optional(),
   secondaryCategories: z.array(z.string()).optional(),
   address: z.string().optional(),
@@ -462,6 +463,7 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
         phone: data.phone,
         website: data.website,
         businessHours: data.businessHours,
+        description: data.description,
         primaryCategory: data.primaryCategory,
         secondaryCategories: data.secondaryCategories,
         address: data.address,
@@ -491,6 +493,7 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
     res.json({ success: true });
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    if (error?.message === 'description_too_long') return res.status(400).json({ error: 'description_too_long' });
     logger.error('[PATCH /api/admin/directory/presence-seeds/:id/fields] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
@@ -1566,6 +1569,56 @@ router.get('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (r
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/compose
+ * Return the deterministic composed enrichment for a seed (audit: null, market profile).
+ */
+router.post('/presence-seeds/:id/compose', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await DirectoryPresenceSeedService.getComposedEnrichment(id, {
+      region: 'us-east-1',
+      userId: (req as any).user?.id,
+      ip: req.ip || undefined,
+      userAgent: req.get('User-Agent') || undefined,
+    });
+    res.json({ success: true, result });
+  } catch (error: any) {
+    const status = error?.message === 'seed_not_found' ? 404 : 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory/presence-seeds/:id/compose] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/reset
+ * Reset a seed's description/keywords to the composed market enrichment and clear operator override.
+ */
+router.post('/presence-seeds/:id/reset', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await DirectoryPresenceSeedService.resetEnrichment(id, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true, result });
+  } catch (error: any) {
+    const status = error?.message === 'seed_not_found' ? 404 : 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory/presence-seeds/:id/reset] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
   }
 });
 

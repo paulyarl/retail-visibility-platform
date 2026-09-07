@@ -530,4 +530,87 @@ router.post('/listings/:tenantId/re-enrich', authenticateToken, requireAdmin, as
   }
 });
 
+const tenantSeoSchema = z.object({
+  seo_description: z.string().max(500).optional(),
+  seo_keywords: z.array(z.string().max(50)).max(10).optional(),
+  reset_description: z.boolean().optional(),
+  reset_keywords: z.boolean().optional(),
+});
+
+/**
+ * GET /api/admin/directory/listings/:tenantId/seo
+ * Read tenant listing SEO state, composed reference, and owner-authored guard.
+ */
+router.get('/listings/:tenantId/seo', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const state = await CategoryMarketEnrichmentService.getInstance().getTenantSeoState(
+      tenantId,
+      {
+        region: 'us-east-1',
+        userId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip || undefined,
+        userAgent: req.get('User-Agent') || undefined,
+      },
+    );
+    return res.json({ success: true, state });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = { listing_not_found: 404 };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[GET /admin/directory/listings/:tenantId/seo] Error:', undefined, {
+        error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack },
+      });
+    }
+    return res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/**
+ * PATCH /api/admin/directory/listings/:tenantId/seo
+ * Operator override or reset of tenant listing SEO fields.
+ * Rejects with 409 owner_authored when the latest log event is owner_edit.
+ */
+router.patch('/listings/:tenantId/seo', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const parsed = tenantSeoSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_input', issues: parsed.error.flatten().fieldErrors });
+    }
+
+    const state = await CategoryMarketEnrichmentService.getInstance().overrideTenantSeo(
+      tenantId,
+      {
+        seo_description: parsed.data.seo_description,
+        seo_keywords: parsed.data.seo_keywords,
+        reset_description: parsed.data.reset_description,
+        reset_keywords: parsed.data.reset_keywords,
+      },
+      (req as any).user?.userId || (req as any).user?.id,
+      {
+        region: 'us-east-1',
+        userId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip || undefined,
+        userAgent: req.get('User-Agent') || undefined,
+      },
+    );
+    return res.json({ success: true, state });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = {
+      listing_not_found: 404,
+      owner_authored: 409,
+      description_too_long: 400,
+      keywords_too_long: 400,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[PATCH /admin/directory/listings/:tenantId/seo] Error:', undefined, {
+        error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack },
+      });
+    }
+    return res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
 export default router;

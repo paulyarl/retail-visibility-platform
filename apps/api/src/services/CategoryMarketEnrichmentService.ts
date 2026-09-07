@@ -10,6 +10,7 @@ import {
   buildCategorySeoPacket,
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
+  DISCLOSURE_SENTENCE,
   type CategorySeoPacket,
   type SeedSeoPacket,
   type CampaignSeoFields,
@@ -250,6 +251,124 @@ class CategoryMarketEnrichmentService extends BaseService {
     `;
     if (!rows || !Array.isArray(rows) || rows.length === 0) return null;
     return await this.rowToMarketState(rows[0]);
+  }
+
+  async overrideMarket(
+    categoryKey: string,
+    city: string,
+    state: string,
+    opts: {
+      overrideDescription?: string | null;
+      overrideMetaTitle?: string | null;
+      overrideKeywords?: string[] | null;
+      resetDescription?: boolean;
+      resetMetaTitle?: boolean;
+      resetKeywords?: boolean;
+    },
+    overrideBy?: string | null,
+    ctx?: RequestCtx,
+  ): Promise<MarketState | null> {
+    const normalizedKey = normalizeCategoryKey(categoryKey);
+    const normalizedCity = normalizeReferenceCity(city);
+    const normalizedState = normalizeReferenceState(state);
+    if (!normalizedCity || !normalizedState) {
+      throw new Error('invalid_market_key');
+    }
+
+    const row = await this.prisma.directory_category_enrichment.findFirst({
+      where: {
+        category_key: normalizedKey,
+        city: normalizedCity,
+        state: normalizedState,
+      },
+    });
+    if (!row) {
+      throw new Error('market_not_found');
+    }
+
+    const updateData: any = { updated_at: new Date() };
+    if (opts.resetDescription) {
+      updateData.operator_override_description = null;
+    } else if (opts.overrideDescription !== undefined) {
+      if (opts.overrideDescription.length > 1000) {
+        throw new Error('description_too_long');
+      }
+      updateData.operator_override_description = opts.overrideDescription;
+    }
+    if (opts.resetMetaTitle) {
+      updateData.operator_override_meta_title = null;
+    } else if (opts.overrideMetaTitle !== undefined) {
+      if (opts.overrideMetaTitle.length > 70) {
+        throw new Error('meta_title_too_long');
+      }
+      updateData.operator_override_meta_title = opts.overrideMetaTitle;
+    }
+    if (opts.resetKeywords) {
+      updateData.operator_override_keywords = { set: [] };
+    } else if (opts.overrideKeywords !== undefined) {
+      if (opts.overrideKeywords.length > 15) {
+        throw new Error('keywords_too_long');
+      }
+      updateData.operator_override_keywords = opts.overrideKeywords;
+    }
+
+    const anyOverride =
+      updateData.operator_override_description !== undefined ||
+      updateData.operator_override_meta_title !== undefined ||
+      updateData.operator_override_keywords !== undefined;
+    const anyReset = opts.resetDescription || opts.resetMetaTitle || opts.resetKeywords;
+
+    if (anyOverride) {
+      updateData.override_by = overrideBy || null;
+      updateData.override_at = new Date();
+    } else if (anyReset) {
+      // If all override columns are now null, clear attribution.
+      const remaining = await this.prisma.directory_category_enrichment.findUnique({
+        where: { id: row.id },
+        select: {
+          operator_override_description: true,
+          operator_override_meta_title: true,
+          operator_override_keywords: true,
+        },
+      });
+      if (
+        remaining &&
+        !remaining.operator_override_description &&
+        !remaining.operator_override_meta_title &&
+        (!remaining.operator_override_keywords || remaining.operator_override_keywords.length === 0)
+      ) {
+        updateData.override_by = null;
+        updateData.override_at = null;
+      }
+    }
+
+    await this.prisma.directory_category_enrichment.update({
+      where: { id: row.id },
+      data: updateData,
+    });
+
+    const action = anyReset ? 'directory_enrichment.operator_reset' : 'directory_enrichment.operator_override';
+    audit({
+      action,
+      actor: overrideBy,
+      actorType: 'user',
+      target: row.id,
+      payload: {
+        market: { categoryKey: normalizedKey, city: normalizedCity, state: normalizedState },
+        override: {
+          description: opts.overrideDescription,
+          metaTitle: opts.overrideMetaTitle,
+          keywords: opts.overrideKeywords,
+        },
+        reset: {
+          description: opts.resetDescription,
+          metaTitle: opts.resetMetaTitle,
+          keywords: opts.resetKeywords,
+        },
+      },
+    });
+
+    return await this.getMarketByKey(normalizedKey, normalizedCity, normalizedState);
   }
 
   async listMarkets(opts: {
@@ -742,6 +861,259 @@ class CategoryMarketEnrichmentService extends BaseService {
       profileId: gold.id,
       expectedFieldNames: expected,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Tenant listing operator override (Phase 4)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async refreshDirectoryMaterializedViews(): Promise<void> {
+    const views = [
+      'directory_gbp_listings',
+      'directory_category_products',
+      'directory_gbp_stats',
+      'directory_category_listings',
+      'directory_category_stats',
+    ];
+    for (const view of views) {
+      try {
+        await this.prisma.$executeRawUnsafe(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${view}`);
+      } catch (err: any) {
+        if (err?.code === '55000') {
+          await this.prisma.$executeRawUnsafe(`REFRESH MATERIALIZED VIEW ${view}`);
+        } else {
+          logger.warn(`MV refresh skipped for ${view}`, undefined, { error: err?.message });
+        }
+      }
+    }
+  }
+
+  private async composeTenantListingPacket(
+    listing: any,
+    ctx?: RequestCtx,
+  ): Promise<SeedSeoPacket> {
+    const category = listing.primary_category || '';
+    const city = listing.city || '';
+    const state = listing.state || '';
+    const profile = await this.resolveProfileForMarket(
+      normalizeCategoryKey(category),
+      normalizeReferenceCity(city),
+      ctx,
+    );
+    const goldStandard = state
+      ? await IntelligenceProfileService.getInstance().resolveGoldStandard(
+          normalizeCategoryKey(category),
+          null,
+          normalizeReferenceCity(city),
+          normalizeReferenceState(state),
+          ctx,
+        )
+      : null;
+
+    const campaign: CampaignSeoFields = {
+      businessName: listing.business_name || 'Business',
+      category,
+      addressCity: listing.city || null,
+      addressState: listing.state || null,
+    };
+
+    return buildSeedSeoPacket({
+      campaign,
+      audit: null,
+      intelligenceProfile: this.toIntelligenceProfileSeoFields(profile),
+      goldStandard: this.toGoldStandardSeoFields(goldStandard),
+    });
+  }
+
+  async getTenantSeoState(
+    tenantId: string,
+    ctx?: RequestCtx,
+  ): Promise<{
+    tenantId: string;
+    listingId: string;
+    ownerAuthored: { description: boolean; keywords: boolean };
+    composed: { description: string; keywords: string[] };
+    current: {
+      description: string | null;
+      keywords: string[];
+      seoDescription: string | null;
+      seoKeywords: string[];
+    };
+    lastEnrichment: any | null;
+    disclosure: string;
+  }> {
+    const [listing, settings] = await Promise.all([
+      this.prisma.directory_listings_list.findFirst({ where: { tenant_id: tenantId } }),
+      this.prisma.directory_settings_list.findUnique({ where: { tenant_id: tenantId } }),
+    ]);
+    if (!listing) {
+      throw new Error('listing_not_found');
+    }
+
+    const latestLog = await this.prisma.directory_listing_enrichment_log.findFirst({
+      where: { listing_id: listing.id },
+      orderBy: { enriched_at: 'desc' },
+    });
+
+    const ownerValues = latestLog?.trigger_source === 'owner_edit' ? (latestLog.fields_values as any) || {} : {};
+    const ownerAuthored = {
+      description: ownerValues.description !== undefined && ownerValues.description !== null,
+      keywords: Array.isArray(ownerValues.keywords) && ownerValues.keywords.length > 0,
+    };
+
+    const packet = await this.composeTenantListingPacket(listing, ctx);
+
+    return {
+      tenantId,
+      listingId: listing.id,
+      ownerAuthored,
+      composed: { description: packet.description, keywords: packet.keywords },
+      current: {
+        description: listing.description ?? null,
+        keywords: listing.keywords ?? [],
+        seoDescription: settings?.seo_description ?? null,
+        seoKeywords: settings?.seo_keywords ?? [],
+      },
+      lastEnrichment: latestLog,
+      disclosure: DISCLOSURE_SENTENCE,
+    };
+  }
+
+  async overrideTenantSeo(
+    tenantId: string,
+    opts: {
+      seo_description?: string;
+      seo_keywords?: string[];
+      reset_description?: boolean;
+      reset_keywords?: boolean;
+    },
+    overrideBy?: string | null,
+    ctx?: RequestCtx,
+  ): Promise<any> {
+    const listing = await this.prisma.directory_listings_list.findFirst({
+      where: { tenant_id: tenantId },
+    });
+    if (!listing) {
+      throw new Error('listing_not_found');
+    }
+
+    const latestLog = await this.prisma.directory_listing_enrichment_log.findFirst({
+      where: { listing_id: listing.id },
+      orderBy: { enriched_at: 'desc' },
+    });
+
+    const ownerValues = latestLog?.trigger_source === 'owner_edit' ? (latestLog.fields_values as any) || {} : {};
+    const ownerDescription = ownerValues.description !== undefined && ownerValues.description !== null;
+    const ownerKeywords = Array.isArray(ownerValues.keywords) && ownerValues.keywords.length > 0;
+
+    const requestedDescription = opts.seo_description !== undefined || opts.reset_description;
+    const requestedKeywords = opts.seo_keywords !== undefined || opts.reset_keywords;
+    if (requestedDescription && ownerDescription) {
+      throw new Error('owner_authored');
+    }
+    if (requestedKeywords && ownerKeywords) {
+      throw new Error('owner_authored');
+    }
+
+    const packet = await this.composeTenantListingPacket(listing, ctx);
+
+    let finalDescription = listing.description;
+    let finalKeywords = listing.keywords ?? [];
+    const projected: string[] = [];
+
+    if (opts.reset_description) {
+      finalDescription = packet.description;
+      projected.push('description');
+    } else if (opts.seo_description !== undefined) {
+      if (opts.seo_description.length > 500) {
+        throw new Error('description_too_long');
+      }
+      const withDisclosure = opts.seo_description.endsWith(DISCLOSURE_SENTENCE)
+        ? opts.seo_description
+        : opts.seo_description + DISCLOSURE_SENTENCE;
+      finalDescription = withDisclosure;
+      projected.push('description');
+    }
+
+    if (opts.reset_keywords) {
+      finalKeywords = packet.keywords;
+      projected.push('keywords');
+    } else if (opts.seo_keywords !== undefined) {
+      if (opts.seo_keywords.length > 10) {
+        throw new Error('keywords_too_long');
+      }
+      finalKeywords = opts.seo_keywords;
+      projected.push('keywords');
+    }
+
+    if (projected.length === 0) {
+      return this.getTenantSeoState(tenantId, ctx);
+    }
+
+    await this.prisma.directory_listings_list.update({
+      where: { id: listing.id },
+      data: {
+        description: finalDescription,
+        keywords: finalKeywords,
+        updated_at: new Date(),
+      },
+    });
+
+    await this.prisma.directory_settings_list.upsert({
+      where: { tenant_id: tenantId },
+      update: {
+        seo_description: finalDescription,
+        seo_keywords: finalKeywords,
+        updated_at: new Date(),
+      },
+      create: {
+        id: tenantId,
+        tenant_id: tenantId,
+        seo_description: finalDescription,
+        seo_keywords: finalKeywords,
+        updated_at: new Date(),
+      },
+    });
+
+    const triggerSource = opts.reset_description || opts.reset_keywords ? 'operator_reset' : 'operator_override';
+    await this.prisma.directory_listing_enrichment_log.create({
+      data: {
+        id: generateListingEnrichmentLogId(),
+        tenant_id: tenantId,
+        listing_id: listing.id,
+        category_key: normalizeCategoryKey(listing.primary_category || ''),
+        city: listing.city || '',
+        state: listing.state || '',
+        fields_projected: projected,
+        fields_skipped: [],
+        fields_values: {
+          description: projected.includes('description') ? finalDescription : null,
+          keywords: projected.includes('keywords') ? finalKeywords : null,
+        },
+        intelligence_profile_id: packet.inputs.intelligenceProfileId,
+        composer_version: packet.composerVersion,
+        enriched_at: new Date(),
+        enriched_by: overrideBy || null,
+        trigger_source: triggerSource,
+      },
+    });
+
+    audit({
+      action: triggerSource === 'operator_reset' ? 'directory_enrichment.operator_reset' : 'directory_enrichment.operator_override',
+      actor: overrideBy,
+      actorType: 'user',
+      target: listing.id,
+      payload: {
+        tenantId,
+        projected,
+        reset: { description: opts.reset_description, keywords: opts.reset_keywords },
+        override: { seo_description: opts.seo_description, seo_keywords: opts.seo_keywords },
+      },
+    });
+
+    await this.refreshDirectoryMaterializedViews();
+
+    return this.getTenantSeoState(tenantId, ctx);
   }
 }
 

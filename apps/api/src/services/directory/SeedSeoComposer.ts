@@ -105,6 +105,8 @@ export interface SeedSeoPacket {
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
+export const DISCLOSURE_SENTENCE = ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+
 const COMPOSER_VERSION = 1;
 const META_TITLE_MAX = 70;
 const DESCRIPTION_MAX = 300;
