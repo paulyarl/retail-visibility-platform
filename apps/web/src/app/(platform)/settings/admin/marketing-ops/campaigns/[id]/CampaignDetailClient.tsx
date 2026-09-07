@@ -1509,9 +1509,24 @@ export default function CampaignDetailClient({
                       <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Linked Tenant</dt>
                       <dd className="text-sm mt-0.5">
                         {campaign.tenant_id ? (
-                          <Link href={`/t/${campaign.tenant_id}/settings/tenant`} className="text-teal-600 dark:text-teal-400 hover:underline">
-                            {campaign.tenant_id}
-                          </Link>
+                          <div className="flex flex-col gap-0.5">
+                            <Link href={`/t/${campaign.tenant_id}/settings/tenant`} className="text-teal-600 dark:text-teal-400 hover:underline">
+                              {campaign.tenant_id}
+                            </Link>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                              <Link href={`/t/${campaign.tenant_id}/settings/directory`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                Directory categories
+                              </Link>
+                              <span className="text-gray-300 dark:text-neutral-600">·</span>
+                              <Link href={`/t/${campaign.tenant_id}/settings/hours`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                Hours
+                              </Link>
+                              <span className="text-gray-300 dark:text-neutral-600">·</span>
+                              <Link href={`/t/${campaign.tenant_id}/settings/branding`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                Branding
+                              </Link>
+                            </div>
+                          </div>
                         ) : (
                           <span className="text-gray-900 dark:text-white">—</span>
                         )}
