@@ -9,12 +9,14 @@ interface DirectoryListingsTableProps {
   listings: AdminDirectoryListing[];
   onFeature: (tenantId: string, tenantName: string) => void;
   onUnfeature: (tenantId: string) => void;
+  onSpawnCampaign: (tenantId: string, tenantName: string, category?: string) => void;
 }
 
 export default function DirectoryListingsTable({
   listings,
   onFeature,
   onUnfeature,
+  onSpawnCampaign,
 }: DirectoryListingsTableProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -102,7 +104,7 @@ export default function DirectoryListingsTable({
               </span>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {listing.is_featured ? (
                 <button
                   onClick={() => onUnfeature(listing.tenant_id)}
@@ -118,6 +120,12 @@ export default function DirectoryListingsTable({
                   Feature
                 </button>
               )}
+              <button
+                onClick={() => onSpawnCampaign(listing.tenant_id, listing.businessName, listing.primary_category)}
+                className="flex-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Spawn Campaign
+              </button>
               <Link
                 href={`/t/${listing.tenant_id}/settings/directory`}
                 className="flex-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-center"
@@ -232,6 +240,12 @@ export default function DirectoryListingsTable({
                       Feature
                     </button>
                   )}
+                  <button
+                    onClick={() => onSpawnCampaign(listing.tenant_id, listing.businessName, listing.primary_category)}
+                    className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200"
+                  >
+                    Spawn Campaign
+                  </button>
                   <Link
                     href={`/t/${listing.tenant_id}/settings/directory`}
                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"

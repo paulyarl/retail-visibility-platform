@@ -8,6 +8,8 @@ import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { z } from 'zod';
 import { generateDirectoryFeaturedId, generateProductCatId } from '../lib/id-generator';
+import { HttpError } from '../middleware/errorHandler';
+import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -322,6 +324,59 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
   } catch (error: any) {
     logger.error('[DELETE /admin/directory/unfeature/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_unfeature_listing' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/listings/:tenantId/spawn-campaign
+ * Spawn a business-scope marketing campaign from a tenant's directory listing
+ * NAP. Lets an operator pull any directory-listed business into the marketing
+ * architecture (audit prompts, enrichment, SEO composition, recovery playbooks)
+ * without needing a directory_presence_seeds row.
+ */
+const spawnTenantCampaignSchema = z.object({
+  category: z.string().max(100).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+router.post('/listings/:tenantId/spawn-campaign', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const validation = spawnTenantCampaignSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.createCampaignFromTenantListing(
+      tenantId,
+      {
+        category: validation.data.category,
+        notes: validation.data.notes,
+      },
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.status(201).json({ success: true, campaign: result.campaign });
+  } catch (error: any) {
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({ error: error.code, message: error.message });
+    }
+    const statusMap: Record<string, number> = {
+      listing_not_found: 404,
+      incomplete_nap: 400,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[POST /admin/directory/listings/:tenantId/spawn-campaign] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
   }
 });
 

@@ -50,6 +50,7 @@ export interface AdminDirectoryListingsHook {
   };
   featureListing: (tenantId: string, until: Date, priority?: number) => Promise<void>;
   unfeatureListing: (tenantId: string) => Promise<void>;
+  spawnCampaign: (tenantId: string, input: { category?: string; notes?: string }) => Promise<any>;
   refresh: () => Promise<void>;
 }
 
@@ -189,6 +190,18 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     }
   }, [fetchListings]);
 
+  const spawnCampaign = useCallback(async (tenantId: string, input: { category?: string; notes?: string }) => {
+    try {
+      setError(null);
+      const campaign = await platformHomeService.spawnCampaignFromTenantListing(tenantId, input);
+      return campaign;
+    } catch (err) {
+      clientLogger.error('Error spawning campaign from tenant listing:', { detail: err });
+      setError(err instanceof Error ? err.message : 'Failed to spawn campaign');
+      throw err;
+    }
+  }, []);
+
   return {
     listings,
     loading,
@@ -196,6 +209,7 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     pagination: filteredPagination,
     featureListing,
     unfeatureListing,
+    spawnCampaign,
     refresh: fetchListings,
   };
 }

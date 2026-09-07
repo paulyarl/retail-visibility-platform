@@ -1500,6 +1500,42 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Spawn a business-scope marketing campaign from a tenant's directory listing.
+   * Returns the created campaign object.
+   */
+  async spawnCampaignFromTenantListing(
+    tenantId: string,
+    input: { category?: string; notes?: string },
+  ): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/admin/directory/listings/${tenantId}/spawn-campaign`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+        `platform-spawn-campaign-${tenantId}`
+      );
+
+      if (!result.success) {
+        const err = result.error as any;
+        const message = typeof err === 'string' ? err : err?.message || err?.error;
+        throw new Error(message || 'Failed to spawn campaign');
+      }
+
+      const data = result.data?.data ?? result.data;
+      return data?.campaign ?? data;
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to spawn campaign from tenant listing:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
    * Get admin enrichment analytics
    */
   async getAdminEnrichmentAnalytics(): Promise<Analytics | null> {

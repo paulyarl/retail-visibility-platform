@@ -2193,6 +2193,105 @@ class DirectoryPresenceSeedService {
       napMatch: linkResult.napMatch,
     };
   }
+
+  /**
+   * Spawn a business-scope marketing campaign from a tenant's directory
+   * listing (a claimed or non-seed tenant). This is the tenant-listing
+   * counterpart to {@link createCampaignFromSeed} — it lets an operator
+   * pull any directory-listed business into the marketing architecture
+   * (audit prompts, enrichment, SEO composition, recovery playbooks)
+   * without needing a directory_presence_seeds row.
+   *
+   * Unlike the seed variant, there is no seed-campaign link table to bond
+   * (the tenant already has a real customer relationship). The campaign is
+   * created with `scope = 'business'` and starts at the `seek` stage.
+   *
+   * The structural-duplicate guardrail in MarketingCampaignService still
+   * applies — if an active campaign with the same business-scope signature
+   * already exists, a ConflictError (409) is thrown.
+   */
+  async createCampaignFromTenantListing(
+    tenantId: string,
+    opts: {
+      category?: string;
+      notes?: string;
+    } = {},
+    ctx?: SeedAuditCtx,
+  ): Promise<{ campaign: any }> {
+    const listing = await prisma.$queryRaw<any[]>`
+      SELECT * FROM directory_listings_list WHERE tenant_id = ${tenantId} LIMIT 1
+    `;
+    if (!listing[0]) throw new Error('listing_not_found');
+
+    const dl = listing[0];
+    const businessName = dl.business_name;
+    const category = (opts.category && opts.category.trim()) || dl.primary_category || '';
+    const city = dl.city || '';
+    const state = dl.state || null;
+    const phone = dl.phone || null;
+    const websiteUrl = dl.website || null;
+    const addressLine1 = dl.address || null;
+    const addressZip = dl.zip_code || null;
+
+    if (!businessName) {
+      throw new Error('incomplete_nap');
+    }
+
+    const defaultNotes =
+      `Spawned from tenant directory listing (tenant: ${tenantId}, slug: ${dl.slug || dl.id}).`;
+    const notes = opts.notes != null ? opts.notes : defaultNotes;
+
+    // Dynamic import to avoid any module-load circular dependency.
+    const { default: MarketingCampaignService } = await import('./MarketingCampaignService.js');
+
+    const requestCtx: RequestCtx = {
+      region: 'us-east-1',
+      userId: ctx?.actorId,
+      ip: ctx?.ip,
+      userAgent: ctx?.userAgent,
+    };
+
+    const campaign = await MarketingCampaignService.createCampaign(
+      {
+        scope: 'business',
+        businessName,
+        category,
+        city,
+        state: state || undefined,
+        phone: phone || undefined,
+        websiteUrl: websiteUrl || undefined,
+        addressLine1: addressLine1 || undefined,
+        addressCity: city || undefined,
+        addressState: state || undefined,
+        addressZip: addressZip || undefined,
+        addressCountry: 'US',
+        hasWebsite: websiteUrl ? 'yes' : undefined,
+        notes,
+      },
+      requestCtx,
+    );
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_listing.spawn_campaign',
+      payload: {
+        tenantId,
+        campaignId: campaign.id,
+        businessName,
+        category,
+        city,
+        state,
+      },
+    });
+
+    logger.info('DirectoryPresenceSeedService.createCampaignFromTenantListing', undefined, {
+      tenantId,
+      campaignId: campaign.id,
+    });
+
+    return { campaign };
+  }
 }
 
 export default new DirectoryPresenceSeedService();

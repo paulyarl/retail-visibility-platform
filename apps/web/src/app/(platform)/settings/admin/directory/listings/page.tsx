@@ -7,6 +7,7 @@ import Link from 'next/link';
 import DirectoryListingsTable from '@/components/admin/directory/DirectoryListingsTable';
 import FeatureListingModal from '@/components/admin/directory/FeatureListingModal';
 import { clientLogger } from '@/lib/client-logger';
+import { Rocket, X, AlertTriangle } from 'lucide-react';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,17 @@ export default function AdminDirectoryListingsPage() {
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [selectedTenantName, setSelectedTenantName] = useState<string>('');
 
-  const { listings, loading, error, featureListing, unfeatureListing } = useAdminDirectoryListings(filters);
+  // Spawn campaign modal state
+  const [spawnModalOpen, setSpawnModalOpen] = useState(false);
+  const [spawnTenantId, setSpawnTenantId] = useState<string>('');
+  const [spawnTenantName, setSpawnTenantName] = useState<string>('');
+  const [spawnCategory, setSpawnCategory] = useState<string>('');
+  const [spawnNotes, setSpawnNotes] = useState<string>('');
+  const [spawning, setSpawning] = useState(false);
+  const [spawnError, setSpawnError] = useState<string | null>(null);
+  const [spawnSuccess, setSpawnSuccess] = useState<string | null>(null);
+
+  const { listings, loading, error, featureListing, unfeatureListing, spawnCampaign } = useAdminDirectoryListings(filters);
 
   const handleFeature = async (tenantId: string, tenantName: string) => {
     setSelectedTenantId(tenantId);
@@ -46,6 +57,37 @@ export default function AdminDirectoryListingsPage() {
       await unfeatureListing(tenantId);
     } catch (err) {
       clientLogger.error('Failed to unfeature listing:', { detail: err });
+    }
+  };
+
+  const handleSpawnCampaign = (tenantId: string, tenantName: string, category?: string) => {
+    setSpawnTenantId(tenantId);
+    setSpawnTenantName(tenantName);
+    setSpawnCategory(category || '');
+    setSpawnNotes('');
+    setSpawnError(null);
+    setSpawnSuccess(null);
+    setSpawnModalOpen(true);
+  };
+
+  const handleSpawnConfirm = async () => {
+    setSpawnError(null);
+    setSpawnSuccess(null);
+    try {
+      setSpawning(true);
+      const campaign = await spawnCampaign(spawnTenantId, {
+        category: spawnCategory.trim() || undefined,
+        notes: spawnNotes.trim() || undefined,
+      });
+      setSpawnSuccess(
+        `Campaign "${campaign?.business_name || campaign?.id || spawnTenantName}" spawned successfully. ` +
+        `View it in Marketing Ops.`
+      );
+      setSpawnModalOpen(false);
+    } catch (err) {
+      setSpawnError(err instanceof Error ? err.message : 'Failed to spawn campaign');
+    } finally {
+      setSpawning(false);
     }
   };
 
@@ -172,8 +214,19 @@ export default function AdminDirectoryListingsPage() {
         </div>
       ) : (
         <>
-          <DirectoryListingsTable listings={listings} onFeature={handleFeature} onUnfeature={handleUnfeature} />
-          
+          {spawnSuccess && (
+            <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-green-800 dark:text-green-200">{spawnSuccess}</p>
+            </div>
+          )}
+
+          <DirectoryListingsTable
+            listings={listings}
+            onFeature={handleFeature}
+            onUnfeature={handleUnfeature}
+            onSpawnCampaign={handleSpawnCampaign}
+          />
+
           <FeatureListingModal
             isOpen={featureModalOpen}
             onClose={() => setFeatureModalOpen(false)}
@@ -181,6 +234,93 @@ export default function AdminDirectoryListingsPage() {
             loading={loading}
             tenantName={selectedTenantName}
           />
+
+          {/* Spawn Campaign Modal */}
+          {spawnModalOpen && (
+            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Spawn a campaign</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Creates a new business-scope marketing campaign from this tenant&apos;s
+                      directory listing NAP.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSpawnModalOpen(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                      Business name
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-white">{spawnTenantName}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Category
+                    </label>
+                    <input
+                      type="text"
+                      value={spawnCategory}
+                      onChange={(e) => setSpawnCategory(e.target.value)}
+                      placeholder="Leave blank to use listing category"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Override the marketing niche category if the directory category
+                      doesn&apos;t match. Leave blank to inherit.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Notes (optional)
+                    </label>
+                    <textarea
+                      value={spawnNotes}
+                      onChange={(e) => setSpawnNotes(e.target.value)}
+                      placeholder="Defaults to a tenant-listing-origin note."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="inline w-4 h-4 mr-1" />
+                    The campaign starts at the <strong>seek</strong> stage (triage). If an
+                    active campaign with the same business-scope signature already exists, the
+                    structural-duplicate guardrail will block creation.
+                  </div>
+                  {spawnError && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                      {spawnError}
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setSpawnModalOpen(false)}
+                    disabled={spawning}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSpawnConfirm}
+                    disabled={spawning}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <Rocket className="w-4 h-4" />
+                    {spawning ? 'Spawning...' : 'Spawn Campaign'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
