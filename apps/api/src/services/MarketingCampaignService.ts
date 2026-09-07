@@ -854,6 +854,50 @@ export class MarketingCampaignService extends BaseService {
     }
   }
 
+  /**
+   * Append a mid-run gap entry to the campaign's gap_log (Migration 262,
+   * spec §4.5). The gap log is a chronological incident record — entries
+   * are append-only; corrections are new entries, not edits.
+   */
+  async appendGapLog(
+    campaignId: string,
+    entry: {
+      field: string;
+      description: string;
+      severity: 'critical' | 'important' | 'minor';
+      resolver: 'self' | 'staff' | 'developer';
+    },
+    ctx?: RequestCtx,
+  ): Promise<{ id: string; entry: any }> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { id: true, gap_log: true },
+      });
+      if (!campaign) {
+        throw new NotFoundError(`Campaign ${campaignId} not found`);
+      }
+      const record = {
+        timestamp: new Date().toISOString(),
+        field: entry.field,
+        description: entry.description,
+        severity: entry.severity,
+        resolver: entry.resolver,
+        logged_by: ctx?.userId ?? 'unknown',
+      };
+      const existing = Array.isArray(campaign.gap_log) ? (campaign.gap_log as any[]) : [];
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { gap_log: [...existing, record] },
+      });
+      logger.info('appendGapLog: appended', ctx, { campaignId, field: entry.field, severity: entry.severity });
+      return { id: campaignId, entry: record };
+    } catch (error) {
+      logger.error('Failed to append gap log', ctx, { error: (error as Error).message, campaignId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   // ====================
   // READ
   // ====================

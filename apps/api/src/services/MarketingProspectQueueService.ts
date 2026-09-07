@@ -166,6 +166,10 @@ export interface UpdateQueueInput {
   priority?: ProspectPriority;
   note?: string | null;
   assigned_to?: string | null; // null = unassign
+  // Migration 262 — account family groups prospects sharing an owner
+  // (e.g. the Tairov storefronts): one operator, one thread. Editable on
+  // hold/in_thread too — family assignment is identity, not cadence state.
+  account_family?: string | null;
 }
 
 export interface CreateCampaignInput {
@@ -455,13 +459,21 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (!existing) {
         throw new NotFoundError(`Queue entry ${id} not found`);
       }
-      if (existing.status !== 'queued' && existing.status !== 'verify_then_outreach') {
+      // account_family is identity metadata — editable on hold/in_thread too.
+      // Cadence fields (priority/note/assigned_to) stay gated to open statuses.
+      const onlyFamilyPatch =
+        patch.account_family !== undefined &&
+        patch.priority === undefined && patch.note === undefined && patch.assigned_to === undefined;
+      const familyEditable = ['queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(existing.status);
+      const open = existing.status === 'queued' || existing.status === 'verify_then_outreach';
+      if (!open && !(onlyFamilyPatch && familyEditable)) {
         throw new ConflictError(`Queue entry ${id} is not editable (status=${existing.status})`);
       }
 
       const data: any = {};
       if (patch.priority !== undefined) data.priority = patch.priority;
       if (patch.note !== undefined) data.note = patch.note;
+      if (patch.account_family !== undefined) data.account_family = patch.account_family;
       if (patch.assigned_to !== undefined) {
         if (patch.assigned_to === null) {
           data.assigned_to = null;

@@ -10,15 +10,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockCampaignsList, mockStageHistory } = vi.hoisted(() => ({
+const { mockCampaignsList, mockStageHistory, mockQueue } = vi.hoisted(() => ({
   mockCampaignsList: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
   mockStageHistory: { create: vi.fn() },
+  mockQueue: { findUnique: vi.fn(), update: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
   prisma: {
     mkt_campaigns_list: mockCampaignsList,
     mkt_stage_history_list: mockStageHistory,
+    mkt_prospect_queue: mockQueue,
   },
 }));
 
@@ -42,6 +44,7 @@ vi.mock('../MarketingServiceCategoryService', () => ({
 import MarketingCampaignService, {
   transitionsFor,
 } from '../MarketingCampaignService';
+import MarketingProspectQueueService from '../MarketingProspectQueueService';
 
 const service = MarketingCampaignService;
 
@@ -235,5 +238,107 @@ describe('detachChildCampaign', () => {
     });
 
     await expect(service.detachChildCampaign('mcamp-int-001')).rejects.toThrow('child_not_parented');
+  });
+});
+
+
+// ====================
+// GAP LOG — append-only incident record (§4.5)
+// ====================
+
+describe('appendGapLog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCampaignsList.update.mockResolvedValue({});
+  });
+
+  it('appends a timestamped entry preserving existing entries', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({
+      id: 'mcamp-pg-001',
+      gap_log: [{ timestamp: '2026-09-01T00:00:00Z', field: 'contact.phone', description: 'prior', severity: 'minor', resolver: 'self' }],
+    });
+
+    const result = await service.appendGapLog('mcamp-pg-001', {
+      field: 'contact.email',
+      description: 'No verified email for any prospect',
+      severity: 'important',
+      resolver: 'staff',
+    }, { userId: 'uid-op-1' } as any);
+
+    const updateCall = mockCampaignsList.update.mock.calls[0][0];
+    expect(updateCall.data.gap_log).toHaveLength(2);
+    expect(updateCall.data.gap_log[1]).toMatchObject({
+      field: 'contact.email',
+      severity: 'important',
+      logged_by: 'uid-op-1',
+    });
+    expect(updateCall.data.gap_log[1].timestamp).toBeTruthy();
+    expect(result.entry.field).toBe('contact.email');
+  });
+
+  it('starts the log when gap_log is null', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({ id: 'mcamp-pg-001', gap_log: null });
+
+    await service.appendGapLog('mcamp-pg-001', {
+      field: 'seed.nap', description: 'x', severity: 'minor', resolver: 'self',
+    });
+
+    const updateCall = mockCampaignsList.update.mock.calls[0][0];
+    expect(updateCall.data.gap_log).toHaveLength(1);
+  });
+
+  it('throws not-found when the campaign does not exist', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.appendGapLog('mcamp-missing', {
+        field: 'x', description: 'y', severity: 'minor', resolver: 'self',
+      }),
+    ).rejects.toThrow(/not found/i);
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+});
+
+// ====================
+// QUEUE — account_family identity patch (§4.9)
+// ====================
+
+describe('queue update — account_family', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQueue.update.mockImplementation(({ data }: any) => Promise.resolve({ id: 'pque-001', ...data }));
+  });
+
+  it('allows a family-only patch on a hold row (identity, not cadence)', async () => {
+    mockQueue.findUnique.mockResolvedValue({ id: 'pque-001', status: 'hold' });
+
+    await MarketingProspectQueueService.update('pque-001', { account_family: 'Tairov' });
+
+    expect(mockQueue.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { account_family: 'Tairov' } }),
+    );
+  });
+
+  it('allows a family-only patch on an in_thread row', async () => {
+    mockQueue.findUnique.mockResolvedValue({ id: 'pque-001', status: 'in_thread' });
+
+    await MarketingProspectQueueService.update('pque-001', { account_family: 'Tairov' });
+    expect(mockQueue.update).toHaveBeenCalled();
+  });
+
+  it('rejects a family patch on a dismissed row', async () => {
+    mockQueue.findUnique.mockResolvedValue({ id: 'pque-001', status: 'dismissed' });
+
+    await expect(
+      MarketingProspectQueueService.update('pque-001', { account_family: 'Tairov' }),
+    ).rejects.toThrow(/not editable/);
+  });
+
+  it('still rejects cadence-field patches on hold rows', async () => {
+    mockQueue.findUnique.mockResolvedValue({ id: 'pque-001', status: 'hold' });
+
+    await expect(
+      MarketingProspectQueueService.update('pque-001', { priority: 'high' }),
+    ).rejects.toThrow(/not editable/);
   });
 });

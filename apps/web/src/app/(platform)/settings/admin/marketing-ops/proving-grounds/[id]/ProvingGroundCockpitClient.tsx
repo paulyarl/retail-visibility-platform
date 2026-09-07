@@ -54,6 +54,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [attachId, setAttachId] = useState('');
   const [attaching, setAttaching] = useState(false);
   const [verdictBusy, setVerdictBusy] = useState<string | null>(null);
+  const [gapFormOpen, setGapFormOpen] = useState(false);
+  const [gapBusy, setGapBusy] = useState(false);
+  const [gapForm, setGapForm] = useState<{ field: string; description: string; severity: 'critical' | 'important' | 'minor'; resolver: 'self' | 'staff' | 'developer' }>({
+    field: '', description: '', severity: 'important', resolver: 'self',
+  });
 
   const treeIds = useMemo(
     () => [campaignId, ...children.map((c) => c.id)],
@@ -138,6 +143,22 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setError(err.message || 'Failed to record verdict');
     } finally {
       setVerdictBusy(null);
+    }
+  };
+
+  const handleAppendGap = async () => {
+    setGapBusy(true);
+    setError(null);
+    try {
+      await marketingOpsService.appendGapLog(campaignId, gapForm);
+      setGapForm({ field: '', description: '', severity: 'important', resolver: 'self' });
+      setGapFormOpen(false);
+      const camp = await marketingOpsService.getCampaign(campaignId);
+      setCampaign(camp);
+    } catch (err: any) {
+      setError(err.message || 'Failed to log gap');
+    } finally {
+      setGapBusy(false);
     }
   };
 
@@ -385,10 +406,66 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         </div>
       </div>
 
-      {/* Gap log */}
-      {campaign.gap_log && campaign.gap_log.length > 0 && (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Gap log</h2>
+      {/* Gap log — append-only mid-run incident record (spec §4.5) */}
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Gap log</h2>
+          <button
+            onClick={() => setGapFormOpen((o) => !o)}
+            className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+          >
+            {gapFormOpen ? 'cancel' : '+ log gap'}
+          </button>
+        </div>
+        {gapFormOpen && (
+          <div className="mb-3 rounded-lg border border-gray-200 dark:border-neutral-700 p-3 space-y-2">
+            <div className="flex gap-2">
+              <input
+                value={gapForm.field}
+                onChange={(e) => setGapForm((f) => ({ ...f, field: e.target.value }))}
+                placeholder="Field (e.g. contact.email)"
+                className="w-40 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              />
+              <select
+                value={gapForm.severity}
+                onChange={(e) => setGapForm((f) => ({ ...f, severity: e.target.value as any }))}
+                className="px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              >
+                <option value="critical">critical</option>
+                <option value="important">important</option>
+                <option value="minor">minor</option>
+              </select>
+              <select
+                value={gapForm.resolver}
+                onChange={(e) => setGapForm((f) => ({ ...f, resolver: e.target.value as any }))}
+                className="px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              >
+                <option value="self">self-fixable</option>
+                <option value="staff">staff</option>
+                <option value="developer">developer</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={gapForm.description}
+                onChange={(e) => setGapForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="What's missing or broken — e.g. no verified email for any prospect"
+                className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              />
+              <button
+                onClick={handleAppendGap}
+                disabled={gapBusy || !gapForm.field.trim() || !gapForm.description.trim()}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+              >
+                {gapBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Append'}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400">Append-only — corrections are new entries, not edits.</p>
+          </div>
+        )}
+        {(!campaign.gap_log || campaign.gap_log.length === 0) ? (
+          <p className="text-xs text-gray-400">No gaps logged — unverifiable fields and missing data land here during the run.</p>
+        ) : (
           <ul className="space-y-1.5">
             {[...campaign.gap_log].reverse().map((g, i) => (
               <li key={i} className="text-xs text-gray-600 dark:text-gray-300 flex items-start gap-2">
@@ -403,8 +480,8 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

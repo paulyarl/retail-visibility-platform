@@ -1177,6 +1177,28 @@ router.delete('/:campaignId/children/:childId', async (req: any, res: Response) 
   }
 });
 
+// POST /:id/gap-log — append a mid-run gap entry (Migration 262, spec §4.5).
+// Append-only chronological record; the server stamps timestamp + logged_by.
+const gapLogEntrySchema = z.object({
+  field: z.string().min(1).max(120),
+  description: z.string().min(1).max(2000),
+  severity: z.enum(['critical', 'important', 'minor']),
+  resolver: z.enum(['self', 'staff', 'developer']),
+});
+
+router.post('/:id/gap-log', async (req: any, res: Response) => {
+  try {
+    const parsed = gapLogEntrySchema.parse(req.body);
+    const result = await MarketingCampaignService.appendGapLog(req.params.id, parsed, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.put('/:id', async (req: any, res: Response) => {
   try {
     const parsed = campaignUpdateSchema.parse(req.body);
@@ -4314,9 +4336,12 @@ const prospectQueuePatchSchema = z.object({
   priority: z.enum(['high', 'normal']).optional(),
   note: z.string().max(2000).nullable().optional(),
   assigned_to: z.string().min(1).nullable().optional(),
+  // Migration 262 — account-family grouping (one owner → one operator/thread).
+  account_family: z.string().max(120).nullable().optional(),
 });
 
-// PATCH /prospect-queue/:id — update priority / note / assigned_to (claim semantics).
+// PATCH /prospect-queue/:id — update priority / note / assigned_to (claim semantics)
+// / account_family (identity — also editable on hold/in_thread).
 router.patch('/prospect-queue/:id', async (req: any, res: Response) => {
   try {
     const parsed = prospectQueuePatchSchema.parse(req.body);
@@ -4324,6 +4349,7 @@ router.patch('/prospect-queue/:id', async (req: any, res: Response) => {
       priority: parsed.priority,
       note: parsed.note,
       assigned_to: parsed.assigned_to,
+      account_family: parsed.account_family,
     }, getCtx(req));
     res.json({ success: true, data: updated });
   } catch (error) {

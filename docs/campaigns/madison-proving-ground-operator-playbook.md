@@ -11,6 +11,11 @@
 
 **Constraint:** 100% remote. No walk-ins. Madison proves the remote motion before Milwaukee / Twin Cities expansion.
 
+**System surfaces (implemented — Migration 262):**
+- Cockpit: `/settings/admin/marketing-ops/proving-grounds/<campaignId>` — PG-01 preflight checklist, tree funnel + gates, dedup verdict panel, children attach/detach, due-today, gap log.
+- Worklist: `/settings/admin/marketing-ops/queue` — filter `source_campaign_ids` by the tree; **Log** button on each seeded row records the touch and advances the cadence.
+- The cadence table below is **implemented** in `ProvingGroundCadenceService.logTouch` — logging an outcome stamps `next_touch_at`, advances/strikes ladder rungs, enforces the touch cap, and exits to `in_thread`/`hold`/`dismissed` automatically. This doc is the *rationale*; the service is the *mechanism*.
+
 ---
 
 ## The Funnel (what "done" looks like at each stage)
@@ -34,29 +39,31 @@ Stage names in the system: `seek → preview_built → shown → paid → delive
 
 ## Phase 0 — Pre-Flight Checklist (before any touch)
 
-Do these once, in order. Each blocks the next.
+These steps are seeded as the **PG-01 playbook checklist** on the proving-ground campaign — resolve them in the cockpit's checklist surface, in order. Each blocks the next.
 
-- [ ] **Reconcile cross-campaign duplicates.** Four entities appear in both audits:
-  - Istanbul Super Market / "Istanbul Market" (745 S Gammon) → owned by **competitive** campaign, Tier 1 #3
-  - Halal & Hijab Market = Amal Halal Market (807 S Gammon) → **competitive**, Tier 2 #4
-  - India House (709 S Gammon) → `insufficient` in Middle Eastern audit, `verified` in Indian audits → **emerging** campaign owns it
+- [ ] **Reconcile cross-campaign duplicates** *(PG-01 step 1 — the cockpit's duplicate panel)*. Record each resolution as a **dedup verdict** (`POST /presence-seeds/dedup-verdicts`, `same_entity` or `distinct`) — verdicts are persisted and resolved groups stop surfacing in the funnel's `duplicateSeedCount` and weekly reviews. Known groups:
+  - Istanbul Super Market / "Istanbul Market" (745 S Gammon) → `same_entity`, merge into the competitive campaign's seed; Tier 1 #3
+  - Halal & Hijab Market = Amal Halal Market (807 S Gammon) → `same_entity` → **competitive**, Tier 2 #4
+  - India House (709 S Gammon) → `insufficient` in Middle Eastern audit, `verified` in Indian audits → `distinct` (or exclude from the ME group); **emerging** campaign owns it
   - Maharaja (1701 Thierer) → `verified` both places → benchmark in emerging; do not pitch twice
-  - Also dedupe *within* emerging: **Swagat = Krishna Foods** (same phone/address, 6717 Odana)
-- [ ] **Seed unclaimed place entries** for all 13 contactable prospects (10 competitive + 6 emerging − 3 overlaps − holds). Verify each entry's NAP against the audit's `discovery_provenance` before seeding — do not propagate name variants into the canonical record.
+  - Also dedupe *within* emerging: **Swagat = Krishna Foods** (same phone/address, 6717 Odana) → `same_entity`
+- [ ] **Seed unclaimed place entries** *(PG-01 step 2 — `POST /presence-seeds/proving-ground-seed`)* for all 13 contactable prospects (10 competitive + 6 emerging − 3 overlaps − holds). The endpoint creates + publishes each seed, links it to the source intelligence campaign, issues the claim token, and stamps `queue.seed_id`. Verify each entry's NAP against the audit's `discovery_provenance` before seeding — do not propagate name variants into the canonical record (a `same_entity` verdict also merges the alias into the survivor's `name_variants`).
 - [ ] **Generate claim-invite QR links** per prospect (surface = `claim_invite`) so scans attribute correctly in `inviteScans`.
 - [ ] **Build per-prospect gap-map one-pagers** (the leave-behind / textable link): their gate failures side-by-side with the gold-standard exemplar (Sahadi's/Phoenicia for Middle Eastern; Krishna/Maharaja for Indian).
 - [ ] **Resolve open verifications** (see Gap Log below): Little Tibet phone, Apne Bazaar owner name, Madison International Market open/closed status.
-- [ ] **Sequence each prospect's channel ladder before Touch 1.** For every prospect, write down the ordered channel list derived *only from audited evidence* — never assume a channel exists because it's common. Each channel must have a provenance source in the audit or a Phase-0 verification:
+- [ ] **Sequence each prospect's channel ladder before Touch 1** *(PG-01 step 6 — persisted as `channel_sequence` on the queue row; rendered as rung chips in the worklist)*. For every prospect, write down the ordered channel list derived *only from audited evidence* — never assume a channel exists because it's common. Each channel must have a provenance source in the audit or a Phase-0 verification:
   - Phone → which number, from which source, and are there variants (Amal has two; Go/Gooh confusion means verify the 284-7277 line is the store's, not the marketplace's)
   - Text/WhatsApp → only if the phone is a mobile line (unknown for landline-looking 608 numbers — mark "try, watch for unread")
   - Email / website contact form → only if a live owned site was verified in `discovery_provenance` (Namaste's `business.site` and Go Grocer's Grubhub link do **not** count — no owned form exists)
   - Postal QR mailer → storefront address confirmed in provenance (Apne, Madison Halal Meat)
   - Referral/community path → anchor named (UW list for India House, FCI for Little Tibet, Cap Times owner names for Apne/Little Tibet)
-  
-  Output per prospect: `channel_sequence = [call → text → form → mailer → referral]` with any dead/absent channels already removed, so the cadence table never routes into a channel that doesn't exist. This is also where cross-campaign ordering is set — prospects sharing an owner (Tairov family) share one sequence and one thread.
-- [ ] **Assign a single operator owner per account family.** The Tairov/Tairova family (Istanbul + both Fresh Marts) is ONE account — one operator, one thread, three storefront gap-maps.
+
+  Output per prospect: `channel_sequence = [call → text → form → mailer → referral]` on the queue row, with any dead/absent channels already removed — the cadence engine never routes into a `dead` rung. This is also where cross-campaign ordering is set — prospects sharing an owner (Tairov family) share one sequence and one thread.
+- [ ] **Assign a single operator owner per account family** *(PG-01 step 7 — set `account_family` on the queue row; editable from the row's family chip, including on hold/in_thread)*. The Tairov/Tairova family (Istanbul + both Fresh Marts) is ONE account — one operator, one thread, three storefront gap-maps.
 
 ### Gap Log — assumptions in the current docs that need filling
+
+*Append entries via the cockpit's "+ log gap" form (`POST /api/admin/marketing-ops/:id/gap-log`) — append-only; corrections are new entries.*
 
 | Gap | Why it matters | Action |
 |-----|----------------|--------|
@@ -92,12 +99,14 @@ Do these once, in order. Each blocks the next.
 **Touch 1 rules:**
 - One channel per touch, but channels **sequence on signal, not on a fixed calendar**. Each outcome has its own wait-before-next-channel (below).
 - Every touch ends with the same CTA: *"Claim your free listing"* — never a paid tier on Touch 1.
-- Log each touch in `outreach_log` with channel + script variant + **outcome signal**; this feeds `touches` → `cacEstimate` and drives the cadence table.
+- Log each touch with the worklist's **Log** button (`POST /prospect-queue/:id/log-touch`). The canonical record is `directory_seed_outreach_touches` on the seed — it feeds `touches` → `cacEstimate`, advances the ladder, and stamps `next_touch_at`. (`mkt_outreach_log` gets a mirror only after the prospect graduates to a business campaign.)
 - **Send window:** grocery owners answer mid-morning (9:30–11:30) and mid-afternoon (2–4), never at lunch/dinner rush or Friday afternoon (halal-community prayer window).
 
 ### Channel Escalation Cadence
 
 Each prospect's channel order was fixed in Phase 0 (`channel_sequence` checklist item) — this table says *when* to advance down that pre-built ladder, never which channel to improvise. The signal — not elapsed days — determines the wait. A hard-negative signal means the *channel* is wrong, so don't wait at all; a soft/no-signal means the prospect may simply not have seen it, so give it a real window.
+
+*Canonical outcome names (the Log modal): wrong number → `bad_number`, no answer → `no_answer`, voicemail → `voicemail`, text read-no-reply → `read_no_reply`, text unread → `unread`, email no-reply → `no_reply`, bounce → `bounce`, form submitted → `form_submitted`, mailer sent → log `channel=mail` with no outcome (+10d, then check `qr_scan_events`; a scan without claim → log another `mail` touch for the second postcard — "you checked your listing…"), referral → `referral_asked`, live contact (any channel, incl. a form reply or a delivered referral) → `connected`, disqualified → `not_interested`.*
 
 | Outcome signal | What it means | Wait before next touch | Next channel |
 |---|---|---|---|
@@ -110,13 +119,13 @@ Each prospect's channel order was fixed in Phase 0 (`channel_sequence` checklist
 | Email bounce | Channel is dead | **0 days** | Phone; drop email from the record |
 | Website contact form submitted | Unproven — no read receipt | **7 days** | Phone call referencing the form submission |
 | Mailer sent (postal QR) | Only channel for no-phone prospects | **10 days**, then check `qr_scan_events` | Scan-without-claim → second postcard ("you checked your listing…"); no scan → referral chain or hold |
-| Referral ask made | Third-party delivery, unproven | **14 days** | Mark `hold`, +60-day follow-up |
+| Referral ask made | Third-party delivery, unproven | **14 days** | Next rung (referral usually ends the ladder → `hold` +60d) |
 
-**Escalation caps:**
-- Max **3 touches per prospect per 30 days** regardless of channel mix — after that it's `hold` + `next_follow_up_at` +60d, per Phase 3.
-- A dead-channel signal (wrong number, bounce) **never consumes a touch slot** — the prospect hasn't been touched yet.
-- One **live conversation** (answered call or replied message) resets the cadence: that prospect is now in a thread, and the ladder — not this table — drives the next move.
-- Record the outcome signal in `outreach_log` (`delivery_status` / `last_delivery_error` fields exist for this) so the cadence is auditable, not operator memory.
+**Escalation caps (enforced by `ProvingGroundCadenceService`):**
+- Max **3 consuming touches per prospect per 30 days** regardless of channel mix — after that the row moves to `hold` with `next_touch_at` +60d, per Phase 3.
+- A dead-channel signal (`bad_number`, `bounce`) **never consumes a touch slot** — the prospect hasn't been touched yet.
+- One **live conversation** (`connected`/`claimed`) exits the cadence: status → `in_thread`, `next_touch_at` cleared — the thread, not this table, drives the next move. Log `not_interested` from a thread to dismiss.
+- The logged outcome signal IS the audit trail — the cadence reads the touch rows, not operator memory.
 
 ## Phase 2 — Touch 2 (Days 8–14, non-responders only)
 
@@ -128,7 +137,7 @@ Timing is governed by the **Channel Escalation Cadence** above — a prospect ma
 
 ## Phase 3 — Touch 3 / Nurture (Days 15–30)
 
-- Non-responders after 3 touches → move to `hold`, schedule `next_follow_up_at` +60 days. Do not burn the list.
+- Non-responders after 3 consuming touches → the cadence moves them to `hold` with `next_touch_at` +60 days. Do not burn the list.
 - Partial engagers (scanned/replied but didn't claim) → 15-minute screen-share offer: "I'll fix the listing with you live."
 - Claimed prospects → NAP verification call (Phase-0 checklist item 3 metric: `napVerified`), then the Presence pitch using their own before/after.
 
@@ -144,9 +153,9 @@ Timing is governed by the **Channel Escalation Cadence** above — a prospect ma
 
 ## Measurement
 
-All funnel metrics already exist in `SeedFunnelAnalyticsService.getCohortFunnel`: `seeds`, `contactable`, `invited`, `claimed`, `claimed30d`, `napVerified`, `converted`, `touches`, `cacEstimate`, `inviteScans`, `inviteScanRate`, `potentialDuplicateSeeds` (watch this — the Swagat/Krishna and Amal/Halal & Hijab name variants will surface there).
+All funnel metrics live on the cockpit's tree funnel — `SeedFunnelAnalyticsService.getCohortFunnel` filtered to the proving ground + its intelligence children: `seeds`, `contactable`, `invited`, `claimed`, `claimed30d`, `napVerified`, `converted`, `touches`, `cacEstimate`, `inviteScans`, `inviteScanRate`, `potentialDuplicateSeeds` (resolved groups drop out once a verdict is recorded — the Swagat/Krishna and Amal/Halal & Hijab name variants are the expected first entries).
 
-Weekly review: pull the cohort report filtered to both campaign IDs, check gates G1–G4, update the Gap Log.
+Weekly review: open the cockpit, check gates G1–G4 on the combined row, resolve any new duplicate groups, and append to the Gap Log.
 
 ## What this playbook deliberately defers
 

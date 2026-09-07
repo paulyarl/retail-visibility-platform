@@ -140,6 +140,14 @@ call → voicemail (offer claim link) → Facebook page message
      → owner's preferred channel (WhatsApp) → corridor walk-in
 ```
 
+When this campaign is attached to a proving ground, log each attempt with the
+canonical outcome vocabulary so the cadence engine (`ProvingGroundCadenceService`)
+drives timing: `no_answer` (+1d, max 2 retries), `voicemail` (+3 business days,
+advance), `unread` (+2d, abandon channel), `bad_number` (dead, same-day advance),
+`connected` (→ `in_thread`), `not_interested` (dismiss). The corridor walk-in rung
+is a last resort for this discovery campaign only — proving-ground scope is
+100% remote.
+
 Efficiency note: East African Market (807 S Gammon Rd) and the African Market cluster
 (805 S Gammon Rd / 6701 Seybold Rd) share the S Gammon corridor — one trip covers a
 failed call on either.
@@ -155,7 +163,12 @@ failed call on either.
 | Unreachable after full ladder | Hold; move to watch-list; **never** record closure from silence |
 
 Directory-presence seeding follows the standard seed/claim workflow (seed tenant,
-provenance rows, publish, mint claim token, `/directory/claim/:token`). Suggested seed
+provenance rows, publish, mint claim token, `/directory/claim/:token`). **If this
+campaign is attached to a proving ground**, seed through the tree instead —
+`POST /api/admin/directory-presence/presence-seeds/proving-ground-seed` seeds +
+publishes + links the seed to this campaign + issues the claim token + stamps
+`queue.seed_id` in one call (queue stays `queued`; seeding is the start of
+outreach). Suggested seed
 batch key: `madison-african-grocery-2026` (pattern matches the Indianapolis batch).
 SNAP values may only be set with sourced evidence (SNAP retailer list, owner confirmation
 after claim, or ops-reviewed photo) — never inferred from the category label.

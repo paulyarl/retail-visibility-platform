@@ -347,6 +347,22 @@ export default function ProspectQueueClient() {
     }
   };
 
+  // Account family — identity patch (also allowed on hold/in_thread).
+  const handleSetFamily = async (entry: ProspectQueueEntry) => {
+    const next = window.prompt(
+      'Account family — prospects sharing an owner share one operator and one thread (e.g. "Tairov"). Empty to clear.',
+      entry.account_family ?? '',
+    );
+    if (next === null) return;
+    const value = next.trim() || null;
+    try {
+      await marketingOpsService.updateProspectQueue(entry.id, { account_family: value });
+      setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, account_family: value } : e));
+    } catch (err: any) {
+      setError(err.message || 'Failed to set account family');
+    }
+  };
+
   // ─── Verify-then-outreach handlers (Migration 255) ──────────────────
 
   const handleRequestVerification = async (id: string) => {
@@ -725,6 +741,21 @@ export default function ProspectQueueClient() {
                                 </span>
                               ))}
                             </div>
+                          )}
+                          {/* Account family — one owner → one operator/thread
+                              (Migration 262). Click to set/edit. */}
+                          {(entry.account_family || entry.seed_id) && (
+                            <button
+                              onClick={() => handleSetFamily(entry)}
+                              className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[9px] font-medium ${
+                                entry.account_family
+                                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+                                  : 'bg-transparent text-gray-400 border border-dashed border-gray-300 dark:border-neutral-600'
+                              }`}
+                              title="Account family — prospects sharing an owner share one operator and one thread"
+                            >
+                              {entry.account_family ? `family: ${entry.account_family}` : '+ account family'}
+                            </button>
                           )}
                         </td>
 

@@ -1022,6 +1022,9 @@ export interface ProspectQueuePatch {
   priority?: ProspectPriority;
   note?: string | null;
   assigned_to?: string | null;
+  // Migration 262 — account-family grouping (one owner → one operator/thread);
+  // also editable on hold/in_thread rows.
+  account_family?: string | null;
 }
 
 export interface ProspectQueueEntry {
@@ -1683,6 +1686,26 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch campaign');
     }
+    return result.data?.data ?? result.data;
+  }
+
+  /** POST /:id/gap-log — append a mid-run gap entry (Migration 262, spec §4.5). */
+  async appendGapLog(campaignId: string, entry: {
+    field: string;
+    description: string;
+    severity: 'critical' | 'important' | 'minor';
+    resolver: 'self' | 'staff' | 'developer';
+  }): Promise<{ id: string; entry: any }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/gap-log`,
+      { method: 'POST', body: JSON.stringify(entry) },
+      `mkt-ops-gap-log-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to append gap log');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
     return result.data?.data ?? result.data;
   }
 
