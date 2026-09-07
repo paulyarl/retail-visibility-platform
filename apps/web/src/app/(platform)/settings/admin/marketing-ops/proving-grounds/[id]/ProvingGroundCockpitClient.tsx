@@ -254,9 +254,9 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
                 ['Seeds', combined.metrics.seeds],
-                ['Verified', combined.metrics.verified],
+                ['NAP verified', combined.metrics.napVerified],
                 ['Touches', combined.metrics.touches],
-                ['Invites', combined.metrics.invitesSent],
+                ['Invites', combined.metrics.invited],
                 ['Claimed', combined.metrics.claimed],
                 ['CAC est.', combined.metrics.cacEstimate != null ? `$${combined.metrics.cacEstimate.toFixed(0)}` : '—'],
               ].map(([label, val]) => (
