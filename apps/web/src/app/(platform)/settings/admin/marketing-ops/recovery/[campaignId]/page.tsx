@@ -1,7 +1,12 @@
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import RecoveryDetailClient from './RecoveryDetailClient';
 
-export default function RecoveryDetailPage({ params }: { params: { campaignId: string } }) {
+export default async function RecoveryDetailPage({
+  params,
+}: {
+  params: Promise<{ campaignId: string }>;
+}) {
+  const { campaignId } = await params;
   return (
     <MarketingOpsPageShell
       title="Recovery Campaign"
@@ -13,7 +18,7 @@ export default function RecoveryDetailPage({ params }: { params: { campaignId: s
         { label: 'Recovery' },
       ]}
     >
-      <RecoveryDetailClient campaignId={params.campaignId} />
+      <RecoveryDetailClient campaignId={campaignId} />
     </MarketingOpsPageShell>
   );
 }

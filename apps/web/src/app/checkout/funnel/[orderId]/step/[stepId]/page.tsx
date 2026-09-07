@@ -6,11 +6,12 @@ export const metadata = {
   description: 'Exclusive offer just for you',
 };
 
-export default function FunnelStepPage({
+export default async function FunnelStepPage({
   params,
 }: {
-  params: { orderId: string; stepId: string };
+  params: Promise<{ orderId: string; stepId: string }>;
 }) {
+  const { orderId, stepId } = await params;
   return (
     <Suspense
       fallback={
@@ -22,7 +23,7 @@ export default function FunnelStepPage({
         </div>
       }
     >
-      <FunnelStepClient orderId={params.orderId} stepId={params.stepId} />
+      <FunnelStepClient orderId={orderId} stepId={stepId} />
     </Suspense>
   );
 }

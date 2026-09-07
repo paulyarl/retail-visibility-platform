@@ -1,7 +1,12 @@
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import ProvingGroundCockpitClient from './ProvingGroundCockpitClient';
 
-export default function ProvingGroundPage({ params }: { params: { id: string } }) {
+export default async function ProvingGroundPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   return (
     <MarketingOpsPageShell
       title="Proving Ground"
@@ -13,7 +18,7 @@ export default function ProvingGroundPage({ params }: { params: { id: string } }
         { label: 'Proving Ground' },
       ]}
     >
-      <ProvingGroundCockpitClient campaignId={params.id} />
+      <ProvingGroundCockpitClient campaignId={id} />
     </MarketingOpsPageShell>
   );
 }
