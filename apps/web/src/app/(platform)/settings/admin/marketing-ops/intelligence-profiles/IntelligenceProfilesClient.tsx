@@ -34,6 +34,7 @@ import {
   IconEdit,
   IconSearch,
   IconExternalLink,
+  IconFlask2,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
@@ -110,6 +111,7 @@ export default function IntelligenceProfilesClient() {
   const [nbCityFilter, setNbCityFilter] = useState('');
   const [nbSearch, setNbSearch] = useState('');
   const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
+  const [promotingCampaignId, setPromotingCampaignId] = useState<string | null>(null);
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
@@ -178,6 +180,43 @@ export default function IntelligenceProfilesClient() {
       });
     } finally {
       setDeletingCampaignId(null);
+    }
+  };
+
+  // Promote an intelligence discovery campaign into a proving-ground tree
+  // (Migration 262, spec §7). One-click from the table: creates the
+  // city-scope proving_ground parent or — when one already exists for the
+  // same city+category signature — merges this run into it.
+  const handlePromoteToPg = async (c: Campaign) => {
+    setPromotingCampaignId(c.id);
+    try {
+      const res = await marketingOpsService.promoteToProvingGround(c.id);
+      const pg = res.provingGround;
+      const skippedNote = res.skipped.length > 0 ? ` ${res.skipped.length} attach${res.skipped.length === 1 ? '' : 'es'} skipped.` : '';
+      notifications.show({
+        title: res.reusedExisting ? 'Merged into Proving Ground' : 'Proving Ground Created',
+        message: (
+          <>
+            {`"${c.title || c.category || c.id}" is now attached to ${pg.title || pg.id}.${skippedNote} `}
+            <Link href={`/settings/admin/marketing-ops/proving-grounds/${pg.id}`} style={{ color: 'var(--mantine-color-violet-6)', fontWeight: 600 }}>
+              Open cockpit →
+            </Link>
+          </>
+        ),
+        color: 'violet',
+        icon: <IconFlask2 size={16} />,
+        autoClose: 8000,
+      });
+      await fetchNonBusinessCampaigns();
+    } catch (err) {
+      notifications.show({
+        title: 'Promote Failed',
+        message: (err as Error).message,
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setPromotingCampaignId(null);
     }
   };
 
@@ -694,6 +733,32 @@ export default function IntelligenceProfilesClient() {
                               >
                                 <IconEdit size={14} />
                               </ActionIcon>
+                              {/* PG: intelligence runs promote/merge into a proving ground;
+                                  existing proving grounds jump straight to the cockpit. */}
+                              {c.scope === 'intelligence' && !c.parent_campaign_id && (
+                                <ActionIcon
+                                  variant="light"
+                                  color="violet"
+                                  size="sm"
+                                  title="Promote to proving ground (merges into the existing one for this market)"
+                                  loading={promotingCampaignId === c.id}
+                                  onClick={() => handlePromoteToPg(c)}
+                                >
+                                  <IconFlask2 size={14} />
+                                </ActionIcon>
+                              )}
+                              {c.campaign_category === 'proving_ground' && (
+                                <ActionIcon
+                                  component={Link}
+                                  href={`/settings/admin/marketing-ops/proving-grounds/${c.id}`}
+                                  variant="filled"
+                                  color="violet"
+                                  size="sm"
+                                  title="Open proving ground cockpit"
+                                >
+                                  <IconFlask2 size={14} />
+                                </ActionIcon>
+                              )}
                               <Menu position="bottom-end" withinPortal>
                                 <Menu.Target>
                                   <ActionIcon
