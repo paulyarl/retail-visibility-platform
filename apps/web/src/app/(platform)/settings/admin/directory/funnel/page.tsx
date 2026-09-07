@@ -8,8 +8,9 @@ import directoryPresenceAdminService, {
   type CohortFunnelReport,
   type GateResult,
   type CohortFunnelMetrics,
+  type PotentialDuplicateSeed,
 } from '@/services/DirectoryPresenceAdminService';
-import { TrendingUp, Funnel, AlertTriangle, CheckCircle, XCircle, MinusCircle, Download } from 'lucide-react';
+import { TrendingUp, Funnel, AlertTriangle, CheckCircle, XCircle, MinusCircle, Download, Link2, Unlink, Loader2, FlaskConical } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,9 +47,32 @@ export default function SeedFunnelPage() {
     fetchFunnel();
   }, [fetchFunnel]);
 
+  const [verdictBusy, setVerdictBusy] = useState<string | null>(null);
+
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchFunnel();
+  };
+
+  // Dedup verdict — same as the proving-ground cockpit's panel: records a
+  // same_entity/distinct verdict on the group; resolved groups drop out of
+  // duplicateSeedCount on the next fetch (Migration 262, spec §4.9).
+  const handleVerdict = async (group: PotentialDuplicateSeed, verdict: 'same_entity' | 'distinct') => {
+    const key = group.seedIds.join(',');
+    setVerdictBusy(key);
+    try {
+      await directoryPresenceAdminService.recordDedupVerdict({
+        seedIds: group.seedIds,
+        matchKey: group.matchKey,
+        verdict,
+        mergeInto: verdict === 'same_entity' ? group.seedIds[0] : undefined,
+      });
+      await fetchFunnel();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to record verdict');
+    } finally {
+      setVerdictBusy(null);
+    }
   };
 
   if (loading && !report) {
@@ -170,8 +194,27 @@ export default function SeedFunnelPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Per-Campaign Cohorts</h2>
           </div>
           {report.cohorts.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6 text-center text-gray-500">
-              No cohorts match the current filters.
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-8 text-center">
+              <Funnel className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                No cohorts match the current filters. Cohorts appear once seeds are linked to a
+                campaign — typically via a proving ground's preflight seeding step.
+              </p>
+              <div className="flex items-center justify-center gap-3 text-sm">
+                <Link
+                  href="/settings/admin/marketing-ops/proving-grounds"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
+                >
+                  <FlaskConical className="w-3.5 h-3.5" />
+                  Proving Grounds
+                </Link>
+                <Link
+                  href="/settings/admin/directory/presence-seeds"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
+                >
+                  Presence Seeds →
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-4 mb-8">
@@ -216,32 +259,55 @@ export default function SeedFunnelPage() {
                 </h2>
               </div>
               <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                Detection-only — no auto-merge. Review and consolidate manually (spec §3.1).
+                Detection-only — no auto-merge. Record a verdict to resolve each group; resolved
+                groups drop out of this count (spec §3.1 / §4.9).
               </p>
               <div className="space-y-2">
-                {report.potentialDuplicateSeeds.map((dup, i) => (
-                  <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-medium text-amber-600 uppercase">{dup.matchKey}</span>
-                        <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                          {dup.names.join(' ↔ ')}
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        {dup.seedIds.map((sid) => (
-                          <Link
-                            key={sid}
-                            href={`/settings/admin/directory/presence-seeds/${sid}`}
-                            className="text-xs text-blue-600 hover:underline"
+                {report.potentialDuplicateSeeds.map((dup, i) => {
+                  const key = dup.seedIds.join(',');
+                  return (
+                    <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <span className="text-xs font-medium text-amber-600 uppercase">{dup.matchKey}</span>
+                          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                            {dup.names.join(' ↔ ')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex gap-1 mr-2">
+                            {dup.seedIds.map((sid) => (
+                              <Link
+                                key={sid}
+                                href={`/settings/admin/directory/presence-seeds/${sid}`}
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                {sid.slice(0, 8)}…
+                              </Link>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => handleVerdict(dup, 'same_entity')}
+                            disabled={verdictBusy === key}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+                            title="Same entity — merges identity into the first seed"
                           >
-                            {sid.slice(0, 8)}…
-                          </Link>
-                        ))}
+                            {verdictBusy === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                            Same entity
+                          </button>
+                          <button
+                            onClick={() => handleVerdict(dup, 'distinct')}
+                            disabled={verdictBusy === key}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 disabled:opacity-50"
+                          >
+                            <Unlink className="w-3 h-3" />
+                            Distinct
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -433,7 +499,17 @@ function CohortCard({ cohort }: { cohort: CohortFunnelReport }) {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-white">
-            {cohort.displayId || cohort.cohortKey}
+            {cohort.campaignId ? (
+              <Link
+                href={`/settings/admin/marketing-ops/campaigns/${cohort.campaignId}`}
+                className="hover:underline hover:text-blue-600 dark:hover:text-blue-400"
+                title="Open campaign"
+              >
+                {cohort.displayId || cohort.cohortKey}
+              </Link>
+            ) : (
+              cohort.displayId || cohort.cohortKey
+            )}
           </h3>
           {cohort.category && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
