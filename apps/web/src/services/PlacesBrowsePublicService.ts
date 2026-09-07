@@ -53,6 +53,28 @@ export interface PlacesByCategoryResponse {
   count: number;
 }
 
+export interface CategoryEnrichmentMarket {
+  categoryName: string;
+  city: string;
+  state: string;
+}
+
+export interface CategoryEnrichmentEffective {
+  metaTitle: string;
+  description: string;
+  keywords: string[];
+  schemaTypeHint: string | null;
+  secondaryCategories: string[];
+  synonyms: string[];
+}
+
+export interface CategoryEnrichmentResponse {
+  market: CategoryEnrichmentMarket | null;
+  effective: CategoryEnrichmentEffective;
+  overridden: { description: boolean; metaTitle: boolean; keywords: boolean };
+  enrichedAt: string;
+}
+
 class PlacesBrowsePublicService extends PublicApiSingleton {
   private static instance: PlacesBrowsePublicService;
 
@@ -105,6 +127,37 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         categorySlug: data.categorySlug,
         places: data.places || [],
         count: data.count || 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** GET /api/public/directory/category-enrichment — effective category SEO */
+  async getCategoryEnrichment(
+    categorySlug: string,
+    city?: string,
+    state?: string,
+  ): Promise<CategoryEnrichmentResponse | null> {
+    try {
+      const qs = new URLSearchParams();
+      qs.set('category', categorySlug);
+      if (city) qs.set('city', city);
+      if (state) qs.set('state', state);
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/category-enrichment?${qs.toString()}`,
+        { method: 'GET' },
+        `category-enrichment-${categorySlug}-${city || 'all'}-${state || 'all'}`,
+        5 * 60 * 1000,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      if (!data || !data.market) return null;
+      return {
+        market: data.market,
+        effective: data.effective,
+        overridden: data.overridden,
+        enrichedAt: data.enrichedAt,
       };
     } catch {
       return null;

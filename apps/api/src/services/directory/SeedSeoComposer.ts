@@ -499,3 +499,107 @@ export function buildSeoEnrichmentJson(packet: SeedSeoPacket): {
     generated_at: new Date().toISOString(),
   };
 }
+
+// ─── Category-level packet ─────────────────────────────────────────────────
+
+export interface CategorySeoPacket {
+  metaTitle: string;
+  description: string;
+  keywords: string[];
+  secondaryCategories: string[];
+  schemaTypeHint: string | null;
+  inputs: { intelligenceProfileId: string | null; goldStandardProfileId: string | null };
+  composerVersion: number;
+}
+
+function composeCategoryMetaTitle(categoryName: string, city: string, state: string): string {
+  const title = `${categoryName} in ${city}, ${state} — VisibleShelf Places`;
+  return truncateAtWordBoundary(title, META_TITLE_MAX);
+}
+
+function composeCategoryDescription(
+  categoryName: string,
+  city: string,
+  state: string,
+  filteredSynonyms: string[],
+): string {
+  const base = `Browse ${categoryName} businesses in ${city}, ${state}, listed on VisibleShelf from public information.`;
+  const related = filteredSynonyms.slice(0, 3).filter((s) => s.length <= 60);
+  let text = base;
+  if (related.length > 0) {
+    text += ` Related: ${related.join(', ')}.`;
+  }
+  return truncateAtWordBoundary(text, DESCRIPTION_MAX);
+}
+
+function filterProhibitedSynonyms(
+  synonyms: string[] | undefined,
+  prohibitedKeywords: Set<string>,
+): string[] {
+  if (!synonyms) return [];
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const syn of synonyms) {
+    const lower = syn.toLowerCase().trim();
+    if (!lower || prohibitedKeywords.has(lower) || seen.has(lower)) continue;
+    seen.add(lower);
+    result.push(syn);
+  }
+  return result;
+}
+
+export function buildCategorySeoPacket(input: {
+  categoryKey: string;
+  categoryName: string;
+  city: string;
+  state: string | null;
+  intelligenceProfile: IntelligenceProfileSeoFields | null;
+  goldStandard: GoldStandardSeoFields | null;
+}): CategorySeoPacket {
+  const { categoryName, city, state, intelligenceProfile, goldStandard } = input;
+  const effectiveState = state ?? '';
+
+  const prohibitedKeywords = new Set<string>();
+  if (intelligenceProfile?.prohibitedKeywords) {
+    for (const kw of intelligenceProfile.prohibitedKeywords) {
+      prohibitedKeywords.add(kw.toLowerCase().trim());
+    }
+  }
+
+  const filteredSynonyms = filterProhibitedSynonyms(
+    intelligenceProfile?.synonyms,
+    prohibitedKeywords,
+  );
+
+  const metaTitle = composeCategoryMetaTitle(categoryName, city, effectiveState);
+  const description = composeCategoryDescription(
+    categoryName,
+    city,
+    effectiveState,
+    filteredSynonyms,
+  );
+
+  const syntheticCampaign: CampaignSeoFields = {
+    businessName: categoryName,
+    category: categoryName,
+    addressCity: city,
+    addressState: effectiveState,
+  };
+
+  const keywords = composeKeywords(syntheticCampaign, null, intelligenceProfile, goldStandard, prohibitedKeywords);
+  const secondaryCategories = composeSecondaryCategories(syntheticCampaign, null, intelligenceProfile);
+  const schemaTypeHint = composeSchemaTypeHint(syntheticCampaign, null, intelligenceProfile);
+
+  return {
+    metaTitle,
+    description,
+    keywords,
+    secondaryCategories,
+    schemaTypeHint,
+    inputs: {
+      intelligenceProfileId: intelligenceProfile?.profileId ?? null,
+      goldStandardProfileId: goldStandard?.profileId ?? null,
+    },
+    composerVersion: COMPOSER_VERSION,
+  };
+}

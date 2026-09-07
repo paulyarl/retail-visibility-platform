@@ -28,6 +28,7 @@ import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { validateAttachment } from '../validators/recovery-intake.schema';
 import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
+import CategoryMarketEnrichmentService from '../services/CategoryMarketEnrichmentService';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1215,6 +1216,52 @@ router.get('/claim/:token/slug-patterns', async (req: Request, res: Response) =>
     });
   } catch (error: any) {
     logger.error('[GET /api/public/directory/claim/:token/slug-patterns] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/category-enrichment — effective category SEO for category pages */
+router.get('/category-enrichment', async (req: Request, res: Response) => {
+  try {
+    const category = req.query.category as string | undefined;
+    const city = req.query.city as string | undefined;
+    const state = req.query.state as string | undefined;
+
+    if (!category || !city) {
+      return res.json({ market: null });
+    }
+
+    const market = await CategoryMarketEnrichmentService.getInstance().getMarket(category, city, state);
+    if (!market) {
+      return res.json({ market: null });
+    }
+
+    res.json({
+      success: true,
+      market: {
+        categoryName: market.categoryName,
+        city: market.city,
+        state: market.state,
+      },
+      effective: {
+        metaTitle: market.effective.metaTitle,
+        description: market.effective.description,
+        keywords: market.effective.keywords,
+        schemaTypeHint: market.effective.schemaTypeHint,
+        secondaryCategories: market.effective.secondaryCategories,
+        synonyms: market.synonyms,
+      },
+      overridden: {
+        description: market.override.description !== null,
+        metaTitle: market.override.metaTitle !== null,
+        keywords: market.override.keywords !== null,
+      },
+      enrichedAt: market.enrichedAt.toISOString(),
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/category-enrichment] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

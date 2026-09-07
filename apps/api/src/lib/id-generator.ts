@@ -1270,6 +1270,16 @@ export function generateDirectorySeedCampaignLinkId(tenantId: string): string {
  * Format: dsug-{nanoid12}
  * URL-safe, readable, unique, global (not tenant-scoped)
  */
+export function generateCategoryMarketEnrichmentId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `cme-${nanoid()}`;
+}
+
+export function generateListingEnrichmentLogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `dlel-${nanoid()}`;
+}
+
 export function generateDirectoryPresenceSuggestionId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
   return `dsug-${nanoid()}`;

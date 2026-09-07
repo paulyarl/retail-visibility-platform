@@ -301,6 +301,7 @@ import testGbpRoutes from '../routes/test-gbp';
 import directoryAdminRoutes from '../routes/directory-admin';
 import directorySupportRoutes from '../routes/directory-support';
 import directoryPresenceAdminRoutes from '../routes/directory-presence-admin';
+import categoryEnrichmentAdminRoutes from '../routes/category-enrichment-admin';
 import directoryPresencePublicRoutes from '../routes/directory-presence-public';
 import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade';
 import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-public';
@@ -2061,6 +2062,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'admin',
     comment: 'Admin directory presence seed management (presence-seeds/* routes)',
+  },
+  {
+    path: '/api/admin/directory/category-enrichment',
+    router: categoryEnrichmentAdminRoutes,
+    domain: 'directory',
+    authLevel: 'admin',
+    comment: 'Category market enrichment administration',
   },
   {
     path: '/api/admin/growth-engine',

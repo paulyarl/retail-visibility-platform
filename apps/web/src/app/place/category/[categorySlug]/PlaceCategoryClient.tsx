@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import placesBrowsePublicService, {
   PlaceListing,
+  type CategoryEnrichmentResponse,
 } from '@/services/PlacesBrowsePublicService';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
@@ -23,6 +24,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 interface PlaceCategoryClientProps {
   categorySlug: string;
   city?: string;
+  state?: string;
 }
 
 function formatCategoryName(slug: string): string {
@@ -35,34 +37,37 @@ function formatCategoryName(slug: string): string {
 export default function PlaceCategoryClient({
   categorySlug,
   city,
+  state,
 }: PlaceCategoryClientProps) {
   const [places, setPlaces] = useState<PlaceListing[]>([]);
+  const [enrichment, setEnrichment] = useState<CategoryEnrichmentResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const categoryName = formatCategoryName(categorySlug);
+  const categoryName = enrichment?.market?.categoryName ?? formatCategoryName(categorySlug);
 
   useEffect(() => {
-    const fetchPlaces = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await placesBrowsePublicService.getPlacesByCategory(
-          categorySlug,
-          city,
-        );
-        if (data) {
-          setPlaces(data.places);
+        const [placesData, enrichmentData] = await Promise.all([
+          placesBrowsePublicService.getPlacesByCategory(categorySlug, city),
+          city ? placesBrowsePublicService.getCategoryEnrichment(categorySlug, city, state) : Promise.resolve(null),
+        ]);
+        if (placesData) {
+          setPlaces(placesData.places);
         } else {
           setError('Failed to load places.');
         }
+        setEnrichment(enrichmentData);
       } catch {
         setError('Failed to load places.');
       } finally {
         setLoading(false);
       }
     };
-    fetchPlaces();
-  }, [categorySlug, city]);
+    fetchData();
+  }, [categorySlug, city, state]);
 
   if (loading) {
     return (
@@ -80,16 +85,39 @@ export default function PlaceCategoryClient({
     );
   }
 
-  // Group by city for the city filter chips
+  // Group by city for the city filter chips; capture state for disambiguation
   const cityCounts: Record<string, number> = {};
+  const cityStateMap: Record<string, string> = {};
   for (const place of places) {
     const key = place.city || 'Unknown';
     cityCounts[key] = (cityCounts[key] || 0) + 1;
+    if (place.state && !cityStateMap[key]) {
+      cityStateMap[key] = place.state;
+    }
   }
   const cities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
 
+  const jsonLd = enrichment
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: enrichment.effective.metaTitle || categoryName,
+        description: enrichment.effective.description,
+        url:
+          typeof window !== 'undefined'
+            ? window.location.href
+            : `https://visibleshelf.com/place/category/${categorySlug}`,
+      }
+    : null;
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
       {/* Header */}
       <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -118,7 +146,17 @@ export default function PlaceCategoryClient({
                   {categoryName}
                 </h1>
               </div>
-              <p className="text-neutral-600 dark:text-neutral-400">
+              {enrichment?.effective?.description && (
+                <p className="text-neutral-600 dark:text-neutral-400 max-w-3xl">
+                  {enrichment.effective.description}
+                </p>
+              )}
+              {enrichment?.effective?.synonyms && enrichment.effective.synonyms.length > 0 && (
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                  Related: {enrichment.effective.synonyms.join(', ')}
+                </p>
+              )}
+              <p className="text-neutral-600 dark:text-neutral-400 mt-2">
                 {places.length} {places.length === 1 ? 'place' : 'places'} listed
                 {city ? ` in ${city}` : ''}
               </p>
@@ -145,21 +183,25 @@ export default function PlaceCategoryClient({
               >
                 All cities
               </Link>
-              {cities.map(([cityName, count]) => (
-                <Link
-                  key={cityName}
-                  href={`/place/category/${categorySlug}?city=${encodeURIComponent(cityName)}`}
-                  className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full transition-colors ${
-                    city === cityName
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-600'
-                  }`}
-                >
-                  <MapPin className="w-3 h-3" />
-                  {cityName}
-                  <span className="font-medium">{count}</span>
-                </Link>
-              ))}
+              {cities.map(([cityName, count]) => {
+                const stateForCity = cityStateMap[cityName];
+                const stateQs = stateForCity ? `&state=${encodeURIComponent(stateForCity)}` : '';
+                return (
+                  <Link
+                    key={cityName}
+                    href={`/place/category/${categorySlug}?city=${encodeURIComponent(cityName)}${stateQs}`}
+                    className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full transition-colors ${
+                      city === cityName
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+                    }`}
+                  >
+                    <MapPin className="w-3 h-3" />
+                    {cityName}
+                    <span className="font-medium">{count}</span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

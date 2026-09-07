@@ -1,26 +1,52 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import PlaceCategoryClient from './PlaceCategoryClient';
+import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ categorySlug: string }>;
-  searchParams: Promise<{ city?: string }>;
+  searchParams: Promise<{ city?: string; state?: string }>;
 }
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: PageProps): Promise<Metadata> {
   const { categorySlug } = await params;
+  const resolvedSearchParams = await searchParams;
+  const city = resolvedSearchParams.city;
+  const state = resolvedSearchParams.state;
+
   const categoryName = decodeURIComponent(categorySlug)
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
+  const enrichment = city
+    ? await placesBrowsePublicService.getCategoryEnrichment(categorySlug, city, state)
+    : null;
+
+  if (enrichment?.market) {
+    return {
+      title: enrichment.effective.metaTitle,
+      description: enrichment.effective.description,
+      keywords: enrichment.effective.keywords,
+      openGraph: {
+        title: enrichment.effective.metaTitle,
+        description: enrichment.effective.description,
+        type: 'website',
+      },
+    };
+  }
+
+  const cityClause = city ? ` in ${city}` : '';
+  const fallbackDescription = `Browse ${categoryName} businesses${cityClause} listed on VisibleShelf from public information. Find places near you and claim your listing.`;
+
   return {
     title: `${categoryName} — Places Directory — VisibleShelf`,
-    description: `Browse ${categoryName} businesses listed on VisibleShelf from public information. Find places near you and claim your listing.`,
+    description: fallbackDescription,
     openGraph: {
       title: `${categoryName} — Places Directory — VisibleShelf`,
       description: `Browse ${categoryName} businesses listed on VisibleShelf.`,
@@ -47,6 +73,7 @@ export default async function PlaceCategoryPage({ params, searchParams }: PagePr
       <PlaceCategoryClient
         categorySlug={resolvedParams.categorySlug}
         city={resolvedSearchParams.city}
+        state={resolvedSearchParams.state}
       />
     </Suspense>
   );

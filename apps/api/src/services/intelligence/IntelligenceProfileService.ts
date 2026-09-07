@@ -819,6 +819,50 @@ export class IntelligenceProfileService extends BaseService {
         version,
         categoryKey: result.category_key,
       });
+
+      // Post-activation market enrichment (non-blocking). Fire only on
+      // first activation of a city-scoped, non-gold-standard establishment
+      // profile. See CATEGORY_MARKET_ENRICHMENT_SPEC §5.3.
+      if (result.intelligence_focus !== 'gold_standards' && result.reference_city && result.reference_state) {
+        try {
+          const existing = await this.prisma.$queryRaw`SELECT 1 FROM directory_category_enrichment
+            WHERE category_key = ${result.category_key}
+              AND city = ${result.reference_city}
+              AND state = ${result.reference_state}
+            LIMIT 1` as any[];
+          if (!existing[0]) {
+            void (async () => {
+              try {
+                const CategoryMarketEnrichmentService = (await import('../CategoryMarketEnrichmentService')).default;
+                await CategoryMarketEnrichmentService.getInstance().enrichMarket(
+                  result.category_key,
+                  result.reference_city!,
+                  result.reference_state!,
+                  { triggerSource: 'profile_activated', enrichedBy: ctx?.userId },
+                  ctx,
+                );
+              } catch (err) {
+                logger.warn('post-activation market enrichment failed (non-blocking)', ctx, {
+                  error: (err as Error).message,
+                });
+              }
+            })();
+          }
+        } catch (err) {
+          logger.warn('post-activation market enrichment lookup failed (non-blocking)', ctx, {
+            error: (err as Error).message,
+          });
+        }
+      } else {
+        logger.info('market enrichment skipped after activation', ctx, {
+          profileId,
+          focus: result.intelligence_focus,
+          referenceCity: result.reference_city,
+          referenceState: result.reference_state,
+          reason: result.intelligence_focus === 'gold_standards' ? 'gold_standards' : 'out_of_scope',
+        });
+      }
+
       return result as IntelligenceProfile;
     } catch (error) {
       logger.error('IntelligenceProfileService.activateDraft failed', ctx, {
