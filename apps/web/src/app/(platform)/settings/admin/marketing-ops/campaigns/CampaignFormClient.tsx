@@ -200,6 +200,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     tones: [] as string[],
     originCountries: [] as string[],
     originRegions: [] as string[],
+    // City↔state pairing map observed across existing campaigns — used to
+    // cross-narrow the City/State SuggestiveSelects and warn on pairs that
+    // have never been seen together (e.g. "Madison" + "IN"). Novel pairs
+    // stay allowed: expanding into a new market is a legitimate action.
+    cityStates: {} as Record<string, string[]>,
+    stateCities: {} as Record<string, string[]>,
   });
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   // Profile-existence check for discovery prerequisite gating. When the
@@ -225,6 +231,19 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       .then(([{ items }, presetTones]) => {
         const recordTones = distinctValues(items, (c) => c.tone);
         const mergedTones = [...new Set([...presetTones, ...recordTones])].sort((a, b) => a.localeCompare(b));
+        // Observed city↔state pairings (case-insensitive keys, trimmed) so
+        // the two dropdowns can narrow each other and flag unseen pairs.
+        const cityStates: Record<string, Set<string>> = {};
+        const stateCities: Record<string, Set<string>> = {};
+        for (const c of items) {
+          const city = c.city?.trim();
+          const state = c.state?.trim();
+          if (!city || !state) continue;
+          const ck = city.toLowerCase();
+          const sk = state.toLowerCase();
+          (cityStates[ck] ??= new Set()).add(state);
+          (stateCities[sk] ??= new Set()).add(city);
+        }
         setVocab({
           categories: distinctValues(items, (c) => c.category),
           cities: distinctValues(items, (c) => c.city),
@@ -235,6 +254,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           tones: mergedTones,
           originCountries: distinctValues(items, (c) => (c as any).business_origin_country),
           originRegions: distinctValues(items, (c) => (c as any).business_origin_region),
+          cityStates: Object.fromEntries(Object.entries(cityStates).map(([k, v]) => [k, [...v].sort()])),
+          stateCities: Object.fromEntries(Object.entries(stateCities).map(([k, v]) => [k, [...v].sort()])),
         });
       })
       .catch(() => {});
@@ -427,6 +448,33 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // ─── City↔State family awareness ──────────────────────────────────────
+  // The two SuggestiveSelects are backed by vocab observed across existing
+  // campaigns. When one sibling is set, the other's options narrow to pairs
+  // seen together; picking a city observed in exactly one state auto-fills
+  // state. A both-set pair never seen together surfaces a soft warning —
+  // not a block, since expanding into a new market is legitimate.
+  const cityKey = form.city.trim().toLowerCase();
+  const stateKey = form.state.trim().toLowerCase();
+  const statesSeenWithCity = cityKey ? vocab.cityStates[cityKey] : undefined;
+  const citiesSeenInState = stateKey ? vocab.stateCities[stateKey] : undefined;
+  const cityOptions = citiesSeenInState?.length ? citiesSeenInState : vocab.cities;
+  const stateOptions = statesSeenWithCity?.length ? statesSeenWithCity : vocab.states;
+  const cityStateMismatch = !!(
+    form.city && form.state &&
+    statesSeenWithCity &&
+    !statesSeenWithCity.some((s) => s.toLowerCase() === stateKey)
+  );
+
+  const handleCityChange = (v: string) => {
+    setForm((prev) => {
+      const observed = vocab.cityStates[v.trim().toLowerCase()];
+      const autoState =
+        !prev.state.trim() && observed?.length === 1 ? observed[0] : prev.state;
+      return { ...prev, city: v, state: autoState };
+    });
   };
 
   // Smart-paste handler for Address Line 1: if the pasted/typed value looks
@@ -947,17 +995,28 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             </FormField>
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="City" required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'}>
-              <SuggestiveSelect required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'} value={form.city} onChange={(v) => handleChange('city', v)}
-                options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
+              <SuggestiveSelect required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'} value={form.city} onChange={handleCityChange}
+                options={cityOptions} emptyLabel="-- Select city --" newLabel="+ New city..."
                 newInputPlaceholder="Enter new city" className={inputClass} />
+              {citiesSeenInState && (
+                <p className="text-xs text-gray-400 mt-1">Showing cities observed in {form.state} — use <span className="font-medium">+ New city</span> for a new market.</p>
+              )}
             </FormField>
             )}
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="State" required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'}>
               <SuggestiveSelect required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'} value={form.state} onChange={(v) => handleChange('state', v)}
-                options={vocab.states} emptyLabel="-- Select state --" newLabel="+ New state..."
+                options={stateOptions} emptyLabel="-- Select state --" newLabel="+ New state..."
                 newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
-              <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
+              {cityStateMismatch ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  &ldquo;{form.city}&rdquo; has only been used with {statesSeenWithCity!.join(', ')} — double-check the city/state pairing.
+                </p>
+              ) : statesSeenWithCity ? (
+                <p className="text-xs text-gray-400 mt-1">Showing states observed with {form.city}.</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
+              )}
             </FormField>
             )}
             <FormField label="Neighborhood">
