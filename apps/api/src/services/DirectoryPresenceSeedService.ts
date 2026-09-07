@@ -2351,7 +2351,7 @@ class DirectoryPresenceSeedService {
 
   private async resolveProfileForMarket(
     categoryKey: string,
-    city: string,
+    city: string | null,
     ctx?: RequestCtx,
   ): Promise<{ id: string; category_name: string; configuration_json: any } | null> {
     const service = IntelligenceProfileService;
@@ -2436,11 +2436,17 @@ class DirectoryPresenceSeedService {
       select: { source_name: true, updated_at: true, value: true },
     });
 
+    const sourceName = packet.inputs.auditId
+      ? 'linked_campaign'
+      : packet.inputs.intelligenceProfileId
+        ? 'market_enrichment'
+        : 'none';
+
     return {
       seedId,
       packet,
-      sourceName: provenance?.source_name || 'none',
-      composedAt: provenance?.updated_at || null,
+      sourceName,
+      composedAt: provenance?.source_name === sourceName ? provenance.updated_at : null,
       currentDescription: row.description || null,
       provenanceValue: provenance?.value || null,
     };
@@ -2457,7 +2463,13 @@ class DirectoryPresenceSeedService {
     if (!seed[0]) throw new Error('seed_not_found');
     const row = seed[0];
 
-    const composed = await this.getComposedEnrichment(seedId, ctx);
+    const composeCtx: RequestCtx = {
+      region: 'us-east-1',
+      userId: ctx?.actorId,
+      ip: ctx?.ip,
+      userAgent: ctx?.userAgent,
+    };
+    const composed = await this.getComposedEnrichment(seedId, composeCtx);
     const packet = composed.packet as SeedSeoPacket;
     const now = new Date();
 
@@ -2548,7 +2560,6 @@ class DirectoryPresenceSeedService {
       action: 'directory_enrichment.operator_reset',
       actor: ctx?.actorId,
       actorType: ctx?.actorType || 'user',
-      target: seedId,
       payload: { seedId, listingId: row.listing_id, category: packet.inputs.intelligenceProfileId },
     });
 

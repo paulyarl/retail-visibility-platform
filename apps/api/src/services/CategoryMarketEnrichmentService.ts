@@ -286,10 +286,21 @@ class CategoryMarketEnrichmentService extends BaseService {
       throw new Error('market_not_found');
     }
 
+    const remaining = await this.prisma.directory_category_enrichment.findUnique({
+      where: { id: row.id },
+      select: {
+        operator_override_description: true,
+        operator_override_meta_title: true,
+        operator_override_keywords: true,
+        override_by: true,
+        override_at: true,
+      },
+    });
+
     const updateData: any = { updated_at: new Date() };
     if (opts.resetDescription) {
       updateData.operator_override_description = null;
-    } else if (opts.overrideDescription !== undefined) {
+    } else if (opts.overrideDescription !== undefined && opts.overrideDescription !== null) {
       if (opts.overrideDescription.length > 1000) {
         throw new Error('description_too_long');
       }
@@ -297,49 +308,44 @@ class CategoryMarketEnrichmentService extends BaseService {
     }
     if (opts.resetMetaTitle) {
       updateData.operator_override_meta_title = null;
-    } else if (opts.overrideMetaTitle !== undefined) {
+    } else if (opts.overrideMetaTitle !== undefined && opts.overrideMetaTitle !== null) {
       if (opts.overrideMetaTitle.length > 70) {
         throw new Error('meta_title_too_long');
       }
       updateData.operator_override_meta_title = opts.overrideMetaTitle;
     }
     if (opts.resetKeywords) {
-      updateData.operator_override_keywords = { set: [] };
-    } else if (opts.overrideKeywords !== undefined) {
+      updateData.operator_override_keywords = [];
+    } else if (opts.overrideKeywords !== undefined && opts.overrideKeywords !== null) {
       if (opts.overrideKeywords.length > 15) {
         throw new Error('keywords_too_long');
       }
       updateData.operator_override_keywords = opts.overrideKeywords;
     }
 
-    const anyOverride =
-      updateData.operator_override_description !== undefined ||
-      updateData.operator_override_meta_title !== undefined ||
-      updateData.operator_override_keywords !== undefined;
+    const wroteDescription = opts.overrideDescription !== undefined && opts.overrideDescription !== null;
+    const wroteMetaTitle = opts.overrideMetaTitle !== undefined && opts.overrideMetaTitle !== null;
+    const wroteKeywords = opts.overrideKeywords !== undefined && opts.overrideKeywords !== null;
+    const anyOverride = wroteDescription || wroteMetaTitle || wroteKeywords;
     const anyReset = opts.resetDescription || opts.resetMetaTitle || opts.resetKeywords;
+
+    const finalDescription = updateData.operator_override_description !== undefined
+      ? updateData.operator_override_description
+      : (remaining?.operator_override_description ?? null);
+    const finalMetaTitle = updateData.operator_override_meta_title !== undefined
+      ? updateData.operator_override_meta_title
+      : (remaining?.operator_override_meta_title ?? null);
+    const finalKeywords = updateData.operator_override_keywords !== undefined
+      ? (updateData.operator_override_keywords || [])
+      : (remaining?.operator_override_keywords || []);
+    const hasAnyOverride = !!(finalDescription || finalMetaTitle || finalKeywords.length > 0);
 
     if (anyOverride) {
       updateData.override_by = overrideBy || null;
       updateData.override_at = new Date();
-    } else if (anyReset) {
-      // If all override columns are now null, clear attribution.
-      const remaining = await this.prisma.directory_category_enrichment.findUnique({
-        where: { id: row.id },
-        select: {
-          operator_override_description: true,
-          operator_override_meta_title: true,
-          operator_override_keywords: true,
-        },
-      });
-      if (
-        remaining &&
-        !remaining.operator_override_description &&
-        !remaining.operator_override_meta_title &&
-        (!remaining.operator_override_keywords || remaining.operator_override_keywords.length === 0)
-      ) {
-        updateData.override_by = null;
-        updateData.override_at = null;
-      }
+    } else if (anyReset && !hasAnyOverride) {
+      updateData.override_by = null;
+      updateData.override_at = null;
     }
 
     await this.prisma.directory_category_enrichment.update({
@@ -352,7 +358,6 @@ class CategoryMarketEnrichmentService extends BaseService {
       action,
       actor: overrideBy,
       actorType: 'user',
-      target: row.id,
       payload: {
         market: { categoryKey: normalizedKey, city: normalizedCity, state: normalizedState },
         override: {
@@ -823,7 +828,7 @@ class CategoryMarketEnrichmentService extends BaseService {
 
   private async resolveProfileForMarket(
     categoryKey: string,
-    city: string,
+    city: string | null,
     ctx?: RequestCtx,
   ): Promise<{ id: string; category_name: string; configuration_json: any } | null> {
     const service = IntelligenceProfileService.getInstance();
@@ -1102,7 +1107,6 @@ class CategoryMarketEnrichmentService extends BaseService {
       action: triggerSource === 'operator_reset' ? 'directory_enrichment.operator_reset' : 'directory_enrichment.operator_override',
       actor: overrideBy,
       actorType: 'user',
-      target: listing.id,
       payload: {
         tenantId,
         projected,

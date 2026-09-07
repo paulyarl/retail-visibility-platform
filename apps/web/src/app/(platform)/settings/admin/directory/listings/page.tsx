@@ -6,9 +6,12 @@ import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 import DirectoryListingsTable from '@/components/admin/directory/DirectoryListingsTable';
 import FeatureListingModal from '@/components/admin/directory/FeatureListingModal';
+import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import { clientLogger } from '@/lib/client-logger';
-import { Rocket, X, AlertTriangle } from 'lucide-react';
+import { Rocket, X, AlertTriangle, Save, RotateCcw } from 'lucide-react';
 import { getTierInfo } from '@/lib/tiers';
+
+const DISCLOSURE_SENTENCE = ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -34,6 +37,19 @@ export default function AdminDirectoryListingsPage() {
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [spawnedCampaign, setSpawnedCampaign] = useState<{ id: string; businessName?: string; category: string } | null>(null);
   const [reEnrichSuccess, setReEnrichSuccess] = useState<string | null>(null);
+
+  // Edit SEO modal state
+  const [seoModalOpen, setSeoModalOpen] = useState(false);
+  const [seoTenantId, setSeoTenantId] = useState('');
+  const [seoTenantName, setSeoTenantName] = useState('');
+  const [seoState, setSeoState] = useState<any | null>(null);
+  const [seoLoading, setSeoLoading] = useState(false);
+  const [seoSaving, setSeoSaving] = useState(false);
+  const [seoError, setSeoError] = useState<string | null>(null);
+  const [seoDescription, setSeoDescription] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState('');
+  const [seoResetDescription, setSeoResetDescription] = useState(false);
+  const [seoResetKeywords, setSeoResetKeywords] = useState(false);
 
   const { listings, loading, error, availableTiers, featureListing, unfeatureListing, spawnCampaign, reEnrich } = useAdminDirectoryListings(filters);
 
@@ -103,6 +119,84 @@ export default function AdminDirectoryListingsPage() {
       clientLogger.error('Failed to re-enrich listing:', { detail: err });
     }
   };
+
+  const openSeoModal = async (tenantId: string, tenantName: string) => {
+    setSeoTenantId(tenantId);
+    setSeoTenantName(tenantName);
+    setSeoModalOpen(true);
+    setSeoError(null);
+    setSeoLoading(true);
+    try {
+      const state = await directoryPresenceAdminService.getTenantSeoState(tenantId);
+      setSeoState(state);
+      const currentDesc = state?.current?.seoDescription
+        ? stripDisclosure(state.current.seoDescription)
+        : '';
+      setSeoDescription(currentDesc);
+      setSeoKeywords((state?.current?.seoKeywords || []).join(', '));
+      setSeoResetDescription(false);
+      setSeoResetKeywords(false);
+    } catch (err) {
+      setSeoError(err instanceof Error ? err.message : 'Failed to load SEO state');
+    } finally {
+      setSeoLoading(false);
+    }
+  };
+
+  const closeSeoModal = () => {
+    setSeoModalOpen(false);
+    setSeoState(null);
+    setSeoError(null);
+  };
+
+  const handleSaveSeo = async () => {
+    setSeoError(null);
+    try {
+      setSeoSaving(true);
+      const keywordsArray = seoKeywords
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean);
+      const payload: any = {};
+      if (seoResetDescription) {
+        payload.reset_description = true;
+      } else if (seoDescription.trim()) {
+        payload.seo_description = seoDescription.trim();
+      } else {
+        payload.seo_description = '';
+      }
+      if (seoResetKeywords) {
+        payload.reset_keywords = true;
+      } else if (seoKeywords.trim()) {
+        payload.seo_keywords = keywordsArray;
+      } else {
+        payload.seo_keywords = [];
+      }
+      const state = await directoryPresenceAdminService.overrideTenantSeo(seoTenantId, payload);
+      setSeoState(state);
+      const currentDesc = state?.current?.seoDescription
+        ? stripDisclosure(state.current.seoDescription)
+        : '';
+      setSeoDescription(currentDesc);
+      setSeoKeywords((state?.current?.seoKeywords || []).join(', '));
+      setSeoResetDescription(false);
+      setSeoResetKeywords(false);
+      setReEnrichSuccess(`SEO updated for ${seoTenantName}.`);
+      closeSeoModal();
+    } catch (err) {
+      setSeoError(err instanceof Error ? err.message : 'Failed to update SEO');
+    } finally {
+      setSeoSaving(false);
+    }
+  };
+
+  function stripDisclosure(text: string): string {
+    return text.endsWith(DISCLOSURE_SENTENCE) ? text.slice(0, -DISCLOSURE_SENTENCE.length) : text;
+  }
+
+  const isOwnerDescription = !!seoState?.ownerAuthored?.description;
+  const isOwnerKeywords = !!seoState?.ownerAuthored?.keywords;
+  const previewDescription = (seoDescription.trim() ? seoDescription.trim() : seoState?.composed?.description || '') + DISCLOSURE_SENTENCE;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -258,6 +352,7 @@ export default function AdminDirectoryListingsPage() {
             onUnfeature={handleUnfeature}
             onSpawnCampaign={handleSpawnCampaign}
             onReEnrich={handleReEnrich}
+            onEditSeo={openSeoModal}
           />
 
           <FeatureListingModal
@@ -349,6 +444,139 @@ export default function AdminDirectoryListingsPage() {
                   >
                     <Rocket className="w-4 h-4" />
                     {spawning ? 'Spawning...' : 'Spawn Campaign'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit SEO Modal */}
+          {seoModalOpen && (
+            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Edit SEO</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{seoTenantName}</p>
+                  </div>
+                  <button onClick={closeSeoModal} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  {seoLoading ? (
+                    <div className="text-sm text-gray-500">Loading SEO state…</div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                          Composed description (read-only)
+                        </label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
+                          {seoState?.composed?.description || '—'}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Override description (≤ 500 chars)
+                          </label>
+                          <div className="flex items-start gap-2">
+                            <textarea
+                              rows={4}
+                              value={seoDescription}
+                              onChange={(e) => setSeoDescription(e.target.value)}
+                              disabled={seoResetDescription || isOwnerDescription}
+                              maxLength={500}
+                              className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                            />
+                            <label className="inline-flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap mt-2">
+                              <input
+                                type="checkbox"
+                                checked={seoResetDescription}
+                                onChange={(e) => setSeoResetDescription(e.target.checked)}
+                                disabled={isOwnerDescription}
+                              />
+                              <RotateCcw className="w-3 h-3" /> Reset
+                            </label>
+                          </div>
+                          {isOwnerDescription && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Owner-edited description is locked. Reset is disabled.
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">{seoDescription.length}/500 characters</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Live preview (with disclosure)
+                          </label>
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-gray-700 dark:text-gray-300 min-h-[104px]">
+                            {previewDescription}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Override keywords (comma-separated, ≤ 10)
+                        </label>
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="text"
+                            value={seoKeywords}
+                            onChange={(e) => setSeoKeywords(e.target.value)}
+                            disabled={seoResetKeywords || isOwnerKeywords}
+                            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                            placeholder="african grocery, west african foods"
+                          />
+                          <label className="inline-flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap mt-2">
+                            <input
+                              type="checkbox"
+                              checked={seoResetKeywords}
+                              onChange={(e) => setSeoResetKeywords(e.target.checked)}
+                              disabled={isOwnerKeywords}
+                            />
+                            <RotateCcw className="w-3 h-3" /> Reset
+                          </label>
+                        </div>
+                        {isOwnerKeywords && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            Owner-edited keywords are locked. Reset is disabled.
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {seoKeywords.split(',').map((k) => k.trim()).filter(Boolean).length} keywords
+                        </p>
+                      </div>
+
+                      {seoError && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                          {seoError}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                  <button
+                    onClick={closeSeoModal}
+                    disabled={seoSaving}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveSeo}
+                    disabled={seoLoading || seoSaving || (isOwnerDescription && isOwnerKeywords)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    {seoSaving ? 'Saving...' : 'Save SEO'}
                   </button>
                 </div>
               </div>

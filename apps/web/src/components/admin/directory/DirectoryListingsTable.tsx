@@ -12,6 +12,7 @@ interface DirectoryListingsTableProps {
   onUnfeature: (tenantId: string) => void;
   onSpawnCampaign: (tenantId: string, tenantName: string, category?: string) => void;
   onReEnrich?: (tenantId: string, tenantName: string) => void;
+  onEditSeo?: (tenantId: string, tenantName: string) => void;
 }
 
 export default function DirectoryListingsTable({
@@ -20,6 +21,7 @@ export default function DirectoryListingsTable({
   onUnfeature,
   onSpawnCampaign,
   onReEnrich,
+  onEditSeo,
 }: DirectoryListingsTableProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -160,6 +162,14 @@ export default function DirectoryListingsTable({
               >
                 Spawn Campaign
               </button>
+              {onEditSeo && (
+                <button
+                  onClick={() => onEditSeo(listing.tenant_id, listing.businessName)}
+                  className="flex-1 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                >
+                  Edit SEO
+                </button>
+              )}
               {onReEnrich && (
                 <button
                   onClick={() => onReEnrich(listing.tenant_id, listing.businessName)}
@@ -335,6 +345,14 @@ export default function DirectoryListingsTable({
                       className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-200"
                     >
                       Re-enrich
+                    </button>
+                  )}
+                  {onEditSeo && (
+                    <button
+                      onClick={() => onEditSeo(listing.tenant_id, listing.businessName)}
+                      className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"
+                    >
+                      Edit SEO
                     </button>
                   )}
                   <Link

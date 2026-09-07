@@ -45,6 +45,9 @@ const PROVENANCE_FIELD_KEYS = [
   'secondary_categories',
 ] as const;
 
+const DISCLOSURE_SENTENCE =
+  ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
   'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
@@ -123,6 +126,11 @@ const STATUS_COLORS: Record<string, string> = {
   suppressed: 'bg-red-100 text-red-700',
 };
 
+function stripDisclosure(text: string | null | undefined): string {
+  if (!text) return '';
+  return text.endsWith(DISCLOSURE_SENTENCE) ? text.slice(0, -DISCLOSURE_SENTENCE.length) : text;
+}
+
 function formatDate(value: string | Date | null | undefined): string {
   if (!value) return '—';
   const d = typeof value === 'string' ? new Date(value) : value;
@@ -168,6 +176,10 @@ export default function PresenceSeedDetailPage() {
   const [editPrimaryCategory, setEditPrimaryCategory] = useState('');
   const [editSecondaryCategories, setEditSecondaryCategories] = useState<string[]>([]);
   const [editSlug, setEditSlug] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [composedEnrichment, setComposedEnrichment] = useState<any | null>(null);
+  const [composedLoading, setComposedLoading] = useState(false);
+  const [resettingEnrichment, setResettingEnrichment] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -184,9 +196,25 @@ export default function PresenceSeedDetailPage() {
     }
   }, [seedId]);
 
+  const loadComposed = useCallback(async () => {
+    try {
+      setComposedLoading(true);
+      const result = await directoryPresenceAdminService.getSeedComposed(seedId);
+      setComposedEnrichment(result);
+    } catch (err) {
+      clientLogger.error('Failed to load composed enrichment:', { detail: err });
+    } finally {
+      setComposedLoading(false);
+    }
+  }, [seedId]);
+
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
+
+  useEffect(() => {
+    if (seedId) loadComposed();
+  }, [seedId, loadComposed]);
 
   const handlePublish = async () => {
     setActionError(null);
@@ -322,6 +350,25 @@ export default function PresenceSeedDetailPage() {
     }
   };
 
+  const handleResetEnrichment = async () => {
+    if (!confirm('Reset description and keywords to the composed market enrichment?')) return;
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setResettingEnrichment(true);
+      const result = await directoryPresenceAdminService.resetSeedOverride(seedId);
+      setComposedEnrichment(result);
+      setActionSuccess('Enrichment reset to composed market values.');
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to reset enrichment',
+      );
+    } finally {
+      setResettingEnrichment(false);
+    }
+  };
+
   const seed = detail?.seed as any;
   const listing = detail?.listing as any;
   const provenance = detail?.provenance ?? [];
@@ -371,6 +418,7 @@ export default function PresenceSeedDetailPage() {
   const startEditing = () => {
     setEditPhone(listing?.phone ?? '');
     setEditWebsite(listing?.website ?? '');
+    setEditDescription(stripDisclosure(listing?.description));
     setEditPrimaryCategory(seed?.category ?? listing?.primary_category ?? '');
     setEditSecondaryCategories(
       Array.isArray(listing?.secondary_categories) ? listing.secondary_categories : [],
@@ -444,6 +492,7 @@ export default function PresenceSeedDetailPage() {
       const fields: any = {
         phone: editPhone.trim() || undefined,
         website: editWebsite.trim() || undefined,
+        description: editDescription.trim() || null,
         primaryCategory: editPrimaryCategory.trim() || null,
         secondaryCategories: editSecondaryCategories,
         address: editAddress.trim() || undefined,
@@ -506,6 +555,23 @@ export default function PresenceSeedDetailPage() {
           value: undefined,
           sourceName: editHoursSource.trim() || undefined,
           sourceUrl: editHoursSourceUrl.trim() || undefined,
+          confidence: 'high',
+          showOnPublic: true,
+        });
+        provenanceUpdates.length = 0;
+        provenanceUpdates.push(...filtered);
+      }
+
+      // Add/replace description provenance when the operator overrides description
+      if (editDescription.trim()) {
+        const filtered = provenanceUpdates.filter(
+          (p) => p.fieldKey !== 'description',
+        );
+        filtered.push({
+          fieldKey: 'description',
+          value: editDescription.trim(),
+          sourceName: 'operator_override',
+          sourceUrl: undefined,
           confidence: 'high',
           showOnPublic: true,
         });
@@ -1215,6 +1281,45 @@ export default function PresenceSeedDetailPage() {
         )}
       </section>
 
+      {/* Composed Enrichment (Phase 4) */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Composed enrichment</h2>
+          <button
+            onClick={handleResetEnrichment}
+            disabled={resettingEnrichment || composedLoading}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {resettingEnrichment ? 'Resetting…' : 'Reset to composed'}
+          </button>
+        </div>
+        {composedLoading ? (
+          <p className="text-sm text-gray-500">Loading composed enrichment…</p>
+        ) : composedEnrichment ? (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Composed description (read-only)
+              </label>
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-mono whitespace-pre-wrap">
+                {composedEnrichment.packet?.description || '—'}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+              <span>
+                Source: <span className="font-medium text-gray-700">{composedEnrichment.sourceName || 'none'}</span>
+              </span>
+              <span>
+                Last composed: {formatDate(composedEnrichment.composedAt)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No composed enrichment available.</p>
+        )}
+      </section>
+
       {/* Linked Campaigns (Migration 230) */}
       <LinkedCampaignsPanel
         seedId={seedId}
@@ -1262,6 +1367,25 @@ export default function PresenceSeedDetailPage() {
                 onChange={(e) => setEditWebsite(e.target.value)}
                 placeholder="https://"
               />
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description (overrides composed enrichment)
+              </label>
+              <textarea
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                rows={4}
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                maxLength={500}
+                placeholder="Operator-written description. The disclosure sentence is appended on save."
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {editDescription.length}/500 characters. The disclosure sentence is appended when saved.
+              </p>
             </div>
           </div>
 

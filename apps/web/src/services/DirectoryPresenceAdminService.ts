@@ -1014,7 +1014,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'override_market_failed');
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'override_market_failed');
+    }
     const data = result.data?.data ?? result.data;
     return data?.result as EnrichedMarket;
   }
@@ -1027,7 +1030,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'get_tenant_seo_failed');
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'get_tenant_seo_failed');
+    }
     const data = result.data?.data ?? result.data;
     return data?.state ?? data;
   }
@@ -1064,7 +1070,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'compose_seed_failed');
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'compose_seed_failed');
+    }
     const data = result.data?.data ?? result.data;
     return data?.result ?? data;
   }
@@ -1077,7 +1086,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'reset_seed_failed');
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'reset_seed_failed');
+    }
     const data = result.data?.data ?? result.data;
     return data?.result ?? data;
   }
