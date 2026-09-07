@@ -17,6 +17,7 @@ import {
   X,
   Plus,
   ArrowRight,
+  Rocket,
 } from 'lucide-react';
 
 const NAP_CONFIDENCE_COLORS: Record<string, string> = {
@@ -46,9 +47,13 @@ const ALL_PROJECTION_FIELDS = [
 interface Props {
   seedId: string;
   canEdit: boolean;
+  /** Seed's current category — pre-fills the spawn-campaign modal. */
+  seedCategory?: string;
+  /** Seed's business name — shown in the spawn-campaign modal for context. */
+  seedBusinessName?: string;
 }
 
-export default function LinkedCampaignsPanel({ seedId, canEdit }: Props) {
+export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, seedBusinessName }: Props) {
   const [links, setLinks] = useState<DirectorySeedCampaignLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +75,13 @@ export default function LinkedCampaignsPanel({ seedId, canEdit }: Props) {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [unlinksyncingId, setUnlinkingId] = useState<string | null>(null);
+
+  // Spawn campaign modal state
+  const [showSpawn, setShowSpawn] = useState(false);
+  const [spawnCategory, setSpawnCategory] = useState('');
+  const [spawnNotes, setSpawnNotes] = useState('');
+  const [spawnLinkRole, setSpawnLinkRole] = useState<'primary' | 'sibling' | 'recovery'>('primary');
+  const [spawning, setSpawning] = useState(false);
 
   const fetchLinks = useCallback(async () => {
     try {
@@ -192,6 +204,38 @@ export default function LinkedCampaignsPanel({ seedId, canEdit }: Props) {
     }
   };
 
+  const openSpawn = () => {
+    setShowSpawn(true);
+    setSpawnCategory(seedCategory || '');
+    setSpawnNotes('');
+    setSpawnLinkRole('primary');
+    setActionError(null);
+    setActionSuccess(null);
+  };
+
+  const handleSpawn = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setSpawning(true);
+      const result = await directoryPresenceAdminService.spawnCampaignFromSeed(seedId, {
+        category: spawnCategory.trim() || undefined,
+        notes: spawnNotes.trim() || undefined,
+        linkRole: spawnLinkRole,
+      });
+      setActionSuccess(
+        `Spawned campaign "${result.campaign?.business_name || result.campaign?.id}" and linked as ${spawnLinkRole}.` +
+        (result.autoProjected ? ' NAP matched with high confidence — signals auto-projected.' : ''),
+      );
+      setShowSpawn(false);
+      fetchLinks();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to spawn campaign');
+    } finally {
+      setSpawning(false);
+    }
+  };
+
   if (loading) {
     return (
       <section className="bg-white border border-gray-200 rounded-xl p-6">
@@ -213,12 +257,21 @@ export default function LinkedCampaignsPanel({ seedId, canEdit }: Props) {
           </p>
         </div>
         {canEdit && (
-          <button
-            onClick={openPicker}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            <Plus className="w-4 h-4" /> Link Campaign
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openSpawn}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+              title="Create a new business-scope campaign from this seed's NAP and link it"
+            >
+              <Rocket className="w-4 h-4" /> Spawn Campaign
+            </button>
+            <button
+              onClick={openPicker}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4" /> Link Campaign
+            </button>
+          </div>
         )}
       </div>
 
@@ -524,6 +577,109 @@ export default function LinkedCampaignsPanel({ seedId, canEdit }: Props) {
                   {syncing ? 'Syncing...' : `Project ${selectedFields.length} field(s)`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spawn campaign modal */}
+      {showSpawn && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Spawn a campaign</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Creates a new business-scope marketing campaign from this seed&apos;s NAP
+                  and links it immediately.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSpawn(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {seedBusinessName && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    Business name
+                  </label>
+                  <p className="text-sm text-gray-900">{seedBusinessName}</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={spawnCategory}
+                  onChange={(e) => setSpawnCategory(e.target.value)}
+                  placeholder={seedCategory || 'Leave blank to use seed category'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Override the marketing niche category if the directory category
+                  doesn&apos;t match. Leave blank to inherit the seed category.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Link role
+                </label>
+                <select
+                  value={spawnLinkRole}
+                  onChange={(e) => setSpawnLinkRole(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="primary">primary</option>
+                  <option value="sibling">sibling</option>
+                  <option value="recovery">recovery</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  &lsquo;primary&rsquo; is blocked if a primary link already exists — use
+                  &lsquo;sibling&rsquo; or &lsquo;recovery&rsquo; instead.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  value={spawnNotes}
+                  onChange={(e) => setSpawnNotes(e.target.value)}
+                  placeholder="Defaults to a seed-origin note."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                <AlertTriangle className="inline w-4 h-4 mr-1" />
+                The campaign starts at the <strong>seek</strong> stage (triage). If an
+                active campaign with the same business-scope signature already exists, the
+                structural-duplicate guardrail will block creation — link the existing
+                campaign instead.
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowSpawn(false)}
+                disabled={spawning}
+                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSpawn}
+                disabled={spawning}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                <Rocket className="w-4 h-4" />
+                {spawning ? 'Spawning...' : 'Spawn & Link'}
+              </button>
             </div>
           </div>
         </div>

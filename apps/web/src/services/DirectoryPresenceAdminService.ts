@@ -822,6 +822,37 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean };
   }
 
+  /** POST /api/admin/directory-presence/presence-seeds/:id/spawn-campaign
+   *  Spawn a business-scope marketing campaign from the seed's NAP and link
+   *  it. Returns the created campaign + link + NAP match result. */
+  async spawnCampaignFromSeed(
+    seedId: string,
+    input: {
+      category?: string;
+      notes?: string;
+      linkRole?: 'primary' | 'sibling' | 'recovery';
+    },
+  ): Promise<{
+    campaign: any;
+    link: DirectorySeedCampaignLink;
+    autoProjected: boolean;
+    napMatch: any;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/spawn-campaign`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const message = typeof err === 'string' ? err : err?.message || err?.error;
+      throw new Error(message || 'Failed to spawn campaign from seed');
+    }
+    const data = result.data?.data ?? result.data;
+    return data as { campaign: any; link: DirectorySeedCampaignLink; autoProjected: boolean; napMatch: any };
+  }
+
   // ============================
   // Claim Requests (Migration 246)
   // ============================

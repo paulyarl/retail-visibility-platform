@@ -1216,7 +1216,12 @@ export default function PresenceSeedDetailPage() {
       </section>
 
       {/* Linked Campaigns (Migration 230) */}
-      <LinkedCampaignsPanel seedId={seedId} canEdit={canEdit} />
+      <LinkedCampaignsPanel
+        seedId={seedId}
+        canEdit={canEdit}
+        seedCategory={seed?.category}
+        seedBusinessName={listing?.business_name}
+      />
 
       {/* Edit panel */}
       {editing && (

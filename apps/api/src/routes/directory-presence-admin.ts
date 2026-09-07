@@ -14,6 +14,7 @@
  *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
  *   DELETE /api/admin/directory/presence-seeds/:id — permanently delete a seed and its tenant
  *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
+ *   POST   /api/admin/directory/presence-seeds/:id/spawn-campaign — spawn a business-scope campaign from the seed's NAP and link it
  *   GET    /api/admin/directory/claim-requests           — list claim requests
  *   POST   /api/admin/directory/claim-requests/:id/approve — approve claim request
  *   POST   /api/admin/directory/claim-requests/:id/reject  — reject claim request
@@ -35,6 +36,7 @@ import {
   generateClaimInvitePostcard,
   getClaimInviteKitMeta,
 } from '../services/ClaimInviteQrKitService';
+import { HttpError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 
 const router = Router();
@@ -1322,6 +1324,69 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
     const status = statusMap[error?.message] || 500;
     if (status === 500) {
       logger.error('[POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/spawn-campaign
+ *  Spawn a business-scope marketing campaign from a seed's NAP and link it.
+ *  Reverse of /from-campaign — lets an operator leverage the marketing
+ *  architecture (audit prompts, enrichment, SEO composition, recovery
+ *  playbooks) for a seed that has no campaign yet. */
+const spawnCampaignSchema = z.object({
+  category: z.string().max(100).optional(),
+  notes: z.string().max(2000).optional(),
+  linkRole: z.enum(['primary', 'sibling', 'recovery']).optional().default('primary'),
+});
+
+router.post('/presence-seeds/:id/spawn-campaign', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = spawnCampaignSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.createCampaignFromSeed(
+      id,
+      {
+        category: validation.data.category,
+        notes: validation.data.notes,
+        linkRole: validation.data.linkRole,
+      },
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+
+    res.status(201).json({
+      success: true,
+      campaign: result.campaign,
+      link: result.link,
+      autoProjected: result.autoProjected,
+      napMatch: result.napMatch,
+    });
+  } catch (error: any) {
+    // Typed HTTP errors (ConflictError from the structural-duplicate
+    // guardrail, ValidationError from prerequisites) carry their own status.
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({ error: error.code, message: error.message });
+    }
+    const statusMap: Record<string, number> = {
+      seed_not_found: 404,
+      listing_not_found: 404,
+      incomplete_nap: 400,
+      primary_link_already_exists: 409,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory/presence-seeds/:id/spawn-campaign] Error:', undefined, {
         error: { name: error?.name || 'Error', message: error?.message || String(error) },
       });
     }

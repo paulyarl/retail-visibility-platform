@@ -2058,6 +2058,141 @@ class DirectoryPresenceSeedService {
       ORDER BY occurred_at DESC
     `;
   }
+
+  /**
+   * Spawn a business-scope marketing campaign from a directory presence seed,
+   * pre-populated with the seed's NAP (name / address / phone / website /
+   * category / geo), and immediately link it to the seed.
+   *
+   * This is the reverse of {@link createFromCampaign}: it lets an operator
+   * leverage the marketing architecture (audit prompts, enrichment actions,
+   * SEO/description composition, recovery playbooks) for a seed that has no
+   * campaign yet.
+   *
+   * The campaign is created with `scope = 'business'` and starts at the
+   * `seek` stage (standard triage entry). The operator can override the
+   * category (directory categories and marketing niche categories don't
+   * always match) and add notes. The link role defaults to `primary` but
+   * can be set to `sibling` / `recovery`.
+   *
+   * The structural-duplicate guardrail in MarketingCampaignService still
+   * applies — if an active campaign with the same business-scope signature
+   * already exists, a ConflictError (409) is thrown and the operator should
+   * link the existing campaign instead.
+   */
+  async createCampaignFromSeed(
+    seedId: string,
+    opts: {
+      category?: string;
+      notes?: string;
+      linkRole?: 'primary' | 'sibling' | 'recovery';
+    } = {},
+    ctx?: SeedAuditCtx,
+  ): Promise<{
+    campaign: any;
+    link: any;
+    autoProjected: boolean;
+    napMatch: any;
+  }> {
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT * FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+
+    const listing = await prisma.$queryRaw<any[]>`
+      SELECT * FROM directory_listings_list WHERE id = ${seed[0].listing_id} LIMIT 1
+    `;
+    if (!listing[0]) throw new Error('listing_not_found');
+
+    const s = seed[0];
+    const dl = listing[0];
+    const businessName = dl.business_name;
+    const category = (opts.category && opts.category.trim()) || s.category || '';
+    const city = dl.city || s.city || '';
+    const state = dl.state || s.state || null;
+    const phone = dl.phone || null;
+    const websiteUrl = dl.website || null;
+    const addressLine1 = dl.address || null;
+    const addressZip = dl.zip_code || null;
+
+    if (!businessName) {
+      throw new Error('incomplete_nap');
+    }
+
+    const defaultNotes =
+      `Spawned from directory presence seed ${seedId} (batch: ${s.seed_batch || '—'}). ` +
+      `Listing: ${dl.slug || dl.id}.`;
+    const notes = opts.notes != null ? opts.notes : defaultNotes;
+
+    // Dynamic import to avoid any module-load circular dependency with
+    // MarketingCampaignService (which is a large service module).
+    const { default: MarketingCampaignService } = await import('./MarketingCampaignService.js');
+
+    const requestCtx: RequestCtx = {
+      region: 'us-east-1',
+      userId: ctx?.actorId,
+      ip: ctx?.ip,
+      userAgent: ctx?.userAgent,
+    };
+
+    const campaign = await MarketingCampaignService.createCampaign(
+      {
+        scope: 'business',
+        businessName,
+        category,
+        city,
+        state: state || undefined,
+        phone: phone || undefined,
+        websiteUrl: websiteUrl || undefined,
+        addressLine1: addressLine1 || undefined,
+        addressCity: city || undefined,
+        addressState: state || undefined,
+        addressZip: addressZip || undefined,
+        addressCountry: 'US',
+        hasWebsite: websiteUrl ? 'yes' : undefined,
+        notes,
+      },
+      requestCtx,
+    );
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.spawn_campaign',
+      payload: {
+        seedId,
+        campaignId: campaign.id,
+        businessName,
+        category,
+        city,
+        state,
+      },
+    });
+
+    logger.info('DirectoryPresenceSeedService.createCampaignFromSeed', undefined, {
+      seedId,
+      campaignId: campaign.id,
+    });
+
+    // Link the freshly created campaign back to the seed. Use the requested
+    // role (default primary). linkCampaign enforces single-primary and will
+    // throw primary_link_already_exists if one is already present — surface
+    // that to the operator so they can choose a different role or unlink first.
+    const linkRole = opts.linkRole || 'primary';
+    const linkResult = await DirectorySeedCampaignLinkService.linkCampaign(
+      seedId,
+      campaign.id,
+      linkRole,
+      ctx,
+    );
+
+    return {
+      campaign,
+      link: linkResult.link,
+      autoProjected: linkResult.autoProjected,
+      napMatch: linkResult.napMatch,
+    };
+  }
 }
 
 export default new DirectoryPresenceSeedService();
