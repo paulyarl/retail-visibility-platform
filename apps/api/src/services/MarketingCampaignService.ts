@@ -278,6 +278,8 @@ export interface CampaignInput {
   notes?: string;
   parentCampaignId?: string;
   businessProspectId?: string;
+  /** Tenant that this campaign belongs to (e.g. a directory-listed tenant). */
+  tenantId?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
   intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards';
   intelligenceZipCodes?: string;
@@ -731,6 +733,7 @@ export class MarketingCampaignService extends BaseService {
           notes: input.notes || null,
           parent_campaign_id: input.parentCampaignId || null,
           business_prospect_id: input.businessProspectId || null,
+          tenant_id: input.tenantId || null,
           stage: initialStage,
           stage_entered_at: new Date(),
           // Intelligence scope fields (Sprint 3 — Migration 200)

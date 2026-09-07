@@ -282,6 +282,17 @@ export interface AdminDirectoryListing {
   qualityScore: number;
   itemCount: number;
   businessName: string;
+  seedCategory?: string | null;
+  seedStatus?: string | null;
+  campaigns?: Array<{
+    id: string;
+    displayId?: string | null;
+    businessName?: string | null;
+    category: string;
+    city?: string | null;
+    state?: string | null;
+    stage: string;
+  }>;
   tenant: {
     id: string;
     name: string;
@@ -1500,6 +1511,33 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Re-enrich a directory listing's market (category/city/state) using the
+   * latest intelligence profile and composer.
+   */
+  async reEnrichDirectoryListing(tenantId: string): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/admin/directory/listings/${tenantId}/re-enrich`,
+        { method: 'POST' },
+        `platform-re-enrich-directory-listing-${tenantId}`
+      );
+
+      // Invalidate directory listings cache so the badge/tooltip refresh
+      await this.invalidateCachePattern('platform-admin-directory-listings*');
+      await this.invalidateCachePattern('platform-admin-directory-stats*');
+
+      return result.data || result;
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to re-enrich directory listing:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
    * Spawn a business-scope marketing campaign from a tenant's directory listing.
    * Returns the created campaign object.
    */
@@ -1528,6 +1566,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       }
 
       const data = result.data?.data ?? result.data;
+
+      // Invalidate directory listings cache so the campaign column updates
+      // immediately on the admin directory listings page.
+      await this.invalidateCachePattern('platform-admin-directory-listings*');
+
       return data?.campaign ?? data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to spawn campaign from tenant listing:', { detail: error });

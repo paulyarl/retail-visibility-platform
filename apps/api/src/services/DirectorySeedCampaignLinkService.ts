@@ -444,6 +444,19 @@ class DirectorySeedCampaignLinkService {
     const listingId = r.listing_id;
     const campaignAdminUrl = `/settings/admin/marketing-ops/recovery/${campaignId}`;
 
+    // Pre-load current provenance for operator-override guard (§5.7.1).
+    // Only description/keywords/same_as are relevant for the projection fields
+    // that mutate SEO-facing columns.
+    const currentProvenance = await prisma.directory_field_provenance.findMany({
+      where: {
+        seed_id: seedId,
+        field_key: { in: ['description', 'keywords', 'same_as'] },
+      },
+    });
+    const provenanceByField = new Map(currentProvenance.map((p) => [p.field_key, p]));
+    const isOverridden = (fieldKey: string) =>
+      provenanceByField.get(fieldKey)?.source_name === 'operator_override';
+
     const setClauses: string[] = ['updated_at = now()'];
     const params: any[] = [];
     const provenanceRows: Array<{ fieldKey: string; value: string | null }> = [];
@@ -488,6 +501,10 @@ class DirectorySeedCampaignLinkService {
           // When the composer degrades (no audit, no profile), write nothing
           // rather than falling back to notes — the notes-leak path is
           // closed unconditionally, not conditionally.
+          const descriptionOverridden = isOverridden('description');
+          const keywordsOverridden = isOverridden('keywords');
+          const sameAsOverridden = isOverridden('same_as');
+
           const auditRow = await (prisma as any).mkt_audits_list.findFirst({
             where: { campaign_id: campaignId, platform: 'business_analysis' },
             orderBy: { created_at: 'desc' },
@@ -547,21 +564,38 @@ class DirectorySeedCampaignLinkService {
             });
 
             if (packet.description) {
-              addSet('description', packet.description);
-              addSet('keywords', packet.keywords);
-              addSet('same_as', packet.sameAs);
-              provenanceRows.push({ fieldKey: 'description', value: packet.description });
-              provenanceRows.push({ fieldKey: 'keywords', value: packet.keywords.join(', ') });
-              if (packet.sameAs.length > 0) {
-                provenanceRows.push({ fieldKey: 'same_as', value: packet.sameAs.join(', ') });
+              let wroteAny = false;
+              if (!descriptionOverridden) {
+                addSet('description', packet.description);
+                provenanceRows.push({ fieldKey: 'description', value: packet.description });
+                wroteAny = true;
               }
-              // Update seo_enrichment on the seed row
-              await prisma.$executeRaw`
-                UPDATE directory_presence_seeds
-                SET seo_enrichment = ${JSON.stringify(buildSeoEnrichmentJson(packet))}::jsonb, updated_at = now()
-                WHERE id = ${seedId}
-              `;
-              projected.push(field);
+              if (!keywordsOverridden) {
+                addSet('keywords', packet.keywords);
+                provenanceRows.push({ fieldKey: 'keywords', value: packet.keywords.join(', ') });
+                wroteAny = true;
+              }
+              if (!sameAsOverridden) {
+                addSet('same_as', packet.sameAs);
+                if (packet.sameAs.length > 0) {
+                  provenanceRows.push({ fieldKey: 'same_as', value: packet.sameAs.join(', ') });
+                }
+                wroteAny = true;
+              }
+
+              // Update seo_enrichment on the seed row only when at least one
+              // non-overridden field was projected. If all three are overridden,
+              // the entire description projection is skipped.
+              if (wroteAny) {
+                await prisma.$executeRaw`
+                  UPDATE directory_presence_seeds
+                  SET seo_enrichment = ${JSON.stringify(buildSeoEnrichmentJson(packet))}::jsonb, updated_at = now()
+                  WHERE id = ${seedId}
+                `;
+                projected.push(field);
+              } else {
+                skipped.push(field);
+              }
             } else {
               skipped.push(field);
             }
@@ -572,6 +606,10 @@ class DirectorySeedCampaignLinkService {
           break;
         }
         case 'originCountry':
+          if (isOverridden('keywords')) {
+            skipped.push(field);
+            break;
+          }
           if (r.business_origin_country) {
             const kw = this.mergeKeyword(r.keywords, `origin_country:${r.business_origin_country}`);
             addSet('keywords', kw);
@@ -580,6 +618,10 @@ class DirectorySeedCampaignLinkService {
           } else skipped.push(field);
           break;
         case 'originRegion':
+          if (isOverridden('keywords')) {
+            skipped.push(field);
+            break;
+          }
           if (r.business_origin_region) {
             const kw = this.mergeKeyword(r.keywords, `origin_region:${r.business_origin_region}`);
             addSet('keywords', kw);
@@ -588,6 +630,10 @@ class DirectorySeedCampaignLinkService {
           } else skipped.push(field);
           break;
         case 'neighborhood':
+          if (isOverridden('keywords')) {
+            skipped.push(field);
+            break;
+          }
           if (r.camp_neighborhood) {
             const kw = this.mergeKeyword(r.keywords, `neighborhood:${r.camp_neighborhood}`);
             addSet('keywords', kw);

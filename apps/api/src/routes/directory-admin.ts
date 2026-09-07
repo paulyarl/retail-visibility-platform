@@ -5,11 +5,13 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { z } from 'zod';
 import { generateDirectoryFeaturedId, generateProductCatId } from '../lib/id-generator';
 import { HttpError } from '../middleware/errorHandler';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import CategoryMarketEnrichmentService from '../services/CategoryMarketEnrichmentService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -93,47 +95,151 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
       prisma.directory_settings_list.count({ where }),
     ]);
 
-    // Add quality scores (basic calculation)
-    const enrichedListings = await Promise.all(
-      listings.map(async (listing) => {
-        const profile = await prisma.tenant_business_profiles_list.findUnique({
-          where: { tenant_id: listing.tenant_id },
-        });
+    // Batch enrich listings with profile, inventory counts, seed category,
+    // and any marketing campaigns tied to this tenant.
+    const tenantIds = listings.map((l) => l.tenant_id);
 
-        const itemCount = await prisma.inventory_items.count({
-          where: { tenant_id: listing.tenant_id, item_status: 'active' },
-        });
+    const [profiles, itemCounts, seeds, businessCampaigns, seedLinks, latestEnrichmentRows] = await Promise.all([
+      prisma.tenant_business_profiles_list.findMany({
+        where: { tenant_id: { in: tenantIds } },
+        select: {
+          tenant_id: true,
+          business_name: true,
+          address_line1: true,
+          city: true,
+          state: true,
+          phone_number: true,
+          email: true,
+          website: true,
+          logo_url: true,
+          hours: true,
+        },
+      }),
+      prisma.inventory_items.groupBy({
+        by: ['tenant_id'],
+        where: { tenant_id: { in: tenantIds }, item_status: 'active' },
+        _count: true,
+      }),
+      prisma.directory_presence_seeds.findMany({
+        where: { tenant_id: { in: tenantIds } },
+        select: { tenant_id: true, category: true, status: true },
+      }),
+      prisma.mkt_campaigns_list.findMany({
+        where: { tenant_id: { in: tenantIds }, scope: 'business' },
+        select: {
+          id: true,
+          tenant_id: true,
+          business_name: true,
+          category: true,
+          city: true,
+          state: true,
+          stage: true,
+          display_id: true,
+        },
+      }),
+      prisma.directory_seed_campaign_links.findMany({
+        where: { tenant_id: { in: tenantIds } },
+        include: {
+          mkt_campaigns_list: {
+            select: {
+              id: true,
+              tenant_id: true,
+              business_name: true,
+              category: true,
+              city: true,
+              state: true,
+              stage: true,
+              display_id: true,
+            },
+          },
+        },
+      }),
+      tenantIds.length
+        ? (prisma.$queryRaw`
+            SELECT DISTINCT ON (tenant_id) *
+            FROM directory_listing_enrichment_log
+            WHERE tenant_id IN (${Prisma.join(tenantIds)})
+            ORDER BY tenant_id, enriched_at DESC
+          ` as Promise<any[]>)
+        : Promise.resolve([] as any[]),
+    ]);
 
-        // Calculate quality score
-        let qualityScore = 0;
-        if (profile) {
-          if (profile.business_name) qualityScore += 15;
-          if (profile.address_line1) qualityScore += 10;
-          if (profile.city && profile.state) qualityScore += 10;
-          if (profile.phone_number) qualityScore += 10;
-          if (profile.email) qualityScore += 5;
-          if (profile.website) qualityScore += 10;
-          if (profile.logo_url) qualityScore += 10;
-          if (profile.hours) qualityScore += 10;
-        }
-        if (listing.seo_description && listing.seo_description.length > 100) qualityScore += 10;
-        if (listing.primary_category) qualityScore += 5;
-        if (itemCount > 0) qualityScore += 10;
-        if (itemCount > 10) qualityScore += 5;
-
-        return {
-          ...listing,
-          qualityScore,
-          itemCount,
-          businessName: profile?.business_name || listing.tenants?.name || 'Unknown Business',
-          tenant: listing.tenants ? {
-            id: listing.tenants.id,
-            name: listing.tenants.name,
-            subscriptionTier: listing.tenants.subscription_tier,
-          } : null,
-        };
-      })
+    const profileByTenant = new Map(profiles.map((p) => [p.tenant_id, p]));
+    const itemCountByTenant = new Map(itemCounts.map((g) => [g.tenant_id, g._count]));
+    const seedByTenant = new Map(seeds.map((s) => [s.tenant_id, s]));
+    const latestEnrichmentByTenant = new Map(
+      latestEnrichmentRows.map((row: any) => [row.tenant_id, row]),
     );
+
+    const campaignsByTenant = new Map<string, any[]>();
+    const addCampaign = (tenantId: string, campaign: any) => {
+      if (!tenantId || !campaign) return;
+      const list = campaignsByTenant.get(tenantId) || [];
+      if (!list.find((c) => c.id === campaign.id)) {
+        list.push(campaign);
+        campaignsByTenant.set(tenantId, list);
+      }
+    };
+    businessCampaigns.forEach((c) => addCampaign(c.tenant_id || '', c));
+    seedLinks.forEach((l) => addCampaign(l.tenant_id || '', l.mkt_campaigns_list));
+
+    const campaignSummary = (c: any) => ({
+      id: c.id,
+      displayId: c.display_id ?? null,
+      businessName: c.business_name ?? null,
+      category: c.category,
+      city: c.city,
+      state: c.state ?? null,
+      stage: c.stage,
+    });
+
+    const enrichedListings = listings.map((listing) => {
+      const profile = profileByTenant.get(listing.tenant_id);
+      const itemCount = itemCountByTenant.get(listing.tenant_id) || 0;
+      const seed = seedByTenant.get(listing.tenant_id);
+      const campaigns = (campaignsByTenant.get(listing.tenant_id) || []).map(campaignSummary);
+      const latestEnrichment = latestEnrichmentByTenant.get(listing.tenant_id);
+
+      // Calculate quality score
+      let qualityScore = 0;
+      if (profile) {
+        if (profile.business_name) qualityScore += 15;
+        if (profile.address_line1) qualityScore += 10;
+        if (profile.city && profile.state) qualityScore += 10;
+        if (profile.phone_number) qualityScore += 10;
+        if (profile.email) qualityScore += 5;
+        if (profile.website) qualityScore += 10;
+        if (profile.logo_url) qualityScore += 10;
+        if (profile.hours) qualityScore += 10;
+      }
+      if (listing.seo_description && listing.seo_description.length > 100) qualityScore += 10;
+      if (listing.primary_category) qualityScore += 5;
+      if (itemCount > 0) qualityScore += 10;
+      if (itemCount > 10) qualityScore += 5;
+
+      return {
+        ...listing,
+        qualityScore,
+        itemCount,
+        businessName: profile?.business_name || listing.tenants?.name || 'Unknown Business',
+        seedCategory: seed?.category ?? null,
+        seedStatus: seed?.status ?? null,
+        campaigns,
+        lastEnrichmentEvent: latestEnrichment
+          ? {
+              triggerSource: latestEnrichment.trigger_source,
+              enrichedAt: latestEnrichment.enriched_at,
+              intelligenceProfileId: latestEnrichment.intelligence_profile_id ?? null,
+              fieldsProjected: latestEnrichment.fields_projected ?? [],
+            }
+          : null,
+        tenant: listing.tenants ? {
+          id: listing.tenants.id,
+          name: listing.tenants.name,
+          subscriptionTier: listing.tenants.subscription_tier,
+        } : null,
+      };
+    });
 
     // Apply quality filter if specified
     let filteredListings = enrichedListings;
@@ -377,6 +483,50 @@ router.post('/listings/:tenantId/spawn-campaign', authenticateToken, requireAdmi
       });
     }
     res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/listings/:tenantId/re-enrich
+ * Re-run market enrichment for the category/city/state of a published listing.
+ */
+router.post('/listings/:tenantId/re-enrich', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const listing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: tenantId, is_published: true },
+    });
+    if (!listing) {
+      return res.status(404).json({ error: 'listing_not_found' });
+    }
+    if (!listing.primary_category || !listing.city || !listing.state) {
+      return res.status(400).json({ error: 'incomplete_listing_for_enrichment' });
+    }
+
+    const ctx: any = {
+      region: 'us-east-1',
+      userId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip || undefined,
+      userAgent: req.get('User-Agent') || undefined,
+    };
+
+    const result = await CategoryMarketEnrichmentService.getInstance().enrichMarket(
+      listing.primary_category,
+      listing.city,
+      listing.state,
+      {
+        triggerSource: 'manual',
+        enrichedBy: (req as any).user?.userId || (req as any).user?.id,
+      },
+      ctx,
+    );
+
+    return res.json({ success: true, result });
+  } catch (error: any) {
+    logger.error('[POST /admin/directory/listings/:tenantId/re-enrich] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack },
+    });
+    return res.status(500).json({ error: 'failed_to_re_enrich' });
   }
 });
 

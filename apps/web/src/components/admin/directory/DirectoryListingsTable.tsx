@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { AdminDirectoryListing } from '@/hooks/admin/useAdminDirectoryListings';
 import DirectoryStatusBadge from '@/components/directory/DirectoryStatusBadge';
 import Link from 'next/link';
+import { getTierInfo } from '@/lib/tiers';
 
 interface DirectoryListingsTableProps {
   listings: AdminDirectoryListing[];
   onFeature: (tenantId: string, tenantName: string) => void;
   onUnfeature: (tenantId: string) => void;
   onSpawnCampaign: (tenantId: string, tenantName: string, category?: string) => void;
+  onReEnrich?: (tenantId: string, tenantName: string) => void;
 }
 
 export default function DirectoryListingsTable({
@@ -17,6 +19,7 @@ export default function DirectoryListingsTable({
   onFeature,
   onUnfeature,
   onSpawnCampaign,
+  onReEnrich,
 }: DirectoryListingsTableProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -42,22 +45,24 @@ export default function DirectoryListingsTable({
     return 'text-red-600 dark:text-red-400';
   };
 
+  const formatEnrichmentTooltip = (event: AdminDirectoryListing['lastEnrichmentEvent']) => {
+    if (!event) return '';
+    const date = new Date(event.enrichedAt).toLocaleString();
+    const profile = event.intelligenceProfileId ? `profile ${event.intelligenceProfileId}` : 'no profile';
+    return `${event.triggerSource} · ${date} · ${profile}`;
+  };
+
   const getTierBadgeColor = (tier?: string) => {
     if (!tier) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-    
-    const colors: Record<string, string> = {
-      google_only: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-      starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      discovery: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      commitment: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-      storefront: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-      professional: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      enterprise: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      chain_starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      chain_pro: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      chain_enterprise: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    };
-    return colors[tier] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    // Use the canonical tier color from TIER_LIMITS so every tier the API
+    // returns (directory_presence, omnichannel, expired_trial, trial_*, ...)
+    // gets a consistent color instead of falling back to gray.
+    return getTierInfo(tier).color || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+  };
+
+  const getTierLabel = (tier?: string) => {
+    if (!tier) return '';
+    return getTierInfo(tier).name;
   };
 
   if (listings.length === 0) {
@@ -97,12 +102,40 @@ export default function DirectoryListingsTable({
             
             <div className="flex items-center gap-2 mb-2">
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getTierBadgeColor(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier)}`}>
-                {(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier || '').replace('_', ' ')}
+                {getTierLabel(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier)}
               </span>
               <span className={`text-sm font-medium ${getQualityColor(listing.qualityScore)}`}>
                 {listing.qualityScore}%
               </span>
+              {listing.lastEnrichmentEvent && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                  title={formatEnrichmentTooltip(listing.lastEnrichmentEvent)}
+                >
+                  SEO enriched
+                </span>
+              )}
             </div>
+
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              <span className="font-medium text-gray-900 dark:text-white">Category:</span>{' '}
+              {listing.primary_category || listing.seedCategory || '—'}
+            </div>
+
+            {listing.campaigns && listing.campaigns.length > 0 && (
+              <div className="mb-2 space-y-1">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Campaigns</span>
+                {listing.campaigns.map((campaign) => (
+                  <Link
+                    key={campaign.id}
+                    href={`/settings/admin/marketing-ops/campaigns/${campaign.id}`}
+                    className="block text-sm text-blue-600 hover:underline truncate"
+                  >
+                    {campaign.businessName || campaign.id} · {campaign.category} · {campaign.stage}
+                  </Link>
+                ))}
+              </div>
+            )}
 
             <div className="flex gap-2 flex-wrap">
               {listing.is_featured ? (
@@ -121,11 +154,19 @@ export default function DirectoryListingsTable({
                 </button>
               )}
               <button
-                onClick={() => onSpawnCampaign(listing.tenant_id, listing.businessName, listing.primary_category)}
+                onClick={() => onSpawnCampaign(listing.tenant_id, listing.businessName, listing.primary_category || listing.seedCategory || undefined)}
                 className="flex-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700"
               >
                 Spawn Campaign
               </button>
+              {onReEnrich && (
+                <button
+                  onClick={() => onReEnrich(listing.tenant_id, listing.businessName)}
+                  className="flex-1 px-3 py-1.5 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
+                >
+                  Re-enrich
+                </button>
+              )}
               <Link
                 href={`/t/${listing.tenant_id}/settings/directory`}
                 className="flex-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-center"
@@ -168,6 +209,12 @@ export default function DirectoryListingsTable({
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Category
               </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Campaign
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Enriched
+              </th>
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Actions
               </th>
@@ -200,7 +247,7 @@ export default function DirectoryListingsTable({
                 </td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTierBadgeColor(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier)}`}>
-                    {(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier || '').replace('_', ' ')}
+                    {getTierLabel(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier)}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -214,7 +261,7 @@ export default function DirectoryListingsTable({
                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                   <div className="space-y-1">
                     <div className="font-medium text-gray-900 dark:text-white">
-                      {listing.primary_category || '-'}
+                      {listing.primary_category || listing.seedCategory || '-'}
                     </div>
                     {listing.secondary_categories && listing.secondary_categories.length > 0 && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -223,6 +270,47 @@ export default function DirectoryListingsTable({
                       </div>
                     )}
                   </div>
+                </td>
+                <td className="px-6 py-4 text-left text-sm">
+                  {listing.campaigns && listing.campaigns.length > 0 ? (
+                    <div className="space-y-1">
+                      {listing.campaigns.slice(0, 2).map((campaign) => (
+                        <div key={campaign.id} className="flex items-center gap-2 min-w-0">
+                          <Link
+                            href={`/settings/admin/marketing-ops/campaigns/${campaign.id}`}
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 truncate font-medium"
+                          >
+                            {campaign.businessName || campaign.id}
+                          </Link>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {campaign.category}
+                          </span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                            {campaign.stage}
+                          </span>
+                        </div>
+                      ))}
+                      {listing.campaigns.length > 2 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          +{listing.campaigns.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">—</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-left text-sm">
+                  {listing.lastEnrichmentEvent ? (
+                    <span
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                      title={formatEnrichmentTooltip(listing.lastEnrichmentEvent)}
+                    >
+                      SEO enriched
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
                   {listing.is_featured ? (
@@ -241,11 +329,19 @@ export default function DirectoryListingsTable({
                     </button>
                   )}
                   <button
-                    onClick={() => onSpawnCampaign(listing.tenant_id, listing.businessName, listing.primary_category)}
+                    onClick={() => onSpawnCampaign(listing.tenant_id, listing.businessName, listing.primary_category || listing.seedCategory || undefined)}
                     className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200"
                   >
                     Spawn Campaign
                   </button>
+                  {onReEnrich && (
+                    <button
+                      onClick={() => onReEnrich(listing.tenant_id, listing.businessName)}
+                      className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-200"
+                    >
+                      Re-enrich
+                    </button>
+                  )}
                   <Link
                     href={`/t/${listing.tenant_id}/settings/directory`}
                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"

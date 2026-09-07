@@ -2223,11 +2223,19 @@ class DirectoryPresenceSeedService {
     `;
     if (!listing[0]) throw new Error('listing_not_found');
 
+    // Draft / directory-presence-tier seeds may not have projected their
+    // category onto the directory listing yet. Use the seed category as a
+    // fallback so the operator doesn't have to type it manually.
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT * FROM directory_presence_seeds WHERE tenant_id = ${tenantId} LIMIT 1
+    `;
+    const seedRow = seed[0];
+
     const dl = listing[0];
     const businessName = dl.business_name;
-    const category = (opts.category && opts.category.trim()) || dl.primary_category || '';
-    const city = dl.city || '';
-    const state = dl.state || null;
+    const category = (opts.category && opts.category.trim()) || dl.primary_category || seedRow?.category || '';
+    const city = dl.city || seedRow?.city || '';
+    const state = dl.state || seedRow?.state || null;
     const phone = dl.phone || null;
     const websiteUrl = dl.website || null;
     const addressLine1 = dl.address || null;
@@ -2254,6 +2262,7 @@ class DirectoryPresenceSeedService {
     const campaign = await MarketingCampaignService.createCampaign(
       {
         scope: 'business',
+        tenantId,
         businessName,
         category,
         city,
@@ -2270,6 +2279,25 @@ class DirectoryPresenceSeedService {
       },
       requestCtx,
     );
+
+    // If this tenant is a directory presence seed, link the new campaign so
+    // both the directory listings table and the seed panel show it.
+    if (seedRow) {
+      try {
+        await DirectorySeedCampaignLinkService.linkCampaign(seedRow.id, campaign.id, 'primary', ctx);
+      } catch (linkErr: any) {
+        logger.warn(
+          'DirectoryPresenceSeedService.createCampaignFromTenantListing — could not link seed campaign',
+          undefined,
+          {
+            tenantId,
+            seedId: seedRow.id,
+            campaignId: campaign.id,
+            error: linkErr?.message || String(linkErr),
+          },
+        );
+      }
+    }
 
     audit({
       actor: ctx?.actorId,

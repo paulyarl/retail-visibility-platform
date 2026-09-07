@@ -10,6 +10,8 @@ import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
+import { generateListingEnrichmentLogId } from '../lib/id-generator';
+import { normalizeCategoryKey } from '../services/intelligence/IntelligenceProfileService';
 
 const router = Router();
 
@@ -243,23 +245,84 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
     
     // Also update directory_listings_list if the listing is published
     // This ensures the public directory page reflects the changes immediately
-    await pool.query(`
-      UPDATE directory_listings_list
-      SET 
-        primary_category = $2,
-        secondary_categories = $3,
-        description = $4,
-        is_featured = $5,
-        updated_at = NOW()
-      WHERE tenant_id = $1 AND is_published = true
-    `, [
+    const setClauses = [
+      'primary_category = $2',
+      'secondary_categories = $3',
+      'is_featured = $4',
+      'updated_at = NOW()',
+    ];
+    const updateParams: any[] = [
       tenantId,
       parsed.data.primary_category || null,
       parsed.data.secondary_categories || null,
-      parsed.data.seo_description || null,
-      parsed.data.is_featured || false
-    ]);
+      parsed.data.is_featured || false,
+    ];
+    let paramIdx = 5;
+    const descriptionEdited = 'seo_description' in (req.body || {}) && req.body.seo_description !== undefined;
+    const keywordsEdited = 'seo_keywords' in (req.body || {}) && req.body.seo_keywords !== undefined;
+    if (descriptionEdited) {
+      setClauses.push(`description = $${paramIdx}`);
+      updateParams.push(parsed.data.seo_description || null);
+      paramIdx++;
+    }
+    if (keywordsEdited) {
+      setClauses.push(`keywords = $${paramIdx}`);
+      updateParams.push(parsed.data.seo_keywords || null);
+      paramIdx++;
+    }
+
+    await pool.query(
+      `UPDATE directory_listings_list SET ${setClauses.join(', ')} WHERE tenant_id = $1 AND is_published = true`,
+      updateParams,
+    );
     console.log('[PATCH /tenants/:id/directory/listing] Updated directory_listings_list');
+
+    // Owner edit provenance: stamp directory_listing_enrichment_log so market
+    // enrichment never clobbers owner-authored content.
+    if (descriptionEdited || keywordsEdited) {
+      try {
+        const listingResult = await pool.query(
+          'SELECT id, primary_category, city, state FROM directory_listings_list WHERE tenant_id = $1 AND is_published = true LIMIT 1',
+          [tenantId],
+        );
+        const listing = listingResult.rows[0];
+        if (listing) {
+          const projected: string[] = [];
+          const fieldsValues: any = {};
+          if (descriptionEdited) {
+            projected.push('description');
+            fieldsValues.description = parsed.data.seo_description || null;
+          }
+          if (keywordsEdited) {
+            projected.push('keywords');
+            fieldsValues.keywords = parsed.data.seo_keywords || [];
+          }
+          await pool.query(
+            `INSERT INTO directory_listing_enrichment_log
+              (id, tenant_id, listing_id, category_key, city, state, fields_projected, fields_skipped, skip_reasons, fields_values, intelligence_profile_id, composer_version, enriched_at, enriched_by, trigger_source)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NULL, 'owner_edit')`,
+            [
+              generateListingEnrichmentLogId(),
+              tenantId,
+              listing.id,
+              normalizeCategoryKey(listing.primary_category || ''),
+              listing.city || '',
+              listing.state || '',
+              projected,
+              [],
+              null,
+              JSON.stringify(fieldsValues),
+              null,
+              1,
+            ],
+          );
+        }
+      } catch (logErr: any) {
+        logger.error('[PATCH /tenants/:id/directory/listing] Failed to stamp owner_edit log:', undefined, {
+          error: { name: logErr?.name || 'Error', message: logErr?.message || String(logErr) },
+        });
+      }
+    }
     
     // Refresh directory_gbp_listings materialized view to sync featured status
     // This ensures the featured stores API reflects the changes immediately

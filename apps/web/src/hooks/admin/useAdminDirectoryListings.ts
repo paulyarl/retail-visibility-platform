@@ -16,6 +16,23 @@ export interface AdminDirectoryListing {
   qualityScore: number;
   itemCount: number;
   businessName: string;
+  seedCategory?: string | null;
+  seedStatus?: string | null;
+  lastEnrichmentEvent?: {
+    triggerSource: string;
+    enrichedAt: string;
+    intelligenceProfileId: string | null;
+    fieldsProjected: string[];
+  } | null;
+  campaigns?: Array<{
+    id: string;
+    displayId?: string | null;
+    businessName?: string | null;
+    category: string;
+    city?: string | null;
+    state?: string | null;
+    stage: string;
+  }>;
   tenants?: {
     id: string;
     name: string;
@@ -30,7 +47,10 @@ export interface AdminDirectoryListing {
 
 export interface DirectoryFilters {
   status?: 'published' | 'draft' | 'featured';
-  tier?: 'google_only' | 'starter'| 'discovery' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
+  // Tier values are driven by whatever subscription_tier values the API
+  // actually returns (directory_presence, omnichannel, expired_trial, trial_*, ...),
+  // so this is intentionally an open string rather than a fixed union.
+  tier?: string;
   quality?: 'low' | 'medium' | 'high';
   category?: string;
   search?: string;
@@ -48,9 +68,14 @@ export interface AdminDirectoryListingsHook {
     total: number;
     totalPages: number;
   };
+  // Distinct subscription_tier values present in the full (unfiltered) API
+  // response, sorted alphabetically. Drives the on-page tier filter so it
+  // always reflects what the API actually returns.
+  availableTiers: string[];
   featureListing: (tenantId: string, until: Date, priority?: number) => Promise<void>;
   unfeatureListing: (tenantId: string) => Promise<void>;
   spawnCampaign: (tenantId: string, input: { category?: string; notes?: string }) => Promise<any>;
+  reEnrich: (tenantId: string) => Promise<any>;
   refresh: () => Promise<void>;
 }
 
@@ -148,7 +173,8 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
       filtered = filtered.filter(l => 
         l.businessName?.toLowerCase().includes(query) ||
         l.tenant?.name?.toLowerCase().includes(query) ||
-        l.primary_category?.toLowerCase().includes(query)
+        l.primary_category?.toLowerCase().includes(query) ||
+        l.seedCategory?.toLowerCase().includes(query)
       );
     }
 
@@ -161,6 +187,18 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     total: listings.length,
     totalPages: Math.ceil(listings.length / (pagination.limit || 50)),
   }), [listings, pagination]);
+
+  // Distinct tiers present in the full dataset, so the on-page filter always
+  // reflects the API response (directory_presence, omnichannel, expired_trial,
+  // trial_*, etc.) instead of a hardcoded list that drifts from the data.
+  const availableTiers = useMemo(() => {
+    const tiers = new Set<string>();
+    for (const l of allListings) {
+      const tier = l.tenant?.subscriptionTier ?? l.tenants?.subscription_tier;
+      if (tier) tiers.add(tier);
+    }
+    return Array.from(tiers).sort((a, b) => a.localeCompare(b));
+  }, [allListings]);
 
   useEffect(() => {
     fetchListings();
@@ -194,22 +232,38 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     try {
       setError(null);
       const campaign = await platformHomeService.spawnCampaignFromTenantListing(tenantId, input);
+      await fetchListings();
       return campaign;
     } catch (err) {
       clientLogger.error('Error spawning campaign from tenant listing:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to spawn campaign');
       throw err;
     }
-  }, []);
+  }, [fetchListings]);
+
+  const reEnrich = useCallback(async (tenantId: string) => {
+    try {
+      setError(null);
+      const result = await platformHomeService.reEnrichDirectoryListing(tenantId);
+      await fetchListings();
+      return result;
+    } catch (err) {
+      clientLogger.error('Error re-enriching directory listing:', { detail: err });
+      setError(err instanceof Error ? err.message : 'Failed to re-enrich listing');
+      throw err;
+    }
+  }, [fetchListings]);
 
   return {
     listings,
     loading,
     error,
     pagination: filteredPagination,
+    availableTiers,
     featureListing,
     unfeatureListing,
     spawnCampaign,
+    reEnrich,
     refresh: fetchListings,
   };
 }

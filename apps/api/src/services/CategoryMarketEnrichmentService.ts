@@ -8,14 +8,20 @@ import {
 } from './intelligence/IntelligenceProfileService';
 import {
   buildCategorySeoPacket,
+  buildSeedSeoPacket,
+  buildSeoEnrichmentJson,
   type CategorySeoPacket,
+  type SeedSeoPacket,
+  type CampaignSeoFields,
   type IntelligenceProfileSeoFields,
   type GoldStandardSeoFields,
 } from './directory/SeedSeoComposer';
 import {
   generateCategoryMarketEnrichmentId,
+  generateListingEnrichmentLogId,
 } from '../lib/id-generator';
 import { audit } from '../audit';
+import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 
 export interface MarketState {
@@ -174,12 +180,20 @@ class CategoryMarketEnrichmentService extends BaseService {
       },
     });
 
+    const listingResult = await this.enrichMarketListings(
+      { categoryKey, city: normalizedCity, state: normalizedState },
+      profile,
+      goldStandard,
+      { triggerSource, enrichedBy },
+      ctx,
+    );
+
     return {
       marketKey: { categoryKey, city: normalizedCity, state: normalizedState },
       categoryEnrichmentId: id,
-      listingsEnriched: 0,
-      listingsSkipped: 0,
-      skipReasons: {},
+      listingsEnriched: listingResult.enriched,
+      listingsSkipped: listingResult.skipped,
+      skipReasons: listingResult.skipReasons,
     };
   }
 
@@ -236,6 +250,351 @@ class CategoryMarketEnrichmentService extends BaseService {
     `;
     if (!rows || !Array.isArray(rows) || rows.length === 0) return null;
     return await this.rowToMarketState(rows[0]);
+  }
+
+  /**
+   * Enrich all published listings that match the market key.
+   * For seed listings, guard against operator_override provenance and audit-powered
+   * linked-campaign content. For tenant listings, guard against owner_edit and
+   * operator_override log rows.
+   */
+  private async enrichMarketListings(
+    marketKey: { categoryKey: string; city: string; state: string },
+    profile: { id: string; category_name: string; configuration_json: any },
+    goldStandard: { id: string; configuration_json: any } | null,
+    opts: { triggerSource: string; enrichedBy: string | null },
+    ctx?: RequestCtx,
+  ): Promise<{ enriched: number; skipped: number; skipReasons: Record<string, number> }> {
+    const profileSeo = this.toIntelligenceProfileSeoFields(profile);
+    const goldSeo = this.toGoldStandardSeoFields(goldStandard);
+    const pageSize = 200;
+    let skip = 0;
+    let enriched = 0;
+    let skipped = 0;
+    const skipReasons: Record<string, number> = {};
+
+    while (true) {
+      const listings = await this.prisma.directory_listings_list.findMany({
+        where: {
+          is_published: true,
+          primary_category: { equals: profile.category_name, mode: 'insensitive' },
+          city: { equals: marketKey.city, mode: 'insensitive' },
+          state: { equals: marketKey.state, mode: 'insensitive' },
+        },
+        include: { directory_presence_seeds: true },
+        take: pageSize,
+        skip,
+      });
+      if (listings.length === 0) break;
+
+      const listingIds = listings.map((l) => l.id);
+      const seedIds = listings
+        .map((l) => l.directory_presence_seeds?.id)
+        .filter(Boolean) as string[];
+
+      const [seedProvenanceRows, latestLogByListingId] = await Promise.all([
+        seedIds.length
+          ? this.prisma.directory_field_provenance.findMany({
+              where: {
+                seed_id: { in: seedIds },
+                field_key: { in: ['description', 'keywords'] },
+              },
+            })
+          : Promise.resolve([] as any[]),
+        this.getLatestLogsByListingId(listingIds),
+      ]);
+
+      const seedProvenanceMap = new Map<string, Map<string, any>>();
+      for (const row of seedProvenanceRows) {
+        if (!seedProvenanceMap.has(row.seed_id)) seedProvenanceMap.set(row.seed_id, new Map());
+        seedProvenanceMap.get(row.seed_id)!.set(row.field_key, row);
+      }
+
+      for (const listing of listings) {
+        try {
+          const campaignFields: CampaignSeoFields = {
+            businessName: listing.business_name || 'Business',
+            category: listing.primary_category || profile.category_name,
+            addressCity: listing.city || null,
+            addressState: listing.state || null,
+          };
+
+          const packet = buildSeedSeoPacket({
+            campaign: campaignFields,
+            audit: null,
+            intelligenceProfile: profileSeo,
+            goldStandard: goldSeo,
+          });
+
+          if (!packet.description) {
+            this.incSkipReason(skipReasons, 'composer_degraded');
+            skipped++;
+            continue;
+          }
+
+          if (listing.directory_presence_seeds) {
+            const seed = listing.directory_presence_seeds;
+            const provenanceMap = seedProvenanceMap.get(seed.id) || new Map();
+            const descriptionOverridden =
+              provenanceMap.get('description')?.source_name === 'operator_override';
+            const keywordsOverridden =
+              provenanceMap.get('keywords')?.source_name === 'operator_override';
+
+            if (descriptionOverridden && keywordsOverridden) {
+              this.incSkipReason(skipReasons, 'operator_override');
+              skipped++;
+              continue;
+            }
+
+            // Also skip if a linked campaign already powered this seed. A
+            // linked-campaign provenance row for description/keywords means the
+            // content came from an operator-validated audit, which outranks market
+            // enrichment.
+            const hasCampaignContent =
+              provenanceMap.get('description')?.source_name === 'linked_campaign' ||
+              provenanceMap.get('keywords')?.source_name === 'linked_campaign';
+            if (hasCampaignContent) {
+              this.incSkipReason(skipReasons, 'linked_campaign');
+              skipped++;
+              continue;
+            }
+
+            await this.writeSeedListing(
+              listing,
+              seed,
+              packet,
+              { descriptionOverridden, keywordsOverridden },
+              opts,
+              ctx,
+            );
+            enriched++;
+          } else {
+            const latestLog = latestLogByListingId.get(listing.id);
+            const guard = this.computeTenantGuard(latestLog);
+            if (guard.ownerAuthored) {
+              this.incSkipReason(skipReasons, 'owner_authored');
+              skipped++;
+              continue;
+            }
+            if (guard.descriptionOverridden && guard.keywordsOverridden) {
+              this.incSkipReason(skipReasons, 'operator_override');
+              skipped++;
+              continue;
+            }
+
+            await this.writeTenantListing(listing, packet, guard, opts, ctx);
+            enriched++;
+          }
+        } catch (err) {
+          this.incSkipReason(skipReasons, 'error');
+          skipped++;
+          logger.warn('[CategoryMarketEnrichmentService] listing enrichment failed', ctx, {
+            listingId: listing.id,
+            error: (err as Error).message,
+          });
+        }
+      }
+
+      skip += pageSize;
+      if (listings.length < pageSize) break;
+    }
+
+    return { enriched, skipped, skipReasons };
+  }
+
+  private incSkipReason(reasons: Record<string, number>, key: string) {
+    reasons[key] = (reasons[key] || 0) + 1;
+  }
+
+  private async getLatestLogsByListingId(
+    listingIds: string[],
+  ): Promise<Map<string, any>> {
+    if (listingIds.length === 0) return new Map();
+    const rows = await this.prisma.$queryRaw`
+      SELECT DISTINCT ON (listing_id) *
+      FROM directory_listing_enrichment_log
+      WHERE listing_id IN (${Prisma.join(listingIds)})
+      ORDER BY listing_id, enriched_at DESC
+    ` as any[];
+    const map = new Map<string, any>();
+    for (const row of rows) {
+      map.set(row.listing_id, row);
+    }
+    return map;
+  }
+
+  private computeTenantGuard(latestLog: any): {
+    ownerAuthored: boolean;
+    descriptionOverridden: boolean;
+    keywordsOverridden: boolean;
+  } {
+    if (!latestLog) {
+      return { ownerAuthored: false, descriptionOverridden: false, keywordsOverridden: false };
+    }
+    const values = latestLog.fields_values || {};
+    const isOwner = latestLog.trigger_source === 'owner_edit';
+    const isOperator = latestLog.trigger_source === 'operator_override';
+    const descriptionPresent = values.description !== undefined && values.description !== null;
+    const keywordsPresent = Array.isArray(values.keywords) && values.keywords.length > 0;
+    return {
+      ownerAuthored: isOwner,
+      descriptionOverridden: isOperator && descriptionPresent,
+      keywordsOverridden: isOperator && keywordsPresent,
+    };
+  }
+
+  private async writeSeedListing(
+    listing: any,
+    seed: any,
+    packet: SeedSeoPacket,
+    guard: { descriptionOverridden: boolean; keywordsOverridden: boolean },
+    opts: { triggerSource: string; enrichedBy: string | null },
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const updatedDescription = !guard.descriptionOverridden;
+    const updatedKeywords = !guard.keywordsOverridden;
+
+    if (!updatedDescription && !updatedKeywords) return;
+
+    const updateData: any = {};
+    if (updatedDescription) updateData.description = packet.description;
+    if (updatedKeywords) updateData.keywords = packet.keywords;
+    updateData.updated_at = new Date();
+
+    await this.prisma.directory_listings_list.update({
+      where: { id: listing.id },
+      data: updateData,
+    });
+
+    const now = new Date();
+    const upsertProvenance = async (fieldKey: 'description' | 'keywords', value: string | string[]) => {
+      const id = `${fieldKey}-${seed.id}`.substring(0, 60);
+      await this.prisma.directory_field_provenance.upsert({
+        where: { seed_id_field_key: { seed_id: seed.id, field_key: fieldKey } },
+        update: {
+          value: Array.isArray(value) ? value.join(', ') : value,
+          source_name: 'market_enrichment',
+          source_url: null,
+          accessed_at: null,
+          confidence: 'medium',
+          show_on_public: true,
+          updated_at: now,
+        },
+        create: {
+          id,
+          seed_id: seed.id,
+          tenant_id: seed.tenant_id || listing.tenant_id,
+          field_key: fieldKey,
+          value: Array.isArray(value) ? value.join(', ') : value,
+          source_name: 'market_enrichment',
+          source_url: null,
+          accessed_at: null,
+          confidence: 'medium',
+          show_on_public: true,
+          created_at: now,
+          updated_at: now,
+        },
+      });
+    };
+
+    if (updatedDescription) await upsertProvenance('description', packet.description);
+    if (updatedKeywords) await upsertProvenance('keywords', packet.keywords);
+
+    await this.prisma.directory_presence_seeds.update({
+      where: { id: seed.id },
+      data: {
+        seo_enrichment: buildSeoEnrichmentJson(packet) as any,
+        updated_at: new Date(),
+      },
+    });
+
+    logger.info('[CategoryMarketEnrichmentService] seed listing enriched', ctx, {
+      listingId: listing.id,
+      seedId: seed.id,
+      triggerSource: opts.triggerSource,
+    });
+  }
+
+  private async writeTenantListing(
+    listing: any,
+    packet: SeedSeoPacket,
+    guard: { ownerAuthored: boolean; descriptionOverridden: boolean; keywordsOverridden: boolean },
+    opts: { triggerSource: string; enrichedBy: string | null },
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const updatedDescription = !guard.descriptionOverridden;
+    const updatedKeywords = !guard.keywordsOverridden;
+
+    if (!updatedDescription && !updatedKeywords) {
+      return;
+    }
+
+    const updateData: any = {};
+    if (updatedDescription) updateData.description = packet.description;
+    if (updatedKeywords) updateData.keywords = packet.keywords;
+    updateData.updated_at = new Date();
+
+    await this.prisma.directory_listings_list.update({
+      where: { id: listing.id },
+      data: updateData,
+    });
+
+    await this.prisma.directory_settings_list.upsert({
+      where: { tenant_id: listing.tenant_id },
+      update: {
+        ...(updatedDescription ? { seo_description: packet.description } : {}),
+        ...(updatedKeywords ? { seo_keywords: packet.keywords } : {}),
+        updated_at: new Date(),
+      },
+      create: {
+        id: listing.tenant_id,
+        tenant_id: listing.tenant_id,
+        seo_description: updatedDescription ? packet.description : null,
+        seo_keywords: updatedKeywords ? packet.keywords : [],
+        updated_at: new Date(),
+      },
+    });
+
+    const projected: string[] = [];
+    const skipped: string[] = [];
+    const fieldsValues: Record<string, any> = {};
+    if (updatedDescription) {
+      projected.push('description');
+      fieldsValues.description = packet.description;
+    } else {
+      skipped.push('description');
+    }
+    if (updatedKeywords) {
+      projected.push('keywords');
+      fieldsValues.keywords = packet.keywords;
+    } else {
+      skipped.push('keywords');
+    }
+
+    await this.prisma.directory_listing_enrichment_log.create({
+      data: {
+        id: generateListingEnrichmentLogId(),
+        tenant_id: listing.tenant_id,
+        listing_id: listing.id,
+        category_key: normalizeCategoryKey(listing.primary_category || ''),
+        city: listing.city || '',
+        state: listing.state || '',
+        fields_projected: projected,
+        fields_skipped: skipped,
+        skip_reasons: skipped.length ? { reason: 'operator_override' } : undefined,
+        fields_values: fieldsValues,
+        intelligence_profile_id: packet.inputs.intelligenceProfileId,
+        composer_version: packet.composerVersion,
+        enriched_at: new Date(),
+        enriched_by: opts.enrichedBy,
+        trigger_source: opts.triggerSource,
+      },
+    });
+
+    logger.info('[CategoryMarketEnrichmentService] tenant listing enriched', ctx, {
+      listingId: listing.id,
+      triggerSource: opts.triggerSource,
+    });
   }
 
   private async loadSynonyms(row: any): Promise<string[]> {

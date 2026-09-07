@@ -8,6 +8,7 @@ import DirectoryListingsTable from '@/components/admin/directory/DirectoryListin
 import FeatureListingModal from '@/components/admin/directory/FeatureListingModal';
 import { clientLogger } from '@/lib/client-logger';
 import { Rocket, X, AlertTriangle } from 'lucide-react';
+import { getTierInfo } from '@/lib/tiers';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default function AdminDirectoryListingsPage() {
   const [filters, setFilters] = useState({
     status: undefined as 'published' | 'draft' | 'featured' | undefined,
-    tier: undefined as 'google_only' | 'starter' | 'discovery' | 'commitment' | 'storefront' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise' | undefined,
+    tier: undefined as string | undefined,
     quality: undefined as 'low' | 'medium' | 'high' | undefined,
     search: '',
   });
@@ -31,9 +32,10 @@ export default function AdminDirectoryListingsPage() {
   const [spawnNotes, setSpawnNotes] = useState<string>('');
   const [spawning, setSpawning] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
-  const [spawnSuccess, setSpawnSuccess] = useState<string | null>(null);
+  const [spawnedCampaign, setSpawnedCampaign] = useState<{ id: string; businessName?: string; category: string } | null>(null);
+  const [reEnrichSuccess, setReEnrichSuccess] = useState<string | null>(null);
 
-  const { listings, loading, error, featureListing, unfeatureListing, spawnCampaign } = useAdminDirectoryListings(filters);
+  const { listings, loading, error, availableTiers, featureListing, unfeatureListing, spawnCampaign, reEnrich } = useAdminDirectoryListings(filters);
 
   const handleFeature = async (tenantId: string, tenantName: string) => {
     setSelectedTenantId(tenantId);
@@ -66,28 +68,39 @@ export default function AdminDirectoryListingsPage() {
     setSpawnCategory(category || '');
     setSpawnNotes('');
     setSpawnError(null);
-    setSpawnSuccess(null);
+    setSpawnedCampaign(null);
     setSpawnModalOpen(true);
   };
 
   const handleSpawnConfirm = async () => {
     setSpawnError(null);
-    setSpawnSuccess(null);
+    setSpawnedCampaign(null);
     try {
       setSpawning(true);
       const campaign = await spawnCampaign(spawnTenantId, {
         category: spawnCategory.trim() || undefined,
         notes: spawnNotes.trim() || undefined,
       });
-      setSpawnSuccess(
-        `Campaign "${campaign?.business_name || campaign?.id || spawnTenantName}" spawned successfully. ` +
-        `View it in Marketing Ops.`
-      );
+      setSpawnedCampaign(campaign ? {
+        id: campaign.id,
+        businessName: campaign.business_name,
+        category: campaign.category,
+      } : null);
       setSpawnModalOpen(false);
     } catch (err) {
       setSpawnError(err instanceof Error ? err.message : 'Failed to spawn campaign');
     } finally {
       setSpawning(false);
+    }
+  };
+
+  const handleReEnrich = async (tenantId: string, tenantName: string) => {
+    try {
+      setReEnrichSuccess(null);
+      await reEnrich(tenantId);
+      setReEnrichSuccess(`Market enrichment re-run for ${tenantName}.`);
+    } catch (err) {
+      clientLogger.error('Failed to re-enrich listing:', { detail: err });
     }
   };
 
@@ -145,34 +158,38 @@ export default function AdminDirectoryListingsPage() {
             ))}
           </div>
 
-          {/* Tier Filters */}
-          <div className="flex items-center gap-2">
+          {/* Tier Filters — options are derived dynamically from the API
+              response (availableTiers) so the filter always reflects the
+              subscription_tier values that actually exist in the data
+              (directory_presence, omnichannel, expired_trial, trial_*, ...). */}
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tier:</span>
-            {[
-              { value: undefined, label: 'All' },
-              { value: 'google_only', label: 'Google Only' },
-              { value: 'starter', label: 'Starter' },
-              { value: 'discovery', label: 'Discovery' },
-              { value: 'commitment', label: 'Commitment' },
-              { value: 'storefront', label: 'Storefront' },
-              { value: 'professional', label: 'Professional' },
-              { value: 'enterprise', label: 'Enterprise' },
-              { value: 'chain_starter', label: 'Chain Starter' },
-              { value: 'chain_pro', label: 'Chain Pro' },
-              { value: 'chain_enterprise', label: 'Chain Enterprise' }
-            ].map(({ value, label }) => (
-              <button
-                key={label}
-                onClick={() => setFilters({ ...filters, tier: value as any })}
-                className={`px-3 py-1 text-sm rounded-full border transition-colors ${
-                  filters.tier === value
-                    ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700'
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            <button
+              onClick={() => setFilters({ ...filters, tier: undefined })}
+              className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                filters.tier === undefined
+                  ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700'
+              }`}
+            >
+              All
+            </button>
+            {availableTiers.map((value) => {
+              const label = getTierInfo(value).name;
+              return (
+                <button
+                  key={value}
+                  onClick={() => setFilters({ ...filters, tier: value })}
+                  className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                    filters.tier === value
+                      ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Quality Filters */}
@@ -214,9 +231,24 @@ export default function AdminDirectoryListingsPage() {
         </div>
       ) : (
         <>
-          {spawnSuccess && (
+          {spawnedCampaign && (
             <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <p className="text-green-800 dark:text-green-200">{spawnSuccess}</p>
+              <p className="text-green-800 dark:text-green-200">
+                Campaign &quot;{spawnedCampaign.businessName || spawnedCampaign.id}&quot; spawned successfully.{' '}
+                Category: <span className="font-medium">{spawnedCampaign.category}</span>.{' '}
+                <Link
+                  href={`/settings/admin/marketing-ops/campaigns/${spawnedCampaign.id}`}
+                  className="underline font-medium hover:text-green-900 dark:hover:text-green-100"
+                >
+                  View campaign
+                </Link>
+              </p>
+            </div>
+          )}
+
+          {reEnrichSuccess && (
+            <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-green-800 dark:text-green-200">{reEnrichSuccess}</p>
             </div>
           )}
 
@@ -225,6 +257,7 @@ export default function AdminDirectoryListingsPage() {
             onFeature={handleFeature}
             onUnfeature={handleUnfeature}
             onSpawnCampaign={handleSpawnCampaign}
+            onReEnrich={handleReEnrich}
           />
 
           <FeatureListingModal
