@@ -252,6 +252,28 @@ class CategoryMarketEnrichmentService extends BaseService {
     return await this.rowToMarketState(rows[0]);
   }
 
+  async listMarkets(opts: {
+    category?: string;
+    city?: string;
+    state?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<MarketState[]> {
+    const where: any = {};
+    if (opts.category) where.category_key = normalizeCategoryKey(opts.category);
+    if (opts.city) where.city = { equals: normalizeReferenceCity(opts.city), mode: 'insensitive' };
+    if (opts.state) where.state = { equals: normalizeReferenceState(opts.state), mode: 'insensitive' };
+
+    const rows = await this.prisma.directory_category_enrichment.findMany({
+      where,
+      orderBy: { enriched_at: 'desc' },
+      take: opts.limit ?? 50,
+      skip: opts.offset ?? 0,
+    });
+
+    return Promise.all(rows.map((r: any) => this.rowToMarketState(r)));
+  }
+
   /**
    * Enrich all published listings that match the market key.
    * For seed listings, guard against operator_override provenance and audit-powered

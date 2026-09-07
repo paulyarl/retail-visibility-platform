@@ -841,12 +841,26 @@ export class IntelligenceProfileService extends BaseService {
                   { triggerSource: 'profile_activated', enrichedBy: ctx?.userId },
                   ctx,
                 );
+                logger.info('post-activation market enrichment fired', ctx, {
+                  profileId,
+                  categoryKey: result.category_key,
+                  city: result.reference_city,
+                  state: result.reference_state,
+                });
               } catch (err) {
                 logger.warn('post-activation market enrichment failed (non-blocking)', ctx, {
                   error: (err as Error).message,
                 });
               }
             })();
+          } else {
+            logger.info('market enrichment skipped after activation', ctx, {
+              profileId,
+              categoryKey: result.category_key,
+              city: result.reference_city,
+              state: result.reference_state,
+              reason: 'already_enriched',
+            });
           }
         } catch (err) {
           logger.warn('post-activation market enrichment lookup failed (non-blocking)', ctx, {

@@ -23,9 +23,37 @@ const enrichMarketSchema = z.object({
 });
 
 /**
+ * GET /api/admin/directory/category-enrichment/markets
+ * List enriched markets. Query params category/city/state are optional;
+ * omitted returns the most-recently-enriched markets first.
+ */
+router.get(
+  '/markets',
+  authenticateToken,
+  requirePlatformStaffOrAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { category, city, state } = req.query;
+      const markets = await CategoryMarketEnrichmentService.getInstance().listMarkets({
+        category: typeof category === 'string' ? category : undefined,
+        city: typeof city === 'string' ? city : undefined,
+        state: typeof state === 'string' ? state : undefined,
+        limit: 50,
+      });
+      res.json({ success: true, markets });
+    } catch (error) {
+      logger.error('[GET /admin/directory/category-enrichment/markets] Error:', getCtx(req), {
+        error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+      });
+      res.status(500).json({ error: 'internal_error' });
+    }
+  },
+);
+
+/**
  * POST /api/admin/directory/category-enrichment/markets
  * Operator-triggered market enrichment. Resolves profiles and writes the
- * category-level packet; listing writes are Phase 2.
+ * category-level packet plus listing-level enrichment for all matching listings.
  */
 router.post(
   '/markets',

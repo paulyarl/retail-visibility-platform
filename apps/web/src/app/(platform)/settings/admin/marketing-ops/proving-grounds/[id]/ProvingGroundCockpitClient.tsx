@@ -60,6 +60,12 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     field: '', description: '', severity: 'important', resolver: 'self',
   });
 
+  // Category market enrichment status for this proving ground's (category, city, state)
+  const [marketStatus, setMarketStatus] = useState<any | null>(null);
+  const [enrichBusy, setEnrichBusy] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<string | null>(null);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+
   const treeIds = useMemo(
     () => [campaignId, ...children.map((c) => c.id)],
     [campaignId, children],
@@ -71,6 +77,27 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     try {
       const camp = await marketingOpsService.getCampaign(campaignId);
       setCampaign(camp);
+
+      // Load category market enrichment status when proving ground scope is (category, city, state)
+      if (
+        camp.campaign_category === 'proving_ground' &&
+        camp.category &&
+        camp.city &&
+        camp.state
+      ) {
+        try {
+          const market = await directoryPresenceAdminService.getMarket({
+            category: camp.category,
+            city: camp.city,
+            state: camp.state,
+          });
+          setMarketStatus(market);
+        } catch {
+          // Non-blocking: enrichment status is optional observability.
+          setMarketStatus(null);
+        }
+      }
+
       const childList = camp.children ?? [];
       setChildren(childList);
       const ids = [campaignId, ...childList.map((c) => c.id)];
@@ -124,6 +151,31 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       await load();
     } catch (err: any) {
       setError(err.message || 'Failed to detach child');
+    }
+  };
+
+  const handleEnrichMarket = async () => {
+    if (!campaign || campaign.campaign_category !== 'proving_ground' || !campaign.category || !campaign.city || !campaign.state) {
+      setEnrichError('Campaign is missing category/city/state for market enrichment');
+      return;
+    }
+    setEnrichBusy(true);
+    setEnrichError(null);
+    setEnrichResult(null);
+    try {
+      const result = await directoryPresenceAdminService.enrichMarket({
+        category: campaign.category,
+        city: campaign.city,
+        state: campaign.state,
+      });
+      setEnrichResult(
+        `Market enriched: ${result.listingsEnriched} listing${result.listingsEnriched === 1 ? '' : 's'} enriched, ${result.listingsSkipped} skipped.`
+      );
+      await load();
+    } catch (err: any) {
+      setEnrichError(err.message || 'Failed to enrich market');
+    } finally {
+      setEnrichBusy(false);
     }
   };
 
@@ -234,6 +286,42 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
               {combined?.grade === 'decision_grade' ? 'decision-grade' : 'directional'} grade
             </span>
           </div>
+        )}
+
+        {/* Market enrichment status line */}
+        {campaign.campaign_category === 'proving_ground' && campaign.category && campaign.city && campaign.state && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {marketStatus ? (
+                <span>
+                  Market enrichment:{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {marketStatus.triggerSource === 'profile_activated' ? 'auto-fired on profile activation' : marketStatus.triggerSource}
+                  </span>{' '}
+                  · {new Date(marketStatus.enrichedAt).toLocaleString()}
+                  {marketStatus.intelligenceProfileId && (
+                    <span className="ml-1">· profile {marketStatus.intelligenceProfileId}</span>
+                  )}
+                </span>
+              ) : (
+                <span>Market enrichment: not enriched yet</span>
+              )}
+            </div>
+            <button
+              onClick={handleEnrichMarket}
+              disabled={enrichBusy}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+            >
+              {enrichBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Enrich Market Listings
+            </button>
+          </div>
+        )}
+        {enrichResult && (
+          <div className="mt-2 text-xs text-green-600 dark:text-green-400">{enrichResult}</div>
+        )}
+        {enrichError && (
+          <div className="mt-2 text-xs text-red-600 dark:text-red-400">{enrichError}</div>
         )}
       </div>
 

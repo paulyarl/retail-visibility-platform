@@ -937,6 +937,58 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
+
+  // ============================
+  // Category Market Enrichment (spec §6.3)
+  // ============================
+
+  /** POST /api/admin/directory/category-enrichment/markets */
+  async enrichMarket(input: { category: string; city: string; state: string }): Promise<EnrichMarketResult> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/admin/directory/category-enrichment/markets',
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'enrich_market_failed');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.result as EnrichMarketResult;
+  }
+
+  /** GET /api/admin/directory/category-enrichment/markets (first match) */
+  async getMarket(filters: {
+    category: string;
+    city: string;
+    state: string;
+  }): Promise<EnrichedMarket | null> {
+    const markets = await this.listMarkets(filters);
+    return markets[0] ?? null;
+  }
+
+  /** GET /api/admin/directory/category-enrichment/markets */
+  async listMarkets(filters?: {
+    category?: string;
+    city?: string;
+    state?: string;
+  }): Promise<EnrichedMarket[]> {
+    const params = new URLSearchParams();
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.state) params.set('state', filters.state);
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory/category-enrichment/markets${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data?.markets ?? []) as EnrichedMarket[];
+  }
 }
 
 export interface DirectorySeedCampaignLink {
@@ -1015,6 +1067,54 @@ export interface DirectoryClaimRequest {
   city: string;
   state: string;
   attachmentCount: number;
+}
+
+// ============================
+// Category Market Enrichment (spec §6.3)
+// ============================
+
+export interface EnrichedMarket {
+  id: string;
+  categoryKey: string;
+  categoryName: string;
+  city: string;
+  state: string;
+  effective: {
+    metaTitle: string;
+    description: string;
+    keywords: string[];
+    secondaryCategories: string[];
+    schemaTypeHint: string | null;
+    synonyms: string[];
+  };
+  composed: {
+    metaTitle: string;
+    description: string;
+    keywords: string[];
+    secondaryCategories: string[];
+    schemaTypeHint: string | null;
+  };
+  override: {
+    description: string | null;
+    metaTitle: string | null;
+    keywords: string[] | null;
+  };
+  enrichedAt: string;
+  enrichedBy: string | null;
+  triggerSource: string;
+  overrideBy: string | null;
+  overrideAt: string | null;
+  intelligenceProfileId: string | null;
+  goldStandardProfileId: string | null;
+  composerVersion: number;
+}
+
+export interface EnrichMarketResult {
+  marketKey: { categoryKey: string; city: string; state: string };
+  categoryEnrichmentId: string | null;
+  listingsEnriched: number;
+  listingsSkipped: number;
+  skipReasons: Record<string, number>;
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();

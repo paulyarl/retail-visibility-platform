@@ -284,6 +284,12 @@ export interface AdminDirectoryListing {
   businessName: string;
   seedCategory?: string | null;
   seedStatus?: string | null;
+  lastEnrichmentEvent?: {
+    triggerSource: string;
+    enrichedAt: string;
+    intelligenceProfileId: string | null;
+    fieldsProjected: string[];
+  } | null;
   campaigns?: Array<{
     id: string;
     displayId?: string | null;
@@ -302,7 +308,8 @@ export interface AdminDirectoryListing {
 
 export interface DirectoryFilters {
   status?: 'published' | 'draft' | 'featured';
-  tier?: 'google_only' | 'starter' | 'discovery' | 'commitment' | 'storefront' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
+  // Tier values are whatever subscription_tier values the API actually returns.
+  tier?: string;
   quality?: 'low' | 'medium' | 'high';
   category?: string;
   search?: string;
