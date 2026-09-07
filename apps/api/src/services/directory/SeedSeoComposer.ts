@@ -605,3 +605,104 @@ export function buildCategorySeoPacket(input: {
     composerVersion: COMPOSER_VERSION,
   };
 }
+
+// ─── Location-level packet ────────────────────────────────────────────────
+
+export interface LocationSeoPacket {
+  metaTitle: string;
+  description: string;
+  keywords: string[];
+  secondaryCategories: string[];
+  schemaTypeHint: string | null;
+  inputs: { intelligenceProfileId: string | null; goldStandardProfileId: string | null };
+  composerVersion: number;
+}
+
+export interface LocationEnrichmentInput {
+  categoryName: string;
+  keywords: string[];
+  synonyms?: string[];
+}
+
+function composeLocationMetaTitle(
+  locationName: string,
+  businessCount: number,
+): string {
+  const title = `${businessCount} Businesses in ${locationName} — VisibleShelf Directory`;
+  return truncateAtWordBoundary(title, META_TITLE_MAX);
+}
+
+function composeLocationDescription(
+  locationName: string,
+  businessCount: number,
+  topCategories: string[],
+  categorySynonyms: string[],
+): string {
+  const base = `Discover ${businessCount} local businesses in ${locationName}, listed on VisibleShelf from public information.`;
+  const parts: string[] = [base];
+
+  const categories = topCategories.slice(0, 5).filter((c) => c.length <= 40);
+  if (categories.length > 0) {
+    parts.push(` Browse top categories: ${categories.join(', ')}.`);
+  }
+
+  const related = categorySynonyms.slice(0, 5).filter((s) => s.length <= 60);
+  if (related.length > 0) {
+    parts.push(` Find ${related.join(', ')} and more.`);
+  }
+
+  return truncateAtWordBoundary(parts.join(''), DESCRIPTION_MAX);
+}
+
+export function buildLocationSeoPacket(input: {
+  city: string;
+  state: string | null;
+  locationName: string;
+  businessCount: number;
+  categoryEnrichments: LocationEnrichmentInput[];
+}): LocationSeoPacket {
+  const { city, state, locationName, businessCount, categoryEnrichments } = input;
+  const effectiveState = state ?? '';
+
+  const topCategories: string[] = [];
+  const categorySynonyms: string[] = [];
+  const keywordSource: string[] = [];
+
+  for (const enrichment of categoryEnrichments) {
+    if (enrichment.categoryName) {
+      topCategories.push(enrichment.categoryName);
+      keywordSource.push(enrichment.categoryName);
+    }
+    for (const kw of enrichment.keywords || []) {
+      keywordSource.push(kw);
+    }
+    for (const syn of enrichment.synonyms || []) {
+      categorySynonyms.push(syn);
+      keywordSource.push(syn);
+    }
+  }
+
+  keywordSource.unshift(locationName, city);
+  if (effectiveState) keywordSource.push(effectiveState);
+
+  const keywords = dedupeLowercase(keywordSource).slice(0, KEYWORDS_MAX);
+  const secondaryCategories = dedupeLowercase(topCategories).slice(0, SECONDARY_CATEGORIES_MAX);
+
+  const metaTitle = composeLocationMetaTitle(locationName, businessCount);
+  const description = composeLocationDescription(
+    locationName,
+    businessCount,
+    dedupeLowercase(topCategories),
+    dedupeLowercase(categorySynonyms),
+  );
+
+  return {
+    metaTitle,
+    description,
+    keywords,
+    secondaryCategories,
+    schemaTypeHint: 'WebPage',
+    inputs: { intelligenceProfileId: null, goldStandardProfileId: null },
+    composerVersion: COMPOSER_VERSION,
+  };
+}

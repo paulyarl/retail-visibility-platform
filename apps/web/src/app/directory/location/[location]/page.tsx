@@ -7,6 +7,8 @@ import { BreadcrumbStructuredData } from '@/components/directory/StructuredData'
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
+import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import { clientLogger } from '@/lib/client-logger';
 
 interface LocationPageProps {
@@ -81,12 +83,20 @@ export async function generateMetadata({ params }: LocationPageProps): Promise<M
   }
 
   const locationName = formatLocation(parsed.city, parsed.state);
-  const title = `Local Businesses in ${locationName} - Business Directory`;
-  const description = `Discover local businesses, shops, and services in ${locationName}. Find stores, restaurants, and more in your area.`;
+  const enrichment = await placesBrowsePublicService.getLocationEnrichment(parsed.city, parsed.state);
+
+  const title = enrichment?.effective?.metaTitle
+    ? enrichment.effective.metaTitle
+    : `Local Businesses in ${locationName} - Business Directory`;
+  const description = enrichment?.effective?.description
+    ? enrichment.effective.description
+    : `Discover local businesses, shops, and services in ${locationName}. Find stores, restaurants, and more in your area.`;
+  const keywords = enrichment?.effective?.keywords?.join(', ');
 
   return {
     title,
     description,
+    keywords,
     openGraph: {
       title,
       description,
@@ -114,10 +124,14 @@ export default async function LocationPage({ params, searchParams }: LocationPag
   const { city, state } = parsed;
   const locationName = formatLocation(city, state);
 
-  const [data, nearbyLocations] = await Promise.all([
+  const [data, nearbyLocations, enrichment] = await Promise.all([
     getLocationListings(city, state, page),
     getNearbyLocations(city, state),
+    placesBrowsePublicService.getLocationEnrichment(city, state),
   ]);
+
+  const effectiveDescription = enrichment?.effective?.description;
+  const effectiveSecondaryCategories = enrichment?.effective?.secondaryCategories || [];
 
   if (!data) {
     return (
@@ -147,6 +161,12 @@ export default async function LocationPage({ params, searchParams }: LocationPag
       />
 
       <div className="min-h-screen bg-gray-50">
+        <LocationBrowseTracker
+          location={location}
+          city={city}
+          state={state}
+          locationName={locationName}
+        />
         {/* Header */}
         <div className="bg-white border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -174,9 +194,20 @@ export default async function LocationPage({ params, searchParams }: LocationPag
             </div>
 
             <p className="text-gray-700 max-w-3xl">
-              Discover local businesses, shops, restaurants, and services in {locationName}. 
-              Support your local community and find everything you need nearby.
+              {effectiveDescription || `Discover local businesses, shops, restaurants, and services in ${locationName}. Support your local community and find everything you need nearby.`}
             </p>
+            {effectiveSecondaryCategories.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2 max-w-3xl">
+                {effectiveSecondaryCategories.slice(0, 8).map((category: string) => (
+                  <span
+                    key={category}
+                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                  >
+                    {category}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -260,14 +291,20 @@ export default async function LocationPage({ params, searchParams }: LocationPag
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
                   About {locationName}
                 </h2>
-                <p className="text-gray-700 mb-4">
-                  {locationName} is home to a vibrant community of local businesses serving residents and visitors alike. 
-                  From essential services to unique shopping experiences, you'll find everything you need right here in your community.
-                </p>
-                <p className="text-gray-700">
-                  Browse our directory to discover {data.pagination.totalItems} local businesses in {locationName}. 
-                  Support local commerce and find quality products and services from businesses that care about your community.
-                </p>
+                {effectiveDescription ? (
+                  <p className="text-gray-700 mb-4">{effectiveDescription}</p>
+                ) : (
+                  <>
+                    <p className="text-gray-700 mb-4">
+                      {locationName} is home to a vibrant community of local businesses serving residents and visitors alike.
+                      From essential services to unique shopping experiences, you'll find everything you need right here in your community.
+                    </p>
+                    <p className="text-gray-700">
+                      Browse our directory to discover {data.pagination.totalItems} local businesses in {locationName}.
+                      Support local commerce and find quality products and services from businesses that care about your community.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>

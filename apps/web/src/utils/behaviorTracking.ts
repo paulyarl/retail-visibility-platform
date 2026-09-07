@@ -141,6 +141,7 @@ const EVENT_PRIORITY_MAP: Record<string, CachedTrackingEvent['priority']> = {
   'platform_access': 'high',
   'admin_access': 'high',
   'directory_category': 'high',
+  'directory_location': 'high',
 
   // Normal priority - standard batch timing
   'storefront_view': 'normal',
@@ -485,11 +486,11 @@ function getTrackingCache(): BehaviorTrackingCache {
 }
 
 export interface TrackingData {
-  entityType: 'store' | 'product' | 'category' | 'search' | 'platform' | 'dashboard' | 'onboarding' | 'admin';
+  entityType: 'store' | 'product' | 'category' | 'search' | 'platform' | 'dashboard' | 'onboarding' | 'admin' | 'location';
   entityId: string;
   entityName?: string;
   context?: any;
-  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'directory_category' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog' | 'platform_home' | 'platform_dashboard' | 'tenant_dashboard' | 'onboarding_flow' | 'admin_panel';
+  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'directory_category' | 'directory_location' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog' | 'platform_home' | 'platform_dashboard' | 'tenant_dashboard' | 'onboarding_flow' | 'admin_panel';
   durationSeconds?: number;
 }
 

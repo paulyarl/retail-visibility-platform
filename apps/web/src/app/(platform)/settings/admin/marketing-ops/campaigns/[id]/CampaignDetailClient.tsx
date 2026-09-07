@@ -8,6 +8,7 @@ import marketingOpsService, { Campaign, CampaignDetail, CampaignStage, Audit, Ma
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import type { DirectoryListing } from '@/hooks/directory/useDirectoryListing';
+import { getDirectoryListingUrl } from '@/utils/slug';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
@@ -1537,7 +1538,7 @@ export default function CampaignDetailClient({
                               {linkedListing?.slug && (
                                 <>
                                   <Link
-                                    href={linkedListing.listingOrigin === 'directory_seed' ? `/place/${linkedListing.slug}` : `/directory/${linkedListing.slug}`}
+                                    href={getDirectoryListingUrl(linkedListing)}
                                     className="inline-flex items-center gap-1 text-teal-600 dark:text-teal-400 hover:underline"
                                   >
                                     <ExternalLink className="w-3 h-3" />

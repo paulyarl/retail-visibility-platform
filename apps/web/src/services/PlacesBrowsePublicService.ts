@@ -75,6 +75,27 @@ export interface CategoryEnrichmentResponse {
   enrichedAt: string;
 }
 
+export interface LocationEnrichmentMarket {
+  city: string;
+  state: string;
+  locationName: string;
+}
+
+export interface LocationEnrichmentEffective {
+  metaTitle: string;
+  description: string;
+  keywords: string[];
+  schemaTypeHint: string | null;
+  secondaryCategories: string[];
+}
+
+export interface LocationEnrichmentResponse {
+  market: LocationEnrichmentMarket | null;
+  effective: LocationEnrichmentEffective;
+  overridden: { description: boolean; metaTitle: boolean; keywords: boolean };
+  enrichedAt: string;
+}
+
 class PlacesBrowsePublicService extends PublicApiSingleton {
   private static instance: PlacesBrowsePublicService;
 
@@ -148,6 +169,35 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         `/api/public/directory/category-enrichment?${qs.toString()}`,
         { method: 'GET' },
         `category-enrichment-${categorySlug}-${city || 'all'}-${state || 'all'}`,
+        5 * 60 * 1000,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      if (!data || !data.market) return null;
+      return {
+        market: data.market,
+        effective: data.effective,
+        overridden: data.overridden,
+        enrichedAt: data.enrichedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** GET /api/public/directory/location-enrichment — effective location SEO for city pages */
+  async getLocationEnrichment(
+    city: string,
+    state: string,
+  ): Promise<LocationEnrichmentResponse | null> {
+    try {
+      const qs = new URLSearchParams();
+      qs.set('city', city);
+      qs.set('state', state);
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/location-enrichment?${qs.toString()}`,
+        { method: 'GET' },
+        `location-enrichment-${city}-${state}`,
         5 * 60 * 1000,
       );
       if (!result.success) return null;

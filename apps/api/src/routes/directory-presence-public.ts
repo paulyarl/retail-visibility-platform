@@ -29,6 +29,7 @@ import { unifiedConfig } from '../config/unifiedConfig';
 import { validateAttachment } from '../validators/recovery-intake.schema';
 import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
 import CategoryMarketEnrichmentService from '../services/CategoryMarketEnrichmentService';
+import LocationMarketEnrichmentService from '../services/LocationMarketEnrichmentService';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1266,6 +1267,50 @@ router.get('/category-enrichment', async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/category-enrichment] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/location-enrichment — effective location SEO for city pages */
+router.get('/location-enrichment', async (req: Request, res: Response) => {
+  try {
+    const city = req.query.city as string | undefined;
+    const state = req.query.state as string | undefined;
+
+    if (!city || !state) {
+      return res.json({ market: null });
+    }
+
+    const market = await LocationMarketEnrichmentService.getLocation(city, state);
+    if (!market) {
+      return res.json({ market: null });
+    }
+
+    res.json({
+      success: true,
+      market: {
+        city: market.city,
+        state: market.state,
+        locationName: market.locationName,
+      },
+      effective: {
+        metaTitle: market.effective.metaTitle,
+        description: market.effective.description,
+        keywords: market.effective.keywords,
+        schemaTypeHint: market.effective.schemaTypeHint,
+        secondaryCategories: market.effective.secondaryCategories,
+      },
+      overridden: {
+        description: market.override.description !== null,
+        metaTitle: market.override.metaTitle !== null,
+        keywords: market.override.keywords !== null,
+      },
+      enrichedAt: market.enrichedAt.toISOString(),
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/location-enrichment] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

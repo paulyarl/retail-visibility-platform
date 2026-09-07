@@ -25,6 +25,8 @@ import { audit } from '../audit';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 
+const LOCATION_SENTINEL_KEY = '__location__';
+
 export interface MarketState {
   id: string;
   categoryKey: string;
@@ -383,7 +385,7 @@ class CategoryMarketEnrichmentService extends BaseService {
     limit?: number;
     offset?: number;
   } = {}): Promise<MarketState[]> {
-    const where: any = {};
+    const where: any = { category_key: { not: LOCATION_SENTINEL_KEY } };
     if (opts.category) where.category_key = normalizeCategoryKey(opts.category);
     if (opts.city) where.city = { equals: normalizeReferenceCity(opts.city), mode: 'insensitive' };
     if (opts.state) where.state = { equals: normalizeReferenceState(opts.state), mode: 'insensitive' };

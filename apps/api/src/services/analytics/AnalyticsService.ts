@@ -375,7 +375,7 @@ export class AnalyticsService extends BaseService {
       const result: PageTrafficData = {
         pageTypeBreakdown: pageTypeBreakdownWithTrends,
         topPages: filteredTopPages.map((page: any) => {
-          const path = page.page_type === 'directory_category' && page.entity_id
+          const path = (page.page_type === 'directory_category' || page.page_type === 'directory_location') && page.entity_id
             ? `/${page.entity_id}`
             : `/${page.page_type}/${page.entity_id}`;
           return {
