@@ -35,7 +35,9 @@ import {
   IconShoppingCart,
   IconShieldCheck,
   IconSparkles,
+  IconTag,
 } from '@tabler/icons-react';
+import { getCategoryUrl } from '@/utils/slug';
 import directoryClaimPublicService, {
   DirectoryClaimSummary,
   DirectoryClaimAcceptResult,
@@ -558,6 +560,8 @@ export default function DirectoryClaimClient() {
     const tenantId = claimResult?.tenantId;
     const needsPasswordSetup = claimResult?.requiresPasswordSetup && !passwordSet;
     const slug = summary?.slug;
+    const shelfCategories = [summary?.category, ...(summary?.secondaryCategories || [])]
+      .filter(Boolean) as string[];
 
     // Session-aware hrefs (claim handoff spec): /t/{tenantId}/* pages are
     // server-gated on a platform (Auth0) session. A freshly-claimed owner
@@ -658,6 +662,30 @@ export default function DirectoryClaimClient() {
                   </Stack>
                 </Alert>
 
+                {/* Multi-shelf confirmation — the claimed listing appears on every
+                    matching category shelf (multi-category shelf placement spec §3.3) */}
+                {(summary?.secondaryCategories?.length ?? 0) > 0 && (
+                  <Alert color="teal" variant="light" icon={<IconTag size={16} />} w="100%">
+                    <Stack gap="xs">
+                      <Text size="sm" fw={500}>
+                        Your listing appears on {shelfCategories.length} category shelves
+                      </Text>
+                      <Group gap="xs">
+                        {shelfCategories.map((cat) => (
+                          <Badge key={cat} color="teal" variant="light">
+                            <Link href={getCategoryUrl({ name: cat })} style={{ color: 'inherit', textDecoration: 'none' }}>
+                              {cat}
+                            </Link>
+                          </Badge>
+                        ))}
+                      </Group>
+                      <Text size="xs" c="dimmed">
+                        Each shelf is a separate browse page customers use to find businesses like yours.
+                      </Text>
+                    </Stack>
+                  </Alert>
+                )}
+
                 <Group justify="center">
                   {upgradeHref && (
                     <Button component={Link} href={upgradeHref} leftSection={<IconSparkles size={16} />}>
@@ -718,6 +746,21 @@ export default function DirectoryClaimClient() {
             <Text c="dimmed" size="sm" mt="xs">
               {summary?.category} · {summary?.city}, {summary?.state}
             </Text>
+            {(summary?.secondaryCategories?.length ?? 0) > 0 && (
+              <>
+                <Group gap="xs" mt="xs">
+                  {(summary?.secondaryCategories || []).map((cat) => (
+                    <Badge key={cat} color="gray" variant="light" size="sm">
+                      {cat}
+                    </Badge>
+                  ))}
+                </Group>
+                <Text size="xs" c="dimmed" mt="xs">
+                  Your listing will appear on {(summary?.secondaryCategories?.length ?? 0) + 1} category
+                  shelves: {[summary?.category, ...(summary?.secondaryCategories || [])].filter(Boolean).join(' · ')}.
+                </Text>
+              </>
+            )}
           </div>
 
           <Divider />
@@ -753,7 +796,8 @@ export default function DirectoryClaimClient() {
           <Alert color="blue" variant="light" icon={<IconAlertCircle size={16} />}>
             You&apos;re already listed on the {summary?.city} {summary?.category} directory from public
             information (address, phone, and SNAP where reported). Claim the listing to fix hours or
-            phone and add a photo. This is not an online store.
+            phone, add a photo, and manage the categories it appears under — your listing can show up
+            on every matching category shelf. This is not an online store.
           </Alert>
 
           <Divider />

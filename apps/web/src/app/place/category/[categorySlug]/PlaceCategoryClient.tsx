@@ -379,6 +379,7 @@ function PlaceCard({
           {place.claimToken && (
             <Link
               href={claimHref}
+              title="Claim to verify your details and appear on every matching category shelf"
               className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
