@@ -119,7 +119,7 @@ export default function DirectoryListingsTable({
 
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
               <span className="font-medium text-gray-900 dark:text-white">Category:</span>{' '}
-              {listing.primary_category || listing.seedCategory || '—'}
+              {listing.primary_category || listing.seedCategory || listing.campaigns?.[0]?.category || '—'}
             </div>
 
             {listing.campaigns && listing.campaigns.length > 0 && (
@@ -129,9 +129,10 @@ export default function DirectoryListingsTable({
                   <Link
                     key={campaign.id}
                     href={`/settings/admin/marketing-ops/campaigns/${campaign.id}`}
-                    className="block text-sm text-blue-600 hover:underline truncate"
+                    className="block text-sm font-mono text-blue-600 hover:underline truncate"
+                    title={[campaign.category, campaign.stage].filter(Boolean).join(' · ')}
                   >
-                    {campaign.businessName || campaign.id} · {campaign.category} · {campaign.stage}
+                    {campaign.id}
                   </Link>
                 ))}
               </div>
@@ -261,7 +262,7 @@ export default function DirectoryListingsTable({
                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                   <div className="space-y-1">
                     <div className="font-medium text-gray-900 dark:text-white">
-                      {listing.primary_category || listing.seedCategory || '-'}
+                      {listing.primary_category || listing.seedCategory || listing.campaigns?.[0]?.category || '-'}
                     </div>
                     {listing.secondary_categories && listing.secondary_categories.length > 0 && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -275,20 +276,14 @@ export default function DirectoryListingsTable({
                   {listing.campaigns && listing.campaigns.length > 0 ? (
                     <div className="space-y-1">
                       {listing.campaigns.slice(0, 2).map((campaign) => (
-                        <div key={campaign.id} className="flex items-center gap-2 min-w-0">
-                          <Link
-                            href={`/settings/admin/marketing-ops/campaigns/${campaign.id}`}
-                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 truncate font-medium"
-                          >
-                            {campaign.businessName || campaign.id}
-                          </Link>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {campaign.category}
-                          </span>
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                            {campaign.stage}
-                          </span>
-                        </div>
+                        <Link
+                          key={campaign.id}
+                          href={`/settings/admin/marketing-ops/campaigns/${campaign.id}`}
+                          className="block text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 truncate font-mono text-xs"
+                          title={[campaign.category, campaign.stage].filter(Boolean).join(' · ')}
+                        >
+                          {campaign.id}
+                        </Link>
                       ))}
                       {listing.campaigns.length > 2 && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">
