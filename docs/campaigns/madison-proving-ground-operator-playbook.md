@@ -18,6 +18,21 @@
 
 ---
 
+## Creating / Launching a Proving Ground
+
+Three entry points, all producing the same signature (`scope=city` + `campaign_category=proving_ground`, umbrella category, city+state). One active PG per city+category — the structural-duplicate guardrail enforces it.
+
+1. **Promote a discovery run (the normal path)** — open an intelligence campaign (`/settings/admin/marketing-ops/campaigns/<id>`) → **Proving Ground** button → modal with title/category/city/state pre-filled plus a checkbox list of sibling discovery runs in the same market (e.g. the emerging + competitive pair merge into one PG). Submit lands in the cockpit. If an active PG already exists for that city+category, the run **merges into it** instead of erroring.
+   - Already-attached campaigns show a **View Proving Ground** link instead of the button.
+   - Quick path: **Intelligence Profiles → Non-Business Campaigns** table has a violet flask action per unparented intelligence row — one click promotes/merges and toasts an "Open cockpit" link. Existing PG rows show a filled flask that jumps to their cockpit.
+2. **Blank create** — `/settings/admin/marketing-ops/campaigns/new` → Campaign Category = **Proving Ground** (always in the list; selecting it sets Scope to `city` automatically). Fill Category (umbrella, e.g. `Grocery`), City, State. Submit → cockpit. The Proving Grounds index "+ New Campaign" button deep-links this pre-filled.
+
+API: `POST /api/admin/marketing-ops/:campaignId/promote-to-proving-ground` — body `{ title?, category?, city?, state?, mergeCampaignIds? }`; returns `{ provingGround, reusedExisting, attached, skipped }`.
+
+After creation: attach any remaining discovery children from the cockpit's dropdown, then work PG-01 preflight below.
+
+---
+
 ## The Funnel (what "done" looks like at each stage)
 
 Every prospect moves through the same ladder. Each rung has an entry action, an exit gate, and a measurement.

@@ -303,8 +303,8 @@ The existing component, unmodified except for the §4.3 resolution branch (direc
 The proving ground's product purpose: the next city is configuration.
 
 1. **Discover** — run establishment + discovery intelligence campaigns for the city/category (existing flows; coverage page verifies profile gaps).
-2. **Create** — proving ground (`scope='city'`, `campaign_category='proving_ground'`, umbrella category). The guardrail enforces one active per city/category.
-3. **Attach** — link the discovery campaigns as children (§4.2).
+2. **Create + Attach (one action)** — `POST /:campaignId/promote-to-proving-ground` on a discovery campaign creates the PG (`scope='city'`, `campaign_category='proving_ground'`, umbrella category) and attaches the run as its first child; `mergeCampaignIds` folds in sibling runs (emerging + competitive). If an active PG already exists for the city+category signature, the call reuses it — promote IS the merge path, not a 409. UI entry points: campaign-detail "Proving Ground" modal, the Non-Business table's per-row flask action, or the Campaign form (`proving_ground` is always in the Category dropdown; selecting it coerces scope → `city`). The guardrail still enforces one active per city/category.
+3. **Attach stragglers** — link any remaining discovery campaigns as children from the cockpit's attach dropdown (§4.2).
 4. **Preflight** — checklist instantiates from `PG-01`; the operator confirms the scaffolded ladders, seeds + tokens materialize, duplicates get verdicts, families get owners.
 5. **Work** — operators run the due-today list; signals drive the cadence; touches feed the funnel.
 6. **Verdict** — weekly: gates G1–G4 + the postal test off the cockpit dashboard. Pass → ship the motion to the next city. Fail → the gate tells you which layer (channels, claim flow, attribution, pitch timing) to fix before spending elsewhere.
@@ -324,7 +324,7 @@ The proving ground's product purpose: the next city is configuration.
 
 ### 8.2 Code changes
 
-- Create route + `CampaignCategory` type + create-route category enum gain `proving_ground` and `parent_campaign_id`; attach-children endpoint (§4.2).
+- Create route + `CampaignCategory` type + create-route category enum gain `proving_ground` and `parent_campaign_id`; attach-children endpoint (§4.2); `POST /:campaignId/promote-to-proving-ground` (create-or-merge + multi-attach, §7).
 - `resolveEffectivePlaybook` direct-assignment branch (§4.3); triage-engine candidate exclusion for `proving_ground` playbooks.
 - `ProvingGroundCadenceService` (§4.7) + seed write-through + `mkt_outreach_log` mirror.
 - `getCohortFunnel` duplicate-exclusion join (§4.9).
