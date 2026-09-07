@@ -690,12 +690,20 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             {form.scope !== 'intelligence' && (
             <>
             <FormField label="Campaign Category" required>
-              <select value={form.campaign_category} onChange={(e) => handleChange('campaign_category', e.target.value as CampaignCategory)}
+              <select value={form.campaign_category} onChange={(e) => {
+                const next = e.target.value as CampaignCategory;
+                // Campaign Category is the primary selector — it renders
+                // first, so its choice drives scope, not the other way.
+                // Proving Ground is a city/category-scope workspace: selecting
+                // it from a business/intelligence scope coerces scope to city.
+                if (next === 'proving_ground' && (form.scope === 'business' || form.scope === 'intelligence')) {
+                  setForm((prev) => ({ ...prev, campaign_category: next, scope: 'city' }));
+                } else {
+                  handleChange('campaign_category', next);
+                }
+              }}
                 className={inputClass}>
-                {(form.scope === 'city' || form.scope === 'category' || form.campaign_category === 'proving_ground'
-                  ? [...CATEGORIES, 'proving_ground' as CampaignCategory]
-                  : CATEGORIES
-                ).map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : cat === 'proving_ground' ? 'Proving Ground' : 'Triage Management'}</option>)}
+                {[...CATEGORIES, 'proving_ground' as CampaignCategory].map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : cat === 'proving_ground' ? 'Proving Ground' : 'Triage Management'}</option>)}
               </select>
               <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
                 {form.campaign_category === 'review_management' ? (
@@ -725,7 +733,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 ) : form.campaign_category === 'proving_ground' ? (
                   <>
                     <p className="font-medium">Proving Ground</p>
-                    <p className="mt-1"><strong>Workspace:</strong> City/category-scope operator surface for a market launch — aggregates the intelligence discovery campaigns that feed it. One active proving ground per city + category.</p>
+                    <p className="mt-1"><strong>Workspace:</strong> City/category-scope operator surface for a market launch — aggregates the intelligence discovery campaigns that feed it. One active proving ground per city + category. Selecting this sets Scope to <span className="font-mono">city</span> automatically.</p>
                     <p className="mt-1"><strong>Category:</strong> Use an umbrella value (e.g. <span className="font-mono">Grocery</span>) — the guardrail keys on city + category, and per-ethnic-category workspaces fragment the funnel.</p>
                     <p className="mt-1"><strong>Checklist:</strong> PG-01 preflight attaches automatically — no triage step. Manage it from the cockpit at Marketing Ops → Proving Grounds.</p>
                     <p className="mt-1"><strong>Stages:</strong> Created at seek and never transitions — funnel gates (G1–G4) are read off linked seed cohorts, not the campaign stage.</p>
