@@ -154,7 +154,7 @@ router.get('/presence-seeds/funnel/cohorts', requirePlatformStaff, async (req: R
     logger.error('[GET /api/admin/directory/presence-seeds/funnel/cohorts] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
-    res.status(500).json({ error: 'internal_error' });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
   }
 });
 

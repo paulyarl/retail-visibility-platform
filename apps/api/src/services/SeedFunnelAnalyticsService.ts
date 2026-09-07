@@ -30,7 +30,7 @@
  *   S3 (weight 2): revenue transaction       — platform_revenue_transactions
  *   S4 (weight 2): customer order             — orders
  *   W1 (weight 1): product stocking           — inventory_items
- *   W2 (weight 1): owner platform access      — users.last_login_at via user_tenants
+ *   W2 (weight 1): owner platform access      — users.last_login via user_tenants
  *   W3 (weight 1): storefront customization   — inventory_items.custom_branding / landing_page_theme / tenant_storefront_options_settings
  *   W4 (weight 1): GBP sync / business hours  — tenants.google_sync_enabled / google_last_sync / business_hours_list
  */
@@ -318,7 +318,7 @@ const CONVERSION_LATERAL = `
       CASE WHEN EXISTS (
         SELECT 1 FROM user_tenants ut
         JOIN users u ON u.id = ut.user_id
-        WHERE ut.tenant_id = tn.id AND u.last_login_at IS NOT NULL
+        WHERE ut.tenant_id = tn.id AND u.last_login IS NOT NULL
       ) THEN 1 ELSE 0 END AS w2,
       -- W3: storefront customization (weight 1)
       CASE WHEN EXISTS (
@@ -357,9 +357,9 @@ const CONVERSION_LATERAL = `
          WHERE o.tenant_id = tn.id AND o.order_status <> 'draft'::order_status
            AND o.payment_status IN ('paid'::payment_status, 'refunded'::payment_status)),
         (SELECT MIN(ii.created_at) FROM inventory_items ii WHERE ii.tenant_id = tn.id),
-        (SELECT MAX(u.last_login_at) FROM user_tenants ut
+        (SELECT MAX(u.last_login) FROM user_tenants ut
          JOIN users u ON u.id = ut.user_id
-         WHERE ut.tenant_id = tn.id AND u.last_login_at IS NOT NULL),
+         WHERE ut.tenant_id = tn.id AND u.last_login IS NOT NULL),
         CASE WHEN EXISTS (
           SELECT 1 FROM inventory_items ii
           WHERE ii.tenant_id = tn.id
