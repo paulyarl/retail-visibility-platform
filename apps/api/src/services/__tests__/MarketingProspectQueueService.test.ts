@@ -47,12 +47,14 @@ vi.mock('../../lib/id-generator', () => ({
 }));
 
 // Mock the two derive services the create-campaign path replays through.
-// MarketingCampaignService is a default-export singleton instance.
+// MarketingCampaignService is a default-export singleton instance; the
+// INACTIVE_STAGES named export is imported for the campaign-exists filter.
 vi.mock('../MarketingCampaignService', () => ({
   default: {
     deriveBusinessCampaign: vi.fn(),
     createCampaign: vi.fn(),
   },
+  INACTIVE_STAGES: new Set(['lost', 'dead', 'closed', 'resolved_and_closed']),
 }));
 
 // MarketingHotProspectService is a named-export class with getInstance().
@@ -217,15 +219,48 @@ describe('MarketingProspectQueueService', () => {
       expect((result as any).campaignId).toBe('mcamp-existing-001');
       expect(mockQueue.create).not.toHaveBeenCalled();
       // Verify the dedup key uses title + city + state (not scope + category).
+      // Title and business_name are alternative keys inside OR (derived
+      // campaigns carry business_name with title=null).
       const findFirstArg = mockCampaigns.findFirst.mock.calls[0][0];
-      expect(findFirstArg.where.title).toEqual({
+      expect(findFirstArg.where.OR[0].title).toEqual({
         equals: 'Joe Pizza — Review Recovery',
+        mode: 'insensitive',
+      });
+      expect(findFirstArg.where.OR[1].business_name).toEqual({
+        equals: 'Joe Pizza',
         mode: 'insensitive',
       });
       expect(findFirstArg.where.city).toEqual({ equals: 'Austin', mode: 'insensitive' });
       expect(findFirstArg.where.state).toEqual({ equals: 'TX', mode: 'insensitive' });
       expect(findFirstArg.where.scope).toBeUndefined();
       expect(findFirstArg.where.category).toBeUndefined();
+    });
+
+    it('returns campaign_exists when the only existing queue row already graduated (campaign_created)', async () => {
+      // Regression: the queue dedup only covered queued/verify_then_outreach,
+      // so a prospect that graduated to a campaign could be queued again as a
+      // second row — the PG promote panel then rendered the same business
+      // twice and could promote both into duplicate listings.
+      mockQueue.findFirst.mockResolvedValue(
+        queueRow({ id: 'pque-graduated-001', status: 'campaign_created', processed_campaign_id: 'mcamp-grad-001' }),
+      );
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Istanbul Super Market',
+        title: 'Istanbul Super Market',
+        source_kind: 'intelligence_seek',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: scanSnapshot({ business_name: 'Istanbul Super Market' }),
+      });
+
+      expect(result.kind).toBe('campaign_exists');
+      expect((result as any).campaignId).toBe('mcamp-grad-001');
+      expect(mockQueue.create).not.toHaveBeenCalled();
+      // The dedup lookup must consider every live status, not just queued.
+      const dedupArg = mockQueue.findFirst.mock.calls[0][0];
+      expect(dedupArg.where.status).toEqual({
+        in: ['queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'],
+      });
     });
 
     it('does NOT return campaign_exists when the only matching campaign is the source/parent campaign (e.g. a city_category_audit that discovered the prospect)', async () => {
@@ -250,7 +285,7 @@ describe('MarketingProspectQueueService', () => {
       // and dedup on title + city + state (not scope + category).
       const findFirstArg = mockCampaigns.findFirst.mock.calls[0][0];
       expect(findFirstArg.where.id).toEqual({ not: PARENT_CAMPAIGN_ID });
-      expect(findFirstArg.where.title).toEqual({
+      expect(findFirstArg.where.OR[0].title).toEqual({
         equals: 'Homer Hills Fleet Services — Review Recovery',
         mode: 'insensitive',
       });

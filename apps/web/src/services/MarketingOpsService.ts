@@ -236,6 +236,10 @@ export interface CampaignDetail extends Campaign {
   files?: MarketingFile[];
   stage_history?: StageHistory[];
   parent_campaign?: CampaignLineageEntry | null;
+  // Proving-ground link for business-scope campaigns created from a prospect
+  // in a PG promotion queue (Migration 262). Null for non-business scopes or
+  // when the campaign is not PG-affiliated. Mirrors parent_campaign's shape.
+  proving_ground?: CampaignLineageEntry | null;
   children?: CampaignLineageEntry[];
   outreach_log?: OutreachLogEntry[];
   // Migration 262 — proving-ground gap log (chronological incident record)

@@ -25,7 +25,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError } from '../middleware/errorHandler';
 import { generateProspectQueueId } from '../lib/id-generator';
-import MarketingCampaignService from './MarketingCampaignService';
+import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 
@@ -238,17 +238,21 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const rating = extractRating(snapshot);
       const reviewCount = extractReviewCount(snapshot);
 
-      // Dedup: active queue entry for the same normalized identity.
+      // Dedup: non-dismissed queue entry for the same normalized identity.
       // Business scope dedups on the full triple (business_name + city +
       // category). Category/city scope entries have no business_name, so they
       // dedup on city + category only (matching a null business_name row).
-      // Matches both 'queued' and 'verify_then_outreach' rows so that adding
-      // to verify when a queued row already exists returns the existing row
-      // (and vice versa) rather than creating a duplicate.
+      // Matches every live status — queued, verify_then_outreach, hold,
+      // in_thread, AND campaign_created — so a prospect that already
+      // graduated to a campaign is never re-queued as a second row (the PG
+      // promote panel would render both, and promoting both would mint
+      // duplicate listings).
       const initialStatus = input.initial_status === 'verify_then_outreach'
         ? 'verify_then_outreach'
         : 'queued';
-      const dedupWhere: any = { status: { in: ['queued', 'verify_then_outreach'] } };
+      const dedupWhere: any = {
+        status: { in: ['queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'] },
+      };
       if (businessName) {
         dedupWhere.business_name = { equals: businessName, mode: 'insensitive' };
       } else {
@@ -264,6 +268,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
           existingId: existingQueued.id, businessName: businessName || null,
           existingStatus: existingQueued.status,
         });
+        if (existingQueued.status === 'campaign_created' && existingQueued.processed_campaign_id) {
+          return { kind: 'campaign_exists', campaignId: existingQueued.processed_campaign_id };
+        }
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
 
@@ -274,13 +281,28 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // scope + city + category (+ business_name) check, which could return
       // false positives for different businesses in the same city+category.
       //
+      // business_name is matched as an alternative key: campaigns derived
+      // straight from an audit card (never queued) carry business_name with
+      // title=null, so a title-only check missed them and the same prospect
+      // could be queued again alongside its existing campaign.
+      //
+      // Inactive campaigns (dead/lost/closed/resolved_and_closed) don't
+      // block — same semantics as the structural-duplicate guardrail: a
+      // killed campaign frees the slot for a fresh run.
+      //
       // Exclude the source/parent campaign (e.g. a city_category_audit that
       // discovered this prospect) — it is the originator, not a campaign for
       // this specific business, so matching it would falsely report the
       // prospect as already in the pipeline.
       const resolvedTitle = input.title.trim();
       const campaignExistsWhere: any = {
-        title: { equals: resolvedTitle, mode: 'insensitive' },
+        stage: { notIn: [...INACTIVE_STAGES] },
+        OR: [
+          { title: { equals: resolvedTitle, mode: 'insensitive' } },
+          ...(businessName
+            ? [{ business_name: { equals: businessName, mode: 'insensitive' } }]
+            : []),
+        ],
       };
       if (input.source_campaign_id) {
         campaignExistsWhere.id = { not: input.source_campaign_id };

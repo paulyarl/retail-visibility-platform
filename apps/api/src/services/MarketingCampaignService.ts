@@ -188,7 +188,7 @@ const RESURRECTION_STAGES = ['lost', 'dead'];
 // establishment / discovery campaigns with the same signature in the
 // campaign-selection list. Re-running an existing campaign produces a
 // versioned output instead of spawning a duplicate row.
-const INACTIVE_STAGES = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
+export const INACTIVE_STAGES = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
 
 /**
  * Normalizes a free-text geo / platform value for signature comparison.
@@ -1118,6 +1118,18 @@ export class MarketingCampaignService extends BaseService {
       const declaredArchetype = await this.resolveDeclaredArchetypes([rest.id], ctx);
       const archetypeInfo = declaredArchetype.get(rest.id);
 
+      // Proving-ground awareness for business-scope campaigns (Migration 262):
+      // a business campaign created from a prospect queue entry whose source
+      // campaign lives in a proving-ground tree should surface a "View
+      // Proving Ground" link, mirroring the intelligence-discovery detail page.
+      // The link is resolved via the prospect queue entry's source_campaign_id
+      // — either the source is the PG itself (city/category scope,
+      // campaign_category='proving_ground') or it is an intelligence discovery
+      // child whose parent_campaign_id is the PG.
+      const provingGround = rest.scope === 'business'
+        ? await this.resolveBusinessProvingGround(rest.id, ctx)
+        : null;
+
       return {
         ...rest,
         audits,
@@ -1127,6 +1139,7 @@ export class MarketingCampaignService extends BaseService {
         parent_campaign: parent ?? null,
         children: children ?? [],
         service_category_label,
+        proving_ground: provingGround,
         // Surface sibling grouping + archetype in camelCase so the detail
         // page header can disambiguate siblings (matches listCampaigns).
         businessProspectId: rest.business_prospect_id ?? null,
@@ -1138,6 +1151,75 @@ export class MarketingCampaignService extends BaseService {
     } catch (error) {
       logger.error('Failed to get campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Resolve the proving ground a business-scope campaign belongs to, if any.
+   *
+   * A business campaign is "in a PG promotion queue" when it was created from
+   * a prospect queue entry whose `source_campaign_id` lives in a proving-ground
+   * tree — either the source is the PG itself (city/category scope,
+   * campaign_category='proving_ground') or it is an intelligence discovery
+   * child whose `parent_campaign_id` is the PG. Returns a minimal lineage
+   * summary (id + label fields) so the detail header can render a "View
+   * Proving Ground" link, or null when the campaign is not PG-affiliated.
+   *
+   * Best-effort: any lookup failure logs and returns null so the detail page
+   * still renders without the link.
+   */
+  private async resolveBusinessProvingGround(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ id: string; business_name: string | null; title?: string | null; category?: string | null; city?: string | null; scope: string; stage: string } | null> {
+    try {
+      const queueEntry = await this.prisma.mkt_prospect_queue.findFirst({
+        where: { processed_campaign_id: campaignId },
+        select: { source_campaign_id: true },
+      });
+      if (!queueEntry?.source_campaign_id) return null;
+
+      const source = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: queueEntry.source_campaign_id },
+        select: {
+          id: true, scope: true, campaign_category: true, parent_campaign_id: true,
+          business_name: true, title: true, category: true, city: true, stage: true,
+        },
+      });
+      if (!source) return null;
+
+      const pgSelect = {
+        id: true, business_name: true, title: true, category: true, city: true,
+        scope: true, stage: true, campaign_category: true,
+      } as const;
+
+      // Source is the PG itself (city/category scope proving ground).
+      if (source.campaign_category === 'proving_ground') {
+        return {
+          id: source.id, business_name: source.business_name, title: source.title,
+          category: source.category, city: source.city, scope: source.scope, stage: source.stage,
+        };
+      }
+
+      // Source is an intelligence discovery child of a PG — resolve the parent
+      // and verify it is actually a proving ground before surfacing the link.
+      if (source.parent_campaign_id) {
+        const parent = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: source.parent_campaign_id },
+          select: pgSelect,
+        });
+        if (parent?.campaign_category === 'proving_ground') {
+          const { campaign_category, ...lineage } = parent as any;
+          return lineage;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn('resolveBusinessProvingGround — lookup failed', ctx, {
+        campaignId, error: (error as Error).message,
+      });
+      return null;
     }
   }
 

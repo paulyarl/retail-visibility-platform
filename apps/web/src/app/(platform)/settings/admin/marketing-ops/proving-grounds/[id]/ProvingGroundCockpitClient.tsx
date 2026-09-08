@@ -171,9 +171,28 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
 
       // Promotion panel: every non-dismissed tree prospect — including
       // campaign_created rows, since graduation to campaign + audit is the
-      // pre-condition for promotion, not an exit. Default-select only
-      // audit-backed, non-hold entries; analyst holds stay out either way.
-      const promotable = queue.entries.filter((e) => e.status !== 'dismissed');
+      // pre-condition for promotion, not an exit. Duplicate identities (same
+      // business + city — legacy rows queued twice around a graduation) are
+      // collapsed to the most-advanced row: seeded > campaign_created >
+      // live-queue statuses, so the panel can never offer the same business
+      // twice (promoting both would mint duplicate listings). Rows without a
+      // business_name (category/city scope) are never collapsed.
+      const identityRank = (e: ProspectQueueEntry) =>
+        e.seed_id ? 3 : e.status === 'campaign_created' ? 2 : 1;
+      const byIdentity = new Map<string, ProspectQueueEntry>();
+      for (const e of queue.entries) {
+        if (e.status === 'dismissed') continue;
+        const key = e.business_name
+          ? `${e.business_name.toLowerCase().trim()}|${(e.city ?? '').toLowerCase().trim()}`
+          : `id:${e.id}`;
+        const existing = byIdentity.get(key);
+        if (!existing) {
+          byIdentity.set(key, e);
+        } else if (identityRank(e) > identityRank(existing)) {
+          byIdentity.set(key, e);
+        }
+      }
+      const promotable = [...byIdentity.values()];
       setPromoteEntries(promotable);
       setPromoteSelected(
         new Set(

@@ -903,6 +903,20 @@ export default function CampaignDetailClient({
                     View Proving Ground
                   </Link>
                 )}
+                {/* Business-scope campaigns created from a prospect in a PG
+                    promotion queue (Migration 262) — surface the same "View
+                    Proving Ground" link as discovery runs. The backend resolves
+                    the PG via the prospect queue entry's source_campaign_id. */}
+                {campaign.scope === 'business' && campaign.proving_ground && (
+                  <Link
+                    href={`/settings/admin/marketing-ops/proving-grounds/${campaign.proving_ground.id}`}
+                    title="This business was promoted from a proving ground worklist"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-300 rounded-lg hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    View Proving Ground
+                  </Link>
+                )}
                 {!campaign.tenant_id && (
                   <button
                     onClick={handleLinkTenant}
