@@ -9,7 +9,7 @@ const {
   mockCampaignsList: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
   mockStageHistory: { create: vi.fn() },
   mockPreviewTokens: { findMany: vi.fn() },
-  mockProspectQueue: { updateMany: vi.fn() },
+  mockProspectQueue: { updateMany: vi.fn(), create: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -28,6 +28,7 @@ vi.mock('../../logger', () => ({
 vi.mock('../../lib/id-generator', () => ({
   generateCampaignId: () => 'mkt-test-001',
   generateStageHistoryId: () => 'msh-test-001',
+  generateProspectQueueId: () => 'pque-test-001',
 }));
 
 vi.mock('../MarketingCategoryToneService', () => ({

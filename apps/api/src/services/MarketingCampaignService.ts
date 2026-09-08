@@ -13,7 +13,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ValidationError, ConflictError } from '../middleware/errorHandler';
-import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId } from '../lib/id-generator';
+import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId, generateProspectQueueId } from '../lib/id-generator';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
 import DemoTenantService from './DemoTenantService';
@@ -197,6 +197,19 @@ const INACTIVE_STAGES = new Set(['lost', 'dead', 'closed', 'resolved_and_closed'
 function normalizeSignatureValue(value: string | null | undefined): string | null {
   const v = (value ?? '').toString().trim().toLowerCase();
   return v || null;
+}
+
+/**
+ * Case-insensitive equals filter for a normalized signature field. Postgres
+ * string equality is case-sensitive, so a lowercased normalized value would
+ * never match the mixed-case value stored on the row ('madison' vs 'Madison')
+ * and the duplicate guardrail would silently match nothing. Null keeps the
+ * IS NULL semantics (nationwide / no-geo signatures).
+ */
+function insensitiveSignatureFilter(
+  value: string | null,
+): string | null | { equals: string; mode: 'insensitive' } {
+  return value === null ? null : { equals: value, mode: 'insensitive' };
 }
 
 /**
@@ -508,6 +521,11 @@ export class MarketingCampaignService extends BaseService {
     // row.
     const activeStageFilter = { NOT: { stage: { in: [...INACTIVE_STAGES] } } };
 
+    // Geo fields are normalized to trimmed-lowercase, so they must be
+    // compared case-insensitively against the mixed-case stored values.
+    const cityFilter = insensitiveSignatureFilter(city);
+    const stateFilter = insensitiveSignatureFilter(state);
+
     let where: any;
 
     if (scope === 'intelligence') {
@@ -525,8 +543,8 @@ export class MarketingCampaignService extends BaseService {
         category,
         intelligence_campaign_kind: kind,
         intelligence_focus: focus,
-        city: city ?? null,
-        state: state ?? null,
+        city: cityFilter,
+        state: stateFilter,
         ...(platformIsAll
           ? { OR: [{ intelligence_platform: null }, { intelligence_platform: { in: ['all', 'All', 'ALL'] } }] }
           : { intelligence_platform: input.intelligencePlatform }),
@@ -538,25 +556,22 @@ export class MarketingCampaignService extends BaseService {
         scope: 'business',
         campaign_category: campaignCategory,
         category,
-        city: city ?? null,
-        state: state ?? null,
-        // business_name is nullable; match on the trimmed-lowercased value
-        // is not directly possible without a computed column, so we compare
-        // the raw value (operators enter business names consistently for the
-        // same business). Null business_name matches null.
-        business_name: input.businessName ?? null,
+        city: cityFilter,
+        state: stateFilter,
+        // business_name is nullable; compare case-insensitively so name-case
+        // variants ('Joe Plumbing' vs 'joe plumbing') still trip the
+        // guardrail. Null business_name matches null.
+        business_name: insensitiveSignatureFilter(businessName),
         ...activeStageFilter,
       };
-      // Suppress unused-var lint for the normalized form (kept for clarity).
-      void businessName;
     } else {
       // category / city scopes
       where = {
         scope,
         campaign_category: campaignCategory,
         category,
-        city: city ?? null,
-        state: state ?? null,
+        city: cityFilter,
+        state: stateFilter,
         ...activeStageFilter,
       };
     }
@@ -1381,6 +1396,65 @@ export class MarketingCampaignService extends BaseService {
             parentId: input.parentId,
             businessName: input.businessName,
             queueEntriesStamped: stamped.count,
+          });
+        } else if (
+          // No queued prospect mirrored this derive — the operator went
+          // straight to "create campaign" without queueing first. Backfill
+          // the queue row (status='campaign_created', already stamped) so the
+          // prospect still surfaces in the proving-ground promotion panel,
+          // which is tree-scoped on source_campaign_id. Gated to discovery
+          // prospect runs (emerging / competitive focus) — the same kind/
+          // focus gate as the PG itself; establishment / gold-standards runs
+          // produce profiles, not prospects, and other scopes have their own
+          // queue semantics (category-ID composite, scan path).
+          (parent.scope as string | null) === 'intelligence'
+          && ((parent.intelligence_campaign_kind as string | null) || 'discovery') === 'discovery'
+          && ['emerging', 'competitive'].includes(((parent.intelligence_focus as string | null) || 'emerging'))
+        ) {
+          await this.prisma.mkt_prospect_queue.create({
+            data: {
+              id: generateProspectQueueId(),
+              business_name: input.businessName,
+              title: input.title ?? input.businessName,
+              category: child.category,
+              city: child.city,
+              state: child.state,
+              source_kind: 'intelligence_seek',
+              source_scope: parent.scope as string,
+              source_campaign_id: input.parentId,
+              business_snapshot: {
+                business_name: input.businessName,
+                location: input.location ?? null,
+                rating: input.rating ?? null,
+                review_count: input.reviewCount ?? null,
+                derived_from_campaign_id: child.id,
+              } as any,
+              detected_signals: (input.detectedSignals ?? []) as any,
+              signal_count: input.detectedSignals?.length ?? 0,
+              rating: input.rating ?? null,
+              review_count: input.reviewCount ?? null,
+              status: 'campaign_created',
+              priority: 'normal',
+              queued_by: ctx?.userId ?? null,
+              assigned_to: input.assignedTo ?? null,
+              processed_campaign_id: child.id,
+              processed_at: new Date(),
+              // Intelligence discovery columns — carried from the discovery
+              // context handoff so the promotion panel keeps its assessment
+              // (seek priority / category fit / identity confidence).
+              category_fit: input.discoveryContext?.category_fit ?? null,
+              identity_confidence: input.discoveryContext?.identity_confidence ?? null,
+              location_status: input.discoveryContext?.location_status ?? null,
+              discovery_provenance: (input.discoveryContext?.discovery_provenance ?? undefined) as any,
+              discovery_signals: (input.discoveryContext?.discovery_signals ?? undefined) as any,
+              business_seek_priority: input.discoveryContext?.business_seek_priority ?? null,
+              intelligence_run_id: input.intelligenceRunId ?? null,
+            },
+          });
+          logger.info('deriveBusinessCampaign: backfilled campaign_created queue row', ctx, {
+            campaignId: child.id,
+            parentId: input.parentId,
+            businessName: input.businessName,
           });
         }
       } catch (linkError) {

@@ -416,6 +416,29 @@ describe('createCampaign structural-duplicate guardrail', () => {
     expect(mockCampaignsList.create).not.toHaveBeenCalled();
   });
 
+  it('builds case-insensitive geo + business-name filters so mixed-case stored rows match', async () => {
+    // Regression: normalizeSignatureValue lowercases city/state, but Postgres
+    // equality is case-sensitive — 'madison' never matched the stored
+    // 'Madison', so the guardrail silently allowed exact duplicates
+    // (e.g. two active "Istanbul Super Market / Madison / WI" campaigns).
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    await service.createCampaign({
+      scope: 'business',
+      businessName: 'Istanbul Super Market',
+      category: 'Middle Eastern Grocery Store',
+      city: 'Madison',
+      state: 'WI',
+    });
+
+    const where = mockCampaignsList.findFirst.mock.calls[0][0].where;
+    expect(where.city).toEqual({ equals: 'madison', mode: 'insensitive' });
+    expect(where.state).toEqual({ equals: 'wi', mode: 'insensitive' });
+    expect(where.business_name).toEqual({ equals: 'istanbul super market', mode: 'insensitive' });
+    expect(where.scope).toBe('business');
+    expect(where.campaign_category).toBe('review_management');
+  });
+
   it('allows a business-scope campaign for a different business in the same category/city', async () => {
     mockCampaignsList.findFirst.mockResolvedValueOnce(null);
 
