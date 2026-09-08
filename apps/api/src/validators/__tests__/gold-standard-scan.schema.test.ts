@@ -313,4 +313,9 @@ describe('GOLD_STANDARD_SCAN_PROMPT_SUFFIX', () => {
     expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('franchise');
     expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('chain');
   });
+
+  it('mentions ALL-PLATFORM SLOT COVERAGE rule', () => {
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('ALL-PLATFORM SLOT COVERAGE');
+    expect(GOLD_STANDARD_SCAN_PROMPT_SUFFIX).toContain('EVERY major platform');
+  });
 });

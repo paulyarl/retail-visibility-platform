@@ -340,6 +340,13 @@ Rules:
   platform), relative to the candidate pool. The best available candidate on a
   platform qualifies even if they have gaps — the quality_score reflects
   absolute quality so operators know how strong the benchmark is.
+- ALL-PLATFORM SLOT COVERAGE. When platform_focus is "all", emit at least one
+  is_gold_standard = true evaluation for EVERY major platform (google, yelp,
+  facebook, bbb, apple_maps, bing) — even when evidence is thin or a listing
+  is missing (use profile_url: null, a low quality_score, and a rationale
+  marking the gap as a creation target). Platforms with zero flagged candidates
+  cannot receive gold-standard slots, which blocks future platform-specific
+  discovery scans from populating them.
 - INDEPENDENT BUSINESSES ONLY. Only independent or small locally-owned groups
   (<= ~10 locations) qualify as gold-standard candidates. Franchises, chains,
   and corporate subsidiaries must be excluded and noted in

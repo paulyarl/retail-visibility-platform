@@ -64,6 +64,22 @@ const CANDIDATE_EVALUATION_SECTION = `Evaluate each candidate per platform:
 - quality_gates_passed/failed: which gates this candidate passed/failed (informational — does NOT filter is_gold_standard)
 - ownership_type, location_count_estimate, independence_rationale: recorded per candidate (see ELIGIBILITY)`;
 
+// ALL-PLATFORM SLOT COVERAGE — the platform's slot system derives per-platform
+// gold-standard slot groups from flagged candidate evaluations. A platform with
+// zero is_gold_standard = true evaluations in the profile is invisible to the
+// slot system, so platform-specific discovery scans have nowhere to promote
+// into. When the scan covers all platforms, every platform must carry at least
+// one flagged candidate — even when the evidence is thin.
+const ALL_PLATFORM_COVERAGE_SECTION = `=== ALL-PLATFORM SLOT COVERAGE (applies when PLATFORM FOCUS is "all") ===
+The platform's slot system derives per-platform gold-standard slots from flagged candidate evaluations — a platform with ZERO is_gold_standard = true evaluations is invisible to the slot system and cannot be populated by future platform-specific discovery scans. Therefore, when the platform focus is "all":
+
+- You MUST emit at least one platform_evaluation with is_gold_standard = true for EVERY major platform (Google, Yelp, Facebook, BBB, Apple Maps, Bing) — no exceptions for thin or missing data.
+- Imperfect or thin evidence is acceptable and expected: verify what exists (a BBB profile, a Bing Maps listing, an unclaimed or auto-generated page), score it honestly (a 3/10 BBB presence is a valid benchmark-of-the-gap), and let quality_gates_failed show operators the gap.
+- If the strongest candidate has NO listing at all on a platform, still emit the evaluation with profile_url: null, a low quality_score, and a rationale marking it as a creation target — do NOT omit the platform.
+- Only omit a platform entirely when verification was genuinely impossible for every candidate in the pool, and record the omission in scan_metadata.
+
+When the platform focus is a single named platform, this section does not apply — other platforms gain slots through their own platform-specific establishment or discovery scans.`;
+
 const BRANDING_ARTIFACTS_SECTION = `=== BRANDING ARTIFACTS ===
 Capture branding artifacts for each candidate:
 - has_logo, has_cover_photo, has_profile_photo
@@ -103,6 +119,8 @@ The gold-standard profile will be used to:
 
 === PLATFORM FOCUS ===
 {{platform}} is the platform this scan focuses on. If the platform is "all", evaluate candidates across all major platforms (Google, Yelp, Facebook, BBB, Apple Maps, Bing). If a specific platform is named, focus the evaluation on that platform but still note cross-platform presence.
+
+${ALL_PLATFORM_COVERAGE_SECTION}
 
 ${ELIGIBILITY_SECTION}
 
@@ -175,6 +193,8 @@ The gold-standard profile will be used to:
 
 === PLATFORM FOCUS ===
 {{platform}} is the platform this scan focuses on. If the platform is "all", evaluate candidates across all major platforms (Google, Yelp, Facebook, BBB, Apple Maps, Bing). If a specific platform is named, focus the evaluation on that platform but still note cross-platform presence.
+
+${ALL_PLATFORM_COVERAGE_SECTION}
 
 ${ELIGIBILITY_SECTION}
 
