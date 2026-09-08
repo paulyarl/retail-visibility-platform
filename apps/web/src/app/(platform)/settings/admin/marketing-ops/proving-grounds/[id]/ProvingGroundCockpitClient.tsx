@@ -14,12 +14,13 @@ import Link from 'next/link';
 import {
   Loader2, RefreshCw, X, ListChecks, GitBranch, AlertTriangle,
   ExternalLink, CheckCircle2, Circle, Link2, Unlink, Phone, Users, Search, MapPin,
-  Eye, Save, RotateCcw,
+  Eye, Save, RotateCcw, Trash2,
 } from 'lucide-react';
 import marketingOpsService, {
   type Audit,
   type CampaignDetail,
   type CampaignLineageEntry,
+  type ProspectDismissReason,
   type ProspectQueueEntry,
 } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
@@ -101,6 +102,20 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [promoteResult, setPromoteResult] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState<string | null>(null);
 
+  // Per-row dismiss — removes a prospect from the promote list and the
+  // worklist (status='dismissed'). Inline reason picker; rows already
+  // promoted (seed_id set) are not dismissible here — the published listing
+  // needs the directory panel, not a queue status flip.
+  const [dismissId, setDismissId] = useState<string | null>(null);
+  const [dismissReason, setDismissReason] = useState<ProspectDismissReason>('bad_fit');
+  const [dismissBusy, setDismissBusy] = useState(false);
+
+  // Seed delete (promoted rows) — permanent teardown of the minted seed
+  // (listing + tenant + tokens + campaign links). The queue stamp is cleared
+  // server-side, so the prospect returns to the promote list un-promoted.
+  const [deleteSeedTarget, setDeleteSeedTarget] = useState<{ id: string; seedId: string; name: string } | null>(null);
+  const [deleteSeedBusy, setDeleteSeedBusy] = useState(false);
+
   const treeIds = useMemo(
     () => [campaignId, ...children.map((c) => c.id)],
     [campaignId, children],
@@ -140,11 +155,10 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         directoryPresenceAdminService.getCohortFunnel({ campaignIds: ids }),
         marketingOpsService.listProspectQueue({
           source_campaign_ids: ids,
-          // verify_then_outreach included so the promotion panel sees gated
-          // prospects; they carry no next_touch_at so due-today is unchanged.
-          // includeCampaigns decorates each entry with its processed
-          // campaign's stage + business-audit coverage (pre-push tracking).
-          status: ['queued', 'in_thread', 'hold', 'verify_then_outreach'],
+          // campaign_created included: a prospect that graduated to a campaign
+          // is exactly the audit-first promotion candidate — it must stay on
+          // the promote panel, not vanish from it.
+          status: ['queued', 'in_thread', 'hold', 'verify_then_outreach', 'campaign_created'],
           includeCampaigns: true,
           limit: 200,
         }),
@@ -155,12 +169,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         .sort((a, b) => new Date(a.next_touch_at!).getTime() - new Date(b.next_touch_at!).getTime());
       setDueToday(sorted.slice(0, 10));
 
-      // Promotion panel: every non-graduated tree prospect. Default-select
-      // only audit-backed, non-hold entries — the ideal is a business audit
-      // per prospect before public seeding (richer seed data), so campaign
-      // + audit is the pre-checked bar; everything else needs an explicit
-      // tick. Analyst holds stay out either way.
-      const promotable = queue.entries.filter((e) => e.status !== 'campaign_created' && e.status !== 'dismissed');
+      // Promotion panel: every non-dismissed tree prospect — including
+      // campaign_created rows, since graduation to campaign + audit is the
+      // pre-condition for promotion, not an exit. Default-select only
+      // audit-backed, non-hold entries; analyst holds stay out either way.
+      const promotable = queue.entries.filter((e) => e.status !== 'dismissed');
       setPromoteEntries(promotable);
       setPromoteSelected(
         new Set(
@@ -340,6 +353,49 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setPromoteError(err.message || 'Failed to promote prospects');
     } finally {
       setPromoteBusy(false);
+    }
+  };
+
+  // Dismiss removes a prospect from the promote list and the worklist
+  // (status='dismissed' — idempotent, row retained as history; viewable on
+  // the queue page under the dismissed filter).
+  const handleDismiss = async (id: string) => {
+    setDismissBusy(true);
+    setError(null);
+    try {
+      await marketingOpsService.dismissProspectQueue(id, dismissReason);
+      setDismissId(null);
+      await load();
+    } catch (err: any) {
+      setError(err.message || 'Failed to dismiss prospect');
+    } finally {
+      setDismissBusy(false);
+    }
+  };
+
+  // Delete a promoted seed — permanent teardown; the backend clears the
+  // queue stamp so the prospect returns to the promote list un-promoted.
+  const handleDeleteSeed = async () => {
+    if (!deleteSeedTarget) return;
+    setDeleteSeedBusy(true);
+    setError(null);
+    try {
+      const result = await directoryPresenceAdminService.deleteSeed(deleteSeedTarget.seedId);
+      if (result?.deleted === false) {
+        setError(
+          result.reason === 'seed_already_claimed'
+            ? 'Seed already claimed by a customer — delete refused. Use suppress on the seed workspace instead.'
+            : `Delete failed: ${result.reason ?? 'unknown reason'}`,
+        );
+      } else {
+        setPromoteResult(`Seed deleted — ${deleteSeedTarget.name} returned to the promote list.`);
+      }
+      setDeleteSeedTarget(null);
+      await load();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete seed');
+    } finally {
+      setDeleteSeedBusy(false);
     }
   };
 
@@ -820,7 +876,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         <p className="text-[10px] text-gray-400 mb-2">
           Creates + publishes a directory listing per selected prospect, links it to its discovery campaign, and mints a claim token.
           Audit-backed prospects are pre-checked — a business audit per prospect makes richer seed data. Hold-priority prospects stay
-          unchecked until an analyst's hold is resolved.
+          unchecked until an analyst's hold is resolved; dismiss removes a prospect from the list entirely.
         </p>
         {promoteEntries.length === 0 ? (
           <p className="text-xs text-gray-400">
@@ -885,38 +941,100 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                       )}
                     </label>
                     <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5">
-                      {e.processed_campaign_id ? (
+                      {dismissId === e.id ? (
                         <>
-                          <Link
-                            href={`/settings/admin/marketing-ops/campaigns/${e.processed_campaign_id}`}
-                            className="text-blue-600 dark:text-blue-400 hover:underline"
-                            title="Open the prospect's campaign"
+                          <select
+                            value={dismissReason}
+                            onChange={(ev) => setDismissReason(ev.target.value as ProspectDismissReason)}
+                            className="px-1 py-0.5 text-[10px] border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                            title="Why is this prospect being dismissed?"
                           >
-                            campaign{e.campaign_stage ? ` · ${e.campaign_stage}` : ''}
-                          </Link>
-                          {audited ? (
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800"
-                              title={e.business_audit_at ? `Business audit ${new Date(e.business_audit_at).toLocaleDateString()}` : 'Business audit on file'}
-                            >
-                              audited
-                            </span>
-                          ) : (
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
-                              title="No business_analysis audit yet — run the audit before seeding for richer listing data"
-                            >
-                              no audit
-                            </span>
-                          )}
+                            <option value="bad_fit">bad fit</option>
+                            <option value="duplicate">duplicate</option>
+                            <option value="already_customer">already customer</option>
+                            <option value="unverified_closed">closed</option>
+                            <option value="other">other</option>
+                          </select>
+                          <button
+                            onClick={() => handleDismiss(e.id)}
+                            disabled={dismissBusy}
+                            className="text-[10px] font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+                          >
+                            {dismissBusy ? '…' : 'confirm'}
+                          </button>
+                          <button
+                            onClick={() => setDismissId(null)}
+                            className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          >
+                            cancel
+                          </button>
                         </>
                       ) : (
-                        <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                        <>
+                          {e.processed_campaign_id ? (
+                            <>
+                              <Link
+                                href={`/settings/admin/marketing-ops/campaigns/${e.processed_campaign_id}`}
+                                className="text-blue-600 dark:text-blue-400 hover:underline"
+                                title="Open the prospect's campaign"
+                              >
+                                campaign{e.campaign_stage ? ` · ${e.campaign_stage}` : ''}
+                              </Link>
+                              {audited ? (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800"
+                                  title={e.business_audit_at ? `Business audit ${new Date(e.business_audit_at).toLocaleDateString()}` : 'Business audit on file'}
+                                >
+                                  audited
+                                </span>
+                              ) : (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                                  title="No business_analysis audit yet — run the audit before seeding for richer listing data"
+                                >
+                                  no audit
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                          )}
+                          {promoted && e.seed_id && (
+                            <>
+                              <Link
+                                href={`/settings/admin/directory/presence-seeds/${e.seed_id}`}
+                                className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline"
+                                title="Open the seed workspace"
+                              >
+                                <Eye className="w-3 h-3" />
+                                seed
+                              </Link>
+                              <button
+                                onClick={() => setDeleteSeedTarget({ id: e.id, seedId: e.seed_id!, name: e.business_name || e.title || e.id })}
+                                disabled={promoteBusy || dismissBusy || deleteSeedBusy}
+                                className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                                title="Delete this seed — permanently removes the listing and its tenant; the prospect returns to the promote list"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </>
+                          )}
+                          <span>
+                            {e.status}
+                            {e.identity_confidence ? ` · conf: ${e.identity_confidence}` : ''}
+                          </span>
+                          {!promoted && (
+                            <button
+                              onClick={() => { setDismissId(e.id); setDismissReason('bad_fit'); }}
+                              disabled={promoteBusy || dismissBusy}
+                              className="text-[10px] text-gray-400 hover:text-red-600 disabled:opacity-50"
+                              title="Dismiss this prospect — removes it from the promote list and the worklist (viewable under 'dismissed' on the queue page)"
+                            >
+                              dismiss
+                            </button>
+                          )}
+                        </>
                       )}
-                      <span>
-                        {e.status}
-                        {e.identity_confidence ? ` · conf: ${e.identity_confidence}` : ''}
-                      </span>
                     </span>
                   </li>
                 );
@@ -931,6 +1049,41 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           <div className="mt-2 text-xs text-red-600 dark:text-red-400">{promoteError}</div>
         )}
       </div>
+
+      {/* Seed delete confirmation — mirrors the presence-seeds page's modal */}
+      {deleteSeedTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white dark:bg-neutral-800 p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete this seed?</h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              This permanently deletes the seed, its directory listing, the seed
+              tenant, and all related claim tokens, provenance, and campaign
+              links. This cannot be undone.
+            </p>
+            <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">{deleteSeedTarget.name}</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              The prospect returns to the promote list un-promoted.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteSeedTarget(null)}
+                disabled={deleteSeedBusy}
+                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteSeed}
+                disabled={deleteSeedBusy}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteSeedBusy ? 'Deleting…' : 'Delete seed'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Children */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">

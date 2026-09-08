@@ -1351,6 +1351,45 @@ export class MarketingCampaignService extends BaseService {
             : undefined),
       }, ctx);
 
+      // Queue linkage (proving-ground promote panel): when the derived
+      // business mirrors a prospect queued from the same discovery campaign,
+      // stamp the queue entry so the cockpit's promote panel sees the
+      // campaign + audit coverage instead of "no campaign". Mirrors the
+      // queue-path createCampaignFromQueue semantics (processed_campaign_id
+      // + status='campaign_created'). Best-effort — a missed stamp only
+      // costs panel accuracy, never data.
+      try {
+        const stamped = await this.prisma.mkt_prospect_queue.updateMany({
+          where: {
+            source_campaign_id: input.parentId,
+            processed_campaign_id: null,
+            status: { not: 'dismissed' },
+            OR: [
+              { business_name: { equals: input.businessName, mode: 'insensitive' } },
+              { title: { equals: input.businessName, mode: 'insensitive' } },
+            ],
+          },
+          data: {
+            processed_campaign_id: child.id,
+            processed_at: new Date(),
+            status: 'campaign_created',
+          },
+        });
+        if (stamped.count > 0) {
+          logger.info('deriveBusinessCampaign: stamped matching queue entries', ctx, {
+            campaignId: child.id,
+            parentId: input.parentId,
+            businessName: input.businessName,
+            queueEntriesStamped: stamped.count,
+          });
+        }
+      } catch (linkError) {
+        logger.warn('deriveBusinessCampaign: queue stamp failed (non-fatal)', ctx, {
+          campaignId: child.id,
+          error: (linkError as Error).message,
+        });
+      }
+
       // If the caller passed detected_signals (from the category audit's
       // per-business detected_signals[]), create a business_analysis audit
       // on the child so the triage engine can read them, then auto-trigger

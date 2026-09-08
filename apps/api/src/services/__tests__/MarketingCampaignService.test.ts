@@ -4,10 +4,12 @@ const {
   mockCampaignsList,
   mockStageHistory,
   mockPreviewTokens,
+  mockProspectQueue,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
   mockStageHistory: { create: vi.fn() },
   mockPreviewTokens: { findMany: vi.fn() },
+  mockProspectQueue: { updateMany: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -15,6 +17,7 @@ vi.mock('../../prisma', () => ({
     mkt_campaigns_list: mockCampaignsList,
     mkt_stage_history_list: mockStageHistory,
     mkt_deliverable_preview_tokens: mockPreviewTokens,
+    mkt_prospect_queue: mockProspectQueue,
   },
 }));
 
@@ -175,6 +178,58 @@ describe('deriveBusinessCampaign', () => {
     mockStageHistory.create.mockResolvedValue({});
     mockCampaignsList.create.mockImplementation(({ data }: any) =>
       Promise.resolve(createdChild(data)));
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 0 });
+  });
+
+  it('stamps matching queue entries when the derived business mirrors a queued prospect', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 1 });
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'Bassett Services',
+    });
+
+    expect(mockProspectQueue.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          source_campaign_id: 'mcamp-parent-cat',
+          processed_campaign_id: null,
+          OR: [
+            { business_name: { equals: 'Bassett Services', mode: 'insensitive' } },
+            { title: { equals: 'Bassett Services', mode: 'insensitive' } },
+          ],
+        }),
+        data: expect.objectContaining({
+          processed_campaign_id: 'mkt-test-001',
+          status: 'campaign_created',
+        }),
+      }),
+    );
+  });
+
+  it('does not stamp queue entries when no queued prospect matches the derived business', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 0 });
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'Bassett Services',
+    });
+
+    expect(mockProspectQueue.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a queue-stamp failure (non-fatal)', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+    mockProspectQueue.updateMany.mockRejectedValue(new Error('stamp boom'));
+
+    const result = await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'Bassett Services',
+    });
+
+    expect(result.id).toBe('mkt-test-001');
   });
 
   it('creates a seek-stage business child from a category-scope parent', async () => {

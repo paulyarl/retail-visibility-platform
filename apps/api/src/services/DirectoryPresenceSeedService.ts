@@ -1135,6 +1135,14 @@ class DirectoryPresenceSeedService {
     // already-consumed token that was not removed.
     await prisma.$executeRaw`DELETE FROM directory_claim_requests WHERE seed_id = ${seedId}`;
 
+    // Proving-ground stamp cleanup: any queue entry seeded from this seed
+    // returns to unseeded so it can be promoted again — the cockpit's
+    // promote panel keys on mkt_prospect_queue.seed_id.
+    await prisma.$executeRaw`
+      UPDATE mkt_prospect_queue SET seed_id = NULL, updated_at = now()
+      WHERE seed_id = ${seedId}
+    `;
+
     // The seed row itself.
     await prisma.$executeRaw`DELETE FROM directory_presence_seeds WHERE id = ${seedId}`;
 

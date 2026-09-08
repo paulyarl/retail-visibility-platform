@@ -468,14 +468,17 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     );
   }
 
-  /** DELETE /api/admin/directory-presence/presence-seeds/:id — permanently delete a seed and its tenant */
-  async deleteSeed(id: string): Promise<void> {
-    await this.makeDefaultRequest<any>(
+  /** DELETE /api/admin/directory-presence/presence-seeds/:id — permanently delete a seed and its tenant.
+   *  Returns the backend verdict: { deleted: true } or { deleted: false, reason } (e.g. 'seed_already_claimed'). */
+  async deleteSeed(id: string): Promise<{ deleted: boolean; reason?: string }> {
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}`,
       { method: 'DELETE' },
       undefined,
       0,
     );
+    const data = result.data?.data ?? result.data;
+    return data ?? { deleted: true };
   }
 
   async revokeToken(id: string, tokenId: string): Promise<void> {
