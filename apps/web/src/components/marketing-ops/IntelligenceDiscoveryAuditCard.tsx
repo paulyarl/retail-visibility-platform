@@ -238,6 +238,11 @@ export default function IntelligenceDiscoveryAuditCard({
       if (result.kind === 'created' || result.kind === 'already_queued') {
         setQueuedEntryId((prev) => ({ ...prev, [idx]: result.entry.id }));
         onQueued?.();
+      } else if (result.kind === 'campaign_exists') {
+        // A campaign already exists for this business — surface it on the
+        // Campaign button (link to the existing campaign) instead of the
+        // tiny "exists" text next to an active button.
+        setDerivedCampaignId((prev) => ({ ...prev, [idx]: result.campaignId }));
       }
     } catch (err: any) {
       setDeriveError(err.message || 'Failed to add to queue');
@@ -462,6 +467,15 @@ export default function IntelligenceDiscoveryAuditCard({
                         <Check className="w-3 h-3" />
                         Queued
                       </Link>
+                    ) : queuedFeedback[idx] === 'already' ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=queued`}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700/70 bg-green-50/60 border border-green-200/70 rounded dark:bg-green-900/10 dark:text-green-300/70 dark:border-green-800/60"
+                        title="Already in the prospect queue — click to view"
+                      >
+                        <Check className="w-3 h-3" />
+                        In queue
+                      </Link>
                     ) : (
                       <button
                         onClick={() => handleQueue(biz)}
@@ -482,7 +496,7 @@ export default function IntelligenceDiscoveryAuditCard({
                         <Check className="w-3 h-3" />
                         Sent
                       </Link>
-                    ) : (
+                    ) : queuedFeedback[idx] === 'already' ? null : (
                       <button
                         onClick={() => handleQueue(biz, 'verify_then_outreach')}
                         disabled={queueingIdx !== null || queuedFeedback[idx] === 'queued'}
@@ -493,23 +507,19 @@ export default function IntelligenceDiscoveryAuditCard({
                         Verify
                       </button>
                     )}
-                    {queuedFeedback[idx] === 'already' && (
-                      <Link
-                        href={`/settings/admin/marketing-ops/queue?status=queued`}
-                        className="text-[10px] text-slate-400 hover:text-slate-600 hover:underline"
-                        title="Already in the queue — click to view"
-                      >
-                        already
-                      </Link>
-                    )}
-                    {queuedFeedback[idx] === 'exists' && (
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400" title="A campaign already exists">exists</span>
-                    )}
                     {derivedCampaignId[idx] ? (
                       <Link
                         href={`/settings/admin/marketing-ops/campaigns/${derivedCampaignId[idx]}`}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40"
-                        title="Campaign created — click to view"
+                        className={
+                          queuedFeedback[idx] === 'exists'
+                            ? 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700/70 bg-green-50/60 border border-green-200/70 rounded dark:bg-green-900/10 dark:text-green-300/70 dark:border-green-800/60'
+                            : 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40'
+                        }
+                        title={
+                          queuedFeedback[idx] === 'exists'
+                            ? 'A campaign already exists for this business — click to view'
+                            : 'Campaign created — click to view'
+                        }
                       >
                         <Check className="w-3 h-3" />
                         Campaign
