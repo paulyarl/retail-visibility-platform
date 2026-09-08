@@ -1062,6 +1062,11 @@ export interface ProspectQueueEntry {
   repair_track?: string | null;
   is_hot_prospect?: boolean | null;
   stage_entered_at?: string | null;
+  // Audit coverage (present when includeCampaigns=true) — whether the
+  // processed campaign already has a business_analysis audit. Null when the
+  // entry has no processed campaign yet.
+  campaign_has_business_audit?: boolean | null;
+  business_audit_at?: string | null;
   // Intelligence scope fields (Sprint 2 — Migration 197)
   category_fit?: string | null;
   identity_confidence?: string | null;

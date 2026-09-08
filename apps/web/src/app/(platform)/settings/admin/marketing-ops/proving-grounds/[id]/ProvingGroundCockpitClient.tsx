@@ -13,7 +13,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Loader2, RefreshCw, X, ListChecks, GitBranch, AlertTriangle,
-  ExternalLink, CheckCircle2, Circle, Link2, Unlink, Phone, Users, Search,
+  ExternalLink, CheckCircle2, Circle, Link2, Unlink, Phone, Users, Search, MapPin,
+  Eye, Save, RotateCcw,
 } from 'lucide-react';
 import marketingOpsService, {
   type Audit,
@@ -68,6 +69,21 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [enrichResult, setEnrichResult] = useState<string | null>(null);
   const [enrichError, setEnrichError] = useState<string | null>(null);
 
+  // Public copy — the market SEO the enrichment feeds the public category×city
+  // surfaces (meta title / description / keywords). Viewer + operator override
+  // with the same semantics as the category-enrichment markets page: blank
+  // override keeps the composed copy, Reset clears an existing override.
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyEditing, setCopyEditing] = useState(false);
+  const [copySaving, setCopySaving] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [ovMetaTitle, setOvMetaTitle] = useState('');
+  const [ovDescription, setOvDescription] = useState('');
+  const [ovKeywords, setOvKeywords] = useState('');
+  const [resetMetaTitle, setResetMetaTitle] = useState(false);
+  const [resetDescription, setResetDescription] = useState(false);
+  const [resetKeywords, setResetKeywords] = useState(false);
+
   // Discovery prospects — loaded on demand from the attached intelligence
   // campaigns' intelligence_discovery audits.
   const [prospectsLoading, setProspectsLoading] = useState(false);
@@ -75,6 +91,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [prospectsError, setProspectsError] = useState<string | null>(null);
   const [discoveryAudits, setDiscoveryAudits] = useState<Array<{ childId: string; childTitle: string; audit: Audit }>>([]);
   const gapLogRef = useRef<HTMLDivElement | null>(null);
+
+  // Promote to listings (preflight step 2) — selective seeding of tree-scoped
+  // queue entries via proving-ground-seed. Hold-priority prospects default to
+  // unchecked so analysts' holds are not promoted by accident.
+  const [promoteEntries, setPromoteEntries] = useState<ProspectQueueEntry[]>([]);
+  const [promoteSelected, setPromoteSelected] = useState<Set<string>>(new Set());
+  const [promoteBusy, setPromoteBusy] = useState(false);
+  const [promoteResult, setPromoteResult] = useState<string | null>(null);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
 
   const treeIds = useMemo(
     () => [campaignId, ...children.map((c) => c.id)],
@@ -115,7 +140,12 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         directoryPresenceAdminService.getCohortFunnel({ campaignIds: ids }),
         marketingOpsService.listProspectQueue({
           source_campaign_ids: ids,
-          status: ['queued', 'in_thread', 'hold'],
+          // verify_then_outreach included so the promotion panel sees gated
+          // prospects; they carry no next_touch_at so due-today is unchanged.
+          // includeCampaigns decorates each entry with its processed
+          // campaign's stage + business-audit coverage (pre-push tracking).
+          status: ['queued', 'in_thread', 'hold', 'verify_then_outreach'],
+          includeCampaigns: true,
           limit: 200,
         }),
       ]);
@@ -125,11 +155,34 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         .sort((a, b) => new Date(a.next_touch_at!).getTime() - new Date(b.next_touch_at!).getTime());
       setDueToday(sorted.slice(0, 10));
 
-      // Attachable = unparented intelligence campaigns.
+      // Promotion panel: every non-graduated tree prospect. Default-select
+      // only audit-backed, non-hold entries — the ideal is a business audit
+      // per prospect before public seeding (richer seed data), so campaign
+      // + audit is the pre-checked bar; everything else needs an explicit
+      // tick. Analyst holds stay out either way.
+      const promotable = queue.entries.filter((e) => e.status !== 'campaign_created' && e.status !== 'dismissed');
+      setPromoteEntries(promotable);
+      setPromoteSelected(
+        new Set(
+          promotable
+            .filter((e) => !e.seed_id && e.business_seek_priority !== 'hold' && e.campaign_has_business_audit === true)
+            .map((e) => e.id),
+        ),
+      );
+
+      // Attachable = unparented intelligence *discovery prospect* runs
+      // (kind = discovery, focus = emerging | competitive) — the same gate
+      // as the promote action. Establishment and gold-standards runs
+      // produce profiles, not prospects, and are often state/nationwide
+      // scoped, so they are excluded here too.
       const intel = await marketingOpsService.listCampaigns({ scope: 'intelligence', limit: 100 });
       setAttachable(
         intel.items
-          .filter((c) => !c.parent_campaign_id && !ids.includes(c.id))
+          .filter((c) =>
+            !c.parent_campaign_id
+            && !ids.includes(c.id)
+            && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
+            && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging'))
           .map((c) => ({ id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage, category: c.category, city: c.city })),
       );
     } catch (err: any) {
@@ -189,6 +242,48 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     }
   };
 
+  // ─── Public copy (market SEO) — view + operator override ────────────────
+
+  const openCopyEditor = () => {
+    if (!marketStatus) return;
+    setOvMetaTitle(marketStatus.override?.metaTitle || '');
+    setOvDescription(marketStatus.override?.description || '');
+    setOvKeywords((marketStatus.override?.keywords || []).join(', '));
+    setResetMetaTitle(false);
+    setResetDescription(false);
+    setResetKeywords(false);
+    setCopyError(null);
+    setCopyEditing(true);
+  };
+
+  const handleSaveCopy = async () => {
+    if (!marketStatus) return;
+    setCopySaving(true);
+    setCopyError(null);
+    try {
+      const keywords = ovKeywords.split(',').map((k) => k.trim()).filter(Boolean);
+      const updated = await directoryPresenceAdminService.overrideMarket(
+        marketStatus.categoryKey,
+        marketStatus.city,
+        marketStatus.state,
+        {
+          operator_override_description: ovDescription.trim() || undefined,
+          operator_override_meta_title: ovMetaTitle.trim() || undefined,
+          operator_override_keywords: keywords.length > 0 ? keywords : undefined,
+          reset_description: resetDescription,
+          reset_meta_title: resetMetaTitle,
+          reset_keywords: resetKeywords,
+        },
+      );
+      setMarketStatus(updated);
+      setCopyEditing(false);
+    } catch (err: any) {
+      setCopyError(err.message || 'Failed to save copy overrides');
+    } finally {
+      setCopySaving(false);
+    }
+  };
+
   const handleVerdict = async (group: PotentialDuplicateSeed, verdict: 'same_entity' | 'distinct') => {
     const key = group.seedIds.join(',');
     setVerdictBusy(key);
@@ -205,6 +300,46 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setError(err.message || 'Failed to record verdict');
     } finally {
       setVerdictBusy(null);
+    }
+  };
+
+  // ─── Selective promotion (preflight step 2) ─────────────────────────────
+
+  const togglePromote = (id: string) => {
+    setPromoteSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllPromote = () => {
+    const promotable = promoteEntries.filter((e) => !e.seed_id);
+    const allSelected = promotable.length > 0 && promotable.every((e) => promoteSelected.has(e.id));
+    setPromoteSelected(allSelected ? new Set() : new Set(promotable.map((e) => e.id)));
+  };
+
+  const handlePromoteSelected = async () => {
+    const ids = [...promoteSelected];
+    if (ids.length === 0) return;
+    setPromoteBusy(true);
+    setPromoteError(null);
+    setPromoteResult(null);
+    try {
+      const seedBatch = `pg-${campaignId}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+      const result = await directoryPresenceAdminService.provingGroundSeed(ids, seedBatch);
+      const parts = [
+        `${result.created.length} listing${result.created.length === 1 ? '' : 's'} created`,
+        result.skipped.length ? `${result.skipped.length} skipped` : null,
+        result.failed.length ? `${result.failed.length} failed` : null,
+      ].filter(Boolean);
+      setPromoteResult(`Promotion complete: ${parts.join(', ')}.`);
+      await load();
+    } catch (err: any) {
+      setPromoteError(err.message || 'Failed to promote prospects');
+    } finally {
+      setPromoteBusy(false);
     }
   };
 
@@ -350,33 +485,185 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           </div>
         )}
 
-        {/* Market enrichment status line */}
+        {/* Market enrichment status line + public copy */}
         {campaign.campaign_category === 'proving_ground' && campaign.category && campaign.city && campaign.state && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {marketStatus ? (
-                <span>
-                  Market enrichment:{' '}
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {marketStatus.triggerSource === 'profile_activated' ? 'auto-fired on profile activation' : marketStatus.triggerSource}
-                  </span>{' '}
-                  · {new Date(marketStatus.enrichedAt).toLocaleString()}
-                  {marketStatus.intelligenceProfileId && (
-                    <span className="ml-1">· profile {marketStatus.intelligenceProfileId}</span>
-                  )}
-                </span>
-              ) : (
-                <span>Market enrichment: not enriched yet</span>
-              )}
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {marketStatus ? (
+                  <span>
+                    Market enrichment:{' '}
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {marketStatus.triggerSource === 'profile_activated' ? 'auto-fired on profile activation' : marketStatus.triggerSource}
+                    </span>{' '}
+                    · {new Date(marketStatus.enrichedAt).toLocaleString()}
+                    {marketStatus.intelligenceProfileId && (
+                      <span className="ml-1">· profile {marketStatus.intelligenceProfileId}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span>Market enrichment: not enriched yet</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {marketStatus && (
+                  <button
+                    onClick={() => { setCopyOpen((o) => !o); setCopyEditing(false); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700"
+                    title="Show the SEO copy this market feeds the public category pages"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Public copy
+                  </button>
+                )}
+                <button
+                  onClick={handleEnrichMarket}
+                  disabled={enrichBusy}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {enrichBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Enrich Market Listings
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleEnrichMarket}
-              disabled={enrichBusy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
-            >
-              {enrichBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Enrich Market Listings
-            </button>
+
+            {/* Public copy panel — effective copy + operator override editor */}
+            {copyOpen && marketStatus && (
+              <div className="mt-3 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-900/40 p-3 space-y-3">
+                {!copyEditing ? (
+                  <>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        Live on public {marketStatus.categoryName || campaign.category} · {campaign.city} pages
+                      </p>
+                      <button
+                        onClick={openCopyEditor}
+                        className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+                      >
+                        tweak copy
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 mb-0.5">
+                        Meta title · {marketStatus.override?.metaTitle ? 'operator override' : 'composed'}
+                      </p>
+                      <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{marketStatus.effective?.metaTitle}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 mb-0.5">
+                        Description · {marketStatus.override?.description ? 'operator override' : 'composed'}
+                      </p>
+                      <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{marketStatus.effective?.description}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 mb-1">
+                        Keywords · {marketStatus.override?.keywords ? 'operator override' : 'composed'}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {(marketStatus.effective?.keywords || []).map((k: string, i: number) => (
+                          <span
+                            key={i}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-white dark:bg-neutral-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-neutral-700"
+                          >
+                            {k}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {marketStatus.overrideBy && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                        Overridden by {marketStatus.overrideBy} · {marketStatus.overrideAt ? new Date(marketStatus.overrideAt).toLocaleString() : '—'}
+                      </p>
+                    )}
+                    <Link
+                      href="/settings/admin/directory/category-enrichment/markets"
+                      className="inline-block text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Full market editor →
+                    </Link>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-gray-400">
+                      Blank field keeps the composed copy · tick Reset to clear an override and fall back to composed.
+                    </p>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Composed meta title</label>
+                      <div className="p-2 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded text-xs font-mono text-gray-600 dark:text-gray-400">
+                        {marketStatus.composed?.metaTitle}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={ovMetaTitle}
+                        onChange={(e) => setOvMetaTitle(e.target.value)}
+                        disabled={resetMetaTitle}
+                        maxLength={70}
+                        placeholder="Override meta title (≤ 70 chars)"
+                        className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-neutral-800 disabled:text-gray-400"
+                      />
+                      <label className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        <input type="checkbox" checked={resetMetaTitle} onChange={(e) => setResetMetaTitle(e.target.checked)} />
+                        <RotateCcw className="w-3 h-3" /> Reset
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Composed description</label>
+                      <div className="p-2 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                        {marketStatus.composed?.description}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <textarea
+                        rows={3}
+                        value={ovDescription}
+                        onChange={(e) => setOvDescription(e.target.value)}
+                        disabled={resetDescription}
+                        maxLength={1000}
+                        placeholder="Override description (≤ 1000 chars)"
+                        className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-neutral-800 disabled:text-gray-400"
+                      />
+                      <label className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap mt-2">
+                        <input type="checkbox" checked={resetDescription} onChange={(e) => setResetDescription(e.target.checked)} />
+                        <RotateCcw className="w-3 h-3" /> Reset
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={ovKeywords}
+                        onChange={(e) => setOvKeywords(e.target.value)}
+                        disabled={resetKeywords}
+                        placeholder="Override keywords (comma-separated, ≤ 15)"
+                        className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-neutral-800 disabled:text-gray-400"
+                      />
+                      <label className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        <input type="checkbox" checked={resetKeywords} onChange={(e) => setResetKeywords(e.target.checked)} />
+                        <RotateCcw className="w-3 h-3" /> Reset
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setCopyEditing(false)}
+                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveCopy}
+                        disabled={copySaving}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        {copySaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Save copy
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {copyError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{copyError}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
         {enrichResult && (
@@ -433,7 +720,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             <ListChecks className="w-4 h-4" /> Due today
           </h2>
           {dueToday.length === 0 ? (
-            <p className="text-xs text-gray-400">Nothing due — seed prospects from preflight step 2 to populate the worklist.</p>
+            <p className="text-xs text-gray-400">Nothing due — promote prospects to listings (preflight step 2) to populate the worklist.</p>
           ) : (
             <ul className="space-y-1.5">
               {dueToday.map((e) => {
@@ -502,6 +789,149 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         )}
       </div>
 
+      {/* Promote to listings — preflight step 2's data surface: selective
+          seeding of tree prospects. Hold-priority rows default unchecked. */}
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <MapPin className="w-4 h-4" /> Promote to listings (preflight step 2)
+          </h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleAllPromote}
+              disabled={promoteBusy || promoteEntries.every((e) => e.seed_id)}
+              className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50 disabled:no-underline"
+            >
+              {promoteEntries.filter((e) => !e.seed_id).length > 0
+                && promoteEntries.filter((e) => !e.seed_id).every((e) => promoteSelected.has(e.id))
+                ? 'clear all' : 'select all'}
+            </button>
+            <button
+              onClick={handlePromoteSelected}
+              disabled={promoteBusy || promoteSelected.size === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+              title="Create + publish a directory listing per selected prospect, link it to its discovery campaign, and mint a claim token"
+            >
+              {promoteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+              Promote selected ({promoteSelected.size})
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-400 mb-2">
+          Creates + publishes a directory listing per selected prospect, links it to its discovery campaign, and mints a claim token.
+          Audit-backed prospects are pre-checked — a business audit per prospect makes richer seed data. Hold-priority prospects stay
+          unchecked until an analyst's hold is resolved.
+        </p>
+        {promoteEntries.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            No workable prospects yet — queue businesses from the discovery panel below, then promote selectively here.
+          </p>
+        ) : (
+          <>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
+              {promoteEntries.filter((e) => e.campaign_has_business_audit === true).length} of {promoteEntries.length} prospects have a
+              business audit
+              {promoteEntries.some((e) => !e.seed_id && e.campaign_has_business_audit !== true) && (
+                <span className="text-amber-600 dark:text-amber-400">
+                  {' '}· {promoteEntries.filter((e) => !e.seed_id && e.campaign_has_business_audit !== true).length} awaiting campaign/audit
+                </span>
+              )}
+              {[...promoteSelected].filter((id) => {
+                const e = promoteEntries.find((p) => p.id === id);
+                return e && e.campaign_has_business_audit !== true;
+              }).length > 0 && (
+                <span className="text-amber-600 dark:text-amber-400">
+                  {' '}· {promoteSelected.size - promoteEntries.filter((e) => promoteSelected.has(e.id) && e.campaign_has_business_audit === true).length} selected without audit (thinner seed data)
+                </span>
+              )}
+            </p>
+            <ul className="space-y-1">
+              {promoteEntries.map((e) => {
+                const isHold = e.business_seek_priority === 'hold';
+                const promoted = !!e.seed_id;
+                const audited = e.campaign_has_business_audit === true;
+                const checked = promoted || promoteSelected.has(e.id);
+                return (
+                  <li
+                    key={e.id}
+                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                      promoted
+                        ? 'bg-green-50/60 dark:bg-green-900/10'
+                        : isHold
+                          ? 'bg-gray-50 dark:bg-neutral-700/20'
+                          : 'hover:bg-gray-50 dark:hover:bg-neutral-700/30'
+                    }`}
+                  >
+                    <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={promoted || promoteBusy}
+                        onChange={() => togglePromote(e.id)}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
+                      />
+                      <span className={`truncate font-medium ${promoted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}>
+                        {e.business_name || e.title || e.id}
+                      </span>
+                      {isHold && !promoted && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 flex-shrink-0">
+                          <AlertTriangle className="w-2.5 h-2.5" /> hold
+                        </span>
+                      )}
+                      {promoted && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 flex-shrink-0">
+                          promoted
+                        </span>
+                      )}
+                    </label>
+                    <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5">
+                      {e.processed_campaign_id ? (
+                        <>
+                          <Link
+                            href={`/settings/admin/marketing-ops/campaigns/${e.processed_campaign_id}`}
+                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                            title="Open the prospect's campaign"
+                          >
+                            campaign{e.campaign_stage ? ` · ${e.campaign_stage}` : ''}
+                          </Link>
+                          {audited ? (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800"
+                              title={e.business_audit_at ? `Business audit ${new Date(e.business_audit_at).toLocaleDateString()}` : 'Business audit on file'}
+                            >
+                              audited
+                            </span>
+                          ) : (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                              title="No business_analysis audit yet — run the audit before seeding for richer listing data"
+                            >
+                              no audit
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                      )}
+                      <span>
+                        {e.status}
+                        {e.identity_confidence ? ` · conf: ${e.identity_confidence}` : ''}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+        {promoteResult && (
+          <div className="mt-2 text-xs text-green-600 dark:text-green-400">{promoteResult}</div>
+        )}
+        {promoteError && (
+          <div className="mt-2 text-xs text-red-600 dark:text-red-400">{promoteError}</div>
+        )}
+      </div>
+
       {/* Children */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
@@ -538,7 +968,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             onChange={(e) => setAttachId(e.target.value)}
             className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
           >
-            <option value="">Attach an unparented intelligence campaign…</option>
+            <option value="">Attach an unparented discovery campaign…</option>
             {attachable.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
@@ -602,6 +1032,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                   audit={audit}
                   campaignId={childId}
                   onLogGap={(biz) => handleProspectGap(biz.business_name, biz.city, biz.state)}
+                  onQueued={load}
                 />
               </div>
             ))}

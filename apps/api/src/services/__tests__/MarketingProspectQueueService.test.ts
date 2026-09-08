@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockQueue,
   mockCampaigns,
+  mockAudits,
 } = vi.hoisted(() => ({
   mockQueue: {
     findUnique: vi.fn(),
@@ -24,12 +25,16 @@ const {
     findFirst: vi.fn(),
     update: vi.fn(),
   },
+  mockAudits: {
+    findMany: vi.fn(),
+  },
 }));
 
 vi.mock('../../prisma', () => ({
   prisma: {
     mkt_prospect_queue: mockQueue,
     mkt_campaigns_list: mockCampaigns,
+    mkt_audits_list: mockAudits,
   },
 }));
 
@@ -431,6 +436,51 @@ describe('MarketingProspectQueueService', () => {
       expect(mockQueue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ assigned_to: null }) }),
       );
+    });
+
+    it('decorates entries with campaign_has_business_audit + business_audit_at when includeCampaigns is set', async () => {
+      const campaignId = 'mcamp-camp-001';
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-audit-001', processed_campaign_id: campaignId }),
+      ]);
+      mockQueue.count.mockResolvedValue(1);
+      mockAudits.findMany.mockResolvedValue([
+        { campaign_id: campaignId, created_at: new Date('2026-09-01T10:00:00Z') },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
+
+      expect(mockAudits.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { campaign_id: { in: [campaignId] }, platform: 'business_analysis' },
+        }),
+      );
+      expect(result.entries[0].campaign_has_business_audit).toBe(true);
+      expect(result.entries[0].business_audit_at).toEqual(new Date('2026-09-01T10:00:00Z'));
+    });
+
+    it('flags campaign_has_business_audit false when the processed campaign has no business audit', async () => {
+      const campaignId = 'mcamp-noaudit-001';
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-noaudit-001', processed_campaign_id: campaignId }),
+      ]);
+      mockQueue.count.mockResolvedValue(1);
+      mockAudits.findMany.mockResolvedValue([]);
+
+      const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
+
+      expect(result.entries[0].campaign_has_business_audit).toBe(false);
+      expect(result.entries[0].business_audit_at).toBeNull();
+    });
+
+    it('leaves audit decoration null for entries without a processed campaign', async () => {
+      mockQueue.findMany.mockResolvedValue([queueRow({ id: 'pque-nocamp-001' })]);
+      mockQueue.count.mockResolvedValue(1);
+
+      const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
+
+      expect(result.entries[0].campaign_has_business_audit).toBeNull();
+      expect(result.entries[0].business_audit_at).toBeNull();
     });
   });
 

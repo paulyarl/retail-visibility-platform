@@ -107,6 +107,7 @@ export default function IntelligenceDiscoveryAuditCard({
   audit,
   campaignId,
   onLogGap,
+  onQueued,
 }: {
   audit: Audit;
   campaignId: string;
@@ -114,6 +115,9 @@ export default function IntelligenceDiscoveryAuditCard({
    *  a "Gap" button renders next to Queue/Verify/Campaign so the operator can
    *  log a data gap against a specific prospect on the parent campaign. */
   onLogGap?: (biz: DiscoveredBusiness) => void;
+  /** Optional callback fired after a business lands in the prospect queue
+   *  (Queue or Verify path) so host pages can refresh queue-backed panels. */
+  onQueued?: () => void;
 }) {
   const data = parseDiscovery(audit);
   const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
@@ -233,6 +237,7 @@ export default function IntelligenceDiscoveryAuditCard({
       }));
       if (result.kind === 'created' || result.kind === 'already_queued') {
         setQueuedEntryId((prev) => ({ ...prev, [idx]: result.entry.id }));
+        onQueued?.();
       }
     } catch (err: any) {
       setDeriveError(err.message || 'Failed to add to queue');

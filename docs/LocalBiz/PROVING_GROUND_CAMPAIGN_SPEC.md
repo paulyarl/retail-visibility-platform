@@ -106,12 +106,12 @@ The funnel measures **seeds** (`directory_presence_seeds`): contactable, invited
   - parent must be `campaign_category = 'proving_ground'` (city/category scope);
   - child must be `scope = 'intelligence'`;
   - child must satisfy **`parent_campaign_id IS NULL` or already equal this parent** — 409 `conflict` with the existing parent id otherwise. The null-guard (not "proving-ground parent") is deliberate: the column is singular, and any future lineage use (e.g. a metro rollup) must not be silently clobbered.
-- **Originate vs. attach — kind/focus gating (verified against `promoteToProvingGround`):** only **discovery prospect runs** — `intelligence_campaign_kind = 'discovery'` AND `intelligence_focus ∈ {emerging, competitive}` — may *originate* a proving ground (the promote path and the cockpit "Promote" button). Rationale:
+- **Kind/focus gating — uniform for originate AND attach:** a child must be a **discovery prospect run** — `intelligence_campaign_kind = 'discovery'` AND `intelligence_focus ∈ {emerging, competitive}` (nulls normalize to `discovery`/`emerging`, matching the signature normalization). Enforced in **both** `promoteToProvingGround` (400 `source_not_discovery_prospect_run`) and `attachChildCampaign` (400 `child_not_discovery_prospect_run`), and mirrored in both UI affordances (the Non-Business Campaigns promote button, the campaign-detail promote button, and the cockpit attach dropdown). Rationale:
   - Discovery runs carry the market's `discovered_businesses` → queue rows → seeds → funnel. They are the feed the proving ground exists to work.
-  - Establishment runs produce the *profile* (category definition, gates, gold standard), not prospects — attaching one contributes zero seeds and zero queue rows.
+  - Establishment runs produce the *profile* (category definition, gates, gold standard), not prospects — attaching one contributes zero seeds and zero queue rows, and clutters the children panel with non-workable entries.
   - Establishment and gold-standards runs are frequently **state-scoped or nationwide** (`city`/`state` null per the guardrail signature — "Indian Grocery / Establishment / Gold_standards / All Platforms"). A promote keyed on a null city would fail the non-empty `city` requirement or, worse, key the workspace to the wrong geography.
-  - Non-discovery intelligence campaigns may still be **attached** to an existing proving ground via `attachChildCampaign` as provenance children ("which profile established this market's benchmark") — they just cannot originate the workspace.
-- The campaign detail `children` include already selects `scope`, so mixed-scope children are discriminable; the cockpit renders intelligence children by focus/kind (competitive/emerging × discovery/establishment), **not** by stage pipeline. Business grandchildren stay under their intelligence parents — the proving ground does not flatten the tree.
+  - In `promoteToProvingGround`'s merge path (`mergeCampaignIds`), non-discovery ids are collected into `skipped` rather than aborting the promotion.
+- The campaign detail `children` include already selects `scope`, so mixed-scope children are discriminable; the cockpit renders intelligence children by focus (competitive / emerging), **not** by stage pipeline. Business grandchildren stay under their intelligence parents — the proving ground does not flatten the tree.
 
 ### 4.3 `proving_ground_preflight` playbook + checklist attachment
 
@@ -268,7 +268,7 @@ CREATE TABLE mkt_prospect_dedup_verdicts (
 One page per proving ground:
 
 1. **Header** — city/category, workspace badge, live gate chips (G1–G4 + postal verdict, read off the funnel report).
-2. **Children panel** — intelligence campaigns rendered by focus/kind, linking to their detail pages.
+2. **Children panel** — attached discovery campaigns rendered by focus (competitive / emerging), linking to their detail pages.
 3. **Preflight panel** — the existing checklist component, resolved via §4.3.
 4. **Gate dashboard** — `getCohortFunnel` filtered to `campaignIds = [parent, ...children]`.
 5. **Gap log panel** — preflight step 5's note + per-prospect `verification` states.
@@ -307,9 +307,9 @@ The existing component, unmodified except for the §4.3 resolution branch (direc
 
 The proving ground's product purpose: the next city is configuration.
 
-1. **Discover** — run establishment + discovery intelligence campaigns for the city/category (existing flows; coverage page verifies profile gaps).
+1. **Discover** — run establishment + discovery intelligence campaigns for the city/category (existing flows; coverage page verifies profile gaps). The establishment run produces the profile the discovery runs consume — it is never attached to the proving ground (§4.2 kind/focus gate).
 2. **Create + Attach (one action)** — `POST /:campaignId/promote-to-proving-ground` on a discovery campaign creates the PG (`scope='city'`, `campaign_category='proving_ground'`, umbrella category) and attaches the run as its first child; `mergeCampaignIds` folds in sibling runs (emerging + competitive). If an active PG already exists for the city+category signature, the call reuses it — promote IS the merge path, not a 409. UI entry points: campaign-detail "Proving Ground" modal, the Non-Business table's per-row flask action, or the Campaign form (`proving_ground` is always in the Category dropdown; selecting it coerces scope → `city`). The guardrail still enforces one active per city/category.
-3. **Attach stragglers** — link any remaining discovery campaigns as children from the cockpit's attach dropdown (§4.2).
+3. **Attach stragglers** — link any remaining discovery campaigns (emerging / competitive focus) as children from the cockpit's attach dropdown (§4.2) — the dropdown is pre-filtered to the same kind/focus gate.
 4. **Preflight** — checklist instantiates from `PG-01`; the operator confirms the scaffolded ladders, seeds + tokens materialize, duplicates get verdicts, families get owners.
 5. **Work** — operators run the due-today list; signals drive the cadence; touches feed the funnel.
 6. **Verdict** — weekly: gates G1–G4 + the postal test off the cockpit dashboard. Pass → ship the motion to the next city. Fail → the gate tells you which layer (channels, claim flow, attribution, pitch timing) to fix before spending elsewhere.
@@ -347,7 +347,7 @@ Follows the AGENTS.md seed discipline: idempotent with **marker-presence** check
 
 - **Guardrail:** duplicate proving-ground create → 409 `conflict` with existing id/stage (extend the `marketingCampaign.recovery.test.ts` pattern); killed parent frees the slot.
 - **Checklist:** proving-ground campaign resolves `PG-01` with no triage row; `assertBusinessScope` still rejects city scope for triage; triage candidate list excludes `proving_ground` playbooks.
-- **Attachment:** one-parent guard (409 on second attach); children listing discriminates scopes.
+- **Attachment:** one-parent guard (409 on second attach); children listing discriminates scopes; **kind/focus gate** — non-discovery kinds and `gold_standards` focus → 400 `child_not_discovery_prospect_run` on attach, `source_not_discovery_prospect_run` on promote; merge skips non-discovery ids rather than aborting.
 - **Cadence:** each §4.7 signal → correct wait + ladder advance; dead-channel does not consume a slot; touch cap 3/30d → `hold` +60d; `connected` → `in_thread`; write-through updates `outreach_state`/`outreach_scheduled_at`.
 - **Funnel visibility:** a logged seed touch increments `touches` in `getCohortFunnel`; mirrored `mkt_outreach_log` row appears post-graduation.
 - **Dedup:** verdict persisted → pair excluded from `potentialDuplicateSeeds`; `same_entity` merges `name_variants`.

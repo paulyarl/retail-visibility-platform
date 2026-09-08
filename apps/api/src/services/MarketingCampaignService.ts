@@ -784,6 +784,11 @@ export class MarketingCampaignService extends BaseService {
    * parent. Guards (spec §4.2):
    * - parent must exist and have campaign_category = 'proving_ground'
    * - child must exist and have scope = 'intelligence'
+   * - child must be a discovery prospect run — intelligence_campaign_kind =
+   *   'discovery' and intelligence_focus ∈ {emerging, competitive}.
+   *   Establishment / gold-standards runs produce profiles, not prospects,
+   *   and are often state/nationwide-scoped — they are excluded from the
+   *   tree entirely.
    * - child must not already be parented — one proving ground owns the tree
    */
   async attachChildCampaign(
@@ -810,6 +815,11 @@ export class MarketingCampaignService extends BaseService {
       }
       if ((child.scope as string | null) !== 'intelligence') {
         throw new ValidationError('child_not_intelligence_scope');
+      }
+      const childKind = (child.intelligence_campaign_kind as string | null) || 'discovery';
+      const childFocus = (child.intelligence_focus as string | null) || 'emerging';
+      if (childKind !== 'discovery' || (childFocus !== 'emerging' && childFocus !== 'competitive')) {
+        throw new ValidationError('child_not_discovery_prospect_run');
       }
       if (child.parent_campaign_id) {
         throw new ConflictError('child_already_parented');

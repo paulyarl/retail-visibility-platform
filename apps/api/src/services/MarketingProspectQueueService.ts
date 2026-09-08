@@ -424,6 +424,29 @@ class MarketingProspectQueueServiceClass extends BaseService {
         where: { status: 'queued' },
       });
 
+      // Audit coverage (pre-push tracking): when decorating with campaigns,
+      // also flag which processed campaigns already have a business_analysis
+      // audit — the proving-ground cockpit's promote panel uses it to steer
+      // operators toward audit-first seeding (audits produce the richest
+      // seed data for the public listings). Keyed on the processed_campaign_id
+      // FK column, not the join, so the flag reflects the row's own state.
+      const auditDates = new Map<string, Date>();
+      if (filters.includeCampaigns) {
+        const campaignIds = entries
+          .map((e: any) => e.processed_campaign_id)
+          .filter(Boolean);
+        if (campaignIds.length > 0) {
+          const audits = await this.prisma.mkt_audits_list.findMany({
+            where: { campaign_id: { in: campaignIds }, platform: 'business_analysis' },
+            select: { campaign_id: true, created_at: true },
+          });
+          for (const a of audits) {
+            const prev = auditDates.get(a.campaign_id);
+            if (!prev || a.created_at > prev) auditDates.set(a.campaign_id, a.created_at);
+          }
+        }
+      }
+
       // Flatten the campaign join for the board view so the API payload is
       // { ..., campaign_stage, campaign_category, ... } instead of the long
       // Prisma relation name.
@@ -438,6 +461,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
               repair_track: camp?.repair_track ?? null,
               is_hot_prospect: camp?.is_hot_prospect ?? null,
               stage_entered_at: camp?.stage_entered_at ?? null,
+              campaign_has_business_audit: e.processed_campaign_id ? auditDates.has(e.processed_campaign_id) : null,
+              business_audit_at: e.processed_campaign_id ? auditDates.get(e.processed_campaign_id) ?? null : null,
             };
           })
         : entries;
