@@ -65,6 +65,18 @@ const FOCUS_THEME: Record<
     downstream:
       'The resulting profile is imported as a draft and must be reviewed and activated by an operator before competitive discovery campaigns can consume it as their evaluation criteria.',
   },
+  proving_ground: {
+    label: 'Proving Ground',
+    headerBg: 'bg-teal-50 dark:bg-teal-900/10',
+    headerBorder: 'border-teal-200 dark:border-teal-700',
+    headerTitleClass: 'text-teal-900 dark:text-teal-300',
+    headerBodyClass: 'text-teal-800 dark:text-teal-400',
+    establishmentNoun: 'category intelligence profile',
+    produces:
+      'Proving grounds are city-scope operator workspaces; they aggregate intelligence discovery runs rather than establishing their own profile.',
+    downstream:
+      'Intelligence discovery campaigns parented to a proving ground surface as proving-ground slots on the coverage map.',
+  },
 };
 
 /**

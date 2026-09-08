@@ -5281,7 +5281,7 @@ export interface GalleryDashboard {
 // INTELLIGENCE PROFILE + RUN TYPES (Sprint 2 — Seek Intelligence Scope)
 // ====================
 
-export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'proving_ground';
 export type IntelligenceCampaignKind = 'discovery' | 'establishment';
 export type IntelligenceMode = 'profile' | 'none';
 export type ProfileStatus = 'draft' | 'active' | 'retired';

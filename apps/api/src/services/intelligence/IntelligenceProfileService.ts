@@ -50,7 +50,11 @@ export type IntelligenceProfileStatus = 'draft' | 'active' | 'retired';
  *   and are consumed by both intelligence establishment/discovery and the
  *   business audit as a benchmark.
  */
-export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
+// 'proving_ground' is included for coverage-map slot tagging only — a proving
+// ground is a city-scope operator workspace (not an intelligence profile), but
+// the coverage UI treats gold_standards / emerging / competitive / proving_ground
+// as parallel slot dimensions. It is never written to mkt_intelligence_profiles.
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'proving_ground';
 
 /**
  * Role for gold-standard injection into prompts.
@@ -2187,7 +2191,7 @@ export class IntelligenceProfileService extends BaseService {
     cities: string[];
   }> {
     try {
-      const [activeProfiles, draftProfiles, intelligenceCampaigns] = await Promise.all([
+      const [activeProfiles, draftProfiles, intelligenceCampaigns, provingGrounds, pgChildren] = await Promise.all([
         this.prisma.mkt_intelligence_profiles.findMany({
           where: { status: 'active' },
           select: {
@@ -2208,6 +2212,24 @@ export class IntelligenceProfileService extends BaseService {
           where: { scope: 'intelligence', city: { not: '' } },
           select: { city: true, category: true },
           distinct: ['city', 'category'],
+        }),
+        // Proving-ground campaigns (spec §4.1): scope='city',
+        // campaign_category='proving_ground'. These are operator workspaces,
+        // not intelligence profiles — surfaced on the coverage map so the
+        // operator can see which markets already have a proving ground.
+        this.prisma.mkt_campaigns_list.findMany({
+          where: { scope: 'city', campaign_category: 'proving_ground' },
+          select: {
+            id: true, category: true, city: true, state: true, stage: true,
+            title: true,
+          },
+        }),
+        // Intelligence campaigns parented to a proving ground — used to
+        // match an umbrella-category PG (e.g. "Grocery") back to the specific
+        // intelligence categories it aggregates (e.g. "Indian Grocery").
+        this.prisma.mkt_campaigns_list.findMany({
+          where: { scope: 'intelligence', parent_campaign_id: { not: null } },
+          select: { parent_campaign_id: true, category: true },
         }),
       ]);
 
@@ -2231,6 +2253,46 @@ export class IntelligenceProfileService extends BaseService {
         });
       }
 
+      // Map each proving ground to the set of intelligence category names it
+      // covers — primarily via its parented intelligence children (the
+      // umbrella case), with a fallback to the PG's own category when it has
+      // no children yet (standalone PG whose category already matches an
+      // intelligence category by name).
+      const pgCategoriesByParentId = new Map<string, Set<string>>();
+      for (const child of pgChildren) {
+        const pid = child.parent_campaign_id!;
+        if (!pgCategoriesByParentId.has(pid)) pgCategoriesByParentId.set(pid, new Set());
+        if (child.category) pgCategoriesByParentId.get(pid)!.add(child.category);
+      }
+      const pgCoversCategory = (pg: { id: string; category: string | null }, intelCategoryName: string): boolean => {
+        const viaChildren = pgCategoriesByParentId.get(pg.id);
+        if (viaChildren && viaChildren.size > 0) {
+          return viaChildren.has(intelCategoryName);
+        }
+        // Fallback: standalone PG with no intelligence children — match by name.
+        return (pg.category ?? '').trim().toLowerCase() === intelCategoryName.trim().toLowerCase();
+      };
+
+      // Add a proving_ground slot per (intelligence category, PG city) for
+      // every PG that covers that category. PGs are workspaces (always
+      // 'active' on the coverage map — there is no draft state for a campaign).
+      for (const pg of provingGrounds) {
+        const pgCity = (pg.city ?? '').trim();
+        if (!pgCity) continue; // PG requires a city (spec §4.1); skip malformed rows.
+        for (const [categoryKey, { category_name, slots }] of byCategory.entries()) {
+          if (!pgCoversCategory(pg, category_name)) continue;
+          slots.push({
+            focus: 'proving_ground',
+            city: pgCity,
+            state: pg.state ?? null,
+            platform: null,
+            status: 'active',
+            profile_id: pg.id,
+            version: 0,
+          });
+        }
+      }
+
       // Collect distinct cities from intelligence campaigns (for the city dimension).
       const cities = [...new Set(intelligenceCampaigns.map((c) => c.city).filter(Boolean))].sort();
 
@@ -2239,9 +2301,9 @@ export class IntelligenceProfileService extends BaseService {
           category_key,
           category_name,
           slots: slots.sort((a, b) => {
-            // Sort: gold_standards first, then emerging, then competitive;
-            // within each focus, by city/platform name.
-            const focusOrder = { gold_standards: 0, emerging: 1, competitive: 2 };
+            // Sort: gold_standards first, then emerging, then competitive,
+            // then proving_ground; within each focus, by city/platform name.
+            const focusOrder = { gold_standards: 0, emerging: 1, competitive: 2, proving_ground: 3 };
             const fo = focusOrder[a.focus as keyof typeof focusOrder] ?? 3;
             const fob = focusOrder[b.focus as keyof typeof focusOrder] ?? 3;
             if (fo !== fob) return fo - fob;

@@ -30,12 +30,14 @@ const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
   emerging: 'Emerging',
   competitive: 'Competitive',
   gold_standards: 'Gold Standards',
+  proving_ground: 'Proving Ground',
 };
 
 const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
   emerging: 'blue',
   competitive: 'violet',
   gold_standards: 'gold',
+  proving_ground: 'teal',
 };
 
 // The canonical platforms the operator should cover per category.
@@ -195,8 +197,10 @@ export default function CoverageClient() {
               4. Emerging Discovery (city + category) → prospect queue<br />
               5. Competitive Establishment (city + category) → activate<br />
               6. Competitive Discovery (city + category) → prospect queue<br />
+              7. Proving Ground (city + category) → operator workspace aggregating the discovery runs<br />
               <Text size="xs" c="dimmed" fs="italic" mt={4}>
                 Thin market? Skip competitive (steps 5-6). Keep gold standard — it&apos;s reusable across cities.
+                Promote a discovery run into a proving ground once prospects exist for the city.
               </Text>
             </Text>
           </Box>
@@ -242,11 +246,13 @@ export default function CoverageClient() {
         const goldSlots = cat.slots.filter((s) => s.focus === 'gold_standards');
         const emergingSlots = cat.slots.filter((s) => s.focus === 'emerging');
         const competitiveSlots = cat.slots.filter((s) => s.focus === 'competitive');
+        const provingGroundSlots = cat.slots.filter((s) => s.focus === 'proving_ground');
 
-        // Cities that have emerging or competitive profiles for this category.
+        // Cities that have emerging, competitive, or proving-ground profiles for this category.
         const categoryCities = new Set([
           ...emergingSlots.map((s) => s.city).filter(Boolean) as string[],
           ...competitiveSlots.map((s) => s.city).filter(Boolean) as string[],
+          ...provingGroundSlots.map((s) => s.city).filter(Boolean) as string[],
         ]);
 
         // If a city filter is active, only show this category if it has
@@ -310,6 +316,21 @@ export default function CoverageClient() {
               title="Competitive (per city)"
               focus="competitive"
               slots={competitiveSlots}
+              category={cat}
+              cityFilter={cityFilter}
+              slotStatus={slotStatus}
+              createLink={createCampaignLink}
+              dimensionKey="city"
+              dimensionValues={cityFilter ? [cityFilter] : allCities}
+              dimensionLabels={undefined}
+              showAllCitiesHint={!cityFilter}
+            />
+
+            {/* Proving Ground section — per city (operator workspace) */}
+            <CoverageSection
+              title="Proving Ground (per city — operator workspace)"
+              focus="proving_ground"
+              slots={provingGroundSlots}
               category={cat}
               cityFilter={cityFilter}
               slotStatus={slotStatus}
@@ -463,9 +484,24 @@ interface SlotChipProps {
 }
 
 function SlotChip({ label, slot, focus, category, city, platform, createLink }: SlotChipProps) {
+  const isPg = focus === 'proving_ground';
+
+  // Proving-ground slots point at campaign rows, not intelligence profiles.
+  // Active → the PG cockpit; missing → the new-campaign form pre-filled for
+  // a city-scope proving_ground campaign (spec §4.1).
+  const pgCockpitLink = slot ? `/settings/admin/marketing-ops/proving-grounds/${slot.profile_id}` : '';
+  const pgCreateLink = () => {
+    const sp = new URLSearchParams();
+    sp.set('scope', 'city');
+    sp.set('campaignCategory', 'proving_ground');
+    sp.set('category', category.category_name);
+    if (city) sp.set('city', city);
+    return `/settings/admin/marketing-ops/campaigns/new?${sp.toString()}`;
+  };
+
   if (slot && slot.status === 'active') {
     return (
-      <Tooltip label={`Active — v${slot.version}`}>
+      <Tooltip label={isPg ? 'Proving ground active — open cockpit' : `Active — v${slot.version}`}>
         <Group gap={4} style={{
           padding: '4px 10px',
           borderRadius: 6,
@@ -475,7 +511,7 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
           <IconCircleCheck size={14} color="var(--mantine-color-green-6)" />
           <Text size="xs" fw={500}>{label}</Text>
           {slot.status === 'active' && (
-            <Link href={createLink({
+            <Link href={isPg ? pgCockpitLink : createLink({
               focus, kind: 'discovery',
               category: category.category_name,
               city, platform,
@@ -492,7 +528,9 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
 
   if (slot && slot.status === 'draft') {
     return (
-      <Tooltip label={`Draft v${slot.version} — activate to enable discovery`}>
+      <Tooltip label={isPg
+        ? 'Proving ground draft — activate the campaign to go live'
+        : `Draft v${slot.version} — activate to enable discovery`}>
         <Group gap={4} style={{
           padding: '4px 10px',
           borderRadius: 6,
@@ -507,14 +545,18 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
     );
   }
 
-  // Missing — show a "create establishment" action
+  // Missing — show a "create" action. For proving ground, link to the
+  // city-scope PG new-campaign form; otherwise the establishment campaign.
+  const missingHref = isPg ? pgCreateLink() : createLink({
+    focus, kind: 'establishment',
+    category: category.category_name,
+    city, platform,
+  });
   return (
-    <Link href={createLink({
-      focus, kind: 'establishment',
-      category: category.category_name,
-      city, platform,
-    })}>
-      <Tooltip label={`No ${FOCUS_LABELS[focus]} profile — click to create establishment campaign`}>
+    <Link href={missingHref}>
+      <Tooltip label={isPg
+        ? `No proving ground for ${city ?? 'this city'} — click to create`
+        : `No ${FOCUS_LABELS[focus]} profile — click to create establishment campaign`}>
         <Group gap={4} style={{
           padding: '4px 10px',
           borderRadius: 6,

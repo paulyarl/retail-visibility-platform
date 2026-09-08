@@ -60,12 +60,14 @@ const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
   emerging: 'blue',
   competitive: 'violet',
   gold_standards: 'amber',
+  proving_ground: 'teal',
 };
 
 const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
   emerging: 'Emerging',
   competitive: 'Competitive',
   gold_standards: 'Gold Standards',
+  proving_ground: 'Proving Ground',
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
