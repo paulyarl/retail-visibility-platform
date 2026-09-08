@@ -2186,6 +2186,10 @@ export class IntelligenceProfileService extends BaseService {
         status: 'active' | 'draft' | 'inflight';
         profile_id: string;
         version: number;
+        // Active slots only: id of an in-flight discovery campaign covering
+        // this same position, when one exists (the arrow opens it instead of
+        // the create form).
+        discovery_campaign_id?: string | null;
       }>;
     }>;
     cities: string[];
@@ -2217,6 +2221,7 @@ export class IntelligenceProfileService extends BaseService {
           select: {
             id: true, category: true, city: true, state: true, stage: true,
             intelligence_focus: true, intelligence_platform: true,
+            intelligence_campaign_kind: true,
           },
           orderBy: { created_at: 'desc' },
         }),
@@ -2353,6 +2358,39 @@ export class IntelligenceProfileService extends BaseService {
             profile_id: pg.id,
             version: 0,
           });
+        }
+      }
+
+      // Attach in-flight discovery campaigns to active slots — clicking a green
+      // slot opens the existing discovery campaign instead of creating a
+      // duplicate (the structural-duplicate guardrail would 409). Newest wins
+      // (campaigns arrive created_at desc). Gold standards match on platform
+      // (nationwide = null on both sides); emerging/competitive match on city
+      // only, mirroring how the city chips render.
+      const discoveryCampaignByKey = new Map<string, string>();
+      for (const c of intelligenceCampaigns) {
+        if (inactiveStages.has(c.stage)) continue;
+        if (c.intelligence_campaign_kind !== 'discovery') continue;
+        const focus = c.intelligence_focus as IntelligenceFocus | null;
+        if (focus !== 'emerging' && focus !== 'competitive' && focus !== 'gold_standards') continue;
+        const nameKey = (c.category ?? '').trim().toLowerCase();
+        if (!nameKey) continue;
+        const cityNorm = (c.city ?? '').trim();
+        const isGold = focus === 'gold_standards';
+        const platNorm = isGold && c.intelligence_platform && c.intelligence_platform !== 'all'
+          ? c.intelligence_platform
+          : null;
+        const key = `${nameKey}|${focus}|${cityNorm}|${isGold ? (platNorm ?? '') : ''}`;
+        if (!discoveryCampaignByKey.has(key)) discoveryCampaignByKey.set(key, c.id);
+      }
+      for (const entry of byCategory.values()) {
+        const nameKey = entry.category_name.trim().toLowerCase();
+        for (const s of entry.slots) {
+          if (s.status !== 'active') continue;
+          const isGold = s.focus === 'gold_standards';
+          const key = `${nameKey}|${s.focus}|${(s.city ?? '').trim()}|${isGold ? (s.platform ?? '') : ''}`;
+          const dcId = discoveryCampaignByKey.get(key);
+          if (dcId) s.discovery_campaign_id = dcId;
         }
       }
 

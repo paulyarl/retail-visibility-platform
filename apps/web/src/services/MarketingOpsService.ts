@@ -5315,6 +5315,10 @@ export interface CoverageSlot {
   status: 'active' | 'draft' | 'inflight';
   profile_id: string;
   version: number;
+  // Active slots only: id of an in-flight discovery campaign covering this
+  // same position, when one exists (the arrow opens it instead of the
+  // create-discovery form).
+  discovery_campaign_id?: string | null;
 }
 
 export interface CoverageCategory {

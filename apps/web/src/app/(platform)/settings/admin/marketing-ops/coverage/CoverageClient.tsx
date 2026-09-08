@@ -507,8 +507,23 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
   };
 
   if (slot && slot.status === 'active') {
+    // Green arrow: open the in-flight discovery campaign when one exists for
+    // this position; otherwise create a new one.
+    const discoveryHref = isPg
+      ? pgCockpitLink
+      : slot.discovery_campaign_id
+        ? `/settings/admin/marketing-ops/campaigns/${slot.discovery_campaign_id}`
+        : createLink({
+          focus, kind: 'discovery',
+          category: category.category_name,
+          city, platform,
+        });
     return (
-      <Tooltip label={isPg ? 'Proving ground active — open cockpit' : `Active — v${slot.version}`}>
+      <Tooltip label={isPg
+        ? 'Proving ground active — open cockpit'
+        : slot.discovery_campaign_id
+          ? 'Active — discovery campaign in flight. Click to open it'
+          : `Active — v${slot.version}. Click to create a discovery campaign`}>
         <Group gap={4} style={{
           padding: '4px 10px',
           borderRadius: 6,
@@ -518,11 +533,7 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
           <IconCircleCheck size={14} color="var(--mantine-color-green-6)" />
           <Text size="xs" fw={500}>{label}</Text>
           {slot.status === 'active' && (
-            <Link href={isPg ? pgCockpitLink : createLink({
-              focus, kind: 'discovery',
-              category: category.category_name,
-              city, platform,
-            })}>
+            <Link href={discoveryHref}>
               <ActionIcon variant="subtle" size="xs" color="green" ml={2}>
                 <IconArrowRight size={12} />
               </ActionIcon>
