@@ -735,6 +735,17 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Core Fields */}
           <FormSection title="Business Information">
+            {/* Title — first, consistent placement across all scopes */}
+            <FormField label="Title" className="sm:col-span-2">
+              <input type="text" value={form.title} onChange={(e) => { setTitleManuallyEdited(true); handleChange('title', e.target.value); }}
+                placeholder="Optional descriptive title (e.g. &quot;Q3 Austin restaurant review-gap test&quot;)"
+                className={inputClass} />
+              {form.scope === 'intelligence' ? (
+                <p className="text-xs text-gray-400 mt-1">Auto-generated from Category, Kind, Focus, City, and State (e.g. &quot;African Grocery Store - Discovery - Emerging - Indianapolis, IN&quot;). Edit to customize — once you type, the auto-fill stops.</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Scope-neutral label for the campaign objective. When set, it appears as the primary heading in lists and detail pages; the business name / category / city remain as the secondary line.</p>
+              )}
+            </FormField>
             {form.scope !== 'intelligence' && (
             <>
             <FormField label="Campaign Category" required>
@@ -833,28 +844,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             </FormField>
             {form.scope === 'intelligence' && (
               <>
-                <FormField label="Focus" required className="sm:col-span-2">
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="intelligence_focus" value="emerging"
-                        checked={form.intelligence_focus === 'emerging'}
-                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
-                      <span className="text-sm">Emerging — discover low-visibility, hard-to-find businesses</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="intelligence_focus" value="competitive"
-                        checked={form.intelligence_focus === 'competitive'}
-                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
-                      <span className="text-sm">Competitive — analyze established competitors</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="intelligence_focus" value="gold_standards"
-                        checked={form.intelligence_focus === 'gold_standards'}
-                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
-                      <span className="text-sm">Gold Standards — establish/discover category-platform benchmark profiles</span>
-                    </label>
-                  </div>
-                </FormField>
+                {/* Campaign Kind — before Focus per operator arrangement */}
                 <FormField label="Campaign Kind" required className="sm:col-span-2">
                   <div className="flex gap-4">
                     <label className={`flex items-center gap-2 ${activeProfileExists === false ? 'opacity-50' : ''}`}>
@@ -892,82 +882,78 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                   )}
                   <p className="text-xs text-gray-400 mt-1">Establishment campaigns appear in the Profile Establishment prompt workspace; discovery campaigns appear in the Emerging/Competitive discovery workspaces.</p>
                 </FormField>
-                {form.intelligence_focus === 'gold_standards' && (
-                  <FormField label="Platform" required className="sm:col-span-2">
-                    <select value={form.intelligence_platform}
-                      onChange={(e) => handleChange('intelligence_platform', e.target.value)}
-                      className={inputClass}>
-                      <option value="">— Select Platform —</option>
-                      <option value="all">All Platforms</option>
-                      <option value="google">Google</option>
-                      <option value="yelp">Yelp</option>
-                      <option value="facebook">Facebook</option>
-                      <option value="bbb">BBB</option>
-                      <option value="apple_maps">Apple Maps</option>
-                      <option value="bing">Bing</option>
-                    </select>
-                    <p className="text-xs text-gray-400 mt-1">
-                      The platform this gold-standard scan focuses on. &quot;All Platforms&quot; evaluates candidates across every major platform.
-                      Gold-standard campaigns are <strong>nationwide only</strong> — the platform replaces city/state as the focus dimension.
-                      Local establishment &amp; discovery work happens via the Emerging and Competitive campaign archetypes.
-                    </p>
-                  </FormField>
-                )}
-                {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
-                  <FormField label="Platform (optional)" className="sm:col-span-2">
-                    <select value={form.intelligence_platform}
-                      onChange={(e) => handleChange('intelligence_platform', e.target.value)}
-                      className={inputClass}>
-                      <option value="">All Platforms (default)</option>
-                      <option value="google">Google</option>
-                      <option value="yelp">Yelp</option>
-                      <option value="facebook">Facebook</option>
-                      <option value="bbb">BBB</option>
-                      <option value="apple_maps">Apple Maps</option>
-                      <option value="bing">Bing</option>
-                    </select>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Point the discovery scan at a specific platform to rate candidates against that platform&apos;s gold standard.
-                      &quot;All Platforms&quot; (default) runs a broad cross-platform scan — efficient for general discovery.
-                      Selecting a specific platform narrows the gold-standard benchmark to that platform, which can uncover
-                      platform-specific gaps and opportunities a broad scan would miss.
-                    </p>
-                  </FormField>
-                )}
-                {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
-                  <FormField label="ZIP Codes (optional)">
-                    <input type="text" value={form.intelligence_zip_codes}
-                      onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
-                      placeholder="e.g. 46268, 46214 (comma-separated)"
-                      className={inputClass} />
-                    <p className="text-xs text-gray-400 mt-1">Restrict discovery to specific ZIP codes. Leave empty to use city-wide search.</p>
-                  </FormField>
-                )}
-                {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
-                  <FormField label="Search Radius (miles, optional)">
-                    <input type="number" min="0" step="1" value={form.intelligence_search_radius_miles}
-                      onChange={(e) => handleChange('intelligence_search_radius_miles', e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="e.g. 15"
-                      className={inputClass} />
-                    <p className="text-xs text-gray-400 mt-1">Radius around the city center for discovery. Leave empty for city-wide.</p>
-                  </FormField>
-                )}
+                <FormField label="Focus" required className="sm:col-span-2">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_focus" value="emerging"
+                        checked={form.intelligence_focus === 'emerging'}
+                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
+                      <span className="text-sm">Emerging — discover low-visibility, hard-to-find businesses</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_focus" value="competitive"
+                        checked={form.intelligence_focus === 'competitive'}
+                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
+                      <span className="text-sm">Competitive — analyze established competitors</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="intelligence_focus" value="gold_standards"
+                        checked={form.intelligence_focus === 'gold_standards'}
+                        onChange={(e) => handleChange('intelligence_focus', e.target.value)} />
+                      <span className="text-sm">Gold Standards — establish/discover category-platform benchmark profiles</span>
+                    </label>
+                  </div>
+                </FormField>
               </>
             )}
-            <FormField label="Title" className="sm:col-span-2">
-              <input type="text" value={form.title} onChange={(e) => { setTitleManuallyEdited(true); handleChange('title', e.target.value); }}
-                placeholder="Optional descriptive title (e.g. &quot;Q3 Austin restaurant review-gap test&quot;)"
-                className={inputClass} />
-              {form.scope === 'intelligence' ? (
-                <p className="text-xs text-gray-400 mt-1">Auto-generated from Category, Kind, Focus, City, and State (e.g. &quot;African Grocery Store - Discovery - Emerging - Indianapolis, IN&quot;). Edit to customize — once you type, the auto-fill stops.</p>
-              ) : (
-                <p className="text-xs text-gray-400 mt-1">Scope-neutral label for the campaign objective. When set, it appears as the primary heading in lists and detail pages; the business name / category / city remain as the secondary line.</p>
-              )}
-            </FormField>
-            <FormField label="Business Name" required={form.scope === 'business'}>
+            {/* Business Name — full width, own row */}
+            <FormField label="Business Name" required={form.scope === 'business'} className="sm:col-span-2">
               <input type="text" required={form.scope === 'business'} value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
                 className={inputClass} />
             </FormField>
+            {/* Platform (intelligence) — half width, pairs with Category below */}
+            {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
+              <FormField label="Platform" required>
+                <select value={form.intelligence_platform}
+                  onChange={(e) => handleChange('intelligence_platform', e.target.value)}
+                  className={inputClass}>
+                  <option value="">— Select Platform —</option>
+                  <option value="all">All Platforms</option>
+                  <option value="google">Google</option>
+                  <option value="yelp">Yelp</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="bbb">BBB</option>
+                  <option value="apple_maps">Apple Maps</option>
+                  <option value="bing">Bing</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  The platform this gold-standard scan focuses on. &quot;All Platforms&quot; evaluates candidates across every major platform.
+                  Gold-standard campaigns are <strong>nationwide only</strong> — the platform replaces city/state as the focus dimension.
+                  Local establishment &amp; discovery work happens via the Emerging and Competitive campaign archetypes.
+                </p>
+              </FormField>
+            )}
+            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+              <FormField label="Platform (optional)">
+                <select value={form.intelligence_platform}
+                  onChange={(e) => handleChange('intelligence_platform', e.target.value)}
+                  className={inputClass}>
+                  <option value="">All Platforms (default)</option>
+                  <option value="google">Google</option>
+                  <option value="yelp">Yelp</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="bbb">BBB</option>
+                  <option value="apple_maps">Apple Maps</option>
+                  <option value="bing">Bing</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Point the discovery scan at a specific platform to rate candidates against that platform&apos;s gold standard.
+                  &quot;All Platforms&quot; (default) runs a broad cross-platform scan — efficient for general discovery.
+                  Selecting a specific platform narrows the gold-standard benchmark to that platform, which can uncover
+                  platform-specific gaps and opportunities a broad scan would miss.
+                </p>
+              </FormField>
+            )}
             <FormField label="Category" required={form.scope !== 'business'}>
               <SuggestiveSelect required={form.scope !== 'business'} value={form.category} onChange={(v) => handleChange('category', v)}
                 options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
@@ -976,23 +962,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
               )}
             </FormField>
-            <FormField label="Origin Country">
-              <SuggestiveSelect value={form.business_origin_country} onChange={(v) => handleChange('business_origin_country', v)}
-                options={vocab.originCountries} emptyLabel="-- None --" newLabel="+ New country..."
-                newInputPlaceholder="e.g. Gambia, Nigeria, India" className={inputClass} />
-              <p className="text-xs text-gray-400 mt-1">Heritage country of origin for diaspora niches (e.g. African Grocery Store). Feeds deliverable prompts + niche overrides. Leave blank for non-diaspora categories.</p>
-            </FormField>
-            <FormField label="Origin Region">
-              <SuggestiveSelect value={form.business_origin_region} onChange={(v) => handleChange('business_origin_region', v)}
-                options={vocab.originRegions} emptyLabel="-- None --" newLabel="+ New region..."
-                newInputPlaceholder="e.g. West Africa, South Asia" className={inputClass} />
-              <p className="text-xs text-gray-400 mt-1">Broader region when a single country is too narrow (e.g. West Africa spans Gambia, Senegal, Nigeria).</p>
-            </FormField>
-            <FormField label="Tone">
-              <SuggestiveSelect value={form.tone} onChange={(v) => handleChange('tone', v)}
-                options={vocab.tones} emptyLabel="-- Select tone --" newLabel="+ New tone..."
-                newInputPlaceholder="Enter new tone" className={inputClass} />
-            </FormField>
+            {/* City | State — family pair */}
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="City" required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'}>
               <SuggestiveSelect required={(form.scope === 'intelligence' && form.intelligence_focus !== 'gold_standards') || form.campaign_category === 'proving_ground'} value={form.city} onChange={handleCityChange}
@@ -1019,6 +989,43 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               )}
             </FormField>
             )}
+            {/* ZIP Codes | Search Radius — intelligence emerging/competitive */}
+            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+              <FormField label="ZIP Codes (optional)">
+                <input type="text" value={form.intelligence_zip_codes}
+                  onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
+                  placeholder="e.g. 46268, 46214 (comma-separated)"
+                  className={inputClass} />
+                <p className="text-xs text-gray-400 mt-1">Restrict discovery to specific ZIP codes. Leave empty to use city-wide search.</p>
+              </FormField>
+            )}
+            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+              <FormField label="Search Radius (miles, optional)">
+                <input type="number" min="0" step="1" value={form.intelligence_search_radius_miles}
+                  onChange={(e) => handleChange('intelligence_search_radius_miles', e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="e.g. 15"
+                  className={inputClass} />
+                <p className="text-xs text-gray-400 mt-1">Radius around the city center for discovery. Leave empty for city-wide.</p>
+              </FormField>
+            )}
+            {/* Origin Country | Origin Region */}
+            <FormField label="Origin Country">
+              <SuggestiveSelect value={form.business_origin_country} onChange={(v) => handleChange('business_origin_country', v)}
+                options={vocab.originCountries} emptyLabel="-- None --" newLabel="+ New country..."
+                newInputPlaceholder="e.g. Gambia, Nigeria, India" className={inputClass} />
+              <p className="text-xs text-gray-400 mt-1">Heritage country of origin for diaspora niches (e.g. African Grocery Store). Feeds deliverable prompts + niche overrides. Leave blank for non-diaspora categories.</p>
+            </FormField>
+            <FormField label="Origin Region">
+              <SuggestiveSelect value={form.business_origin_region} onChange={(v) => handleChange('business_origin_region', v)}
+                options={vocab.originRegions} emptyLabel="-- None --" newLabel="+ New region..."
+                newInputPlaceholder="e.g. West Africa, South Asia" className={inputClass} />
+              <p className="text-xs text-gray-400 mt-1">Broader region when a single country is too narrow (e.g. West Africa spans Gambia, Senegal, Nigeria).</p>
+            </FormField>
+            <FormField label="Tone">
+              <SuggestiveSelect value={form.tone} onChange={(v) => handleChange('tone', v)}
+                options={vocab.tones} emptyLabel="-- Select tone --" newLabel="+ New tone..."
+                newInputPlaceholder="Enter new tone" className={inputClass} />
+            </FormField>
             <FormField label="Neighborhood">
               <SuggestiveSelect value={form.neighborhood} onChange={(v) => handleChange('neighborhood', v)}
                 options={vocab.neighborhoods} emptyLabel="-- Select neighborhood --" newLabel="+ New neighborhood..."

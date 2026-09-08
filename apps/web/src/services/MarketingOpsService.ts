@@ -5310,7 +5310,9 @@ export interface CoverageSlot {
   city: string | null;
   state: string | null;
   platform: string | null;
-  status: 'active' | 'draft';
+  // 'inflight' — an intelligence campaign exists for this slot but has not yet
+  // produced a draft/active profile. profile_id holds the campaign id.
+  status: 'active' | 'draft' | 'inflight';
   profile_id: string;
   version: number;
 }

@@ -9,6 +9,7 @@ import {
 import {
   IconRefresh, IconAlertCircle, IconCheck, IconCircleCheck,
   IconCircleDot, IconMapPin, IconPlus, IconArrowRight, IconInfoCircle,
+  IconClock,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import marketingOpsService, {
@@ -271,6 +272,11 @@ export default function CoverageClient() {
                 <Text fw={600}>{cat.category_name}</Text>
                 <Badge variant="light" size="xs">{cat.slots.filter(s => s.status === 'active').length} active</Badge>
                 <Badge variant="light" color="gray" size="xs">{cat.slots.filter(s => s.status === 'draft').length} draft</Badge>
+                {cat.slots.some(s => s.status === 'inflight') && (
+                  <Badge variant="light" color="blue" size="xs">
+                    {cat.slots.filter(s => s.status === 'inflight').length} in flight
+                  </Badge>
+                )}
               </Group>
               <Link href={createCampaignLink({
                 focus: 'gold_standards', kind: 'establishment',
@@ -464,7 +470,8 @@ function isPlatformFn(key: string): boolean {
 
 // ─── Slot Chip ──────────────────────────────────────────────────────────
 // A single status chip for one (category, focus, dimension) slot.
-// Shows: active (green check), draft (amber dot), missing (gray + action).
+// Shows: active (green check), draft (amber dot), in-flight (blue clock —
+// campaign exists but no profile yet), missing (gray + action).
 
 interface SlotChipProps {
   label: string;
@@ -542,6 +549,28 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
           <Text size="xs" c="dimmed">(draft)</Text>
         </Group>
       </Tooltip>
+    );
+  }
+
+  // In-flight — an intelligence campaign exists for this slot but has not yet
+  // produced a draft/active profile. Click opens the campaign instead of
+  // creating a duplicate (the structural-duplicate guardrail would 409).
+  if (slot && slot.status === 'inflight') {
+    return (
+      <Link href={`/settings/admin/marketing-ops/campaigns/${slot.profile_id}`}>
+        <Tooltip label="Campaign in flight — profile not yet produced. Click to open the campaign.">
+          <Group gap={4} style={{
+            padding: '4px 10px',
+            borderRadius: 6,
+            background: 'var(--mantine-color-blue-light)',
+            border: '1px solid var(--mantine-color-blue-3)',
+            cursor: 'pointer',
+          }}>
+            <IconClock size={14} color="var(--mantine-color-blue-6)" />
+            <Text size="xs" fw={500}>{label}</Text>
+          </Group>
+        </Tooltip>
+      </Link>
     );
   }
 

@@ -2183,7 +2183,7 @@ export class IntelligenceProfileService extends BaseService {
         city: string | null;
         state: string | null;
         platform: string | null;
-        status: 'active' | 'draft';
+        status: 'active' | 'draft' | 'inflight';
         profile_id: string;
         version: number;
       }>;
@@ -2208,10 +2208,17 @@ export class IntelligenceProfileService extends BaseService {
             reference_platform: true, status: true,
           },
         }),
+        // All intelligence campaigns (any stage) — the city dimension list is
+        // derived from every campaign, while non-terminal ones additionally
+        // surface as 'inflight' slots below (campaign exists, profile not yet
+        // imported).
         this.prisma.mkt_campaigns_list.findMany({
-          where: { scope: 'intelligence', city: { not: '' } },
-          select: { city: true, category: true },
-          distinct: ['city', 'category'],
+          where: { scope: 'intelligence' },
+          select: {
+            id: true, category: true, city: true, state: true, stage: true,
+            intelligence_focus: true, intelligence_platform: true,
+          },
+          orderBy: { created_at: 'desc' },
         }),
         // Proving-ground campaigns (spec §4.1): scope='city',
         // campaign_category='proving_ground'. These are operator workspaces,
@@ -2250,6 +2257,62 @@ export class IntelligenceProfileService extends BaseService {
           status: p.status as 'active' | 'draft',
           profile_id: p.id,
           version: p.version,
+        });
+      }
+
+      // In-flight intelligence campaigns (establishment or discovery) that have
+      // not yet produced a draft/active profile — surfaced as 'inflight' slots
+      // so the operator sees work already underway instead of a gray "create"
+      // gap (creating would trip the structural-duplicate guardrail). Terminal
+      // stages are excluded, mirroring INACTIVE_STAGES in MarketingCampaignService
+      // (inlined here to avoid a circular import).
+      const inactiveStages = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
+      const entriesByName = new Map<string, { category_name: string; slots: any[] }>();
+      for (const entry of byCategory.values()) {
+        const nameKey = entry.category_name.trim().toLowerCase();
+        if (!entriesByName.has(nameKey)) entriesByName.set(nameKey, entry);
+      }
+      for (const c of intelligenceCampaigns) {
+        if (inactiveStages.has(c.stage)) continue;
+        const focus = c.intelligence_focus as IntelligenceFocus | null;
+        if (focus !== 'emerging' && focus !== 'competitive' && focus !== 'gold_standards') continue;
+        const catName = (c.category ?? '').trim();
+        if (!catName) continue;
+        const cityNorm = (c.city ?? '').trim();
+        // Gold standards are platform-dimensioned (nationwide); emerging and
+        // competitive are city-dimensioned, so their slots ignore platform.
+        const isGold = focus === 'gold_standards';
+        const platNorm = isGold && c.intelligence_platform && c.intelligence_platform !== 'all'
+          ? c.intelligence_platform
+          : null;
+        const nameKey = catName.toLowerCase();
+        let entry = entriesByName.get(nameKey);
+        if (!entry) {
+          // Campaign for a category with no profiles yet — create the category
+          // box so the in-flight work is visible. Key is a slug of the name;
+          // once a profile exists, its own category_key takes over.
+          const slug = nameKey.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || nameKey;
+          entry = ensureCategory(slug, catName);
+          entriesByName.set(nameKey, entry);
+        }
+        // Skip when a slot already covers this position (profile slot, or an
+        // earlier in-flight campaign). City-scoped focuses match on city only —
+        // the city chip ignores platform — while gold standards match on
+        // platform (nationwide = null on both sides).
+        const covered = entry.slots.some((s) =>
+          s.focus === focus &&
+          (s.city ?? '') === cityNorm &&
+          (!isGold || (s.platform ?? '') === (platNorm ?? ''))
+        );
+        if (covered) continue;
+        entry.slots.push({
+          focus,
+          city: cityNorm || null,
+          state: (c.state ?? '').trim() || null,
+          platform: platNorm,
+          status: 'inflight',
+          profile_id: c.id,
+          version: 0,
         });
       }
 
