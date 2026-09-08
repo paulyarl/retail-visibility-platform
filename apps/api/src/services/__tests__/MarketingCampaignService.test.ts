@@ -136,6 +136,17 @@ const parentBusinessCampaign = parentCategoryCampaign({
   business_name: 'Parent Biz',
 });
 
+const parentIntelligenceDiscoveryCampaign = (overrides: Partial<any> = {}) =>
+  parentCategoryCampaign({
+    id: 'mcamp-parent-intel',
+    scope: 'intelligence',
+    category: 'African Grocery Store',
+    city: 'Fort Wayne',
+    intelligence_campaign_kind: 'discovery',
+    intelligence_focus: 'emerging',
+    ...overrides,
+  });
+
 const parentWithOutreachAudit = parentCategoryCampaign({
   id: 'mcamp-parent-audit',
   mkt_audits_list: [
@@ -219,6 +230,66 @@ describe('deriveBusinessCampaign', () => {
     });
 
     expect(mockProspectQueue.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('backfills a campaign_created queue row when no queued prospect matches and the parent is an intelligence discovery run', async () => {
+    // Creating a campaign for a prospect without queueing it first must have
+    // the same promotion-panel effect as add-to-queue: the row is born
+    // stamped (status='campaign_created' + processed_campaign_id) so the PG
+    // cockpit's promote panel sees it.
+    mockCampaignsList.findUnique.mockResolvedValue(parentIntelligenceDiscoveryCampaign());
+    mockProspectQueue.create.mockResolvedValue({});
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-intel',
+      businessName: 'Istanbul Super Market',
+      rating: 4.6,
+      reviewCount: 120,
+      intelligenceRunId: 'mrun-1',
+    });
+
+    expect(mockProspectQueue.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          business_name: 'Istanbul Super Market',
+          title: 'Istanbul Super Market',
+          category: 'African Grocery Store',
+          city: 'Fort Wayne',
+          source_kind: 'intelligence_seek',
+          source_scope: 'intelligence',
+          source_campaign_id: 'mcamp-parent-intel',
+          status: 'campaign_created',
+          processed_campaign_id: 'mkt-test-001',
+          intelligence_run_id: 'mrun-1',
+        }),
+      }),
+    );
+  });
+
+  it('does not backfill a queue row for non-intelligence parents', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentCategoryCampaign());
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 0 });
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-cat',
+      businessName: 'Bassett Services',
+    });
+
+    expect(mockProspectQueue.create).not.toHaveBeenCalled();
+  });
+
+  it('does not backfill a queue row for establishment runs (profiles, not prospects)', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(
+      parentIntelligenceDiscoveryCampaign({ intelligence_campaign_kind: 'establishment' }),
+    );
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 0 });
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-intel',
+      businessName: 'Profile Run Biz',
+    });
+
+    expect(mockProspectQueue.create).not.toHaveBeenCalled();
   });
 
   it('survives a queue-stamp failure (non-fatal)', async () => {
