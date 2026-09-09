@@ -31,7 +31,7 @@ interface PlatformEvaluation {
     claimed?: boolean | null;
     review_count?: number | null;
     rating?: number | null;
-    attributes?: string[] | string;
+    attributes?: Array<string | { key?: string; label?: string; source_url?: string; as_of?: string }> | string;
     website?: string | null;
     additional_categories?: string[] | string;
   } | null;
@@ -326,11 +326,47 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
   };
 
   // Normalize attributes/additional_categories which may be an array or a
-  // comma-separated string depending on the scan source.
-  const normalizeList = (val: string[] | string | undefined | null): string[] => {
+  // comma-separated string depending on the scan source. Entries may also be
+  // sourced attribute objects ({key, as_of, label, source_url}) — collapse
+  // those to their label so they render as text instead of crashing React (#31).
+  const normalizeList = (val: unknown): string[] => {
     if (!val) return [];
-    if (Array.isArray(val)) return val.filter(Boolean);
-    return val.split(',').map((s) => s.trim()).filter(Boolean);
+    const items = Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : [];
+    return items
+      .map((item) => {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          const o = item as Record<string, unknown>;
+          const label = o.label ?? o.key ?? o.name;
+          return typeof label === 'string' ? label.trim() : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+  };
+
+  // Attribute chips with evidence provenance: sourced attribute objects
+  // ({key, as_of, label, source_url}) surface their source + as-of date in
+  // the chip tooltip; plain strings render as-is.
+  const normalizeAttributeChips = (val: unknown): Array<{ label: string; title?: string }> => {
+    if (!val) return [];
+    const items = Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : [];
+    return items
+      .map((item) => {
+        if (typeof item === 'string') return { label: item.trim() };
+        if (item && typeof item === 'object') {
+          const o = item as Record<string, unknown>;
+          const label = typeof o.label === 'string' && o.label.trim() ? o.label.trim() : typeof o.key === 'string' ? o.key.trim() : '';
+          if (!label) return null;
+          const provenance = [
+            typeof o.as_of === 'string' && o.as_of ? `as of ${o.as_of}` : '',
+            typeof o.source_url === 'string' ? o.source_url : '',
+          ].filter(Boolean);
+          return { label, title: provenance.length > 0 ? `${label} (${provenance.join(' · ')})` : undefined };
+        }
+        return null;
+      })
+      .filter((chip): chip is { label: string; title?: string } => chip !== null && !!chip.label);
   };
 
   // Pretty-print a branding artifact field name for display.
@@ -725,14 +761,14 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                               const cfg = pe.platform_config;
                               const ba = pe.branding_artifacts;
                               const addlCats = normalizeList(cfg?.additional_categories);
-                              const attrs = normalizeList(cfg?.attributes);
+                              const attrChips = normalizeAttributeChips(cfg?.attributes);
                               const photoTypes = ba?.photo_types ?? [];
                               const brandingFlags: string[] = [];
                               if (ba?.has_logo) brandingFlags.push('Logo');
                               if (ba?.has_cover_photo) brandingFlags.push('Cover photo');
                               if (ba?.has_profile_photo) brandingFlags.push('Profile photo');
                               if (ba?.photo_count != null) brandingFlags.push(`${ba.photo_count} photos`);
-                              const hasAny = cfg?.primary_category || addlCats.length > 0 || attrs.length > 0 || brandingFlags.length > 0 || photoTypes.length > 0;
+                              const hasAny = cfg?.primary_category || addlCats.length > 0 || attrChips.length > 0 || brandingFlags.length > 0 || photoTypes.length > 0;
                               if (!hasAny) return null;
                               return (
                                 <div className="mt-1.5 space-y-1 text-xs">
@@ -751,13 +787,17 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                                     </div>
                                   )}
                                   {/* Attributes */}
-                                  {attrs.length > 0 && (
+                                  {attrChips.length > 0 && (
                                     <div className="flex items-start gap-1.5 flex-wrap">
                                       <span className="text-gray-400 dark:text-gray-500 font-medium shrink-0">Attributes:</span>
                                       <div className="flex flex-wrap gap-1">
-                                        {attrs.map((attr, i) => (
-                                          <span key={i} className="px-1 py-0.5 bg-gray-100 dark:bg-neutral-700 text-gray-500 dark:text-gray-400 rounded">
-                                            {attr}
+                                        {attrChips.map((chip, i) => (
+                                          <span
+                                            key={i}
+                                            title={chip.title}
+                                            className="px-1 py-0.5 bg-gray-100 dark:bg-neutral-700 text-gray-500 dark:text-gray-400 rounded"
+                                          >
+                                            {chip.label}
                                           </span>
                                         ))}
                                       </div>
