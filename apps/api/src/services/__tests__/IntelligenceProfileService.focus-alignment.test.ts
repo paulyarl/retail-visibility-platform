@@ -578,7 +578,7 @@ describe('IntelligenceProfileService — city-scoped activation (Migration 205)'
       category_name: 'African Grocery Store',
       version: 2,
       intelligence_focus: 'competitive',
-      reference_city: 'zionsville',
+      reference_city: 'Zionsville',
       status: 'draft',
       configuration_json: {},
     };
@@ -629,6 +629,8 @@ describe('IntelligenceProfileService — city-scoped activation (Migration 205)'
         category_key: 'african grocery store',
         intelligence_focus: 'competitive',
         reference_city: null,
+        reference_state: null,
+        reference_platform: null,
         status: 'active',
       },
       data: { status: 'retired', updated_at: expect.any(Date) },
@@ -652,7 +654,7 @@ describe('IntelligenceProfileService — city-stamped import (Migration 205)', (
       category_name: 'African Grocery Store',
       version: 1,
       intelligence_focus: 'competitive',
-      reference_city: 'zionsville',
+      reference_city: 'Zionsville',
       status: 'draft',
       configuration_json: {},
     });
@@ -665,10 +667,10 @@ describe('IntelligenceProfileService — city-stamped import (Migration 205)', (
       referenceCity: 'Zionsville',
     });
 
-    expect(result.reference_city).toBe('zionsville');
+    expect(result.reference_city).toBe('Zionsville');
     expect(mockPrisma.mkt_intelligence_profiles.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        reference_city: 'zionsville',
+        reference_city: 'Zionsville',
         intelligence_focus: 'competitive',
         status: 'draft',
       }),
@@ -681,7 +683,7 @@ describe('IntelligenceProfileService — city-stamped import (Migration 205)', (
       category_key: 'african grocery store',
       version: 1,
       intelligence_focus: 'competitive',
-      reference_city: 'zionsville',
+      reference_city: 'Zionsville',
     };
     mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(existing);
     mockPrisma.mkt_intelligence_profiles.create.mockResolvedValueOnce({
@@ -690,7 +692,7 @@ describe('IntelligenceProfileService — city-stamped import (Migration 205)', (
       category_name: 'African Grocery Store',
       version: 2,
       intelligence_focus: 'competitive',
-      reference_city: 'zionsville',
+      reference_city: 'Zionsville',
       status: 'draft',
       configuration_json: {},
     });
@@ -707,7 +709,9 @@ describe('IntelligenceProfileService — city-stamped import (Migration 205)', (
       where: {
         category_key: 'african grocery store',
         intelligence_focus: 'competitive',
-        reference_city: 'zionsville',
+        reference_city: 'Zionsville',
+        reference_state: null,
+        reference_platform: null,
       },
       orderBy: { version: 'desc' },
     });
@@ -842,10 +846,10 @@ describe('IntelligenceProfileService — renderProfileBlock city retargeting dir
     const block = service.renderProfileBlock(profile, 'Zionsville');
 
     expect(block).toContain('CITY RETARGETING DIRECTIVE');
-    expect(block).toContain('indianapolis');
-    expect(block).toContain('zionsville');
-    expect(block).toContain('Reference city (profile established for): indianapolis');
-    expect(block).toContain('Target city (this discovery campaign): zionsville');
+    expect(block).toContain('Indianapolis');
+    expect(block).toContain('Zionsville');
+    expect(block).toContain('Reference city (profile established for): Indianapolis');
+    expect(block).toContain('Target city (this discovery campaign): Zionsville');
   });
 
   it('does NOT emit a retargeting directive when profile city matches target city', () => {
@@ -863,7 +867,7 @@ describe('IntelligenceProfileService — renderProfileBlock city retargeting dir
     const block = service.renderProfileBlock(profile, 'Zionsville');
 
     expect(block).not.toContain('CITY RETARGETING DIRECTIVE');
-    expect(block).toContain('Reference city (profile established for): zionsville');
+    expect(block).toContain('Reference city (profile established for): Zionsville');
   });
 
   it('emits a CITY APPLICATION DIRECTIVE for a city-agnostic profile applied to a city-specific campaign', () => {
@@ -882,7 +886,7 @@ describe('IntelligenceProfileService — renderProfileBlock city retargeting dir
 
     expect(block).toContain('CITY APPLICATION DIRECTIVE');
     expect(block).toContain('city-agnostic');
-    expect(block).toContain('zionsville');
+    expect(block).toContain('Zionsville');
   });
 });
 
