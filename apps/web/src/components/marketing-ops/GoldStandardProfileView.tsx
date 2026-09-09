@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Paper,
   Text,
@@ -14,7 +15,9 @@ import {
   Tooltip,
   Anchor,
   ThemeIcon,
+  Button,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
   IconTarget,
   IconCheck,
@@ -26,9 +29,13 @@ import {
   IconShieldCheck,
   IconListDetails,
   IconInfoCircle,
+  IconListCheck,
+  IconAlertCircle,
 } from '@tabler/icons-react';
+import Link from 'next/link';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
+import { queueGoldStandardCandidate } from '@/lib/gold-standard-queue';
 
 // ─── Types (mirror of gold-standard-scan.schema.ts output) ───────────────
 
@@ -362,7 +369,17 @@ function PlatformExpectedFieldsView({ platformKey, pf }: { platformKey: string; 
   );
 }
 
-function CandidateCard({ candidate, idx }: { candidate: Candidate; idx: number }) {
+function CandidateCard({
+  candidate,
+  idx,
+  onQueue,
+  queueing,
+}: {
+  candidate: Candidate;
+  idx: number;
+  onQueue?: (candidate: Candidate) => void;
+  queueing?: boolean;
+}) {
   const evaluations = candidate.platform_evaluations ?? [];
   const goldPlatforms = evaluations.filter((e) => e.is_gold_standard === true);
   const isExcluded = candidate.ownership_type === 'franchise' || candidate.ownership_type === 'chain';
@@ -416,6 +433,33 @@ function CandidateCard({ candidate, idx }: { candidate: Candidate; idx: number }
               <Text size="xs" c="dimmed" fs="italic">{candidate.independence_rationale}</Text>
             )}
           </Stack>
+          {onQueue && !isExcluded && (
+            goldPlatforms.length > 0 ? (
+              <Tooltip label="Queue for gap outreach — benchmark business with gaps on other platforms">
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="gray"
+                  leftSection={<IconListCheck size={14} />}
+                  loading={queueing}
+                  onClick={() => onQueue(candidate)}
+                >
+                  Queue
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button
+                size="xs"
+                variant="light"
+                color="blue"
+                leftSection={<IconListCheck size={14} />}
+                loading={queueing}
+                onClick={() => onQueue(candidate)}
+              >
+                Add to Prospect Queue
+              </Button>
+            )
+          )}
         </Group>
 
         {/* Per-platform evaluations */}
@@ -519,6 +563,56 @@ export default function GoldStandardProfileView({ profile }: Props) {
   const goldCandidates = candidates.filter((c) =>
     c.platform_evaluations?.some((e) => e.is_gold_standard === true),
   );
+
+  // Add-to-queue — per SOP the queued prospect gets a full business audit;
+  // the audit's signals supersede the coarse gate-failure pre-screen.
+  const [queueingKey, setQueueingKey] = useState<string | null>(null);
+
+  const handleAddToQueue = async (candidate: Candidate) => {
+    const key = `${candidate.business_name}:${candidate.city ?? ''}`;
+    setQueueingKey(key);
+    try {
+      const result = await queueGoldStandardCandidate(profile, candidate);
+      if (result.kind === 'campaign_exists') {
+        notifications.show({
+          title: 'Already in Pipeline',
+          message: (
+            <>
+              {`${candidate.business_name} already has an active campaign. `}
+              <Link href={`/settings/admin/marketing-ops/campaigns/${result.campaignId}`} style={{ color: 'var(--mantine-color-blue-6)', fontWeight: 600 }}>
+                Open campaign →
+              </Link>
+            </>
+          ),
+          color: 'orange',
+          icon: <IconAlertCircle size={16} />,
+        });
+      } else if (result.kind === 'already_queued') {
+        notifications.show({
+          title: 'Already Queued',
+          message: `"${candidate.business_name}" is already in the prospect queue.`,
+          color: 'orange',
+          icon: <IconAlertCircle size={16} />,
+        });
+      } else {
+        notifications.show({
+          title: 'Added to Prospect Queue',
+          message: `"${candidate.business_name}" queued for triage. Run a business audit — its signals supersede the gate-failure pre-screen.`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      }
+    } catch (err) {
+      notifications.show({
+        title: 'Queue Failed',
+        message: (err as Error).message,
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setQueueingKey(null);
+    }
+  };
 
   return (
     <Stack gap="md">
@@ -668,7 +762,13 @@ export default function GoldStandardProfileView({ profile }: Props) {
               </Text>
               <Stack gap="sm">
                 {candidates.map((c, i) => (
-                  <CandidateCard key={i} candidate={c} idx={i} />
+                  <CandidateCard
+                    key={i}
+                    candidate={c}
+                    idx={i}
+                    onQueue={handleAddToQueue}
+                    queueing={queueingKey === `${c.business_name}:${c.city ?? ''}`}
+                  />
                 ))}
               </Stack>
             </Stack>

@@ -4216,10 +4216,10 @@ const prospectQueueAddSchema = z.object({
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
-  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion']),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion', 'gold_standard_candidate']),
   // source_campaign_id is required for audit-derived entries; optional for
-  // manual + public_suggestion entries (no parent campaign — the public
-  // suggestion is the origin).
+  // manual + public_suggestion + gold_standard_candidate entries (no parent
+  // campaign — the originating surface is a profile/scan, not a campaign).
   source_campaign_id: z.string().min(1).optional(),
   source_audit_id: z.string().optional(),
   source_execution_id: z.string().optional(),
@@ -4245,8 +4245,9 @@ const prospectQueueAddSchema = z.object({
   // the audit already flagged NAP/digital presence as unable_to_verify.
   initial_status: z.enum(['queued', 'verify_then_outreach']).optional(),
 }).superRefine((data, ctx) => {
-  // manual + public_suggestion are parentless kinds — no source campaign.
-  if (!['manual', 'public_suggestion'].includes(data.source_kind) && !data.source_campaign_id) {
+  // manual + public_suggestion + gold_standard_candidate are parentless
+  // kinds — no source campaign.
+  if (!['manual', 'public_suggestion', 'gold_standard_candidate'].includes(data.source_kind) && !data.source_campaign_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['source_campaign_id'],

@@ -927,7 +927,7 @@ export interface DeriveAllUnmatchedResult {
 
 // ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
 
-export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek' | 'category_identification' | 'directory_lead_gen' | 'public_suggestion';
+export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek' | 'category_identification' | 'directory_lead_gen' | 'public_suggestion' | 'gold_standard_candidate';
 export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed'
   // Migration 262 — proving-ground cadence states
   | 'hold' | 'in_thread';

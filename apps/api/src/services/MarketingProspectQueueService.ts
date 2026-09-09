@@ -39,7 +39,8 @@ export type ProspectSourceKind =
   | 'intelligence_seek'
   | 'directory_lead_gen'
   | 'category_identification'
-  | 'public_suggestion';
+  | 'public_suggestion'
+  | 'gold_standard_candidate';
 
 // Migration 262 — 'hold' parks the prospect (touch-cap / nurture; re-enters
 // at next_touch_at) and 'in_thread' marks a live conversation (the ladder is

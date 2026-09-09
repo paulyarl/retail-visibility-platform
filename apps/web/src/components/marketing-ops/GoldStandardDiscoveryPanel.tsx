@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MarketingOpsService, type IntelligenceProfile, type CampaignDetail, type Audit } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
+import { queueGoldStandardCandidate } from '@/lib/gold-standard-queue';
 
 const marketingOpsService = MarketingOpsService.getInstance();
 
@@ -296,6 +297,30 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
+  // Add-to-queue — per SOP the queued prospect gets a full business audit;
+  // the audit's signals supersede the coarse gate-failure pre-screen.
+  const [queueingName, setQueueingName] = useState<string | null>(null);
+
+  const handleAddToQueue = async (candidate: Candidate) => {
+    if (!activeProfile) return;
+    setQueueingName(candidate.business_name);
+    setSuccessMessage(null);
+    setError(null);
+    try {
+      const result = await queueGoldStandardCandidate(activeProfile, candidate);
+      if (result.kind === 'campaign_exists') {
+        setSuccessMessage(`"${candidate.business_name}" already has an active campaign — see the prospect queue dedup notice.`);
+      } else {
+        setSuccessMessage(`Added "${candidate.business_name}" to the prospect queue for triage.`);
+      }
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to add candidate to prospect queue');
+    } finally {
+      setQueueingName(null);
+    }
+  };
+
   const prettyPlatform = (platform: string): string => {
     return platform === 'apple_maps' ? 'Apple Maps' : platform === 'bbb' ? 'BBB' : platform.charAt(0).toUpperCase() + platform.slice(1);
   };
@@ -556,6 +581,31 @@ export default function GoldStandardDiscoveryPanel({ campaign, audits }: Props) 
                       )}
                       {candidate.category_notes && (
                         <div className="text-xs text-gray-500 mt-1 italic">{candidate.category_notes}</div>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {candidate.ownership_type !== 'franchise' && candidate.ownership_type !== 'chain' && activeProfile && (
+                        goldPlatforms.length > 0 ? (
+                          <button
+                            type="button"
+                            disabled={queueingName === candidate.business_name}
+                            onClick={() => handleAddToQueue(candidate)}
+                            className="text-xs px-2 py-0.5 rounded border border-gray-200 dark:border-neutral-700 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            title="Queue for gap outreach — benchmark business with gaps on other platforms"
+                          >
+                            {queueingName === candidate.business_name ? 'Queuing…' : 'Queue'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={queueingName === candidate.business_name}
+                            onClick={() => handleAddToQueue(candidate)}
+                            className="text-xs px-2 py-1 rounded font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                            title="Queue for pain-based triage — a full business audit will surface the trusted signals"
+                          >
+                            {queueingName === candidate.business_name ? 'Adding…' : '+ Add to Prospect Queue'}
+                          </button>
+                        )
                       )}
                     </div>
                   </div>
