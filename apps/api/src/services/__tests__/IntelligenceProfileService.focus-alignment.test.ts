@@ -53,6 +53,19 @@ vi.mock('../../logger', () => ({
 }));
 
 import { IntelligenceProfileService, normalizeCategoryKey } from '../intelligence/IntelligenceProfileService';
+import { logger } from '../../logger';
+
+// Queued mockResolvedValueOnce responses survive vi.clearAllMocks() — reset
+// the prisma mocks between tests so an over-queued response in one test
+// cannot leak into the next.
+beforeEach(() => {
+  mockPrisma.mkt_intelligence_profiles.findFirst.mockReset();
+  mockPrisma.mkt_intelligence_profiles.findMany.mockReset();
+  mockPrisma.mkt_intelligence_profiles.create.mockReset();
+  mockPrisma.mkt_intelligence_profiles.update.mockReset();
+  mockPrisma.mkt_intelligence_profiles.updateMany.mockReset();
+  mockPrisma.mkt_intelligence_profiles.findUnique.mockReset();
+});
 
 describe('IntelligenceProfileService — focus-aware resolution (Migration 202)', () => {
   let service: IntelligenceProfileService;
@@ -109,29 +122,17 @@ describe('IntelligenceProfileService — focus-aware resolution (Migration 202)'
     expect(result!.intelligence_focus).toBe('competitive');
   });
 
-  it('resolve(category, "emerging") with no emerging but a competitive active → falls back to competitive', async () => {
+  it('resolve(category, "emerging") with only a competitive active → returns null (no cross-focus fallback)', async () => {
     // First call (focus-specific) returns null
     mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
-    // Second call (fallback) returns the competitive profile
-    const competitiveProfile = {
-      id: 'auto_repair_competitive',
-      category_key: 'auto repair',
-      category_name: 'Auto Repair',
-      version: 1,
-      intelligence_focus: 'competitive',
-      status: 'active',
-      configuration_json: {},
-    };
-    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(competitiveProfile);
 
     const result = await service.resolve('Auto Repair', 'emerging');
 
-    // Fallback returns the competitive profile (legacy behavior)
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('auto_repair_competitive');
-    expect(result!.intelligence_focus).toBe('competitive');
-    // Two queries: first focus-specific, second fallback
-    expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledTimes(2);
+    // Migration 202 type-contamination guard: when a focus is explicitly
+    // requested, a miss returns null rather than a different-focus profile.
+    expect(result).toBeNull();
+    // One query — focus-specific match, then the type guard returns null
+    expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledTimes(1);
   });
 
   it('resolve(category, "emerging") with both active → returns emerging (exact match wins)', async () => {
@@ -182,7 +183,6 @@ describe('IntelligenceProfileService — focus-aware resolution (Migration 202)'
 
   it('resolve(category, "emerging") with no profiles at all → returns null', async () => {
     mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
-    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
 
     const result = await service.resolve('Unknown Category', 'emerging');
 
@@ -219,11 +219,15 @@ describe('IntelligenceProfileService — type-scoped activation (Migration 202)'
     // The retirement updateMany should filter by category_key + focus +
     // reference_city. Migration 205 adds reference_city: null to the filter
     // so a city-agnostic draft retires only city-agnostic active profiles.
+    // Migrations 229/236 add reference_state + reference_platform to the
+    // scope tuple (both NULL for a city-agnostic, cross-platform draft).
     expect(mockPrisma.mkt_intelligence_profiles.updateMany).toHaveBeenCalledWith({
       where: {
         category_key: 'auto repair',
         intelligence_focus: 'competitive',
         reference_city: null,
+        reference_state: null,
+        reference_platform: null,
         status: 'active',
       },
       data: { status: 'retired', updated_at: expect.any(Date) },
@@ -323,8 +327,16 @@ describe('IntelligenceProfileService — focus-stamped import (Migration 202)', 
     // Should have searched with category_key + intelligence_focus +
     // reference_city. Migration 205 adds reference_city: null so a
     // city-agnostic import finds the city-agnostic profile lineage.
+    // Migrations 229/236 add reference_state + reference_platform to the
+    // identity tuple (both NULL for a city-agnostic, cross-platform import).
     expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledWith({
-      where: { category_key: 'plumbing', intelligence_focus: 'competitive', reference_city: null },
+      where: {
+        category_key: 'plumbing',
+        intelligence_focus: 'competitive',
+        reference_city: null,
+        reference_state: null,
+        reference_platform: null,
+      },
       orderBy: { version: 'desc' },
     });
   });
@@ -448,7 +460,7 @@ describe('IntelligenceProfileService — city-scoped resolution (Migration 205)'
       category_name: 'African Grocery Store',
       version: 1,
       intelligence_focus: 'competitive',
-      reference_city: 'zionsville',
+      reference_city: 'Zionsville',
       status: 'active',
       configuration_json: {},
     };
@@ -458,11 +470,11 @@ describe('IntelligenceProfileService — city-scoped resolution (Migration 205)'
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe('african_grocery_zionsville');
-    expect(result!.reference_city).toBe('zionsville');
+    expect(result!.reference_city).toBe('Zionsville');
     expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledWith({
       where: {
         category_key: 'african grocery store',
-        reference_city: 'zionsville',
+        reference_city: 'Zionsville',
         intelligence_focus: 'competitive',
         status: 'active',
       },
@@ -578,12 +590,16 @@ describe('IntelligenceProfileService — city-scoped activation (Migration 205)'
 
     await service.activateDraft('african_grocery_zionsville', 2);
 
-    // The retirement updateMany should filter by category + city + focus
+    // The retirement updateMany should filter by category + city + focus.
+    // Migrations 229/236 add reference_state + reference_platform to the
+    // scope tuple (both NULL — the draft carries neither).
     expect(mockPrisma.mkt_intelligence_profiles.updateMany).toHaveBeenCalledWith({
       where: {
         category_key: 'african grocery store',
         intelligence_focus: 'competitive',
-        reference_city: 'zionsville',
+        reference_city: 'Zionsville',
+        reference_state: null,
+        reference_platform: null,
         status: 'active',
       },
       data: { status: 'retired', updated_at: expect.any(Date) },
@@ -695,6 +711,109 @@ describe('IntelligenceProfileService — city-stamped import (Migration 205)', (
       },
       orderBy: { version: 'desc' },
     });
+  });
+});
+
+describe('IntelligenceProfileService — platform-stamped import (Migration 236)', () => {
+  let service: IntelligenceProfileService;
+
+  beforeEach(() => {
+    service = IntelligenceProfileService.getInstance();
+    vi.clearAllMocks();
+  });
+
+  it('importAsDraft normalizes reference_platform "all" to null (cross-platform slot)', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValueOnce({
+      id: 'african_grocery_cross',
+      category_key: 'african grocery store',
+      category_name: 'African Grocery Store',
+      version: 1,
+      intelligence_focus: 'competitive',
+      reference_platform: null,
+      status: 'draft',
+      configuration_json: {},
+    });
+
+    await service.importAsDraft({
+      categoryKey: 'African Grocery Store',
+      categoryName: 'African Grocery Store',
+      configurationJson: { specialized_sources: [] } as any,
+      intelligenceFocus: 'competitive',
+      referencePlatform: 'all',
+    });
+
+    // Both the scope-tuple lookup and the write use the normalized
+    // cross-platform slot (NULL), so a re-import versions the same profile
+    // instead of forking a second 'all'-scoped profile id.
+    expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({ reference_platform: null }),
+      orderBy: { version: 'desc' },
+    });
+    expect(mockPrisma.mkt_intelligence_profiles.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reference_platform: null }),
+    });
+  });
+
+  it('importAsDraft keeps a specific reference_platform', async () => {
+    mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
+    mockPrisma.mkt_intelligence_profiles.create.mockResolvedValueOnce({
+      id: 'african_grocery_google',
+      category_key: 'african grocery store',
+      category_name: 'African Grocery Store',
+      version: 1,
+      intelligence_focus: 'competitive',
+      reference_platform: 'google',
+      status: 'draft',
+      configuration_json: {},
+    });
+
+    await service.importAsDraft({
+      categoryKey: 'African Grocery Store',
+      categoryName: 'African Grocery Store',
+      configurationJson: { specialized_sources: [] } as any,
+      intelligenceFocus: 'competitive',
+      referencePlatform: 'Google',
+    });
+
+    expect(mockPrisma.mkt_intelligence_profiles.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reference_platform: 'google' }),
+    });
+  });
+
+  it('resolve with platform "all" resolves the cross-platform (NULL) city-exact profile without a fallback warning', async () => {
+    const crossPlatformProfile = {
+      id: 'african_grocery_cross',
+      category_key: 'african grocery store',
+      category_name: 'African Grocery Store',
+      version: 1,
+      intelligence_focus: 'competitive',
+      reference_city: 'Indianapolis',
+      reference_platform: null,
+      status: 'active',
+      configuration_json: {},
+    };
+    // Step 1 (city + 'all' exact) misses; Step 2 (city + NULL) hits
+    mockPrisma.mkt_intelligence_profiles.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(crossPlatformProfile);
+
+    const result = await service.resolve('African Grocery Store', 'competitive', 'Indianapolis', 'all');
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('african_grocery_cross');
+    expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        category_key: 'african grocery store',
+        reference_city: 'Indianapolis',
+        status: 'active',
+        intelligence_focus: 'competitive',
+        reference_platform: null,
+      },
+      orderBy: { version: 'desc' },
+    });
+    // 'all' → NULL is the exact cross-platform slot, not contamination
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });
 

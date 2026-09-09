@@ -219,6 +219,22 @@ export function normalizeReferenceState(s: string | null | undefined): string | 
   return trimmed.toUpperCase();
 }
 
+/**
+ * Normalize a platform scope for storage as reference_platform. Returns the
+ * lowercase platform key (e.g. 'Google' → 'google'), or NULL for the
+ * cross-platform slot. 'all' (and empty input) normalize to NULL — NULL is
+ * the canonical cross-platform representation (Migration 236): the resolver
+ * fallback chain, the coverage dimension matcher, and the gold-standard
+ * import path all treat reference_platform = NULL as the 'all' slot, so
+ * storing the literal 'all' would split the scope-tuple identity (a re-import
+ * of the same establishment would create a new profile id instead of
+ * versioning the existing profile).
+ */
+export function normalizePlatformScope(s: string | null | undefined): string | null {
+  const normalized = s ? s.trim().toLowerCase() || null : null;
+  return normalized === 'all' ? null : normalized;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────
 
 export class IntelligenceProfileService extends BaseService {
@@ -327,10 +343,16 @@ export class IntelligenceProfileService extends BaseService {
         if (normalizedCity) {
           const s2 = await tryFind(normalizedCity, null);
           if (s2) {
-            logger.warn('Gold standard profile resolved via city+cross-platform fallback', ctx, {
-              categoryKey: key, requestedCity: normalizedCity, requestedPlatform: normalizedPlatform,
-              resolvedPlatform: null, focus: focus ?? 'none', profileId: (s2 as any).id,
-            });
+            // An 'all' request resolving the NULL cross-platform row is the
+            // exact slot (NULL = cross-platform per Migration 236), not a
+            // fallback — only a specific-platform request falling through
+            // here is contamination worth warning about.
+            if (normalizedPlatform !== 'all') {
+              logger.warn('Gold standard profile resolved via city+cross-platform fallback', ctx, {
+                categoryKey: key, requestedCity: normalizedCity, requestedPlatform: normalizedPlatform,
+                resolvedPlatform: null, focus: focus ?? 'none', profileId: (s2 as any).id,
+              });
+            }
             return s2;
           }
         }
@@ -589,7 +611,7 @@ export class IntelligenceProfileService extends BaseService {
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
     const referenceState = normalizeReferenceState(input.referenceState ?? null);
-    const referencePlatform = input.referencePlatform ? input.referencePlatform.trim().toLowerCase() || null : null;
+    const referencePlatform = normalizePlatformScope(input.referencePlatform);
     try {
       const profile = await this.prisma.mkt_intelligence_profiles.create({
         data: {
@@ -651,7 +673,7 @@ export class IntelligenceProfileService extends BaseService {
     const intelligenceFocus = input.intelligenceFocus ?? 'emerging';
     const referenceCity = normalizeReferenceCity(input.referenceCity ?? null);
     const referenceState = normalizeReferenceState(input.referenceState ?? null);
-    const referencePlatform = input.referencePlatform ? input.referencePlatform.trim().toLowerCase() || null : null;
+    const referencePlatform = normalizePlatformScope(input.referencePlatform);
     try {
       // Determine the profile id + next version number
       let profileId = input.existingProfileId;

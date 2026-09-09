@@ -422,11 +422,12 @@ export default function IntelligenceProfilesClient() {
                   </Badge>
                 );
               })()}
-              {profile.reference_platform && (
-                <Badge size="xs" variant="dot" color="indigo">
-                  {platformLabel(profile.reference_platform)}
-                </Badge>
-              )}
+              {/* Platform scope: NULL = cross-platform (Migration 236 stores
+                  cross-platform profiles with reference_platform = NULL), so
+                  map it onto the 'all' slot — every profile shows its scope. */}
+              <Badge size="xs" variant="dot" color="indigo">
+                {platformLabel(profile.reference_platform || 'all')}
+              </Badge>
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
