@@ -133,6 +133,7 @@ A field must not render publicly without a provenance row with `show_on_public =
 - SNAP/EBT stays in its dedicated `snap_ebt_*` columns (migration 207) — do NOT fold it into generic attributes
 - Natural data source: gold-standard scan candidates' `platform_config.attributes` (Apple Maps card payment attributes, Google profile attributes, Yelp amenities)
 - Renders as a chip row on the directory entry classic layout, next to category chips, gated by `attributesVisible`
+- Attribute picker (migration 268): `directory_attribute_definitions` table — predefined, category-aware chips (grouped payments / accessibility / ownership / service_options / certifications / other; `applies_to_categories` NULL = universal, otherwise lowercase category names or `platform_categories` slugs). Served by `GET /api/admin/directory-presence/attribute-definitions?category=<name>`; the seed detail edit drawer renders them as toggle chips with per-attribute evidence fields plus a custom-attribute escape hatch (replaces the old raw-JSON textarea)
 
 ## Claim Flow
 

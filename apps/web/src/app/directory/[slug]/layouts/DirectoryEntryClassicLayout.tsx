@@ -10,6 +10,7 @@ import StoreRatingsSection from '@/components/directory/StoreRatingsSection';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
+import AttributeChips from '@/components/directory/AttributeChips';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
@@ -182,24 +183,8 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                           ))}
                         </div>
                       )}
-                      {attributesVisible && sourcedAttributes.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-2 mt-2">
-                          {sourcedAttributes.map((attr) => {
-                            const evidence = [
-                              attr.sourcePlatform ? `Reported by ${attr.sourcePlatform.replace(/_/g, ' ')}` : null,
-                              attr.asOf ? `as of ${attr.asOf}` : null,
-                            ].filter(Boolean).join(' · ');
-                            return (
-                              <span
-                                key={attr.key}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
-                                title={evidence ? `${attr.label} — ${evidence}` : attr.label}
-                              >
-                                {attr.label}
-                              </span>
-                            );
-                          })}
-                        </div>
+                      {attributesVisible && (
+                        <AttributeChips attributes={sourcedAttributes} />
                       )}
                       <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
                       {listing.keywords && listing.keywords.length > 0 && (

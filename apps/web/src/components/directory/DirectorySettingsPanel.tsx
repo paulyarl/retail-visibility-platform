@@ -236,6 +236,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         gallery_display_mode: rawSettings.gallery_display_mode || 'carousel',
         external_link_enabled: rawSettings.external_link_enabled,
         snap_ebt_display: rawSettings.snap_ebt_display,
+        attributes_display: rawSettings.attributes_display,
       });
 
       // Invalidate frontend capability cache so public endpoints pick up changes
@@ -287,6 +288,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     rawSettings.enhanced_seo,
     rawSettings.external_link_enabled,
     rawSettings.snap_ebt_display,
+    rawSettings.attributes_display,
   ].filter(Boolean).length;
 
   return (
@@ -774,6 +776,31 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                             checked={!!rawSettings.snap_ebt_display}
                             disabled={!capState?.snapEbtBadgeEnabled}
                             onChange={(e) => toggleRaw('snap_ebt_display', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* Sourced Attributes */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Attribute Chips</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {capState?.attributesBadgeEnabled
+                              ? 'Show sourced attribute chips (payments accepted, accessibility, ownership) on your listing'
+                              : (
+                                <Link href={`/t/${tenantId}/settings/tiers`} className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium">
+                                  Not included in your plan — upgrade to enable →
+                                </Link>
+                              )}
+                          </p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.attributesBadgeEnabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.attributes_display}
+                            disabled={!capState?.attributesBadgeEnabled}
+                            onChange={(e) => toggleRaw('attributes_display', e.target.checked)}
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>

@@ -294,7 +294,15 @@ Return a single JSON object with this structure (the Gold Standard Scan result):
             "photo_types": ["<string>", ...],
             "visual_assets": ["<string>", ...]
           },
-          "platform_config": { "<key>": "<value>", ... },
+          "platform_config": {
+            "primary_category": "<string|null>",
+            "additional_categories": ["<string>", ...],
+            "attributes": [
+              { "key": "<snake_case_key>", "label": "<display label>",
+                "source_url": "<url or null>", "as_of": "<ISO date or null>" }
+            ],
+            "<other config keys>": "<value>"
+          },
           "quality_gates_passed": ["<gate field name>", ...],
           "quality_gates_failed": ["<gate field name>", ...]
         }
@@ -329,6 +337,16 @@ Rules:
   the exemplar URL shown to operators and referenced in audit benchmarks.
 - branding_artifacts capture what the candidate has (logo, cover photo, photo
   count, photo types). These become branding quality gates and audit gap inputs.
+- ATTRIBUTES — REQUIRED. For every platform evaluation, record the attribute
+  chips the candidate's public profile actually displays (payments accepted,
+  accessibility, ownership, service options, certifications) in
+  platform_config.attributes as a structured array of
+  { key, label, source_url, as_of }. key is a snake_case identifier (e.g.
+  "accepts_apple_pay", "wheelchair_accessible"); label is the display text.
+  Each attribute carries its own evidence (source_url of the profile/section
+  where observed, as_of date). NEVER infer attributes from category labels —
+  record only what the profile itself shows. An empty array is valid when the
+  profile displays no attribute chips.
 - quality_gates use severity "non_negotiable" for must-have fields and
   "recommended" for nice-to-have fields. Quality gates are aspirational targets
   derived from the top candidates — they do NOT filter is_gold_standard. A

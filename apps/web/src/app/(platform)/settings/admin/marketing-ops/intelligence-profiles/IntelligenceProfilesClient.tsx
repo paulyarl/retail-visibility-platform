@@ -18,6 +18,7 @@ import {
   TextInput,
   ActionIcon,
   Menu,
+  Tabs,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -102,6 +103,10 @@ export default function IntelligenceProfilesClient() {
   // shows only gold-standard profiles; 'emerging'/'competitive' filter
   // to those respective intelligence focuses.
   const [focusFilter, setFocusFilter] = useState<IntelligenceFocus | 'all'>('all');
+
+  // Active Profiles / Non-Business Campaigns render in tabs; Draft Profiles
+  // stay stacked above so pending activations stay visible without a click.
+  const [activeTab, setActiveTab] = useState<string | null>('active');
 
   // Non-business campaigns (category/city/intelligence scope) — managed here
   // instead of the sales-pipeline Kanban, since they don't move through stages.
@@ -564,242 +569,242 @@ export default function IntelligenceProfilesClient() {
 
           <Divider />
 
-          {/* Active Profiles */}
-          <div>
-            <Group gap="xs" mb="xs">
-              <IconCheck size={18} />
-              <Text size="sm" fw={600}>Active Profiles</Text>
-              <Badge size="sm" variant="light" color="green">{activeProfiles.length}</Badge>
-            </Group>
-            <Text size="xs" c="dimmed" mb="sm">
-              Active profiles are used by resolvePrompt() for business-scope §1B amplification
-              and by PromptComposerService for intelligence-scope discovery runs. Each category
-              can have one active Emerging and one active Competitive profile — discovery
-              campaigns auto-align to the profile matching their focus.
-            </Text>
-            {activeProfiles.length === 0 ? (
-              <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
-                <Text size="xs" c="dimmed">No active profiles.</Text>
-              </Paper>
-            ) : (
-              activeProfiles.map((p) => renderProfileCard(p, false))
-            )}
-          </div>
+          <Tabs value={activeTab} onChange={(v) => setActiveTab(v || 'active')}>
+            <Tabs.List>
+              <Tabs.Tab value="active" leftSection={<IconCheck size={14} />}>
+                Active Profiles ({activeProfiles.length})
+              </Tabs.Tab>
+              <Tabs.Tab value="campaigns" leftSection={<IconListCheck size={14} />}>
+                Non-Business Campaigns ({nonBusinessCampaigns.length})
+              </Tabs.Tab>
+            </Tabs.List>
 
-          <Divider />
+            {/* Active Profiles */}
+            <Tabs.Panel value="active" pt="md">
+              <Text size="xs" c="dimmed" mb="sm">
+                Active profiles are used by resolvePrompt() for business-scope §1B amplification
+                and by PromptComposerService for intelligence-scope discovery runs. Each category
+                can have one active Emerging and one active Competitive profile — discovery
+                campaigns auto-align to the profile matching their focus.
+              </Text>
+              {activeProfiles.length === 0 ? (
+                <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
+                  <Text size="xs" c="dimmed">No active profiles.</Text>
+                </Paper>
+              ) : (
+                activeProfiles.map((p) => renderProfileCard(p, false))
+              )}
+            </Tabs.Panel>
 
-          {/* Non-Business Campaigns — aggregate-scope campaigns (category,
-              city, intelligence) that don't move through the sales pipeline.
-              Managed here with edit/delete since they're excluded from the
-              campaigns Kanban (which is business-scope only). */}
-          <div>
-            <Group justify="space-between" mb="xs">
-              <Group gap="xs">
-                <IconListCheck size={18} />
-                <Text size="sm" fw={600}>Non-Business Campaigns</Text>
-                <Badge size="sm" variant="light" color="gray">{filteredNonBusinessCampaigns.length}</Badge>
+            {/* Non-Business Campaigns — aggregate-scope campaigns (category,
+                city, intelligence) that don't move through the sales pipeline.
+                Managed here with edit/delete since they're excluded from the
+                campaigns Kanban (which is business-scope only). */}
+            <Tabs.Panel value="campaigns" pt="md">
+              <Group justify="space-between" mb="xs">
+                <Badge size="sm" variant="light" color="gray">{filteredNonBusinessCampaigns.length} shown</Badge>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  leftSection={<IconRefresh size={14} />}
+                  onClick={fetchNonBusinessCampaigns}
+                  loading={nbLoading}
+                >
+                  Refresh
+                </Button>
               </Group>
-              <Button
-                variant="subtle"
-                size="xs"
-                leftSection={<IconRefresh size={14} />}
-                onClick={fetchNonBusinessCampaigns}
-                loading={nbLoading}
-              >
-                Refresh
-              </Button>
-            </Group>
-            <Text size="xs" c="dimmed" mb="sm">
-              Aggregate-scope campaigns (category, city, intelligence) don&apos;t move through the
-              sales pipeline. Use this table to edit or delete them. Business-scope campaigns
-              are tracked on the{' '}
-              <Link href="/settings/admin/marketing-ops/campaigns" style={{ color: 'var(--mantine-color-blue-6)' }}>
-                Campaigns Kanban
-              </Link>.
-            </Text>
+              <Text size="xs" c="dimmed" mb="sm">
+                Aggregate-scope campaigns (category, city, intelligence) don&apos;t move through the
+                sales pipeline. Use this table to edit or delete them. Business-scope campaigns
+                are tracked on the{' '}
+                <Link href="/settings/admin/marketing-ops/campaigns" style={{ color: 'var(--mantine-color-blue-6)' }}>
+                  Campaigns Kanban
+                </Link>.
+              </Text>
 
-            {nbError && (
-              <Alert color="red" icon={<IconAlertCircle size={16} />} mb="sm">
-                {nbError}
-              </Alert>
-            )}
+              {nbError && (
+                <Alert color="red" icon={<IconAlertCircle size={16} />} mb="sm">
+                  {nbError}
+                </Alert>
+              )}
 
-            {/* Filters */}
-            <Group gap="xs" mb="sm" grow>
-              <TextInput
-                placeholder="Search title, category, city…"
-                value={nbSearch}
-                onChange={(e) => setNbSearch(e.target.value)}
-                leftSection={<IconSearch size={14} />}
-                size="xs"
-              />
-              <Select
-                placeholder="All scopes"
-                value={nbScopeFilter || ''}
-                onChange={(v) => setNbScopeFilter((v as CampaignScope | '') || '')}
-                data={[
-                  { value: 'category', label: 'Category' },
-                  { value: 'city', label: 'City' },
-                  { value: 'intelligence', label: 'Intelligence' },
-                ]}
-                clearable
-                size="xs"
-              />
-              <Select
-                placeholder="All categories"
-                value={nbCategoryFilter || ''}
-                onChange={(v) => setNbCategoryFilter(v || '')}
-                data={nbCategoryOptions.map((c) => ({ value: c, label: c }))}
-                clearable
-                searchable
-                size="xs"
-              />
-              <Select
-                placeholder="All cities"
-                value={nbCityFilter || ''}
-                onChange={(v) => setNbCityFilter(v || '')}
-                data={nbCityOptions.map((c) => ({ value: c, label: c }))}
-                clearable
-                searchable
-                size="xs"
-              />
-            </Group>
-
-            {nbLoading ? (
-              <Group justify="center" py={20}>
-                <Loader size="sm" />
+              {/* Filters */}
+              <Group gap="xs" mb="sm" grow>
+                <TextInput
+                  placeholder="Search title, category, city…"
+                  value={nbSearch}
+                  onChange={(e) => setNbSearch(e.target.value)}
+                  leftSection={<IconSearch size={14} />}
+                  size="xs"
+                />
+                <Select
+                  placeholder="All scopes"
+                  value={nbScopeFilter || ''}
+                  onChange={(v) => setNbScopeFilter((v as CampaignScope | '') || '')}
+                  data={[
+                    { value: 'category', label: 'Category' },
+                    { value: 'city', label: 'City' },
+                    { value: 'intelligence', label: 'Intelligence' },
+                  ]}
+                  clearable
+                  size="xs"
+                />
+                <Select
+                  placeholder="All categories"
+                  value={nbCategoryFilter || ''}
+                  onChange={(v) => setNbCategoryFilter(v || '')}
+                  data={nbCategoryOptions.map((c) => ({ value: c, label: c }))}
+                  clearable
+                  searchable
+                  size="xs"
+                />
+                <Select
+                  placeholder="All cities"
+                  value={nbCityFilter || ''}
+                  onChange={(v) => setNbCityFilter(v || '')}
+                  data={nbCityOptions.map((c) => ({ value: c, label: c }))}
+                  clearable
+                  searchable
+                  size="xs"
+                />
               </Group>
-            ) : filteredNonBusinessCampaigns.length === 0 ? (
-              <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
-                <Text size="xs" c="dimmed">
-                  {nonBusinessCampaigns.length === 0
-                    ? 'No non-business campaigns found.'
-                    : 'No campaigns match the current filters.'}
-                </Text>
-              </Paper>
-            ) : (
-              <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
-                <Table striped highlightOnHover horizontalSpacing="sm" verticalSpacing="xs" style={{ fontSize: 'var(--mantine-font-size-xs)' }}>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Title</Table.Th>
-                      <Table.Th>Scope</Table.Th>
-                      <Table.Th>Category</Table.Th>
-                      <Table.Th>City</Table.Th>
-                      <Table.Th>Stage</Table.Th>
-                      <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {filteredNonBusinessCampaigns.map((c) => {
-                      const label = c.title || c.business_name || c.category || c.city || c.id;
-                      return (
-                        <Table.Tr key={c.id}>
-                          <Table.Td>
-                            <Group gap="xs" wrap="nowrap">
-                              <Text size="xs" fw={500} lineClamp={1}>{label}</Text>
-                              {c.display_id && (
-                                <Text size="10px" c="dimmed" ff="monospace">{c.display_id}</Text>
-                              )}
-                            </Group>
-                          </Table.Td>
-                          <Table.Td>
-                            <Badge size="xs" variant="light" color="gray">{c.scope}</Badge>
-                          </Table.Td>
-                          <Table.Td>{c.category || '—'}</Table.Td>
-                          <Table.Td>{c.city || '—'}{c.neighborhood ? ` (${c.neighborhood})` : ''}</Table.Td>
-                          <Table.Td>
-                            <Badge size="xs" variant="light" color="blue">
-                              {STAGE_LABELS[c.stage] ?? c.stage}
-                            </Badge>
-                          </Table.Td>
-                          <Table.Td style={{ textAlign: 'right' }}>
-                            <Group gap="xs" justify="flex-end" wrap="nowrap">
-                              <ActionIcon
-                                component={Link}
-                                href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
-                                variant="light"
-                                color="blue"
-                                size="sm"
-                                title="Open campaign"
-                              >
-                                <IconExternalLink size={14} />
-                              </ActionIcon>
-                              <ActionIcon
-                                component={Link}
-                                href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
-                                variant="light"
-                                color="gray"
-                                size="sm"
-                                title="Edit campaign"
-                              >
-                                <IconEdit size={14} />
-                              </ActionIcon>
-                              {/* PG: only discovery prospect runs (emerging / competitive
-                                  focus) may originate a proving ground — they carry the
-                                  candidate businesses and a real city. Establishment and
-                                  gold-standards runs produce profiles, not prospects, and
-                                  are often state/nationwide-scoped. Existing proving
-                                  grounds jump straight to the cockpit. */}
-                              {c.scope === 'intelligence' && !c.parent_campaign_id
-                                && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
-                                && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging') && (
-                                <ActionIcon
-                                  variant="light"
-                                  color="violet"
-                                  size="sm"
-                                  title="Promote to proving ground (merges into the existing one for this market)"
-                                  loading={promotingCampaignId === c.id}
-                                  onClick={() => handlePromoteToPg(c)}
-                                >
-                                  <IconFlask2 size={14} />
-                                </ActionIcon>
-                              )}
-                              {c.campaign_category === 'proving_ground' && (
+
+              {nbLoading ? (
+                <Group justify="center" py={20}>
+                  <Loader size="sm" />
+                </Group>
+              ) : filteredNonBusinessCampaigns.length === 0 ? (
+                <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
+                  <Text size="xs" c="dimmed">
+                    {nonBusinessCampaigns.length === 0
+                      ? 'No non-business campaigns found.'
+                      : 'No campaigns match the current filters.'}
+                  </Text>
+                </Paper>
+              ) : (
+                <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+                  <Table striped highlightOnHover horizontalSpacing="sm" verticalSpacing="xs" style={{ fontSize: 'var(--mantine-font-size-xs)' }}>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Title</Table.Th>
+                        <Table.Th>Scope</Table.Th>
+                        <Table.Th>Category</Table.Th>
+                        <Table.Th>City</Table.Th>
+                        <Table.Th>Stage</Table.Th>
+                        <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {filteredNonBusinessCampaigns.map((c) => {
+                        const label = c.title || c.business_name || c.category || c.city || c.id;
+                        return (
+                          <Table.Tr key={c.id}>
+                            <Table.Td>
+                              <Group gap="xs" wrap="nowrap">
+                                <Text size="xs" fw={500} lineClamp={1}>{label}</Text>
+                                {c.display_id && (
+                                  <Text size="10px" c="dimmed" ff="monospace">{c.display_id}</Text>
+                                )}
+                              </Group>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge size="xs" variant="light" color="gray">{c.scope}</Badge>
+                            </Table.Td>
+                            <Table.Td>{c.category || '—'}</Table.Td>
+                            <Table.Td>{c.city || '—'}{c.neighborhood ? ` (${c.neighborhood})` : ''}</Table.Td>
+                            <Table.Td>
+                              <Badge size="xs" variant="light" color="blue">
+                                {STAGE_LABELS[c.stage] ?? c.stage}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td style={{ textAlign: 'right' }}>
+                              <Group gap="xs" justify="flex-end" wrap="nowrap">
                                 <ActionIcon
                                   component={Link}
-                                  href={`/settings/admin/marketing-ops/proving-grounds/${c.id}`}
-                                  variant="filled"
-                                  color="violet"
+                                  href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                                  variant="light"
+                                  color="blue"
                                   size="sm"
-                                  title="Open proving ground cockpit"
+                                  title="Open campaign"
                                 >
-                                  <IconFlask2 size={14} />
+                                  <IconExternalLink size={14} />
                                 </ActionIcon>
-                              )}
-                              <Menu position="bottom-end" withinPortal>
-                                <Menu.Target>
+                                <ActionIcon
+                                  component={Link}
+                                  href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                                  variant="light"
+                                  color="gray"
+                                  size="sm"
+                                  title="Edit campaign"
+                                >
+                                  <IconEdit size={14} />
+                                </ActionIcon>
+                                {/* PG: only discovery prospect runs (emerging / competitive
+                                    focus) may originate a proving ground — they carry the
+                                    candidate businesses and a real city. Establishment and
+                                    gold-standards runs produce profiles, not prospects, and
+                                    are often state/nationwide-scoped. Existing proving
+                                    grounds jump straight to the cockpit. */}
+                                {c.scope === 'intelligence' && !c.parent_campaign_id
+                                  && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
+                                  && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging') && (
                                   <ActionIcon
                                     variant="light"
-                                    color="red"
+                                    color="violet"
                                     size="sm"
-                                    title="Delete campaign"
-                                    loading={deletingCampaignId === c.id}
+                                    title="Promote to proving ground (merges into the existing one for this market)"
+                                    loading={promotingCampaignId === c.id}
+                                    onClick={() => handlePromoteToPg(c)}
                                   >
-                                    <IconTrash size={14} />
+                                    <IconFlask2 size={14} />
                                   </ActionIcon>
-                                </Menu.Target>
-                                <Menu.Dropdown>
-                                  <Menu.Label>Confirm deletion</Menu.Label>
-                                  <Menu.Item
-                                    color="red"
-                                    leftSection={<IconTrash size={14} />}
-                                    onClick={() => handleDeleteCampaign(c.id, label)}
+                                )}
+                                {c.campaign_category === 'proving_ground' && (
+                                  <ActionIcon
+                                    component={Link}
+                                    href={`/settings/admin/marketing-ops/proving-grounds/${c.id}`}
+                                    variant="filled"
+                                    color="violet"
+                                    size="sm"
+                                    title="Open proving ground cockpit"
                                   >
-                                    Delete &ldquo;{label}&rdquo;
-                                  </Menu.Item>
-                                </Menu.Dropdown>
-                              </Menu>
-                            </Group>
-                          </Table.Td>
-                        </Table.Tr>
-                      );
-                    })}
-                  </Table.Tbody>
-                </Table>
-              </Paper>
-            )}
-          </div>
+                                    <IconFlask2 size={14} />
+                                  </ActionIcon>
+                                )}
+                                <Menu position="bottom-end" withinPortal>
+                                  <Menu.Target>
+                                    <ActionIcon
+                                      variant="light"
+                                      color="red"
+                                      size="sm"
+                                      title="Delete campaign"
+                                      loading={deletingCampaignId === c.id}
+                                    >
+                                      <IconTrash size={14} />
+                                    </ActionIcon>
+                                  </Menu.Target>
+                                  <Menu.Dropdown>
+                                    <Menu.Label>Confirm deletion</Menu.Label>
+                                    <Menu.Item
+                                      color="red"
+                                      leftSection={<IconTrash size={14} />}
+                                      onClick={() => handleDeleteCampaign(c.id, label)}
+                                    >
+                                      Delete &ldquo;{label}&rdquo;
+                                    </Menu.Item>
+                                  </Menu.Dropdown>
+                                </Menu>
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        );
+                      })}
+                    </Table.Tbody>
+                  </Table>
+                </Paper>
+              )}
+            </Tabs.Panel>
+          </Tabs>
 
           <Divider />
 

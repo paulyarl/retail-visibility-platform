@@ -105,6 +105,21 @@ const discoveredBusinessSchema = z.object({
       platform: z.string().optional(),
     }).passthrough(),
   ).nullable().optional(),
+
+  // Sourced attribute chips observed on the prospect's platform profiles
+  // (payments accepted, accessibility, ownership, service options). Each
+  // entry carries its own evidence (source_url + as_of) — never inferred
+  // from category labels. Optional + forward-compatible; feeds the directory
+  // seed attribute picker when the prospect becomes a seed.
+  observed_attributes: z.array(
+    z.object({
+      platform: z.string(),
+      key: z.string().nullable().optional(),
+      label: z.string(),
+      source_url: z.string().nullable().optional(),
+      as_of: z.string().nullable().optional(),
+    }).passthrough(),
+  ).nullable().optional(),
 }).passthrough();
 
 // ─── Top-level schema ────────────────────────────────────────────────────
@@ -346,6 +361,10 @@ Return a single JSON object with this structure:
       "business_seek_priority": "high" | "medium" | "low" | "hold",
       "rating": <number or null>,
       "review_count": <number or null>,
+      "observed_attributes": [
+        { "platform": "<platform>", "key": "<snake_case_key>", "label": "<display label>",
+          "source_url": "<url or null>", "as_of": "<ISO date or null>" }
+      ],
       "gold_standard_match": <true | false | null — ONLY when a GOLD STANDARD DISCOVERY BENCHMARK block is present in the prompt; null when no gold standard block>,
       "gold_standard_gate_results": [
         { "gate": "<gate name>", "passed": <true | false>, "platform": "<platform name, optional>" }
@@ -400,6 +419,8 @@ Rules:
 - If identity_confidence is "low", business_seek_priority MUST be "hold".
 - If category_fit is "insufficient", business_seek_priority MUST be "hold" OR business_seek_recommended MUST be false.
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
+- Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
+- OBSERVED ATTRIBUTES: For each candidate, record the attribute chips its platform profiles actually display (payments accepted, accessibility, ownership, service options, certifications) in observed_attributes — one entry per attribute with the platform, a snake_case key, a display label, the profile URL where it was observed, and the date observed. Never infer attributes from the business's category, name, or neighborhood — record only what the profile itself shows. Omit the field entirely when no attribute chips are observed.
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 `;

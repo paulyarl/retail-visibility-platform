@@ -37,6 +37,11 @@ import {
   DISCLOSURE_SENTENCE,
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
+import {
+  extractAttributesFromAuditData,
+  extractAttributesFromAudits,
+  type DirectoryListingAttribute,
+} from './directory/listingAttributes';
 import IntelligenceProfileService, {
   normalizeCategoryKey,
   normalizeReferenceCity,
@@ -52,17 +57,25 @@ interface SeedAuditCtx {
 }
 
 /**
- * A single sourced attribute chip on a directory listing (payments accepted,
- * accessibility, ownership, service options). Each entry carries its own
- * evidence — source platform + URL + as_of date. Never inferred from category
- * labels. SNAP/EBT stays in its dedicated snap_ebt_* columns (migration 207).
+ * A single sourced attribute chip on a directory listing — canonical type
+ * lives in ./directory/listingAttributes (shared by every attribute surface).
  */
-export interface DirectoryListingAttribute {
-  key: string;
+export type { DirectoryListingAttribute } from './directory/listingAttributes';
+
+/**
+ * A predefined attribute chip offered by the seed editor's attribute picker
+ * (migration 268). Universal definitions (applies_to_categories NULL) apply
+ * to every category; category-specific definitions match on the category
+ * name (case-insensitive) or its platform_categories slug.
+ */
+export interface DirectoryAttributeDefinition {
+  attributeKey: string;
   label: string;
-  sourcePlatform?: string;
-  sourceUrl?: string;
-  asOf?: string;
+  groupKey: string;
+  /** NULL = universal (applies to every category); otherwise category names. */
+  appliesToCategories?: string[] | null;
+  defaultSourcePlatform?: string | null;
+  sortOrder: number;
 }
 
 export interface CreateSeedInput {
@@ -1962,6 +1975,29 @@ class DirectoryPresenceSeedService {
 
     const seoEnrichmentJson = buildSeoEnrichmentJson(seoPacket);
 
+    // ── Sourced attributes (migration 267) ───────────────────────────────
+    // Mine every attribute-bearing audit on THIS campaign (gold-standard
+    // scans, business audits, discovery scans, city scans) so the seed is
+    // born with the analyst-recorded attribute chips and their evidence —
+    // not just NAP. Newest audit wins per key; each attribute carries its
+    // own provenance, and a provenance row is written for the set.
+    const campaignAudits = await (prisma as any).mkt_audits_list.findMany({
+      where: {
+        campaign_id: campaignId,
+        platform: { in: ['gold_standard_scan', 'business_analysis', 'intelligence_discovery', 'city_analysis'] },
+      },
+      orderBy: { created_at: 'desc' },
+      take: 20,
+    });
+    const sourcedAttributes = extractAttributesFromAudits(
+      (Array.isArray(campaignAudits) ? campaignAudits : []).map((a: any) => ({
+        platform: String(a.platform),
+        audit_data: a.audit_data,
+        created_at: a.created_at,
+      })),
+      { cap: 40 },
+    );
+
     const seedInput: CreateSeedInput = {
       businessName,
       address,
@@ -1975,6 +2011,7 @@ class DirectoryPresenceSeedService {
         ? seoPacket.secondaryCategories
         : (google.additional_categories || []),
       snapEbtReported: false,
+      attributes: sourcedAttributes.length > 0 ? sourcedAttributes : undefined,
       seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
       identityConfidence,
       categoryFit,
@@ -1995,6 +2032,9 @@ class DirectoryPresenceSeedService {
         { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: profile ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName: 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
         { fieldKey: 'secondary_categories', value: seoPacket.secondaryCategories.join(', '), sourceName: profile ? 'intelligence_profile' : 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.secondaryCategories.length > 0 },
+        // Sourced attributes — evidence lives on each attribute entry; the
+        // provenance row records the audit lineage for the set.
+        { fieldKey: 'attributes', value: sourcedAttributes.length > 0 ? 'sourced' : undefined, sourceName: sourcedAttributes[0]?.sourcePlatform || 'business_analysis_audit', sourceUrl: sourcedAttributes[0]?.sourceUrl || sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: sourcedAttributes.length > 0 },
       ].filter((p) => p.value != null && p.value !== '') as any,
     };
 
@@ -2599,6 +2639,304 @@ class DirectoryPresenceSeedService {
     });
 
     return composed;
+  }
+
+  /**
+   * List active attribute definitions for the seed editor's attribute picker.
+   *
+   * When a category is provided, the category's platform_categories slug is
+   * resolved and definitions match when their applies_to_categories array is
+   * NULL (universal) or contains the category name (case-insensitive) or the
+   * slug. Results are ordered by group then sort_order so the picker can
+   * render stable sections.
+   */
+  async listAttributeDefinitions(
+    category?: string | null,
+  ): Promise<DirectoryAttributeDefinition[]> {
+    const catName = (category ?? '').trim().toLowerCase();
+    let catSlug = '';
+    if (catName) {
+      const catRows = await prisma.$queryRaw<any[]>`
+        SELECT slug FROM platform_categories WHERE LOWER(name) = ${catName} LIMIT 1
+      `;
+      catSlug = (Array.isArray(catRows) && catRows[0]?.slug) || '';
+    }
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT attribute_key, label, group_key, default_source_platform, sort_order
+      FROM directory_attribute_definitions
+      WHERE is_active = true
+        AND (
+          applies_to_categories IS NULL
+          OR ${catName} = ANY(applies_to_categories)
+          OR ${catSlug} = ANY(applies_to_categories)
+        )
+      ORDER BY group_key ASC, sort_order ASC, label ASC
+    `;
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+      attributeKey: row.attribute_key,
+      label: row.label,
+      groupKey: row.group_key || 'other',
+      defaultSourcePlatform: row.default_source_platform ?? null,
+      sortOrder: row.sort_order ?? 100,
+    }));
+  }
+
+  /**
+   * List ALL attribute definitions (including inactive, unfiltered by
+   * category) for the operator's attribute-library management page.
+   */
+  async listAllAttributeDefinitions(): Promise<Array<DirectoryAttributeDefinition & {
+    id: string;
+    appliesToCategories: string[] | null;
+    isActive: boolean;
+  }>> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, attribute_key, label, group_key, applies_to_categories,
+             default_source_platform, sort_order, is_active, created_at, updated_at
+      FROM directory_attribute_definitions
+      ORDER BY group_key ASC, sort_order ASC, label ASC
+    `;
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+      id: row.id,
+      attributeKey: row.attribute_key,
+      label: row.label,
+      groupKey: row.group_key || 'other',
+      appliesToCategories: Array.isArray(row.applies_to_categories) ? row.applies_to_categories : null,
+      defaultSourcePlatform: row.default_source_platform ?? null,
+      sortOrder: row.sort_order ?? 100,
+      isActive: row.is_active !== false,
+    }));
+  }
+
+  /**
+   * Create (or reactivate) an attribute definition. Upsert on attribute_key:
+   * re-adding an existing key reactivates it and applies the new fields.
+   */
+  async createAttributeDefinition(input: {
+    attributeKey: string;
+    label: string;
+    groupKey: string;
+    appliesToCategories?: string[] | null;
+    defaultSourcePlatform?: string | null;
+    sortOrder?: number;
+  }, ctx?: SeedAuditCtx): Promise<DirectoryAttributeDefinition & { id: string }> {
+    const key = input.attributeKey.trim().toLowerCase();
+    if (!/^[a-z0-9_]+$/.test(key)) {
+      throw new Error('attribute_key must be lowercase letters, numbers, and underscores');
+    }
+    const applies = (input.appliesToCategories ?? []).map((c) => c.trim().toLowerCase()).filter(Boolean);
+    const rows = await prisma.$queryRaw<any[]>`
+      INSERT INTO directory_attribute_definitions
+        (attribute_key, label, group_key, applies_to_categories, default_source_platform, sort_order)
+      VALUES (
+        ${key}, ${input.label.trim()}, ${input.groupKey || 'other'},
+        ${applies.length > 0 ? applies : null}::text[],
+        ${input.defaultSourcePlatform || null}, ${input.sortOrder ?? 100}
+      )
+      ON CONFLICT (attribute_key) DO UPDATE SET
+        label = EXCLUDED.label,
+        group_key = EXCLUDED.group_key,
+        applies_to_categories = EXCLUDED.applies_to_categories,
+        default_source_platform = EXCLUDED.default_source_platform,
+        sort_order = EXCLUDED.sort_order,
+        is_active = true,
+        updated_at = now()
+      RETURNING id, attribute_key, label, group_key, default_source_platform, sort_order
+    `;
+    const row = (Array.isArray(rows) ? rows : [])[0];
+    audit({
+      action: 'directory_attribute_definition.created',
+      actorType: 'user',
+      payload: { attributeKey: input.attributeKey, groupKey: input.groupKey },
+    });
+    return {
+      id: row.id,
+      attributeKey: row.attribute_key,
+      label: row.label,
+      groupKey: row.group_key || 'other',
+      appliesToCategories: input.appliesToCategories ?? null,
+      defaultSourcePlatform: row.default_source_platform ?? null,
+      sortOrder: row.sort_order ?? 100,
+    };
+  }
+
+  /**
+   * Update an attribute definition (label, group, category scoping, sort
+   * order, active flag). Deactivation is soft — existing listings keep their
+   * assigned attributes; the key just stops being offered to new edits.
+   */
+  async updateAttributeDefinition(
+    id: string,
+    fields: {
+      label?: string;
+      groupKey?: string;
+      appliesToCategories?: string[] | null;
+      defaultSourcePlatform?: string | null;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ): Promise<void> {
+    const setClauses: string[] = [];
+    const params: any[] = [];
+    const toPgArrayLiteral = (arr: string[] | null | undefined): string | null => {
+      if (!arr || arr.length === 0) return null;
+      return `{${arr.map((v) => `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')}}`;
+    };
+    if (fields.label !== undefined) {
+      params.push(fields.label);
+      setClauses.push(`label = $${params.length}`);
+    }
+    if (fields.groupKey !== undefined) {
+      params.push(fields.groupKey);
+      setClauses.push(`group_key = $${params.length}`);
+    }
+    if (fields.appliesToCategories !== undefined) {
+      const applies = (fields.appliesToCategories ?? []).map((c) => c.trim().toLowerCase()).filter(Boolean);
+      params.push(applies.length > 0 ? applies : null);
+      setClauses.push(`applies_to_categories = $${params.length}::text[]`);
+    }
+    if (fields.defaultSourcePlatform !== undefined) {
+      params.push(fields.defaultSourcePlatform);
+      setClauses.push(`default_source_platform = $${params.length}`);
+    }
+    if (fields.sortOrder !== undefined) {
+      params.push(fields.sortOrder);
+      setClauses.push(`sort_order = $${params.length}`);
+    }
+    if (fields.isActive !== undefined) {
+      params.push(fields.isActive);
+      setClauses.push(`is_active = $${params.length}`);
+    }
+    if (setClauses.length === 0) return;
+    await prisma.$executeRawUnsafe(
+      `UPDATE directory_attribute_definitions SET ${setClauses.join(', ')}, updated_at = now() WHERE id = $${params.length + 1}`,
+      ...params,
+      id,
+    );
+    audit({
+      action: 'directory_attribute_definition.updated',
+      actorType: 'user',
+      payload: { id, fields: Object.keys(fields) },
+    });
+  }
+
+  /**
+   * Delete an attribute definition. Listings keep their assigned attributes
+   * (the JSONB on the listing is the source of truth for display) — only the
+   * preset disappears from the picker.
+   */
+  async deleteAttributeDefinition(id: string): Promise<void> {
+    await prisma.$executeRaw`DELETE FROM directory_attribute_definitions WHERE id = ${id}`;
+    audit({
+      action: 'directory_attribute_definition.deleted',
+      actorType: 'user',
+      payload: { id },
+    });
+  }
+
+  /**
+   * Sourced attribute suggestions for a seed — mined from intelligence audits
+   * (gold-standard scans, business audits, intelligence discovery) that are
+   * linked to the seed's campaigns or share its category. Each suggestion
+   * carries the evidence the analyst recorded (source platform + URL + as_of)
+   * so accepting one is a legitimate provenance event, never an inference.
+   *
+   * Suggestions already present on the listing are excluded; the remainder is
+   * deduped by key (newest audit wins) and annotated with the predefined
+   * definition they match, when one exists.
+   */
+  async listAttributeSuggestions(seedId: string): Promise<{
+    suggestions: Array<{
+      key: string;
+      label: string;
+      sourcePlatform?: string | null;
+      sourceUrl?: string | null;
+      asOf?: string | null;
+      origin: string;
+      matchedDefinitionKey: string | null;
+    }>;
+  }> {
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT dps.category, dl.attributes
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId} LIMIT 1
+    `;
+    const seedRow = Array.isArray(seedRows) ? seedRows[0] : null;
+    if (!seedRow) return { suggestions: [] };
+
+    const existingKeys = new Set<string>(
+      (Array.isArray(seedRow.attributes) ? seedRow.attributes : [])
+        .map((a: any) => String(a?.key ?? '').trim().toLowerCase())
+        .filter(Boolean),
+    );
+
+    const auditRows = await prisma.$queryRaw<any[]>`
+      SELECT a.id, a.campaign_id, a.platform, a.audit_data, a.created_at
+      FROM mkt_audits_list a
+      WHERE a.platform IN ('gold_standard_scan', 'business_analysis', 'intelligence_discovery', 'city_analysis')
+        AND (
+          a.campaign_id IN (SELECT campaign_id FROM directory_seed_campaign_links WHERE seed_id = ${seedId})
+          OR EXISTS (
+            SELECT 1 FROM mkt_campaigns_list c
+            WHERE c.id = a.campaign_id AND LOWER(c.category) = LOWER(${String(seedRow.category ?? '')})
+          )
+        )
+      ORDER BY a.created_at DESC
+      LIMIT 30
+    `;
+
+    const definitions = await this.listAttributeDefinitions(seedRow.category ?? undefined);
+    const defByKey = new Map<string, DirectoryAttributeDefinition>(
+      definitions.map((d) => [d.attributeKey.toLowerCase(), d]),
+    );
+
+    // Shared extraction pipeline (directory/listingAttributes.ts) — one
+    // normalize/extract/dedupe implementation for every attribute surface.
+    // Audits arrive newest-first; first occurrence of a key wins.
+    const originByKey = new Map<string, string>();
+    const attrByKey = new Map<string, DirectoryListingAttribute>();
+    for (const audit of Array.isArray(auditRows) ? auditRows : []) {
+      const data = audit.audit_data;
+      if (!data || typeof data !== 'object') continue;
+      const origin = String(audit.platform);
+      for (const a of extractAttributesFromAuditData(origin, data)) {
+        const key = a.key.toLowerCase();
+        if (!key || originByKey.has(key)) continue;
+        originByKey.set(key, origin);
+        attrByKey.set(key, a);
+      }
+      // Cap per-audit work — suggestions are best-effort, never a hot path.
+      if (originByKey.size >= 120) break;
+    }
+
+    // Drop entries already on the listing and annotate the predefined
+    // definition each suggestion matches (if any).
+    const out: Array<{
+      key: string;
+      label: string;
+      sourcePlatform?: string | null;
+      sourceUrl?: string | null;
+      asOf?: string | null;
+      origin: string;
+      matchedDefinitionKey: string | null;
+    }> = [];
+    for (const [key, a] of attrByKey) {
+      if (existingKeys.has(key)) continue;
+      const def = defByKey.get(key);
+      out.push({
+        key: def?.attributeKey ?? a.key,
+        label: a.label,
+        sourcePlatform: a.sourcePlatform ?? null,
+        sourceUrl: a.sourceUrl ?? null,
+        asOf: a.asOf ?? null,
+        origin: originByKey.get(key) ?? 'unknown',
+        matchedDefinitionKey: def?.attributeKey ?? null,
+      });
+      if (out.length >= 40) break;
+    }
+
+    return { suggestions: out };
   }
 }
 

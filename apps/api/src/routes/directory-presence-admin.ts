@@ -322,6 +322,125 @@ router.get('/presence-seeds', requirePlatformStaff, async (req: Request, res: Re
   }
 });
 
+/**
+ * GET /api/admin/directory-presence/attribute-definitions?category=<name>
+ *
+ * Predefined attribute chips for the seed editor's attribute picker
+ * (migration 268). Universal definitions always return; category-specific
+ * definitions are included when the category name (case-insensitive) or its
+ * platform_categories slug appears in applies_to_categories.
+ */
+router.get('/attribute-definitions', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const all = req.query.all === 'true';
+    const category = (req.query.category as string | undefined)?.trim() || null;
+    const definitions = all
+      ? await DirectoryPresenceSeedService.listAllAttributeDefinitions()
+      : await DirectoryPresenceSeedService.listAttributeDefinitions(category);
+    res.json({ success: true, definitions });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/attribute-definitions] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+const attributeDefinitionCreateSchema = z.object({
+  attributeKey: z.string().min(1).max(64).regex(/^[a-z0-9_]+$/, 'lowercase letters, numbers, underscores only'),
+  label: z.string().min(1).max(100),
+  groupKey: z.enum(['payments', 'accessibility', 'ownership', 'service_options', 'certifications', 'other']),
+  appliesToCategories: z.array(z.string().min(1).max(100)).max(50).nullable().optional(),
+  defaultSourcePlatform: z.string().max(32).nullable().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+});
+
+const attributeDefinitionUpdateSchema = z.object({
+  label: z.string().min(1).max(100).optional(),
+  groupKey: z.enum(['payments', 'accessibility', 'ownership', 'service_options', 'certifications', 'other']).optional(),
+  appliesToCategories: z.array(z.string().min(1).max(100)).max(50).nullable().optional(),
+  defaultSourcePlatform: z.string().max(32).nullable().optional(),
+  sortOrder: z.number().int().min(0).max(10000).optional(),
+  isActive: z.boolean().optional(),
+});
+
+/** POST /api/admin/directory-presence/attribute-definitions — create/reactivate a preset */
+router.post('/attribute-definitions', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = attributeDefinitionCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    const definition = await DirectoryPresenceSeedService.createAttributeDefinition(validation.data);
+    res.json({ success: true, definition: definition });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'validation_error', details: error.issues });
+    }
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    logger.error('[POST /api/admin/directory-presence/attribute-definitions] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(error?.message?.includes('attribute_key') ? 400 : 500).json({ error: error?.message || 'internal_error' });
+  }
+});
+
+/** PATCH /api/admin/directory-presence/attribute-definitions/:id — update a definition */
+router.patch('/attribute-definitions/:id', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = attributeDefinitionUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    await DirectoryPresenceSeedService.updateAttributeDefinition(req.params.id, validation.data);
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'validation_error', details: error.issues });
+    }
+    logger.error('[PATCH /api/admin/directory-presence/attribute-definitions/:id] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** DELETE /api/admin/directory-presence/attribute-definitions/:id — delete a preset */
+router.delete('/attribute-definitions/:id', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    await DirectoryPresenceSeedService.deleteAttributeDefinition(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[DELETE /api/admin/directory-presence/attribute-definitions/:id] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/:id/attribute-suggestions
+ *
+ * Sourced attribute suggestions for a seed, mined from intelligence audits
+ * (gold-standard scans, business audits, intelligence discovery) linked to
+ * the seed's campaigns or sharing its category. Each suggestion carries the
+ * analyst-recorded evidence (source platform + URL + as_of).
+ */
+router.get('/presence-seeds/:id/attribute-suggestions', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await DirectoryPresenceSeedService.listAttributeSuggestions(id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/attribute-suggestions] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/presence-seeds/:id — seed detail */
 router.get('/presence-seeds/:id', requirePlatformStaff, async (req: Request, res: Response) => {
   try {

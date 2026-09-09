@@ -271,6 +271,23 @@ const auditMetadataSchema = z.object({
   limitations: z.array(z.string()).optional(),
 }).passthrough();
 
+/**
+ * Sourced attribute entry — a single attribute chip the business's public
+ * profile on a platform actually displays (payments accepted, accessibility,
+ * ownership, service options, certifications). Each entry carries its own
+ * evidence (source_url + as_of). Never inferred from category labels.
+ * Analysts may emit a bare string (label only) or the structured object.
+ */
+const platformAttributeEntrySchema = z.union([
+  z.string(),
+  z.object({
+    key: z.string().nullable().optional(),
+    label: z.string().nullable().optional(),
+    source_url: z.string().nullable().optional(),
+    as_of: z.string().nullable().optional(),
+  }).passthrough(),
+]);
+
 const platformSchema = z.object({
   profile_status: profileStatusEnum,
   rating: coercedNumberNullable,
@@ -287,6 +304,11 @@ const platformSchema = z.object({
   // Captured so the audit can reference the exact profile being evaluated
   // and so the gold-standard benchmark comparison has a concrete destination.
   profile_url: z.string().nullable().optional(),
+  // Sourced attribute chips the profile actually displays (payments accepted,
+  // accessibility, ownership, service options). Each entry carries its own
+  // evidence — never inferred from category labels. SNAP/EBT stays in its
+  // dedicated fields (migration 207), never here.
+  attributes: z.array(platformAttributeEntrySchema).nullable().optional(),
 }).passthrough();
 
 const googlePlatformSchema = platformSchema.extend({

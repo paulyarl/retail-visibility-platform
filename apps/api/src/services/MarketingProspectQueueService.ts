@@ -621,9 +621,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }, ctx);
 
         // Seed a business_analysis audit with the queued signals so triage can
-        // assign a playbook immediately (mirrors the derive path).
+        // assign a playbook immediately (mirrors the derive path). Snapshot
+        // attributes ride along at the top level so the campaign → seed
+        // attribute mining finds them (migration 267 sourced attributes).
         const signals = (entry.detected_signals as string[]) ?? [];
-        if (signals.length > 0) {
+        const snapshotAttributes = Array.isArray(snapshot.attributes) ? snapshot.attributes : [];
+        if (signals.length > 0 || snapshotAttributes.length > 0) {
           const { generateMarketingAuditId } = await import('../lib/id-generator.js');
           const auditId = generateMarketingAuditId();
           await this.prisma.mkt_audits_list.create({
@@ -638,6 +641,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
                 },
                 detected_signals: signals,
                 summary: `Manually queued with ${signals.length} detected signals.`,
+                // Sourced attributes carried from the queue snapshot — the
+                // campaign → seed path mines this block (migration 267).
+                ...(snapshotAttributes.length > 0 ? { attributes: snapshotAttributes } : {}),
               } as any,
             },
           });
@@ -745,6 +751,56 @@ class MarketingProspectQueueServiceClass extends BaseService {
           addressCountry: (snapshot.address_country as string) ?? undefined,
         }, ctx);
         result = { campaign, created: true };
+      }
+
+      // Attribute handoff (migration 267): when the queue snapshot carries
+      // sourced attributes, stamp them onto a business_analysis audit on the
+      // campaign so createFromCampaign mines them at seed time. Covers the
+      // thin derive path (the scan path already stores the full business JSON
+      // in its city_analysis audit, and the manual path stamps its own audit
+      // above). Best-effort — attribute handoff never blocks promotion.
+      const snapshotAttributes = Array.isArray((entry.business_snapshot as any)?.attributes)
+        ? (entry.business_snapshot as any).attributes
+        : [];
+      if (snapshotAttributes.length > 0 && result.campaign?.id) {
+        try {
+          const { generateMarketingAuditId } = await import('../lib/id-generator.js');
+          const existingAttrAudit = await this.prisma.mkt_audits_list.findFirst({
+            where: { campaign_id: result.campaign.id, platform: 'business_analysis' },
+            orderBy: { created_at: 'desc' },
+          });
+          if (existingAttrAudit) {
+            const merged = {
+              ...(existingAttrAudit.audit_data as any),
+              attributes: snapshotAttributes,
+            };
+            await this.prisma.mkt_audits_list.update({
+              where: { id: existingAttrAudit.id },
+              data: { audit_data: merged as any },
+            });
+          } else {
+            const attrAuditId = generateMarketingAuditId();
+            await this.prisma.mkt_audits_list.create({
+              data: {
+                id: attrAuditId,
+                campaign_id: result.campaign.id,
+                platform: 'business_analysis',
+                audit_data: {
+                  audit_metadata: {
+                    business_name: entry.business_name,
+                    source: 'queue_promotion',
+                  },
+                  attributes: snapshotAttributes,
+                } as any,
+              },
+            });
+          }
+        } catch (attrError) {
+          logger.warn('createCampaignFromQueue: attribute handoff failed (non-fatal)', ctx, {
+            queueEntryId: input.queueEntryId,
+            error: (attrError as Error).message,
+          });
+        }
       }
 
       // AC84 dedup inside the derive services may return created:false — the

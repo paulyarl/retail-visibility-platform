@@ -50,6 +50,15 @@ export interface DiscoveredBusiness {
   business_seek_priority: 'high' | 'medium' | 'low' | 'hold';
   rating?: number | null;
   review_count?: number | null;
+  /** Sourced attribute chips observed on the business's platform profiles
+   *  (migration 267 contract — recorded by the analyst, never inferred). */
+  observed_attributes?: Array<{
+    key: string;
+    label: string;
+    platform?: string;
+    source_url?: string;
+    as_of?: string;
+  }>;
   notes?: string;
   [key: string]: any;
 }
@@ -219,6 +228,9 @@ export default function IntelligenceDiscoveryAuditCard({
           website: biz.website,
           gbp_url: biz.gbp_url,
           ownership_type: biz.ownership_type,
+          // Sourced attributes ride the snapshot so queue → campaign → seed
+          // carries the analyst-recorded evidence (migration 267).
+          attributes: Array.isArray(biz.observed_attributes) ? biz.observed_attributes : [],
         },
         priority: biz.business_seek_priority === 'high' ? 'high' : 'normal',
         // Intelligence discovery columns

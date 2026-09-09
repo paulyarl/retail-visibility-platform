@@ -40,7 +40,7 @@ const BUSINESS_AUDIT_V1_ID = 'mpt-je6m7ru6';
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-03-business-identity-top -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-09-attributes-capture -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -287,6 +287,26 @@ const CATEGORY_FIT_MD = `* Category fit assessment (required): Evaluate whether 
 `;
 
 const CATEGORY_CONTENT_CHECK_MD = `* Category-specific content check: Evaluate whether the website surfaces category-relevant products, services, terminology, or ordering/pickup options as defined in the Category Intelligence block. Record findings in \`website.category_specific_content_present\` and \`website.ordering_or_pickup_info_present\`. Absence of category-specific content is recorded as "not_verified," not as a negative claim.
+`;
+
+// ─── Directive: Sourced Attribute Capture (inserted after the Category Fit
+//     bullet in the Google Business Profile Assessment). Requires the analyst
+//     to record the attribute chips each platform profile actually displays —
+//     feeds the directory listing attribute picker (migrations 267/268).
+const ATTRIBUTES_CAPTURE_DIRECTIVE = `
+### Sourced Attribute Capture — REQUIRED
+
+For each platform block (platforms.google, platforms.yelp, platforms.facebook, platforms.bbb), record the attribute chips the business's public profile on that platform actually displays, in \`platforms.{platform}.attributes\` — an array of:
+
+{ "key": "<snake_case_key>", "label": "<display label>", "source_url": "<profile URL where observed or null>", "as_of": "<ISO date observed or null>" }
+
+Scope: payments accepted (Apple Pay, Google Pay, credit cards, cash, contactless), accessibility (wheelchair accessible, accessible parking/entrance/restroom), ownership (family-owned, immigrant-owned, woman-owned), service options (curbside pickup, delivery, takeout, in-store shopping, online ordering), and certifications (halal, kosher) — exactly as the platform profile displays them.
+
+Rules:
+* Evidence per attribute — record each attribute only when the profile itself displays it (attribute chips, amenity sections, payment badges). Never infer attributes from the business's category, name, or neighborhood.
+* Omit the attributes field entirely when the platform profile displays no attribute chips — do not fabricate an empty inventory.
+* SNAP/EBT is NEVER recorded here — it has dedicated fields (snap_ebt_reported) and a stricter regulatory contract.
+* Attributes are a VISIBILITY inventory only — they never represent payment processing capability.
 `;
 
 const NAP_ABSENCE_MD = `Do not add points solely because information is unavailable (per the Category Intelligence evidence rule \`absence_is_not_a_negative\`).
@@ -576,6 +596,20 @@ function transformCategoryIntegrated(body: string): string {
   //     replaced — the FROM string won't be found).
   out = replaceFirst(out, REQUESTED_BUSINESS_PLACEHOLDERS_FROM, REQUESTED_BUSINESS_PLACEHOLDERS_TO);
 
+  // 4g. Sourced Attribute Capture directive — after the Category Fit bullet
+  //     in the Google Business Profile Assessment. Fallback anchors cover
+  //     variant bodies; the last fallback anchors on the business-identity
+  //     intro, which step 0 guarantees exists in this body.
+  try {
+    out = insertAfter(out, 'corroborate with multiple indicators.', ATTRIBUTES_CAPTURE_DIRECTIVE);
+  } catch {
+    try {
+      out = insertAfter(out, '* Duplicate or conflicting listing signals', ATTRIBUTES_CAPTURE_DIRECTIVE);
+    } catch {
+      out = insertAfter(out, 'Never invent or assume data.', ATTRIBUTES_CAPTURE_DIRECTIVE);
+    }
+  }
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -633,6 +667,20 @@ function transformSignalAligned(body: string): string {
     '* Conversion opportunities',
     '\n' + CATEGORY_CONTENT_CHECK_MD,
   );
+
+  // 5b. Sourced Attribute Capture directive — after the Category Fit bullet
+  //     (Google Business Profile Assessment). Fallback anchors cover variant
+  //     bodies; the last fallback anchors on the review-response note, which
+  //     step 3 guarantees exists in this body.
+  try {
+    out = insertAfter(out, 'corroborate with multiple indicators.', ATTRIBUTES_CAPTURE_DIRECTIVE);
+  } catch {
+    try {
+      out = insertAfter(out, '* Duplicate or conflicting listing signals', ATTRIBUTES_CAPTURE_DIRECTIVE);
+    } catch {
+      out = insertAfter(out, 'Do not estimate review-response counts unless an authorized source explicitly provides an estimate.', ATTRIBUTES_CAPTURE_DIRECTIVE);
+    }
+  }
 
   // 6. Absence rule — replace the existing NAP-score line in Digital
   //    Opportunity Score.
@@ -807,6 +855,19 @@ function transformBusinessAuditV1(body: string): string {
   //    cautions. V1 has no CI/GS bindings, so this goes right before the
   //    existing "## Business" section deeper in the body.
   out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
+
+  // 0b. Sourced Attribute Capture directive — after the Category Fit bullet
+  //     (same anchor chain as the V2 transforms; the last fallback anchors on
+  //     the business-identity intro, which step 0 guarantees exists).
+  try {
+    out = insertAfter(out, 'corroborate with multiple indicators.', ATTRIBUTES_CAPTURE_DIRECTIVE);
+  } catch {
+    try {
+      out = insertAfter(out, '* Duplicate or conflicting listing signals', ATTRIBUTES_CAPTURE_DIRECTIVE);
+    } catch {
+      out = insertAfter(out, 'Never invent or assume data.', ATTRIBUTES_CAPTURE_DIRECTIVE);
+    }
+  }
 
   // 1. Replace requested_business empty-string defaults with variable
   //    placeholders. Idempotent (no-op if already replaced).

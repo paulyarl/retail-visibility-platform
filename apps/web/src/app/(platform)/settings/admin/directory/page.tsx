@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb, Funnel } from 'lucide-react';
+import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb, Funnel, Tag } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +78,13 @@ export default function DirectoryPanelPage() {
       description: 'Review businesses suggested by visitors. Convert approved suggestions into directory listings.',
       icon: Lightbulb,
       gradient: 'from-yellow-500 to-amber-500',
+    },
+    {
+      href: '/settings/admin/directory/attribute-definitions',
+      title: 'Attribute Presets',
+      description: 'Define the category-specific attribute chips offered on presence seeds (payments, accessibility, ownership, service options).',
+      icon: Tag,
+      gradient: 'from-violet-500 to-purple-500',
     },
     {
       href: '/settings/admin/directory/funnel',

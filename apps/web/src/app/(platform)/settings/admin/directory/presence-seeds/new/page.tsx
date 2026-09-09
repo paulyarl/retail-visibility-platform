@@ -110,6 +110,9 @@ export default function NewPresenceSeedPage() {
   const [snapEbtSource, setSnapEbtSource] = useState('');
   const [snapEbtSourceName, setSnapEbtSourceName] = useState('');
 
+  // Sourced attributes (payments accepted, accessibility, ownership, service options)
+  const [attributesJson, setAttributesJson] = useState('');
+
   // Provenance rows
   const [provenance, setProvenance] = useState<ProvenanceRow[]>([
     { ...EMPTY_PROVENANCE_ROW },
@@ -242,6 +245,42 @@ export default function NewPresenceSeedPage() {
       if (snapEbtSource.trim()) payload.snapEbtSource = snapEbtSource.trim();
       if (snapEbtSourceName.trim())
         payload.snapEbtSourceName = snapEbtSourceName.trim();
+    }
+
+    // Sourced attributes — JSON array of {key, label, sourcePlatform, sourceUrl, asOf}.
+    // Each attribute carries its own evidence; never inferred from category labels.
+    if (attributesJson.trim()) {
+      let parsed: any;
+      try {
+        parsed = JSON.parse(attributesJson);
+      } catch {
+        setError('Attributes must be valid JSON (array of { key, label, sourcePlatform, sourceUrl, asOf }).');
+        return;
+      }
+      if (!Array.isArray(parsed)) {
+        setError('attributes must be a JSON array of { key, label, sourcePlatform, sourceUrl, asOf }');
+        return;
+      }
+      for (const a of parsed) {
+        if (!a || typeof a !== 'object' || !a.key || !a.label) {
+          setError('Each attribute requires at least "key" and "label".');
+          return;
+        }
+      }
+      payload.attributes = parsed;
+      const firstSource = parsed.find((a: any) => a.sourcePlatform || a.sourceUrl);
+      if (firstSource) {
+        payload.provenance = [
+          ...(payload.provenance || []),
+          {
+            fieldKey: 'attributes',
+            sourceName: firstSource.sourcePlatform || undefined,
+            sourceUrl: firstSource.sourceUrl || undefined,
+            confidence: 'high' as const,
+            showOnPublic: true,
+          },
+        ];
+      }
     }
 
     try {
@@ -670,6 +709,25 @@ export default function NewPresenceSeedPage() {
             sourced from the SNAP retailer list, owner confirmation, or an
             in-store photo reviewed by ops.
           </p>
+        </section>
+
+        {/* Sourced Attributes */}
+        <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">Sourced Attributes</h2>
+          <p className="text-xs text-gray-500">
+            Optional attribute chips (payments accepted, accessibility, ownership,
+            service options). JSON array of{' '}
+            <code className="text-xs">{`{ key, label, sourcePlatform, sourceUrl, asOf }`}</code>.
+            Each attribute carries its own evidence — never inferred from category
+            labels. SNAP/EBT stays in its dedicated section above.
+          </p>
+          <textarea
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+            rows={6}
+            value={attributesJson}
+            onChange={(e) => setAttributesJson(e.target.value)}
+            placeholder={'[\n  {\n    "key": "accepts_apple_pay",\n    "label": "Apple Pay",\n    "sourcePlatform": "apple_maps",\n    "sourceUrl": "https://maps.apple.com/...",\n    "asOf": "2026-09-09"\n  }\n]'}
+          />
         </section>
 
         {/* Provenance */}

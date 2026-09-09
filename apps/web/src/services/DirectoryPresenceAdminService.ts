@@ -81,6 +81,7 @@ export interface CreateSeedRequest {
   snapEbtAsOf?: string;
   snapEbtSource?: string;
   snapEbtSourceName?: string;
+  attributes?: DirectoryListingAttribute[];
   seedBatch: string;
   identityConfidence: 'high' | 'medium';
   categoryFit: 'verified' | 'probable';
@@ -101,6 +102,42 @@ export interface CreateSeedRequest {
 export interface InviteResult {
   token: string;
   expiresAt: string;
+}
+
+/** A sourced attribute chip stored on the listing (migration 267). */
+export interface DirectoryListingAttribute {
+  key: string;
+  label: string;
+  sourcePlatform?: string;
+  sourceUrl?: string;
+  asOf?: string;
+}
+
+/** A predefined attribute chip from the category-aware picker (migration 268). */
+export interface DirectoryAttributeDefinition {
+  attributeKey: string;
+  label: string;
+  groupKey: string;
+  defaultSourcePlatform?: string | null;
+  sortOrder: number;
+}
+
+/** An attribute suggestion mined from intelligence audits (scan/audit-sourced). */
+export interface DirectoryAttributeSuggestion {
+  key: string;
+  label: string;
+  sourcePlatform?: string | null;
+  sourceUrl?: string | null;
+  asOf?: string | null;
+  origin: string;
+  matchedDefinitionKey: string | null;
+}
+
+/** A full attribute-definition row (management view — includes id + active flag). */
+export interface DirectoryAttributeDefinitionRow extends DirectoryAttributeDefinition {
+  id: string;
+  appliesToCategories: string[] | null;
+  isActive: boolean;
 }
 
 // ============================
@@ -277,6 +314,97 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return (data as any) ?? null;
   }
 
+  /** GET /api/admin/directory-presence/attribute-definitions?category=<name> — picker view (active, category-scoped) */
+  async listAttributeDefinitions(category?: string): Promise<DirectoryAttributeDefinition[]> {
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/attribute-definitions${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.definitions ?? [];
+  }
+
+  /** GET /api/admin/directory-presence/attribute-definitions?all=true — management view */
+  async listAllAttributeDefinitions(): Promise<DirectoryAttributeDefinitionRow[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/attribute-definitions?all=true`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.definitions ?? [];
+  }
+
+  /** POST /api/admin/directory-presence/attribute-definitions — create/reactivate a preset */
+  async createAttributeDefinition(input: {
+    attributeKey: string;
+    label: string;
+    groupKey: string;
+    appliesToCategories?: string[] | null;
+    defaultSourcePlatform?: string | null;
+    sortOrder?: number;
+  }): Promise<DirectoryAttributeDefinitionRow | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/attribute-definitions`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.definition ?? null;
+  }
+
+  /** PATCH /api/admin/directory-presence/attribute-definitions/:id */
+  async updateAttributeDefinition(
+    id: string,
+    fields: {
+      label?: string;
+      groupKey?: string;
+      appliesToCategories?: string[] | null;
+      defaultSourcePlatform?: string | null;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/attribute-definitions/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify(fields) },
+      undefined,
+      0,
+    );
+  }
+
+  /** DELETE /api/admin/directory-presence/attribute-definitions/:id */
+  async deleteAttributeDefinition(id: string): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/attribute-definitions/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/attribute-suggestions */
+  async listAttributeSuggestions(seedId: string): Promise<DirectoryAttributeSuggestion[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/attribute-suggestions`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.suggestions ?? [];
+  }
+
   async createSeed(input: CreateSeedRequest): Promise<DirectoryPresenceSeedSummary> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds`,
@@ -427,6 +555,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       snapEbtAsOf?: string | null;
       snapEbtSource?: string | null;
       snapEbtSourceName?: string | null;
+      attributes?: DirectoryListingAttribute[] | null;
       phone?: string;
       website?: string;
       businessHours?: any;

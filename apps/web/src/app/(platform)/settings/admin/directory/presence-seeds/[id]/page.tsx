@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
+  DirectoryAttributeDefinition,
+  DirectoryAttributeSuggestion,
+  DirectoryListingAttribute,
   DirectoryPresenceSeedDetail,
 } from '@/services/DirectoryPresenceAdminService';
 import { clientLogger } from '@/lib/client-logger';
@@ -48,6 +51,24 @@ const PROVENANCE_FIELD_KEYS = [
 
 const DISCLOSURE_SENTENCE =
   ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+
+// Display order for attribute picker groups (migration 268). Definitions with
+// a group_key outside this list fall into 'other'.
+const ATTRIBUTE_GROUPS: Array<{ key: string; label: string }> = [
+  { key: 'payments', label: 'Payments accepted' },
+  { key: 'accessibility', label: 'Accessibility' },
+  { key: 'ownership', label: 'Ownership' },
+  { key: 'service_options', label: 'Service options' },
+  { key: 'certifications', label: 'Certifications' },
+  { key: 'other', label: 'Other' },
+];
+
+// Origin labels for scan/audit-sourced attribute suggestions.
+const SUGGESTION_ORIGIN_LABELS: Record<string, string> = {
+  gold_standard_scan: 'Gold standard scan',
+  business_analysis: 'Business audit',
+  intelligence_discovery: 'Discovery scan',
+};
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
@@ -161,7 +182,12 @@ export default function PresenceSeedDetailPage() {
   const [editSnapAsOf, setEditSnapAsOf] = useState('');
   const [editSnapSource, setEditSnapSource] = useState('');
   const [editSnapSourceName, setEditSnapSourceName] = useState('');
-  const [editAttributesJson, setEditAttributesJson] = useState('');
+  const [editAttributes, setEditAttributes] = useState<DirectoryListingAttribute[]>([]);
+  const [attributeDefs, setAttributeDefs] = useState<DirectoryAttributeDefinition[]>([]);
+  const [attributeDefsLoading, setAttributeDefsLoading] = useState(false);
+  const [attributeSuggestions, setAttributeSuggestions] = useState<DirectoryAttributeSuggestion[]>([]);
+  const [attributeSuggestionsLoading, setAttributeSuggestionsLoading] = useState(false);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
   const [editProvenance, setEditProvenance] = useState<EditProvenanceRow[]>([]);
   const [editAddress, setEditAddress] = useState('');
   const [editCity, setEditCity] = useState('');
@@ -439,11 +465,26 @@ export default function PresenceSeedDetailPage() {
     setEditSnapAsOf(asOf);
     setEditSnapSource(listing?.snap_ebt_source ?? '');
     setEditSnapSourceName(listing?.snap_ebt_source_name ?? '');
-    setEditAttributesJson(
-      Array.isArray(listing?.attributes) && listing.attributes.length > 0
-        ? JSON.stringify(listing.attributes, null, 2)
-        : '',
+    setEditAttributes(
+      Array.isArray(listing?.attributes) ? listing.attributes.map((a: any) => ({ ...a })) : [],
     );
+    // Category-aware attribute presets — universal definitions always return;
+    // category-specific ones match the seed's primary category (name or slug).
+    setAttributeDefsLoading(true);
+    directoryPresenceAdminService
+      .listAttributeDefinitions(seed?.category ?? listing?.primary_category ?? '')
+      .then((defs) => setAttributeDefs(defs))
+      .catch(() => setAttributeDefs([]))
+      .finally(() => setAttributeDefsLoading(false));
+    // Scan/audit-sourced suggestions — gold-standard scans, business audits,
+    // and discovery scans linked to this seed or sharing its category.
+    setAttributeSuggestionsLoading(true);
+    setDismissedSuggestions(new Set());
+    directoryPresenceAdminService
+      .listAttributeSuggestions(seedId)
+      .then((s) => setAttributeSuggestions(s))
+      .catch(() => setAttributeSuggestions([]))
+      .finally(() => setAttributeSuggestionsLoading(false));
     setEditProvenance(
       provenance.map((p) => ({
         fieldKey: p.fieldKey,
@@ -490,6 +531,43 @@ export default function PresenceSeedDetailPage() {
     setEditProvenance((rows) =>
       rows.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
     );
+
+  const updateAttribute = (idx: number, patch: Partial<DirectoryListingAttribute>) =>
+    setEditAttributes((attrs) => attrs.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
+
+  const removeAttribute = (idx: number) =>
+    setEditAttributes((attrs) => attrs.filter((_, i) => i !== idx));
+
+  const toggleAttribute = (def: DirectoryAttributeDefinition) =>
+    setEditAttributes((attrs) =>
+      attrs.some((a) => a.key === def.attributeKey)
+        ? attrs.filter((a) => a.key !== def.attributeKey)
+        : [...attrs, { key: def.attributeKey, label: def.label }],
+    );
+
+  const addCustomAttribute = () =>
+    setEditAttributes((attrs) => [...attrs, { key: '', label: '' }]);
+
+  // Accept a scan/audit-sourced suggestion — carries the analyst-recorded
+  // evidence (source platform + URL + as_of) onto the attribute entry.
+  const acceptSuggestion = (s: DirectoryAttributeSuggestion) =>
+    setEditAttributes((attrs) =>
+      attrs.some((a) => a.key === s.key)
+        ? attrs
+        : [
+            ...attrs,
+            {
+              key: s.matchedDefinitionKey || s.key,
+              label: s.label,
+              sourcePlatform: s.sourcePlatform || undefined,
+              sourceUrl: s.sourceUrl || undefined,
+              asOf: s.asOf || undefined,
+            },
+          ],
+    );
+
+  const dismissSuggestion = (key: string) =>
+    setDismissedSuggestions((prev) => new Set(dismissedSuggestions).add(key));
 
   const handleSaveFields = async () => {
     setActionError(null);
@@ -540,34 +618,36 @@ export default function PresenceSeedDetailPage() {
         fields.snapEbtSourceName = null;
       }
 
-      // Sourced attributes — JSON array of {key, label, sourcePlatform, sourceUrl, asOf}.
-      // Each attribute carries its own evidence; never inferred from category labels.
+      // Sourced attributes — serialize the structured picker state. Each
+      // attribute carries its own evidence; never inferred from category labels.
       let attributesSource: { sourceName?: string; sourceUrl?: string } | null = null;
-      if (editAttributesJson.trim()) {
-        let parsed: any;
-        try {
-          parsed = JSON.parse(editAttributesJson);
-        } catch {
-          throw new Error('Attributes must be valid JSON (array of { key, label, sourcePlatform, sourceUrl, asOf }).');
+      const cleanedAttributes = editAttributes
+        .map((a) => ({
+          key: (a.key || '').trim(),
+          label: (a.label || '').trim(),
+          sourcePlatform: (a.sourcePlatform || '').trim() || undefined,
+          sourceUrl: (a.sourceUrl || '').trim() || undefined,
+          asOf: (a.asOf || '').trim() || undefined,
+        }))
+        .filter((a) => a.key || a.label);
+      for (const a of cleanedAttributes) {
+        if (!a.key || !a.label) {
+          throw new Error('Each attribute requires a key and a label.');
         }
-        if (!Array.isArray(parsed)) {
-          throw new Error('attributes must be a JSON array of { key, label, sourcePlatform, sourceUrl, asOf }');
+        if (a.sourceUrl && !/^https?:\/\//i.test(a.sourceUrl)) {
+          throw new Error(`Attribute "${a.label}" has an invalid source URL (must start with http:// or https://).`);
         }
-        for (const a of parsed) {
-          if (!a || typeof a !== 'object' || !a.key || !a.label) {
-            throw new Error('Each attribute requires at least "key" and "label".');
-          }
-        }
-        fields.attributes = parsed;
-        const firstSource = parsed.find((a: any) => a.sourcePlatform || a.sourceUrl);
-        if (firstSource) {
-          attributesSource = {
-            sourceName: firstSource.sourcePlatform || undefined,
-            sourceUrl: firstSource.sourceUrl || undefined,
-          };
-        }
-      } else {
-        fields.attributes = null;
+      }
+      if (new Set(cleanedAttributes.map((a) => a.key)).size !== cleanedAttributes.length) {
+        throw new Error('Attribute keys must be unique.');
+      }
+      fields.attributes = cleanedAttributes.length > 0 ? cleanedAttributes : null;
+      const firstSource = cleanedAttributes.find((a) => a.sourcePlatform || a.sourceUrl);
+      if (firstSource) {
+        attributesSource = {
+          sourceName: firstSource.sourcePlatform || undefined,
+          sourceUrl: firstSource.sourceUrl || undefined,
+        };
       }
 
       const provenanceUpdates = editProvenance
@@ -1583,19 +1663,171 @@ export default function PresenceSeedDetailPage() {
           <div className="border-t border-gray-100 pt-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Sourced attributes</h3>
             <p className="text-xs text-gray-500 mb-3">
-              Optional attribute chips (payments accepted, accessibility, ownership,
-              service options). JSON array of{' '}
-              <code className="text-xs">{`{ key, label, sourcePlatform, sourceUrl, asOf }`}</code>.
-              Each attribute carries its own evidence — never inferred from category
-              labels. SNAP/EBT stays in its dedicated fields above.
+              Toggle the attribute chips that apply — the preset list is filtered to the
+              seed&apos;s primary category. Each attribute carries its own evidence
+              (source platform, URL, as-of date); never inferred from category labels.
+              SNAP/EBT stays in its dedicated fields above.
             </p>
-            <textarea
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
-              rows={6}
-              value={editAttributesJson}
-              onChange={(e) => setEditAttributesJson(e.target.value)}
-              placeholder={'[\n  {\n    "key": "accepts_apple_pay",\n    "label": "Apple Pay",\n    "sourcePlatform": "apple_maps",\n    "sourceUrl": "https://maps.apple.com/...",\n    "asOf": "2026-09-08"\n  }\n]'}
-            />
+
+            {attributeDefsLoading ? (
+              <p className="text-xs text-gray-400 italic">Loading attribute presets…</p>
+            ) : (
+              <div className="space-y-3">
+                {/* Scan/audit-sourced suggestions — one-click accept with evidence */}
+                {attributeSuggestionsLoading ? (
+                  <p className="text-xs text-gray-400 italic">Loading suggestions from scans & audits…</p>
+                ) : (() => {
+                  const visible = attributeSuggestions.filter(
+                    (s) =>
+                      !dismissedSuggestions.has(s.key) &&
+                      !editAttributes.some((a) => a.key === (s.matchedDefinitionKey || s.key)),
+                  );
+                  if (visible.length === 0) return null;
+                  return (
+                    <div className="border border-blue-200 bg-blue-50/60 rounded-lg p-3">
+                      <p className="text-xs font-medium text-blue-900 mb-2">
+                        From scans &amp; audits — click Add to assign with its recorded evidence
+                      </p>
+                      <div className="space-y-1.5">
+                        {visible.map((s) => (
+                          <div key={s.key} className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="text-sm font-medium text-gray-900">{s.label}</span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                {SUGGESTION_ORIGIN_LABELS[s.origin] ?? s.origin}
+                                {s.sourcePlatform ? ` · ${s.sourcePlatform}` : ''}
+                                {s.asOf ? ` · ${s.asOf}` : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => acceptSuggestion(s)}
+                                className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => dismissSuggestion(s.key)}
+                                className="text-gray-400 hover:text-gray-600 p-1"
+                                title="Dismiss"
+                              >
+                                <X size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {ATTRIBUTE_GROUPS.map((group) => {
+                const defs = attributeDefs.filter((d) => (d.groupKey || 'other') === group.key);
+                if (defs.length === 0) return null;
+                return (
+                  <div key={group.key} className="mb-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">{group.label}</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {defs.map((def) => {
+                        const active = editAttributes.some((a) => a.key === def.attributeKey);
+                        return (
+                          <button
+                            key={def.attributeKey}
+                            type="button"
+                            onClick={() => toggleAttribute(def)}
+                            className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                              active
+                                ? 'bg-blue-50 border-blue-400 text-blue-700'
+                                : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                            }`}
+                          >
+                            {def.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              </div>
+            )}
+
+            {editAttributes.length > 0 && (
+              <div className="space-y-2 mt-3">
+                {editAttributes.map((attr, idx) => {
+                  const predefinedDef = attributeDefs.find((d) => d.attributeKey === attr.key);
+                  return (
+                    <div key={`${attr.key || 'custom'}-${idx}`} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                          value={attr.label}
+                          onChange={(e) => updateAttribute(idx, { label: e.target.value })}
+                          placeholder="Attribute label"
+                        />
+                        {predefinedDef ? (
+                          <code className="text-xs text-gray-400 shrink-0">{attr.key}</code>
+                        ) : (
+                          <input
+                            className="w-44 border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-mono"
+                            value={attr.key}
+                            onChange={(e) => updateAttribute(idx, { key: e.target.value })}
+                            placeholder="attribute_key"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeAttribute(idx)}
+                          className="text-gray-400 hover:text-red-600 p-1"
+                          title="Remove attribute"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Source platform</label>
+                          <input
+                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                            value={attr.sourcePlatform ?? ''}
+                            onChange={(e) => updateAttribute(idx, { sourcePlatform: e.target.value })}
+                            placeholder={predefinedDef?.defaultSourcePlatform || 'apple_maps / google / yelp'}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Source URL</label>
+                          <input
+                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                            value={attr.sourceUrl ?? ''}
+                            onChange={(e) => updateAttribute(idx, { sourceUrl: e.target.value })}
+                            placeholder="https://…"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">As of</label>
+                          <input
+                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                            value={attr.asOf ?? ''}
+                            onChange={(e) => updateAttribute(idx, { asOf: e.target.value })}
+                            placeholder="2026-09-08"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={addCustomAttribute}
+              className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 mt-2"
+            >
+              <Plus size={14} /> Add custom attribute
+            </button>
           </div>
 
           <div className="border-t border-gray-100 pt-4">

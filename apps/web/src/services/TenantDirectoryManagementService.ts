@@ -24,6 +24,7 @@ export interface DirectoryEntrySettings {
   external_link_enabled?: boolean;
   gallery_display_mode?: 'carousel' | 'magazine';
   snap_ebt_display?: boolean | null;
+  attributes_display?: boolean | null;
 }
 
 export class TenantDirectoryManagementService extends TenantApiSingleton {
