@@ -38,6 +38,18 @@ Repeat each command with `--config prd` for production.
 
 **Idempotency check pattern:** seed scripts must check for the **presence of the new marker** (e.g. `BRIEFING_MARKER`), NOT the absence of an old section (e.g. `!body.includes('## Output')`). The absence-of-old pattern is unsafe because old bodies may never have had the old section either, causing the seed to skip every time.
 
+## DB CHECK Constraints — Enum Sync Discipline
+
+`mkt_prospect_queue` (and other mkt_* tables) carry Postgres CHECK constraints that are **not** managed by Prisma (schema.prisma is db-pulled and ignores them). When you add a value to an app-layer enum, you MUST also ship a numbered migration that drops + re-adds the CHECK with the full value set, or inserts with the new value fail with `23514 check constraint violated` (500 `internal_error` at runtime).
+
+Known constraint ↔ enum pairs (drift history: migrations 256, 264, 270 — this has bitten three times):
+
+- `chk_prospect_queue_source_kind` ↔ `ProspectSourceKind` in `MarketingProspectQueueService.ts` + `prospectQueueAddSchema` in `marketing-ops.ts`
+- `chk_prospect_queue_status` ↔ `ProspectStatus` (same file)
+- `chk_prospect_queue_source_scope` ↔ `ProspectCampaignScope` (same file)
+
+When adding an enum value, grep the table name for `chk_` constraints and sync every one the enum touches. Migrations are applied manually: `psql $DATABASE_URL -f database/migrations/<n>_<name>.sql` (Doppler-provided URL), against both `local` and `prd`.
+
 ## Architecture
 
 - **Campaign structural-duplicate guardrail:** `MarketingCampaignService.createCampaign` blocks creation of a second *active* campaign with the same structural signature. Re-run the existing campaign to produce a versioned output instead. Inactive stages (`lost`, `dead`, `closed`, `resolved_and_closed`) do NOT block — a fresh campaign can be created after the prior one was killed. The check is keyed on structural attributes (NOT campaign id):
