@@ -700,6 +700,11 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
+      const defaultTitle =
+        input.scope === 'business' && input.businessName && input.category
+          ? [input.businessName, input.category, input.city].filter(Boolean).join(' - ')
+          : null;
+
       const campaign = await this.prisma.mkt_campaigns_list.create({
         data: {
           id,
@@ -708,7 +713,7 @@ export class MarketingCampaignService extends BaseService {
           campaign_category: campaignCategory,
           repair_track: input.repairTrack || null,
           repair_issue_type: input.repairIssueType || null,
-          title: input.title || null,
+          title: input.title || defaultTitle || null,
           business_name: input.businessName || null,
           category: input.category || '',
           city: input.city || '',
