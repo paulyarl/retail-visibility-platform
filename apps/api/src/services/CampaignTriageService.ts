@@ -428,7 +428,23 @@ export class CampaignTriageService extends BaseService {
 
   // ─── Read ──────────────────────────────────────────────────────────────
 
-  async getTriageResult(campaignId: string, ctx?: RequestCtx): Promise<StoredTriageResult | null> {
+  async getTriageResult(
+    campaignId: string,
+    ctx?: RequestCtx,
+    opts?: { businessScopeOnly?: boolean },
+  ): Promise<StoredTriageResult | null> {
+    // Read-path scope guard: triage rows only exist for business-scope
+    // campaigns. Short-circuit to null (→ route 404) for any other scope
+    // instead of querying the triage table. Internal callers (archetype
+    // resolution, hook suggestions, call scripts) omit this opt — they run
+    // against business campaigns or tolerate a null result.
+    if (opts?.businessScopeOnly) {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { scope: true },
+      }) as any;
+      if (!campaign || campaign.scope !== 'business') return null;
+    }
     const result = await this.prisma.mkt_campaign_triage_results.findUnique({
       where: { campaign_id: campaignId },
       include: { playbook: true, overridden_playbook: true },

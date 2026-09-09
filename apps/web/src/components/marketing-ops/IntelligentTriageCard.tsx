@@ -87,6 +87,12 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
   const [siblingArchetypes, setSiblingArchetypes] = useState<Map<string, string>>(new Map());
   const [creatingSibling, setCreatingSibling] = useState<string | null>(null);
 
+  // Triage is a per-business funnel — category/city/intelligence-scope
+  // campaigns never have a triage row, so skip the fetch (and the card)
+  // entirely for them instead of firing a guaranteed 404. The primary
+  // render gate lives in CampaignDetailClient; this is defense in depth.
+  const isBusinessScope = campaign.scope === 'business';
+
   const fetchTriage = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -104,7 +110,10 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
     }
   }, [campaign.id]);
 
-  useEffect(() => { fetchTriage(); }, [fetchTriage]);
+  useEffect(() => {
+    if (!isBusinessScope) return;
+    fetchTriage();
+  }, [fetchTriage, isBusinessScope]);
 
   // Fetch triage alternatives + existing siblings when triage is loaded
   // (multi-archetype suggestions). Siblings are fetched alongside so we can
@@ -130,6 +139,8 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
     }).catch(() => { /* non-critical */ });
     fetchSiblings();
   }, [campaign.id, triage, fetchSiblings]);
+
+  if (!isBusinessScope) return null;
 
   const handleCreateSibling = async (playbookCode: string, archetype: string) => {
     setCreatingSibling(playbookCode);

@@ -430,9 +430,12 @@ export default function CampaignDetailClient({
         ...(isIntelligence && (focus || kind) ? { include_null_focus_kind: true } : {}),
       })
       .catch(() => [] as PromptTemplate[]);
-    const triagePromise = marketingOpsService
-      .getTriage(campaign.id)
-      .catch(() => null);
+    // Triage is a business-scope-only funnel — skip the fetch entirely for
+    // category/city/intelligence scopes (the backend has no triage row for
+    // them, so the request would always 404).
+    const triagePromise = campaign.scope === 'business'
+      ? marketingOpsService.getTriage(campaign.id).catch(() => null)
+      : Promise.resolve(null);
     Promise.all([promptsPromise, triagePromise])
       .then(([templates, triage]) => {
         setPromptTemplates(templates);

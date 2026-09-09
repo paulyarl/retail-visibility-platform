@@ -5457,9 +5457,12 @@ router.post('/:campaignId/triage/evaluate', async (req: any, res: Response) => {
 });
 
 // Read the latest stored triage result for a campaign.
+// businessScopeOnly: triage is a per-business funnel — category/city/
+// intelligence-scope campaigns have no triage row, so they 404 here without
+// touching the triage table (mirrors the evaluate/accept/override guard).
 router.get('/:campaignId/triage', async (req: any, res: Response) => {
   try {
-    const result = await CampaignTriageService.getTriageResult(req.params.campaignId, getCtx(req));
+    const result = await CampaignTriageService.getTriageResult(req.params.campaignId, getCtx(req), { businessScopeOnly: true });
     if (!result) {
       return res.status(404).json({ success: false, error: 'No triage result found — call /triage/evaluate first' });
     }
