@@ -67,6 +67,13 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
   const canShowSocial = directoryEntryOptions?.socialEnabled ?? true;
   const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
 
+  // Sourced attribute chips — tier-gated + merchant-gated; each attribute carries
+  // its own evidence (source platform + URL + as_of date). SNAP/EBT keeps its own
+  // dedicated badge and is not duplicated here.
+  const attributesVisible = directoryEntryOptions?.attributesVisible ?? false;
+  const sourcedAttributes: Array<{ key: string; label: string; sourcePlatform?: string; sourceUrl?: string; asOf?: string }> =
+    Array.isArray(listing?.attributes) ? listing.attributes : [];
+
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
@@ -173,6 +180,25 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                               <span>{category.name}</span>
                             </Link>
                           ))}
+                        </div>
+                      )}
+                      {attributesVisible && sourcedAttributes.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {sourcedAttributes.map((attr) => {
+                            const evidence = [
+                              attr.sourcePlatform ? `Reported by ${attr.sourcePlatform.replace(/_/g, ' ')}` : null,
+                              attr.asOf ? `as of ${attr.asOf}` : null,
+                            ].filter(Boolean).join(' · ');
+                            return (
+                              <span
+                                key={attr.key}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                                title={evidence ? `${attr.label} — ${evidence}` : attr.label}
+                              >
+                                {attr.label}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                       <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />

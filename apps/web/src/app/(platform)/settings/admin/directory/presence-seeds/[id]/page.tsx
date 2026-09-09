@@ -43,6 +43,7 @@ const PROVENANCE_FIELD_KEYS = [
   'keywords',
   'same_as',
   'secondary_categories',
+  'attributes',
 ] as const;
 
 const DISCLOSURE_SENTENCE =
@@ -160,6 +161,7 @@ export default function PresenceSeedDetailPage() {
   const [editSnapAsOf, setEditSnapAsOf] = useState('');
   const [editSnapSource, setEditSnapSource] = useState('');
   const [editSnapSourceName, setEditSnapSourceName] = useState('');
+  const [editAttributesJson, setEditAttributesJson] = useState('');
   const [editProvenance, setEditProvenance] = useState<EditProvenanceRow[]>([]);
   const [editAddress, setEditAddress] = useState('');
   const [editCity, setEditCity] = useState('');
@@ -437,6 +439,11 @@ export default function PresenceSeedDetailPage() {
     setEditSnapAsOf(asOf);
     setEditSnapSource(listing?.snap_ebt_source ?? '');
     setEditSnapSourceName(listing?.snap_ebt_source_name ?? '');
+    setEditAttributesJson(
+      Array.isArray(listing?.attributes) && listing.attributes.length > 0
+        ? JSON.stringify(listing.attributes, null, 2)
+        : '',
+    );
     setEditProvenance(
       provenance.map((p) => ({
         fieldKey: p.fieldKey,
@@ -533,6 +540,36 @@ export default function PresenceSeedDetailPage() {
         fields.snapEbtSourceName = null;
       }
 
+      // Sourced attributes — JSON array of {key, label, sourcePlatform, sourceUrl, asOf}.
+      // Each attribute carries its own evidence; never inferred from category labels.
+      let attributesSource: { sourceName?: string; sourceUrl?: string } | null = null;
+      if (editAttributesJson.trim()) {
+        let parsed: any;
+        try {
+          parsed = JSON.parse(editAttributesJson);
+        } catch {
+          throw new Error('Attributes must be valid JSON (array of { key, label, sourcePlatform, sourceUrl, asOf }).');
+        }
+        if (!Array.isArray(parsed)) {
+          throw new Error('attributes must be a JSON array of { key, label, sourcePlatform, sourceUrl, asOf }');
+        }
+        for (const a of parsed) {
+          if (!a || typeof a !== 'object' || !a.key || !a.label) {
+            throw new Error('Each attribute requires at least "key" and "label".');
+          }
+        }
+        fields.attributes = parsed;
+        const firstSource = parsed.find((a: any) => a.sourcePlatform || a.sourceUrl);
+        if (firstSource) {
+          attributesSource = {
+            sourceName: firstSource.sourcePlatform || undefined,
+            sourceUrl: firstSource.sourceUrl || undefined,
+          };
+        }
+      } else {
+        fields.attributes = null;
+      }
+
       const provenanceUpdates = editProvenance
         .filter((row) => row.fieldKey && (row.value || row.sourceName))
         .map((row) => ({
@@ -572,6 +609,23 @@ export default function PresenceSeedDetailPage() {
           value: editDescription.trim(),
           sourceName: 'operator_override',
           sourceUrl: undefined,
+          confidence: 'high',
+          showOnPublic: true,
+        });
+        provenanceUpdates.length = 0;
+        provenanceUpdates.push(...filtered);
+      }
+
+      // Add/replace attributes provenance when sourced attributes are set
+      if (fields.attributes !== undefined && fields.attributes !== null) {
+        const filtered = provenanceUpdates.filter(
+          (p) => p.fieldKey !== 'attributes',
+        );
+        filtered.push({
+          fieldKey: 'attributes',
+          value: undefined,
+          sourceName: attributesSource?.sourceName || 'operator_override',
+          sourceUrl: attributesSource?.sourceUrl || undefined,
           confidence: 'high',
           showOnPublic: true,
         });
@@ -1527,12 +1581,29 @@ export default function PresenceSeedDetailPage() {
           </div>
 
           <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Sourced attributes</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Optional attribute chips (payments accepted, accessibility, ownership,
+              service options). JSON array of{' '}
+              <code className="text-xs">{`{ key, label, sourcePlatform, sourceUrl, asOf }`}</code>.
+              Each attribute carries its own evidence — never inferred from category
+              labels. SNAP/EBT stays in its dedicated fields above.
+            </p>
+            <textarea
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+              rows={6}
+              value={editAttributesJson}
+              onChange={(e) => setEditAttributesJson(e.target.value)}
+              placeholder={'[\n  {\n    "key": "accepts_apple_pay",\n    "label": "Apple Pay",\n    "sourcePlatform": "apple_maps",\n    "sourceUrl": "https://maps.apple.com/...",\n    "asOf": "2026-09-08"\n  }\n]'}
+            />
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Business hours</h3>
             <p className="text-xs text-gray-500 mb-3">
               Only set hours when sourced. Unsourced hours are omitted from the
               public listing per the directory presence contract.
             </p>
-
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
               <select

@@ -494,6 +494,7 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
          dll.description,
          dll.snap_ebt_reported,
          dll.snap_ebt_source,
+         dll.attributes,
          dll.public_disclaimer,
          dps.category,
          dps.city as seed_city,
@@ -536,6 +537,7 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
       description: row.description,
       snapEbtReported: row.snap_ebt_reported,
       snapEbtSource: row.snap_ebt_source,
+      attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
       categorySlug: row.category_slug || decodedSlug,
@@ -621,7 +623,7 @@ router.get('/places/search', async (req: Request, res: Response) => {
         dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
         dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
         dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
-        dll.public_disclaimer,
+        dll.attributes, dll.public_disclaimer,
         dps.category, dps.city as seed_city, dps.state as seed_state,
         pc.slug AS category_slug, pc.icon_emoji
       FROM directory_presence_seeds dps
@@ -650,6 +652,7 @@ router.get('/places/search', async (req: Request, res: Response) => {
       description: row.description,
       snapEbtReported: row.snap_ebt_reported,
       snapEbtSource: row.snap_ebt_source,
+      attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
       categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
@@ -708,7 +711,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
          dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
          dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
          dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
-         dll.public_disclaimer,
+         dll.attributes, dll.public_disclaimer,
          dps.category, dps.city as seed_city, dps.state as seed_state,
          pc.slug AS category_slug, pc.id AS category_id, pc.icon_emoji
        FROM directory_presence_seeds dps
@@ -738,6 +741,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       description: row.description,
       snapEbtReported: row.snap_ebt_reported,
       snapEbtSource: row.snap_ebt_source,
+      attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
       categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),

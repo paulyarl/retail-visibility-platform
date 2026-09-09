@@ -52,6 +52,13 @@ export function resolveDirectoryEntryOptions(
   const snapEbtBadgeEnabled = mainOn && (!!features.directory_visibility_snap_ebt || flexible);
   const snapEbtVisible = snapEbtBadgeEnabled && (merchantPrefs?.snap_ebt_display !== false);
 
+  // Sourced attributes display — tier-gated by directory_visibility_attributes feature.
+  // Each attribute carries its own evidence (source platform + URL + as_of date);
+  // the resolver only gates WHETHER attributes may display — evidence lives in
+  // directory_field_provenance / listing.attributes. Never inferred from category labels.
+  const attributesBadgeEnabled = mainOn && (!!features.directory_visibility_attributes || flexible);
+  const attributesVisible = attributesBadgeEnabled && (merchantPrefs?.attributes_display !== false);
+
   const prefs = {
     directory_entry_opt_enabled: merchantPrefs?.directory_entry_opt_enabled !== false,
     directory_entry_layout: merchantPrefs?.directory_entry_layout || 'classic',
@@ -101,6 +108,9 @@ export function resolveDirectoryEntryOptions(
     // SNAP/EBT visibility badge — tier-gated availability + merchant-gated effective state
     snap_ebt_badge_enabled: snapEbtBadgeEnabled,
     snap_ebt_visible: snapEbtVisible,
+    // Sourced attributes display — tier-gated availability + merchant-gated effective state
+    attributes_badge_enabled: attributesBadgeEnabled,
+    attributes_visible: attributesVisible,
     merchant_preferences: prefs,
   };
 }

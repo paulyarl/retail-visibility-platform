@@ -389,11 +389,15 @@ export interface DirectoryEntryOptionsState {
   // SNAP/EBT visibility badge — tier-gated availability + merchant-gated effective state
   snapEbtBadgeEnabled: boolean;
   snapEbtVisible: boolean;
+  // Sourced attributes display — tier-gated availability + merchant-gated effective state
+  attributesBadgeEnabled: boolean;
+  attributesVisible: boolean;
   merchantPreferences: {
     directory_entry_opt_enabled: boolean;
     directory_entry_layout: DirectoryEntryLayoutKey;
     external_link_enabled?: boolean;
     snap_ebt_display?: boolean | null;
+    attributes_display?: boolean | null;
   };
   features: Record<string, boolean>;
 }

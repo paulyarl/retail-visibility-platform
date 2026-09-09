@@ -88,6 +88,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           t.demo_expires_at,
           dll.listing_origin,
           dll.public_disclaimer,
+          dll.attributes,
           dps.seo_enrichment->>'meta_title' as meta_title,
           dps.seo_enrichment->>'schema_type_hint' as schema_type_hint,
           (SELECT dct.token FROM directory_claim_tokens dct
@@ -388,6 +389,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       demoExpiresAt: (listing as any).demo_expires_at || null,
       listingOrigin: (listing as any).listing_origin || null,
       publicDisclaimer: (listing as any).public_disclaimer || null,
+      attributes: Array.isArray((listing as any).attributes) ? (listing as any).attributes : [],
       activeClaimToken: (listing as any).active_claim_token || null,
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,

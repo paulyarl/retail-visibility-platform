@@ -9,7 +9,7 @@ import {
 import {
   IconRefresh, IconAlertCircle, IconCheck, IconCircleCheck,
   IconCircleDot, IconMapPin, IconPlus, IconArrowRight, IconInfoCircle,
-  IconClock,
+  IconClock, IconListCheck,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import marketingOpsService, {
@@ -46,7 +46,7 @@ const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
 // the platforms that matter most. "all" is included as a broad-scan option.
 // forcing redeploy - 8/29/2026 
 
-const GOLD_STANDARD_PLATFORMS = ['all', 'google', 'yelp', 'facebook', 'bbb', 'manta'];
+const GOLD_STANDARD_PLATFORMS = ['all', 'google', 'yelp', 'facebook', 'bbb', 'apple_maps', 'bing'];
 
 export default function CoverageClient() {
   const [coverage, setCoverage] = useState<IntelligenceCoverage | null>(null);
@@ -277,6 +277,11 @@ export default function CoverageClient() {
                     {cat.slots.filter(s => s.status === 'inflight').length} in flight
                   </Badge>
                 )}
+                {cat.slots.some(s => s.status === 'discovered') && (
+                  <Badge variant="light" color="teal" size="xs">
+                    {cat.slots.filter(s => s.status === 'discovered').length} discovered
+                  </Badge>
+                )}
               </Group>
               <Link href={createCampaignLink({
                 focus: 'gold_standards', kind: 'establishment',
@@ -471,7 +476,9 @@ function isPlatformFn(key: string): boolean {
 // ─── Slot Chip ──────────────────────────────────────────────────────────
 // A single status chip for one (category, focus, dimension) slot.
 // Shows: active (green check), draft (amber dot), in-flight (blue clock —
-// campaign exists but no profile yet), missing (gray + action).
+// campaign exists but no profile yet), discovered (teal — gold-standards
+// platform discovery executed, candidates captured, no platform profile by
+// design), missing (gray + action).
 
 interface SlotChipProps {
   label: string;
@@ -560,6 +567,30 @@ function SlotChip({ label, slot, focus, category, city, platform, createLink }: 
           <Text size="xs" c="dimmed">(draft)</Text>
         </Group>
       </Tooltip>
+    );
+  }
+
+  // Discovered (gold standards only) — the platform discovery campaign has
+  // executed and captured candidates, but no platform profile exists (by
+  // design: the platform slot reuses the all-platforms establishment
+  // profile). Distinct from in-flight so the operator can tell finished
+  // discovery work from work still underway. Click opens the campaign.
+  if (slot && slot.status === 'discovered') {
+    return (
+      <Link href={`/settings/admin/marketing-ops/campaigns/${slot.profile_id}`}>
+        <Tooltip label="Gold standard discovery complete — candidates captured. Click to open the campaign.">
+          <Group gap={4} style={{
+            padding: '4px 10px',
+            borderRadius: 6,
+            background: 'var(--mantine-color-teal-light)',
+            border: '1px solid var(--mantine-color-teal-3)',
+            cursor: 'pointer',
+          }}>
+            <IconListCheck size={14} color="var(--mantine-color-teal-6)" />
+            <Text size="xs" fw={500}>{label}</Text>
+          </Group>
+        </Tooltip>
+      </Link>
     );
   }
 

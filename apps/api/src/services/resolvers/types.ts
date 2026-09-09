@@ -254,6 +254,7 @@ export interface DirectoryEntryMerchantSettings {
   external_link_enabled?: boolean | null;
   gallery_display_mode?: string | null;
   snap_ebt_display?: boolean | null;
+  attributes_display?: boolean | null;
 }
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
@@ -564,6 +565,10 @@ export interface EffectiveDirectoryEntryOptions {
   // This is a VISIBILITY BADGE only, not a payment capability.
   snap_ebt_badge_enabled: boolean;
   snap_ebt_visible: boolean;
+  // Sourced attributes display — tier-gated availability + merchant-gated effective state.
+  // Each attribute carries its own evidence (source platform + URL + as_of date).
+  attributes_badge_enabled: boolean;
+  attributes_visible: boolean;
   merchant_preferences: Record<string, any>;
 }
 

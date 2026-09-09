@@ -24,6 +24,7 @@ const directoryEntryOptionsSchema = z.object({
   external_link_enabled: z.boolean().optional(),
   gallery_display_mode: z.enum(['carousel', 'magazine']).optional(),
   snap_ebt_display: z.boolean().nullable().optional(),
+  attributes_display: z.boolean().nullable().optional(),
 });
 
 // Default settings for directory entry — only directory-entry-relevant fields
@@ -40,6 +41,7 @@ export const DEFAULT_DIRECTORY_ENTRY_SETTINGS = {
   external_link_enabled: false,
   gallery_display_mode: 'carousel',
   snap_ebt_display: null as boolean | null,
+  attributes_display: null as boolean | null,
 };
 
 // Get directory entry options settings for a tenant
@@ -73,6 +75,7 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
           external_link_enabled: oldSettings.external_link_enabled ?? false,
           gallery_display_mode: (oldSettings as any).gallery_display_mode || 'carousel',
           snap_ebt_display: (oldSettings as any).snap_ebt_display ?? null,
+          attributes_display: (oldSettings as any).attributes_display ?? null,
           created_at: oldSettings.created_at,
           updated_at: oldSettings.updated_at,
         } as any;
@@ -124,6 +127,7 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
         external_link_enabled: settings.external_link_enabled ?? false,
         gallery_display_mode: settings.gallery_display_mode || 'carousel',
         snap_ebt_display: (settings as any).snap_ebt_display ?? null,
+        attributes_display: (settings as any).attributes_display ?? null,
       },
     });
   } catch (error) {
@@ -208,6 +212,7 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
         external_link_enabled: settings.external_link_enabled ?? false,
         gallery_display_mode: settings.gallery_display_mode || 'carousel',
         snap_ebt_display: (settings as any).snap_ebt_display ?? null,
+        attributes_display: (settings as any).attributes_display ?? null,
       },
     });
   } catch (error) {

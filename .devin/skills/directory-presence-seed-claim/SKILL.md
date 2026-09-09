@@ -119,8 +119,20 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `keywords` — composed SEO keywords (SeedSeoComposer, spec §4.4.6)
 - `same_as` — sameAs URLs from directory/social profiles + audit platforms
 - `secondary_categories` — union of audit additional_categories + profile subcategories
+- `attributes` — sourced attribute chips (payments accepted, accessibility, ownership, service options)
 
 A field must not render publicly without a provenance row with `show_on_public = true`. Hours are omitted unless sourced.
+
+## Sourced Attributes Display
+
+- Feature key: `directory_visibility_attributes` (migration 267) — mirrors the SNAP/EBT badge pattern
+- `attributes_badge_enabled`: tier capability
+- `attributes_visible`: tier capability AND merchant has not suppressed (`attributes_display !== false` in `tenant_directory_entry_settings`)
+- Storage: `directory_listings_list.attributes` JSONB — array of `{ key, label, sourcePlatform, sourceUrl, asOf }`
+- Each attribute carries its own evidence (source platform + URL + as_of date); never inferred from category labels
+- SNAP/EBT stays in its dedicated `snap_ebt_*` columns (migration 207) — do NOT fold it into generic attributes
+- Natural data source: gold-standard scan candidates' `platform_config.attributes` (Apple Maps card payment attributes, Google profile attributes, Yelp amenities)
+- Renders as a chip row on the directory entry classic layout, next to category chips, gated by `attributesVisible`
 
 ## Claim Flow
 

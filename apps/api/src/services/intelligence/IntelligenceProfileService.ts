@@ -2162,8 +2162,10 @@ export class IntelligenceProfileService extends BaseService {
   // ─── Coverage aggregation ─────────────────────────────────────────────
   // Returns a coverage map of active + draft profiles grouped by category,
   // showing which profile slots are filled (active), in progress (draft),
-  // or missing. Used by the Coverage admin page to show gaps the operator
-  // needs to fill before discovery campaigns can run.
+  // in flight (campaign underway, no profile yet), or — gold standards only —
+  // discovered (platform discovery executed, candidates captured, no platform
+  // profile by design). Used by the Coverage admin page to show gaps the
+  // operator needs to fill before discovery campaigns can run.
   //
   // Slot dimensions:
   //   gold_standards: per platform (reference_platform), nationwide (city/state null)
@@ -2183,7 +2185,10 @@ export class IntelligenceProfileService extends BaseService {
         city: string | null;
         state: string | null;
         platform: string | null;
-        status: 'active' | 'draft' | 'inflight';
+        // 'discovered' — gold-standards discovery campaign for this slot has
+        // executed (completed execution / imported scan audit) but produced no
+        // platform profile by design. profile_id holds the campaign id.
+        status: 'active' | 'draft' | 'inflight' | 'discovered';
         profile_id: string;
         version: number;
         // Active slots only: id of an in-flight discovery campaign covering
@@ -2272,6 +2277,38 @@ export class IntelligenceProfileService extends BaseService {
       // stages are excluded, mirroring INACTIVE_STAGES in MarketingCampaignService
       // (inlined here to avoid a circular import).
       const inactiveStages = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
+
+      // Gold-standards discovery completion (Gold Standards only): a
+      // platform-specific gold-standard DISCOVERY campaign never produces a
+      // platform profile — discovery imports create audits, not drafts (the
+      // platform slot deliberately reuses the all-platforms establishment
+      // profile). Its review-track stage never reaches a terminal value, so
+      // without this check the slot would render blue 'inflight' forever even
+      // after the scan executed and captured candidates. A campaign with at
+      // least one completed execution or one imported scan audit counts as
+      // done → slot status 'discovered'.
+      const goldDiscoveryCampaignIds = intelligenceCampaigns
+        .filter((c) => !inactiveStages.has(c.stage) &&
+          c.intelligence_campaign_kind === 'discovery' &&
+          c.intelligence_focus === 'gold_standards')
+        .map((c) => c.id);
+      const executedGoldDiscoveryIds = new Set<string>();
+      if (goldDiscoveryCampaignIds.length > 0) {
+        const [doneExecutions, discoveryAudits] = await Promise.all([
+          this.prisma.mkt_prompt_executions_list.findMany({
+            where: { campaign_id: { in: goldDiscoveryCampaignIds }, status: 'completed' },
+            select: { campaign_id: true },
+          }),
+          this.prisma.mkt_audits_list.findMany({
+            where: { campaign_id: { in: goldDiscoveryCampaignIds } },
+            select: { campaign_id: true },
+          }),
+        ]);
+        for (const row of [...doneExecutions, ...discoveryAudits]) {
+          executedGoldDiscoveryIds.add(row.campaign_id);
+        }
+      }
+
       const entriesByName = new Map<string, { category_name: string; slots: any[] }>();
       for (const entry of byCategory.values()) {
         const nameKey = entry.category_name.trim().toLowerCase();
@@ -2310,12 +2347,15 @@ export class IntelligenceProfileService extends BaseService {
           (!isGold || (s.platform ?? '') === (platNorm ?? ''))
         );
         if (covered) continue;
+        const executedDiscovery = focus === 'gold_standards' &&
+          c.intelligence_campaign_kind === 'discovery' &&
+          executedGoldDiscoveryIds.has(c.id);
         entry.slots.push({
           focus,
           city: cityNorm || null,
           state: (c.state ?? '').trim() || null,
           platform: platNorm,
-          status: 'inflight',
+          status: executedDiscovery ? 'discovered' : 'inflight',
           profile_id: c.id,
           version: 0,
         });

@@ -396,6 +396,8 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         external_link_enabled: false,
         snap_ebt_badge_enabled: false,
         snap_ebt_visible: false,
+        attributes_badge_enabled: false,
+        attributes_visible: false,
         merchant_preferences: {},
       },
       faq: {

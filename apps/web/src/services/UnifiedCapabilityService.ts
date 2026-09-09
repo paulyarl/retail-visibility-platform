@@ -452,6 +452,7 @@ interface BackendEffectiveDirectoryEntryMerchantPrefs {
   directory_entry_layout: string;
   external_link_enabled?: boolean;
   snap_ebt_display?: boolean | null;
+  attributes_display?: boolean | null;
 }
 
 interface BackendEffectiveDirectoryEntry {
@@ -486,6 +487,8 @@ interface BackendEffectiveDirectoryEntry {
   external_link_enabled: boolean;
   snap_ebt_badge_enabled: boolean;
   snap_ebt_visible: boolean;
+  attributes_badge_enabled: boolean;
+  attributes_visible: boolean;
   merchant_preferences: BackendEffectiveDirectoryEntryMerchantPrefs;
 }
 
@@ -919,11 +922,14 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     externalLinkEnabled: b.external_link_enabled,
     snapEbtBadgeEnabled: b.snap_ebt_badge_enabled ?? false,
     snapEbtVisible: b.snap_ebt_visible ?? false,
+    attributesBadgeEnabled: b.attributes_badge_enabled ?? false,
+    attributesVisible: b.attributes_visible ?? false,
     merchantPreferences: {
       directory_entry_opt_enabled: b.merchant_preferences.directory_entry_opt_enabled,
       directory_entry_layout: (b.merchant_preferences.directory_entry_layout as DirectoryEntryLayoutKey) || 'classic',
       external_link_enabled: b.merchant_preferences.external_link_enabled,
       snap_ebt_display: b.merchant_preferences.snap_ebt_display,
+      attributes_display: b.merchant_preferences.attributes_display,
     },
     features: {},
   };

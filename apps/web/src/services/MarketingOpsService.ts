@@ -5312,7 +5312,10 @@ export interface CoverageSlot {
   platform: string | null;
   // 'inflight' — an intelligence campaign exists for this slot but has not yet
   // produced a draft/active profile. profile_id holds the campaign id.
-  status: 'active' | 'draft' | 'inflight';
+  // 'discovered' — gold-standards platform discovery has executed (completed
+  // execution / imported scan audit) but produced no platform profile by
+  // design. profile_id holds the campaign id.
+  status: 'active' | 'draft' | 'inflight' | 'discovered';
   profile_id: string;
   version: number;
   // Active slots only: id of an in-flight discovery campaign covering this

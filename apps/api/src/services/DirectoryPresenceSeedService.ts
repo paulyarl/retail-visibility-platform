@@ -51,6 +51,20 @@ interface SeedAuditCtx {
   userAgent?: string;
 }
 
+/**
+ * A single sourced attribute chip on a directory listing (payments accepted,
+ * accessibility, ownership, service options). Each entry carries its own
+ * evidence — source platform + URL + as_of date. Never inferred from category
+ * labels. SNAP/EBT stays in its dedicated snap_ebt_* columns (migration 207).
+ */
+export interface DirectoryListingAttribute {
+  key: string;
+  label: string;
+  sourcePlatform?: string;
+  sourceUrl?: string;
+  asOf?: string;
+}
+
 export interface CreateSeedInput {
   businessName: string;
   address: string;
@@ -67,6 +81,12 @@ export interface CreateSeedInput {
   snapEbtAsOf?: Date;
   snapEbtSource?: string;
   snapEbtSourceName?: string;
+  /**
+   * Sourced attribute chips (payments accepted, accessibility, ownership,
+   * service options). Each entry carries its own evidence — never inferred
+   * from category labels. SNAP/EBT stays in its dedicated snap_ebt_* columns.
+   */
+  attributes?: DirectoryListingAttribute[];
   seedBatch: string;
   identityConfidence: 'high' | 'medium';
   categoryFit: 'verified' | 'probable';
@@ -370,6 +390,7 @@ class DirectoryPresenceSeedService {
         phone, website, primary_category, secondary_categories,
         latitude, longitude, business_hours, is_published, listing_origin, public_disclaimer,
         snap_ebt_reported, snap_ebt_as_of, snap_ebt_source, snap_ebt_source_name,
+        attributes,
         subscription_tier, product_count, description, keywords, same_as,
         created_at, updated_at
       ) VALUES (
@@ -395,6 +416,7 @@ class DirectoryPresenceSeedService {
         ${input.snapEbtAsOf || null},
         ${input.snapEbtSource || null},
         ${input.snapEbtSourceName || null},
+        ${JSON.stringify(input.attributes || [])}::jsonb,
         'directory_presence',
         0,
         ${input.description || null},
@@ -715,6 +737,7 @@ class DirectoryPresenceSeedService {
       snapEbtAsOf?: Date | null;
       snapEbtSource?: string | null;
       snapEbtSourceName?: string | null;
+      attributes?: DirectoryListingAttribute[] | null;
       phone?: string;
       email?: string | null;
       website?: string;
@@ -798,6 +821,10 @@ class DirectoryPresenceSeedService {
     if (fields.snapEbtSourceName !== undefined) {
       setClauses.push('snap_ebt_source_name = $' + (params.length + 1));
       params.push(fields.snapEbtSourceName);
+    }
+    if (fields.attributes !== undefined) {
+      setClauses.push('attributes = $' + (params.length + 1) + '::jsonb');
+      params.push(JSON.stringify(fields.attributes || []));
     }
     if (fields.phone !== undefined) {
       setClauses.push('phone = $' + (params.length + 1));
