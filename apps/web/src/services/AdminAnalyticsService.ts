@@ -54,6 +54,22 @@ export interface EnrichmentAnalytics {
   errorTypes: Record<string, number>;
 }
 
+export interface CategoryEmergenceRow {
+  city: string;
+  state: string;
+  kind: 'primary' | 'secondary';
+  category: string;
+  listingCount: number;
+}
+
+export interface CategoryEmergenceFilters {
+  state?: string;
+  city?: string;
+  category?: string;
+  minCount?: number;
+  kind?: 'primary' | 'secondary';
+}
+
 /**
  * Service for managing admin analytics and reporting
  * Handles admin dashboard analytics, directory stats, and enrichment analytics
@@ -364,6 +380,32 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     }
 
     return result.data || null;
+  }
+
+  /**
+   * Get category emergence counts by city/state
+   */
+  async getCategoryEmergence(filters: CategoryEmergenceFilters = {}): Promise<CategoryEmergenceRow[] | null> {
+    const params = new URLSearchParams();
+    if (filters.state) params.append('state', filters.state);
+    if (filters.city) params.append('city', filters.city);
+    if (filters.category) params.append('category', filters.category);
+    if (filters.minCount) params.append('minCount', filters.minCount.toString());
+    if (filters.kind) params.append('kind', filters.kind);
+    const qs = params.toString();
+
+    const result = await this.makeDefaultRequest<{ rows: CategoryEmergenceRow[] }>(
+      `/api/admin/directory/category-emergence?${qs}`,
+      {},
+      `platform-admin-category-emergence-${qs}`,
+    );
+
+    if (!result.success) {
+      clientLogger.error('[AdminAnalyticsService] Failed to get category emergence:', { detail: result.error });
+      return null;
+    }
+
+    return result.data?.rows || null;
   }
 }
 

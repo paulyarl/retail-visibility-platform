@@ -613,4 +613,83 @@ router.patch('/listings/:tenantId/seo', authenticateToken, requireAdmin, async (
   }
 });
 
+/**
+ * GET /api/admin/directory/category-emergence
+ *
+ * Returns primary and secondary category counts grouped by published
+ * directory listing city/state. Useful for spotting emerging sub-niches
+ * that have enough hosting population to justify a standalone category.
+ */
+router.get('/category-emergence', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { state, city, category, minCount, kind } = req.query as Record<string, string | undefined>;
+    const minCountNum = minCount ? Number(minCount) : undefined;
+
+    let query = Prisma.sql`
+      WITH category_counts AS (
+        SELECT
+          city,
+          state,
+          'primary' AS kind,
+          primary_category AS category,
+          count(*)::int AS listing_count
+        FROM directory_listings_list
+        WHERE is_published = true
+          AND city IS NOT NULL
+          AND state IS NOT NULL
+          AND primary_category IS NOT NULL
+        GROUP BY city, state, primary_category
+
+        UNION ALL
+
+        SELECT
+          l.city,
+          l.state,
+          'secondary' AS kind,
+          s.category AS category,
+          count(*)::int AS listing_count
+        FROM directory_listings_list l
+        CROSS JOIN LATERAL unnest(l.secondary_categories) s(category)
+        WHERE l.is_published = true
+          AND l.city IS NOT NULL
+          AND l.state IS NOT NULL
+          AND s.category IS NOT NULL
+        GROUP BY l.city, l.state, s.category
+      )
+      SELECT city, state, kind, category, listing_count
+      FROM category_counts
+      WHERE 1 = 1
+    `;
+
+    if (state) {
+      query = Prisma.sql`${query} AND LOWER(state) = LOWER(${state})`;
+    }
+    if (city) {
+      query = Prisma.sql`${query} AND LOWER(city) = LOWER(${city})`;
+    }
+    if (category) {
+      query = Prisma.sql`${query} AND LOWER(category) = LOWER(${category})`;
+    }
+    if (kind === 'primary' || kind === 'secondary') {
+      query = Prisma.sql`${query} AND kind = ${kind}`;
+    }
+    if (minCountNum !== undefined && !Number.isNaN(minCountNum)) {
+      query = Prisma.sql`${query} AND listing_count >= ${minCountNum}`;
+    }
+
+    query = Prisma.sql`${query}
+      ORDER BY listing_count DESC, state, city, kind, category
+    `;
+
+    const rows = await prisma.$queryRaw<
+      { city: string; state: string; kind: string; category: string; listing_count: number }[]
+    >(query);
+
+    return res.json({ rows });
+  } catch (error: any) {
+    logger.error('[GET /admin/directory/category-emergence] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    return res.status(500).json({ error: 'failed_to_get_category_emergence' });
+  }
+});
+
 export default router;

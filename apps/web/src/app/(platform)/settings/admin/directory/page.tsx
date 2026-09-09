@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb, Funnel, Tag } from 'lucide-react';
+import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb, Funnel, Tag, BarChart3 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +92,13 @@ export default function DirectoryPanelPage() {
       description: 'Cohort analytics, G1–G4 gate grading, conversion scores, scaling readiness, and duplicate detection.',
       icon: Funnel,
       gradient: 'from-emerald-500 to-teal-500',
+    },
+    {
+      href: '/settings/admin/directory/category-emergence',
+      title: 'Category Emergence',
+      description: 'Category counts per city/state. Spot emerging sub-niches before promoting them to standalone directories.',
+      icon: BarChart3,
+      gradient: 'from-cyan-500 to-blue-500',
     },
   ];
 

@@ -273,6 +273,7 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Featured',             href: '/settings/admin/directory/featured' },
       { label: 'Directory Appearance', href: '/settings/admin/directory/appearance' },
       { label: 'Market Enrichment',    href: '/settings/admin/directory/category-enrichment/markets' },
+      { label: 'Category Emergence',   href: '/settings/admin/directory/category-emergence' },
     ],
   },
   {
