@@ -632,6 +632,10 @@ Return your response as JSON matching this exact schema:
       "displayed_phone": "<string|null>",
       "displayed_website": "<string|null>",
       "profile_issues": ["<string>", ...],
+      "attributes": [
+        { "key": "<snake_case_key>", "label": "<display label>",
+          "source_url": "<url or null>", "as_of": "<ISO date or null>" }
+      ],
       "data_status": "complete|partial|unavailable|unable_to_verify"
     },
     "yelp": { ...same per-platform structure minus primary_category/additional_categories/category_fit_assessment... },
@@ -771,6 +775,7 @@ PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/invento
 - platforms.google.photo_count: <number|null> — total number of photos on GBP
 - platforms.google.photo_types: ["storefront"|"exterior"|"interior"|"product"|"team"|"logo", ...] — categorize GBP photos by type
 - platforms.google.special_hours_present: <boolean|null> — are special/holiday hours present on GBP?
+- platforms.{platform}.attributes: [{ "key": "<snake_case_key>", "label": "<display label>", "source_url": "<url|null>", "as_of": "<ISO date|null>" }, ...] — the attribute chips the profile actually displays (payments accepted, accessibility, ownership, service options, certifications). Record each attribute only when the profile itself displays it (attribute chips, amenity sections, payment badges); NEVER infer attributes from the business's category, name, or neighborhood. Omit the field entirely when the profile displays no attribute chips — do not fabricate an empty inventory.
 
 CRITICAL JSON RULES:
 - Every element of a JSON array (e.g. "unanswered_negative_review_examples",
