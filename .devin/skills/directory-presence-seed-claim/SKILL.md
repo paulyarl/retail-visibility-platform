@@ -63,7 +63,9 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 ### Backend
 
 - `apps/api/src/lib/id-generator.ts` — `generateDirectoryListingId`, `generateDirectoryPresenceSeedId`, `generateDirectoryFieldProvenanceId`, `generateDirectoryClaimTokenId`, `generateDirectoryClaimTokenString`
-- `apps/api/src/services/DirectoryPresenceSeedService.ts` — admin seed CRUD, publish, invite, update fields
+- `apps/api/src/services/DirectoryPresenceSeedService.ts` — admin seed CRUD, publish, invite, update fields; `composeCampaignSeoPacket` (shared SEO packet composer) + `previewCampaignSeo` (form prefill)
+- `apps/api/src/services/directory/SeedSeoComposer.ts` — pure deterministic SEO packet composer (meta title, description, keywords, secondary categories, same_as, schema hint) shared by `createFromCampaign` and the manual form's seo-preview
+- `apps/api/src/services/directory/listingAttributes.ts` — shared sourced-attribute normalize/extract/dedupe pipeline (one `DirectoryListingAttribute` shape across every attribute surface)
 - `apps/api/src/services/DirectoryClaimService.ts` — public claim token summary + accept (accept embeds the gateway upgrade preview)
 - `apps/api/src/services/DirectoryPresenceUpgradeOptionsService.ts` — shared builder for the Entry Presence gateway triad / tier-ladder options (used by both the upgrade-options route and the claim accept response)
 - `apps/api/src/routes/directory-presence-upgrade.ts` — `GET/POST /api/tenant/:tenantId/upgrade(/options)` (GET is a thin auth + membership wrapper around the shared builder)
@@ -79,6 +81,7 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `apps/web/src/services/DirectoryPresenceAdminService.ts` — admin seed management service
 - `apps/web/src/app/directory/claim/[token]/` — public claim page
 - `apps/web/src/app/(platform)/settings/admin/directory/presence-seeds/` — admin seeds page
+- `apps/web/src/app/(platform)/settings/admin/directory/presence-seeds/new/page.tsx` — Create Seed form with load-from-prospect picker + SEO Enrichment section
 - `apps/web/src/components/directory/UnclaimedDirectoryBanner.tsx` — unclaimed listing banner
 
 ## API Endpoints
@@ -86,8 +89,9 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 ### Admin (requires PLATFORM_ADMIN)
 
 - `GET /api/admin/directory-presence/presence-seeds` — list seeds (filters: seedBatch, status, city, category)
+- `GET /api/admin/directory-presence/presence-seeds/seo-preview?campaignId=<id>` — compose the SEO packet (meta title, description, keywords, secondary categories, same_as) from the campaign's latest `business_analysis` audit without creating anything. Degrades to Tier A campaign facts when no audit exists (`seoEnrichment` null). Declared before `/presence-seeds/:id` so `seo-preview` is not swallowed as an id. Used by the Create Seed form.
 - `GET /api/admin/directory-presence/presence-seeds/:id` — seed detail with provenance + tokens (includes the raw `token` string for each claim token so operators can recover a claim link after issuing)
-- `POST /api/admin/directory-presence/presence-seeds` — create seed (tenant + listing + provenance)
+- `POST /api/admin/directory-presence/presence-seeds` — create seed (tenant + listing + provenance). Also accepts optional SEO enrichment fields: `description` (≤500), `keywords` (≤15), `sameAs` (≤50), `seoEnrichment` (stored on the seed's `seo_enrichment` JSON)
 - `POST /api/admin/directory-presence/presence-seeds/:id/publish` — publish listing
 - `POST /api/admin/directory-presence/presence-seeds/:id/invite` — mint claim token (90-day default)
 - `PATCH /api/admin/directory-presence/presence-seeds/:id/fields` — update sourced fields + provenance
@@ -134,6 +138,21 @@ A field must not render publicly without a provenance row with `show_on_public =
 - Natural data source: gold-standard scan candidates' `platform_config.attributes` (Apple Maps card payment attributes, Google profile attributes, Yelp amenities)
 - Renders as a chip row on the directory entry classic layout, next to category chips, gated by `attributesVisible`
 - Attribute picker (migration 268): `directory_attribute_definitions` table — predefined, category-aware chips (grouped payments / accessibility / ownership / service_options / certifications / other; `applies_to_categories` NULL = universal, otherwise lowercase category names or `platform_categories` slugs). Served by `GET /api/admin/directory-presence/attribute-definitions?category=<name>`; the seed detail edit drawer renders them as toggle chips with per-attribute evidence fields plus a custom-attribute escape hatch (replaces the old raw-JSON textarea)
+
+## Manual Seed Creation (Load from Prospect)
+
+The Create Seed form (`presence-seeds/new`) can prefill itself from an existing prospect instead of retyping — bridging audits → seeds without retyping NAP.
+
+**Two load sources** (picker at the top of the form):
+
+- **Prospect Queue** — auto-loads non-dismissed `mkt_prospect_queue` entries on mount (skips rows with `seed_id` already set); client-side filter by name/category/city. Prefills from the entry: `business_name` (falls back to `title`), NAP from `business_snapshot` with `verified_nap` taking precedence (mirrors the queue → campaign promotion path), full street addresses auto-split via `addressParser`, lat/lng, SNAP fields, sourced attributes from `business_snapshot.attributes` (normalized string-or-object entries), provenance rows from `discovery_provenance` (source `prospect_queue:<source_kind>`), identity confidence / category fit from the discovery columns, seed batch `from-queue-<entryId>`.
+- **Campaign Prospect** — searches business-scope campaigns (`GET /api/admin/marketing-ops?scope=business&search=`). Prefills from the campaign record's NAP columns (`address_line1/2`, `address_city/state/zip`, `phone`, `website_url`, `category`), `same_as` provenance from `directory_profiles` + `social_profiles`, seed batch `from-campaign-<display_id>`.
+
+**SEO Enrichment section** — when the loaded prospect has a source campaign (campaign path always; queue path via `source_campaign_id`), the form fetches `seo-preview` and prefills description / keywords / same-as (plus secondary categories if the form has none), and upserts the spec §4.4.6 provenance rows (`description`/`keywords` ← `seed_seo_composer`, `same_as` ← `business_analysis_audit`). This is the same `SeedSeoComposer` packet the automated `createFromCampaign` path writes — both paths produce identical enrichment. Tier A degradation (no audit) still prefills the template description; `seoEnrichment` is only sent when an audit exists.
+
+**Post-create campaign link** — when the seed was loaded from a campaign, the form auto-links it (`POST .../campaign-links`, primary role) after creation so funnel analytics + the seed detail attribute-suggestion miner can find it. Link failures are logged, never blocking.
+
+Nothing is saved on load — the operator reviews/edits every prefilled field and the seed is only created on submit. Queue entries are not mutated by loading; dismiss them separately after seeding.
 
 ## Claim Flow
 
