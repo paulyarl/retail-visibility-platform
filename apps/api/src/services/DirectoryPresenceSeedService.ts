@@ -1961,9 +1961,9 @@ class DirectoryPresenceSeedService {
         { fieldKey: 'primary_category', value: campaign.category, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         // SEO provenance rows (spec §4.4.6)
         { fieldKey: 'description', value: seoPacket.description, sourceName: 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
-        { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: profile ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName: 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
-        { fieldKey: 'secondary_categories', value: seoPacket.secondaryCategories.join(', '), sourceName: profile ? 'intelligence_profile' : 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.secondaryCategories.length > 0 },
+        { fieldKey: 'secondary_categories', value: seoPacket.secondaryCategories.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.secondaryCategories.length > 0 },
         // Sourced attributes — evidence lives on each attribute entry; the
         // provenance row records the audit lineage for the set.
         { fieldKey: 'attributes', value: sourcedAttributes.length > 0 ? 'sourced' : undefined, sourceName: sourcedAttributes[0]?.sourcePlatform || 'business_analysis_audit', sourceUrl: sourcedAttributes[0]?.sourceUrl || sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: sourcedAttributes.length > 0 },

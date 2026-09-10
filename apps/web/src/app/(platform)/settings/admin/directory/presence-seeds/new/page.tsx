@@ -552,6 +552,7 @@ export default function NewPresenceSeedPage() {
         : undefined,
       latitude: lat,
       longitude: lng,
+      seedBatch: seedBatch.trim(),
       identityConfidence,
       categoryFit,
       notes: notes.trim() || undefined,
