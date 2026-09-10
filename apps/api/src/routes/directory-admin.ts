@@ -625,6 +625,15 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
     const { state, city, category, minCount, kind } = req.query as Record<string, string | undefined>;
     const minCountNum = minCount ? Number(minCount) : undefined;
 
+    const publishedSettings = await prisma.directory_settings_list.findMany({
+      where: { is_published: true },
+      select: { tenant_id: true },
+    });
+    if (publishedSettings.length === 0) {
+      return res.json({ rows: [] });
+    }
+    const idList = Prisma.join(publishedSettings.map((s) => Prisma.sql`${s.tenant_id}`));
+
     let query = Prisma.sql`
       WITH category_counts AS (
         SELECT
@@ -633,14 +642,13 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           'primary' AS kind,
           primary_category AS category,
           count(*)::int AS listing_count
-        FROM directory_listings_list dll
-        INNER JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
-        WHERE dll.is_published = true
-          AND dsl.is_published = true
-          AND dll.city IS NOT NULL
-          AND dll.state IS NOT NULL
-          AND dll.primary_category IS NOT NULL
-        GROUP BY dll.city, dll.state, dll.primary_category
+        FROM directory_listings_list
+        WHERE is_published = true
+          AND tenant_id IN (${idList})
+          AND city IS NOT NULL
+          AND state IS NOT NULL
+          AND primary_category IS NOT NULL
+        GROUP BY city, state, primary_category
 
         UNION ALL
 
@@ -651,10 +659,9 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           s.category AS category,
           count(*)::int AS listing_count
         FROM directory_listings_list l
-        INNER JOIN directory_settings_list dsl ON l.tenant_id = dsl.tenant_id
         CROSS JOIN LATERAL unnest(l.secondary_categories) s(category)
         WHERE l.is_published = true
-          AND dsl.is_published = true
+          AND l.tenant_id IN (${idList})
           AND l.city IS NOT NULL
           AND l.state IS NOT NULL
           AND s.category IS NOT NULL
