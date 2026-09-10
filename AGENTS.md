@@ -1002,3 +1002,21 @@ Frontend:
 - Client: `MarketingOpsService.logProspectTouch` / `attachProvingGroundChild` / `detachProvingGroundChild` / `promoteToProvingGround` / `getCampaignChildren`; `DirectoryPresenceAdminService.provingGroundSeed` / `recordDedupVerdict` / `listDedupVerdicts`.
 
 Tests: `provingGround.test.ts` (guardrail + attach/detach + gap log + account_family), `provingGroundCadence.test.ts` (cadence map, cap, write-through, verdicts), PG-01 cases in `PlaybookChecklistService.test.ts`, verdict-exclusion cases in `SeedFunnelAnalyticsService.getCohortFunnel.test.ts`.
+
+## Intelligence Coverage Map — 7-State Slot Model
+
+Page: `/settings/admin/marketing-ops/coverage` (`CoverageClient.tsx`). Backend: `IntelligenceProfileService.getCoverage()`; route `GET /api/admin/marketing-ops/intelligence-profiles/coverage`.
+
+Every slot position (gold standards: platform, nationwide; emerging/competitive: city) carries TWO orthogonal state dimensions — the UI renders two stacked chips per position (establishment on top, discovery on the bottom):
+
+- **Establishment** `slot.status`: `pending` (nothing) → `inflight` (establishment campaign, no profile yet — `profile_id` holds the campaign id) → `draft` (draft profile) → `active` (active profile). Actions: create campaign → open campaign → activate profile → discovery unlocked below.
+- **Discovery** `slot.discovery_status` + `discovery_campaign_id`: `pending` → `inflight` → `executed`. A discovery campaign is **executed** when it has ≥1 `mkt_prompt_executions_list` row with `status='completed'` OR ≥1 `mkt_audits_list` row (gold_standard_scan / intelligence_discovery imports). Actions: create campaign → open campaign → open audit (`?tab=audits`).
+
+Key rules (regression history — do not reintroduce):
+- The discovery dimension is tracked **per campaign kind, independent of establishment** — discovery campaigns never flip the establishment status and never create an `inflight` establishment slot. The old model conflated them (an executed discovery rendered "green + in-flight arrow" forever).
+- Discovery campaigns attach to the slot covering their position (any establishment status); when none exists (e.g. gold-standards platform scan with no platform profile — platform slots reuse the All Platforms establishment by design) a `pending` slot is created to host the discovery state. An establishment campaign arriving later **upgrades** a pending slot rather than pushing a second one. Newest discovery campaign wins (campaigns arrive `created_at desc`).
+- Terminal stages (`lost`, `dead`, `closed`, `resolved_and_closed`) are excluded from both dimensions.
+- The old `status: 'discovered'` value is gone — replaced by `status: 'pending'` + `discovery_status: 'executed'`.
+- Frontend: the discovery chip stays **locked** (lock icon, not clickable) until the establishment chip is active — except gold standards, where the **All Platforms** establishment also unlocks per-platform discovery (proxy establishment — mirrors `resolveGoldStandard`'s platform fallback chain). "All Platforms" is always the first chip in the gold row.
+
+Tests: `apps/api/src/services/__tests__/IntelligenceProfileService.coverage.test.ts` (15 tests — all 7 states, gold platform slots, newest-wins, pending-slot upgrade, terminal exclusion, PG slot shape).
