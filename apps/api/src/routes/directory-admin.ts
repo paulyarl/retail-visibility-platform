@@ -643,8 +643,7 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           primary_category AS category,
           count(*)::int AS listing_count
         FROM directory_listings_list
-        WHERE is_published = true
-          AND tenant_id IN (${idList})
+        WHERE tenant_id IN (${idList})
           AND city IS NOT NULL
           AND state IS NOT NULL
           AND primary_category IS NOT NULL
@@ -660,8 +659,7 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           count(*)::int AS listing_count
         FROM directory_listings_list l
         CROSS JOIN LATERAL unnest(l.secondary_categories) s(category)
-        WHERE l.is_published = true
-          AND l.tenant_id IN (${idList})
+        WHERE l.tenant_id IN (${idList})
           AND l.city IS NOT NULL
           AND l.state IS NOT NULL
           AND s.category IS NOT NULL
