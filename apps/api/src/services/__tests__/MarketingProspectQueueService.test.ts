@@ -704,10 +704,6 @@ describe('MarketingProspectQueueService', () => {
       );
     });
 
-        undefined,
-      );
-    });
-
     it('prefers verified_nap over the raw snapshot on the thin path (phone/website/owner/category)', async () => {
       const entry = queueRow({
         business_name: 'Sushi Bar',
@@ -1110,7 +1106,7 @@ describe('MarketingProspectQueueService', () => {
         business_snapshot: { website: 'https://stale.example.com', email: 'old@example.com' },
         verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
       });
-      mockQueue.findUnique.mockResolvedValue(verifyRow(verifyRow));
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
       mockQueue.update.mockImplementation(({ data }: any) =>
         Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
       );

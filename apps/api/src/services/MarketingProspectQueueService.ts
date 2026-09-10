@@ -1050,12 +1050,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // Flat enrichment — mirrors verified values onto the snapshot keys the
       // campaign derive paths read, so a verified correction (e.g. phone
       // captured on the call) replaces the discovery-pass value. `website`
-      // is intentionally NOT flattened here: scan snapshots store it as an
-      // object ({ status, url }) while thin snapshots store a string — the
-      // create-campaign paths resolve the verified value instead.
+      // is only flattened when the existing snapshot stores it as a string —
+      // scan snapshots store it as an object ({ status, url }), which the
+      // create-campaign paths overlay separately.
       const flatEnrichment: Record<string, string> = {};
       if (verifiedNap.phone) flatEnrichment.phone = verifiedNap.phone;
       if (verifiedNap.email) flatEnrichment.email = verifiedNap.email;
+      if (verifiedNap.website && typeof snapshot.website !== 'object') flatEnrichment.website = verifiedNap.website;
       if (verifiedNap.address) flatEnrichment.address = verifiedNap.address;
       if (verifiedNap.city) flatEnrichment.address_city = verifiedNap.city;
       if (verifiedNap.state) flatEnrichment.address_state = verifiedNap.state;

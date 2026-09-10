@@ -656,7 +656,7 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           AND s.category IS NOT NULL
         GROUP BY l.city, l.state, s.category
       )
-      SELECT city, state, kind, category, listing_count
+      SELECT city, state, kind, category, listing_count AS "listingCount"
       FROM category_counts
       WHERE 1 = 1
     `;
@@ -678,11 +678,11 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
     }
 
     query = Prisma.sql`${query}
-      ORDER BY listing_count DESC, state, city, kind, category
+      ORDER BY "listingCount" DESC, state, city, kind, category
     `;
 
     const rows = await prisma.$queryRaw<
-      { city: string; state: string; kind: string; category: string; listing_count: number }[]
+      { city: string; state: string; kind: string; category: string; listingCount: number }[]
     >(query);
 
     return res.json({ rows });
