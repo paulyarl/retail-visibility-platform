@@ -130,12 +130,6 @@ export interface SeedSeoPreview {
   schemaTypeHint: string | null;
   seoEnrichment: Record<string, unknown> | null;
 }
-  key: string;
-  label: string;
-  sourcePlatform?: string;
-  sourceUrl?: string;
-  asOf?: string;
-}
 
 /** A predefined attribute chip from the category-aware picker (migration 268). */
 export interface DirectoryAttributeDefinition {
