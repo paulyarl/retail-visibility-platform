@@ -1,0 +1,858 @@
+{
+  "intelligence_mode": "profile",
+  "category": "African Grocery Store",
+  "city": "Indianapolis",
+  "state": "IN",
+  "focus": "competitive",
+  "discovered_businesses": [
+    {
+      "business_name": "Saraga International Grocery",
+      "category": "International Grocery / African Goods",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "3605 Commercial Dr, Indianapolis, IN 46222",
+      "phone": "(317) 388-9999",
+      "website": "https://saragaindy.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "local_chain",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION", "INT_UNDEREXPOSED_CREDENTIAL"],
+      "discovery_provenance": [
+        {"source": "Saraga International Grocery official site", "role": "primary_source", "evidence_types": ["website", "locations", "hours", "product_scope"], "url": "https://saragaindy.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "moneygram_service", "label": "MoneyGram / phone cards", "source_url": "https://saragaindy.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "halal_meat", "label": "Halal meat", "source_url": "https://saragaindy.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "live_fish", "label": "Live fish / seafood", "source_url": "https://saragaindy.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "website"},
+        {"gate": "published_hours", "passed": true, "platform": "website"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "website"},
+        {"gate": "functional_website", "passed": true, "platform": "website"}
+      ]
+    },
+    {
+      "business_name": "Kaura International Food Market",
+      "category": "African Goods Store / International Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "4271 Lafayette Rd, Indianapolis, IN 46254",
+      "phone": "(317) 297-7036",
+      "website": "https://www.kauramarket.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "MapQuest / Wheree", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "reviews"], "url": "https://www.mapquest.com/us/indiana/kaura-international-food-market-388266416", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": 8.4,
+      "review_count": 6,
+      "observed_attributes": [
+        {"platform": "wheree", "key": "snap_ebt", "label": "SNAP/EBT accepted", "source_url": "https://kaura-international-food-market.wheree.com/", "as_of": "2026-09-10"},
+        {"platform": "wheree", "key": "wheelchair_accessible", "label": "Wheelchair accessible", "source_url": "https://kaura-international-food-market.wheree.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Mecca Market",
+      "category": "Halal Grocery / International Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "1205 S High School Rd, Indianapolis, IN 46241",
+      "phone": "(317) 247-5353",
+      "website": "https://maccamarket.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "Mecca Market official site / Zabihah", "role": "primary_source", "evidence_types": ["website", "halal_status", "hours", "products"], "url": "https://maccamarket.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "halal_meat", "label": "Halal meat", "source_url": "https://maccamarket.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "in_house_restaurant", "label": "In-house restaurant", "source_url": "https://maccamarket.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "official_website"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "official_website"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Ethiopian Market LLC",
+      "category": "Ethiopian / East African Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "7355 W 10th St, Indianapolis, IN 46214",
+      "phone": "(317) 332-8984",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_CATEGORY_SPECIALIZATION", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Loc8NearMe / Foreigner Bazaar", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "product_terms"], "url": "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "loc8nearme", "key": "teff_flour", "label": "Teff flour", "source_url": "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/", "as_of": "2026-09-10"},
+        {"platform": "loc8nearme", "key": "injera", "label": "Injera / takeaway food", "source_url": "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Senay Habesha (Ethiopian & Eritrean) Store",
+      "category": "Ethiopian / Eritrean Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "5636 W Washington St, Indianapolis, IN 46241",
+      "phone": "(317) 523-5197",
+      "website": "http://senayhabeshastore.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_CATEGORY_SPECIALIZATION", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Shops1000 / Loc8NearMe", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "website"], "url": "https://www.shops1000.com/US/Indianapolis/100767611860632/Senay-habesha-store", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "habesha_products", "label": "Habesha products", "source_url": "https://www.shops1000.com/US/Indianapolis/100767611860632/Senay-habesha-store", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "African Market",
+      "category": "African Goods Store",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "8057 E 38th St, Indianapolis, IN 46226",
+      "phone": "(317) 602-8322",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "Find African Foods / Foodbevg", "role": "vertical_directory", "evidence_types": ["address", "phone", "cooked_food", "product_terms"], "url": "https://www.findafricanfoods.com/stores/us/indianapolis/african-market", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "foodbevg", "key": "cooked_food", "label": "Cooked food Friday/Saturday", "source_url": "https://www.foodbevg.com/US/Indianapolis/105909770859398/African-Market", "as_of": "2026-09-10"},
+        {"platform": "foodbevg", "key": "delivery", "label": "Delivery over $50", "source_url": "https://www.foodbevg.com/US/Indianapolis/105909770859398/African-Market", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "vertical_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "social_platform"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "vertical_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "American International Market (AIM Mart / Grocery Hub)",
+      "category": "International Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "1435 W 86th St, Indianapolis, IN 46260",
+      "phone": "(317) 316-7718",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "probable",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_POSSIBLE_CATEGORY_MISALIGNMENT"],
+      "discovery_provenance": [
+        {"source": "IndyStar / Muslim Run", "role": "news_social", "evidence_types": ["address", "phone", "international_scope", "halal"], "url": "https://eu.indystar.com/story/news/2022/02/25/international-market-indianapolis-aim-mart-moving-into-former-marsh-86th-and-ditch-grocery/6911985001/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "news", "key": "halal_kosher_meat", "label": "Halal and kosher meat", "source_url": "https://eu.indystar.com/story/news/2022/02/25/international-market-indianapolis-aim-mart-moving-into-former-marsh-86th-and-ditch-grocery/6911985001/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "news_social"},
+        {"gate": "published_hours", "passed": false, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": false, "platform": "news_social"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Halal Supermarket / International Foods",
+      "category": "Halal Grocery / African & Middle Eastern",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "4861 W 38th St, Indianapolis, IN 46254",
+      "phone": "(317) 672-7685",
+      "website": "https://halalsupermarketindy.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_CATEGORY_SPECIALIZATION", "INT_ACTIVE_OPERATIONAL_EVIDENCE"],
+      "discovery_provenance": [
+        {"source": "Halal Supermarket official site / Apple Maps", "role": "primary_source", "evidence_types": ["website", "hours", "zabiha_halal", "delivery"], "url": "https://halalsupermarketindy.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "zabiha_halal", "label": "Zabiha halal certified", "source_url": "https://halalsupermarketindy.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "delivery", "label": "Delivery", "source_url": "https://halalsupermarketindy.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "official_website"},
+        {"gate": "published_hours", "passed": true, "platform": "official_website"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "official_website"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Chingitti Halal Market",
+      "category": "Halal Grocery / African & Middle Eastern",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "711 E Thompson Rd, Indianapolis, IN 46227",
+      "phone": "(317) 552-2738",
+      "website": "http://chingittihalal.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_CATEGORY_SPECIALIZATION", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Zabihah / Foodbevg", "role": "vertical_directory", "evidence_types": ["address", "phone", "halal", "hours"], "url": "https://www.zabihah.com/restaurants/cbf33e16-7767-11ef-95ae-6045bdeb9f57/chingitti-halal-market-indianapolis-in", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": 4.8,
+      "review_count": 50,
+      "observed_attributes": [
+        {"platform": "foodbevg", "key": "halal_signage", "label": "Halal signage", "source_url": "https://www.foodbevg.com/US/Indianapolis/119535351128867/Chingitti-halal-market", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": false, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "vertical_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "vertical_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Sant Yalla International African Market",
+      "category": "African Goods Store",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "2989 W 71st St, Indianapolis, IN 46268",
+      "phone": "(317) 220-8555",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "Foreigner Bazaar / Loc8NearMe / Muslim Listings", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "photos"], "url": "https://www.loc8nearme.com/indiana/indianapolis/sant-yalla-international-african-market/5763785/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "muslimlistings", "key": "daily_hours", "label": "Daily 9am-9pm", "source_url": "https://muslimlistings.org/listing/sant-yalla-international-african-market/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Nhyira International Market",
+      "category": "African & Caribbean Grocery",
+      "city": "Greenwood",
+      "state": "IN",
+      "address": "1001 N State Rd 135, Suite B7, Greenwood, IN 46142",
+      "phone": "(317) 743-8138",
+      "website": "https://www.nhyiramarket.com/",
+      "gbp_url": null,
+      "location_status": "metro_area",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Towne Post Network / Foreigner Bazaar", "role": "vertical_directory", "evidence_types": ["address", "phone", "website", "product_scope"], "url": "https://townepost.com/indiana/center-grove/nhyira-international-market/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "vertical_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "vertical_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "vertical_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "KB International Inc",
+      "category": "African & Caribbean Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "5425 N Keystone Ave, Suite 400, Indianapolis, IN 46220",
+      "phone": "(317) 202-2402",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_CATEGORY_SPECIALIZATION", "INT_ACTIVE_OPERATIONAL_EVIDENCE"],
+      "discovery_provenance": [
+        {"source": "Wheree / MapQuest", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "reviews"], "url": "https://kb-international-inc.wheree.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": 4.4,
+      "review_count": 111,
+      "observed_attributes": [
+        {"platform": "wheree", "key": "nigerian_ghanaian", "label": "Nigerian & Ghanaian items", "source_url": "https://kb-international-inc.wheree.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": false, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    }
+  ],
+  "qualifying_businesses": [
+    {
+      "business_name": "Saraga International Grocery",
+      "category": "International Grocery / African Goods",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "3605 Commercial Dr, Indianapolis, IN 46222",
+      "phone": "(317) 388-9999",
+      "website": "https://saragaindy.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "local_chain",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION", "INT_UNDEREXPOSED_CREDENTIAL"],
+      "discovery_provenance": [
+        {"source": "Saraga International Grocery official site", "role": "primary_source", "evidence_types": ["website", "locations", "hours", "product_scope"], "url": "https://saragaindy.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "moneygram_service", "label": "MoneyGram / phone cards", "source_url": "https://saragaindy.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "halal_meat", "label": "Halal meat", "source_url": "https://saragaindy.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "live_fish", "label": "Live fish / seafood", "source_url": "https://saragaindy.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "website"},
+        {"gate": "published_hours", "passed": true, "platform": "website"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "website"},
+        {"gate": "functional_website", "passed": true, "platform": "website"}
+      ]
+    },
+    {
+      "business_name": "Kaura International Food Market",
+      "category": "African Goods Store / International Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "4271 Lafayette Rd, Indianapolis, IN 46254",
+      "phone": "(317) 297-7036",
+      "website": "https://www.kauramarket.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "MapQuest / Wheree", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "reviews"], "url": "https://www.mapquest.com/us/indiana/kaura-international-food-market-388266416", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": 8.4,
+      "review_count": 6,
+      "observed_attributes": [
+        {"platform": "wheree", "key": "snap_ebt", "label": "SNAP/EBT accepted", "source_url": "https://kaura-international-food-market.wheree.com/", "as_of": "2026-09-10"},
+        {"platform": "wheree", "key": "wheelchair_accessible", "label": "Wheelchair accessible", "source_url": "https://kaura-international-food-market.wheree.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Mecca Market",
+      "category": "Halal Grocery / International Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "1205 S High School Rd, Indianapolis, IN 46241",
+      "phone": "(317) 247-5353",
+      "website": "https://maccamarket.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "Mecca Market official site / Zabihah", "role": "primary_source", "evidence_types": ["website", "halal_status", "hours", "products"], "url": "https://maccamarket.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "halal_meat", "label": "Halal meat", "source_url": "https://maccamarket.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "in_house_restaurant", "label": "In-house restaurant", "source_url": "https://maccamarket.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "official_website"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "official_website"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Ethiopian Market LLC",
+      "category": "Ethiopian / East African Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "7355 W 10th St, Indianapolis, IN 46214",
+      "phone": "(317) 332-8984",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_CATEGORY_SPECIALIZATION", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Loc8NearMe / Foreigner Bazaar", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "product_terms"], "url": "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "loc8nearme", "key": "teff_flour", "label": "Teff flour", "source_url": "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/", "as_of": "2026-09-10"},
+        {"platform": "loc8nearme", "key": "injera", "label": "Injera / takeaway food", "source_url": "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Senay Habesha (Ethiopian & Eritrean) Store",
+      "category": "Ethiopian / Eritrean Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "5636 W Washington St, Indianapolis, IN 46241",
+      "phone": "(317) 523-5197",
+      "website": "http://senayhabeshastore.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_CATEGORY_SPECIALIZATION", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Shops1000 / Loc8NearMe", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "website"], "url": "https://www.shops1000.com/US/Indianapolis/100767611860632/Senay-habesha-store", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "habesha_products", "label": "Habesha products", "source_url": "https://www.shops1000.com/US/Indianapolis/100767611860632/Senay-habesha-store", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "African Market",
+      "category": "African Goods Store",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "8057 E 38th St, Indianapolis, IN 46226",
+      "phone": "(317) 602-8322",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "Find African Foods / Foodbevg", "role": "vertical_directory", "evidence_types": ["address", "phone", "cooked_food", "product_terms"], "url": "https://www.findafricanfoods.com/stores/us/indianapolis/african-market", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "foodbevg", "key": "cooked_food", "label": "Cooked food Friday/Saturday", "source_url": "https://www.foodbevg.com/US/Indianapolis/105909770859398/African-Market", "as_of": "2026-09-10"},
+        {"platform": "foodbevg", "key": "delivery", "label": "Delivery over $50", "source_url": "https://www.foodbevg.com/US/Indianapolis/105909770859398/African-Market", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "vertical_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "social_platform"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "vertical_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "American International Market (AIM Mart / Grocery Hub)",
+      "category": "International Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "1435 W 86th St, Indianapolis, IN 46260",
+      "phone": "(317) 316-7718",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "probable",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_POSSIBLE_CATEGORY_MISALIGNMENT"],
+      "discovery_provenance": [
+        {"source": "IndyStar / Muslim Run", "role": "news_social", "evidence_types": ["address", "phone", "international_scope", "halal"], "url": "https://eu.indystar.com/story/news/2022/02/25/international-market-indianapolis-aim-mart-moving-into-former-marsh-86th-and-ditch-grocery/6911985001/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "news", "key": "halal_kosher_meat", "label": "Halal and kosher meat", "source_url": "https://eu.indystar.com/story/news/2022/02/25/international-market-indianapolis-aim-mart-moving-into-former-marsh-86th-and-ditch-grocery/6911985001/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "news_social"},
+        {"gate": "published_hours", "passed": false, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": false, "platform": "news_social"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Halal Supermarket / International Foods",
+      "category": "Halal Grocery / African & Middle Eastern",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "4861 W 38th St, Indianapolis, IN 46254",
+      "phone": "(317) 672-7685",
+      "website": "https://halalsupermarketindy.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_CATEGORY_SPECIALIZATION", "INT_ACTIVE_OPERATIONAL_EVIDENCE"],
+      "discovery_provenance": [
+        {"source": "Halal Supermarket official site / Apple Maps", "role": "primary_source", "evidence_types": ["website", "hours", "zabiha_halal", "delivery"], "url": "https://halalsupermarketindy.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "high",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "website", "key": "zabiha_halal", "label": "Zabiha halal certified", "source_url": "https://halalsupermarketindy.com/", "as_of": "2026-09-10"},
+        {"platform": "website", "key": "delivery", "label": "Delivery", "source_url": "https://halalsupermarketindy.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": true,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "official_website"},
+        {"gate": "published_hours", "passed": true, "platform": "official_website"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "official_website"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Chingitti Halal Market",
+      "category": "Halal Grocery / African & Middle Eastern",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "711 E Thompson Rd, Indianapolis, IN 46227",
+      "phone": "(317) 552-2738",
+      "website": "http://chingittihalal.com/",
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_CATEGORY_SPECIALIZATION", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Zabihah / Foodbevg", "role": "vertical_directory", "evidence_types": ["address", "phone", "halal", "hours"], "url": "https://www.zabihah.com/restaurants/cbf33e16-7767-11ef-95ae-6045bdeb9f57/chingitti-halal-market-indianapolis-in", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": 4.8,
+      "review_count": 50,
+      "observed_attributes": [
+        {"platform": "foodbevg", "key": "halal_signage", "label": "Halal signage", "source_url": "https://www.foodbevg.com/US/Indianapolis/119535351128867/Chingitti-halal-market", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": false, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "vertical_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "vertical_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Sant Yalla International African Market",
+      "category": "African Goods Store",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "2989 W 71st St, Indianapolis, IN 46268",
+      "phone": "(317) 220-8555",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_MULTISOURCE_IDENTITY", "INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION"],
+      "discovery_provenance": [
+        {"source": "Foreigner Bazaar / Loc8NearMe / Muslim Listings", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "photos"], "url": "https://www.loc8nearme.com/indiana/indianapolis/sant-yalla-international-african-market/5763785/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [
+        {"platform": "muslimlistings", "key": "daily_hours", "label": "Daily 9am-9pm", "source_url": "https://muslimlistings.org/listing/sant-yalla-international-african-market/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "Nhyira International Market",
+      "category": "African & Caribbean Grocery",
+      "city": "Greenwood",
+      "state": "IN",
+      "address": "1001 N State Rd 135, Suite B7, Greenwood, IN 46142",
+      "phone": "(317) 743-8138",
+      "website": "https://www.nhyiramarket.com/",
+      "gbp_url": null,
+      "location_status": "metro_area",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "high",
+      "discovery_signals": ["INT_ACTIVE_OPERATIONAL_EVIDENCE", "INT_CATEGORY_SPECIALIZATION", "INT_VERTICAL_SOURCE_DISCOVERY"],
+      "discovery_provenance": [
+        {"source": "Towne Post Network / Foreigner Bazaar", "role": "vertical_directory", "evidence_types": ["address", "phone", "website", "product_scope"], "url": "https://townepost.com/indiana/center-grove/nhyira-international-market/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": null,
+      "review_count": null,
+      "observed_attributes": [],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": true, "platform": "vertical_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "vertical_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "vertical_directory"},
+        {"gate": "functional_website", "passed": true, "platform": "official_website"}
+      ]
+    },
+    {
+      "business_name": "KB International Inc",
+      "category": "African & Caribbean Grocery",
+      "city": "Indianapolis",
+      "state": "IN",
+      "address": "5425 N Keystone Ave, Suite 400, Indianapolis, IN 46220",
+      "phone": "(317) 202-2402",
+      "website": null,
+      "gbp_url": null,
+      "location_status": "inside_city",
+      "ownership_type": "independent",
+      "category_fit": "verified",
+      "identity_confidence": "medium",
+      "discovery_signals": ["INT_CATEGORY_SPECIALIZATION", "INT_ACTIVE_OPERATIONAL_EVIDENCE"],
+      "discovery_provenance": [
+        {"source": "Wheree / MapQuest", "role": "mainstream_directory", "evidence_types": ["address", "phone", "hours", "reviews"], "url": "https://kb-international-inc.wheree.com/", "accessed_at": "2026-09-10"}
+      ],
+      "business_seek_recommended": true,
+      "business_seek_priority": "medium",
+      "rating": 4.4,
+      "review_count": 111,
+      "observed_attributes": [
+        {"platform": "wheree", "key": "nigerian_ghanaian", "label": "Nigerian & Ghanaian items", "source_url": "https://kb-international-inc.wheree.com/", "as_of": "2026-09-10"}
+      ],
+      "gold_standard_match": false,
+      "gold_standard_gate_results": [
+        {"gate": "canonical_nap_consistency", "passed": false, "platform": "mainstream_directory"},
+        {"gate": "published_hours", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "category_specific_positioning", "passed": true, "platform": "mainstream_directory"},
+        {"gate": "functional_website", "passed": false, "platform": "official_website"}
+      ]
+    }
+  ],
+  "candidate_count": 12,
+  "qualifying_count": 12,
+  "hold_count": 0,
+  "category_definition": "African Grocery Store: a retail storefront or market-plus-restaurant business that sells African pantry staples (fufu/poundo flour, egusi, gari, teff, injera, berbere, suya, palm oil, smoked/dried fish, attiéké, shea-based cosmetics), fresh/frozen produce, meats, spices, beverages, and related specialty goods. Subcategories include West African (Nigerian/Ghanaian), East African/Habesha (Ethiopian/Eritrean), Somali/halal, pan-African/Caribbean hybrids, and international supermarkets with substantial African sections. Business models are product-first, often hybrid with prepared/cooked food, money-transfer services, or halal butcher counters.",
+  "geographic_classification_notes": "All candidates were classified based on the city field in the source. Indianapolis addresses were treated as inside_city. Nhyira International Market is in Greenwood (Johnson County) and was classified as metro_area. Additional leads were surfaced in Fishers, Fort Wayne, and Huntertown, but only the metro-relevant and Indianapolis candidates are represented in the qualifying set. No national/regional chains were found; Saraga is treated as a local multi-location operator despite an out-of-state Columbus, OH location.",
+  "ownership_exclusion_notes": "No national_chain, national_franchise, or regional_chain entities were identified. Saraga International Grocery is the largest multi-location operator (3 Indianapolis-metro locations plus 1 in Columbus, OH); it is retained in the competitive benchmark set as the local anchor per the Category Intelligence Profile. All other records are independent or single-location operators.",
+  "profile_id": "mip-yw9gkx0e",
+  "profile_version": 1,
+  "platform_analysis": {
+    "gold_standard_profile_id": "mip-zlu54lle",
+    "gold_standard_profile_version": 16,
+    "gold_standard_platform": "cross-platform",
+    "platform_breakdown": [
+      {
+        "platform": "official_website",
+        "present_count": 6,
+        "absent_count": 6,
+        "meets_gold_standard_count": 6,
+        "common_gate_failures": []
+      },
+      {
+        "platform": "mainstream_directory",
+        "present_count": 11,
+        "absent_count": 1,
+        "meets_gold_standard_count": 6,
+        "common_gate_failures": [
+          {"gate": "canonical_nap_consistency", "failed_count": 2},
+          {"gate": "functional_website", "failed_count": 5}
+        ]
+      },
+      {
+        "platform": "vertical_directory",
+        "present_count": 6,
+        "absent_count": 6,
+        "meets_gold_standard_count": 5,
+        "common_gate_failures": [
+          {"gate": "canonical_nap_consistency", "failed_count": 1}
+        ]
+      },
+      {
+        "platform": "social_platform",
+        "present_count": 2,
+        "absent_count": 10,
+        "meets_gold_standard_count": 1,
+        "common_gate_failures": [
+          {"gate": "functional_website", "failed_count": 1}
+        ]
+      }
+    ],
+    "candidates_meeting_all_gates": 6,
+    "most_common_gate_failures": [
+      {"gate": "functional_website", "failed_count": 6, "severity": "non_negotiable"},
+      {"gate": "canonical_nap_consistency", "failed_count": 3, "severity": "non_negotiable"},
+      {"gate": "category_specific_positioning", "failed_count": 1, "severity": "non_negotiable"},
+      {"gate": "published_hours", "failed_count": 1, "severity": "non_negotiable"}
+    ],
+    "outreach_recommendation": {
+      "primary_platform": "mainstream_directory",
+      "platform_rationale": "Mainstream directory listings (MapQuest, Wheree, Atly, Loc8NearMe, Waze) are the widest observed presence channel for this competitive set, but they carry the most fixable NAP inconsistencies, missing hours, and absent owned-website links. Cleaning and claiming these is the highest-leverage near-term action before moving to Google/Bing/Yelp canonical profiles.",
+      "platform_specific_opportunities": [
+        {"platform": "official_website", "opportunity": "6 of 12 candidates have a working owned site; 6 lack one, leaving a clear website-creation opportunity.", "evidence_summary": "Ethiopian Market LLC, African Market, AIM Mart, Sant Yalla, and KB International have no owned website surfaced; Chingitti has one but NAP conflicts remain."},
+        {"platform": "mainstream_directory", "opportunity": "5 candidates without an owned website plus 2 with NAP conflicts create 7 NAP/hours cleanup targets.", "evidence_summary": "Kaura, Ethiopian, Chingitti, and KB have inconsistent or thin directory entries; many listings are auto-aggregated and unclaimed."},
+        {"platform": "vertical_directory", "opportunity": "African-specific directories (Find African Foods, Zabihah, ChamberofCommerce) are present but often stale or unverified.", "evidence_summary": "Several candidates appear in vertical directories with outdated phone/address fragments; active claim and refresh would improve category-specific visibility."}
+      ],
+      "recommended_platform_focus": "mainstream_directory",
+      "primary_angle": "Strengthen your NAP, hours, and African category positioning on the directories where Indianapolis African grocery shoppers already search, then build/claim an owned website and Google Business Profile.",
+      "suggested_call_to_action": "Claim and correct your MapQuest, Wheree, and Loc8NearMe listings; add a dedicated website with clear African product categories, hours, and local phone; and get listed on Find African Foods and Zabihah."
+    }
+  }
+}

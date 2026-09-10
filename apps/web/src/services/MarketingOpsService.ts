@@ -5321,18 +5321,22 @@ export interface CoverageSlot {
   city: string | null;
   state: string | null;
   platform: string | null;
-  // 'inflight' — an intelligence campaign exists for this slot but has not yet
-  // produced a draft/active profile. profile_id holds the campaign id.
-  // 'discovered' — gold-standards platform discovery has executed (completed
-  // execution / imported scan audit) but produced no platform profile by
-  // design. profile_id holds the campaign id.
-  status: 'active' | 'draft' | 'inflight' | 'discovered';
+  // Establishment dimension (the top chip of the stacked pair):
+  // 'pending'  — no campaign, no profile yet (profile_id is empty).
+  // 'inflight' — establishment campaign exists but has not produced a
+  //              draft/active profile yet (profile_id holds the campaign id).
+  // 'draft'    — draft profile exists (profile_id holds the profile id).
+  // 'active'   — active profile exists (profile_id holds the profile id).
+  status: 'active' | 'draft' | 'inflight' | 'pending';
   profile_id: string;
   version: number;
-  // Active slots only: id of an in-flight discovery campaign covering this
-  // same position, when one exists (the arrow opens it instead of the
-  // create-discovery form).
-  discovery_campaign_id?: string | null;
+  // Discovery dimension (the bottom chip of the stacked pair):
+  // 'pending'  — no discovery campaign yet.
+  // 'inflight' — discovery campaign exists but has not executed.
+  // 'executed' — discovery campaign has a completed execution and/or an
+  //              imported audit (gold_standard_scan / intelligence_discovery).
+  discovery_status: 'pending' | 'inflight' | 'executed';
+  discovery_campaign_id: string | null;
 }
 
 export interface CoverageCategory {

@@ -2182,12 +2182,33 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   // ─── Coverage aggregation ─────────────────────────────────────────────
-  // Returns a coverage map of active + draft profiles grouped by category,
-  // showing which profile slots are filled (active), in progress (draft),
-  // in flight (campaign underway, no profile yet), or — gold standards only —
-  // discovered (platform discovery executed, candidates captured, no platform
-  // profile by design). Used by the Coverage admin page to show gaps the
-  // operator needs to fill before discovery campaigns can run.
+  // Returns a coverage map grouped by category with TWO orthogonal state
+  // dimensions per slot position:
+  //
+  //   Establishment (profile production):
+  //     'pending'   — nothing yet (no campaign, no profile)
+  //     'inflight'  — establishment campaign underway, no profile yet
+  //                   (profile_id holds the campaign id)
+  //     'draft'     — draft profile exists (profile_id holds the profile id)
+  //     'active'    — active profile exists (profile_id holds the profile id)
+  //
+  //   Discovery (candidate scan against an established position):
+  //     'pending'   — no discovery campaign
+  //     'inflight'  — discovery campaign underway, not yet executed
+  //     'executed'  — discovery campaign has ≥1 completed execution or an
+  //                   imported audit (discovery_campaign_id holds the id)
+  //
+  // Combined, the emerging/competitive operator flow has seven states:
+  //   1. establishment pending    → create campaign
+  //   2. establishment in-flight  → open campaign
+  //   3. establishment draft      → activate profile
+  //   4. establishment activated  → switch to next discovery
+  //   5. discovery pending        → create campaign
+  //   6. discovery in-flight      → open campaign
+  //   7. discovery executed       → open audit
+  //
+  // Used by the Coverage admin page to show gaps the operator needs to fill
+  // before discovery campaigns can run.
   //
   // Slot dimensions:
   //   gold_standards: per platform (reference_platform), nationwide (city/state null)
@@ -2207,16 +2228,16 @@ export class IntelligenceProfileService extends BaseService {
         city: string | null;
         state: string | null;
         platform: string | null;
-        // 'discovered' — gold-standards discovery campaign for this slot has
-        // executed (completed execution / imported scan audit) but produced no
-        // platform profile by design. profile_id holds the campaign id.
-        status: 'active' | 'draft' | 'inflight' | 'discovered';
+        // Establishment dimension (see block comment above).
+        status: 'active' | 'draft' | 'inflight' | 'pending';
         profile_id: string;
         version: number;
-        // Active slots only: id of an in-flight discovery campaign covering
-        // this same position, when one exists (the arrow opens it instead of
-        // the create form).
-        discovery_campaign_id?: string | null;
+        // Discovery dimension (see block comment above). A discovery
+        // campaign never changes the establishment status — the two
+        // dimensions are tracked independently so the UI can render the
+        // full 7-state flow.
+        discovery_status: 'pending' | 'inflight' | 'executed';
+        discovery_campaign_id: string | null;
       }>;
     }>;
     cities: string[];
@@ -2289,6 +2310,8 @@ export class IntelligenceProfileService extends BaseService {
           status: p.status as 'active' | 'draft',
           profile_id: p.id,
           version: p.version,
+          discovery_status: 'pending',
+          discovery_campaign_id: null,
         });
       }
 
@@ -2300,34 +2323,38 @@ export class IntelligenceProfileService extends BaseService {
       // (inlined here to avoid a circular import).
       const inactiveStages = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
 
-      // Gold-standards discovery completion (Gold Standards only): a
-      // platform-specific gold-standard DISCOVERY campaign never produces a
-      // platform profile — discovery imports create audits, not drafts (the
-      // platform slot deliberately reuses the all-platforms establishment
-      // profile). Its review-track stage never reaches a terminal value, so
-      // without this check the slot would render blue 'inflight' forever even
-      // after the scan executed and captured candidates. A campaign with at
-      // least one completed execution or one imported scan audit counts as
-      // done → slot status 'discovered'.
-      const goldDiscoveryCampaignIds = intelligenceCampaigns
+      // Discovery execution detection (all focuses): a discovery campaign is
+      // 'executed' once it has at least one completed execution or one
+      // imported audit (gold_standard_scan / intelligence_discovery imports
+      // land in mkt_audits_list). This cannot be derived from stage: these
+      // campaigns ride the review track and never reach a terminal stage, so
+      // without this check an executed slot renders 'inflight' forever.
+      // Gold-standards platform discovery never produces a platform profile
+      // (the platform slot reuses the all-platforms establishment profile),
+      // and emerging/competitive discovery campaigns produce audits and
+      // queue candidates rather than profiles — so the establishment and
+      // discovery dimensions must be tracked separately.
+      const discoveryCampaignIds = intelligenceCampaigns
         .filter((c) => !inactiveStages.has(c.stage) &&
           c.intelligence_campaign_kind === 'discovery' &&
-          c.intelligence_focus === 'gold_standards')
+          (c.intelligence_focus === 'emerging' ||
+            c.intelligence_focus === 'competitive' ||
+            c.intelligence_focus === 'gold_standards'))
         .map((c) => c.id);
-      const executedGoldDiscoveryIds = new Set<string>();
-      if (goldDiscoveryCampaignIds.length > 0) {
+      const executedDiscoveryIds = new Set<string>();
+      if (discoveryCampaignIds.length > 0) {
         const [doneExecutions, discoveryAudits] = await Promise.all([
           this.prisma.mkt_prompt_executions_list.findMany({
-            where: { campaign_id: { in: goldDiscoveryCampaignIds }, status: 'completed' },
+            where: { campaign_id: { in: discoveryCampaignIds }, status: 'completed' },
             select: { campaign_id: true },
           }),
           this.prisma.mkt_audits_list.findMany({
-            where: { campaign_id: { in: goldDiscoveryCampaignIds } },
+            where: { campaign_id: { in: discoveryCampaignIds } },
             select: { campaign_id: true },
           }),
         ]);
         for (const row of [...doneExecutions, ...discoveryAudits]) {
-          executedGoldDiscoveryIds.add(row.campaign_id);
+          executedDiscoveryIds.add(row.campaign_id);
         }
       }
 
@@ -2359,28 +2386,69 @@ export class IntelligenceProfileService extends BaseService {
           entry = ensureCategory(slug, catName);
           entriesByName.set(nameKey, entry);
         }
-        // Skip when a slot already covers this position (profile slot, or an
-        // earlier in-flight campaign). City-scoped focuses match on city only —
-        // the city chip ignores platform — while gold standards match on
+        // Position matcher: city-scoped focuses match on city only — the
+        // city chip ignores platform — while gold standards match on
         // platform (nationwide = null on both sides).
-        const covered = entry.slots.some((s) =>
+        const samePosition = (s: any) =>
           s.focus === focus &&
           (s.city ?? '') === cityNorm &&
-          (!isGold || (s.platform ?? '') === (platNorm ?? ''))
-        );
-        if (covered) continue;
-        const executedDiscovery = focus === 'gold_standards' &&
-          c.intelligence_campaign_kind === 'discovery' &&
-          executedGoldDiscoveryIds.has(c.id);
-        entry.slots.push({
-          focus,
-          city: cityNorm || null,
-          state: (c.state ?? '').trim() || null,
-          platform: platNorm,
-          status: executedDiscovery ? 'discovered' : 'inflight',
-          profile_id: c.id,
-          version: 0,
-        });
+          (!isGold || (s.platform ?? '') === (platNorm ?? ''));
+
+        if (c.intelligence_campaign_kind === 'establishment') {
+          // Establishment campaign — surface as 'inflight' when the position
+          // has no establishment slot yet (active/draft profile, or an
+          // earlier in-flight establishment campaign). A 'pending' slot
+          // created below to host discovery state does NOT count: the
+          // establishment dimension is still empty, so upgrade it instead of
+          // pushing a second slot.
+          if (entry.slots.some((s) => samePosition(s) && s.status !== 'pending')) continue;
+          const pendingSlot = entry.slots.find((s) => samePosition(s) && s.status === 'pending');
+          if (pendingSlot) {
+            pendingSlot.status = 'inflight';
+            pendingSlot.profile_id = c.id;
+          } else {
+            entry.slots.push({
+              focus,
+              city: cityNorm || null,
+              state: (c.state ?? '').trim() || null,
+              platform: platNorm,
+              status: 'inflight',
+              profile_id: c.id,
+              version: 0,
+              discovery_status: 'pending',
+              discovery_campaign_id: null,
+            });
+          }
+          continue;
+        }
+
+        // Discovery campaign — attach the discovery dimension to the slot
+        // covering this position (any establishment status), creating a
+        // 'pending' slot when none exists (e.g. a gold-standards platform
+        // scan with no platform profile, or an orphaned emerging/competitive
+        // run) so the work is still visible. Newest wins: campaigns arrive
+        // created_at desc, so the first discovery campaign per position
+        // claims the slot and older ones are ignored.
+        const positionSlots = entry.slots.filter((s) => samePosition(s));
+        const discoveryStatus = executedDiscoveryIds.has(c.id) ? 'executed' : 'inflight';
+        if (positionSlots.length > 0) {
+          if (!positionSlots.some((s) => s.discovery_campaign_id)) {
+            positionSlots[0].discovery_status = discoveryStatus;
+            positionSlots[0].discovery_campaign_id = c.id;
+          }
+        } else {
+          entry.slots.push({
+            focus,
+            city: cityNorm || null,
+            state: (c.state ?? '').trim() || null,
+            platform: platNorm,
+            status: 'pending',
+            profile_id: '',
+            version: 0,
+            discovery_status: discoveryStatus,
+            discovery_campaign_id: c.id,
+          });
+        }
       }
 
       // Map each proving ground to the set of intelligence category names it
@@ -2419,40 +2487,9 @@ export class IntelligenceProfileService extends BaseService {
             status: 'active',
             profile_id: pg.id,
             version: 0,
+            discovery_status: 'pending',
+            discovery_campaign_id: null,
           });
-        }
-      }
-
-      // Attach in-flight discovery campaigns to active slots — clicking a green
-      // slot opens the existing discovery campaign instead of creating a
-      // duplicate (the structural-duplicate guardrail would 409). Newest wins
-      // (campaigns arrive created_at desc). Gold standards match on platform
-      // (nationwide = null on both sides); emerging/competitive match on city
-      // only, mirroring how the city chips render.
-      const discoveryCampaignByKey = new Map<string, string>();
-      for (const c of intelligenceCampaigns) {
-        if (inactiveStages.has(c.stage)) continue;
-        if (c.intelligence_campaign_kind !== 'discovery') continue;
-        const focus = c.intelligence_focus as IntelligenceFocus | null;
-        if (focus !== 'emerging' && focus !== 'competitive' && focus !== 'gold_standards') continue;
-        const nameKey = (c.category ?? '').trim().toLowerCase();
-        if (!nameKey) continue;
-        const cityNorm = (c.city ?? '').trim();
-        const isGold = focus === 'gold_standards';
-        const platNorm = isGold && c.intelligence_platform && c.intelligence_platform !== 'all'
-          ? c.intelligence_platform
-          : null;
-        const key = `${nameKey}|${focus}|${cityNorm}|${isGold ? (platNorm ?? '') : ''}`;
-        if (!discoveryCampaignByKey.has(key)) discoveryCampaignByKey.set(key, c.id);
-      }
-      for (const entry of byCategory.values()) {
-        const nameKey = entry.category_name.trim().toLowerCase();
-        for (const s of entry.slots) {
-          if (s.status !== 'active') continue;
-          const isGold = s.focus === 'gold_standards';
-          const key = `${nameKey}|${s.focus}|${(s.city ?? '').trim()}|${isGold ? (s.platform ?? '') : ''}`;
-          const dcId = discoveryCampaignByKey.get(key);
-          if (dcId) s.discovery_campaign_id = dcId;
         }
       }
 
