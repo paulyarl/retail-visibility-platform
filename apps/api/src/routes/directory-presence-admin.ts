@@ -1708,7 +1708,7 @@ router.get('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (r
 });
 
 /**
- * POST /api/admin/directory/presence-seeds/:id/compose
+ * POST /api/admin/directory-presence/presence-seeds/:id/compose
  * Return the deterministic composed enrichment for a seed (audit: null, market profile).
  */
 router.post('/presence-seeds/:id/compose', requirePlatformAdmin, async (req: Request, res: Response) => {
@@ -1724,7 +1724,7 @@ router.post('/presence-seeds/:id/compose', requirePlatformAdmin, async (req: Req
   } catch (error: any) {
     const status = error?.message === 'seed_not_found' ? 404 : 500;
     if (status === 500) {
-      logger.error('[POST /api/admin/directory/presence-seeds/:id/compose] Error:', undefined, {
+      logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/compose] Error:', undefined, {
         error: { name: error?.name || 'Error', message: error?.message || String(error) },
       });
     }
@@ -1733,7 +1733,7 @@ router.post('/presence-seeds/:id/compose', requirePlatformAdmin, async (req: Req
 });
 
 /**
- * POST /api/admin/directory/presence-seeds/:id/reset
+ * POST /api/admin/directory-presence/presence-seeds/:id/reset
  * Reset a seed's description/keywords to the composed market enrichment and clear operator override.
  */
 router.post('/presence-seeds/:id/reset', requirePlatformAdmin, async (req: Request, res: Response) => {
@@ -1749,7 +1749,7 @@ router.post('/presence-seeds/:id/reset', requirePlatformAdmin, async (req: Reque
   } catch (error: any) {
     const status = error?.message === 'seed_not_found' ? 404 : 500;
     if (status === 500) {
-      logger.error('[POST /api/admin/directory/presence-seeds/:id/reset] Error:', undefined, {
+      logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/reset] Error:', undefined, {
         error: { name: error?.name || 'Error', message: error?.message || String(error) },
       });
     }

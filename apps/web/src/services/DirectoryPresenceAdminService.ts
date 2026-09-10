@@ -1194,10 +1194,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data?.state ?? data;
   }
 
-  /** POST /api/admin/directory/presence-seeds/:id/compose */
+  /** POST /api/admin/directory-presence/presence-seeds/:id/compose */
   async getSeedComposed(seedId: string): Promise<any> {
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory/presence-seeds/${encodeURIComponent(seedId)}/compose`,
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/compose`,
       { method: 'POST' },
       undefined,
       0,
@@ -1210,10 +1210,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data?.result ?? data;
   }
 
-  /** POST /api/admin/directory/presence-seeds/:id/reset */
+  /** POST /api/admin/directory-presence/presence-seeds/:id/reset */
   async resetSeedOverride(seedId: string): Promise<any> {
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory/presence-seeds/${encodeURIComponent(seedId)}/reset`,
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/reset`,
       { method: 'POST' },
       undefined,
       0,
