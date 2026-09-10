@@ -1,18 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   CreateSeedRequest,
+  DirectoryListingAttribute,
 } from '@/services/DirectoryPresenceAdminService';
+import marketingOpsService, {
+  type ProspectQueueEntry,
+  type Campaign,
+} from '@/services/MarketingOpsService';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { clientLogger } from '@/lib/client-logger';
 import { addressParser } from '@/lib/address-parser';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
-import { Plus, ArrowLeft, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Trash2, Search, Loader2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +25,11 @@ const PROVENANCE_FIELD_KEYS = [
   'name',
   'address',
   'phone',
+  'website',
   'snap_ebt',
   'hours',
   'specialty_line',
+  'same_as',
 ] as const;
 
 interface ProvenanceRow {
@@ -119,6 +126,20 @@ export default function NewPresenceSeedPage() {
     { ...EMPTY_PROVENANCE_ROW, fieldKey: 'address' },
   ]);
 
+  // Load-from-prospect picker
+  const [sourceType, setSourceType] = useState<'queue' | 'campaign'>('queue');
+  const [prospectQuery, setProspectQuery] = useState('');
+  const [queueEntries, setQueueEntries] = useState<ProspectQueueEntry[]>([]);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [campaignResults, setCampaignResults] = useState<Campaign[]>([]);
+  const [campaignSearching, setCampaignSearching] = useState(false);
+  const [loadedFrom, setLoadedFrom] = useState<{
+    kind: 'queue' | 'campaign';
+    id: string;
+    label: string;
+  } | null>(null);
+
   const addProvenanceRow = () =>
     setProvenance((rows) => [...rows, { ...EMPTY_PROVENANCE_ROW }]);
   const removeProvenanceRow = (idx: number) =>
@@ -127,6 +148,253 @@ export default function NewPresenceSeedPage() {
     setProvenance((rows) =>
       rows.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
     );
+
+  // ─── Load from existing prospect ──────────────────────────────────────
+  // Queue entries and campaigns already carry the business identity, NAP,
+  // category, provenance, and sourced attributes — prefill the form from
+  // them instead of retyping. Everything stays editable after loading.
+
+  const loadQueueEntries = async () => {
+    setQueueLoading(true);
+    setQueueError(null);
+    try {
+      const res = await marketingOpsService.listProspectQueue({ limit: 200 });
+      setQueueEntries(res.entries.filter((e) => e.status !== 'dismissed'));
+    } catch (err) {
+      setQueueError(err instanceof Error ? err.message : 'Failed to load prospect queue.');
+    } finally {
+      setQueueLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadQueueEntries();
+  }, []);
+
+  const filteredQueueEntries = useMemo(() => {
+    const q = prospectQuery.trim().toLowerCase();
+    const visible = queueEntries.filter(
+      (e) => !(e as ProspectQueueEntry & { seed_id?: string | null }).seed_id,
+    );
+    if (!q) return visible.slice(0, 25);
+    return visible
+      .filter((e) =>
+        [e.business_name, e.title, e.category, e.city, e.state].some((v) =>
+          (v ?? '').toLowerCase().includes(q),
+        ),
+      )
+      .slice(0, 25);
+  }, [queueEntries, prospectQuery]);
+
+  const searchCampaignProspects = async () => {
+    setCampaignSearching(true);
+    try {
+      const res = await marketingOpsService.listCampaigns({
+        scope: 'business',
+        search: prospectQuery.trim() || undefined,
+        limit: 25,
+      });
+      setCampaignResults(res.items);
+    } catch {
+      setCampaignResults([]);
+    } finally {
+      setCampaignSearching(false);
+    }
+  };
+
+  /** Normalize one snapshot attribute entry (string label or structured object). */
+  const normalizeAttribute = (
+    raw: any,
+    fallbackPlatform: string,
+  ): DirectoryListingAttribute | null => {
+    const slug = (label: string) =>
+      label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (typeof raw === 'string') {
+      const label = raw.trim();
+      return label ? { key: slug(label), label, sourcePlatform: fallbackPlatform } : null;
+    }
+    if (raw && typeof raw === 'object') {
+      const label = String(raw.label ?? raw.value ?? '').trim();
+      if (!label) return null;
+      return {
+        key: String(raw.key ?? '').trim().toLowerCase() || slug(label),
+        label,
+        sourcePlatform:
+          String(raw.sourcePlatform ?? raw.source_platform ?? fallbackPlatform ?? '').trim() ||
+          undefined,
+        sourceUrl: String(raw.sourceUrl ?? raw.source_url ?? '').trim() || undefined,
+        asOf: String(raw.asOf ?? raw.as_of ?? '').trim() || undefined,
+      };
+    }
+    return null;
+  };
+
+  const provenanceRowsFor = (
+    fields: Array<{ fieldKey: string; value: string }>,
+    sourceName: string,
+    sourceUrl: string,
+    confidence: ProvenanceRow['confidence'],
+  ): ProvenanceRow[] =>
+    fields
+      .filter((f) => f.value)
+      .map((f) => ({
+        fieldKey: f.fieldKey,
+        value: f.value,
+        sourceName,
+        sourceUrl,
+        confidence,
+        showOnPublic: true,
+      }));
+
+  const applyQueueEntry = (entry: ProspectQueueEntry) => {
+    const snap = (entry.business_snapshot ?? {}) as Record<string, any>;
+    // Verified NAP (captured on the verification call) wins over the raw
+    // discovery snapshot — mirrors the queue → campaign promotion path.
+    const verified = (snap.verified_nap ?? {}) as Record<string, string>;
+
+    const name = String(entry.business_name || verified.name || entry.title || '').trim();
+    const rawAddress = String(verified.address || snap.address || snap.street_address || '').trim();
+    const parsed = rawAddress && addressParser.canParse(rawAddress)
+      ? addressParser.parse(rawAddress)
+      : null;
+    const phone = String(verified.phone || snap.phone || snap.business_phone || '').trim();
+    const website = String(
+      verified.website
+        || (typeof snap.website === 'string' ? snap.website : snap?.website?.url)
+        || '',
+    ).trim();
+    const stateRaw = String(verified.state || entry.state || parsed?.state || '')
+      .trim()
+      .toUpperCase();
+
+    setBusinessName(name);
+    setAddress(String(parsed?.address_line1 || rawAddress));
+    setCity(String(verified.city || entry.city || parsed?.city || ''));
+    setState(US_STATES.includes(stateRaw) ? stateRaw : '');
+    setZipCode(String(snap.zip_code || parsed?.postal_code || '').trim());
+    setPhone(phone);
+    setWebsite(website);
+    setPrimaryCategory(String(verified.category || entry.category || '').trim());
+    setSecondaryCategories(
+      Array.isArray(snap.secondary_categories)
+        ? snap.secondary_categories.map(String)
+        : [],
+    );
+    setLatitude(snap.latitude != null ? String(snap.latitude) : '');
+    setLongitude(snap.longitude != null ? String(snap.longitude) : '');
+
+    if (snap.snap_ebt_reported) {
+      setSnapEbtReported(true);
+      if (snap.snap_ebt_as_of) setSnapEbtAsOf(String(snap.snap_ebt_as_of).slice(0, 10));
+      if (snap.snap_ebt_source) setSnapEbtSource(String(snap.snap_ebt_source));
+      if (snap.snap_ebt_source_name) setSnapEbtSourceName(String(snap.snap_ebt_source_name));
+    }
+
+    const attrs = (Array.isArray(snap.attributes) ? snap.attributes : [])
+      .map((a: any) => normalizeAttribute(a, 'queue_snapshot'))
+      .filter(Boolean) as DirectoryListingAttribute[];
+    setAttributesJson(attrs.length > 0 ? JSON.stringify(attrs, null, 2) : '');
+
+    const conf: ProvenanceRow['confidence'] =
+      entry.identity_confidence === 'high'
+        ? 'high'
+        : entry.identity_confidence === 'low'
+          ? 'low'
+          : 'medium';
+    setIdentityConfidence(conf === 'low' ? 'medium' : conf);
+    setCategoryFit(entry.category_fit === 'verified' ? 'verified' : 'probable');
+    setSeedBatch(`from-queue-${entry.id}`);
+    if (entry.note) setNotes(entry.note);
+
+    const provSource = `prospect_queue:${entry.source_kind}`;
+    const provUrl = entry.source_campaign_id
+      ? `/settings/admin/marketing-ops/campaigns/${entry.source_campaign_id}`
+      : '/settings/admin/marketing-ops/queue';
+    setProvenance(
+      provenanceRowsFor(
+        [
+          { fieldKey: 'name', value: name },
+          { fieldKey: 'address', value: String(parsed?.address_line1 || rawAddress) },
+          { fieldKey: 'phone', value: phone },
+          { fieldKey: 'website', value: website },
+        ],
+        provSource,
+        provUrl,
+        conf,
+      ),
+    );
+    setLoadedFrom({ kind: 'queue', id: entry.id, label: name || entry.id });
+  };
+
+  const applyCampaignProspect = (campaign: Campaign) => {
+    const name = String(campaign.business_name || campaign.title || '').trim();
+    const address = [campaign.address_line1, campaign.address_line2]
+      .filter(Boolean)
+      .join(', ');
+    const phone = String(campaign.phone || '').trim();
+    const website = String(campaign.website_url || '').trim();
+    const stateRaw = String(campaign.address_state || campaign.state || '')
+      .trim()
+      .toUpperCase();
+
+    setBusinessName(name);
+    setAddress(address);
+    setCity(String(campaign.address_city || campaign.city || ''));
+    setState(US_STATES.includes(stateRaw) ? stateRaw : '');
+    setZipCode(String(campaign.address_zip || ''));
+    setPhone(phone);
+    setWebsite(website);
+    setPrimaryCategory(String(campaign.category || '').trim());
+    setSecondaryCategories([]);
+    setLatitude('');
+    setLongitude('');
+    setSnapEbtReported(false);
+    setSnapEbtAsOf('');
+    setSnapEbtSource('');
+    setSnapEbtSourceName('');
+    // Sourced attributes with per-attribute evidence live on the campaign's
+    // audits, not the campaign row — the seed detail page's suggestion miner
+    // surfaces them once the seed is linked (done after create below).
+    setAttributesJson('');
+    setIdentityConfidence('medium');
+    setCategoryFit('probable');
+    setSeedBatch(`from-campaign-${campaign.display_id || campaign.id}`);
+    setNotes('');
+
+    const provUrl = `/settings/admin/marketing-ops/campaigns/${campaign.id}`;
+    const sameAsUrls = [
+      ...(Array.isArray(campaign.directory_profiles)
+        ? campaign.directory_profiles.map((p) => p?.url).filter(Boolean)
+        : []),
+      ...(Array.isArray(campaign.social_profiles)
+        ? campaign.social_profiles.map((p) => p?.url).filter(Boolean)
+        : []),
+    ] as string[];
+    setProvenance([
+      ...provenanceRowsFor(
+        [
+          { fieldKey: 'name', value: name },
+          { fieldKey: 'address', value: address },
+          { fieldKey: 'phone', value: phone },
+          { fieldKey: 'website', value: website },
+        ],
+        'campaign_record',
+        provUrl,
+        'high',
+      ),
+      ...provenanceRowsFor(
+        [{ fieldKey: 'same_as', value: sameAsUrls.join(', ') }],
+        'campaign_record',
+        provUrl,
+        'high',
+      ),
+    ]);
+    setLoadedFrom({
+      kind: 'campaign',
+      id: campaign.id,
+      label: name || campaign.display_id || campaign.id,
+    });
+  };
 
   const handleAddressChange = (value: string) => {
     if (addressParser.canParse(value)) {
@@ -313,6 +581,22 @@ export default function NewPresenceSeedPage() {
         }
       }
 
+      // When the seed was loaded from a campaign prospect, link it so the
+      // funnel analytics + attribute-suggestion miner can find it.
+      if (loadedFrom?.kind === 'campaign' && loadedFrom.id) {
+        try {
+          await directoryPresenceAdminService.linkCampaign(
+            seed.id,
+            loadedFrom.id,
+            'primary',
+          );
+        } catch (linkErr) {
+          clientLogger.warn('Failed to link seed to source campaign:', {
+            detail: linkErr,
+          });
+        }
+      }
+
       router.push(
         `/settings/admin/directory/presence-seeds/${seed.id}`,
       );
@@ -345,6 +629,174 @@ export default function NewPresenceSeedPage() {
           {error}
         </div>
       )}
+
+      {/* Load from existing prospect */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4 max-w-3xl">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Load from existing prospect
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Optional — prefill the form below from a prospect queue entry or a
+            business campaign. Everything stays editable.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSourceType('queue')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
+              sourceType === 'queue'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            Prospect Queue
+          </button>
+          <button
+            type="button"
+            onClick={() => setSourceType('campaign')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
+              sourceType === 'campaign'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            Campaign Prospect
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className={inputClass}
+            value={prospectQuery}
+            onChange={(e) => setProspectQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && sourceType === 'campaign') {
+                e.preventDefault();
+                searchCampaignProspects();
+              }
+            }}
+            placeholder={
+              sourceType === 'queue'
+                ? 'Filter queue entries by name, category, or city...'
+                : 'Search campaigns by business name, title, or display ID...'
+            }
+          />
+          {sourceType === 'campaign' && (
+            <button
+              type="button"
+              onClick={searchCampaignProspects}
+              disabled={campaignSearching}
+              className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap"
+            >
+              {campaignSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
+              Search
+            </button>
+          )}
+        </div>
+
+        {sourceType === 'queue' &&
+          (queueLoading ? (
+            <p className="text-sm text-gray-500 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading queue entries...
+            </p>
+          ) : queueError ? (
+            <div className="text-sm text-red-600 flex items-center gap-2">
+              {queueError}
+              <button
+                type="button"
+                onClick={loadQueueEntries}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredQueueEntries.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No queue entries available. Add prospects from an audit surface or
+              type the seed manually below.
+            </p>
+          ) : (
+            <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+              {filteredQueueEntries.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => applyQueueEntry(entry)}
+                  className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {entry.business_name || entry.title || entry.id}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {[entry.category, entry.city, entry.state]
+                        .filter(Boolean)
+                        .join(' · ') || 'No location data'}
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-400 whitespace-nowrap">
+                    {entry.status}
+                    {entry.source_kind ? ` · ${entry.source_kind}` : ''}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ))}
+
+        {sourceType === 'campaign' && campaignResults.length > 0 && (
+          <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+            {campaignResults.map((campaign) => (
+              <button
+                key={campaign.id}
+                type="button"
+                onClick={() => applyCampaignProspect(campaign)}
+                className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {campaign.business_name || campaign.title || campaign.id}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {[campaign.category, campaign.city, campaign.state]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+                <div className="text-xs text-gray-400 whitespace-nowrap">
+                  {campaign.display_id || campaign.id} · {campaign.stage}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {loadedFrom && (
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm flex items-start justify-between gap-3">
+            <span>
+              Loaded from{' '}
+              {loadedFrom.kind === 'queue' ? 'queue prospect' : 'campaign'}{' '}
+              <strong>{loadedFrom.label}</strong>. Review every field below —
+              nothing is saved until you create the seed.
+              {loadedFrom.kind === 'queue' &&
+                ' After creating the seed, dismiss the queue entry if it is no longer needed.'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLoadedFrom(null)}
+              className="text-green-700 hover:text-green-900 text-xs font-medium whitespace-nowrap"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+      </section>
 
       <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
         {/* Identity */}
