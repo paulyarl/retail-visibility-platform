@@ -88,6 +88,11 @@ export interface CreateSeedRequest {
   notes?: string;
   slug?: string;
   businessHours?: any;
+  /** SEO enrichment fields (prefilled from the campaign seo-preview). */
+  description?: string;
+  keywords?: string[];
+  sameAs?: string[];
+  seoEnrichment?: any;
   provenance?: Array<{
     fieldKey: string;
     value?: string;
@@ -106,6 +111,25 @@ export interface InviteResult {
 
 /** A sourced attribute chip stored on the listing (migration 267). */
 export interface DirectoryListingAttribute {
+  key: string;
+  label: string;
+  sourcePlatform?: string;
+  sourceUrl?: string;
+  asOf?: string;
+}
+
+/** SEO packet composed from a campaign's business_analysis audit (SeedSeoComposer). */
+export interface SeedSeoPreview {
+  hasAudit: boolean;
+  businessName: string;
+  metaTitle: string;
+  description: string;
+  keywords: string[];
+  secondaryCategories: string[];
+  sameAs: string[];
+  schemaTypeHint: string | null;
+  seoEnrichment: Record<string, unknown> | null;
+}
   key: string;
   label: string;
   sourcePlatform?: string;
@@ -414,6 +438,25 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     );
     const data = result.data?.data ?? result.data;
     return (data as any)?.seed;
+  }
+
+  /**
+   * GET /api/admin/directory-presence/presence-seeds/seo-preview?campaignId=<id>
+   * — SEO packet (description, keywords, same_as, secondary categories, meta
+   * title) composed from the campaign's latest business_analysis audit. Used
+   * by the Create Seed form to prefill its SEO Enrichment section when the
+   * operator loads a campaign prospect.
+   */
+  async getSeoPreview(campaignId: string): Promise<SeedSeoPreview | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/seo-preview?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any) ?? null;
   }
 
   async publishSeed(id: string): Promise<void> {

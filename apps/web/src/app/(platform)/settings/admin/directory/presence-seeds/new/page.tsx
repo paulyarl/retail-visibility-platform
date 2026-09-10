@@ -29,6 +29,8 @@ const PROVENANCE_FIELD_KEYS = [
   'snap_ebt',
   'hours',
   'specialty_line',
+  'description',
+  'keywords',
   'same_as',
 ] as const;
 
@@ -140,6 +142,17 @@ export default function NewPresenceSeedPage() {
     label: string;
   } | null>(null);
 
+  // SEO enrichment (prefilled from the source campaign's business_analysis
+  // audit via the seo-preview endpoint — same composer the automated
+  // campaign → seed path uses).
+  const [description, setDescription] = useState('');
+  const [keywords, setKeywords] = useState('');
+  const [sameAs, setSameAs] = useState('');
+  const [seoMetaTitle, setSeoMetaTitle] = useState('');
+  const [seoHasAudit, setSeoHasAudit] = useState(false);
+  const [seoLoading, setSeoLoading] = useState(false);
+  const [seoEnrichment, setSeoEnrichment] = useState<Record<string, any> | null>(null);
+
   const addProvenanceRow = () =>
     setProvenance((rows) => [...rows, { ...EMPTY_PROVENANCE_ROW }]);
   const removeProvenanceRow = (idx: number) =>
@@ -246,6 +259,56 @@ export default function NewPresenceSeedPage() {
         showOnPublic: true,
       }));
 
+  /**
+   * Prefill the SEO enrichment fields from the source campaign's latest
+   * business_analysis audit (same SeedSeoComposer the automated campaign →
+   * seed path uses). Also upserts provenance rows for the composed fields so
+   * they render publicly per the provenance contract (spec §4.4.6).
+   */
+  const loadSeoPreview = async (campaignId: string) => {
+    setSeoLoading(true);
+    try {
+      const preview = await directoryPresenceAdminService.getSeoPreview(campaignId);
+      if (!preview) return;
+      setSeoMetaTitle(preview.metaTitle || '');
+      setSeoHasAudit(preview.hasAudit);
+      setDescription(preview.description || '');
+      setKeywords((preview.keywords || []).join(', '));
+      setSameAs((preview.sameAs || []).join('\n'));
+      setSeoEnrichment(preview.seoEnrichment ?? null);
+      if ((preview.secondaryCategories || []).length > 0) {
+        setSecondaryCategories((prev) =>
+          prev.length > 0 ? prev : (preview.secondaryCategories as string[]),
+        );
+      }
+      setProvenance((rows) => {
+        const next = [...rows];
+        const upsert = (fieldKey: string, value: string, sourceName: string) => {
+          if (!value) return;
+          const row: ProvenanceRow = {
+            fieldKey,
+            value,
+            sourceName,
+            sourceUrl: `/settings/admin/marketing-ops/campaigns/${campaignId}`,
+            confidence: 'high',
+            showOnPublic: true,
+          };
+          const i = next.findIndex((r) => r.fieldKey === fieldKey);
+          if (i >= 0) next[i] = { ...next[i], ...row };
+          else next.push(row);
+        };
+        upsert('description', preview.description || '', 'seed_seo_composer');
+        upsert('keywords', (preview.keywords || []).join(', '), 'seed_seo_composer');
+        upsert('same_as', (preview.sameAs || []).join(', '), 'business_analysis_audit');
+        return next;
+      });
+    } catch (err) {
+      clientLogger.warn('Failed to load SEO preview:', { detail: err });
+    } finally {
+      setSeoLoading(false);
+    }
+  };
+
   const applyQueueEntry = (entry: ProspectQueueEntry) => {
     const snap = (entry.business_snapshot ?? {}) as Record<string, any>;
     // Verified NAP (captured on the verification call) wins over the raw
@@ -324,6 +387,11 @@ export default function NewPresenceSeedPage() {
       ),
     );
     setLoadedFrom({ kind: 'queue', id: entry.id, label: name || entry.id });
+    // Audit-derived entries point at their source campaign — pull the SEO
+    // packet (description, keywords, same_as) from its business_analysis audit.
+    if (entry.source_campaign_id) {
+      loadSeoPreview(entry.source_campaign_id);
+    }
   };
 
   const applyCampaignProspect = (campaign: Campaign) => {
@@ -394,6 +462,7 @@ export default function NewPresenceSeedPage() {
       id: campaign.id,
       label: name || campaign.display_id || campaign.id,
     });
+    loadSeoPreview(campaign.id);
   };
 
   const handleAddressChange = (value: string) => {
@@ -483,7 +552,6 @@ export default function NewPresenceSeedPage() {
         : undefined,
       latitude: lat,
       longitude: lng,
-      seedBatch: seedBatch.trim(),
       identityConfidence,
       categoryFit,
       notes: notes.trim() || undefined,
@@ -498,6 +566,22 @@ export default function NewPresenceSeedPage() {
           showOnPublic: row.showOnPublic,
         })),
     };
+
+    // SEO enrichment — only send fields that have content.
+    if (description.trim()) payload.description = description.trim();
+    const keywordList = keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .slice(0, 15);
+    if (keywordList.length > 0) payload.keywords = keywordList;
+    const sameAsList = sameAs
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 50);
+    if (sameAsList.length > 0) payload.sameAs = sameAsList;
+    if (seoEnrichment) payload.seoEnrichment = seoEnrichment;
 
     if (snapEbtReported) {
       payload.snapEbtReported = true;
@@ -1109,6 +1193,62 @@ export default function NewPresenceSeedPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+          </div>
+        </section>
+
+        {/* SEO Enrichment */}
+        <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">SEO Enrichment</h2>
+            {seoLoading && (
+              <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Loading from campaign audit...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">
+            Prefilled by the SEO composer from the source campaign's
+            business_analysis audit — the analyst's public narrative becomes the
+            description; keywords compose category, audit store format and
+            additional categories, intelligence-profile synonyms/subcategories,
+            and gold-standard field hints.
+            {seoMetaTitle && !seoLoading && (
+              <>
+                {' '}Composed meta title: <strong>{seoMetaTitle}</strong>
+                {!seoHasAudit && ' (Tier A — no business_analysis audit on the campaign yet)'}
+              </>
+            )}
+          </p>
+          <div>
+            <label className={labelClass}>Description</label>
+            <textarea
+              className={inputClass}
+              rows={3}
+              maxLength={500}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Composed by the SEO composer when loaded from a campaign — otherwise write a public-safe description."
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Keywords (comma-separated)</label>
+            <input
+              className={inputClass}
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="african grocery, indianapolis, international foods"
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Same As (profile URLs, one per line)</label>
+            <textarea
+              className={inputClass}
+              rows={3}
+              value={sameAs}
+              onChange={(e) => setSameAs(e.target.value)}
+              placeholder={'https://www.google.com/maps/place/...\nhttps://www.yelp.com/biz/...'}
+            />
           </div>
         </section>
 

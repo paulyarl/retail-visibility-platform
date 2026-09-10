@@ -2,6 +2,7 @@
  * Admin Directory Presence Seeds Routes
  *
  *   GET    /api/admin/directory/presence-seeds           — list seeds
+ *   GET    /api/admin/directory/presence-seeds/seo-preview — compose a campaign's SEO packet (form prefill)
  *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
  *   POST   /api/admin/directory/presence-seeds/:id/touches — log an outreach touch
  *   GET    /api/admin/directory/presence-seeds/:id/touches — list outreach touches
@@ -85,6 +86,12 @@ const createSeedSchema = z.object({
   notes: z.string().optional(),
   slug: z.string().optional(),
   businessHours: z.any().optional(),
+  // SEO enrichment fields (composed by SeedSeoComposer; prefilled by the
+  // Create Seed form from the seo-preview endpoint when loading a prospect).
+  description: z.string().max(500).optional(),
+  keywords: z.array(z.string().max(100)).max(15).optional(),
+  sameAs: z.array(z.string().max(500)).max(50).optional(),
+  seoEnrichment: z.any().optional(),
   provenance: z.array(z.object({
     fieldKey: z.string(),
     value: z.string().optional(),
@@ -441,6 +448,33 @@ router.get('/presence-seeds/:id/attribute-suggestions', requirePlatformStaff, as
   }
 });
 
+/**
+ * GET /api/admin/directory-presence/presence-seeds/seo-preview?campaignId=<id>
+ *
+ * Compose the SEO packet (meta title, description, keywords, secondary
+ * categories, same_as) the campaign's latest business_analysis audit would
+ * contribute to a seed — without creating anything. The manual Create Seed
+ * form prefills its SEO Enrichment section from this when the operator loads
+ * a campaign prospect (or a queue entry with a source campaign). Declared
+ * before /presence-seeds/:id so 'seo-preview' is not swallowed as an id.
+ */
+router.get('/presence-seeds/seo-preview', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const campaignId = (req.query.campaignId as string | undefined)?.trim();
+    if (!campaignId) {
+      return res.status(400).json({ error: 'campaignId_required' });
+    }
+    const preview = await DirectoryPresenceSeedService.previewCampaignSeo(campaignId);
+    if (!preview) return res.status(404).json({ error: 'campaign_not_found' });
+    res.json({ success: true, ...preview });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/seo-preview] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/presence-seeds/:id — seed detail */
 router.get('/presence-seeds/:id', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
@@ -482,6 +516,10 @@ router.post('/presence-seeds', requirePlatformAdmin, async (req: Request, res: R
       snapEbtSource: input.snapEbtSource,
       snapEbtSourceName: input.snapEbtSourceName,
       attributes: input.attributes,
+      description: input.description,
+      keywords: input.keywords,
+      sameAs: input.sameAs,
+      seoEnrichment: input.seoEnrichment,
       seedBatch: input.seedBatch,
       identityConfidence: input.identityConfidence,
       categoryFit: input.categoryFit,

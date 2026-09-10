@@ -1901,79 +1901,11 @@ class DirectoryPresenceSeedService {
       : 'high';
 
     // ── SEO enrichment (spec §5.1, §4.2) ────────────────────────────────
-    // Resolve intelligence profile with explicit non-gold_standards focus.
-    const seoFocus = (campaign.intelligence_focus === 'gold_standards'
-      ? 'competitive'
-      : campaign.intelligence_focus || 'competitive') as 'emerging' | 'competitive';
-    const profile = await IntelligenceProfileService.resolve(
-      campaign.category,
-      seoFocus,
-      campaign.address_city ?? null,
-      campaign.intelligence_platform ?? null,
-    ).catch(() => null);
-
-    const goldStandard = await IntelligenceProfileService.resolveGoldStandard(
-      campaign.category,
-      campaign.intelligence_platform ?? 'google',
-      campaign.address_city ?? null,
-      campaign.address_state ?? null,
-    ).catch(() => null);
-
-    // Build composer inputs from explicit fields only (never the raw blob)
-    const platformsObj = d.platforms ?? {};
-    const platformProfileUrls: Array<{ platform: string; url: string }> = [];
-    for (const pkey of ['google', 'yelp', 'facebook', 'bbb']) {
-      const pdata = (platformsObj as any)[pkey];
-      if (pdata?.profile_url && typeof pdata.profile_url === 'string') {
-        platformProfileUrls.push({ platform: pkey, url: pdata.profile_url });
-      }
-    }
-
-    const seoPacket: SeedSeoPacket | null = buildSeedSeoPacket({
-      campaign: {
-        businessName,
-        category: campaign.category,
-        addressCity: campaign.address_city ?? null,
-        addressState: campaign.address_state ?? null,
-        neighborhood: campaign.neighborhood ?? null,
-        businessOriginCountry: campaign.business_origin_country ?? null,
-        businessOriginRegion: campaign.business_origin_region ?? null,
-        directoryProfiles: Array.isArray(campaign.directory_profiles)
-          ? campaign.directory_profiles
-          : null,
-        socialProfiles: Array.isArray(campaign.social_profiles)
-          ? campaign.social_profiles
-          : null,
-      },
-      audit: {
-        auditId: audit.id,
-        storeFormat: meta.matched_business?.store_format ?? null,
-        googleAdditionalCategories: google.additional_categories ?? null,
-        platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
-        publicNarrative: d.public_narrative ?? null,
-      },
-      intelligenceProfile: profile
-        ? {
-            profileId: profile.id,
-            synonyms: profile.configuration_json?.synonyms ?? undefined,
-            subcategories: profile.configuration_json?.subcategories ?? undefined,
-            prohibitedKeywords: profile.configuration_json?.prohibited_keywords ?? undefined,
-            schemaOrgType: profile.configuration_json?.schema_org_type ?? null,
-          }
-        : null,
-      goldStandard: goldStandard
-        ? {
-            profileId: goldStandard.id,
-            expectedFieldNames: Array.isArray(goldStandard.configuration_json?.expected_fields)
-              ? (goldStandard.configuration_json.expected_fields as any[]).map((f: any) =>
-                  typeof f === 'string' ? f : f?.field || f?.name,
-                ).filter(Boolean)
-              : undefined,
-          }
-        : null,
-    });
-
-    const seoEnrichmentJson = buildSeoEnrichmentJson(seoPacket);
+    // Composed from the latest business_analysis audit + intelligence
+    // profile + gold standard via the shared composer (also powers the
+    // manual Create Seed form's seo-preview prefill).
+    const { packet: seoPacket, enrichmentJson: seoEnrichmentJson } =
+      await this.composeCampaignSeoPacket(campaign, d, audit.id, businessName);
 
     // ── Sourced attributes (migration 267) ───────────────────────────────
     // Mine every attribute-bearing audit on THIS campaign (gold-standard
@@ -2076,6 +2008,156 @@ class DirectoryPresenceSeedService {
       publicUrl: `/place/${slug}`,
       created: true,
       seoEnriched: true,
+    };
+  }
+
+  /**
+   * Compose the SEO packet (spec §5.1) for a campaign from its latest
+   * business_analysis audit + intelligence profile + gold standard. Shared by
+   * createFromCampaign and previewCampaignSeo so the manual Create Seed form
+   * prefills exactly what the automated path would write. Degrades to Tier A
+   * campaign facts when the audit blob is empty.
+   */
+  private async composeCampaignSeoPacket(
+    campaign: any,
+    auditData: any,
+    auditId: string,
+    businessName: string,
+  ): Promise<{
+    packet: SeedSeoPacket;
+    enrichmentJson: ReturnType<typeof buildSeoEnrichmentJson>;
+  }> {
+    const d = auditData ?? {};
+    const meta = d.audit_metadata ?? {};
+    const google = d.platforms?.google ?? {};
+
+    const seoFocus = (campaign.intelligence_focus === 'gold_standards'
+      ? 'competitive'
+      : campaign.intelligence_focus || 'competitive') as 'emerging' | 'competitive';
+    const profile = await IntelligenceProfileService.resolve(
+      campaign.category,
+      seoFocus,
+      campaign.address_city ?? null,
+      campaign.intelligence_platform ?? null,
+    ).catch(() => null);
+
+    const goldStandard = await IntelligenceProfileService.resolveGoldStandard(
+      campaign.category,
+      campaign.intelligence_platform ?? 'google',
+      campaign.address_city ?? null,
+      campaign.address_state ?? null,
+    ).catch(() => null);
+
+    // Build composer inputs from explicit fields only (never the raw blob)
+    const platformsObj = d.platforms ?? {};
+    const platformProfileUrls: Array<{ platform: string; url: string }> = [];
+    for (const pkey of ['google', 'yelp', 'facebook', 'bbb']) {
+      const pdata = (platformsObj as any)[pkey];
+      if (pdata?.profile_url && typeof pdata.profile_url === 'string') {
+        platformProfileUrls.push({ platform: pkey, url: pdata.profile_url });
+      }
+    }
+
+    const packet = buildSeedSeoPacket({
+      campaign: {
+        businessName,
+        category: campaign.category,
+        addressCity: campaign.address_city ?? null,
+        addressState: campaign.address_state ?? null,
+        neighborhood: campaign.neighborhood ?? null,
+        businessOriginCountry: campaign.business_origin_country ?? null,
+        businessOriginRegion: campaign.business_origin_region ?? null,
+        directoryProfiles: Array.isArray(campaign.directory_profiles)
+          ? campaign.directory_profiles
+          : null,
+        socialProfiles: Array.isArray(campaign.social_profiles)
+          ? campaign.social_profiles
+          : null,
+      },
+      audit: {
+        auditId,
+        storeFormat: meta.matched_business?.store_format ?? null,
+        googleAdditionalCategories: google.additional_categories ?? null,
+        platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
+        publicNarrative: d.public_narrative ?? null,
+      },
+      intelligenceProfile: profile
+        ? {
+            profileId: profile.id,
+            synonyms: profile.configuration_json?.synonyms ?? undefined,
+            subcategories: profile.configuration_json?.subcategories ?? undefined,
+            prohibitedKeywords: profile.configuration_json?.prohibited_keywords ?? undefined,
+            schemaOrgType: profile.configuration_json?.schema_org_type ?? null,
+          }
+        : null,
+      goldStandard: goldStandard
+        ? {
+            profileId: goldStandard.id,
+            expectedFieldNames: Array.isArray(goldStandard.configuration_json?.expected_fields)
+              ? (goldStandard.configuration_json.expected_fields as any[]).map((f: any) =>
+                  typeof f === 'string' ? f : f?.field || f?.name,
+                ).filter(Boolean)
+              : undefined,
+          }
+        : null,
+    });
+
+    return { packet, enrichmentJson: buildSeoEnrichmentJson(packet) };
+  }
+
+  /**
+   * Preview the SEO packet a campaign would contribute to a seed (spec §5.1)
+   * without creating anything — the manual Create Seed form prefills its SEO
+   * enrichment section from this when the operator loads a campaign prospect.
+   * Degrades to Tier A campaign facts when no business_analysis audit exists
+   * (seoEnrichment null in that case — nothing to store).
+   */
+  async previewCampaignSeo(campaignId: string): Promise<{
+    hasAudit: boolean;
+    businessName: string;
+    metaTitle: string;
+    description: string;
+    keywords: string[];
+    secondaryCategories: string[];
+    sameAs: string[];
+    schemaTypeHint: string | null;
+    seoEnrichment: ReturnType<typeof buildSeoEnrichmentJson> | null;
+  } | null> {
+    const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+    });
+    if (!campaign) return null;
+
+    const audit = await (prisma as any).mkt_audits_list.findFirst({
+      where: { campaign_id: campaignId, platform: 'business_analysis' },
+      orderBy: { created_at: 'desc' },
+    });
+    const d = (audit?.audit_data ?? {}) as any;
+    const meta = d.audit_metadata ?? {};
+    const businessName =
+      campaign.business_name ||
+      meta.matched_business?.business_name ||
+      meta.requested_business?.business_name ||
+      campaign.category ||
+      'Business';
+
+    const { packet, enrichmentJson } = await this.composeCampaignSeoPacket(
+      campaign,
+      d,
+      audit?.id ?? 'preview',
+      businessName,
+    );
+
+    return {
+      hasAudit: !!audit,
+      businessName,
+      metaTitle: packet.metaTitle,
+      description: packet.description,
+      keywords: packet.keywords,
+      secondaryCategories: packet.secondaryCategories,
+      sameAs: packet.sameAs,
+      schemaTypeHint: packet.schemaTypeHint,
+      seoEnrichment: audit ? enrichmentJson : null,
     };
   }
 
