@@ -946,6 +946,13 @@ export interface VerificationResolutionInput {
   verifiedAddress?: string;
   verifiedCity?: string;
   verifiedState?: string;
+  // Enrichment fields captured on the verification call — re-enrich the
+  // prospect's record so the campaign created from the queue is born with
+  // verified contact + classification data.
+  verifiedWebsite?: string;
+  verifiedEmail?: string;
+  verifiedCategory?: string;
+  verifiedOwnerName?: string;
   ownerReceptivity?: OwnerReceptivity;
   callNotes?: string;
   nextAction: VerificationNextAction;
@@ -962,6 +969,10 @@ export interface VerificationRecord {
   verified_address?: string;
   verified_city?: string;
   verified_state?: string;
+  verified_website?: string;
+  verified_email?: string;
+  verified_category?: string;
+  verified_owner_name?: string;
   owner_receptivity?: OwnerReceptivity;
   call_notes?: string;
   next_action?: VerificationNextAction;

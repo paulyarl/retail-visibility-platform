@@ -621,6 +621,54 @@ describe('MarketingProspectQueueService', () => {
       );
     });
 
+    it('overlays verified NAP onto the scan snapshot when replaying scan_unmatched entries', async () => {
+      const entry = queueRow({
+        source_kind: 'scan_unmatched',
+        status: 'queued',
+        business_snapshot: scanSnapshot({
+          business_phone: '512-555-0000',
+          website: { status: 'none' },
+          verified_nap: {
+            name: 'Joe Pizza Verified',
+            phone: '512-555-0100',
+            website: 'https://joepizza.example.com',
+            city: 'Dallas',
+            state: 'TX',
+          },
+        }),
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      const newCampaign = { id: 'mcamp-scan-001', city: 'Austin', state: 'TX', assigned_to: null };
+      (MarketingHotProspectService as any).getInstance().deriveBusinessCampaignFromScanBusiness.mockResolvedValue({
+        campaign: newCampaign,
+        created: true,
+      });
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...entry, ...data }),
+      );
+      mockCampaigns.update.mockResolvedValue({ ...newCampaign, city: 'Dallas' });
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      // Snapshot passed to the scan derive carries the verified contact fields.
+      const passedBusiness = (MarketingHotProspectService as any).getInstance()
+        .deriveBusinessCampaignFromScanBusiness.mock.calls[0][1];
+      expect(passedBusiness.business_name).toBe('Joe Pizza Verified');
+      expect(passedBusiness.business_phone).toBe('512-555-0100');
+      expect(passedBusiness.website).toEqual(expect.objectContaining({ url: 'https://joepizza.example.com' }));
+      expect(passedBusiness.category).toBe('restaurant');
+      // Verified city differs from the parent-derived city → patched.
+      expect(mockCampaigns.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mcamp-scan-001' },
+          data: { city: 'Dallas' },
+        }),
+      );
+    });
+
     it('replays a category_analysis entry through deriveBusinessCampaign (thin path)', async () => {
       const entry = queueRow({
         business_name: 'Sushi Bar',
@@ -651,6 +699,52 @@ describe('MarketingProspectQueueService', () => {
           reviewCount: 120,
           detectedSignals: ['RA_NO_WEBSITE'],
           assignedTo: ACTING_USER_ID, // entry unassigned → falls back to acting user
+        }),
+        undefined,
+      );
+    });
+
+        undefined,
+      );
+    });
+
+    it('prefers verified_nap over the raw snapshot on the thin path (phone/website/owner/category)', async () => {
+      const entry = queueRow({
+        business_name: 'Sushi Bar',
+        source_kind: 'category_analysis',
+        business_snapshot: thinSnapshot({
+          phone: '512-555-0000',
+          website: 'https://stale.example.com',
+          verified_nap: {
+            name: 'Sushi Bar Verified',
+            phone: '512-555-0100',
+            website: 'https://verified.example.com',
+            category: 'Japanese Grocery',
+            owner_name: 'Kenji Sato',
+          },
+        }),
+        detected_signals: ['RA_NO_WEBSITE'],
+        signal_count: 1,
+        rating: 4.5,
+        review_count: 120,
+        assigned_to: null,
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      const newCampaign = { id: 'mcamp-child-003', assigned_to: ACTING_USER_ID };
+      (MarketingCampaignService as any).deriveBusinessCampaign.mockResolvedValue(newCampaign);
+      mockQueue.update.mockResolvedValue({ ...entry, status: 'campaign_created', processed_campaign_id: 'mcamp-child-003' });
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(MarketingCampaignService.deriveBusinessCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phone: '512-555-0100',
+          websiteUrl: 'https://verified.example.com',
+          ownerNames: ['Kenji Sato'],
+          categoryOverride: 'Japanese Grocery',
         }),
         undefined,
       );
@@ -1004,6 +1098,58 @@ describe('MarketingProspectQueueService', () => {
                 phone: '412-555-0100',
                 address: '123 Main St',
               }),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('writes verified enrichment (website/email/category/owner) onto the entry when nextAction=requeue', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        business_snapshot: { website: 'https://stale.example.com', email: 'old@example.com' },
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow(verifyRow));
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      const result = await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedName: 'Daree Salam African Market',
+        verifiedPhone: '412-555-0100',
+        verifiedWebsite: 'https://dareesalam.example.com',
+        verifiedEmail: 'owner@dareesalam.example.com',
+        verifiedCategory: 'African Grocery',
+        verifiedOwnerName: 'Maria Daree',
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.queueEntry.status).toBe('queued');
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'queued',
+            // Enrichment fields land on the row + snapshot + verification record.
+            category: 'African Grocery',
+            business_snapshot: expect.objectContaining({
+              website: 'https://dareesalam.example.com',
+              email: 'owner@dareesalam.example.com',
+              owner_name: 'Maria Daree',
+              verified_nap: expect.objectContaining({
+                website: 'https://dareesalam.example.com',
+                email: 'owner@dareesalam.example.com',
+                owner_name: 'Maria Daree',
+              }),
+            }),
+            verification: expect.objectContaining({
+              verified_website: 'https://dareesalam.example.com',
+              verified_email: 'owner@dareesalam.example.com',
+              verified_category: 'African Grocery',
+              verified_owner_name: 'Maria Daree',
             }),
           }),
         }),

@@ -71,6 +71,13 @@ export interface VerificationResolutionInput {
   verifiedAddress?: string;
   verifiedCity?: string;
   verifiedState?: string;
+  // Enrichment fields captured on the verification call — written onto the
+  // queue entry's snapshot (and category column) so the campaign derive path
+  // re-enriches the prospect's record instead of inheriting stale data.
+  verifiedWebsite?: string;
+  verifiedEmail?: string;
+  verifiedCategory?: string;
+  verifiedOwnerName?: string;
   ownerReceptivity?: OwnerReceptivity;
   callNotes?: string;
   nextAction: VerificationNextAction;
@@ -88,6 +95,10 @@ export interface VerificationRecord {
   verified_address?: string;
   verified_city?: string;
   verified_state?: string;
+  verified_website?: string;
+  verified_email?: string;
+  verified_category?: string;
+  verified_owner_name?: string;
   owner_receptivity?: OwnerReceptivity;
   call_notes?: string;
   next_action?: VerificationNextAction;
@@ -590,6 +601,14 @@ class MarketingProspectQueueServiceClass extends BaseService {
 
       const assignee = entry.assigned_to ?? input.actingUserId ?? null;
       const snapshot = (entry.business_snapshot as any) ?? {};
+      // Verified NAP/enrichment (written by resolveVerification) takes
+      // precedence over the raw discovery snapshot so a correction captured
+      // on the verification call flows into the campaign.
+      const verifiedNap = (snapshot.verified_nap as Record<string, string> | undefined) ?? {};
+      const snapshotOwnerNames = Array.isArray(snapshot.owner_names) ? (snapshot.owner_names as string[]) : undefined;
+      const ownerNames = verifiedNap.owner_name
+        ? [verifiedNap.owner_name]
+        : ((snapshot.owner_name as string) ? [snapshot.owner_name as string] : snapshotOwnerNames);
 
       let result: { campaign: any; created: boolean };
 
@@ -608,6 +627,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
           city: entry.city ?? '',
           state: entry.state ?? undefined,
           assignedTo: assignee ?? undefined,
+          // Contact enrichment from the snapshot (refreshed by verification
+          // resolution) so the campaign is born with verified NAP + contacts.
+          phone: (verifiedNap.phone as string) ?? (snapshot.phone as string) ?? undefined,
+          email: (verifiedNap.email as string) ?? (snapshot.email as string) ?? undefined,
+          websiteUrl: (verifiedNap.website as string) ?? (snapshot.website as string) ?? undefined,
+          ownerNames,
           notes: [
             `Manually queued prospect (no parent campaign, scope=${campaignScope}).`,
             entry.city ? `City: ${entry.city}` : null,
@@ -663,13 +688,39 @@ class MarketingProspectQueueServiceClass extends BaseService {
       } else if (entry.source_kind === 'city_category_audit' || entry.source_kind === 'scan_unmatched') {
         // Replay path is selected by source_kind — scan-derived entries carry
         // the full business JSON; category-analysis entries carry a thin payload.
+        // Verified NAP/enrichment is overlaid onto the scan-shape keys
+        // (business_phone, website.url, business_name, category) so the
+        // campaign is born with the values confirmed on the verification call.
+        const scanBusiness: any = { ...snapshot };
+        if (verifiedNap.name) scanBusiness.business_name = verifiedNap.name;
+        if (verifiedNap.phone) scanBusiness.business_phone = verifiedNap.phone;
+        if (verifiedNap.website) {
+          scanBusiness.website = {
+            ...((typeof snapshot.website === 'object' && snapshot.website) ? snapshot.website : {}),
+            url: verifiedNap.website,
+          };
+        }
+        if (verifiedNap.category) scanBusiness.category = verifiedNap.category;
+        if (verifiedNap.email) scanBusiness.email = verifiedNap.email;
         const r = await MarketingHotProspectService.getInstance().deriveBusinessCampaignFromScanBusiness(
           entry.source_campaign_id,
-          snapshot,
+          scanBusiness,
           ctx,
           { note: entry.note ?? undefined },
         );
         result = r;
+        // The scan path derives city/state from the parent campaign — apply
+        // the verified location when the operator captured a different one.
+        const geoPatch: any = {};
+        if (verifiedNap.city && r.campaign?.city !== verifiedNap.city) geoPatch.city = verifiedNap.city;
+        if (verifiedNap.state && r.campaign?.state !== verifiedNap.state) geoPatch.state = verifiedNap.state;
+        if (r.created && r.campaign?.id && Object.keys(geoPatch).length > 0) {
+          await this.prisma.mkt_campaigns_list.update({
+            where: { id: r.campaign.id },
+            data: geoPatch,
+          });
+          r.campaign = { ...r.campaign, ...geoPatch };
+        }
         // Carry ownership forward for the scan path (deriveBusinessCampaign
         // accepts assignedTo natively; the scan path does not, so set it
         // after creation when the entry had an assignee).
@@ -740,16 +791,24 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // snapshot's contact + address fields so the derived campaign
           // inherits NAP from the queue entry (set by the discovery card's
           // Queue/Verify actions) instead of only business_name. The flat
-          // `address` string maps to addressLine1.
-          phone: (snapshot.phone as string) ?? undefined,
-          email: (snapshot.email as string) ?? undefined,
-          websiteUrl: (snapshot.website as string) ?? undefined,
+          // `address` string maps to addressLine1. Verified values captured
+          // on the verification call (business_snapshot.verified_nap) take
+          // precedence over the raw discovery snapshot.
+          phone: (verifiedNap.phone as string) ?? (snapshot.phone as string) ?? undefined,
+          email: (verifiedNap.email as string) ?? (snapshot.email as string) ?? undefined,
+          websiteUrl: (verifiedNap.website as string)
+            ?? (typeof snapshot.website === 'string' ? snapshot.website : ((snapshot.website as any)?.url as string | undefined))
+            ?? undefined,
           gbpUrl: (snapshot.gbp_url as string) ?? undefined,
-          addressLine1: (snapshot.address as string) ?? undefined,
-          addressCity: (snapshot.address_city as string) ?? undefined,
-          addressState: (snapshot.address_state as string) ?? undefined,
+          addressLine1: (verifiedNap.address as string) ?? (snapshot.address as string) ?? undefined,
+          addressCity: (verifiedNap.city as string) ?? (snapshot.address_city as string) ?? undefined,
+          addressState: (verifiedNap.state as string) ?? (snapshot.address_state as string) ?? undefined,
           addressZip: (snapshot.address_zip as string) ?? undefined,
           addressCountry: (snapshot.address_country as string) ?? undefined,
+          ownerNames,
+          // Category corrected on the verification call overrides the
+          // parent-inherited category (undefined → inherit as before).
+          categoryOverride: (verifiedNap.category as string) ?? undefined,
         }, ctx);
         result = { campaign, created: true };
       }
@@ -952,6 +1011,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
         verified_address: input.verifiedAddress,
         verified_city: input.verifiedCity,
         verified_state: input.verifiedState,
+        verified_website: input.verifiedWebsite,
+        verified_email: input.verifiedEmail,
+        verified_category: input.verifiedCategory,
+        verified_owner_name: input.verifiedOwnerName,
         owner_receptivity: input.ownerReceptivity,
         call_notes: input.callNotes,
         next_action: input.nextAction,
@@ -965,9 +1028,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (input.verifiedName && input.verifiedName.trim()) napPatch.business_name = input.verifiedName.trim();
       if (input.verifiedCity && input.verifiedCity.trim()) napPatch.city = input.verifiedCity.trim();
       if (input.verifiedState && input.verifiedState.trim()) napPatch.state = input.verifiedState.trim();
+      if (input.verifiedCategory && input.verifiedCategory.trim()) napPatch.category = input.verifiedCategory.trim();
 
-      // Merge verified NAP into the business_snapshot so the campaign derive
-      // path can pick it up. We preserve all existing snapshot fields.
+      // Merge verified NAP + enrichment into the business_snapshot so the
+      // campaign derive path can pick them up. Verified values are written
+      // both to the verified_nap provenance block and to the flat snapshot
+      // keys the derive paths read (phone, email, website, address*, owner).
+      // We preserve all existing snapshot fields.
       const snapshot = (existing.business_snapshot as any) ?? {};
       const verifiedNap: Record<string, string> = {};
       if (input.verifiedName?.trim()) verifiedNap.name = input.verifiedName.trim();
@@ -975,8 +1042,36 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (input.verifiedAddress?.trim()) verifiedNap.address = input.verifiedAddress.trim();
       if (input.verifiedCity?.trim()) verifiedNap.city = input.verifiedCity.trim();
       if (input.verifiedState?.trim()) verifiedNap.state = input.verifiedState.trim();
-      const updatedSnapshot = Object.keys(verifiedNap).length > 0
-        ? { ...snapshot, verified_nap: verifiedNap }
+      if (input.verifiedWebsite?.trim()) verifiedNap.website = input.verifiedWebsite.trim();
+      if (input.verifiedEmail?.trim()) verifiedNap.email = input.verifiedEmail.trim();
+      if (input.verifiedCategory?.trim()) verifiedNap.category = input.verifiedCategory.trim();
+      if (input.verifiedOwnerName?.trim()) verifiedNap.owner_name = input.verifiedOwnerName.trim();
+
+      // Flat enrichment — mirrors verified values onto the snapshot keys the
+      // campaign derive paths read, so a verified correction (e.g. phone
+      // captured on the call) replaces the discovery-pass value. `website`
+      // is intentionally NOT flattened here: scan snapshots store it as an
+      // object ({ status, url }) while thin snapshots store a string — the
+      // create-campaign paths resolve the verified value instead.
+      const flatEnrichment: Record<string, string> = {};
+      if (verifiedNap.phone) flatEnrichment.phone = verifiedNap.phone;
+      if (verifiedNap.email) flatEnrichment.email = verifiedNap.email;
+      if (verifiedNap.address) flatEnrichment.address = verifiedNap.address;
+      if (verifiedNap.city) flatEnrichment.address_city = verifiedNap.city;
+      if (verifiedNap.state) flatEnrichment.address_state = verifiedNap.state;
+      if (verifiedNap.owner_name) flatEnrichment.owner_name = verifiedNap.owner_name;
+      if (verifiedNap.address || verifiedNap.city || verifiedNap.state) {
+        flatEnrichment.location = [verifiedNap.address, verifiedNap.city ?? snapshot.address_city, verifiedNap.state ?? snapshot.address_state]
+          .filter(Boolean).join(', ');
+      }
+
+      const hasVerified = Object.keys(verifiedNap).length > 0;
+      const updatedSnapshot = hasVerified
+        ? {
+            ...snapshot,
+            ...flatEnrichment,
+            verified_nap: { ...((snapshot.verified_nap as any) ?? {}), ...verifiedNap },
+          }
         : snapshot;
 
       if (input.nextAction === 'dismiss') {

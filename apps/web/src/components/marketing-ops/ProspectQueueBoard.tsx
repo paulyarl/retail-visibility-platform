@@ -85,12 +85,17 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
     verifiedAddress: string;
     verifiedCity: string;
     verifiedState: string;
+    verifiedWebsite: string;
+    verifiedEmail: string;
+    verifiedCategory: string;
+    verifiedOwnerName: string;
     ownerReceptivity: OwnerReceptivity | '';
     callNotes: string;
     nextAction: VerificationNextAction;
   }>({
     outcome: 'operational',
     verifiedName: '', verifiedPhone: '', verifiedAddress: '', verifiedCity: '', verifiedState: '',
+    verifiedWebsite: '', verifiedEmail: '', verifiedCategory: '', verifiedOwnerName: '',
     ownerReceptivity: '', callNotes: '', nextAction: 'create_campaign',
   });
   const [resolving, setResolving] = useState(false);
@@ -259,10 +264,14 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
     setResolveForm({
       outcome: 'operational',
       verifiedName: nap.name ?? entry.business_name ?? '',
-      verifiedPhone: nap.phone ?? '',
-      verifiedAddress: nap.address ?? '',
+      verifiedPhone: nap.phone ?? snap.phone ?? '',
+      verifiedAddress: nap.address ?? snap.address ?? '',
       verifiedCity: nap.city ?? entry.city ?? '',
       verifiedState: nap.state ?? entry.state ?? '',
+      verifiedWebsite: snap.website ?? '',
+      verifiedEmail: snap.email ?? '',
+      verifiedCategory: entry.category ?? snap.category ?? '',
+      verifiedOwnerName: snap.owner_name ?? (Array.isArray(snap.owner_names) ? snap.owner_names[0] : '') ?? '',
       ownerReceptivity: '',
       callNotes: '',
       nextAction: 'create_campaign',
@@ -293,6 +302,10 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
         verifiedAddress: resolveForm.verifiedAddress || undefined,
         verifiedCity: resolveForm.verifiedCity || undefined,
         verifiedState: resolveForm.verifiedState || undefined,
+        verifiedWebsite: resolveForm.verifiedWebsite || undefined,
+        verifiedEmail: resolveForm.verifiedEmail || undefined,
+        verifiedCategory: resolveForm.verifiedCategory || undefined,
+        verifiedOwnerName: resolveForm.verifiedOwnerName || undefined,
         ownerReceptivity: resolveForm.ownerReceptivity || undefined,
         callNotes: resolveForm.callNotes || undefined,
         nextAction: resolveForm.nextAction,
@@ -529,6 +542,41 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                     value={resolveForm.verifiedState}
                     onChange={(e) => setResolveForm((f) => ({ ...f, verifiedState: e.target.value }))}
                     className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
+                  Enrichment <span className="font-normal text-gray-400">— flows into the campaign record</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="Website (https://…)"
+                    value={resolveForm.verifiedWebsite}
+                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedWebsite: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={resolveForm.verifiedEmail}
+                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedEmail: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Category"
+                    value={resolveForm.verifiedCategory}
+                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedCategory: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Owner name"
+                    value={resolveForm.verifiedOwnerName}
+                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedOwnerName: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
