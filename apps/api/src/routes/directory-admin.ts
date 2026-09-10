@@ -633,12 +633,14 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           'primary' AS kind,
           primary_category AS category,
           count(*)::int AS listing_count
-        FROM directory_listings_list
-        WHERE is_published = true
-          AND city IS NOT NULL
-          AND state IS NOT NULL
-          AND primary_category IS NOT NULL
-        GROUP BY city, state, primary_category
+        FROM directory_listings_list dll
+        INNER JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+        WHERE dll.is_published = true
+          AND dsl.is_published = true
+          AND dll.city IS NOT NULL
+          AND dll.state IS NOT NULL
+          AND dll.primary_category IS NOT NULL
+        GROUP BY dll.city, dll.state, dll.primary_category
 
         UNION ALL
 
@@ -649,8 +651,10 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           s.category AS category,
           count(*)::int AS listing_count
         FROM directory_listings_list l
+        INNER JOIN directory_settings_list dsl ON l.tenant_id = dsl.tenant_id
         CROSS JOIN LATERAL unnest(l.secondary_categories) s(category)
         WHERE l.is_published = true
+          AND dsl.is_published = true
           AND l.city IS NOT NULL
           AND l.state IS NOT NULL
           AND s.category IS NOT NULL
