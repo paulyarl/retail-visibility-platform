@@ -2126,6 +2126,19 @@ class DirectoryPresenceSeedService {
       { cap: 40 },
     );
 
+    // Campaign-assigned secondary categories flow onto the seed at birth
+    // (case-insensitive dedup, exclude the primary, cap at 9). The operator
+    // assigns these via the category-identification audit's "secondary"
+    // destination action — they're already on the campaign when "Add to
+    // place listing" is clicked.
+    const campaignSecondaryRaw = Array.isArray(campaign.secondary_categories)
+      ? campaign.secondary_categories.map((c: any) => String(c).trim()).filter(Boolean)
+      : [];
+    const campaignPrimaryLower = (campaign.category ?? '').toLowerCase();
+    const campaignSecondary = campaignSecondaryRaw
+      .filter((c: string) => c.toLowerCase() !== campaignPrimaryLower)
+      .slice(0, 9);
+
     const seedInput: CreateSeedInput = {
       businessName,
       address,
@@ -2135,8 +2148,7 @@ class DirectoryPresenceSeedService {
       phone: phone || undefined,
       website: websiteUrl || undefined,
       primaryCategory: campaign.category,
-      // secondary_categories is never auto-populated — the operator sets it
-      // via Edit Fields after the category-identification audit.
+      secondaryCategories: campaignSecondary.length > 0 ? campaignSecondary : undefined,
       snapEbtReported: false,
       attributes: sourcedAttributes.length > 0 ? sourcedAttributes : undefined,
       seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
@@ -2154,6 +2166,7 @@ class DirectoryPresenceSeedService {
         { fieldKey: 'phone', value: phone || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!phone },
         { fieldKey: 'website', value: websiteUrl || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!websiteUrl },
         { fieldKey: 'primary_category', value: campaign.category, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'secondary_categories', value: campaignSecondary.length > 0 ? campaignSecondary.join(', ') : undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: campaignSecondary.length > 0 },
         // SEO provenance rows (spec §4.4.6)
         { fieldKey: 'description', value: seoPacket.description, sourceName: 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },

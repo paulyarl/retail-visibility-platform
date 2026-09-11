@@ -338,6 +338,7 @@ class DirectorySeedCampaignLinkService {
         dl.description, dl.keywords,
         mc.phone AS camp_phone, mc.website_url AS camp_website,
         mc.category AS camp_category,
+        mc.secondary_categories AS camp_secondary_categories,
         mc.neighborhood AS camp_neighborhood,
         mc.business_origin_country, mc.business_origin_region,
         mc.directory_profiles, mc.notes AS camp_notes
@@ -349,6 +350,15 @@ class DirectorySeedCampaignLinkService {
     `;
     if (!rows[0]) return [];
     const r = rows[0];
+
+    const normalizeCatArray = (v: any): string[] =>
+      Array.isArray(v) ? v.map((s: any) => String(s).trim()).filter(Boolean) : [];
+
+    const campSecondary = normalizeCatArray(r.camp_secondary_categories);
+    const seedSecondary = normalizeCatArray(r.secondary_categories);
+    const secondaryChanged =
+      campSecondary.length > 0 &&
+      campSecondary.some((c: string) => !seedSecondary.some((s: string) => s.toLowerCase() === c.toLowerCase()));
 
     const entries: DiffEntry[] = [
       {
@@ -368,6 +378,12 @@ class DirectorySeedCampaignLinkService {
         campaignValue: r.camp_category ?? null,
         seedValue: r.primary_category ?? null,
         changed: (r.camp_category ?? '') !== (r.primary_category ?? ''),
+      },
+      {
+        field: 'secondaryCategories',
+        campaignValue: campSecondary.length > 0 ? campSecondary : null,
+        seedValue: seedSecondary.length > 0 ? seedSecondary : null,
+        changed: secondaryChanged,
       },
       {
         field: 'description',
@@ -427,7 +443,9 @@ class DirectorySeedCampaignLinkService {
         dl.keywords, dl.business_name,
         mc.phone AS camp_phone, mc.website_url AS camp_website,
         mc.business_name AS camp_business_name,
-        mc.category AS camp_category, mc.neighborhood AS camp_neighborhood,
+        mc.category AS camp_category,
+        mc.secondary_categories AS camp_secondary_categories,
+        mc.neighborhood AS camp_neighborhood,
         mc.address_city AS camp_city, mc.address_state AS camp_state,
         mc.intelligence_focus,
         mc.business_origin_country, mc.business_origin_region,
@@ -492,10 +510,51 @@ class DirectorySeedCampaignLinkService {
             projected.push(field);
           } else skipped.push(field);
           break;
-        case 'secondaryCategories':
-          // Campaign doesn't carry secondary categories directly; skip
-          skipped.push(field);
+        case 'secondaryCategories': {
+          // Project campaign.secondary_categories onto the seed listing.
+          // Union with existing seed secondaries (case-insensitive dedup),
+          // exclude the primary category, cap at 9. This lets a category
+          // identification scan run after seed creation and flow its found
+          // categories onto the seed via the Sync modal.
+          const campSec = Array.isArray(r.camp_secondary_categories)
+            ? r.camp_secondary_categories.map((c: any) => String(c).trim()).filter(Boolean)
+            : [];
+          if (campSec.length === 0) {
+            skipped.push(field);
+            break;
+          }
+          const primaryCat = (r.camp_category ?? '').toLowerCase();
+          // Read current seed secondary_categories from the listing row we
+          // already loaded (dl.secondary_categories is NOT in the sync query;
+          // we union against the listing's current value via a sub-fetch).
+          const currentSeedSecRows = await prisma.$queryRaw<any[]>`
+            SELECT dl.secondary_categories
+            FROM directory_presence_seeds dps
+            JOIN directory_listings_list dl ON dl.id = dps.listing_id
+            WHERE dps.id = ${seedId}
+            LIMIT 1
+          `;
+          const currentSeedSec: string[] = Array.isArray(currentSeedSecRows[0]?.secondary_categories)
+            ? currentSeedSecRows[0].secondary_categories.map((s: any) => String(s).trim()).filter(Boolean)
+            : [];
+          const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+          const merged: string[] = [...currentSeedSec];
+          for (const cat of campSec) {
+            if (primaryCat && eq(primaryCat, cat)) continue;
+            if (merged.some((m) => eq(m, cat))) continue;
+            merged.push(cat);
+          }
+          const capped = merged.slice(0, 9);
+          if (capped.length === currentSeedSec.length) {
+            // Nothing new to add
+            skipped.push(field);
+            break;
+          }
+          addSet('secondary_categories', capped);
+          provenanceRows.push({ fieldKey: 'secondary_categories', value: campSec.join(', ') });
+          projected.push(field);
           break;
+        }
         case 'description': {
           // Spec §5.4: replace raw notes projection with composer output.
           // When the composer degrades (no audit, no profile), write nothing
@@ -857,6 +916,7 @@ class DirectorySeedCampaignLinkService {
       'phone',
       'website',
       'primaryCategory',
+      'secondaryCategories',
       'originCountry',
       'originRegion',
       'neighborhood',

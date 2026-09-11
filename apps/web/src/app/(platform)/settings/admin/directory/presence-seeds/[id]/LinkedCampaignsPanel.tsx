@@ -37,6 +37,7 @@ const ALL_PROJECTION_FIELDS = [
   { key: 'phone', label: 'Phone' },
   { key: 'website', label: 'Website' },
   { key: 'primaryCategory', label: 'Primary category' },
+  { key: 'secondaryCategories', label: 'Secondary categories' },
   { key: 'description', label: 'Description (campaign notes)' },
   { key: 'originCountry', label: 'Origin country → keywords' },
   { key: 'originRegion', label: 'Origin region → keywords' },
@@ -531,9 +532,11 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                                   <p className="text-gray-500">Campaign:</p>
                                   <p className="text-gray-900 break-words">
                                     {hasCampaignValue
-                                      ? typeof d.campaignValue === 'object'
-                                        ? JSON.stringify(d.campaignValue).slice(0, 120)
-                                        : String(d.campaignValue).slice(0, 200)
+                                      ? Array.isArray(d.campaignValue)
+                                        ? d.campaignValue.join(', ').slice(0, 200)
+                                        : typeof d.campaignValue === 'object'
+                                          ? JSON.stringify(d.campaignValue).slice(0, 120)
+                                          : String(d.campaignValue).slice(0, 200)
                                       : '—'}
                                   </p>
                                 </div>
@@ -541,9 +544,11 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                                   <p className="text-gray-500">Seed (current):</p>
                                   <p className="text-gray-900 break-words">
                                     {d.seedValue !== null && d.seedValue !== undefined && d.seedValue !== ''
-                                      ? typeof d.seedValue === 'object'
-                                        ? JSON.stringify(d.seedValue).slice(0, 120)
-                                        : String(d.seedValue).slice(0, 200)
+                                      ? Array.isArray(d.seedValue)
+                                        ? d.seedValue.join(', ').slice(0, 200)
+                                        : typeof d.seedValue === 'object'
+                                          ? JSON.stringify(d.seedValue).slice(0, 120)
+                                          : String(d.seedValue).slice(0, 200)
                                       : '—'}
                                   </p>
                                 </div>
