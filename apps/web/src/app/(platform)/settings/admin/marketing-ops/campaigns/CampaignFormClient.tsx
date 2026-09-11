@@ -1375,7 +1375,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               </select>
             </FormField>
             <FormField label="Pain Score (1-10)">
-              <input type="number" min={1} max={10} value={form.pain_score} onChange={(e) => handleChange('pain_score', e.target.value === '' ? '' : parseInt(e.target.value))}
+              <input type="number" min={0} max={10} value={form.pain_score} onChange={(e) => handleChange('pain_score', e.target.value === '' ? '' : parseInt(e.target.value))}
                 className={inputClass} />
             </FormField>
           </FormSection>
