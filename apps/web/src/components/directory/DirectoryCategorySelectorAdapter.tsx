@@ -12,6 +12,7 @@ interface DirectoryCategorySelectorAdapterProps {
   onPrimaryChange: (category: string) => void;
   onSecondaryChange: (categories: string[]) => void;
   disabled?: boolean;
+  allowCreateNew?: boolean;
 }
 
 export default function DirectoryCategorySelectorAdapter({
@@ -20,6 +21,7 @@ export default function DirectoryCategorySelectorAdapter({
   onPrimaryChange,
   onSecondaryChange,
   disabled = false,
+  allowCreateNew = false,
 }: DirectoryCategorySelectorAdapterProps) {
   const { categories, loading, error } = useDirectoryCategories();
 
@@ -97,6 +99,7 @@ export default function DirectoryCategorySelectorAdapter({
       disabled={disabled}
       maxSecondaryCategories={9}
       showGroupedDropdown={false}
+      allowCreateNew={allowCreateNew}
     />
   );
 }

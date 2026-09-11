@@ -41,6 +41,12 @@ export interface CategorySelectorMultiProps {
   maxSecondaryCategories?: number;
   showGroupedDropdown?: boolean; // For GBP-style grouped categories
   categoryGroups?: Record<string, CategoryOption[]>;
+  // When true, the search results show a "Create '<term>'" option when the
+  // typed text doesn't exactly match an existing category. Lets operators
+  // add categories that aren't in the platform vocab yet (e.g. "Ethiopian
+  // Grocery Store"). Default false — existing usages (seed create/edit,
+  // directory options) are unaffected.
+  allowCreateNew?: boolean;
 }
 
 const DEFAULT_MAX_SECONDARY = 9;
@@ -63,6 +69,7 @@ export default function CategorySelectorMulti({
   maxSecondaryCategories = DEFAULT_MAX_SECONDARY,
   showGroupedDropdown = false,
   categoryGroups,
+  allowCreateNew = false,
 }: CategorySelectorMultiProps) {
   const [primaryUseSearch, setPrimaryUseSearch] = useState(false);
   const [primarySearchTerm, setPrimarySearchTerm] = useState('');
@@ -163,6 +170,37 @@ export default function CategorySelectorMulti({
 
   const isCategorySelected = (categoryId: string) => {
     return primary?.id === categoryId || secondary.some(s => s.id === categoryId);
+  };
+
+  // Check if a search term exactly matches an existing category name
+  // (case-insensitive). Used to decide whether to show the "Create new" option.
+  const matchesExistingCategory = (term: string, list: CategoryOption[]): boolean => {
+    const t = term.trim().toLowerCase();
+    if (!t) return true;
+    return list.some(c => c.name.toLowerCase() === t);
+  };
+
+  // Create a new CategoryOption from a typed term (used for both primary and
+  // secondary when allowCreateNew is enabled).
+  const createNewOption = (term: string): CategoryOption => ({
+    id: term.trim(),
+    name: term.trim(),
+  });
+
+  const handleCreatePrimary = () => {
+    const option = createNewOption(primarySearchTerm);
+    onPrimaryChange(option);
+    setPrimarySearchTerm('');
+    setPrimaryUseSearch(false);
+  };
+
+  const handleCreateSecondary = () => {
+    const option = createNewOption(secondarySearchTerm);
+    if (!isCategorySelected(option.id) && secondary.length < maxSecondaryCategories) {
+      onSecondaryChange([...secondary, option]);
+    }
+    setShowSecondaryInput(false);
+    setSecondarySearchTerm('');
   };
 
   // Get the appropriate search results or filtered categories
@@ -270,6 +308,20 @@ export default function CategorySelectorMulti({
                         </button>
                       );
                     })}
+                    {allowCreateNew && primarySearchTerm.trim() && !primarySearching && !matchesExistingCategory(primarySearchTerm, primaryDisplayCategories) && (
+                      <button
+                        type="button"
+                        onClick={handleCreatePrimary}
+                        className="w-full text-left px-3 py-2 border-t border-neutral-200 dark:border-neutral-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span className="text-sm text-blue-700 dark:text-blue-300">
+                            Create <span className="font-medium">&ldquo;{primarySearchTerm.trim()}&rdquo;</span> as a new category
+                          </span>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -471,6 +523,20 @@ export default function CategorySelectorMulti({
                           </button>
                         );
                       })}
+                      {allowCreateNew && secondarySearchTerm.trim() && !secondarySearching && !matchesExistingCategory(secondarySearchTerm, secondaryDisplayCategories) && (
+                        <button
+                          type="button"
+                          onClick={handleCreateSecondary}
+                          className="w-full text-left px-3 py-2 border-t border-neutral-200 dark:border-neutral-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                            <span className="text-sm text-blue-700 dark:text-blue-300">
+                              Create <span className="font-medium">&ldquo;{secondarySearchTerm.trim()}&rdquo;</span> as a new category
+                            </span>
+                          </div>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
