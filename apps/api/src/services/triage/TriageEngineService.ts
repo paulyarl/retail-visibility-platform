@@ -51,6 +51,30 @@ import {
 // ─── DSL evaluator ───────────────────────────────────────────────────────
 
 /**
+ * Defensive normalization for playbook.matching_rules. The catalog column is
+ * admin-editable free-form JSONB and seeded rows (e.g. PG-01) store `{}`;
+ * ruleMatches + buildReasoning + buildDetectedSignals dereference
+ * any/all/none with `.length`, so a partial rules object would 500 the
+ * endpoint. Missing clauses default to the DSL's empty/pass semantics.
+ */
+function normalizeRules(rules: MatchingRules): MatchingRules {
+  const mr = (rules && typeof rules === 'object' ? rules : {}) as Partial<MatchingRules>;
+  const dual =
+    mr.dual &&
+    Array.isArray((mr.dual as any).groupA) &&
+    Array.isArray((mr.dual as any).groupB)
+      ? mr.dual
+      : null;
+  return {
+    any: Array.isArray(mr.any) ? mr.any : [],
+    all: Array.isArray(mr.all) ? mr.all : [],
+    none: Array.isArray(mr.none) ? mr.none : [],
+    dual,
+    confidence: typeof mr.confidence === 'number' ? mr.confidence : 0,
+  };
+}
+
+/**
  * Evaluate a single playbook's matching_rules against a SignalCode[] set.
  * Returns true if the playbook matches (all clauses satisfied).
  *
@@ -210,7 +234,7 @@ export function evaluateTriage(
   for (const playbook of sorted) {
     if (!playbook.isActive) continue;
 
-    const rules = playbook.matchingRules;
+    const rules = normalizeRules(playbook.matchingRules);
     if (ruleMatches(rules, signalSet)) {
       return {
         playbookCode: playbook.code,
@@ -263,7 +287,7 @@ export function evaluateAllMatchingPlaybooks(
   for (const playbook of sorted) {
     if (!playbook.isActive) continue;
 
-    const rules = playbook.matchingRules;
+    const rules = normalizeRules(playbook.matchingRules);
     if (ruleMatches(rules, signalSet)) {
       matches.push({
         playbookCode: playbook.code,
@@ -292,14 +316,15 @@ export function fallbackRecommendation(
   fallback: PlaybookCatalogRow,
 ): TriageRecommendation {
   const signalSet = new Set(signals);
+  const rules = normalizeRules(fallback.matchingRules);
   return {
     playbookCode: fallback.code,
     playbookName: fallback.name,
     category: fallback.category,
     archetype: fallback.archetype,
-    confidence: fallback.matchingRules.confidence,
+    confidence: rules.confidence,
     reasoning: `fallback: no playbook rule matched; defaulting to ${fallback.code} (${fallback.name})`,
-    detectedSignals: buildDetectedSignals(signalSet, fallback.matchingRules),
+    detectedSignals: buildDetectedSignals(signalSet, rules),
   };
 }
 

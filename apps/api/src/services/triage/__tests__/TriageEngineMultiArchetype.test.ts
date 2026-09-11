@@ -197,4 +197,17 @@ describe('evaluateAllMatchingPlaybooks — multi-archetype sibling suggestions',
     expect(matches[0].playbookCode).toBe('PB-01'); // winner
     expect(matches[0].category).toBe('profile_repair');
   });
+
+  // Regression: seeded PG-01 stores matching_rules = {} — a partial rules
+  // object must not crash the evaluator (ruleMatches dereferences
+  // any/all/none with .length). Empty clauses pass per the DSL, so a
+  // normalized {} row matches every signal set (same as the PB-03 fallback).
+  it('does not throw on a playbook with partial/empty matching_rules', () => {
+    const malformed = playbook('PG-XX' as any, 90, 'A4', 'profile_repair', {} as MatchingRules);
+    const cascade = [...postMigrationCascade(), malformed];
+    expect(() => evaluateAllMatchingPlaybooks(['CP_NAP_NAME_DRIFT'], cascade)).not.toThrow();
+    expect(() => evaluateTriage(['CP_NAP_NAME_DRIFT'], cascade)).not.toThrow();
+    const matches = evaluateAllMatchingPlaybooks(['CP_NAP_NAME_DRIFT'], cascade);
+    expect(matches.find((m) => m.playbookCode === ('PG-XX' as any))).toBeDefined();
+  });
 });

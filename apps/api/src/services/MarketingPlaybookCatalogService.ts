@@ -268,6 +268,31 @@ export class MarketingPlaybookCatalogService extends BaseService {
 
   // ─── Mapper ────────────────────────────────────────────────────────────
 
+  /**
+   * Normalize a stored matching_rules JSONB value into a complete
+   * MatchingRules object. The column is admin-editable free-form JSON and
+   * seeded rows (e.g. PG-01) store `{}` — partial or empty objects must not
+   * reach ruleMatches, which dereferences any/all/none with `.length`.
+   * Missing clauses default to the DSL's empty/pass semantics; a non-object
+   * or missing `dual` defaults to null.
+   */
+  private normalizeMatchingRules(raw: any): MatchingRules {
+    const mr = (raw && typeof raw === 'object' ? raw : {}) as Partial<MatchingRules>;
+    const dual =
+      mr.dual &&
+      Array.isArray((mr.dual as any).groupA) &&
+      Array.isArray((mr.dual as any).groupB)
+        ? mr.dual
+        : null;
+    return {
+      any: Array.isArray(mr.any) ? mr.any : [],
+      all: Array.isArray(mr.all) ? mr.all : [],
+      none: Array.isArray(mr.none) ? mr.none : [],
+      dual,
+      confidence: typeof mr.confidence === 'number' ? mr.confidence : 0,
+    };
+  }
+
   private toRow(r: any): PlaybookCatalogRow {
     return {
       id: r.id,
@@ -277,13 +302,7 @@ export class MarketingPlaybookCatalogService extends BaseService {
       archetype: r.archetype as ArchetypeCodeWithA6,
       archetypeLabel: r.archetype_label,
       description: r.description,
-      matchingRules: (r.matching_rules ?? {
-        any: [],
-        all: [],
-        none: [],
-        dual: null,
-        confidence: 0,
-      }) as MatchingRules,
+      matchingRules: this.normalizeMatchingRules(r.matching_rules),
       priorityRank: r.priority_rank ?? 99,
       fitdOfferTitle: r.fitd_offer_title,
       fitdDefaultFeeCents: r.fitd_default_fee_cents,

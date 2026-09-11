@@ -284,7 +284,14 @@ export class CampaignTriageService extends BaseService {
     const signals: SignalCode[] = isDecided
       ? (existing!.detectedSignals.map((s) => s.code) as SignalCode[])
       : (await this.loadSignalsAndPlaybooks(input, ctx)).signals;
-    const playbooks = await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx);
+    // Same proving_ground exclusion as loadSignalsAndPlaybooks — PG playbooks
+    // are aggregate-campaign checklists, not business triage candidates. This
+    // path loads playbooks directly (not via the loader), so the filter must
+    // be applied here too. Without it, PG-01's empty matching_rules ({})
+    // crash ruleMatches on `.length` — and once normalized would match every
+    // signal set, polluting all alternatives lists.
+    const playbooks = (await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx))
+      .filter((p: any) => p.category !== 'proving_ground');
 
     // 3. Run the engine in "all matches" mode
     const allMatches = evaluateAllMatchingPlaybooks(signals, playbooks);
