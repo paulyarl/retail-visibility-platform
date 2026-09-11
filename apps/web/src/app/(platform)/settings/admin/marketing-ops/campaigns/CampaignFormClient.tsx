@@ -9,6 +9,7 @@ import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { addressParser } from '@/lib/address-parser';
+import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
@@ -961,70 +962,22 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 </p>
               </FormField>
             )}
-            <FormField label="Category" required={form.scope !== 'business'}>
-              <SuggestiveSelect required={form.scope !== 'business'} value={form.category} onChange={(v) => handleChange('category', v)}
-                options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
-                newInputPlaceholder="Enter new category" className={inputClass} />
-              {form.scope === 'business' && (
+            {/* Primary + Secondary Categories (Migration 271) — uses the same
+                DirectoryCategorySelectorAdapter as the seed create/edit and
+                directory options pages: dropdown + search for the primary,
+                chip-based add/remove for secondary (max 9). The adapter's
+                onPrimaryChange returns the category name string; the campaign
+                form stores it directly in form.category. */}
+            <FormField label="Categories" className="sm:col-span-2">
+              <DirectoryCategorySelectorAdapter
+                primary={form.category}
+                secondary={form.secondary_categories}
+                onPrimaryChange={(v) => handleChange('category', v)}
+                onSecondaryChange={(v) => handleChange('secondary_categories', v)}
+              />
+              {form.scope === 'business' && !form.category && (
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
               )}
-            </FormField>
-            {/* Secondary Categories (Migration 271) — additional categories
-                beyond the primary. Populated by the category-identification
-                act flow when the campaign already exists; operator-managed
-                here. Vocab-backed SuggestiveSelect + chip list, capped at 9
-                (matches the seed create/edit pattern). */}
-            <FormField label="Secondary Categories" className="sm:col-span-2">
-              <div className="space-y-2">
-                {form.secondary_categories.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {form.secondary_categories.map((cat, i) => (
-                      <span
-                        key={`${cat}-${i}`}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
-                      >
-                        {cat}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = form.secondary_categories.filter((_, idx) => idx !== i);
-                            handleChange('secondary_categories', next);
-                          }}
-                          className="text-violet-500 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-200"
-                          aria-label={`Remove ${cat}`}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {form.secondary_categories.length < 9 && (
-                  <SuggestiveSelect
-                    value=""
-                    onChange={(v) => {
-                      const trimmed = v.trim();
-                      if (!trimmed) return;
-                      // Case-insensitive dedup against primary + existing secondary.
-                      const exists = form.category.trim().toLowerCase() === trimmed.toLowerCase()
-                        || form.secondary_categories.some((c) => c.toLowerCase() === trimmed.toLowerCase());
-                      if (exists) return;
-                      handleChange('secondary_categories', [...form.secondary_categories, trimmed]);
-                    }}
-                    options={vocab.categories.filter((c) =>
-                      c.toLowerCase() !== form.category.trim().toLowerCase()
-                      && !form.secondary_categories.some((s) => s.toLowerCase() === c.toLowerCase())
-                    )}
-                    emptyLabel="+ Add secondary category..."
-                    newLabel="+ New category..."
-                    newInputPlaceholder="Enter new category"
-                    className={inputClass}
-                  />
-                )}
-                <p className="text-xs text-gray-400 mt-1">
-                  Additional categories that describe this business (optional, up to 9). Populated automatically by the category-identification flow when a campaign for this business already exists.
-                </p>
-              </div>
             </FormField>
             {/* City | State — family pair */}
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
