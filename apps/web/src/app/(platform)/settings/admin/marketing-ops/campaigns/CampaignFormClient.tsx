@@ -40,6 +40,9 @@ interface FormState {
   title: string;
   business_name: string;
   category: string;
+  // Migration 271 — secondary categories (operator-managed; populated by the
+  // category-identification act flow when the campaign already exists).
+  secondary_categories: string[];
   city: string;
   state: string;
   neighborhood: string;
@@ -103,6 +106,7 @@ const EMPTY_FORM: FormState = {
   title: '',
   business_name: '',
   category: '',
+  secondary_categories: [],
   city: '',
   state: '',
   neighborhood: '',
@@ -343,6 +347,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         title: c.title ?? '',
         business_name: c.business_name ?? '',
         category: c.category ?? '',
+        secondary_categories: (c as any).secondary_categories ?? [],
         city: c.city ?? '',
         state: c.state ?? '',
         neighborhood: c.neighborhood ?? '',
@@ -578,6 +583,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           title: strOrUndef(form.title),
           business_name: strOrUndef(form.business_name),
           category: form.category,
+          secondary_categories: form.secondary_categories.length > 0 ? form.secondary_categories : undefined,
           city: form.city,
           state: strOrUndef(form.state),
           neighborhood: strOrUndef(form.neighborhood),
@@ -651,6 +657,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           title: form.title,
           business_name: form.business_name,
           category: form.category,
+          secondary_categories: form.secondary_categories,
           city: form.city,
           state: form.state,
           neighborhood: form.neighborhood,
@@ -961,6 +968,63 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               {form.scope === 'business' && (
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
               )}
+            </FormField>
+            {/* Secondary Categories (Migration 271) — additional categories
+                beyond the primary. Populated by the category-identification
+                act flow when the campaign already exists; operator-managed
+                here. Vocab-backed SuggestiveSelect + chip list, capped at 9
+                (matches the seed create/edit pattern). */}
+            <FormField label="Secondary Categories" className="sm:col-span-2">
+              <div className="space-y-2">
+                {form.secondary_categories.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {form.secondary_categories.map((cat, i) => (
+                      <span
+                        key={`${cat}-${i}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                      >
+                        {cat}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = form.secondary_categories.filter((_, idx) => idx !== i);
+                            handleChange('secondary_categories', next);
+                          }}
+                          className="text-violet-500 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-200"
+                          aria-label={`Remove ${cat}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {form.secondary_categories.length < 9 && (
+                  <SuggestiveSelect
+                    value=""
+                    onChange={(v) => {
+                      const trimmed = v.trim();
+                      if (!trimmed) return;
+                      // Case-insensitive dedup against primary + existing secondary.
+                      const exists = form.category.trim().toLowerCase() === trimmed.toLowerCase()
+                        || form.secondary_categories.some((c) => c.toLowerCase() === trimmed.toLowerCase());
+                      if (exists) return;
+                      handleChange('secondary_categories', [...form.secondary_categories, trimmed]);
+                    }}
+                    options={vocab.categories.filter((c) =>
+                      c.toLowerCase() !== form.category.trim().toLowerCase()
+                      && !form.secondary_categories.some((s) => s.toLowerCase() === c.toLowerCase())
+                    )}
+                    emptyLabel="+ Add secondary category..."
+                    newLabel="+ New category..."
+                    newInputPlaceholder="Enter new category"
+                    className={inputClass}
+                  />
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  Additional categories that describe this business (optional, up to 9). Populated automatically by the category-identification flow when a campaign for this business already exists.
+                </p>
+              </div>
             </FormField>
             {/* City | State — family pair */}
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (

@@ -127,6 +127,9 @@ export interface Campaign {
   title: string | null;
   business_name: string | null;
   category: string;
+  // Migration 271 — additional categories beyond the primary, populated by
+  // the category-identification act flow and the campaign edit form.
+  secondary_categories?: string[];
   city: string;
   neighborhood: string | null;
   contact_method: string | null;
@@ -1380,6 +1383,8 @@ export interface CampaignCreateInput {
   title?: string;
   business_name?: string;
   category?: string;
+  // Migration 271 — secondary categories (operator-managed on create/edit).
+  secondary_categories?: string[];
   city: string;
   state?: string;
   neighborhood?: string;
@@ -4592,7 +4597,14 @@ class MarketingOpsService extends AdminApiSingleton {
     city?: string;
     state?: string;
     confidence?: 'high' | 'medium' | 'low';
-  }): Promise<{ kind: string; id?: string; category_added: boolean; category_label: string }> {
+  }): Promise<{
+    kind: string;
+    id?: string;
+    campaignId?: string;
+    category_added: boolean;
+    category_label: string;
+    registered_as?: 'primary' | 'secondary' | 'already_present';
+  }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${campaignId}/category-identification/act`,
       { method: 'POST', body: JSON.stringify(input) },
@@ -4608,8 +4620,10 @@ class MarketingOpsService extends AdminApiSingleton {
     return {
       kind: data?.kind ?? 'unknown',
       id: data?.id,
+      campaignId: data?.campaignId,
       category_added: data?.category_added ?? false,
       category_label: data?.category_label ?? input.category_label,
+      registered_as: data?.registered_as,
     };
   }
 

@@ -851,6 +851,19 @@ export default function CampaignDetailClient({
                   {campaign.scope} · {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
                   {campaign.display_id && ` · ${campaign.display_id}`}
                 </p>
+                {(campaign.secondary_categories?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Secondary categories:</span>
+                    {(campaign.secondary_categories ?? []).map((cat) => (
+                      <span
+                        key={cat}
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                      >
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {campaign.parent_campaign && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     Derived from{' '}

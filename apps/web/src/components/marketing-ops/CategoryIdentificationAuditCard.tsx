@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sparkles, Loader2, Check, Inbox, PhoneCall, ArrowRight, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Audit } from '@/services/MarketingOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
@@ -112,7 +113,13 @@ type ActionKind = 'queued' | 'verify' | 'campaign_created' | 'campaign_exists' |
 
 interface RowActionState {
   loading: boolean;
-  result?: { kind: ActionKind; id?: string; category_added?: boolean };
+  result?: {
+    kind: ActionKind;
+    id?: string;
+    campaignId?: string;
+    category_added?: boolean;
+    registered_as?: 'primary' | 'secondary' | 'already_present';
+  };
   error?: string;
 }
 
@@ -148,7 +155,16 @@ export default function CategoryIdentificationAuditCard({
       const kind = result.kind as ActionKind;
       setActionStates((prev) => ({
         ...prev,
-        [idx]: { loading: false, result: { kind, id: result.id, category_added: result.category_added } },
+        [idx]: {
+          loading: false,
+          result: {
+            kind,
+            id: result.id,
+            campaignId: result.campaignId,
+            category_added: result.category_added,
+            registered_as: result.registered_as,
+          },
+        },
       }));
 
       // Navigate to the spawned campaign if that was the action.
@@ -250,16 +266,30 @@ export default function CategoryIdentificationAuditCard({
 
                 {/* Action buttons */}
                 {isDone ? (
-                  <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>
-                      {state!.result!.kind === 'campaign_created' && 'Campaign spawned'}
-                      {state!.result!.kind === 'campaign_exists' && 'Campaign already exists'}
-                      {state!.result!.kind === 'queued' && 'Added to queue'}
-                      {state!.result!.kind === 'verify' && 'Sent to verify queue'}
-                      {state!.result!.kind === 'already_queued' && 'Already queued'}
-                      {state!.result!.category_added && ' · category registered'}
-                    </span>
+                  <div className="flex flex-col gap-1 text-xs text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>
+                        {state!.result!.kind === 'campaign_created' && 'Campaign spawned'}
+                        {state!.result!.kind === 'campaign_exists' && 'Campaign already exists'}
+                        {state!.result!.kind === 'queued' && 'Added to queue'}
+                        {state!.result!.kind === 'verify' && 'Sent to verify queue'}
+                        {state!.result!.kind === 'already_queued' && 'Already queued'}
+                        {state!.result!.category_added && ' · category registered'}
+                        {state!.result!.registered_as === 'primary' && ' · set as primary category'}
+                        {state!.result!.registered_as === 'secondary' && ' · added as secondary category'}
+                        {state!.result!.registered_as === 'already_present' && ' · category already on campaign'}
+                      </span>
+                    </div>
+                    {state!.result!.kind === 'campaign_exists' && state!.result!.campaignId && (
+                      <Link
+                        href={`/settings/admin/marketing-ops/campaigns/${state!.result!.campaignId}`}
+                        className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <ArrowRight className="w-3 h-3" />
+                        Open campaign
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 flex-wrap">

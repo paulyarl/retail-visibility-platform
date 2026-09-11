@@ -141,7 +141,7 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import multer from 'multer';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
-import { HttpError } from '../middleware/errorHandler';
+import { HttpError, ConflictError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import MarketingCampaignService from '../services/MarketingCampaignService';
@@ -230,6 +230,10 @@ const campaignBaseSchema = z.object({
   // campaign is created without knowing the category (the prompt identifies it).
   // The create schema's refine below enforces category for non-business scopes.
   category: z.string().max(100).optional(),
+  // Migration 271 — secondary categories (operator-managed on the create/edit
+  // form; also populated by the category-identification act flow when the
+  // campaign already exists). Mirrors the seed create/edit pattern (max 9).
+  secondary_categories: z.array(z.string().max(100)).max(9).optional(),
   // City is optional in the base schema so gold_standards campaigns
   // (which are city-agnostic / nationwide) can omit it. The create
   // schema's refine below enforces city for non-gold_standards campaigns.
@@ -1088,6 +1092,7 @@ router.post('/', async (req: any, res: Response) => {
       title: parsed.title,
       businessName: parsed.business_name,
       category: parsed.category,
+      secondaryCategories: parsed.secondary_categories,
       city: parsed.city,
       state: parsed.state,
       neighborhood: parsed.neighborhood,
@@ -1240,6 +1245,7 @@ router.put('/:id', async (req: any, res: Response) => {
       title: parsed.title,
       businessName: parsed.business_name,
       category: parsed.category,
+      secondaryCategories: parsed.secondary_categories,
       city: parsed.city,
       state: parsed.state,
       neighborhood: parsed.neighborhood,
@@ -1870,25 +1876,54 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
       // NAP handoff: forward the audit's nap block so the child is born with
       // phone / website / address / directory profiles — the operator should
       // never have to spawn a campaign without the business's NAP.
-      const child = await MarketingCampaignService.deriveBusinessCampaign({
-        parentId: campaignId,
-        businessName: napBusinessName,
-        categoryOverride: categoryLabel,
-        cityOverride: city,
-        stateOverride: state,
-        assignedTo: req.user?.id,
-        note: `Category identified via category-ID campaign. Category: ${categoryLabel} (confidence: ${parsed.confidence ?? 'unknown'}).`,
-        // NAP handoff from the category-identification audit
-        phone: napPhone ?? undefined,
-        websiteUrl: napWebsite ?? undefined,
-        addressLine1: napAddressLine1 ?? undefined,
-        addressLine2: auditNap.address_line2 ?? undefined,
-        addressCity: auditNap.city ?? undefined,
-        addressState: auditNap.state ?? undefined,
-        addressZip: auditNap.postal_code ?? undefined,
-        addressCountry: auditNap.country_code ?? undefined,
-        directoryProfiles: napDirectoryProfiles.length > 0 ? napDirectoryProfiles : undefined,
-      }, ctx);
+      let child: any;
+      try {
+        child = await MarketingCampaignService.deriveBusinessCampaign({
+          parentId: campaignId,
+          businessName: napBusinessName,
+          categoryOverride: categoryLabel,
+          cityOverride: city,
+          stateOverride: state,
+          assignedTo: req.user?.id,
+          note: `Category identified via category-ID campaign. Category: ${categoryLabel} (confidence: ${parsed.confidence ?? 'unknown'}).`,
+          // NAP handoff from the category-identification audit
+          phone: napPhone ?? undefined,
+          websiteUrl: napWebsite ?? undefined,
+          addressLine1: napAddressLine1 ?? undefined,
+          addressLine2: auditNap.address_line2 ?? undefined,
+          addressCity: auditNap.city ?? undefined,
+          addressState: auditNap.state ?? undefined,
+          addressZip: auditNap.postal_code ?? undefined,
+          addressCountry: auditNap.country_code ?? undefined,
+          directoryProfiles: napDirectoryProfiles.length > 0 ? napDirectoryProfiles : undefined,
+        }, ctx);
+      } catch (deriveErr) {
+        // Migration 271 — structural-duplicate guardrail: an active campaign
+        // for this business already exists. Instead of surfacing a bare 409,
+        // register the identified category on the existing campaign (primary
+        // slot when empty, otherwise secondary) and report it the same way
+        // the queue path does.
+        if (deriveErr instanceof ConflictError && (deriveErr as any).existingCampaignId) {
+          const existingId: string = (deriveErr as any).existingCampaignId;
+          const registration = await MarketingCampaignService.registerIdentifiedCategory(
+            existingId,
+            categoryLabel,
+            ctx,
+          );
+          return res.status(201).json({
+            success: true,
+            data: {
+              kind: 'campaign_exists',
+              id: existingId,
+              campaignId: existingId,
+              category_added: categoryAdded,
+              category_label: categoryLabel,
+              registered_as: registration.registeredAs,
+            },
+          });
+        }
+        throw deriveErr;
+      }
       return res.status(201).json({
         success: true,
         data: {
@@ -1934,6 +1969,20 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
       queuedBy: req.user?.id,
     }, ctx);
 
+    // Migration 271 — when the prospect's campaign already exists, the
+    // identified category had nowhere to land (only the service-category vocab
+    // was updated, so the campaign detail showed nothing). Register it on the
+    // campaign itself: primary slot when empty, otherwise secondary.
+    let registeredAs: 'primary' | 'secondary' | 'already_present' | undefined;
+    if (queueResult.kind === 'campaign_exists') {
+      const registration = await MarketingCampaignService.registerIdentifiedCategory(
+        queueResult.campaignId,
+        categoryLabel,
+        ctx,
+      );
+      registeredAs = registration.registeredAs;
+    }
+
     // addToQueue returns { kind: 'created' | 'already_queued' | 'campaign_exists' }
     return res.status(201).json({
       success: true,
@@ -1944,6 +1993,7 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
         campaignId: queueResult.kind === 'campaign_exists' ? queueResult.campaignId : undefined,
         category_added: categoryAdded,
         category_label: categoryLabel,
+        registered_as: registeredAs,
       },
     });
   } catch (error) {

@@ -12,7 +12,7 @@ import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError, ValidationError, ConflictError } from '../middleware/errorHandler';
+import { NotFoundError, ValidationError, ConflictError, HttpError } from '../middleware/errorHandler';
 import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId, generateProspectQueueId } from '../lib/id-generator';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
@@ -49,6 +49,11 @@ const INT_SIGNAL_LABELS: Record<string, string> = {
 // ====================
 // TYPES
 // ====================
+
+// Migration 271 — cap on secondary categories per campaign. Matches the seed
+// create/edit pattern (CategorySelectorMulti maxSecondaryCategories = 9).
+const MAX_SECONDARY_CATEGORIES = 9;
+
 
 export type CampaignStage =
   | 'seek'
@@ -255,6 +260,11 @@ export interface CampaignInput {
   // The service defaults to '' when absent. Non-business scopes enforce category
   // at the route validation layer.
   category?: string;
+  // Migration 271 — additional categories beyond the primary. Populated by the
+  // category-identification act flow (campaign_exists path registers later
+  // candidates here) and the campaign create/edit form. Mirrors the
+  // primary/secondary pattern on directory_presence_seeds.
+  secondaryCategories?: string[];
   // City is optional for gold_standards campaigns (city-agnostic / nationwide).
   // Non-gold_standards campaigns enforce city at the route validation layer.
   city?: string;
@@ -318,6 +328,8 @@ export interface CampaignUpdateInput {
   title?: string;
   businessName?: string;
   category?: string;
+  // Migration 271 — secondary categories, operator-managed on the edit form.
+  secondaryCategories?: string[];
   city?: string;
   state?: string;
   neighborhood?: string;
@@ -667,12 +679,18 @@ export class MarketingCampaignService extends BaseService {
       if (duplicate) {
         const label = this.formatDuplicateLabel(duplicate);
         const idPart = duplicate.display_id ? ` (display_id=${duplicate.display_id})` : ` (id=${duplicate.id})`;
-        throw new ConflictError(
+        const conflict = new ConflictError(
           `An active campaign with the same structural signature already exists: ${label}${idPart}, ` +
           `currently in stage "${duplicate.stage}". Re-run that campaign to produce a versioned output ` +
           `instead of creating a duplicate. If the existing campaign is no longer needed, transition it ` +
           `to dead/lost first.`,
         );
+        // Migration 271 — structured handle on the duplicate so composite flows
+        // (category-identification act, destination='campaign') can register
+        // the identified category on the existing campaign instead of surfacing
+        // a bare 409.
+        (conflict as any).existingCampaignId = duplicate.id;
+        throw conflict;
       }
 
       // Intelligence discovery prerequisite: an active establishment profile
@@ -716,6 +734,7 @@ export class MarketingCampaignService extends BaseService {
           title: input.title || defaultTitle || null,
           business_name: input.businessName || null,
           category: input.category || '',
+          secondary_categories: (input.secondaryCategories ?? []) as any,
           city: input.city || '',
           state: normalizeReferenceState(input.state) || null,
           neighborhood: input.neighborhood || null,
@@ -1768,6 +1787,7 @@ export class MarketingCampaignService extends BaseService {
     if (input.title !== undefined) data.title = input.title || null;
     if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
+    if (input.secondaryCategories !== undefined) data.secondary_categories = input.secondaryCategories;
     if (input.city !== undefined) data.city = input.city;
     if (input.state !== undefined) data.state = normalizeReferenceState(input.state) || null;
     if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood || null;
@@ -1846,6 +1866,92 @@ export class MarketingCampaignService extends BaseService {
       return updated;
     } catch (error) {
       logger.error('Failed to update campaign', ctx, { error: (error as Error).message, campaignId: id });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // CATEGORY REGISTRATION (Migration 271)
+  // ====================
+
+  /**
+   * Registers an identified category onto an existing campaign.
+   *
+   * Used by the category-identification act flow when the prospect's campaign
+   * already exists (addToQueue → campaign_exists). Previously the category was
+   * only added to the service-category vocab, so the campaign detail showed no
+   * trace of it — the operator saw "category registered" but the campaign
+   * itself never changed.
+   *
+   * Slot resolution (case-insensitive dedup):
+   *   - campaign has no primary category → the label becomes the primary
+   *   - label matches the primary (case-insensitive) → already_present
+   *   - label already in secondary_categories → already_present
+   *   - otherwise → appended to secondary_categories (capped at 9)
+   *
+   * Returns the updated campaign plus which slot the category landed in, so
+   * the route can surface "set as primary category" vs "added as secondary
+   * category" to the operator.
+   */
+  async registerIdentifiedCategory(
+    campaignId: string,
+    categoryLabel: string,
+    ctx?: RequestCtx,
+  ): Promise<{ campaign: any; registeredAs: 'primary' | 'secondary' | 'already_present' }> {
+    const label = categoryLabel.trim();
+    if (!label) {
+      throw new ValidationError('category_label is required');
+    }
+
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+      });
+      if (!campaign) {
+        throw new NotFoundError(`Campaign ${campaignId} not found`);
+      }
+
+      const primary = (campaign.category ?? '').trim();
+      const secondary = ((campaign.secondary_categories as string[] | null) ?? [])
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+      if (primary && eq(primary, label)) {
+        return { campaign, registeredAs: 'already_present' };
+      }
+      if (secondary.some((c) => eq(c, label))) {
+        return { campaign, registeredAs: 'already_present' };
+      }
+
+      if (!primary) {
+        const updated = await this.prisma.mkt_campaigns_list.update({
+          where: { id: campaignId },
+          data: { category: label },
+        });
+        logger.info('Identified category registered as primary', ctx, { campaignId, category: label });
+        return { campaign: updated, registeredAs: 'primary' };
+      }
+
+      if (secondary.length >= MAX_SECONDARY_CATEGORIES) {
+        // Cap reached — treat as present rather than silently dropping.
+        return { campaign, registeredAs: 'already_present' };
+      }
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { secondary_categories: [...secondary, label] },
+      });
+      logger.info('Identified category registered as secondary', ctx, { campaignId, category: label });
+      return { campaign: updated, registeredAs: 'secondary' };
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      logger.error('Failed to register identified category', ctx, {
+        error: (error as Error).message,
+        campaignId,
+        category: label,
+      });
       throw this.handleError(error, ctx);
     }
   }
