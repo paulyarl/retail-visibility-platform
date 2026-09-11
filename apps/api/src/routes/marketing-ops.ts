@@ -1800,13 +1800,15 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
 //      - "queue"   → addToQueue with source_kind='category_identification'
 //      - "verify"  → addToQueue with initial_status='verify_then_outreach'
 //      - "campaign" → deriveBusinessCampaign with category/city/state overrides
+//      - "secondary" → registerIdentifiedCategory on THIS campaign — fills the
+//        primary slot when empty, otherwise appends to secondary_categories
 // The operator never has to think "add category first, then queue" — the
 // destination action absorbs vocab registration as a precondition step.
 
 const categoryIdentificationActSchema = z.object({
   category_label: z.string().min(1).max(255),
   is_known: z.boolean(),
-  destination: z.enum(['queue', 'verify', 'campaign']),
+  destination: z.enum(['queue', 'verify', 'campaign', 'secondary']),
   business_name: z.string().min(1).max(255),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
@@ -1936,6 +1938,29 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
       });
     }
 
+    if (parsed.destination === 'secondary') {
+      // Register the candidate directly on the campaign hosting this audit —
+      // primary slot when empty, otherwise appended to secondary_categories
+      // (case-insensitive dedup → already_present). Same slot-resolution the
+      // queue/spawn paths use when the business campaign already exists.
+      const registration = await MarketingCampaignService.registerIdentifiedCategory(
+        campaignId,
+        categoryLabel,
+        ctx,
+      );
+      return res.status(201).json({
+        success: true,
+        data: {
+          kind: 'secondary_registered',
+          id: campaignId,
+          campaignId,
+          category_added: categoryAdded,
+          category_label: categoryLabel,
+          registered_as: registration.registeredAs,
+        },
+      });
+    }
+
     // Queue or verify — both go through addToQueue.
     // NAP handoff: include flat NAP fields in business_snapshot so the
     // queue→campaign derive path (createCampaignFromQueue) can forward
@@ -1977,6 +2002,22 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
     if (queueResult.kind === 'campaign_exists') {
       const registration = await MarketingCampaignService.registerIdentifiedCategory(
         queueResult.campaignId,
+        categoryLabel,
+        ctx,
+      );
+      registeredAs = registration.registeredAs;
+    } else if (
+      // The audit lives on the business's own campaign (business-scope, same
+      // business_name) — the campaign-exists check inside addToQueue excludes
+      // the source campaign and never runs when a queue row already exists,
+      // so the identified category would only land in the vocab and the
+      // operator would see nothing after refresh. Register it here too.
+      parent.scope === 'business'
+      && parent.business_name
+      && parent.business_name.trim().toLowerCase() === napBusinessName.trim().toLowerCase()
+    ) {
+      const registration = await MarketingCampaignService.registerIdentifiedCategory(
+        campaignId,
         categoryLabel,
         ctx,
       );

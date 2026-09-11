@@ -1640,7 +1640,14 @@ export default function CampaignDetailClient({
                       ) : audit.platform === 'intelligence_discovery' && audit.audit_data ? (
                         <IntelligenceDiscoveryAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'category_identification' && audit.audit_data ? (
-                        <CategoryIdentificationAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                        <CategoryIdentificationAuditCard
+                          key={audit.id}
+                          audit={audit}
+                          campaignId={campaignId}
+                          currentCategory={campaign.category}
+                          currentSecondaryCategories={campaign.secondary_categories ?? []}
+                          onSynced={fetchCampaign}
+                        />
                       ) : audit.platform === 'gold_standard_scan' && audit.audit_data ? (
                         <div key={audit.id} className="border border-amber-200 dark:border-amber-700 rounded-lg p-4 bg-amber-50/50 dark:bg-amber-900/10">
                           <div className="flex items-center justify-between mb-2">

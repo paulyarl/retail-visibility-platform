@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, Check, Inbox, PhoneCall, ArrowRight, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, Check, Inbox, PhoneCall, ArrowRight, AlertCircle, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Audit } from '@/services/MarketingOpsService';
@@ -18,9 +18,12 @@ import AuditImportMetadataBadge from './AuditImportMetadataBadge';
  *
  * This card renders the candidate categories and provides per-candidate
  * composite action buttons:
- *   - Queue       → addToQueue (source_kind='category_identification')
- *   - Verify      → addToQueue with initial_status='verify_then_outreach'
- *   - Spawn       → deriveBusinessCampaign with category override
+ *   - Queue        → addToQueue (source_kind='category_identification')
+ *   - Verify       → addToQueue with initial_status='verify_then_outreach'
+ *   - Spawn        → deriveBusinessCampaign with category override
+ *   - + Secondary  → registerIdentifiedCategory on THIS campaign — fills the
+ *                    primary slot when empty, otherwise appends to
+ *                    secondary_categories
  *
  * When a candidate category is new (is_known_category=false), the composite
  * action also registers it in the service category vocab — the operator never
@@ -109,7 +112,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 };
 
-type ActionKind = 'queued' | 'verify' | 'campaign_created' | 'campaign_exists' | 'already_queued';
+type ActionKind = 'queued' | 'verify' | 'campaign_created' | 'campaign_exists' | 'already_queued' | 'secondary_registered' | 'created';
 
 interface RowActionState {
   loading: boolean;
@@ -126,9 +129,15 @@ interface RowActionState {
 export default function CategoryIdentificationAuditCard({
   audit,
   campaignId,
+  currentCategory,
+  currentSecondaryCategories,
+  onSynced,
 }: {
   audit: Audit;
   campaignId: string;
+  currentCategory?: string | null;
+  currentSecondaryCategories?: string[];
+  onSynced?: () => void;
 }) {
   const data = parseCategoryIdentification(audit);
   const router = useRouter();
@@ -136,10 +145,13 @@ export default function CategoryIdentificationAuditCard({
 
   if (!data) return null;
 
+  const eqLabel = (a?: string | null, b?: string | null) =>
+    !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
   const handleAction = async (
     idx: number,
     candidate: CategoryIdentificationData['candidate_categories'][number],
-    destination: 'queue' | 'verify' | 'campaign',
+    destination: 'queue' | 'verify' | 'campaign' | 'secondary',
   ) => {
     setActionStates((prev) => ({ ...prev, [idx]: { loading: true } }));
     try {
@@ -170,6 +182,11 @@ export default function CategoryIdentificationAuditCard({
       // Navigate to the spawned campaign if that was the action.
       if (kind === 'campaign_created' && result.id) {
         router.push(`/settings/admin/marketing-ops/campaigns/${result.id}`);
+      }
+      // Secondary registration mutates this campaign's category slots —
+      // refresh so the header's secondary-category chips update.
+      if (kind === 'secondary_registered') {
+        onSynced?.();
       }
     } catch (err: any) {
       setActionStates((prev) => ({
@@ -228,6 +245,9 @@ export default function CategoryIdentificationAuditCard({
             const state = actionStates[i];
             const isPrimary = c.category === data.primary_category;
             const isDone = !!state?.result;
+            const alreadyPrimary = eqLabel(c.category, currentCategory);
+            const alreadySecondary = (currentSecondaryCategories ?? []).some((s) => eqLabel(s, c.category));
+            const onCampaign = alreadyPrimary || alreadySecondary;
             return (
               <div
                 key={i}
@@ -272,10 +292,11 @@ export default function CategoryIdentificationAuditCard({
                       <span>
                         {state!.result!.kind === 'campaign_created' && 'Campaign spawned'}
                         {state!.result!.kind === 'campaign_exists' && 'Campaign already exists'}
-                        {state!.result!.kind === 'queued' && 'Added to queue'}
+                        {(state!.result!.kind === 'queued' || state!.result!.kind === 'created') && 'Added to queue'}
                         {state!.result!.kind === 'verify' && 'Sent to verify queue'}
                         {state!.result!.kind === 'already_queued' && 'Already queued'}
-                        {state!.result!.category_added && ' · category registered'}
+                        {state!.result!.kind === 'secondary_registered' && 'Category registered on campaign'}
+                        {state!.result!.category_added && ' · added to category vocab'}
                         {state!.result!.registered_as === 'primary' && ' · set as primary category'}
                         {state!.result!.registered_as === 'secondary' && ' · added as secondary category'}
                         {state!.result!.registered_as === 'already_present' && ' · category already on campaign'}
@@ -328,6 +349,25 @@ export default function CategoryIdentificationAuditCard({
                       {state?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
                       Spawn campaign
                     </button>
+                    {onCampaign ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500"
+                        title={alreadyPrimary ? 'Already this campaign\u2019s primary category' : 'Already in this campaign\u2019s secondary categories'}
+                      >
+                        <Check className="w-3 h-3" />
+                        {alreadyPrimary ? 'Primary' : 'Secondary'}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleAction(i, c, 'secondary')}
+                        disabled={state?.loading}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/20 dark:border-emerald-700 dark:hover:bg-emerald-900/40 disabled:opacity-50"
+                        title="Register this category on the campaign (primary slot when empty, otherwise secondary)"
+                      >
+                        {state?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tag className="w-3 h-3" />}
+                        Add secondary
+                      </button>
+                    )}
                     {state?.error && (
                       <span className="text-[10px] text-red-500">{state.error}</span>
                     )}

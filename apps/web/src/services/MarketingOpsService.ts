@@ -4586,13 +4586,14 @@ class MarketingOpsService extends AdminApiSingleton {
    * action in one server-side request:
    *   1. If the category is new (is_known=false), registers it in the service
    *      category vocab.
-   *   2. Routes the business to the chosen destination (queue / verify / campaign).
+   *   2. Routes the business to the chosen destination (queue / verify /
+   *      campaign / secondary — registers on this campaign's category slots).
    * Returns { kind, id, category_added, category_label }.
    */
   async categoryIdentificationAct(campaignId: string, input: {
     category_label: string;
     is_known: boolean;
-    destination: 'queue' | 'verify' | 'campaign';
+    destination: 'queue' | 'verify' | 'campaign' | 'secondary';
     business_name: string;
     city?: string;
     state?: string;
