@@ -1049,6 +1049,36 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean };
   }
 
+  /** GET /api/admin/directory-presence/presence-seeds/by-campaign/:campaignId
+   *  Reverse lookup: list all presence seeds spawned from / linked to a
+   *  campaign. Powers the campaign overview "Spawned Place Listings" section. */
+  async listSeedsForCampaign(
+    campaignId: string,
+  ): Promise<Array<{
+    seedId: string;
+    listingId: string;
+    tenantId: string;
+    slug: string | null;
+    businessName: string | null;
+    status: string;
+    linkRole: 'primary' | 'sibling' | 'recovery';
+    napMatchConfidence: string;
+    publicUrl: string | null;
+    claimedAt: string | null;
+    publishedAt: string | null;
+    createdAt: string;
+  }>> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/by-campaign/${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.seeds ?? [];
+  }
+
   /** POST /api/admin/directory-presence/presence-seeds/:id/spawn-campaign
    *  Spawn a business-scope marketing campaign from the seed's NAP and link
    *  it. Returns the created campaign + link + NAP match result. */

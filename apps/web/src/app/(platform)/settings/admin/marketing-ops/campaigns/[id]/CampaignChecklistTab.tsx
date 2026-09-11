@@ -39,6 +39,7 @@ import marketingOpsService, {
   OUTREACH_KINDS,
   OUTREACH_KIND_LABELS,
 } from '@/services/MarketingOpsService';
+import { Button } from '@mantine/core';
 
 interface Props {
   campaignId: string;
@@ -242,7 +243,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
     return (
       <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
         <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-        <button onClick={() => setError(null)} className="mt-2 text-xs text-red-600 hover:underline">Dismiss</button>
+        <Button onClick={() => setError(null)} className="mt-2 text-xs text-red-600 hover:underline">Dismiss</Button>
       </div>
     );
   }
@@ -264,12 +265,12 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
           Run triage on the Overview tab to assign a playbook. The checklist appears once an operator accepts or overrides the recommendation.
         </p>
         {onGoToTriage && (
-          <button
+          <Button
             onClick={onGoToTriage}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
           >
             Go to Triage <ArrowUpRight className="w-3 h-3" />
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -291,12 +292,12 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
           <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-4">
             This playbook has no checklist steps yet. Suggest the first step — an admin will review it on the playbook builder tab.
           </p>
-          <button
+          <Button
             onClick={() => openSuggestionForm(null, 'add')}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30"
           >
             <Lightbulb className="w-3 h-3" /> Suggest a step
-          </button>
+          </Button>
         </div>
         <SuggestionFormModal
           show={showSuggestionForm}
@@ -355,12 +356,12 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
               </p>
             </div>
             {onGoToTriage && (
-              <button
+              <Button
                 onClick={onGoToTriage}
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
               >
                 Go to Triage <ArrowUpRight className="w-3 h-3" />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -403,7 +404,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
       {/* Stage filter toggle */}
       {canStageFilter && (
         <div className="flex items-center gap-1">
-          <button
+          <Button
             onClick={() => setStageFilter('due')}
             className={`px-2.5 py-1 text-[11px] font-medium rounded-full border transition-colors ${
               stageFilter === 'due'
@@ -412,8 +413,8 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
             }`}
           >
             Due by {currentStageLabel} ({dueSteps.length})
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setStageFilter('all')}
             className={`px-2.5 py-1 text-[11px] font-medium rounded-full border transition-colors ${
               stageFilter === 'all'
@@ -422,7 +423,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
             }`}
           >
             All stages ({view.steps.length})
-          </button>
+          </Button>
           {stageFilter === 'due' && dueSteps.length < view.steps.length && (
             <span className="text-[10px] text-gray-400 ml-1">
               {view.steps.length - dueSteps.length} later-stage {view.steps.length - dueSteps.length === 1 ? 'step' : 'steps'} hidden
@@ -436,7 +437,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
         {visibleSteps.length === 0 && (
           <div className="text-center py-8 text-xs text-gray-400 border border-dashed border-gray-200 dark:border-neutral-700 rounded-lg">
             No steps due by {currentStageLabel}.{' '}
-            <button onClick={() => setStageFilter('all')} className="text-blue-600 hover:underline">Show all stages</button>
+            <Button onClick={() => setStageFilter('all')} className="text-blue-600 hover:underline">Show all stages</Button>
           </div>
         )}
         {visibleSteps.map((step) => {
@@ -455,7 +456,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
             >
               <div className="flex items-start gap-3">
                 {/* Checkbox */}
-                <button
+                <Button
                   onClick={() => handleToggle(step)}
                   disabled={isToggling}
                   className="mt-0.5 flex-shrink-0"
@@ -468,7 +469,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
                   ) : (
                     <Circle className={`w-5 h-5 ${step.isRequired ? 'text-gray-300 dark:text-neutral-600' : 'text-gray-200 dark:text-neutral-700'}`} />
                   )}
-                </button>
+                </Button>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -536,12 +537,12 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
                             <CheckCircle2 className="w-3 h-3" /> detected
                           </span>
                         ) : (
-                          <button
+                          <Button
                             onClick={() => handleMarkComplete(step, `Auto-detected: ${step.outreachStatus!.kind}`)}
                             className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
                           >
                             <CheckCircle2 className="w-3 h-3" /> detected — mark complete
-                          </button>
+                          </Button>
                         )
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
@@ -574,18 +575,18 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
                     {step.progress?.note && noteStepId !== step.id && (
                       <span className="text-[10px] text-gray-500 dark:text-gray-400 italic">"{step.progress.note}"</span>
                     )}
-                    <button
+                    <Button
                       onClick={() => openNoteEditor(step)}
                       className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                     >
                       {step.progress?.note ? 'edit note' : 'add note'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => openSuggestionForm(step, 'modify')}
                       className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 hover:underline"
                     >
                       <Lightbulb className="w-3 h-3" /> suggest edit
-                    </button>
+                    </Button>
                   </div>
 
                   {/* Inline note editor */}
@@ -599,19 +600,19 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
                         className="w-full text-xs border border-gray-200 dark:border-neutral-600 rounded px-2 py-1.5 bg-transparent"
                       />
                       <div className="flex gap-2">
-                        <button
+                        <Button
                           onClick={() => handleSaveNote(step)}
                           disabled={togglingStepId === step.id}
                           className="px-2 py-1 text-[10px] font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
                         >
                           Save note
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => setNoteStepId(null)}
                           className="px-2 py-1 text-[10px] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -627,12 +628,12 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
         <p className="text-[10px] text-gray-500 dark:text-gray-400">
           Spot a missing step or a step that should change? Suggestions flow to the playbook admin for review.
         </p>
-        <button
+        <Button
           onClick={() => openSuggestionForm(null, 'add')}
           className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30"
         >
           <Lightbulb className="w-3 h-3" /> Suggest a step
-        </button>
+        </Button>
       </div>
 
       <SuggestionFormModal
@@ -710,9 +711,9 @@ function SuggestionFormModal({
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
             Suggest a checklist change
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
         <div className="p-4 space-y-3">
           {suggestionStep && (
@@ -894,16 +895,17 @@ function SuggestionFormModal({
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-neutral-700">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded">
+          <Button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onSubmit}
+            variant='gradient' style={{ color: 'white' }}
             disabled={submitting || !rationale.trim() || (!isRemove && !proposedTitle.trim())}
             className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
           >
             {submitting ? 'Submitting...' : 'Submit Suggestion'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

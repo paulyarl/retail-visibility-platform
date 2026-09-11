@@ -242,6 +242,7 @@ export default function SuggestBusinessClient({
 
               <Button
                 type="submit"
+                variant='gradient' style={{ color: 'white' }}
                 leftSection={<Send className="w-4 h-4" />}
                 loading={status === 'submitting'}
                 fullWidth

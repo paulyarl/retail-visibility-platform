@@ -528,6 +528,56 @@ describe('SeedSeoComposer', () => {
 
       expect(packet.secondaryCategories.length).toBeLessThanOrEqual(6);
     });
+
+    it('strips analyst descriptions from "name: description" subcategory entries', () => {
+      const profile: IntelligenceProfileSeoFields = {
+        profileId: 'p1',
+        subcategories: [
+          'west african provisions & specialty staples: specializing in nigerian, ghanaian, liberian, and sierra leonean imports (yams, plantains, palm oil, egusi, dried fish, garri, seasonings).',
+          'african butcheries & halal meat markets: combining dry grocery imports with dedicated on-site butchery.',
+        ],
+      };
+
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'african grocery store' },
+        audit: null,
+        intelligenceProfile: profile,
+        goldStandard: null,
+      });
+
+      expect(packet.secondaryCategories).toContain('west african provisions & specialty staples');
+      expect(packet.secondaryCategories).toContain('african butcheries & halal meat markets');
+      for (const cat of packet.secondaryCategories) {
+        expect(cat).not.toContain(':');
+        expect(cat.length).toBeLessThanOrEqual(100);
+      }
+      // The verbose form must not leak into keywords either
+      expect(packet.keywords).toContain('west african provisions & specialty staples');
+      for (const kw of packet.keywords) {
+        expect(kw).not.toContain('specializing in');
+      }
+    });
+
+    it('humanizes snake_case subcategory slugs and drops over-long labels', () => {
+      const profile: IntelligenceProfileSeoFields = {
+        profileId: 'p1',
+        subcategories: [
+          'tire_service: tire sales, mounting, alignment',
+          `${'x'.repeat(101)}: description`,
+          ': orphaned description with no label',
+        ],
+      };
+
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'auto repair' },
+        audit: null,
+        intelligenceProfile: profile,
+        goldStandard: null,
+      });
+
+      expect(packet.secondaryCategories).toContain('tire service');
+      expect(packet.secondaryCategories.length).toBe(1);
+    });
   });
 
   describe('sameAs — URL sanitization + dedupe', () => {

@@ -307,7 +307,7 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link
-                      href={`/settings/admin/marketing-ops/recovery/${link.campaignId}`}
+                      href={`/settings/admin/marketing-ops/campaigns/${link.campaignId}`}
                       className="text-sm font-medium text-blue-600 hover:underline truncate"
                     >
                       {link.campaign?.businessName || link.campaignId}

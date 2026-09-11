@@ -442,7 +442,7 @@ class DirectorySeedCampaignLinkService {
     const r = rows[0];
     const tenantId = r.tenant_id;
     const listingId = r.listing_id;
-    const campaignAdminUrl = `/settings/admin/marketing-ops/recovery/${campaignId}`;
+    const campaignAdminUrl = `/settings/admin/marketing-ops/campaigns/${campaignId}`;
 
     // Pre-load current provenance for operator-override guard (§5.7.1).
     // Only description/keywords/same_as are relevant for the projection fields
@@ -717,6 +717,64 @@ class DirectorySeedCampaignLinkService {
     });
 
     return { projected, skipped };
+  }
+
+  /**
+   * Reverse lookup: list all seeds linked to a campaign, with the listing
+   * slug (for the public /place/<slug> URL), seed status, claim state, and
+   * link metadata. Powers the campaign overview "Spawned Place Listings"
+   * section so an operator can re-open a seed created via the audit tab's
+   * "Add to place listing" action on a later visit.
+   */
+  async listSeedsForCampaign(campaignId: string): Promise<Array<{
+    seedId: string;
+    listingId: string;
+    tenantId: string;
+    slug: string | null;
+    businessName: string | null;
+    status: string;
+    linkRole: LinkRole;
+    napMatchConfidence: NapConfidence;
+    publicUrl: string | null;
+    claimedAt: Date | null;
+    publishedAt: Date | null;
+    createdAt: Date;
+  }>> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        dps.id           AS seed_id,
+        dps.listing_id,
+        dps.tenant_id,
+        dps.status,
+        dps.published_at,
+        dps.claimed_at,
+        dps.created_at,
+        dl.slug,
+        dl.business_name,
+        dscl.link_role,
+        dscl.nap_match_confidence
+      FROM directory_seed_campaign_links dscl
+      JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dscl.campaign_id = ${campaignId}
+      ORDER BY
+        CASE dscl.link_role WHEN 'primary' THEN 0 ELSE 1 END,
+        dps.created_at
+    `;
+    return rows.map((r) => ({
+      seedId: r.seed_id,
+      listingId: r.listing_id,
+      tenantId: r.tenant_id,
+      slug: r.slug ?? null,
+      businessName: r.business_name ?? null,
+      status: r.status ?? 'pending',
+      linkRole: r.link_role as LinkRole,
+      napMatchConfidence: (r.nap_match_confidence ?? 'none') as NapConfidence,
+      publicUrl: r.slug ? `/place/${r.slug}` : null,
+      claimedAt: r.claimed_at ? new Date(r.claimed_at) : null,
+      publishedAt: r.published_at ? new Date(r.published_at) : null,
+      createdAt: new Date(r.created_at),
+    }));
   }
 
   /**

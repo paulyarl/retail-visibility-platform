@@ -299,6 +299,7 @@ export default function AddBusinessClient({
 
               <Button
                 type="submit"
+                variant='gradient' style={{ color: 'white' }}
                 leftSection={<Store className="w-4 h-4" />}
                 loading={status === 'submitting'}
                 fullWidth

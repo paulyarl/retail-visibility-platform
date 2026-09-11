@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle, Phone, AlertTriangle, FlaskConical } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle, Phone, AlertTriangle, FlaskConical, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import marketingOpsService, { Campaign, CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
@@ -9,6 +9,7 @@ import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import type { DirectoryListing } from '@/hooks/directory/useDirectoryListing';
 import { getDirectoryListingUrl } from '@/utils/slug';
+import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
@@ -309,6 +310,38 @@ export default function CampaignDetailClient({
       .catch(() => { if (!cancelled) setLinkedListing(null); });
     return () => { cancelled = true; };
   }, [linkedTenantId]);
+
+  // Spawned place listings — directory presence seeds created from this
+  // campaign (via the audit tab's "Add to place listing" action or the
+  // proving-ground seeding flow). Linked through directory_seed_campaign_links.
+  // Surfaced on the overview tab so the operator can re-open a seed on a later
+  // visit — the audit card only shows the seed link during the initial create.
+  const [spawnedSeeds, setSpawnedSeeds] = useState<Array<{
+    seedId: string;
+    listingId: string;
+    tenantId: string;
+    slug: string | null;
+    businessName: string | null;
+    status: string;
+    linkRole: 'primary' | 'sibling' | 'recovery';
+    napMatchConfidence: string;
+    publicUrl: string | null;
+    claimedAt: string | null;
+    publishedAt: string | null;
+    createdAt: string;
+  }>>([]);
+  useEffect(() => {
+    if (!campaign) {
+      setSpawnedSeeds([]);
+      return;
+    }
+    let cancelled = false;
+    directoryPresenceAdminService
+      .listSeedsForCampaign(campaign.id)
+      .then((seeds) => { if (!cancelled) setSpawnedSeeds(seeds ?? []); })
+      .catch(() => { if (!cancelled) setSpawnedSeeds([]); });
+    return () => { cancelled = true; };
+  }, [campaign?.id]);
 
   // Focus-stage deep-link (e.g. ?focus=preview_built from the openers
   // workspace Next Steps). Once the campaign is loaded, scroll the pipeline
@@ -1603,6 +1636,96 @@ export default function CampaignDetailClient({
                     <DetailField label="Demo Tenant" value={campaign.demo_tenant_id ?? null} />
                   </div>
                 </div>
+
+                {/* Spawned Place Listings — directory presence seeds created
+                    from this campaign (audit tab "Add to place listing" or the
+                    proving-ground seeding flow). The audit card only surfaces the
+                    seed link during the initial create; this section makes it
+                    reachable on every later visit, like siblings / derived
+                    campaigns. */}
+                {spawnedSeeds.length > 0 && (
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-green-500" />
+                      Spawned Place Listings
+                    </h3>
+                    <div className="space-y-2">
+                      {spawnedSeeds.map((seed) => {
+                        const claimed = !!seed.claimedAt;
+                        const published = !!seed.publishedAt;
+                        const statusLabel = claimed
+                          ? 'Claimed'
+                          : published
+                            ? 'Published'
+                            : (seed.status || 'pending').replace(/_/g, ' ');
+                        return (
+                          <div
+                            key={seed.seedId}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-neutral-700 p-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+                                <MapPin className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                    {seed.businessName || 'Unnamed listing'}
+                                  </span>
+                                  <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                    claimed
+                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                      : published
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                  }`}>
+                                    {statusLabel}
+                                  </span>
+                                  {seed.linkRole !== 'primary' && (
+                                    <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                      {seed.linkRole}
+                                    </span>
+                                  )}
+                                  {seed.napMatchConfidence && seed.napMatchConfidence !== 'none' && (
+                                    <span className="text-[10px] text-gray-400">
+                                      NAP: {seed.napMatchConfidence}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5 text-xs">
+                                  <Link
+                                    href={`/settings/admin/directory/presence-seeds/${seed.seedId}`}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:underline"
+                                  >
+                                    seed
+                                  </Link>
+                                  {seed.publicUrl && (
+                                    <>
+                                      <span className="text-gray-300 dark:text-neutral-600">·</span>
+                                      <a
+                                        href={seed.publicUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-0.5 text-teal-600 dark:text-teal-400 hover:underline"
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                        Place preview
+                                      </a>
+                                    </>
+                                  )}
+                                  <span className="text-gray-300 dark:text-neutral-600">·</span>
+                                  <span className="text-gray-400">
+                                    {new Date(seed.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {campaign.notes && (
                   <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Notes</h3>

@@ -122,7 +122,7 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `description` — composed SEO description (SeedSeoComposer, spec §4.4.6)
 - `keywords` — composed SEO keywords (SeedSeoComposer, spec §4.4.6)
 - `same_as` — sameAs URLs from directory/social profiles + audit platforms
-- `secondary_categories` — union of audit additional_categories + profile subcategories
+- `secondary_categories` — operator-managed only (Edit Fields after the category-identification audit); never auto-populated by the composer, campaign, or queue paths
 - `attributes` — sourced attribute chips (payments accepted, accessibility, ownership, service options)
 
 A field must not render publicly without a provenance row with `show_on_public = true`. Hours are omitted unless sourced.

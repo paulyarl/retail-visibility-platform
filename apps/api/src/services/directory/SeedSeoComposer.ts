@@ -112,6 +112,9 @@ const META_TITLE_MAX = 70;
 const DESCRIPTION_MAX = 300;
 const KEYWORDS_MAX = 15;
 const SECONDARY_CATEGORIES_MAX = 6;
+// Matches the 100-char cap in the owner-verification claim schema
+// (directory-presence-public.ts) so composed labels always round-trip.
+const CATEGORY_LABEL_MAX = 100;
 
 /**
  * Curated word-boundary → schema.org type table.
@@ -182,6 +185,20 @@ function containsWord(text: string, word: string): boolean {
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Intelligence profile subcategories use the "<name>: <description>" format
+ * required by the establishment schema (intelligence-profile.schema.ts) —
+ * the description is analyst context, not part of the public label. Extract
+ * the name segment, humanize snake_case slugs (same treatment as
+ * store_format in resolveCategoryLabel), and drop entries whose label would
+ * still exceed the downstream 100-char contract.
+ */
+function subcategoryLabel(sub: string): string | null {
+  const label = sub.split(':')[0].replace(/_/g, ' ').trim();
+  if (!label || label.length > CATEGORY_LABEL_MAX) return null;
+  return label;
 }
 
 // ─── Field compositions ──────────────────────────────────────────────────
@@ -272,7 +289,8 @@ function composeKeywords(
   }
   if (profile?.subcategories) {
     for (const sub of profile.subcategories) {
-      ordered.push(sub);
+      const label = subcategoryLabel(sub);
+      if (label) ordered.push(label);
     }
   }
 
@@ -319,7 +337,8 @@ function composeSecondaryCategories(
 
   if (profile?.subcategories) {
     for (const sub of profile.subcategories) {
-      all.push(sub);
+      const label = subcategoryLabel(sub);
+      if (label) all.push(label);
     }
   }
 

@@ -276,11 +276,8 @@ export default function NewPresenceSeedPage() {
       setKeywords((preview.keywords || []).join(', '));
       setSameAs((preview.sameAs || []).join('\n'));
       setSeoEnrichment(preview.seoEnrichment ?? null);
-      if ((preview.secondaryCategories || []).length > 0) {
-        setSecondaryCategories((prev) =>
-          prev.length > 0 ? prev : (preview.secondaryCategories as string[]),
-        );
-      }
+      // Secondary categories are intentionally not prefilled — the operator
+      // sets them after the category-identification audit.
       setProvenance((rows) => {
         const next = [...rows];
         const upsert = (fieldKey: string, value: string, sourceName: string) => {
@@ -338,11 +335,7 @@ export default function NewPresenceSeedPage() {
     setPhone(phone);
     setWebsite(website);
     setPrimaryCategory(String(verified.category || entry.category || '').trim());
-    setSecondaryCategories(
-      Array.isArray(snap.secondary_categories)
-        ? snap.secondary_categories.map(String)
-        : [],
-    );
+    // Secondary categories stay empty — operator-managed post-seed.
     setLatitude(snap.latitude != null ? String(snap.latitude) : '');
     setLongitude(snap.longitude != null ? String(snap.longitude) : '');
 

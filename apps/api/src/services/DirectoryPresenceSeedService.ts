@@ -1469,7 +1469,6 @@ class DirectoryPresenceSeedService {
           phone: snapshot.phone || null,
           website: snapshot.website || null,
           primaryCategory: entry.category || 'Unknown Category',
-          secondaryCategories: snapshot.secondary_categories || null,
           latitude: snapshot.latitude || null,
           longitude: snapshot.longitude || null,
           snapEbtReported: snapshot.snap_ebt_reported || false,
@@ -1597,7 +1596,6 @@ class DirectoryPresenceSeedService {
           phone: snapshot.phone || null,
           website: snapshot.website || null,
           primaryCategory: entry.category || 'Unknown Category',
-          secondaryCategories: snapshot.secondary_categories || null,
           latitude: snapshot.latitude || null,
           longitude: snapshot.longitude || null,
           snapEbtReported: snapshot.snap_ebt_reported || false,
@@ -2137,9 +2135,8 @@ class DirectoryPresenceSeedService {
       phone: phone || undefined,
       website: websiteUrl || undefined,
       primaryCategory: campaign.category,
-      secondaryCategories: seoPacket.secondaryCategories.length > 0
-        ? seoPacket.secondaryCategories
-        : (google.additional_categories || []),
+      // secondary_categories is never auto-populated — the operator sets it
+      // via Edit Fields after the category-identification audit.
       snapEbtReported: false,
       attributes: sourcedAttributes.length > 0 ? sourcedAttributes : undefined,
       seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
@@ -2161,7 +2158,6 @@ class DirectoryPresenceSeedService {
         { fieldKey: 'description', value: seoPacket.description, sourceName: 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName: 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
-        { fieldKey: 'secondary_categories', value: seoPacket.secondaryCategories.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.secondaryCategories.length > 0 },
         // Sourced attributes — evidence lives on each attribute entry; the
         // provenance row records the audit lineage for the set.
         { fieldKey: 'attributes', value: sourcedAttributes.length > 0 ? 'sourced' : undefined, sourceName: sourcedAttributes[0]?.sourcePlatform || 'business_analysis_audit', sourceUrl: sourcedAttributes[0]?.sourceUrl || sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: sourcedAttributes.length > 0 },

@@ -482,6 +482,26 @@ router.get('/presence-seeds/seo-preview', requirePlatformStaff, async (req: Requ
   }
 });
 
+/** GET /api/admin/directory/presence-seeds/by-campaign/:campaignId
+ *  Reverse lookup: list all presence seeds spawned from / linked to a
+ *  campaign (via directory_seed_campaign_links). Powers the campaign
+ *  overview "Spawned Place Listings" section so an operator can re-open
+ *  a seed created via the audit tab's "Add to place listing" action on
+ *  a later visit. Registered before /presence-seeds/:id so 'by-campaign'
+ *  is not swallowed as an id. */
+router.get('/presence-seeds/by-campaign/:campaignId', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const seeds = await DirectorySeedCampaignLinkService.listSeedsForCampaign(campaignId);
+    res.json({ success: true, seeds });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/by-campaign/:campaignId] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/presence-seeds/:id — seed detail */
 router.get('/presence-seeds/:id', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
