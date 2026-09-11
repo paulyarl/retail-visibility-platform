@@ -4617,6 +4617,10 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-prospect-queue');
     await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    // The act may have registered a new vocab category — bust the cached
+    // service-category list so merged dropdowns (DirectoryCategorySelectorAdapter)
+    // pick it up immediately instead of after the 5-min TTL.
+    await this.invalidateCachePattern('mkt-ops-service-categories');
     const data = result.data?.data ?? result.data;
     return {
       kind: data?.kind ?? 'unknown',

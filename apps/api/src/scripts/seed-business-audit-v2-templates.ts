@@ -35,6 +35,15 @@ const CATEGORY_INTEGRATED_ID = 'mpt-j9bbem3l';
 const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
 const BUSINESS_AUDIT_V1_ID = 'mpt-je6m7ru6';
 
+// ─── Output schema declaration ───────────────────────────────────────────
+// All three business-audit templates emit business_analysis-shaped output.
+// The /prompts/executions/external import endpoint resolves the validator
+// via template.output_schema->>'name' through OUTPUT_SCHEMA_REGISTRY —
+// without this declaration it 400s with "does not declare a recognized
+// output_schema". This is applied even when the body marker is already
+// present (the marker only gates BODY transforms, not column fixes).
+const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
+
 // ─── Markers (presence => already wired, skip) ───────────────────────────
 // Versioned marker — bump the version string when the seed's content changes
 // so already-wired templates get re-applied. The transforms are idempotent
@@ -955,9 +964,28 @@ async function main() {
         continue;
       }
 
+      const needsOutputSchema =
+        (existing.output_schema as { name?: string } | null)?.name !==
+        BUSINESS_ANALYSIS_OUTPUT_SCHEMA.name;
+
       if (existing.body.includes(task.marker)) {
-        logger.info(`Already wired — skipping: ${task.label}`);
-        skipped++;
+        if (!needsOutputSchema) {
+          logger.info(`Already wired — skipping: ${task.label}`);
+          skipped++;
+          continue;
+        }
+        // Body already wired — apply the output_schema column fix only.
+        await prisma.mkt_prompt_templates_list.update({
+          where: { id: task.id },
+          data: {
+            output_schema: BUSINESS_ANALYSIS_OUTPUT_SCHEMA,
+            updated_at: new Date(),
+          },
+        });
+        logger.info(`Declared output_schema on already-wired template: ${task.label}`, undefined, {
+          templateId: task.id,
+        });
+        updated++;
         continue;
       }
 
@@ -974,6 +1002,7 @@ async function main() {
         data: {
           body: newBody,
           variables: FULL_BUSINESS_VARIABLES,
+          output_schema: BUSINESS_ANALYSIS_OUTPUT_SCHEMA,
           updated_at: new Date(),
         },
       });

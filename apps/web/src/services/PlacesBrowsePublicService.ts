@@ -96,6 +96,13 @@ export interface LocationEnrichmentResponse {
   enrichedAt: string;
 }
 
+export interface CategoryVocabEntry {
+  value: string;
+  label: string;
+  slug: string;
+  onDirectory: boolean;
+}
+
 class PlacesBrowsePublicService extends PublicApiSingleton {
   private static instance: PlacesBrowsePublicService;
 
@@ -108,6 +115,23 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
       PlacesBrowsePublicService.instance = new PlacesBrowsePublicService();
     }
     return PlacesBrowsePublicService.instance;
+  }
+
+  /** GET /api/public/directory/category-vocab — registered category vocabulary (public read of mkt_service_categories_list) */
+  async getCategoryVocab(): Promise<CategoryVocabEntry[]> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/public/directory/category-vocab',
+        { method: 'GET' },
+        'places-category-vocab',
+        5 * 60 * 1000,
+      );
+      if (!result.success) return [];
+      const data = result.data?.data ?? result.data;
+      return data?.categories ?? [];
+    } catch {
+      return [];
+    }
   }
 
   /** GET /api/public/directory/places — categories with published presence listings */

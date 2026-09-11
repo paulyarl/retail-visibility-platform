@@ -380,27 +380,39 @@ router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (r
 router.get('/places', async (req: Request, res: Response) => {
   try {
     const pool = getDirectPool();
-    // Unclaimed seeds render on their primary shelf only — secondary categories
-    // activate at claim (claim gate: /directory browse honors secondaries).
+    // Listings render on every shelf they belong to — primary + each
+    // secondary category (visibility-first: unclaimed seeds get full shelf
+    // coverage as a conversion motivator).
     const result = await pool.query(
       `SELECT
-         dps.category,
+         shelf.category,
          pc.slug AS category_slug,
          pc.id AS category_id,
          pc.icon_emoji,
          pc.parent_id,
          pc.level,
-         dps.city,
-         dps.state,
+         shelf.city,
+         shelf.state,
          COUNT(*) as place_count
-       FROM directory_presence_seeds dps
-       JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
-       WHERE dps.status = 'published'
-         AND dll.is_published = true
-         AND dll.listing_origin = 'directory_seed'
-       GROUP BY dps.category, pc.slug, pc.id, pc.icon_emoji, pc.parent_id, pc.level, dps.city, dps.state
-       ORDER BY dps.category ASC, dps.city ASC`,
+       FROM (
+         SELECT dps.category AS category, dps.city, dps.state
+         FROM directory_presence_seeds dps
+         JOIN directory_listings_list dll ON dll.id = dps.listing_id
+         WHERE dps.status = 'published' AND dll.is_published = true
+           AND dll.listing_origin = 'directory_seed'
+         UNION ALL
+         SELECT TRIM(sec), dps.city, dps.state
+         FROM directory_presence_seeds dps
+         JOIN directory_listings_list dll ON dll.id = dps.listing_id
+         CROSS JOIN LATERAL unnest(dll.secondary_categories) sec
+         WHERE dps.status = 'published' AND dll.is_published = true
+           AND dll.listing_origin = 'directory_seed'
+           AND NULLIF(TRIM(sec), '') IS NOT NULL
+           AND LOWER(TRIM(sec)) <> LOWER(TRIM(dps.category))
+       ) shelf
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)
+       GROUP BY shelf.category, pc.slug, pc.id, pc.icon_emoji, pc.parent_id, pc.level, shelf.city, shelf.state
+       ORDER BY shelf.category ASC, shelf.city ASC`,
       [],
     );
 
@@ -474,9 +486,9 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
       paramIdx++;
     }
 
-    // Unclaimed seeds render on their primary shelf only — secondary categories
-    // activate at claim (claim gate: claimed listings render on /directory
-    // shelves, which honor secondary_categories).
+    // Listings render on every shelf they belong to — the requested slug is
+    // matched against the primary category AND each secondary category
+    // (secondary shelves are no longer gated on claim).
     const result = await pool.query(
       `SELECT
          dll.id,
@@ -513,8 +525,15 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
          AND dll.listing_origin = 'directory_seed'
          AND (
            pc.slug = $${paramIdx}
-           OR LOWER(REPLACE(REPLACE(LOWER(dps.category), '[^a-z0-9 ]', ''), ' ', '-')) = LOWER($${paramIdx})
+           OR LOWER(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(dps.category), '[^a-z0-9 ]', '', 'g'), '\s+', '-', 'g')) = LOWER($${paramIdx})
+           OR LOWER(REGEXP_REPLACE(LOWER(dps.category), '[^a-z0-9]+', '-', 'g')) = LOWER($${paramIdx})
            OR LOWER(dps.category) = LOWER(REPLACE(REPLACE(LOWER($${paramIdx}), '-', ' '), '  ', ' '))
+           OR EXISTS (
+             SELECT 1 FROM unnest(dll.secondary_categories) sec
+             WHERE LOWER(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(TRIM(sec)), '[^a-z0-9 ]', '', 'g'), '\s+', '-', 'g')) = LOWER($${paramIdx})
+                OR LOWER(REGEXP_REPLACE(LOWER(TRIM(sec)), '[^a-z0-9]+', '-', 'g')) = LOWER($${paramIdx})
+                OR LOWER(TRIM(sec)) = LOWER(REPLACE(REPLACE(LOWER($${paramIdx}), '-', ' '), '  ', ' '))
+           )
          )
          ${cityClause}
        ORDER BY dll.business_name ASC`,
@@ -559,6 +578,50 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/public/directory/category-vocab — registered category vocabulary
+ *
+ * Public read projection of mkt_service_categories_list. The category-
+ * identification act flow registers new niche labels there (admin side);
+ * this endpoint exposes them to public surfaces (suggestion form category
+ * pickers, /place shelf pages) without changing admin semantics.
+ *
+ * Each row carries a name-derived slug that matches the /places shelf
+ * resolution fallback, plus onDirectory flagging whether the label already
+ * exists as a platform_categories row (i.e., a canonical shelf).
+ */
+router.get('/category-vocab', async (_req: Request, res: Response) => {
+  try {
+    const pool = getDirectPool();
+    const result = await pool.query(
+      `SELECT
+         sc.value,
+         sc.label,
+         pc.slug AS platform_slug
+       FROM mkt_service_categories_list sc
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(sc.label)
+       WHERE sc.is_active = true
+       ORDER BY sc.label ASC`,
+      [],
+    );
+
+    const categories = result.rows.map((row: any) => ({
+      value: row.value,
+      label: row.label,
+      slug: row.platform_slug || slugify(row.label),
+      onDirectory: !!row.platform_slug,
+    }));
+
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ success: true, categories });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/category-vocab] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 // ====================
 // Search, city pages, map data, sitemap (Sprint 5)
 // ====================
@@ -592,7 +655,13 @@ router.get('/places/search', async (req: Request, res: Response) => {
       paramIdx++;
     }
     if (category) {
-      whereClause += ` AND LOWER(dps.category) = LOWER($${paramIdx})`;
+      whereClause += ` AND (
+        LOWER(dps.category) = LOWER($${paramIdx})
+        OR EXISTS (
+          SELECT 1 FROM unnest(dll.secondary_categories) sec
+          WHERE LOWER(TRIM(sec)) = LOWER($${paramIdx})
+        )
+      )`;
       params.push(category);
       paramIdx++;
     }
@@ -711,7 +780,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
          dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
          dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
          dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
-         dll.attributes, dll.public_disclaimer,
+         dll.attributes, dll.public_disclaimer, dll.secondary_categories,
          dps.category, dps.city as seed_city, dps.state as seed_state,
          pc.slug AS category_slug, pc.id AS category_id, pc.icon_emoji
        FROM directory_presence_seeds dps
@@ -744,17 +813,30 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
+      secondaryCategories: Array.isArray(row.secondary_categories) ? row.secondary_categories : [],
       categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
       iconEmoji: row.icon_emoji || null,
     }));
 
-    // Group by category
+    // Group by category — a place lands in its primary shelf group AND each
+    // secondary category group (shelf coverage mirrors /places/:categorySlug).
+    const deriveSlug = (name: string) =>
+      name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
     const categoryMap: Record<string, { category: string; slug: string; iconEmoji: string | null; places: any[] }> = {};
     for (const p of places) {
-      if (!categoryMap[p.category]) {
-        categoryMap[p.category] = { category: p.category, slug: p.categorySlug, iconEmoji: p.iconEmoji, places: [] };
+      const shelfCats = [
+        { name: p.category, slug: p.categorySlug, iconEmoji: p.iconEmoji },
+        ...p.secondaryCategories
+          .map((s: string) => s.trim())
+          .filter((s: string) => s && s.toLowerCase() !== (p.category || '').trim().toLowerCase())
+          .map((s: string) => ({ name: s, slug: deriveSlug(s), iconEmoji: null as string | null })),
+      ];
+      for (const shelf of shelfCats) {
+        if (!categoryMap[shelf.name]) {
+          categoryMap[shelf.name] = { category: shelf.name, slug: shelf.slug, iconEmoji: shelf.iconEmoji, places: [] };
+        }
+        categoryMap[shelf.name].places.push(p);
       }
-      categoryMap[p.category].places.push(p);
     }
 
     res.json({
@@ -788,7 +870,13 @@ router.get('/places-map', async (req: Request, res: Response) => {
     let paramIdx = 1;
 
     if (category) {
-      whereClause += ` AND LOWER(dps.category) = LOWER($${paramIdx})`;
+      whereClause += ` AND (
+        LOWER(dps.category) = LOWER($${paramIdx})
+        OR EXISTS (
+          SELECT 1 FROM unnest(dll.secondary_categories) sec
+          WHERE LOWER(TRIM(sec)) = LOWER($${paramIdx})
+        )
+      )`;
       params.push(category);
       paramIdx++;
     }
@@ -850,14 +938,28 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
          AND dll.listing_origin = 'directory_seed'`,
     );
 
-    // Fetch all categories with published listings
+    // Fetch all shelf categories with published listings — primary AND
+    // secondary categories, including vocab-registered labels that have no
+    // platform_categories row (fallback: name-derived slug, matching the
+    // /places/:categorySlug resolution).
     const categoriesResult = await pool.query(
-      `SELECT DISTINCT pc.slug AS category_slug
-       FROM directory_presence_seeds dps
-       JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
-       WHERE dps.status = 'published' AND dll.is_published = true
-         AND dll.listing_origin = 'directory_seed' AND pc.slug IS NOT NULL`,
+      `SELECT DISTINCT shelf.category, pc.slug AS category_slug
+       FROM (
+         SELECT dps.category AS category
+         FROM directory_presence_seeds dps
+         JOIN directory_listings_list dll ON dll.id = dps.listing_id
+         WHERE dps.status = 'published' AND dll.is_published = true
+           AND dll.listing_origin = 'directory_seed'
+         UNION
+         SELECT TRIM(sec)
+         FROM directory_presence_seeds dps
+         JOIN directory_listings_list dll ON dll.id = dps.listing_id
+         CROSS JOIN LATERAL unnest(dll.secondary_categories) sec
+         WHERE dps.status = 'published' AND dll.is_published = true
+           AND dll.listing_origin = 'directory_seed'
+           AND NULLIF(TRIM(sec), '') IS NOT NULL
+       ) shelf
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)`,
     );
 
     // Fetch all cities with published listings
@@ -880,8 +982,9 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
 
     // Category pages
     for (const row of categoriesResult.rows) {
+      const shelfSlug = row.category_slug || slugify(row.category);
       urls.push(`  <url>
-    <loc>${baseUrl}/place/category/${encodeURIComponent(row.category_slug)}</loc>
+    <loc>${baseUrl}/place/category/${encodeURIComponent(shelfSlug)}</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`);

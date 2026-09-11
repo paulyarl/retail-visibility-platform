@@ -1,0 +1,647 @@
+{
+  "audit_metadata": {
+    "audit_date": "2026-09-11",
+    "requested_business": {
+      "business_name": "Arsema G Food Mart LLC",
+      "city": "Indianapolis",
+      "state": "IN",
+      "category": "African Grocery Store",
+      "address": "",
+      "phone": ""
+    },
+    "matched_business": {
+      "business_name": "Arsema Food Mart (legal entity: Arsema G Food Mart LLC)",
+      "category": "African Grocery Store",
+      "store_format": "grocery",
+      "hybrid_role": "Ethiopian-import grocery with a Square Online storefront (shop categories: foods, appliances, decor); direct container-level importer of Ethiopian food staples",
+      "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+      "phone": "(317) 603-3274",
+      "website": "https://arsemamart.square.site"
+    },
+    "identity_status": "confirmed",
+    "identity_confidence": "high",
+    "identity_corroboration_sources": [
+      "Indiana Secretary of State (INBiz) entity record via indiana-company.com",
+      "USDA SNAP retailer record (via aggregator) for 'Arsema G Foodmart Llc 001'",
+      "US Customs import records (ImportGenius, ImportKey, Trademo)",
+      "Waze/Google-place listing for 6667 W Washington St",
+      "Square Online storefront titled 'Arsema G Food Mart'"
+    ],
+    "limitations": [
+      "Google Maps and Bing Maps are JavaScript-gated; GBP rating, review counts, photos, and claim status could not be directly verified.",
+      "The Square storefront is client-rendered; shop category structure and checkout were verified via sitemap and indexed pages, but individual product pages were not rendered to a non-JS visitor.",
+      "The relationship between the 10th St and Washington St addresses (former location vs. second store vs. principal-office-only) requires owner verification — flagged as an outreach conversation point, not an audit deficiency."
+    ]
+  },
+  "detected_signals": [
+    "INT_MULTISOURCE_IDENTITY",
+    "INT_ACTIVE_OPERATIONAL_EVIDENCE",
+    "INT_RECENT_BUSINESS_EVIDENCE",
+    "INT_CATEGORY_SPECIALIZATION",
+    "INT_VERTICAL_SOURCE_DISCOVERY",
+    "INT_LOW_VISIBILITY",
+    "INT_WEAK_MAINSTREAM_INDEXING",
+    "INT_UNDEREXPOSED_CREDENTIAL",
+    "DS_MISSING_PROFILE",
+    "CP_NAP_ADDRESS_DRIFT"
+  ],
+  "summary": "Arsema G Food Mart LLC is a confirmed, operational Ethiopian-specialized African grocery in Indianapolis with unusually strong operational credentials for its category — a direct container importer of Ethiopian staples (teff flour, berbere, shiro, fenugreek, finger millet) and a SNAP/EBT-authorized retailer — behind a thin mainstream digital footprint. It operates a working Square Online storefront with checkout, and its storefront-facing listings consistently show the 6667 W Washington St location with current daily hours (10:00-21:30) and phone (317) 603-3274. The 2724 W 10th St address exists only in regulatory/intelligence-layer records (INBiz principal office, SNAP registration, 2021 customs delivery) plus two stale aggregator listings on MapQuest and YellowPages that appear to have ingested it — a suppression target, not business-published drift, and a natural owner-verification conversation. No Yelp, Facebook, or BBB presence and no verifiable public reviews were found, and directory categorization is generic 'convenience store' with no African positioning. The opportunity is consolidation, positioning, and presence-building on top of already-functional infrastructure.",
+  "public_narrative": "Arsema G Food Mart is an Ethiopian-focused African grocery store on West Washington Street on the west side of Indianapolis. The market imports directly from Ethiopia, stocking staples such as brown teff flour for injera, berbere red pepper blend, shiro chickpea seasoning, fenugreek, and finger millet. A SNAP/EBT-authorized retailer, the store also offers online browsing and ordering through its Square-powered web shop.",
+  "platforms": {
+    "google": {
+      "profile_status": "likely_claimed",
+      "rating": null,
+      "total_reviews": null,
+      "reviews_with_observable_response": null,
+      "observable_unanswered_reviews": null,
+      "observable_unanswered_negative_reviews": null,
+      "observable_unanswered_positive_reviews": null,
+      "observable_response_rate_percent": null,
+      "oldest_observable_unanswered_review": null,
+      "newest_observable_unanswered_review": null,
+      "primary_category": null,
+      "additional_categories": [],
+      "category_fit_assessment": "GBP primary category could not be directly verified (Google Maps is JS-gated). Directory mirrors (Loc8NearMe, MapQuest) label the business generically as 'Convenience Store'/'convenience store'. Category fit is nonetheless strongly corroborated: US Customs manifests document direct imports of Ethiopian staples (teff flour, berbere, shiro, fenugreek, finger millet) from Addis Ababa suppliers, and the entity holds SNAP retailer authorization. Generic labeling is consistent with the category's known miscategorization pattern, not evidence against fit.",
+      "displayed_name": "Arsema Food Mart",
+      "displayed_address": "6667 W Washington St, Indianapolis, IN 46241",
+      "displayed_phone": "(317) 603-3274",
+      "displayed_website": "https://arsemamart.square.site",
+      "profile_issues": [
+        "Generic 'convenience store' categorization on mirrored directory data",
+        "Rating, review count, photos, and posts not verifiable from accessible public sources",
+        "Stale aggregator listings (MapQuest, YellowPages) carry the business's regulatory-layer address (2724 W 10th St) with a different phone number — likely feed ingestion of INBiz/SNAP/customs data, requiring suppression rather than reflecting business-published information"
+      ],
+      "profile_url": null,
+      "data_status": "partial"
+    },
+    "yelp": {
+      "profile_status": "unable_to_verify",
+      "rating": null,
+      "total_reviews": null,
+      "reviews_with_observable_response": null,
+      "observable_unanswered_reviews": null,
+      "observable_unanswered_negative_reviews": null,
+      "observable_unanswered_positive_reviews": null,
+      "observable_response_rate_percent": null,
+      "oldest_observable_unanswered_review": null,
+      "newest_observable_unanswered_review": null,
+      "displayed_name": null,
+      "displayed_address": null,
+      "displayed_phone": null,
+      "displayed_website": null,
+      "profile_url": null,
+      "data_status": "unavailable"
+    },
+    "facebook": {
+      "profile_status": "unable_to_verify",
+      "rating_or_recommendation": null,
+      "total_reviews": null,
+      "reviews_with_observable_response": null,
+      "observable_unanswered_reviews": null,
+      "observable_unanswered_negative_reviews": null,
+      "observable_unanswered_positive_reviews": null,
+      "observable_response_rate_percent": null,
+      "oldest_observable_unanswered_review": null,
+      "newest_observable_unanswered_review": null,
+      "displayed_name": null,
+      "displayed_address": null,
+      "displayed_phone": null,
+      "displayed_website": null,
+      "profile_url": null,
+      "data_status": "unavailable"
+    },
+    "bbb": {
+      "profile_status": "unable_to_verify",
+      "letter_grade": null,
+      "numeric_grade": null,
+      "accreditation_status": "unknown",
+      "customer_rating": null,
+      "total_reviews": null,
+      "unanswered_complaints": null,
+      "displayed_name": null,
+      "displayed_address": null,
+      "displayed_phone": null,
+      "displayed_website": null,
+      "profile_url": null,
+      "data_status": "unavailable"
+    }
+  },
+  "specialized_sources_audited": [
+    {
+      "source": "Indiana Secretary of State Business Services Division (INBiz) via indiana-company.com",
+      "tier": 2,
+      "source_type": "certification",
+      "consulted": true,
+      "findings": "Active domestic LLC 'ARSEMA G FOOD MART LLC'; principal office 2724 W 10th St, Indianapolis, IN 46222 (regulatory-layer address, not a storefront NAP source); secondary address 801 Hardin Blvd, Indianapolis, IN 46241.",
+      "url": "https://indiana-company.com/co/arsema-g-food-mart-llc",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "USDA Food and Nutrition Service - SNAP Retailer Locator (via AffordableHousing411 SNAP retailer record)",
+      "tier": 2,
+      "source_type": "vertical_directory",
+      "consulted": true,
+      "findings": "SNAP-authorized retailer record 'Arsema G Foodmart Llc 001' at 2724 W 10th St, Indianapolis, IN 46222 — regulatory registration address; owner verification needed to confirm whether EBT acceptance applies to the Washington St storefront or a second/former location.",
+      "url": "https://www.affordablehousing411.com/food-assistances/snap-retailer-details-arsema-g-foodmart-llc-001-2724-w-10th-st-indianapolis-in-46222/",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "ImportGenius / ImportKey / Trademo (US Customs import records)",
+      "tier": 3,
+      "source_type": "certification",
+      "consulted": true,
+      "findings": "Multiple container shipments to Arsema G Food Mart LLC: brown teff flour, berbere red pepper blend, shiro chickpea seasoning, chili pepper, fava bean flour, roasted barley, finger millet flour, fenugreek powder, roasted cardamom, aroma hop leaves. Suppliers: Yosal Foods and Meseret Food Exporter (Addis Ababa, Ethiopia; shipped via Djibouti/Gioia Tauro). Most recent shipment 2025-01-30 (~14,190 kg). Importer address: Unit A, 6667 W Washington St; 2021 delivery address: 2724 W 10th St.",
+      "url": "https://www.importgenius.com/importers/arsema-g-food-mart-llc",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "International Marketplace Coalition (IMC) Directory",
+      "tier": 1,
+      "source_type": "vertical_directory",
+      "consulted": true,
+      "findings": "No listing found; consistent with IMC's Lafayette Square / 38th St corridor scope — this business operates on the west/southwest side (W Washington St corridor).",
+      "url": null,
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "Western Union / MoneyGram / RIA agent locators",
+      "tier": 3,
+      "source_type": "vertical_directory",
+      "consulted": true,
+      "findings": "No agent listing under the business name located in searched paths.",
+      "url": null,
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "Waze / Google-place data (place ID ChIJPbpJAQ5Xa4gRButQ5WbPvZ8)",
+      "tier": 4,
+      "source_type": "mainstream_directory",
+      "consulted": true,
+      "findings": "Listing 'Arsema Food Mart' at 6667 W Washington St, Indianapolis, IN 46241 with phone (317) 603-3274, website arsemamart.square.site, and full daily hours 10:00-21:30; real-time open/closed status displayed.",
+      "url": "https://www.waze.com/live-map/directions/us/in/indianapolis/arsema-food-mart-llc",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "Loc8NearMe",
+      "tier": 4,
+      "source_type": "mainstream_directory",
+      "consulted": true,
+      "findings": "Lists 'Arsema Food Mart' (Convenience Stores) at 6667 W Washington St with (317) 603-3274, Mon-Sun 10AM-9:30PM hours, and a photo gallery — consistent with the Waze/GBP storefront record.",
+      "url": "https://www.loc8nearme.com/indiana/indianapolis/arsema-food-mart-llc/7178269/",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "source": "MapQuest / YellowPages (stale aggregator listings)",
+      "tier": 4,
+      "source_type": "mainstream_directory",
+      "consulted": true,
+      "findings": "Both carry 'Arsema Food Mart LLC' at 2724 W 10th St with (317) 929-1859 and an auto-generated 'convenience store' description. Address provenance is intelligence-layer (INBiz principal office / SNAP registration / 2021 customs delivery); these listings appear to be stale feed ingestion of regulatory data rather than business-maintained profiles. Suppression/correction target; also an owner-verification point (former location vs. second store vs. paper address).",
+      "url": "https://www.mapquest.com/us/indiana/arsema-food-mart-llc-400366737",
+      "accessed_date": "2026-09-11"
+    }
+  ],
+  "combined_review_metrics": {
+    "observable_total_reviews": null,
+    "observable_reviews_with_response": null,
+    "observable_unanswered_reviews": null,
+    "observable_unanswered_negative_reviews": null,
+    "observable_unanswered_positive_reviews": null,
+    "observable_response_rate_percent": null,
+    "observable_unanswered_rate_percent": null,
+    "oldest_observable_unanswered_review": null,
+    "newest_observable_unanswered_review": null,
+    "counts_complete": false
+  },
+  "alignment_scoring": {
+    "misalignment_index": null,
+    "action_classification": "BALANCED_HEALTHY",
+    "lead_disposition": "STANDARD_OUTREACH",
+    "primary_outreach_hook": "Open with a verification question, not a pitch: 'Our records show your business associated with both 2724 W 10th St and 6667 W Washington St — can you help us confirm which is the current storefront?' This confirms the address relationship (former location vs. second store vs. registered office), validates whether the SNAP authorization follows the storefront, and surfaces stale aggregator listings the owner likely doesn't know exist. Follow-on scope: recategorize from generic 'convenience store' to African/Ethiopian grocery positioning, establish Yelp/Facebook/BBB presence, and build review generation around the existing Square online store.",
+    "alignment_breakdown": {
+      "admin_score": null,
+      "public_sentiment_score": null,
+      "delta": null
+    }
+  },
+  "website": {
+    "url": "https://arsemamart.square.site",
+    "status": "working",
+    "mobile_friendly": "unable_to_verify",
+    "https": true,
+    "contact_information_visible": "unable_to_verify",
+    "click_to_call_available": "unable_to_verify",
+    "call_to_action_present": true,
+    "service_information_present": "unable_to_verify",
+    "location_information_present": "unable_to_verify",
+    "category_specific_content_present": "unable_to_verify",
+    "ordering_or_pickup_info_present": true,
+    "issues": [
+      "Initial URL requested: https://arsemamart.square.site — no redirect observed; HTTPS valid.",
+      "The site is a JavaScript-rendered Square Online application: the HTML body returned to a non-JS fetch is empty, but sitemap.xml serves live shop URLs (foods, appliances, decor categories) and the cart page is indexed with 'Secure checkout by Square' and payment badges (Apple Pay, Google Pay, Cash App, Visa, Mastercard, Amex, Discover, JCB). Website reachable and conversion path (browse -> cart -> checkout) verified; product-level and contact details on rendered pages were not observable.",
+      "A shop category named 'foods' exists, but individual product pages did not render, so African/Ethiopian product content on the site itself could not be verified."
+    ],
+    "conversion_opportunities": [
+      "Surface store address, phone, and hours prominently on the storefront (not verified as present)",
+      "Publish Ethiopian/African product naming and category terminology on shop pages for search visibility",
+      "Add click-to-call and embedded map/directions on the contact surface"
+    ]
+  },
+  "nap_consistency": {
+    "overall_status": "minor_variations",
+    "canonical_name": "Arsema G Food Mart LLC",
+    "canonical_address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+    "canonical_phone": "(317) 603-3274",
+    "name_variations": [
+      "Arsema Food Mart",
+      "Arsema Food Mart LLC",
+      "Arsema G Food Mart",
+      "Arsema G Foodmart Llc 001",
+      "ARSEMA G FOOD MART LLC"
+    ],
+    "address_variations": [
+      "6667 W Washington St, Unit A, Indianapolis, IN 46241 — storefront-correlated: Waze/GBP-derived listing, Loc8NearMe, Square storefront linkage, importer-of-record address",
+      "2724 W 10th St, Indianapolis, IN 46222 — regulatory/intelligence-layer only: INBiz principal office, USDA SNAP retailer registration, 2021 customs delivery address; surfaced on consumer surface solely via stale MapQuest and YellowPages aggregator listings"
+    ],
+    "phone_variations": [
+      "(317) 603-3274 — storefront listing (Washington St)",
+      "(317) 929-1859 — appears only inside the stale MapQuest/YellowPages 10th St listings",
+      "1-817-489-4729 — trade-record contact; likely customs broker, not a storefront line"
+    ],
+    "material_issues": [
+      "Regulatory/principal address (2724 W 10th St) leaked into two consumer aggregator listings (MapQuest, YellowPages) alongside a stale phone number. This is intel-layer address leakage — a suppression/correction target — not business-published drift, and is consistent with normal legal-vs-trade-address separation for a micro-enterprise (per category rule multisource_identity_reconciliation). The storefront-facing NAP surface itself is consistent. Pending owner verification: whether 10th St was a former retail location, remains a second store, or is a registered-office-only address — flagged as an outreach conversation point."
+    ]
+  },
+  "operational_status": {
+    "status": "active",
+    "last_activity_evidence": "Square Online storefront is live and accepting orders at audit time; Waze listing displays current daily hours and real-time open/closed status; most recent verified import shipment (Ethiopian food staples) arrived 2025-01-30.",
+    "last_activity_date": "2026-09-11",
+    "evidence_sources": [
+      "Square Online storefront (arsemamart.square.site)",
+      "Waze / Google-place listing",
+      "US Customs import records (ImportGenius)"
+    ]
+  },
+  "competitive_benchmarks": [
+    {
+      "business_name": "Jokkymore Dchef Food Services African Market LLC",
+      "store_format": "grocery_plus_prepared_foods",
+      "geographic_reach": "Indianapolis (west side, 1041 N Girls School Rd, 46214)",
+      "product_breadth": "moderate",
+      "prepared_food_component": true,
+      "delivery_model": "unknown",
+      "regional_specialization": "Nigerian/West African — directory description cites imported African foods, snacks, Nigerian cooked-food catering and event services",
+      "google_rating": null,
+      "google_review_count": null,
+      "yelp_rating": null,
+      "yelp_review_count": null,
+      "profile_completeness_score": 5,
+      "format_context_note": "Same-city African market with a prepared-foods/catering arm and an owned website (nrsgo.com); a reasonable comparator for category positioning though on a different corridor.",
+      "specialization_evidence_direct": true
+    },
+    {
+      "business_name": "African/Caribbean Food Stores LLC",
+      "store_format": "grocery",
+      "geographic_reach": "Indianapolis (5342 W 38th St, 46254 — International Marketplace corridor)",
+      "product_breadth": "broad",
+      "prepared_food_component": false,
+      "delivery_model": "unknown",
+      "regional_specialization": "African and Caribbean — directory listing cites fresh produce, African food, canned goods, Caribbean food, frozen food, kitchen utensils",
+      "google_rating": null,
+      "google_review_count": null,
+      "yelp_rating": null,
+      "yelp_review_count": null,
+      "profile_completeness_score": 4,
+      "format_context_note": "Corridor-based African/Caribbean grocer inside the IMC geography; comparable retail format with broader Afro-Caribbean assortment versus Arsema's Ethiopian import specialization.",
+      "specialization_evidence_direct": true
+    }
+  ],
+  "unanswered_negative_review_examples": [],
+  "negative_review_themes": [],
+  "digital_opportunity_score": {
+    "score": 1,
+    "classification": "low",
+    "components": {
+      "google_profile_maintenance": 1,
+      "review_response_opportunity": 0,
+      "unanswered_negative_reviews": 0,
+      "website_opportunity": 0,
+      "nap_consistency": 0
+    },
+    "rationale": "Storefront-facing NAP is consistent — the 10th St address is regulatory-layer data (INBiz principal office, SNAP registration, customs delivery) that legitimately differs from the trade address, so no NAP point is scored; the residual MapQuest/YellowPages listings are stale intel-leak records logged as a suppression gap rather than scored drift. GBP shows management signals (current daily hours, linked working website, phone) but mirrors carry generic 'convenience store' categorization (1 pt). No verifiable review data exists on any platform, so review components score 0 on insufficient data. The Square storefront works with functioning checkout (0 pts)."
+  },
+  "high_attention": false,
+  "high_attention_reasons": [],
+  "recommended_tier": "tier_3",
+  "tier_rationale": "Score of 1 places this in the low band. Needs are corrective and positioning-focused rather than reputation-remediation: stale-listing suppression, category recategorization, missing-platform profile creation (Yelp, Facebook, BBB), and review-generation groundwork on an already-functional online store. Fee range reflects service scope, not the business's finances.",
+  "estimated_monthly_service_fee": {
+    "minimum": 300,
+    "maximum": 750,
+    "currency": "USD"
+  },
+  "recommended_services": [
+    "Business listing cleanup",
+    "Duplicate-listing suppression",
+    "Google Business Profile optimization",
+    "Local SEO",
+    "Review monitoring",
+    "Reputation reporting",
+    "Vertical directory enrollment (IMC / community directories)",
+    "Community/social channel activation (Facebook page creation)"
+  ],
+  "data_quality": {
+    "confidence": "medium",
+    "verified_fields": [
+      "Legal entity name and active status (INBiz)",
+      "Storefront address 6667 W Washington St + phone (317) 603-3274 + hours (Waze/GBP-derived, Loc8NearMe)",
+      "Regulatory-layer address 2724 W 10th St (INBiz principal office, SNAP registration, 2021 customs delivery) — legal/paper address, distinct from storefront NAP",
+      "Working Square Online storefront with checkout and shop categories",
+      "Ethiopian product specialization via US Customs manifests (teff, berbere, shiro, fenugreek, finger millet)",
+      "SNAP/EBT retailer authorization (10th St record)"
+    ],
+    "unavailable_fields": [
+      "Google rating, review count, review dates, owner responses",
+      "Yelp/Facebook/BBB profiles and any associated review data",
+      "GBP claim status, primary category, photos, description",
+      "On-page website contact info, product names, and mobile usability"
+    ],
+    "conflicts": [
+      "Pending owner verification (not a scored conflict): relationship between 2724 W 10th St and 6667 W Washington St — former location vs. second store vs. registered-office-only — and whether the SNAP authorization follows the storefront",
+      "Directory categorization ('Convenience Store') conflicts with verified Ethiopian grocery specialization"
+    ],
+    "limitations": [
+      "Google Maps, Bing Maps, and several directory pages are JS-gated or bot-blocked; GBP depth could not be directly audited",
+      "Platform absence findings (Yelp, Facebook, BBB) reflect searched discovery paths, not proof of non-existence",
+      "Square site content verified at structural level (sitemap, indexed cart/checkout) rather than rendered product level",
+      "Two-address question recorded as an operator-verification item rather than resolved from public data"
+    ]
+  },
+  "sources": [
+    {
+      "platform": "ImportGenius",
+      "source_type": "us_customs_import_records",
+      "url": "https://www.importgenius.com/importers/arsema-g-food-mart-llc",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "ImportKey",
+      "source_type": "us_customs_import_records",
+      "url": "https://importkey.com/i/meseret-food-exporter",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "indiana-company.com (INBiz mirror)",
+      "source_type": "state_entity_registration",
+      "url": "https://indiana-company.com/co/arsema-g-food-mart-llc",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "AffordableHousing411 (USDA SNAP retailer data)",
+      "source_type": "snap_retailer_record",
+      "url": "https://www.affordablehousing411.com/food-assistances/snap-retailer-details-arsema-g-foodmart-llc-001-2724-w-10th-st-indianapolis-in-46222/",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "Square Online storefront",
+      "source_type": "business_website",
+      "url": "https://arsemamart.square.site/sitemap.xml",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "Waze",
+      "source_type": "maps_directory",
+      "url": "https://www.waze.com/live-map/directions/us/in/indianapolis/arsema-food-mart-llc",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "Loc8NearMe",
+      "source_type": "business_directory",
+      "url": "https://www.loc8nearme.com/indiana/indianapolis/arsema-food-mart-llc/7178269/",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "MapQuest",
+      "source_type": "maps_directory",
+      "url": "https://www.mapquest.com/us/indiana/arsema-food-mart-llc-400366737",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "YellowPages",
+      "source_type": "business_directory",
+      "url": "https://www.yellowpages.com/indianapolis-in/mip/arsema-food-mart-547187617",
+      "accessed_date": "2026-09-11"
+    },
+    {
+      "platform": "Trademo",
+      "source_type": "us_customs_import_records",
+      "url": "https://www.trademo.com/united-states/buyers/hscode/110290/17",
+      "accessed_date": "2026-09-11"
+    }
+  ],
+  "gap_analysis": {
+    "gaps": [
+      {
+        "platform": "universal",
+        "field": "street_address",
+        "expected": "Complete physical retail address consistent across all consumer-facing profiles",
+        "actual": "Storefront surface is consistent (6667 W Washington St); regulatory address 2724 W 10th St leaked into stale MapQuest/YellowPages listings",
+        "gap_description": "Not business-published drift — intel-layer address ingestion into consumer aggregators. Suppression/correction target; owner verification will confirm whether 10th St was a former store or is a registered-office-only address.",
+        "severity": "non_negotiable"
+      },
+      {
+        "platform": "universal",
+        "field": "product_scope",
+        "expected": "Clear indication of African pantry staples and specialty products",
+        "actual": "Profiles describe a generic 'convenience store'; no African/Ethiopian positioning text",
+        "gap_description": "Despite verified Ethiopian import specialization, no public profile communicates category positioning.",
+        "severity": "non_negotiable"
+      },
+      {
+        "platform": "universal",
+        "field": "community_and_cultural_context",
+        "expected": "Brand content connects the store to African communities or regional cuisines",
+        "actual": "No cultural/community context found on any public profile",
+        "gap_description": "Ethiopian sourcing and diaspora relevance are invisible in the public-facing brand surface.",
+        "severity": "recommended"
+      },
+      {
+        "platform": "yelp",
+        "field": "business_information",
+        "expected": "Yelp page with name, address, phone, website, hours, African grocery categories",
+        "actual": "No Yelp profile found in searched paths",
+        "gap_description": "Business absent from a primary review platform.",
+        "severity": "non_negotiable"
+      },
+      {
+        "platform": "facebook",
+        "field": "about_section",
+        "expected": "Facebook business page with category, address, phone, hours, African product description",
+        "actual": "No Facebook page found in searched paths",
+        "gap_description": "No social presence for community/diaspora channel engagement.",
+        "severity": "non_negotiable"
+      },
+      {
+        "platform": "google",
+        "field": "business_description",
+        "expected": "Category-specific description covering African product assortment and service area",
+        "actual": "No description verifiable; mirrored categorization is generic 'Convenience Store'",
+        "gap_description": "GBP description and African-grocery categorization not verifiable and likely absent based on downstream mirrors.",
+        "severity": "non_negotiable"
+      },
+      {
+        "platform": "bbb",
+        "field": "business_identity",
+        "expected": "BBB record identifying the business with correct NAP and category",
+        "actual": "No BBB record found in searched paths",
+        "gap_description": "No BBB presence; administrative standing unestablished.",
+        "severity": "recommended"
+      },
+      {
+        "platform": "universal",
+        "field": "delivery_or_ordering_options",
+        "expected": "Online ordering or delivery instructions where offered",
+        "actual": "Square Online ordering exists but is not surfaced on directory profiles beyond a raw website link",
+        "gap_description": "An owned ordering channel exists — an above-baseline asset — but ordering CTAs are not propagated to profiles.",
+        "severity": "recommended"
+      }
+    ],
+    "summary": "The business clears the benchmark's hardest gates (working website with online ordering, published hours, real trading name, consistent storefront NAP) but fails on category-specific positioning (generic 'convenience store' labeling with zero African/Ethiopian messaging) and carries a stale-listing suppression item from regulatory-address leakage into MapQuest/YellowPages. It is absent from Yelp, Facebook, and BBB. The gap profile is suppression + positioning + presence-building, not remediation — and the 10th St question is a natural owner-verification opener."
+  },
+  "quality_gate_results": {
+    "results": [
+      {
+        "platform": "universal",
+        "gate": "canonical_nap_consistency",
+        "passed": true,
+        "severity": "non_negotiable",
+        "notes": "Storefront-facing profiles (Waze/GBP-derived, Loc8NearMe, Square site) consistently show 6667 W Washington St + (317) 603-3274. The conflicting 2724 W 10th St address is regulatory-layer data (INBiz principal office, SNAP registration, customs delivery) — legitimate legal-vs-trade separation, not business-published drift. Residual stale aggregator listings (MapQuest, YellowPages) logged as a suppression gap."
+      },
+      {
+        "platform": "universal",
+        "gate": "published_hours",
+        "passed": true,
+        "severity": "non_negotiable",
+        "notes": "Full weekly hours (Mon-Sun 10:00-21:30) published on the Waze/GBP-derived listing and Loc8NearMe; consistent across those surfaces."
+      },
+      {
+        "platform": "universal",
+        "gate": "category_specific_positioning",
+        "passed": false,
+        "severity": "non_negotiable",
+        "notes": "All observed public surfaces describe a generic convenience store; African/Ethiopian positioning is absent despite verified specialization."
+      },
+      {
+        "platform": "universal",
+        "gate": "functional_website",
+        "passed": true,
+        "severity": "non_negotiable",
+        "notes": "Square Online storefront loads, is HTTPS, has shop categories and a functioning checkout with multiple payment methods."
+      },
+      {
+        "platform": "universal",
+        "gate": "review_presence",
+        "passed": null,
+        "severity": "recommended",
+        "notes": "Not verified — no review counts observable on any platform."
+      },
+      {
+        "platform": "universal",
+        "gate": "cross_platform_consistency",
+        "passed": false,
+        "severity": "recommended",
+        "notes": "Stale aggregator listings (MapQuest, YellowPages) present the regulatory-layer address as a current business address — a leakage artifact to suppress, distinct from the consistent storefront surface."
+      },
+      {
+        "platform": "google",
+        "gate": "google_nap_hours_website",
+        "passed": true,
+        "severity": "non_negotiable",
+        "notes": "Hours, phone, website, and Washington St address present and consistent on the GBP-derived listing."
+      },
+      {
+        "platform": "google",
+        "gate": "google_primary_category",
+        "passed": null,
+        "severity": "non_negotiable",
+        "notes": "Not verified — GBP category not directly observable; mirrors show generic 'Convenience Store'."
+      },
+      {
+        "platform": "google",
+        "gate": "google_description",
+        "passed": null,
+        "severity": "non_negotiable",
+        "notes": "Not verified — no GBP description observable."
+      },
+      {
+        "platform": "google",
+        "gate": "google_photo_library",
+        "passed": null,
+        "severity": "recommended",
+        "notes": "Not verified — photo count not observable; Loc8NearMe mirror shows a small photo gallery."
+      },
+      {
+        "platform": "google",
+        "gate": "google_review_engagement",
+        "passed": null,
+        "severity": "recommended",
+        "notes": "Not verified — no review data accessible."
+      },
+      {
+        "platform": "yelp",
+        "gate": "yelp_business_identity",
+        "passed": false,
+        "severity": "non_negotiable",
+        "notes": "No Yelp profile located in searched paths."
+      },
+      {
+        "platform": "yelp",
+        "gate": "yelp_hours",
+        "passed": false,
+        "severity": "non_negotiable",
+        "notes": "No Yelp profile to carry hours."
+      },
+      {
+        "platform": "yelp",
+        "gate": "yelp_category_and_description",
+        "passed": false,
+        "severity": "non_negotiable",
+        "notes": "No Yelp presence; African grocery positioning absent on the platform."
+      },
+      {
+        "platform": "facebook",
+        "gate": "facebook_page_identity",
+        "passed": false,
+        "severity": "non_negotiable",
+        "notes": "No Facebook page located in searched paths."
+      },
+      {
+        "platform": "facebook",
+        "gate": "facebook_about_description",
+        "passed": false,
+        "severity": "non_negotiable",
+        "notes": "No page, no About content."
+      },
+      {
+        "platform": "bbb",
+        "gate": "bbb_identity_accuracy",
+        "passed": null,
+        "severity": "non_negotiable",
+        "notes": "Not verified — no BBB record found to evaluate."
+      },
+      {
+        "platform": "bing",
+        "gate": "bing_nap_hours",
+        "passed": null,
+        "severity": "non_negotiable",
+        "notes": "Not verified — Bing Maps is JS-gated."
+      },
+      {
+        "platform": "apple_maps",
+        "gate": "apple_nap_hours",
+        "passed": null,
+        "severity": "non_negotiable",
+        "notes": "Not verified — Apple Maps place card not accessible in searched paths."
+      }
+    ],
+    "summary": "Passes: canonical storefront NAP, published hours, functional website, Google NAP/hours/website. Fails: category-specific positioning, cross-platform consistency (stale intel-address leakage on MapQuest/YellowPages), Yelp and Facebook identity gates (no presence). Unverified: all review/engagement, photo, description, BBB, Bing, and Apple Maps gates. Net position: a real operating business with above-average owned infrastructure (importer + online store + SNAP) and below-average directory presence — plus one clean verification conversation waiting to happen."
+  }
+}
