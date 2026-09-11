@@ -16,6 +16,14 @@ interface PublicInquiryFormProps {
   tenantId: string;
   tenantName?: string;
   sourceLabel?: string; // e.g. "Storefront", "Directory"
+  /** Sent as source_tag → stored on crm_inquiries.source so operators can
+   *  distinguish the origin in the Requests Hub (e.g. 'place_claim_request'). */
+  sourceTag?: string;
+  /** Listing this inquiry is about — backend resolves the presence seed,
+   *  appends claim context to the body, and logs the contact on the seed. */
+  listingId?: string;
+  /** Pre-filled subject (editable). Only applied while the field is empty. */
+  defaultSubject?: string;
   onSuccess?: () => void;
   /** If true, FAQs are fetched and shown above the form */
   showFaqs?: boolean;
@@ -30,9 +38,9 @@ function generateCaptcha(): { num1: number; num2: number; seed: string; answer: 
   return { num1, num2, seed: `${num1},${num2}`, answer: num1 + num2 };
 }
 
-export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, onSuccess, showFaqs = true, productId, productName }: PublicInquiryFormProps) {
+export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, sourceTag, listingId, defaultSubject, onSuccess, showFaqs = true, productId, productName }: PublicInquiryFormProps) {
   const [expanded, setExpanded] = useState(false);
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(defaultSubject ?? '');
   const [body, setBody] = useState('');
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
@@ -53,6 +61,12 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, o
   const refreshCaptcha = useCallback(() => setCurrentCaptcha(generateCaptcha()), []);
 
   const isCustomer = crmPublicInquiryService.isCustomerAuthenticated();
+
+  // Pre-fill the subject once a defaultSubject arrives (e.g. after the
+  // listing loads) — never overwrite something the user already typed.
+  useEffect(() => {
+    if (defaultSubject) setSubject((s) => s || defaultSubject);
+  }, [defaultSubject]);
 
   // Load FAQs and categories when component mounts
   useEffect(() => {
@@ -134,6 +148,8 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, o
         sender_name: senderName.trim() || undefined,
         sender_email: senderEmail.trim() || undefined,
         sender_phone: senderPhone.trim() || undefined,
+        source_tag: sourceTag,
+        listing_id: listingId,
         captcha_answer: captchaInput,
         captcha_seed: currentCaptcha.seed,
       });

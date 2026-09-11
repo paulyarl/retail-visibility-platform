@@ -24,10 +24,16 @@ export interface SuggestionRecord {
   submitterIp: string | null;
   submitterComment: string | null;
   sourcePage: string | null;
+  /** Submitter opted in to being contacted about the suggestion. */
+  contactConsent?: boolean;
   status: 'submitted' | 'under_review' | 'approved' | 'rejected' | 'duplicate';
   reviewedBy: string | null;
   reviewedAt: string | null;
   seedId: string | null;
+  /** Prospect-queue back-link when the suggestion was parked via Queue/Verify. */
+  queueEntryId?: string | null;
+  queueEntryStatus?: string | null;
+  queueCampaignId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

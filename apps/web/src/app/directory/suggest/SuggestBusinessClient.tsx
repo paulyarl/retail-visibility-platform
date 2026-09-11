@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lightbulb, ArrowLeft, Send, CheckCircle, AlertCircle } from 'lucide-react';
-import { Button, TextInput, Textarea } from '@mantine/core';
+import { Button, Checkbox, TextInput, Textarea } from '@mantine/core';
 import DirectorySuggestionPublicService from '@/services/DirectorySuggestionPublicService';
 
 interface SuggestBusinessClientProps {
@@ -29,6 +29,7 @@ export default function SuggestBusinessClient({
     primaryCategory: defaultCategory,
     submitterEmail: '',
     submitterComment: '',
+    contactConsent: false,
     sourcePage: '',
     honeyPot: '',
   });
@@ -71,6 +72,7 @@ export default function SuggestBusinessClient({
         primaryCategory: defaultCategory,
         submitterEmail: '',
         submitterComment: '',
+        contactConsent: false,
         sourcePage: typeof window !== 'undefined' ? window.location.pathname : '',
         honeyPot: '',
       });
@@ -208,6 +210,14 @@ export default function SuggestBusinessClient({
                 type="email"
                 value={form.submitterEmail}
                 onChange={(e) => handleChange('submitterEmail', e.target.value)}
+              />
+
+              <Checkbox
+                label="It's OK to contact me about this suggestion (leave unchecked for no follow-up)"
+                checked={form.contactConsent}
+                onChange={(e) => setForm((prev) => ({ ...prev, contactConsent: e.currentTarget.checked }))}
+                disabled={!form.submitterEmail.trim()}
+                description={!form.submitterEmail.trim() ? 'Add your email above to enable contact' : undefined}
               />
 
               <Textarea

@@ -16,6 +16,8 @@ export interface SuggestionInput {
   primaryCategory?: string;
   submitterEmail?: string;
   submitterComment?: string;
+  /** Submitter opted in to being contacted about the suggestion. */
+  contactConsent?: boolean;
   sourcePage?: string;
   honeyPot?: string;
 }

@@ -15,6 +15,13 @@ interface PublicInquiryInput {
   sender_name?: string;
   sender_email?: string;
   sender_phone?: string;
+  /** Origin tag stored on crm_inquiries.source for Requests-Hub triage
+   *  (e.g. 'place_claim_request'). snake_case; validated server-side. */
+  source_tag?: string;
+  /** When the inquiry concerns a directory listing (claim contact form on
+   *  /place/[slug]) the backend resolves its presence seed, appends context
+   *  to the body, and logs the contact on the seed's touch timeline. */
+  listing_id?: string;
   captcha_answer: string;
   captcha_seed: string;
 }

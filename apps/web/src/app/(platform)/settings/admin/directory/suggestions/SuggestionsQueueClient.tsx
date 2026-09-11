@@ -152,8 +152,12 @@ export default function SuggestionsQueueClient() {
         scope: 'business',
         note: `Public directory suggestion ${s.id}${s.sourcePage ? ` (source: ${s.sourcePage})` : ''}${s.submitterComment ? `\nSubmitter: ${s.submitterComment}` : ''}`,
         business_snapshot: {
+          suggestion_id: s.id,
+          contact_consent: s.contactConsent === true,
           phone: s.phone || undefined,
-          email: s.submitterEmail || undefined,
+          // Submitter email is only an outreach route when they opted in.
+          email: s.contactConsent ? s.submitterEmail || undefined : undefined,
+          submitter_email: s.submitterEmail || undefined,
           address: s.address || undefined,
           address_city: s.city || undefined,
           address_state: s.state || undefined,
@@ -340,7 +344,10 @@ export default function SuggestionsQueueClient() {
                   <Table.Td>
                     <div className="font-medium text-gray-900 dark:text-white">{s.businessName}</div>
                     {s.submitterEmail && (
-                      <div className="text-xs text-gray-500">{s.submitterEmail}</div>
+                      <div className="text-xs text-gray-500">
+                        {s.submitterEmail}
+                        {s.contactConsent && <span className="text-green-600 font-medium"> · contact OK</span>}
+                      </div>
                     )}
                     {s.seedId && (
                       <Link
@@ -348,6 +355,16 @@ export default function SuggestionsQueueClient() {
                         className="text-xs text-blue-600 hover:underline inline-flex items-center gap-0.5 mt-0.5"
                       >
                         <ExternalLink className="w-3 h-3" /> seed {s.seedId.slice(0, 10)}…
+                      </Link>
+                    )}
+                    {s.queueEntryId && (
+                      <Link
+                        href="/settings/admin/marketing-ops/queue"
+                        className="text-xs text-teal-600 hover:underline inline-flex items-center gap-0.5 mt-0.5"
+                        title={`Prospect queue status: ${s.queueEntryStatus}`}
+                      >
+                        <ListPlus className="w-3 h-3" /> in queue ({(s.queueEntryStatus || 'queued').replace(/_/g, ' ')})
+                        {s.queueCampaignId ? ' · campaign' : ''}
                       </Link>
                     )}
                   </Table.Td>
@@ -380,16 +397,20 @@ export default function SuggestionsQueueClient() {
                       >
                         Campaign
                       </Button>
-                      <Button size="xs" color="teal" variant="light" loading={actionBusy === `${s.id}:queue`} onClick={() => handleQueue(s, false)} leftSection={<ListPlus className="w-3.5 h-3.5" />}
-                        title="Add to prospect queue for later campaign work"
-                      >
-                        Queue
-                      </Button>
-                      <Button size="xs" color="orange" variant="light" loading={actionBusy === `${s.id}:verify`} onClick={() => handleQueue(s, true)} leftSection={<PhoneCall className="w-3.5 h-3.5" />}
-                        title="Add to verify queue — confirm NAP/contactability by phone before outreach"
-                      >
-                        Verify
-                      </Button>
+                      {!s.queueEntryId && (
+                        <>
+                          <Button size="xs" color="teal" variant="light" loading={actionBusy === `${s.id}:queue`} onClick={() => handleQueue(s, false)} leftSection={<ListPlus className="w-3.5 h-3.5" />}
+                            title="Add to prospect queue for later campaign work"
+                          >
+                            Queue
+                          </Button>
+                          <Button size="xs" color="orange" variant="light" loading={actionBusy === `${s.id}:verify`} onClick={() => handleQueue(s, true)} leftSection={<PhoneCall className="w-3.5 h-3.5" />}
+                            title="Add to verify queue — confirm NAP/contactability by phone before outreach"
+                          >
+                            Verify
+                          </Button>
+                        </>
+                      )}
                       <Button size="xs" color="red" variant="light" loading={actionBusy === `${s.id}:rejected`} onClick={() => handleStatusChange(s.id, 'rejected')} leftSection={<X className="w-3.5 h-3.5" />}>
                         Reject
                       </Button>
@@ -452,6 +473,12 @@ export default function SuggestionsQueueClient() {
               <div>
                 <span className="text-gray-500">Source Page</span>
                 <p className="text-gray-900 dark:text-white break-all">{detail.sourcePage || '—'}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Contact Consent</span>
+                <p className={detail.contactConsent ? 'text-green-700 dark:text-green-400 font-medium' : 'text-gray-900 dark:text-white'}>
+                  {detail.contactConsent ? 'Yes — OK to contact' : 'No — fire-and-forget'}
+                </p>
               </div>
             </div>
             {detail.submitterComment && (

@@ -3788,6 +3788,16 @@ const PublicInquirySchema = z.object({
   sender_name: z.string().max(100).optional(),
   sender_email: z.string().email().optional(),
   sender_phone: z.string().max(50).optional(),
+  // Origin tag for Requests-Hub triage (e.g. 'place_claim_request' from the
+  // /place claim contact form). snake_case only; overrides the default
+  // 'public_form'/'customer_portal' source so operators can distinguish
+  // inbound intent at a glance.
+  source_tag: z.string().regex(/^[a-z][a-z0-9_]{0,49}$/).optional(),
+  // When the inquiry is about a specific directory listing (claim contact
+  // form on /place/[slug]), the listing id is resolved server-side to its
+  // presence seed so context can be appended and the contact logged on the
+  // seed's outreach-touches timeline.
+  listing_id: z.string().max(64).optional(),
   // CAPTCHA fields
   captcha_answer: z.string().min(1, 'CAPTCHA verification required'),
   captcha_seed: z.string().min(1, 'CAPTCHA seed required'),
@@ -3816,7 +3826,7 @@ router.post('/inquiries', async (req, res) => {
       });
     }
 
-    const { tenant_id, subject, body, sender_name, sender_email, sender_phone, captcha_answer, captcha_seed, website_hp } = parse.data;
+    const { tenant_id, subject, body, sender_name, sender_email, sender_phone, source_tag, listing_id, captcha_answer, captcha_seed, website_hp } = parse.data;
 
     // Honeypot check — if filled, silently accept (don't tell bots it failed)
     if (website_hp !== undefined && website_hp !== '') {
@@ -3853,13 +3863,39 @@ router.post('/inquiries', async (req, res) => {
 
     // Determine source and optional customer link
     let customerId: string | undefined;
-    let source = 'public_form';
+    let source = source_tag || 'public_form';
 
     // Check if customer session exists (authenticated customer submitting)
     if (req.customer?.id) {
       customerId = req.customer.id;
-      source = 'customer_portal';
+      source = source_tag || 'customer_portal';
     }
+
+    // Resolve the presence seed behind the listing, when the form supplied
+    // one — the inquiry body gets an operator context block and the contact
+    // is logged on the seed's outreach-touches timeline below.
+    let seedContext: { seedId: string; businessName: string; slug: string } | null = null;
+    if (listing_id) {
+      const seedRows = await prisma.$queryRaw<any[]>`
+        SELECT dps.id AS seed_id, dl.business_name, dl.slug
+        FROM directory_presence_seeds dps
+        JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dps.listing_id = ${listing_id}
+        LIMIT 1
+      `;
+      if (seedRows[0]) {
+        seedContext = {
+          seedId: seedRows[0].seed_id,
+          businessName: seedRows[0].business_name || 'Unknown',
+          slug: seedRows[0].slug || '',
+        };
+      }
+    }
+
+    const contextBlock = seedContext
+      ? `\n\n---\nClaim request context:\nBusiness: ${seedContext.businessName}\nPlace: /place/${seedContext.slug}\nSeed: ${seedContext.seedId}\nReview: /settings/admin/directory/presence-seeds/${seedContext.seedId}`
+      : '';
+    const finalBody = body ? `${body}${contextBlock}` : contextBlock.trimStart() || undefined;
 
     const { CrmInquiryService } = await import('../services/CrmInquiryService');
     const inquiryService = CrmInquiryService.getInstance();
@@ -3874,7 +3910,7 @@ router.post('/inquiries', async (req, res) => {
     const inquiry = await inquiryService.create({
       tenant_id,
       subject,
-      body: body || undefined,
+      body: finalBody,
       customer_id: customerId,
       source,
       sender_name: finalSenderName,
@@ -3900,6 +3936,25 @@ router.post('/inquiries', async (req, res) => {
       });
     } catch (actErr) {
       logger.error('[Public Inquiry] Activity log error (non-critical):', req.ctx, { error: { name: (actErr as any)?.name || 'Error', message: (actErr as any)?.message || String(actErr), stack: (actErr as any)?.stack } });
+    }
+
+    // Log the inbound contact on the seed's outreach-touches timeline so the
+    // seed detail page shows the engagement (channel 'form' / outcome
+    // 'form_submitted' — the owner reached out through the listing).
+    if (seedContext) {
+      try {
+        const { default: seedService } = await import('../services/DirectoryPresenceSeedService');
+        await seedService.addOutreachTouch(seedContext.seedId, {
+          channel: 'form',
+          outcome: 'form_submitted',
+          notes: `Inbound claim inquiry via /place/${seedContext.slug}: "${subject}". Sender: ${finalSenderName || 'Anonymous'}${finalSenderEmail ? ` <${finalSenderEmail}>` : ''}${finalSenderPhone ? ` ${finalSenderPhone}` : ''}. Inquiry ${inquiry.id}.`,
+        }, {
+          actorType: 'customer',
+          actorId: customerId || finalSenderEmail || 'anonymous',
+        });
+      } catch (touchErr) {
+        logger.error('[Public Inquiry] Seed touch log error (non-critical):', req.ctx, { error: { name: (touchErr as any)?.name || 'Error', message: (touchErr as any)?.message || String(touchErr), stack: (touchErr as any)?.stack } });
+      }
     }
 
     console.log(`[Public Inquiry] Created inquiry ${inquiry.id} for tenant ${tenant_id} from ${finalSenderEmail || 'anonymous'} (customer_id: ${customerId || 'none'})`);

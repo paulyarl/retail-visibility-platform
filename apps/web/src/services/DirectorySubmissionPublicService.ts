@@ -19,6 +19,8 @@ export interface SubmissionInput {
   ownerName: string;
   ownerEmail: string;
   ownerPhone?: string;
+  /** Owner opted in to being contacted back about this listing. */
+  contactConsent?: boolean;
   submitterComment?: string;
   sourcePage?: string;
   honeyPot?: string;

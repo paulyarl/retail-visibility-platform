@@ -356,6 +356,9 @@ export default function PlaceEntryEditorialLayout({
                 tenantId="platform"
                 tenantName="VisibleShelf"
                 sourceLabel="Place Claim Request"
+                sourceTag="place_claim_request"
+                listingId={listing.id}
+                defaultSubject={`Claim request — ${listing.businessName}`}
                 showFaqs={false}
               />
             </div>

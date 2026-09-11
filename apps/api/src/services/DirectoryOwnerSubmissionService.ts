@@ -15,6 +15,10 @@ import { logger } from '../logger';
 import { emailService } from './email-service';
 import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
 import { generateDirectoryPresenceSubmissionVerificationId } from '../lib/id-generator';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import CrmTicketService from './CrmTicketService';
+import CrmTicketMessageService from './CrmTicketMessageService';
+import { describeSourcePage } from './DirectorySuggestionService';
 import { z } from 'zod';
 
 export const ownerSubmissionInputSchema = z.object({
@@ -29,6 +33,9 @@ export const ownerSubmissionInputSchema = z.object({
   ownerName: z.string().min(1).max(255),
   ownerEmail: z.string().email().max(255),
   ownerPhone: z.string().max(40).optional(),
+  // "OK to contact me back" — owner identity is collected for the listing but
+  // operators should only use it as an outreach route when this is true.
+  contactConsent: z.boolean().optional(),
   submitterComment: z.string().max(1000).optional(),
   sourcePage: z.string().max(500).optional(),
   honeyPot: z.string().optional(),
@@ -91,6 +98,7 @@ class DirectoryOwnerSubmissionService {
         businessName: input.businessName,
         customerId: ctx.actorId,
       });
+      await this.notifyNewSeed(seed, input);
       return { seed, statusCode: 201 };
     }
 
@@ -154,7 +162,82 @@ class DirectoryOwnerSubmissionService {
       businessName: v.business_name,
     });
 
+    // Reconstruct the submission fields for the ticket description — the
+    // verified payload is a CreateSeedInput (camelCase keys on seedInput).
+    await this.notifyNewSeed(seed, {
+      businessName: v.business_name,
+      ownerName: seedInput.ownerName,
+      ownerEmail: seedInput.ownerEmail,
+      ownerPhone: seedInput.ownerPhone,
+      primaryCategory: seedInput.primaryCategory,
+      city: seedInput.city,
+      state: seedInput.state,
+      submitterComment: seedInput.notes,
+      sourcePage: 'email_verify',
+    } as OwnerSubmissionInput);
+
     return { seed, statusCode: 201 };
+  }
+
+  /**
+   * File a Requests-Hub ticket so the owner-submitted draft seed is visible
+   * to operators (Requests Hub SOP — see AGENTS.md). Linked via
+   * inquiry_id = seed.id; auto-resolved by publishSeed/deleteSeed. Non-fatal.
+   */
+  private async notifyNewSeed(seed: any, input: OwnerSubmissionInput): Promise<void> {
+    try {
+      const ticket = await CrmTicketService.getInstance().create({
+        tenant_id: PLATFORM_SCOPE,
+        title: `Owner-submitted business needs review: ${input.businessName}`,
+        description: `A business owner submitted their business for the directory (Add Your Business). The draft seed awaits publish or delete.
+
+Business: ${input.businessName}
+Owner: ${input.ownerName} <${input.ownerEmail}>${input.ownerPhone ? ` ${input.ownerPhone}` : ''}
+OK to contact owner: ${input.contactConsent ? 'YES' : 'no'}
+Category: ${input.primaryCategory || '—'}
+Location: ${[input.city, input.state].filter(Boolean).join(', ') || '—'}
+Comment: ${input.submitterComment || '—'}
+Seed ID: ${seed.id}
+Source: ${describeSourcePage(input.sourcePage)}
+
+Review at the seed detail page.`,
+        priority: 'medium',
+        category: 'directory_owner_submission',
+        inquiry_id: seed.id,
+      });
+
+      await CrmTicketMessageService.getInstance().create({
+        ticket_id: ticket.id,
+        author_id: 'system',
+        author_type: 'platform',
+        author_name: 'Directory Intake',
+        content_blocks: {
+          version: '1',
+          blocks: [
+            { type: 'paragraph', text: `${input.businessName} was submitted by its owner and created a draft seed.` },
+            { type: 'paragraph', text: `Seed: ${seed.id} · Owner: ${input.ownerEmail}` },
+            { type: 'button', label: 'Review the seed', url: `/settings/admin/directory/presence-seeds/${seed.id}`, variant: 'primary' },
+          ],
+        },
+      });
+
+      // Engagement log — the inbound submission itself is a contact event on
+      // the seed's outreach timeline (same channel/outcome the /place claim
+      // contact form logs).
+      await DirectoryPresenceSeedService.addOutreachTouch(seed.id, {
+        channel: 'form',
+        outcome: 'form_submitted',
+        notes: `Inbound owner submission via ${input.sourcePage || 'add-business form'}: "${input.businessName}" — ${input.ownerName} <${input.ownerEmail}>${input.ownerPhone ? ` ${input.ownerPhone}` : ''}. Contact consent: ${input.contactConsent ? 'yes' : 'no'}.`,
+      }, {
+        actorType: 'customer',
+        actorId: input.ownerEmail,
+      });
+    } catch (err) {
+      logger.error('[DirectoryOwnerSubmissionService] CRM ticket create failed (non-fatal)', undefined, {
+        error: (err as Error).message,
+        seedId: seed?.id,
+      });
+    }
   }
 
   private buildSeedInput(input: OwnerSubmissionInput): CreateSeedInput {
@@ -174,6 +257,7 @@ class DirectoryOwnerSubmissionService {
       ownerName: input.ownerName.trim(),
       ownerEmail: input.ownerEmail.trim().toLowerCase(),
       ownerPhone: input.ownerPhone?.trim(),
+      ownerContactConsent: input.contactConsent === true,
       listingOrigin: 'owner_submitted',
       publicDisclaimer: 'Submitted by the owner. Pending review before publishing.',
       provenance: this.buildProvenance(input),

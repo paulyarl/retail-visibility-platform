@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Store, ArrowLeft, Send, CheckCircle, AlertCircle, Building2, Mail } from 'lucide-react';
-import { Button, TextInput, Textarea } from '@mantine/core';
+import { Button, Checkbox, TextInput, Textarea } from '@mantine/core';
 import DirectorySubmissionPublicService from '@/services/DirectorySubmissionPublicService';
 
 interface AddBusinessClientProps {
@@ -31,6 +31,7 @@ export default function AddBusinessClient({
     ownerName: '',
     ownerEmail: '',
     ownerPhone: '',
+    contactConsent: false,
     submitterComment: '',
     sourcePage: '',
     honeyPot: '',
@@ -83,6 +84,7 @@ export default function AddBusinessClient({
         ownerName: '',
         ownerEmail: '',
         ownerPhone: '',
+        contactConsent: false,
         submitterComment: '',
         sourcePage: typeof window !== 'undefined' ? window.location.pathname : '',
         honeyPot: '',
@@ -265,6 +267,12 @@ export default function AddBusinessClient({
                     placeholder="(317) 555-0100"
                     value={form.ownerPhone}
                     onChange={(e) => handleChange('ownerPhone', e.target.value)}
+                  />
+                  <Checkbox
+                    label="You may contact me about this listing"
+                    description="Unchecked means we'll review the listing but won't reach out to you."
+                    checked={form.contactConsent}
+                    onChange={(e) => setForm((prev) => ({ ...prev, contactConsent: e.currentTarget.checked }))}
                   />
                 </div>
               </div>

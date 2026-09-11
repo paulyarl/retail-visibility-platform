@@ -111,6 +111,8 @@ export interface CreateSeedInput {
   ownerName?: string;
   ownerEmail?: string;
   ownerPhone?: string;
+  /** Owner opted in to being contacted back (migration 275). */
+  ownerContactConsent?: boolean;
   /** Override listing_origin and disclaimer for owner or campaign sources. */
   listingOrigin?: string;
   publicDisclaimer?: string;
@@ -503,7 +505,7 @@ class DirectoryPresenceSeedService {
       INSERT INTO directory_presence_seeds (
         id, tenant_id, listing_id, category, city, state,
         seed_batch, status, identity_confidence, category_fit, notes,
-        owner_name, owner_email, owner_phone, seo_enrichment,
+        owner_name, owner_email, owner_phone, owner_contact_consent, seo_enrichment,
         contact_status, contact_status_derived_at,
         name_variants,
         created_at, updated_at
@@ -522,6 +524,7 @@ class DirectoryPresenceSeedService {
         ${input.ownerName || null},
         ${input.ownerEmail || null},
         ${input.ownerPhone || null},
+        ${input.ownerContactConsent === true},
         ${input.seoEnrichment ? JSON.stringify(input.seoEnrichment) : null}::jsonb,
         ${contactStatus},
         now(),
@@ -631,7 +634,31 @@ class DirectoryPresenceSeedService {
       action: 'directory_presence_seed.publish',
       payload: { seedId, tenantId: seed[0].tenant_id },
     });
+    await this.resolveIntakeTickets(seedId);
     logger.info('DirectoryPresenceSeedService.publishSeed', undefined, { seedId });
+  }
+
+  /**
+   * Resolve any Requests-Hub ticket filed when this seed arrived via a
+   * public intake surface (owner submission). Called from publish/delete —
+   * the seed's deciding actions — so the operator inbox self-cleans.
+   */
+  private async resolveIntakeTickets(seedId: string): Promise<void> {
+    try {
+      await prisma.$executeRaw`
+        UPDATE crm_support_tickets
+        SET status = 'resolved', resolved_at = now(), updated_at = now()
+        WHERE tenant_id = ${PLATFORM_SCOPE}
+          AND inquiry_id = ${seedId}
+          AND category = 'directory_owner_submission'
+          AND status IN ('open', 'in_progress', 'waiting')
+      `;
+    } catch (err) {
+      logger.error('DirectoryPresenceSeedService.resolveIntakeTickets', undefined, {
+        error: (err as Error).message,
+        seedId,
+      });
+    }
   }
 
   /**
@@ -1349,6 +1376,10 @@ class DirectoryPresenceSeedService {
       UPDATE mkt_prospect_queue SET seed_id = NULL, updated_at = now()
       WHERE seed_id = ${seedId}
     `;
+
+    // Deleting an owner-submitted seed is a rejection decision — close its
+    // intake ticket in the Requests Hub.
+    await this.resolveIntakeTickets(seedId);
 
     // The seed row itself.
     await prisma.$executeRaw`DELETE FROM directory_presence_seeds WHERE id = ${seedId}`;

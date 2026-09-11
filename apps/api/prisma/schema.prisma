@@ -1863,6 +1863,7 @@ model directory_presence_seeds {
   owner_verified_at                DateTime?                          @db.Timestamptz(6)
   owner_verification               Json?
   owner_proposed_categories        Json                               @default("[]")
+  owner_contact_consent            Boolean                            @default(false)
   directory_claim_requests         directory_claim_requests[]
   directory_claim_tokens           directory_claim_tokens[]
   directory_enrichment_tokens      directory_enrichment_tokens[]
@@ -7720,6 +7721,7 @@ model directory_presence_suggestions {
   seed_id                  String?                   @db.VarChar(60)
   created_at               DateTime                  @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  contact_consent          Boolean                   @default(false)
   directory_presence_seeds directory_presence_seeds? @relation(fields: [seed_id], references: [id], onUpdate: NoAction, map: "fk_dpsg_seed")
 
   @@index([primary_category], map: "idx_dpsg_category")

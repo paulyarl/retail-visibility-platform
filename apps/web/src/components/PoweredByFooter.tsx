@@ -45,9 +45,12 @@ export function PoweredByFooter({ note, showBusinessOwnersLink = true }: { note?
           <Link href="/legal" className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
             Legal
           </Link>
+          <Link href="/support" className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            Support
+          </Link>
           {showBusinessOwnersLink && (
-            <Link href="/place/about" className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-              For Business Owners
+            <Link href="/place/about" className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="For owners of businesses listed in the directory — claim and verify your free listing">
+              Claim Your Listing
             </Link>
           )}
         </div>

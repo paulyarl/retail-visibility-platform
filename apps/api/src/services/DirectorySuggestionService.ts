@@ -13,6 +13,9 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { generateDirectoryPresenceSuggestionId } from '../lib/id-generator';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import CrmTicketService from './CrmTicketService';
+import CrmTicketMessageService from './CrmTicketMessageService';
 import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
 import { z } from 'zod';
 
@@ -26,11 +29,32 @@ export const suggestionInputSchema = z.object({
   primaryCategory: z.string().max(120).optional(),
   submitterEmail: z.string().email().max(255).optional().or(z.literal('')),
   submitterComment: z.string().max(1000).optional(),
+  // "OK to contact me about this" — false/absent = fire-and-forget; the
+  // operator should not treat the submitter email as an outreach route.
+  contactConsent: z.boolean().optional(),
   sourcePage: z.string().max(500).optional(),
   honeyPot: z.string().optional(),
 });
 
 export type SuggestionInput = z.infer<typeof suggestionInputSchema>;
+
+/**
+ * Render a raw sourcePage URL as "url (surface)" for operator contexts.
+ * The CTAs pass the full referring URL; the path prefix identifies which
+ * intake surface it came from.
+ */
+export function describeSourcePage(sourcePage?: string | null): string {
+  const url = sourcePage?.trim();
+  if (!url) return 'unknown';
+  const path = url.replace(/^https?:\/\/[^/]+/i, '');
+  let surface = 'other';
+  if (path.startsWith('/place/')) surface = 'place entry';
+  else if (path.includes('/location/')) surface = 'location page';
+  else if (path.includes('/category/') || path.includes('/city/')) surface = 'category/city page';
+  else if (path.startsWith('/directory/suggest') || path.startsWith('/directory/add-business')) surface = 'direct form';
+  else if (path.startsWith('/directory')) surface = 'directory';
+  return `${url} (${surface})`;
+}
 
 export interface SuggestionRecord {
   id: string;
@@ -45,10 +69,16 @@ export interface SuggestionRecord {
   submitterIp: string | null;
   submitterComment: string | null;
   sourcePage: string | null;
+  /** Submitter opted in to being contacted about the suggestion. */
+  contactConsent?: boolean;
   status: string;
   reviewedBy: string | null;
   reviewedAt: Date | null;
   seedId: string | null;
+  // Prospect-queue back-link (queue entry's business_snapshot->>'suggestion_id').
+  queueEntryId?: string | null;
+  queueEntryStatus?: string | null;
+  queueCampaignId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -111,7 +141,7 @@ class DirectorySuggestionService {
       INSERT INTO directory_presence_suggestions (
         id, business_name, address, city, state, zip_code, phone,
         primary_category, submitter_email, submitter_ip, submitter_comment, source_page,
-        status, created_at, updated_at
+        contact_consent, status, created_at, updated_at
       ) VALUES (
         ${id},
         ${input.businessName.trim()},
@@ -125,6 +155,7 @@ class DirectorySuggestionService {
         ${normalizedIp},
         ${input.submitterComment?.trim() || null},
         ${input.sourcePage?.trim() || null},
+        ${input.contactConsent === true},
         'submitted',
         NOW(),
         NOW()
@@ -133,8 +164,9 @@ class DirectorySuggestionService {
         id, business_name as "businessName", address, city, state, zip_code as "zipCode",
         phone, primary_category as "primaryCategory", submitter_email as "submitterEmail",
         submitter_ip as "submitterIp", submitter_comment as "submitterComment",
-        source_page as "sourcePage", status, reviewed_by as "reviewedBy",
-        reviewed_at as "reviewedAt", seed_id as "seedId", created_at as "createdAt", updated_at as "updatedAt"
+        source_page as "sourcePage", contact_consent as "contactConsent", status,
+        reviewed_by as "reviewedBy", reviewed_at as "reviewedAt",
+        seed_id as "seedId", created_at as "createdAt", updated_at as "updatedAt"
     `;
 
     const suggestion = result[0];
@@ -147,7 +179,81 @@ class DirectorySuggestionService {
       sourcePage: input.sourcePage,
     });
 
+    await this.notifyNewSuggestion(suggestion);
+
     return { suggestion, statusCode: 201 };
+  }
+
+  /**
+   * File a Requests-Hub ticket for the operator (Requests Hub SOP —
+   * public-surface intake → platform-scope crm_support_tickets, see
+   * AGENTS.md). Non-fatal: the suggestion row is already persisted.
+   */
+  private async notifyNewSuggestion(suggestion: SuggestionRecord): Promise<void> {
+    try {
+      const location = [suggestion.city, suggestion.state].filter(Boolean).join(', ');
+      const ticket = await CrmTicketService.getInstance().create({
+        tenant_id: PLATFORM_SCOPE,
+        title: `Directory suggestion: ${suggestion.businessName}${location ? ` (${location})` : ''}`,
+        description: `A visitor suggested a missing business for the directory.
+
+Business: ${suggestion.businessName}
+Address: ${[suggestion.address, location, suggestion.zipCode].filter(Boolean).join(', ') || '—'}
+Phone: ${suggestion.phone || '—'}
+Category: ${suggestion.primaryCategory || '—'}
+Submitter email: ${suggestion.submitterEmail || '—'}
+OK to contact submitter: ${suggestion.contactConsent ? 'YES' : 'no — fire-and-forget'}
+Comment: ${suggestion.submitterComment || '—'}
+Source: ${describeSourcePage(suggestion.sourcePage)}
+
+Review at Settings → Directory → Suggestions.`,
+        priority: 'medium',
+        category: 'directory_suggestion',
+        inquiry_id: suggestion.id,
+      });
+
+      await CrmTicketMessageService.getInstance().create({
+        ticket_id: ticket.id,
+        author_id: 'system',
+        author_type: 'platform',
+        author_name: 'Directory Intake',
+        content_blocks: {
+          version: '1',
+          blocks: [
+            { type: 'paragraph', text: `${suggestion.businessName}${location ? ` (${location})` : ''} was suggested for the directory.` },
+            { type: 'button', label: 'Review in Suggestions queue', url: '/settings/admin/directory/suggestions', variant: 'primary' },
+          ],
+        },
+      });
+    } catch (err) {
+      logger.error('[DirectorySuggestionService] CRM ticket create failed (non-fatal)', undefined, {
+        error: (err as Error).message,
+        suggestionId: suggestion.id,
+      });
+    }
+  }
+
+  /**
+   * Resolve the suggestion's intake ticket once an operator decides
+   * (approve / under_review / rejected / duplicate) — keeps the Requests
+   * Hub self-cleaning.
+   */
+  private async resolveIntakeTicket(suggestionId: string): Promise<void> {
+    try {
+      await prisma.$executeRaw`
+        UPDATE crm_support_tickets
+        SET status = 'resolved', resolved_at = now(), updated_at = now()
+        WHERE tenant_id = ${PLATFORM_SCOPE}
+          AND inquiry_id = ${suggestionId}
+          AND category = 'directory_suggestion'
+          AND status IN ('open', 'in_progress', 'waiting')
+      `;
+    } catch (err) {
+      logger.error('[DirectorySuggestionService] CRM ticket resolve failed (non-fatal)', undefined, {
+        error: (err as Error).message,
+        suggestionId,
+      });
+    }
   }
 
   /**
@@ -162,39 +268,50 @@ class DirectorySuggestionService {
     let paramIdx = 1;
 
     if (filters.status) {
-      conditions.push(`status = $${paramIdx++}`);
+      conditions.push(`s.status = $${paramIdx++}`);
       params.push(filters.status);
     }
     if (filters.city) {
-      conditions.push(`city ILIKE $${paramIdx++}`);
+      conditions.push(`s.city ILIKE $${paramIdx++}`);
       params.push(`%${filters.city}%`);
     }
     if (filters.state) {
-      conditions.push(`state ILIKE $${paramIdx++}`);
+      conditions.push(`s.state ILIKE $${paramIdx++}`);
       params.push(`%${filters.state}%`);
     }
     if (filters.primaryCategory) {
-      conditions.push(`primary_category ILIKE $${paramIdx++}`);
+      conditions.push(`s.primary_category ILIKE $${paramIdx++}`);
       params.push(`%${filters.primaryCategory}%`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const countQuery = `SELECT COUNT(*) as total FROM directory_presence_suggestions s ${whereClause}`;
     const limit = Math.min(100, Math.max(1, filters.limit || 50));
     const offset = Math.max(0, filters.offset || 0);
-    const countQuery = `SELECT COUNT(*) as total FROM directory_presence_suggestions ${whereClause}`;
     const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countQuery, ...params);
     const total = parseInt(String(countResult[0]?.total || 0), 10);
 
+    // Lateral join surfaces the prospect-queue entry a suggestion was parked
+    // in (business_snapshot->>'suggestion_id' back-link) so the queue row can
+    // render "in queue (status)" instead of offering Queue/Verify again.
     const dataQuery = `
       SELECT
-        id, business_name as "businessName", address, city, state, zip_code as "zipCode",
-        phone, primary_category as "primaryCategory", submitter_email as "submitterEmail",
-        submitter_ip as "submitterIp", submitter_comment as "submitterComment",
-        source_page as "sourcePage", status, reviewed_by as "reviewedBy",
-        reviewed_at as "reviewedAt", seed_id as "seedId", created_at as "createdAt", updated_at as "updatedAt"
-      FROM directory_presence_suggestions
+        s.id, s.business_name as "businessName", s.address, s.city, s.state, s.zip_code as "zipCode",
+        s.phone, s.primary_category as "primaryCategory", s.submitter_email as "submitterEmail",
+        s.submitter_ip as "submitterIp", s.submitter_comment as "submitterComment",
+        s.source_page as "sourcePage", s.contact_consent as "contactConsent", s.status,
+        s.reviewed_by as "reviewedBy",
+        s.reviewed_at as "reviewedAt", s.seed_id as "seedId", s.created_at as "createdAt", s.updated_at as "updatedAt",
+        q.id as "queueEntryId", q.status as "queueEntryStatus", q.processed_campaign_id as "queueCampaignId"
+      FROM directory_presence_suggestions s
+      LEFT JOIN LATERAL (
+        SELECT id, status, processed_campaign_id, created_at FROM mkt_prospect_queue q
+        WHERE q.business_snapshot->>'suggestion_id' = s.id
+        ORDER BY q.created_at DESC
+        LIMIT 1
+      ) q ON true
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY s.created_at DESC
       LIMIT $${paramIdx++} OFFSET $${paramIdx++}
     `;
     params.push(limit, offset);
@@ -213,7 +330,7 @@ class DirectorySuggestionService {
         id, business_name as "businessName", address, city, state, zip_code as "zipCode",
         phone, primary_category as "primaryCategory", submitter_email as "submitterEmail",
         submitter_ip as "submitterIp", submitter_comment as "submitterComment",
-        source_page as "sourcePage", status, reviewed_by as "reviewedBy",
+        source_page as "sourcePage", contact_consent as "contactConsent", status, reviewed_by as "reviewedBy",
         reviewed_at as "reviewedAt", seed_id as "seedId", created_at as "createdAt", updated_at as "updatedAt"
       FROM directory_presence_suggestions
       WHERE id = ${id}
@@ -271,6 +388,18 @@ class DirectorySuggestionService {
         updated_at = NOW()
       WHERE id = ${id}
     `;
+
+    // Lineage: if this suggestion was parked in the prospect queue, stamp the
+    // queue entry with the minted seed so the funnel reads suggestion → queue
+    // → campaign → seed.
+    await prisma.$executeRaw`
+      UPDATE mkt_prospect_queue
+      SET seed_id = ${seed.id}, updated_at = now()
+      WHERE business_snapshot->>'suggestion_id' = ${id}
+        AND seed_id IS NULL
+    `;
+
+    await this.resolveIntakeTicket(id);
 
     logger.info('[DirectorySuggestionService] Approved and invited', undefined, {
       suggestionId: id,
@@ -388,9 +517,11 @@ class DirectorySuggestionService {
         id, business_name as "businessName", address, city, state, zip_code as "zipCode",
         phone, primary_category as "primaryCategory", submitter_email as "submitterEmail",
         submitter_ip as "submitterIp", submitter_comment as "submitterComment",
-        source_page as "sourcePage", status, reviewed_by as "reviewedBy",
+        source_page as "sourcePage", contact_consent as "contactConsent", status, reviewed_by as "reviewedBy",
         reviewed_at as "reviewedAt", seed_id as "seedId", created_at as "createdAt", updated_at as "updatedAt"
     `;
+    // Any status other than 'submitted' is an operator decision.
+    if (status !== 'submitted') await this.resolveIntakeTicket(id);
     return result[0] || null;
   }
 

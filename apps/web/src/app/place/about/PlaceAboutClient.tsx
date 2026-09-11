@@ -52,22 +52,32 @@ export default function PlaceAboutClient() {
         <div className="max-w-4xl mx-auto px-6 py-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm font-medium mb-6">
             <ShieldCheck className="w-4 h-4" />
-            For Business Owners
+            For owners of listed businesses
           </div>
           <h1 className="text-4xl font-bold mb-4">
             Your listing is live. Here&apos;s what comes next.
           </h1>
           <p className="text-lg text-blue-100 leading-relaxed max-w-2xl">
-            VisibleShelf gives local businesses a free directory presence with the option to
-            upgrade when you&apos;re ready. Claim your listing to verify your details, list
-            products, and reach more customers.
+            If your business already has a place page in our directory — added by us or
+            suggested by the community — this is for you. Claim your listing to verify
+            your details, list products, and reach more customers. Free.
+          </p>
+          <p className="text-sm text-blue-200 mt-3 max-w-2xl">
+            Not listed yet?{' '}
+            <Link href="/directory/add-business" className="underline font-medium hover:text-white">
+              Add your business
+            </Link>{' '}
+            for a free listing review. Already a storefront tenant?{' '}
+            <Link href="/account" className="underline font-medium hover:text-white">
+              Sign in to your account
+            </Link>.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
             <Link
               href="/directory"
               className="inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
             >
-              Browse the directory <ArrowRight className="w-4 h-4" />
+              Find your listing <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/features"

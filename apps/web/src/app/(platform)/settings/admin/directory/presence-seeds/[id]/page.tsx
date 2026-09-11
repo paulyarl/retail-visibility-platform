@@ -1667,28 +1667,38 @@ export default function PresenceSeedDetailPage() {
               </p>
             )}
           </div>
-          {seed?.ownerName && (
+          {seed?.owner_name && (
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Owner Name
               </label>
-              <p className="text-sm text-gray-900">{seed.ownerName}</p>
+              <p className="text-sm text-gray-900">{seed.owner_name}</p>
             </div>
           )}
-          {seed?.ownerEmail && (
+          {seed?.owner_email && (
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Owner Email
               </label>
-              <p className="text-sm text-gray-900">{seed.ownerEmail}</p>
+              <p className="text-sm text-gray-900">{seed.owner_email}</p>
             </div>
           )}
-          {seed?.ownerPhone && (
+          {seed?.owner_phone && (
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Owner Phone
               </label>
-              <p className="text-sm text-gray-900">{seed.ownerPhone}</p>
+              <p className="text-sm text-gray-900">{seed.owner_phone}</p>
+            </div>
+          )}
+          {(seed?.owner_name || seed?.owner_email || seed?.owner_phone) && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Contact Consent
+              </label>
+              <p className={`text-sm ${seed.owner_contact_consent ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                {seed.owner_contact_consent ? 'Yes — OK to contact owner' : 'Not given — do not contact'}
+              </p>
             </div>
           )}
         </div>
