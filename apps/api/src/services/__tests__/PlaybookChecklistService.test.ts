@@ -410,6 +410,45 @@ describe('PlaybookChecklistService â€” campaign checklist resolution', () => {
       expect(result.requiredTotal).toBe(0);
     });
 
+    it('prepends seed-first wedge steps for business-scope campaigns (no playbook)', async () => {
+      mockTriage.findUnique.mockResolvedValue(null);
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek', scope: 'business' });
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+      expect(result.playbook).toBeNull();
+      expect(result.steps).toHaveLength(5);
+      expect(result.steps[0].title).toBe('Seed the place listing');
+      expect(result.steps[1].title).toBe('Invite the owner to claim (free, no obligation)');
+      expect(result.steps[2].title).toBe('Open Pitch Construction');
+      // Seed-first steps are guidance, not gates â€” never required.
+      expect(result.steps.every((s) => s.isRequired === false)).toBe(true);
+      expect(result.requiredTotal).toBe(0);
+    });
+
+    it('leads with the permanent block (seed + outreach) ahead of DB steps for business scope', async () => {
+      mockTriage.findUnique.mockResolvedValue(triageAcceptedRow());
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek', scope: 'business' });
+      mockSteps.findMany.mockResolvedValue([
+        stepRow({ is_required: true, stage_tag: 'preview_built' }),
+        stepRow({ id: 'pbcs-2', step_order: 2, is_required: false }),
+      ]);
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+      // 2 seed steps + 3 outreach steps lead; 2 DB steps follow.
+      expect(result.steps).toHaveLength(7);
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(result.steps[0].id).toBe('_permanent_seed_place_listing');
+      expect(result.steps[1].id).toBe('_permanent_pitch_free_claim');
+      expect(result.steps[2].title).toBe('Open Pitch Construction');
+      expect(result.steps[5].id).toBe(STEP_ID);
+      // Only the required DB step counts toward the gate.
+      expect(result.requiredTotal).toBe(1);
+    });
+
     it('returns empty view when triage exists but no operator decision', async () => {
       mockTriage.findUnique.mockResolvedValue(
         triageAcceptedRow({ is_operator_accepted: null, overridden_playbook_id: null }),
@@ -1026,14 +1065,14 @@ describe('PlaybookChecklistService â€” suggestions', () => {
 
 
 // ====================
-// Proving Ground — PG-01 direct resolution (Migration 262, spec §4.3)
+// Proving Ground ï¿½ PG-01 direct resolution (Migration 262, spec ï¿½4.3)
 // ====================
 
-describe('PlaybookChecklistService — proving ground PG-01', () => {
+describe('PlaybookChecklistService ï¿½ proving ground PG-01', () => {
   const PG_CAMPAIGN = { scope: 'city', campaign_category: 'proving_ground', stage: 'seek' };
   const PG_PLAYBOOK = { id: 'pbk-pg01', code: 'PG-01', name: 'Proving Ground Preflight', category: 'proving_ground' };
 
-  it('resolves PG-01 directly for a proving_ground campaign — no triage row needed', async () => {
+  it('resolves PG-01 directly for a proving_ground campaign ï¿½ no triage row needed', async () => {
     mockTriage.findUnique.mockResolvedValue(null);
     mockCampaigns.findUnique.mockResolvedValue(PG_CAMPAIGN);
     mockPlaybook.findFirst.mockResolvedValue(PG_PLAYBOOK);

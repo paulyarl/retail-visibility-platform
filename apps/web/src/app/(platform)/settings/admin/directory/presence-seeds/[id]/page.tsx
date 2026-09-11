@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
@@ -167,7 +167,9 @@ function formatDate(value: string | Date | null | undefined): string {
 
 export default function PresenceSeedDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const seedId = decodeURIComponent(String(params?.id ?? ''));
+  const syncCampaignId = searchParams.get('sync') || undefined;
   const [detail, setDetail] = useState<DirectoryPresenceSeedDetail | null>(
     null,
   );
@@ -1871,6 +1873,7 @@ export default function PresenceSeedDetailPage() {
         canEdit={canEdit}
         seedCategory={seed?.category}
         seedBusinessName={listing?.business_name}
+        autoSyncCampaignId={syncCampaignId}
       />
 
       {/* Edit panel */}

@@ -1714,6 +1714,14 @@ export default function CampaignDetailClient({
                                     </>
                                   )}
                                   <span className="text-gray-300 dark:text-neutral-600">·</span>
+                                  <Link
+                                    href={`/settings/admin/directory/presence-seeds/${seed.seedId}?sync=${campaign.id}`}
+                                    className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    Sync
+                                  </Link>
+                                  <span className="text-gray-300 dark:text-neutral-600">·</span>
                                   <span className="text-gray-400">
                                     {new Date(seed.createdAt).toLocaleDateString()}
                                   </span>

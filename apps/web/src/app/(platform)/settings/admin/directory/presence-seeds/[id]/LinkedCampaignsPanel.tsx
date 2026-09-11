@@ -52,9 +52,13 @@ interface Props {
   seedCategory?: string;
   /** Seed's business name — shown in the spawn-campaign modal for context. */
   seedBusinessName?: string;
+  /** Deep-link: campaign id to auto-open the sync modal for on mount.
+   *  Set via ?sync=<campaignId> from the campaign overview's "Spawned Place
+   *  Listings" Sync link. */
+  autoSyncCampaignId?: string;
 }
 
-export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, seedBusinessName }: Props) {
+export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, seedBusinessName, autoSyncCampaignId }: Props) {
   const [links, setLinks] = useState<DirectorySeedCampaignLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +104,16 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
   useEffect(() => {
     fetchLinks();
   }, [fetchLinks]);
+
+  // Deep-link auto-open: when arrived via ?sync=<campaignId>, auto-open the
+  // sync modal for that campaign once links are loaded.
+  useEffect(() => {
+    if (!autoSyncCampaignId || loading || links.length === 0) return;
+    const target = links.find((l) => l.campaignId === autoSyncCampaignId);
+    if (target) {
+      openSync(target);
+    }
+  }, [autoSyncCampaignId, loading, links]);
 
   const fetchCandidates = useCallback(async (q: string) => {
     try {

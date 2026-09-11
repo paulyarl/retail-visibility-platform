@@ -119,10 +119,59 @@ const STAGE_PIPELINE_ORDER: Record<string, number> = {
 // Approach Kit step that depends on Pitch Construction output.
 
 const PERMANENT_STEP_IDS = {
+  seedPlaceListing: '_permanent_seed_place_listing',
+  pitchFreeClaim: '_permanent_pitch_free_claim',
   pitchConstruction: '_permanent_pitch_construction',
   previewDeliverable: '_permanent_preview_deliverable',
   callScript: '_permanent_call_script',
 } as const;
+
+// ─── Seed-first wedge steps ───────────────────────────────────────────────
+//
+// The go-to-market motion opens with a free directory place listing seeded
+// from public data, followed by a no-obligation claim invite. Only after
+// that good-faith wedge does triage review + the paid pitch land — at
+// preview_built, framed as the upgrade that eases the pain the audit
+// surfaced (migration 276 retags the "Review triage signals" steps).
+//
+// These steps are code-defined (not DB template rows) because they must be
+// visible BEFORE a playbook is assigned — the seed precedes triage. They
+// only apply to business-scope campaigns (aggregate scopes seed from the
+// prospect queue / proving-ground flow instead). Like the outreach-access
+// steps below they are navigation guidance, not gates (isRequired: false).
+
+const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachStatus' | 'internalLink'>[] = [
+  {
+    id: PERMANENT_STEP_IDS.seedPlaceListing,
+    playbookId: '_permanent',
+    stepOrder: 1,
+    title: 'Seed the place listing',
+    instructions:
+      'Create and publish a free directory place listing for this business from public data — the Audits tab\'s "Add to Place Listing" builds it from the business audit (SEO-enriched, published, campaign-linked) and auto-schedules the claim outreach. The free listing is the good-faith wedge: we improved their visibility before asking for anything.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'audits' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.pitchFreeClaim,
+    playbookId: '_permanent',
+    stepOrder: 2,
+    title: 'Invite the owner to claim (free, no obligation)',
+    instructions:
+      'Share the claim link with the owner — claiming is free and lets them fix hours, phone, and photos. Open the linked seed from Overview → Spawned Place Listings to mint or copy the claim invite, contact the owner on the best channel, and log the outcome. The demonstrated goodwill becomes the wedge: the paid pitch lands at preview_built as the upgrade that eases the pain the audit surfaced.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+];
 
 const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachStatus' | 'internalLink'>[] = [
   {
@@ -174,9 +223,7 @@ const PERMANENT_STEP_STAGES = new Set(['seek', 'preview_built']);
 
 /** Check if a step ID is a permanent (code-defined) step. */
 function isPermanentStepId(stepId: string): boolean {
-  return stepId === PERMANENT_STEP_IDS.pitchConstruction
-    || stepId === PERMANENT_STEP_IDS.previewDeliverable
-    || stepId === PERMANENT_STEP_IDS.callScript;
+  return (Object.values(PERMANENT_STEP_IDS) as string[]).includes(stepId);
 }
 
 export interface ChecklistStepInput {
@@ -614,32 +661,48 @@ export class PlaybookChecklistService extends BaseService {
   async getCampaignChecklist(campaignId: string, ctx?: RequestCtx): Promise<CampaignChecklistView> {
     const playbook = await this.resolveEffectivePlaybook(campaignId, ctx);
 
-    // Load the campaign's current stage to decide whether permanent
-    // outreach-access steps should be injected.
+    // Load the campaign's current stage + scope to decide whether permanent
+    // steps should be injected (stage window) and whether the seed-first
+    // wedge steps apply (business scope only).
     let campaignStage: string | null = null;
+    let campaignScope: string | null = null;
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
-        select: { stage: true },
+        select: { stage: true, scope: true },
       });
       campaignStage = campaign?.stage ?? null;
+      campaignScope = campaign?.scope ?? null;
     } catch {
       // Best-effort — if the lookup fails, skip permanent steps
     }
 
     const showPermanent = campaignStage != null && PERMANENT_STEP_STAGES.has(campaignStage);
+    const showSeedSteps = showPermanent && campaignScope === 'business';
+
+    // Progress is loaded even without a playbook so permanent-step
+    // check-offs (e.g. the seed step completed before triage) render.
+    const progressRows = showPermanent
+      ? (await this.prisma.mkt_campaign_checklist_progress.findMany({
+          where: { campaign_id: campaignId },
+        })) ?? []
+      : [];
+    const progressByStep = new Map(progressRows.map((p: any) => [p.step_id, p]));
+
+    const buildPermanentViews = () => [
+      ...(showSeedSteps ? this.buildSeedStepViews(progressByStep) : []),
+      ...this.buildPermanentStepViews(campaignId, progressByStep),
+    ];
 
     if (!playbook) {
       // No playbook assigned — but still show permanent steps if the campaign
-      // is in an early stage. This gives operators immediate access to the
-      // outreach workspaces before triage is run.
+      // is in an early stage. This gives operators the seed-first wedge and
+      // the outreach workspaces before triage is run.
       if (!showPermanent) {
         return { playbook: null, steps: [], completedCount: 0, requiredTotal: 0, requiredCompleted: 0 };
       }
-      const permanentViews = this.buildPermanentStepViews(campaignId);
-      // Renumber to reflect display order (permanent templates carry
-      // stepOrder 2,3,4 from their post-Review position; standalone they
-      // should read 1,2,3).
+      const permanentViews = buildPermanentViews();
+      // Renumber to reflect display order — standalone they read 1..N.
       permanentViews.forEach((s, i) => { s.stepOrder = i + 1; });
       return {
         playbook: null,
@@ -655,11 +718,6 @@ export class PlaybookChecklistService extends BaseService {
       orderBy: [{ step_order: 'asc' }, { created_at: 'asc' }],
     });
 
-    const progressRows = await this.prisma.mkt_campaign_checklist_progress.findMany({
-      where: { campaign_id: campaignId },
-    });
-    const progressByStep = new Map(progressRows.map((p: any) => [p.step_id, p]));
-
     const stepViews: CampaignChecklistStepView[] = steps.map((s: any) => {
       const p = progressByStep.get(s.id);
       return {
@@ -670,16 +728,22 @@ export class PlaybookChecklistService extends BaseService {
       };
     });
 
-    // Inject permanent outreach-access steps AFTER the first DB step for
-    // seek/preview_built campaigns. The first DB step is the "Review
-    // triage signals" step (stepOrder 1), so the workflow reads:
-    // Review → Pitch Construction → Preview Deliverable / Approach Kit → Call Script.
+    // Inject permanent steps for seek/preview_built campaigns.
+    //
+    // Business-scope campaigns get the seed-first wedge too, so the whole
+    // permanent block leads the list:
+    //   Seed → Invite to claim → Pitch Construction → Preview Deliverable /
+    //   Approach Kit → Call Script → then the DB steps (starting with the
+    //   preview_built-tagged "Review triage signals" — the upgrade pitch).
+    //
+    // Other scopes (proving-ground, intelligence) keep the legacy position:
+    // outreach-access steps spliced after the first DB step.
     if (showPermanent) {
-      const permanentViews = this.buildPermanentStepViews(campaignId, progressByStep);
-      if (stepViews.length === 0) {
-        stepViews.push(...permanentViews);
+      const permanentViews = buildPermanentViews();
+      if (showSeedSteps || stepViews.length === 0) {
+        stepViews.unshift(...permanentViews);
       } else {
-        // Insert after the first DB step (the Review step).
+        // Insert after the first DB step.
         stepViews.splice(1, 0, ...permanentViews);
       }
     }
@@ -1193,6 +1257,24 @@ export class PlaybookChecklistService extends BaseService {
    * steps. If a progress map is supplied (from the campaign's progress
    * rows), attaches any saved progress for the synthetic step IDs.
    */
+  /**
+   * Build CampaignChecklistStepView rows for the permanent seed-first wedge
+   * steps (business-scope campaigns only — caller gates on scope).
+   */
+  private buildSeedStepViews(
+    progressByStep?: Map<string, any>,
+  ): CampaignChecklistStepView[] {
+    return PERMANENT_SEED_STEPS.map((step) => {
+      const p = progressByStep?.get(step.id);
+      return {
+        ...step,
+        progress: p
+          ? { completedAt: p.completed_at, completedBy: p.completed_by, note: p.note }
+          : null,
+      };
+    });
+  }
+
   private buildPermanentStepViews(
     _campaignId: string,
     progressByStep?: Map<string, any>,
