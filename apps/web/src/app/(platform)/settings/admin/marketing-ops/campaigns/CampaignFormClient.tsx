@@ -974,7 +974,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 secondary={form.secondary_categories}
                 onPrimaryChange={(v) => handleChange('category', v)}
                 onSecondaryChange={(v) => handleChange('secondary_categories', v)}
-                allowCreateNew
               />
               {form.scope === 'business' && !form.category && (
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>

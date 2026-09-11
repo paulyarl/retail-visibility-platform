@@ -18,6 +18,9 @@ interface GBPCategorySelectorAdapterProps {
   onPrimaryChange: (category: SelectedCategory | null) => void;
   onSecondaryChange: (categories: SelectedCategory[]) => void;
   disabled?: boolean;
+  // Allow creating categories not in the platform vocab (default true — the
+  // 414 directory categories are a starter list, not a closed set).
+  allowCreateNew?: boolean;
 }
 
 interface GBPCategory {
@@ -33,6 +36,7 @@ export default function GBPCategorySelectorAdapter({
   onPrimaryChange,
   onSecondaryChange,
   disabled = false,
+  allowCreateNew = true,
 }: GBPCategorySelectorAdapterProps) {
   // Use the same hook as DirectoryCategorySelectorAdapter for robust category list
   const { categories: directoryCategories, loading: loadingDirectory } = useDirectoryCategories();
@@ -189,6 +193,7 @@ export default function GBPCategorySelectorAdapter({
       maxSecondaryCategories={9}
       showGroupedDropdown={true}
       categoryGroups={categoryGroups}
+      allowCreateNew={allowCreateNew}
     />
   );
 }

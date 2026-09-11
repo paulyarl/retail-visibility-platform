@@ -12,6 +12,12 @@ interface DirectoryCategorySelectorAdapterProps {
   onPrimaryChange: (category: string) => void;
   onSecondaryChange: (categories: string[]) => void;
   disabled?: boolean;
+  // Allow operators to create categories not in the platform vocab. The 414
+  // directory categories are a starter list; every category-consuming surface
+  // (seed create/edit, directory options, campaign form, claim editor) is a
+  // discovery surface that may need to introduce a new category. Default
+  // true — opt out with allowCreateNew={false} if a surface should be
+  // restricted to the existing vocab.
   allowCreateNew?: boolean;
 }
 
@@ -21,7 +27,7 @@ export default function DirectoryCategorySelectorAdapter({
   onPrimaryChange,
   onSecondaryChange,
   disabled = false,
-  allowCreateNew = false,
+  allowCreateNew = true,
 }: DirectoryCategorySelectorAdapterProps) {
   const { categories, loading, error } = useDirectoryCategories();
 
