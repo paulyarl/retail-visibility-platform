@@ -38,6 +38,10 @@ export interface CommonFields {
   state: string | null;
   phone: string | null;
   website_url: string | null;
+  // Business origin (diaspora/heritage) — joined country + region from the
+  // campaign row. May originate from audit scans OR from the owner. Gives
+  // the AI cultural/community context for hyper-specific outreach.
+  business_origin: string | null;
   // ── Signal magnitude context (generalized severity fix) ──
   // All triggered signals ranked by severity, so every prompt knows what
   // else is going on and can lead with the strongest signal when its

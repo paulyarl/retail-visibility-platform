@@ -40,7 +40,7 @@ const BUSINESS_AUDIT_V1_ID = 'mpt-je6m7ru6';
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-09-attributes-capture -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-11-identity-origin -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -113,7 +113,7 @@ const REQUESTED_BUSINESS_PLACEHOLDERS_TO = `"requested_business": {
 //     omitting state, business_address, business_phone.
 const FULL_BUSINESS_VARIABLES = [
   'business_name', 'city', 'state', 'category',
-  'business_address', 'business_phone',
+  'business_address', 'business_phone', 'business_origin',
 ];
 
 // ─── Top-of-prompt business identity block. Inserted right after the intro
@@ -134,11 +134,24 @@ const BUSINESS_IDENTITY_BLOCK = `
 | City | {{city}} |
 | State | {{state}} |
 | Category | {{category}} |
+| Origin | {{business_origin}} |
 | Address | {{business_address}} |
 | Phone | {{business_phone}} |
 
-Audit the business above. If address or phone is blank, the field was not provided — do not treat blank as a negative signal.
+Audit the business above. If address, phone, or origin is blank, the field was not provided — do not treat blank as a negative signal.
 `;
+
+// ─── Idempotent replace: add Origin row to existing identity blocks that
+//     were inserted before the origin row was added. The FROM string is the
+//     Category → Address boundary in the old block; the TO string inserts
+//     the Origin row between them. No-op if already replaced (FROM not found).
+const BUSINESS_IDENTITY_ORIGIN_FROM = '| Category | {{category}} |\n| Address | {{business_address}} |';
+const BUSINESS_IDENTITY_ORIGIN_TO = '| Category | {{category}} |\n| Origin | {{business_origin}} |\n| Address | {{business_address}} |';
+
+// ─── Idempotent replace: update the old "address or phone" blank-field
+//     caveat to include origin. No-op if already replaced.
+const BUSINESS_IDENTITY_CAVEAT_FROM = 'If address or phone is blank, the field was not provided — do not treat blank as a negative signal.';
+const BUSINESS_IDENTITY_CAVEAT_TO = 'If address, phone, or origin is blank, the field was not provided — do not treat blank as a negative signal.';
 
 // ─── Schema fragment: public_narrative (inserted after "summary": "" in the
 //     top-level JSON schema). This field is the public-safe description that
@@ -518,6 +531,11 @@ function transformCategoryIntegrated(body: string): string {
   //    the model sees the business identity first.
   let out = insertAfter(body, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
 
+  // 0b. Add Origin row to existing identity blocks (idempotent — no-op if
+  //     the block already has the Origin row, e.g. fresh inserts).
+  out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
+  out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
+
   // 1. Insert Gold Standard binding section after the Category Intelligence
   //    binding section (which ends with the "If the Category Intelligence
   //    block is missing or empty..." line).
@@ -627,6 +645,11 @@ function transformSignalAligned(body: string): string {
   //    cautions and BEFORE any binding sections. This ensures the model
   //    sees the business identity first.
   out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
+
+  // 0b. Add Origin row to existing identity blocks (idempotent — no-op if
+  //     the block already has the Origin row, e.g. fresh inserts).
+  out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
+  out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
 
   // 1. Insert both binding sections after the business identity block's
   //    last line (the "do not treat blank as a negative signal" note).
@@ -855,6 +878,11 @@ function transformBusinessAuditV1(body: string): string {
   //    cautions. V1 has no CI/GS bindings, so this goes right before the
   //    existing "## Business" section deeper in the body.
   out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
+
+  // 0a. Add Origin row to existing identity blocks (idempotent — no-op if
+  //     the block already has the Origin row, e.g. fresh inserts).
+  out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
+  out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
 
   // 0b. Sourced Attribute Capture directive — after the Category Fit bullet
   //     (same anchor chain as the V2 transforms; the last fallback anchors on

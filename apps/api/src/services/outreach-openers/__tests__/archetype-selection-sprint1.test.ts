@@ -35,6 +35,7 @@ const common: CommonFields = {
   state: 'IN',
   phone: '(317) 555-0100',
   website_url: null,
+  business_origin: null,
   triggered_signals: [],
   primary_signal_severity: 'borderline',
   strongest_co_occurring: null,

@@ -249,10 +249,16 @@ the homework for them.`;
 const SIGNAL_CONTEXT_NOTE = `
 Business identification + signal magnitude context (for your internal
 reference only — do NOT dump these into the opener body verbatim):
-- city, state, phone, website_url are provided in the inputs when available.
-  Use them to identify the business and match it against publicly available
-  information (Google Business Profile, Yelp listings, etc.) so you can write
-  a hyper-specific opener that proves you've done your research.
+- city, state, phone, website_url, business_origin are provided in the
+  inputs when available. Use them to identify the business and match it
+  against publicly available information (Google Business Profile, Yelp
+  listings, etc.) so you can write a hyper-specific opener that proves
+  you've done your research.
+- business_origin captures the business's heritage/diaspora context
+  (e.g. "Senegal, West Africa"). It may come from the owner or from audit
+  scans. Weave it in naturally only if it strengthens the hook (e.g.
+  cultural community context for an ethnic grocery store) — never recite
+  it verbatim.
 - The opener should read as if you already know this business — but never
   recite the raw NAP data. Weave location context in naturally only if it
   strengthens the hook (e.g., "the [city] location" when disambiguating a

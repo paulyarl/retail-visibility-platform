@@ -222,6 +222,8 @@ export class OutreachOpenerService extends BaseService {
       state: campaign.state ?? null,
       phone: campaign.phone ?? null,
       website_url: campaign.website_url ?? null,
+      business_origin: [campaign.business_origin_country, campaign.business_origin_region]
+        .filter(Boolean).join(', ') || null,
       // Signal magnitude context — populated by resolveOpener from the
       // signal extractor + audit data. Defaulted here so buildCommonFields
       // can be called standalone (e.g. in tests) without the audit data.

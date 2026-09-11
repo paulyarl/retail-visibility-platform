@@ -71,7 +71,12 @@ the homework for them.`;
 const NAP_CONTEXT_NOTE = `
 Business identification context (for your internal reference only — do NOT
 dump these into the output verbatim):
-- city, state, phone, website_url are provided in the inputs when available.
+- city, state, phone, website_url, business_origin are provided in the
+  inputs when available.
+- business_origin captures the business's heritage/diaspora context
+  (e.g. "Senegal, West Africa"). It may come from the owner or from audit
+  scans. Weave it in naturally only if it strengthens the output — never
+  recite it verbatim.
 - Use them to identify the business and match it against publicly available
   information (Google Business Profile, Yelp listings, etc.) so you can write
   a hyper-specific output that proves you've done your research.

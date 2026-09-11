@@ -109,6 +109,8 @@ export class CloserService extends BaseService {
       state: campaign.state ?? null,
       phone: campaign.phone ?? null,
       website_url: campaign.website_url ?? null,
+      business_origin: [campaign.business_origin_country, campaign.business_origin_region]
+        .filter(Boolean).join(', ') || null,
       triggered_signals: [],
       primary_signal_severity: 'borderline' as any,
       strongest_co_occurring: null,

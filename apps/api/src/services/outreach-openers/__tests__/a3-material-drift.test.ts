@@ -36,6 +36,7 @@ const common: CommonFields = {
   state: 'IN',
   phone: '317-297-7036',
   website_url: 'https://www.kauramarket.com',
+  business_origin: null,
   triggered_signals: [],
   primary_signal_severity: 'borderline',
   strongest_co_occurring: null,
