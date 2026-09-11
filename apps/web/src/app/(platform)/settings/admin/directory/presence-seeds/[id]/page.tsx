@@ -5,10 +5,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
+  ClaimInviteQrKitMeta,
   DirectoryAttributeDefinition,
+  DirectoryAttributeRecommendation,
   DirectoryAttributeSuggestion,
   DirectoryListingAttribute,
   DirectoryPresenceSeedDetail,
+  OutreachTouch,
 } from '@/services/DirectoryPresenceAdminService';
 import { clientLogger } from '@/lib/client-logger';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
@@ -31,6 +34,8 @@ import {
   Trash2,
   Sparkles,
   Ban,
+  QrCode,
+  Download,
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
@@ -171,6 +176,17 @@ export default function PresenceSeedDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [qrKit, setQrKit] = useState<ClaimInviteQrKitMeta | null>(null);
+  const [qrDownloading, setQrDownloading] = useState<string | null>(null);
+  const [copiedQrLink, setCopiedQrLink] = useState<string | null>(null);
+  const [touches, setTouches] = useState<OutreachTouch[]>([]);
+  const [touchChannel, setTouchChannel] = useState<
+    'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'visit' | 'other'
+  >('call');
+  const [touchOutcome, setTouchOutcome] = useState('');
+  const [touchNotes, setTouchNotes] = useState('');
+  const [loggingTouch, setLoggingTouch] = useState(false);
+  const [decidingProposal, setDecidingProposal] = useState<string | null>(null);
 
   // Edit mode state
   const [editing, setEditing] = useState(false);
@@ -186,6 +202,7 @@ export default function PresenceSeedDetailPage() {
   const [attributeDefs, setAttributeDefs] = useState<DirectoryAttributeDefinition[]>([]);
   const [attributeDefsLoading, setAttributeDefsLoading] = useState(false);
   const [attributeSuggestions, setAttributeSuggestions] = useState<DirectoryAttributeSuggestion[]>([]);
+  const [attributeRecommendations, setAttributeRecommendations] = useState<DirectoryAttributeRecommendation[]>([]);
   const [attributeSuggestionsLoading, setAttributeSuggestionsLoading] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
   const [editProvenance, setEditProvenance] = useState<EditProvenanceRow[]>([]);
@@ -224,6 +241,24 @@ export default function PresenceSeedDetailPage() {
     }
   }, [seedId]);
 
+  const loadQrKit = useCallback(async () => {
+    try {
+      const kit = await directoryPresenceAdminService.getClaimInviteQrKit(seedId);
+      setQrKit(kit);
+    } catch (err) {
+      clientLogger.error('Failed to load claim QR kit:', { detail: err });
+    }
+  }, [seedId]);
+
+  const loadTouches = useCallback(async () => {
+    try {
+      const list = await directoryPresenceAdminService.listOutreachTouches(seedId);
+      setTouches(list);
+    } catch (err) {
+      clientLogger.error('Failed to load outreach touches:', { detail: err });
+    }
+  }, [seedId]);
+
   const loadComposed = useCallback(async () => {
     try {
       setComposedLoading(true);
@@ -238,7 +273,9 @@ export default function PresenceSeedDetailPage() {
 
   useEffect(() => {
     fetchDetail();
-  }, [fetchDetail]);
+    loadQrKit();
+    loadTouches();
+  }, [fetchDetail, loadQrKit, loadTouches]);
 
   useEffect(() => {
     if (seedId) loadComposed();
@@ -269,10 +306,42 @@ export default function PresenceSeedDetailPage() {
         'Claim token generated. Share the link below with the business owner.',
       );
       fetchDetail();
+      loadQrKit();
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : 'Failed to generate invite',
       );
+    }
+  };
+
+  const handleQrDownload = async (
+    variant: 'mail' | 'walkin' | 'social',
+    kind: 'png' | 'postcard',
+  ) => {
+    const key = `${variant}-${kind}`;
+    setActionError(null);
+    try {
+      setQrDownloading(key);
+      const blob =
+        kind === 'png'
+          ? await directoryPresenceAdminService.downloadClaimInvitePng(seedId, variant)
+          : await directoryPresenceAdminService.downloadClaimInvitePostcard(seedId, variant);
+      if (!blob) throw new Error('Download failed');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download =
+        kind === 'png'
+          ? `claim-qr-${variant}.png`
+          : `claim-postcard-${variant}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to download QR artifact',
+      );
+    } finally {
+      setQrDownloading(null);
     }
   };
 
@@ -311,6 +380,7 @@ export default function PresenceSeedDetailPage() {
       await directoryPresenceAdminService.revokeToken(seedId, tokenId);
       setActionSuccess('Claim token revoked.');
       fetchDetail();
+      loadQrKit();
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : 'Failed to revoke token',
@@ -331,6 +401,54 @@ export default function PresenceSeedDetailPage() {
       setActionError(
         err instanceof Error ? err.message : 'Failed to update outreach status',
       );
+    }
+  };
+
+  const handleLogTouch = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setLoggingTouch(true);
+      const result = await directoryPresenceAdminService.addOutreachTouch(seedId, {
+        channel: touchChannel,
+        outcome: (touchOutcome || undefined) as any,
+        notes: touchNotes.trim() || undefined,
+      });
+      if (!result) throw new Error('Failed to log touch');
+      setActionSuccess(`Touch logged (${touchChannel.replace(/_/g, ' ')}).`);
+      setTouchNotes('');
+      setTouchOutcome('');
+      loadTouches();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to log touch',
+      );
+    } finally {
+      setLoggingTouch(false);
+    }
+  };
+
+  const handleProposalDecision = async (
+    label: string,
+    decision: 'accepted' | 'rejected',
+  ) => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setDecidingProposal(`${label}:${decision}`);
+      await directoryPresenceAdminService.decideProposedCategory(seedId, label, decision);
+      setActionSuccess(
+        decision === 'accepted'
+          ? `"${label}" accepted — registered in the category vocab and added to the listing.`
+          : `"${label}" rejected.`,
+      );
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to decide proposed category',
+      );
+    } finally {
+      setDecidingProposal(null);
     }
   };
 
@@ -482,8 +600,14 @@ export default function PresenceSeedDetailPage() {
     setDismissedSuggestions(new Set());
     directoryPresenceAdminService
       .listAttributeSuggestions(seedId)
-      .then((s) => setAttributeSuggestions(s))
-      .catch(() => setAttributeSuggestions([]))
+      .then((r) => {
+        setAttributeSuggestions(r.suggestions);
+        setAttributeRecommendations(r.recommendations);
+      })
+      .catch(() => {
+        setAttributeSuggestions([]);
+        setAttributeRecommendations([]);
+      })
       .finally(() => setAttributeSuggestionsLoading(false));
     setEditProvenance(
       provenance.map((p) => ({
@@ -568,6 +692,23 @@ export default function PresenceSeedDetailPage() {
 
   const dismissSuggestion = (key: string) =>
     setDismissedSuggestions((prev) => new Set(dismissedSuggestions).add(key));
+
+  // Accept an advisory audit recommendation — no observed evidence exists,
+  // so the chip is stamped as an audit recommendation (not a sourced
+  // observation) unless the operator overrides the source fields below.
+  const acceptRecommendation = (r: DirectoryAttributeRecommendation) =>
+    setEditAttributes((attrs) =>
+      attrs.some((a) => a.key === (r.matchedDefinitionKey || r.key))
+        ? attrs
+        : [
+            ...attrs,
+            {
+              key: r.matchedDefinitionKey || r.key,
+              label: r.label,
+              sourcePlatform: 'audit_recommendation',
+            },
+          ],
+    );
 
   const handleSaveFields = async () => {
     setActionError(null);
@@ -1188,6 +1329,96 @@ export default function PresenceSeedDetailPage() {
         )}
       </section>
 
+      {/* Owner verification (migration 274) — the consent-of-record plus
+          owner-proposed categories awaiting operator acceptance */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900">Owner Verification</h2>
+        {seed.owner_verified_at ? (
+          <p className="text-sm text-gray-700">
+            Owner confirmed their categories and attributes at claim submit on{' '}
+            {formatDate(seed.owner_verified_at)}
+            {seed.owner_verification?.confirmedBy
+              ? ` (claimant ${seed.owner_verification.confirmedBy})`
+              : ''}
+            . Confirmed fields carry provenance{' '}
+            <code className="text-xs bg-gray-100 px-1 rounded">owner_claim</code>{' '}
+            and the category fit is marked verified.
+          </p>
+        ) : (
+          <p className="text-sm text-gray-500">
+            Not yet verified — the owner is asked to confirm categories and
+            attributes on the claim page before the claim can be submitted.
+          </p>
+        )}
+
+        {Array.isArray(seed.owner_proposed_categories) &&
+          seed.owner_proposed_categories.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Owner-proposed categories
+              </h3>
+              <p className="text-xs text-gray-500">
+                Labels the owner typed that aren&apos;t in the category vocab.
+                Nothing is published until accepted — accept registers the
+                label in the vocab and adds it to the listing.
+              </p>
+              <ul className="divide-y divide-gray-100">
+                {seed.owner_proposed_categories.map((p: any) => (
+                  <li
+                    key={p.label}
+                    className="py-2 flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">
+                        {p.label}
+                      </span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        {p.role === 'primary' ? 'primary' : 'secondary'} ·{' '}
+                        proposed {formatDate(p.proposed_at)}
+                      </span>
+                    </div>
+                    {p.status === 'pending' ? (
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleProposalDecision(p.label, 'accepted')}
+                          disabled={decidingProposal !== null}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {decidingProposal === `${p.label}:accepted`
+                            ? 'Accepting…'
+                            : 'Accept'}
+                        </button>
+                        <button
+                          onClick={() => handleProposalDecision(p.label, 'rejected')}
+                          disabled={decidingProposal !== null}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          {decidingProposal === `${p.label}:rejected`
+                            ? 'Rejecting…'
+                            : 'Reject'}
+                        </button>
+                      </div>
+                    ) : (
+                      <span
+                        className={`text-xs font-medium ${
+                          p.status === 'accepted'
+                            ? 'text-green-600'
+                            : 'text-red-500'
+                        }`}
+                      >
+                        {p.status}
+                        {p.decided_at ? ` · ${formatDate(p.decided_at)}` : ''}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+      </section>
+
       {/* Claim tokens */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Claim Tokens</h2>
@@ -1285,6 +1516,107 @@ export default function PresenceSeedDetailPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      {/* Claim QR Kit — tracked-scan artifacts, one variant per delivery channel */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Claim QR Kit</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Each artifact encodes a tracked redirect, so scans are recorded
+              before the owner lands on the claim page. Print the mail variant
+              on postcards, the walk-in variant on leave-behind cards, and send
+              the social variant as a DM/share link — all three stay separate
+              in QR analytics.
+            </p>
+          </div>
+          <QrCode className="w-5 h-5 text-gray-400 shrink-0" />
+        </div>
+
+        {!qrKit ? (
+          <p className="text-sm text-gray-500">
+            No active claim token — use “Generate Claim Invite” above to mint one.
+            QR artifacts are available once a token exists.
+          </p>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-4">
+            {(
+              [
+                {
+                  variant: 'mail' as const,
+                  title: 'Mail postcard',
+                  desc: 'Mailed 4×6 invite — scans record as claim_invite.',
+                  url: qrKit.qrUrl,
+                  postcard: true,
+                },
+                {
+                  variant: 'walkin' as const,
+                  title: 'Walk-in leave-behind',
+                  desc: 'Hand-delivered card — scans record as claim_invite_walkin.',
+                  url: qrKit.qrUrlWalkin,
+                  postcard: true,
+                },
+                {
+                  variant: 'social' as const,
+                  title: 'Social / DM link',
+                  desc: 'Send the tracked link in a DM or post — taps record as claim_invite_social.',
+                  url: qrKit.qrUrlSocial,
+                  postcard: false,
+                },
+              ]
+            ).map((v) => (
+              <div
+                key={v.variant}
+                className="border border-gray-200 rounded-lg p-4 space-y-3"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{v.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{v.desc}</p>
+                </div>
+                <p className="text-xs font-mono text-gray-600 break-all bg-gray-50 rounded px-2 py-1.5">
+                  {v.url}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {v.variant === 'social' && (
+                    <button
+                      onClick={() => {
+                        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                          navigator.clipboard.writeText(v.url);
+                          setCopiedQrLink(v.variant);
+                          setTimeout(() => setCopiedQrLink(null), 2000);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+                    >
+                      {copiedQrLink === v.variant ? 'Copied' : 'Copy link'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleQrDownload(v.variant, 'png')}
+                    disabled={qrDownloading !== null}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {qrDownloading === `${v.variant}-png` ? 'Downloading…' : 'QR PNG'}
+                  </button>
+                  {v.postcard && (
+                    <button
+                      onClick={() => handleQrDownload(v.variant, 'postcard')}
+                      disabled={qrDownloading !== null}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {qrDownloading === `${v.variant}-postcard`
+                        ? 'Downloading…'
+                        : 'Postcard PDF'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -1413,6 +1745,75 @@ export default function PresenceSeedDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Per-touch log — feeds the funnel CAC numerator. 'visit' covers
+            same-town walk-ins (leave-behind QR cards). */}
+        <div className="pt-3 border-t border-gray-100 space-y-3">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Log a touch
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={touchChannel}
+              onChange={(e) => setTouchChannel(e.target.value as typeof touchChannel)}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700"
+              title="Touch channel"
+            >
+              <option value="call">call</option>
+              <option value="email">email</option>
+              <option value="sms">sms</option>
+              <option value="mail">mail</option>
+              <option value="form">form</option>
+              <option value="referral">referral</option>
+              <option value="visit">visit</option>
+              <option value="other">other</option>
+            </select>
+            <select
+              value={touchOutcome}
+              onChange={(e) => setTouchOutcome(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700"
+              title="Outcome (optional)"
+            >
+              <option value="">outcome…</option>
+              {[
+                'connected', 'no_response', 'no_answer', 'no_reply', 'voicemail',
+                'bad_number', 'bounce', 'unread', 'read_no_reply', 'form_submitted',
+                'referral_asked', 'claimed', 'not_interested',
+              ].map((o) => (
+                <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={touchNotes}
+              onChange={(e) => setTouchNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="flex-1 min-w-[160px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700"
+            />
+            <button
+              onClick={handleLogTouch}
+              disabled={loggingTouch}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-700 text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {loggingTouch ? 'Logging…' : 'Log touch'}
+            </button>
+          </div>
+          {touches.length > 0 && (
+            <div className="space-y-1">
+              {touches.slice(0, 5).map((t) => (
+                <div key={t.id} className="flex items-center gap-3 text-xs text-gray-600">
+                  <span className="font-medium text-gray-800 w-16">{t.channel}</span>
+                  <span className="w-24">{t.outcome?.replace(/_/g, ' ') || '—'}</span>
+                  <span className="text-gray-400">{formatDate(t.occurredAt)}</span>
+                  {t.notes && <span className="truncate text-gray-500">{t.notes}</span>}
+                </div>
+              ))}
+              {touches.length > 5 && (
+                <p className="text-xs text-gray-400">+{touches.length - 5} more</p>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Composed Enrichment (Phase 4) */}
@@ -1710,6 +2111,61 @@ export default function PresenceSeedDetailPage() {
                               <button
                                 type="button"
                                 onClick={() => dismissSuggestion(s.key)}
+                                className="text-gray-400 hover:text-gray-600 p-1"
+                                title="Dismiss"
+                              >
+                                <X size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Advisory audit recommendations — no evidence; accepting
+                    stamps the chip as an audit recommendation, not a
+                    sourced observation. Owner verification is the intended
+                    promotion path (attribute_verification intake). */}
+                {attributeRecommendations.length > 0 && (() => {
+                  const visible = attributeRecommendations.filter(
+                    (r) =>
+                      !dismissedSuggestions.has(r.key) &&
+                      !editAttributes.some((a) => a.key === (r.matchedDefinitionKey || r.key)),
+                  );
+                  if (visible.length === 0) return null;
+                  return (
+                    <div className="border border-purple-200 bg-purple-50/60 rounded-lg p-3">
+                      <p className="text-xs font-medium text-purple-900 mb-2">
+                        Recommended by audit — advisory, not evidence the chip is enabled
+                      </p>
+                      <div className="space-y-1.5">
+                        {visible.map((r) => (
+                          <div key={r.key} className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="text-sm font-medium text-gray-900">{r.label}</span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                Audit recommendation
+                                {r.platform ? ` · ${r.platform}` : ''}
+                                {r.currentState ? ` · ${r.currentState.replace(/_/g, ' ')}` : ''}
+                              </span>
+                              {r.rationale && (
+                                <p className="text-[11px] text-gray-500 truncate" title={r.rationale}>{r.rationale}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => acceptRecommendation(r)}
+                                className="text-xs px-2 py-0.5 rounded bg-purple-600 text-white hover:bg-purple-700"
+                                title="Add to listing — stamped as audit recommendation, not observed evidence"
+                              >
+                                Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => dismissSuggestion(r.key)}
                                 className="text-gray-400 hover:text-gray-600 p-1"
                                 title="Dismiss"
                               >

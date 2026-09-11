@@ -371,6 +371,26 @@ function FunnelSummaryCard({ report, title }: { report: CohortFunnelReport; titl
           sub="NAP diffs after claim"
         />
       </div>
+
+      {/* Per-channel invite-scan split — drives channel-effort decisions.
+          A seed scanned via two channels counts once in each. */}
+      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <StatCell
+          label="Scans · Mail"
+          value={m.inviteScansMail}
+          sub={m.inviteScanRateMail !== null ? `${(m.inviteScanRateMail * 100).toFixed(1)}% of invited` : '—'}
+        />
+        <StatCell
+          label="Scans · Walk-in"
+          value={m.inviteScansWalkin}
+          sub={m.inviteScanRateWalkin !== null ? `${(m.inviteScanRateWalkin * 100).toFixed(1)}% of invited` : '—'}
+        />
+        <StatCell
+          label="Scans · Social"
+          value={m.inviteScansSocial}
+          sub={m.inviteScanRateSocial !== null ? `${(m.inviteScanRateSocial * 100).toFixed(1)}% of invited` : '—'}
+        />
+      </div>
     </div>
   );
 }

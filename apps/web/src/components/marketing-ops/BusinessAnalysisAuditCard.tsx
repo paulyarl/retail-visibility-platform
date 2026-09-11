@@ -5,6 +5,7 @@ import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw,
 import type { Audit } from '@/services/MarketingOpsService';
 import marketingOpsService from '@/services/MarketingOpsService';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
+import recoveryOpsService from '@/services/RecoveryOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
 // ─── Helpers (shared with CityAnalysisAuditCard — duplicated for isolation) ───
@@ -98,6 +99,10 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const [addingToPlace, setAddingToPlace] = useState(false);
   const [placeResult, setPlaceResult] = useState<{ publicUrl: string; seedId: string; created: boolean; seoEnriched: boolean } | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
+  const [attrVerifyLoading, setAttrVerifyLoading] = useState(false);
+  const [attrVerifyUrl, setAttrVerifyUrl] = useState<string | null>(null);
+  const [attrVerifyError, setAttrVerifyError] = useState<string | null>(null);
+  const [attrVerifyCopied, setAttrVerifyCopied] = useState(false);
 
   const d = (audit.audit_data ?? {}) as any;
   const meta = d.audit_metadata ?? {};
@@ -133,6 +138,25 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
         ? [requested.phone]
         : [];
   const isOperationalBlocked = opStatus !== 'active';
+
+  // Sourced attribute chips (observed on profiles) + advisory recommendations
+  const recAttrs: any[] = Array.isArray(d.recommended_attributes) ? d.recommended_attributes : [];
+  const sourcedAttrs: { platform: string; label: string }[] = [];
+  for (const [plat, block] of Object.entries((d.platforms ?? {}) as Record<string, any>)) {
+    const attrs = (block as any)?.attributes;
+    if (Array.isArray(attrs)) {
+      for (const a of attrs) {
+        const label = typeof a === 'string' ? a : a?.label ?? a?.key;
+        if (label) sourcedAttrs.push({ platform: plat, label });
+      }
+    }
+  }
+
+  const attrStateColor = (state: string) => {
+    if (state === 'not_observed') return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
+    if (state === 'verify_with_owner') return 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300';
+    return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'; // unverifiable
+  };
 
   const handleCopySummary = () => {
     const text = d.summary ?? `${requested.business_name ?? 'Business'} seek audit — score ${score}/10, tier ${tier}`;
@@ -174,6 +198,23 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
       setPlaceError(e.message || 'Failed to add place listing');
     } finally {
       setAddingToPlace(false);
+    }
+  };
+
+  // Mint (or reissue) the owner-facing attribute_verification intake link.
+  // The owner picks which recommended attributes actually apply; confirmed
+  // keys write onto the seed listing stamped as owner-intake sourced.
+  const handleAttributeVerification = async () => {
+    setAttrVerifyLoading(true);
+    setAttrVerifyUrl(null);
+    setAttrVerifyError(null);
+    try {
+      const result = await recoveryOpsService.reissueLink(campaignId, 'attribute_verification');
+      setAttrVerifyUrl(result.url);
+    } catch (e: any) {
+      setAttrVerifyError(e.message || 'Failed to generate attribute verification link');
+    } finally {
+      setAttrVerifyLoading(false);
     }
   };
 
@@ -431,6 +472,72 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             </ul>
           )}
         </Section>
+
+        {/* 4b. Profile attributes — sourced chips + advisory recommendations */}
+        {(sourcedAttrs.length > 0 || recAttrs.length > 0) && (
+          <Section title="Profile Attributes">
+            {sourcedAttrs.length > 0 && (
+              <div className="mb-2">
+                <span className="text-[10px] text-gray-400">Observed on profiles (owner-selected):</span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {sourcedAttrs.map((a, i) => (
+                    <Badge key={i} cls="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                      {a.label} <span className="text-gray-400">· {a.platform}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {recAttrs.length > 0 && (
+              <div>
+                <span className="text-[10px] text-gray-400">Recommended (advisory — not evidence the chip is enabled):</span>
+                <div className="mt-1 space-y-1.5">
+                  {recAttrs.map((r: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 flex-wrap text-xs">
+                      <Badge cls="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">{r.label ?? r.key}</Badge>
+                      {r.platform && <span className="text-gray-400">{r.platform}</span>}
+                      {r.current_state && <Badge cls={attrStateColor(r.current_state)}>{r.current_state.replace(/_/g, ' ')}</Badge>}
+                      {r.basis && <span className="text-[10px] text-gray-400">{r.basis.replace(/_/g, ' ')}</span>}
+                      {r.rationale && <span className="text-gray-500 dark:text-gray-400">{r.rationale}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handleAttributeVerification}
+                    disabled={attrVerifyLoading}
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 dark:text-purple-300 dark:hover:bg-purple-900/20 disabled:opacity-50"
+                    title="Mint an owner-facing intake link — the owner confirms which recommended attributes apply"
+                  >
+                    {attrVerifyLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                    Send attribute verification link
+                  </button>
+                  {attrVerifyUrl && (
+                    <>
+                      <a href={attrVerifyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400 underline">
+                        <ExternalLink className="h-3 w-3" /> owner link
+                      </a>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(attrVerifyUrl);
+                          setAttrVerifyCopied(true);
+                          setTimeout(() => setAttrVerifyCopied(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                      >
+                        <Copy className="h-3 w-3" /> {attrVerifyCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </>
+                  )}
+                  {attrVerifyError && <span className="text-xs text-red-600 dark:text-red-400">{attrVerifyError}</span>}
+                </div>
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Owner confirms which apply — confirmed attributes are written to the seed listing as owner-intake sourced. Recommendations also surface in the seed editor&apos;s attribute picker.
+                </p>
+              </div>
+            )}
+          </Section>
+        )}
 
         {/* 5. Website assessment */}
         <Section title="Website">

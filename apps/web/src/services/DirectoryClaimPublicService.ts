@@ -31,10 +31,40 @@ export interface DirectoryClaimSummary {
   businessHours: any;
   socialLinks?: { platform: string; url: string }[];
   snapEbtReported: boolean;
+  /** Sourced attribute chips (migration 267) — the verify step lets the
+   *  owner accept or reject each one. */
+  attributes?: ClaimListingAttribute[];
+  /** Stamp of the owner's claim-time consent (migration 274). */
+  ownerVerifiedAt?: string | null;
+  /** Owner-typed labels awaiting operator acceptance (pending only). */
+  ownerProposedCategories?: { label: string; role: 'primary' | 'secondary'; status: string }[];
   isExpired: boolean;
   isConsumed: boolean;
   expiresAt: string;
   consumedAt: string | null;
+}
+
+export interface ClaimListingAttribute {
+  key: string;
+  label: string;
+  sourcePlatform?: string;
+  sourceUrl?: string;
+  asOf?: string;
+  ownerConfirmed?: boolean;
+}
+
+/**
+ * Claim-time verification payload (migration 274) — the contract of consent.
+ * `confirmed` must be true; the claim cannot initiate without it.
+ */
+export interface OwnerClaimVerification {
+  primaryCategory: string;
+  secondaryCategories: string[];
+  /** Owner-typed labels not in the vocab — diverted to operator review. */
+  proposedCategories?: string[];
+  /** Final attribute set the owner accepts (omitted sourced chips = rejected). */
+  attributes: { key?: string; label: string }[];
+  confirmed: true;
 }
 
 export interface DirectoryClaimAcceptResult {
@@ -60,6 +90,11 @@ export interface DirectoryClaimInitiateResult {
   verificationRequired?: boolean;
   sentTo?: string;
   operatorApprovalRequired?: boolean;
+  /** True when the claim cannot initiate without the owner verification
+   *  (categories + attributes consent gate, migration 274). */
+  ownerVerificationRequired?: boolean;
+  /** Owner-typed labels diverted to operator review on this submit. */
+  proposedCategories?: string[];
   error?: string;
 }
 
@@ -73,6 +108,8 @@ export interface DirectoryClaimInitiateInput {
   customerEmail?: string;
   /** Customer ID (frontend fallback for identity matching) */
   customerId?: string;
+  /** Claim-time verification (migration 274) — required on first submit. */
+  verification?: OwnerClaimVerification;
 }
 
 export class DirectoryClaimPublicService extends PublicApiSingleton {
@@ -151,6 +188,25 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || 'unknown' };
+    }
+  }
+
+  /** GET /api/public/directory/attribute-definitions?category= — predefined
+   *  attribute chips offered to the owner during claim-time verification. */
+  async getAttributeDefinitions(category?: string): Promise<{ attributeKey: string; label: string; groupKey: string }[]> {
+    try {
+      const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/attribute-definitions${qs}`,
+        { method: 'GET' },
+        undefined,
+        0,
+      );
+      if (!result.success) return [];
+      const data = result.data?.data ?? result.data;
+      return data?.definitions ?? [];
+    } catch {
+      return [];
     }
   }
 

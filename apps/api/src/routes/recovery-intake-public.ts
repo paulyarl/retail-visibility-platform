@@ -309,6 +309,31 @@ router.get(
           break;
         }
 
+        case 'campaign_recommended_attributes': {
+          // Per-campaign options for the attribute_verification intake —
+          // the campaign's latest business audit's recommended_attributes.
+          const audit = await prisma.mkt_audits_list.findFirst({
+            where: { campaign_id: (resolved as any).campaignId, platform: 'business_analysis' },
+            orderBy: { created_at: 'desc' },
+            select: { audit_data: true },
+          });
+          const recs = (audit?.audit_data as any)?.recommended_attributes;
+          if (Array.isArray(recs)) {
+            const seen = new Set<string>();
+            for (const r of recs) {
+              const key = String(r?.key ?? '').trim().toLowerCase();
+              const label = String(r?.label ?? r?.key ?? '').trim();
+              if (!key || !label || seen.has(key)) continue;
+              seen.add(key);
+              options.push({
+                value: key,
+                label: r?.platform ? `${label} (${r.platform})` : label,
+              });
+            }
+          }
+          break;
+        }
+
         default:
           return res.status(400).json({ success: false, error: `Unknown option source: ${source}` });
       }

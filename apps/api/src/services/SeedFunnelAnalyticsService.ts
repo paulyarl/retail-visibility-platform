@@ -54,9 +54,18 @@ export interface CohortFunnelMetrics {
   paid: number;
   touches: number;
   cacEstimate: number | null;
-  /** v1.2 W10: seeds with ≥1 claim_invite QR scan / invited seeds (warm-lead signal) */
+  /** v1.2 W10: seeds with ≥1 claim-invite QR scan / invited seeds (warm-lead signal) */
   inviteScans: number;
   inviteScanRate: number | null;
+  /** Per-channel split of inviteScans by QR surface. A seed scanned via two
+   *  channels counts once in inviteScans AND once per channel — the channel
+   *  counts can sum to more than inviteScans (cross-channel seeds). */
+  inviteScansMail: number;
+  inviteScansWalkin: number;
+  inviteScansSocial: number;
+  inviteScanRateMail: number | null;
+  inviteScanRateWalkin: number | null;
+  inviteScanRateSocial: number | null;
 }
 
 export interface ConversionScoreBreakdown {
@@ -251,6 +260,9 @@ interface CohortRow {
   w4_count: bigint | number;
   touches: bigint | number;
   invite_scans: bigint | number;
+  invite_scans_mail: bigint | number;
+  invite_scans_walkin: bigint | number;
+  invite_scans_social: bigint | number;
 }
 
 function buildFilterClauses(filters: CohortFilters, params: any[]): string {
@@ -429,16 +441,41 @@ const METRIC_SELECT = `
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w3, 0) > 0) AS w3_count,
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w4, 0) > 0) AS w4_count,
   COUNT(dsot.id) AS touches,
-  -- v1.2 W10: invite scans = distinct seeds with ≥1 claim_invite QR scan event
+  -- v1.2 W10: invite scans = distinct seeds with ≥1 claim-invite QR scan event
   -- (qr_scan_events is keyed by tenant_id; seeds carry the same tenant_id post-claim,
   --  and pre-claim scans are attributed to the seed's tenant_id via the QR redirect)
+  -- 'claim_invite' = mailed card, 'claim_invite_walkin' = hand-delivered card,
+  -- 'claim_invite_social' = DM/social link — all count as invite scans.
+  -- Per-channel columns expose the split for channel-effort decisions; a
+  -- cross-channel seed counts once in invite_scans and once per channel.
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface IN ('claim_invite', 'claim_invite_walkin', 'claim_invite_social')
+    )
+  ) AS invite_scans,
   COUNT(DISTINCT dps.id) FILTER (
     WHERE EXISTS (
       SELECT 1 FROM qr_scan_events qse
       WHERE qse.tenant_id = dps.tenant_id
         AND qse.surface = 'claim_invite'
     )
-  ) AS invite_scans
+  ) AS invite_scans_mail,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'claim_invite_walkin'
+    )
+  ) AS invite_scans_walkin,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'claim_invite_social'
+    )
+  ) AS invite_scans_social
 `;
 
 const FUNNEL_FROM = `
@@ -453,6 +490,9 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
   const converted = Number(row.converted ?? 0);
   const touches = Number(row.touches ?? 0);
   const inviteScans = Number(row.invite_scans ?? 0);
+  const inviteScansMail = Number(row.invite_scans_mail ?? 0);
+  const inviteScansWalkin = Number(row.invite_scans_walkin ?? 0);
+  const inviteScansSocial = Number(row.invite_scans_social ?? 0);
   const invited = Number(row.invited ?? 0);
   return {
     seeds: Number(row.seeds ?? 0),
@@ -470,6 +510,12 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
     cacEstimate: converted > 0 ? Math.round((touches * COST_PER_TOUCH / converted) * 100) / 100 : null,
     inviteScans,
     inviteScanRate: invited > 0 ? Math.round((inviteScans / invited) * 10000) / 10000 : null,
+    inviteScansMail,
+    inviteScansWalkin,
+    inviteScansSocial,
+    inviteScanRateMail: invited > 0 ? Math.round((inviteScansMail / invited) * 10000) / 10000 : null,
+    inviteScanRateWalkin: invited > 0 ? Math.round((inviteScansWalkin / invited) * 10000) / 10000 : null,
+    inviteScanRateSocial: invited > 0 ? Math.round((inviteScansSocial / invited) * 10000) / 10000 : null,
   };
 }
 
@@ -510,6 +556,12 @@ function buildReport(
         cacEstimate: null,
         inviteScans: 0,
         inviteScanRate: null,
+        inviteScansMail: 0,
+        inviteScansWalkin: 0,
+        inviteScansSocial: 0,
+        inviteScanRateMail: null,
+        inviteScanRateWalkin: null,
+        inviteScanRateSocial: null,
       };
   const { gates, grade } = gradeGates(metrics);
   const report: CohortFunnelReport = {

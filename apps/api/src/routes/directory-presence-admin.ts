@@ -36,6 +36,7 @@ import {
   generateClaimInvitePng,
   generateClaimInvitePostcard,
   getClaimInviteKitMeta,
+  type ClaimInviteQrVariant,
 } from '../services/ClaimInviteQrKitService';
 import { HttpError } from '../middleware/errorHandler';
 import { logger } from '../logger';
@@ -237,12 +238,18 @@ router.get('/presence-seeds/dedup-verdicts', requirePlatformStaff, async (_req: 
 /**
  * POST /api/admin/directory/presence-seeds/:id/touches
  *
- * Log an outreach touch (call / email / sms / mail / other) with optional
- * outcome and notes. Feeds the CAC numerator for G5 (spec §7 gap 4, W1).
+ * Log an outreach touch (call / email / sms / mail / form / referral / visit /
+ * other) with optional outcome and notes. Feeds the CAC numerator for G5
+ * (spec §7 gap 4, W1). Channel + outcome sets mirror the
+ * directory_seed_outreach_touches CHECK constraints (migrations 259, 262, 273).
  */
 const touchSchema = z.object({
-  channel: z.enum(['call', 'email', 'sms', 'mail', 'other']),
-  outcome: z.enum(['connected', 'no_response', 'voicemail', 'bad_number', 'claimed', 'not_interested']).optional(),
+  channel: z.enum(['call', 'email', 'sms', 'mail', 'form', 'referral', 'visit', 'other']),
+  outcome: z.enum([
+    'connected', 'no_response', 'no_answer', 'no_reply', 'voicemail',
+    'bad_number', 'bounce', 'unread', 'read_no_reply', 'form_submitted',
+    'referral_asked', 'claimed', 'not_interested',
+  ]).optional(),
   notes: z.string().max(2000).optional(),
   occurredAt: z.string().datetime().optional(),
 });
@@ -694,6 +701,49 @@ router.patch('/presence-seeds/:id/status', requirePlatformAdmin, async (req: Req
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'invalid_status') return res.status(400).json({ error: 'invalid_status' });
     logger.error('[PATCH /api/admin/directory/presence-seeds/:id/status] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/proposed-categories/decision
+ *
+ * Operator accept/reject of an owner-proposed category label (migration
+ * 274). Owner-typed categories are held on the seed's
+ * owner_proposed_categories until an operator accepts — 'accepted' registers
+ * the label into the service-category vocab and mints it on the listing.
+ */
+const proposedCategoryDecisionSchema = z.object({
+  label: z.string().min(1).max(100),
+  decision: z.enum(['accepted', 'rejected']),
+});
+
+router.post('/presence-seeds/:id/proposed-categories/decision', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validation = proposedCategoryDecisionSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+
+    const result = await DirectoryPresenceSeedService.decideProposedCategory(
+      id,
+      validation.data.label,
+      validation.data.decision,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    if (error?.message === 'proposal_not_found') return res.status(404).json({ error: 'proposal_not_found' });
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/proposed-categories/decision] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
@@ -1692,6 +1742,8 @@ router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Reque
       seedId: kit.seedId,
       token: kit.token,
       qrUrl: kit.qrUrl,
+      qrUrlWalkin: kit.qrUrlWalkin,
+      qrUrlSocial: kit.qrUrlSocial,
       claimUrl: kit.claimUrl,
       businessName: kit.businessName,
       addressLines: kit.addressLines,
@@ -1705,11 +1757,21 @@ router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Reque
   }
 });
 
-/** GET /api/admin/directory/presence-seeds/:id/qr-kit/png — downloadable QR PNG */
+/** Parse the qr-kit ?variant= query param; anything unrecognized falls back
+ *  to 'mail' so a bad param can't produce a misattributed artifact. */
+function parseQrVariant(raw: unknown): ClaimInviteQrVariant {
+  return raw === 'walkin' || raw === 'social' ? raw : 'mail';
+}
+
+/** GET /api/admin/directory/presence-seeds/:id/qr-kit/png — downloadable QR PNG.
+ *  ?variant=walkin|social encodes that channel's tracked URL
+ *  (surface='claim_invite_walkin' / 'claim_invite_social') instead of the
+ *  default mailed-invite URL (surface='claim_invite'). */
 router.get('/presence-seeds/:id/qr-kit/png', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { pngBuffer, filename } = await generateClaimInvitePng(id);
+    const variant = parseQrVariant(req.query.variant);
+    const { pngBuffer, filename } = await generateClaimInvitePng(id, variant);
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', pngBuffer.length);
@@ -1725,11 +1787,14 @@ router.get('/presence-seeds/:id/qr-kit/png', requirePlatformStaff, async (req: R
   }
 });
 
-/** GET /api/admin/directory/presence-seeds/:id/qr-kit/postcard — downloadable postcard PDF */
+/** GET /api/admin/directory/presence-seeds/:id/qr-kit/postcard — downloadable postcard PDF.
+ *  ?variant=walkin|social renders that channel's variant (tracked URL +
+ *  badge label on the printed card). */
 router.get('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { pdfBuffer, filename } = await generateClaimInvitePostcard(id);
+    const variant = parseQrVariant(req.query.variant);
+    const { pdfBuffer, filename } = await generateClaimInvitePostcard(id, variant);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.setHeader('Content-Length', pdfBuffer.length);

@@ -1860,6 +1860,9 @@ model directory_presence_seeds {
   nap_verified_at                  DateTime?                          @db.Timestamptz(6)
   nap_owner_corrected              Boolean                            @default(false)
   name_variants                    String[]                           @default([])
+  owner_verified_at                DateTime?                          @db.Timestamptz(6)
+  owner_verification               Json?
+  owner_proposed_categories        Json                               @default("[]")
   directory_claim_requests         directory_claim_requests[]
   directory_claim_tokens           directory_claim_tokens[]
   directory_enrichment_tokens      directory_enrichment_tokens[]

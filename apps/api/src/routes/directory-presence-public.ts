@@ -195,6 +195,28 @@ router.post('/submissions/verify', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Owner claim-time verification payload (migration 274). The claim page
+ * requires the owner to confirm categories + attributes before the claim can
+ * be initiated — confirmation is a contract of consent minted on the seed.
+ * Category labels outside the platform/vocab set are held for operator
+ * acceptance (owner_proposed_categories), never written straight through.
+ */
+const ownerVerificationSchema = z.object({
+  primaryCategory: z.string().min(1).max(100),
+  secondaryCategories: z.array(z.string().min(1).max(100)).max(20),
+  proposedCategories: z.array(z.string().min(1).max(100)).max(20).optional(),
+  attributes: z
+    .array(
+      z.object({
+        key: z.string().max(64).optional(),
+        label: z.string().min(1).max(100),
+      }),
+    )
+    .max(60),
+  confirmed: z.literal(true),
+});
+
 /** POST /api/public/directory/claim/:token/initiate — initiate claim (sends OTP if required) */
 router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async (req: Request, res: Response) => {
   try {
@@ -259,6 +281,20 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     const customerEmail = customer?.email || platformUser?.email || body.customerEmail || headerCustomerEmail || undefined;
     const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
 
+    // Claim-time owner verification (migration 274). Absent on OTP resends —
+    // the service only requires it while the seed has no owner_verified_at.
+    let verification: any;
+    if (body.verification !== undefined) {
+      const parsedVerification = ownerVerificationSchema.safeParse(body.verification);
+      if (!parsedVerification.success) {
+        return res.status(400).json({
+          error: 'invalid_verification',
+          issues: parsedVerification.error.flatten().fieldErrors,
+        });
+      }
+      verification = parsedVerification.data;
+    }
+
     const result = await DirectoryClaimService.initiateClaim(token, {
       actorType: 'customer',
       actorId,
@@ -271,15 +307,20 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
       claimantLastName,
       claimantPhone,
       claimantBusinessAddress,
-    } as any);
+    } as any, verification);
 
     if (result.error) {
       const statusMap: Record<string, number> = {
         invalid_token: 404,
         token_expired: 410,
         already_claimed: 409,
+        verification_required: 400,
+        verification_not_confirmed: 400,
       };
-      return res.status(statusMap[result.error] || 400).json({ error: result.error });
+      return res.status(statusMap[result.error] || 400).json({
+        error: result.error,
+        ownerVerificationRequired: result.ownerVerificationRequired || undefined,
+      });
     }
 
     res.json({
@@ -288,6 +329,7 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
       sentTo: result.sentTo,
       operatorApprovalRequired: result.operatorApprovalRequired,
       requestId: result.requestId,
+      proposedCategories: result.proposedCategories,
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/claim/:token/initiate] Error:', undefined, {
@@ -616,6 +658,28 @@ router.get('/category-vocab', async (_req: Request, res: Response) => {
     res.json({ success: true, categories });
   } catch (error) {
     logger.error('[GET /api/public/directory/category-vocab] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/public/directory/attribute-definitions?category=<name>
+ *
+ * Public read of the predefined attribute chips (migration 268). The claim
+ * page's owner-verify step offers these as suggested attributes so the owner
+ * doesn't have to type free-form labels. Read-only projection — the
+ * admin-side CRUD stays behind requirePlatformStaff/Admin.
+ */
+router.get('/attribute-definitions', async (req: Request, res: Response) => {
+  try {
+    const category = (req.query.category as string | undefined)?.trim() || null;
+    const definitions = await DirectoryPresenceSeedService.listAttributeDefinitions(category);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ success: true, definitions });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/attribute-definitions] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

@@ -9,8 +9,13 @@
  *     PostalMailerPdfService).
  *
  * The QR encodes the *tracked redirect URL*, not the claim page URL directly,
- * so that scans are recorded in `qr_scan_events` with surface='claim_invite'
- * before the merchant lands on the claim page.
+ * so that scans are recorded in `qr_scan_events` before the merchant lands on
+ * the claim page. Three URL variants exist so delivery channel stays separable:
+ *   - mail   → `/api/public/qr/claim/{token}`         (surface='claim_invite')
+ *   - walkin → `/api/public/qr/claim/{token}/walkin`  (surface='claim_invite_walkin')
+ *   - social → `/api/public/qr/claim/{token}/social`  (surface='claim_invite_social')
+ * The social variant is a tracked link for DM/social sharing — remote
+ * prospects where a walk-in isn't possible.
  *
  * Spec: docs/LocalBiz/seed_funnel_benchmark_gates_sprint_plan.md §4 W10
  */
@@ -25,10 +30,14 @@ const API_BASE_URL =
 
 const DEFAULT_QR_SIZE = 512;
 
+export type ClaimInviteQrVariant = 'mail' | 'walkin' | 'social';
+
 export interface ClaimInviteQrKit {
   seedId: string;
   token: string;
   qrUrl: string;
+  qrUrlWalkin: string;
+  qrUrlSocial: string;
   claimUrl: string;
   businessName: string;
   addressLines: string[];
@@ -83,6 +92,8 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   const row = rows[0];
   const token = row.token;
   const qrUrl = `${API_BASE_URL}/api/public/qr/claim/${token}`;
+  const qrUrlWalkin = `${qrUrl}/walkin`;
+  const qrUrlSocial = `${qrUrl}/social`;
   const claimUrl = `${API_BASE_URL.replace(/\/api$/, '')}/place/claim/${token}`;
 
   const addressLines: string[] = [];
@@ -96,6 +107,8 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
     seedId,
     token,
     qrUrl,
+    qrUrlWalkin,
+    qrUrlSocial,
     claimUrl,
     businessName: row.business_name || 'Business Owner',
     addressLines,
@@ -103,14 +116,32 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   };
 }
 
+/** Pick the tracked URL for a delivery variant. */
+function kitUrlForVariant(kit: ClaimInviteQrKit, variant: ClaimInviteQrVariant): string {
+  if (variant === 'walkin') return kit.qrUrlWalkin;
+  if (variant === 'social') return kit.qrUrlSocial;
+  return kit.qrUrl;
+}
+
+/** Badge label printed on the postcard so print runs stay separable. */
+function badgeForVariant(variant: ClaimInviteQrVariant): string {
+  if (variant === 'walkin') return 'Claim Invite — Walk-in';
+  if (variant === 'social') return 'Claim Invite — Social';
+  return 'Claim Invite';
+}
+
 /**
  * Generate a PNG QR code for the claim invite.
  */
-export async function generateClaimInvitePng(seedId: string): Promise<GeneratedQrPng> {
+export async function generateClaimInvitePng(
+  seedId: string,
+  variant: ClaimInviteQrVariant = 'mail',
+): Promise<GeneratedQrPng> {
   const kit = await resolveClaimInviteKit(seedId);
   if (!kit) throw new Error('no_active_claim_token');
 
-  const pngBuffer = await QRCode.toBuffer(kit.qrUrl, {
+  const qrUrl = kitUrlForVariant(kit, variant);
+  const pngBuffer = await QRCode.toBuffer(qrUrl, {
     width: DEFAULT_QR_SIZE,
     margin: 2,
     errorCorrectionLevel: 'H',
@@ -118,18 +149,23 @@ export async function generateClaimInvitePng(seedId: string): Promise<GeneratedQ
   });
 
   const safeName = kit.businessName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-  const filename = `claim-qr-${safeName}.png`;
+  const filename = `claim-qr-${safeName}${variant === 'mail' ? '' : `-${variant}`}.png`;
 
-  logger.info('ClaimInviteQrKitService.generateClaimInvitePng', undefined, { seedId, qrUrl: kit.qrUrl });
+  logger.info('ClaimInviteQrKitService.generateClaimInvitePng', undefined, { seedId, qrUrl, variant });
   return { pngBuffer, filename };
 }
 
 /**
  * Generate a 4x6" postcard PDF with the claim-invite QR code.
  */
-export async function generateClaimInvitePostcard(seedId: string): Promise<GeneratedClaimPostcard> {
+export async function generateClaimInvitePostcard(
+  seedId: string,
+  variant: ClaimInviteQrVariant = 'mail',
+): Promise<GeneratedClaimPostcard> {
   const kit = await resolveClaimInviteKit(seedId);
   if (!kit) throw new Error('no_active_claim_token');
+
+  const qrUrl = kitUrlForVariant(kit, variant);
 
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'in', format: [4, 6] });
@@ -187,7 +223,7 @@ export async function generateClaimInvitePostcard(seedId: string): Promise<Gener
   // ── QR code ───────────────────────────────────────────────────────────
   const qrSize = 1.4;
   const qrX = (pageWidth - qrSize) / 2;
-  const qrDataUrl = await QRCode.toDataURL(kit.qrUrl, {
+  const qrDataUrl = await QRCode.toDataURL(qrUrl, {
     width: 400,
     margin: 1,
     errorCorrectionLevel: 'H',
@@ -224,16 +260,18 @@ export async function generateClaimInvitePostcard(seedId: string): Promise<Gener
   }
 
   // ── Claim-invite badge (top right, subtle) ────────────────────────────
+  // Labels the delivery channel so an operator printing both variants can
+  // tell the mail postcard from the walk-in leave-behind at a glance.
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text('Claim Invite', pageWidth - margin, margin + 0.05, { align: 'right' });
+  doc.text(badgeForVariant(variant), pageWidth - margin, margin + 0.05, { align: 'right' });
 
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
   const safeName = kit.businessName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-  const filename = `claim-postcard-${safeName}.pdf`;
+  const filename = `claim-postcard-${safeName}${variant === 'mail' ? '' : `-${variant}`}.pdf`;
 
-  logger.info('ClaimInviteQrKitService.generateClaimInvitePostcard', undefined, { seedId, qrUrl: kit.qrUrl });
+  logger.info('ClaimInviteQrKitService.generateClaimInvitePostcard', undefined, { seedId, qrUrl, variant });
   return { pdfBuffer, filename };
 }
 

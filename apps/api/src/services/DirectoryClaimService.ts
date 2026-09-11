@@ -23,6 +23,7 @@ import bcrypt from 'bcryptjs';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
 import { buildTenantUpgradeOptions, UpgradeOptionsPayload } from './DirectoryPresenceUpgradeOptionsService';
+import { slugifyAttributeKey, type DirectoryListingAttribute } from './directory/listingAttributes';
 
 /** Audit context for claim operations */
 interface ClaimAuditCtx {
@@ -69,10 +70,54 @@ export interface ClaimTokenSummary {
   snapEbtAsOf: Date | null;
   snapEbtSource: string | null;
   snapEbtSourceName: string | null;
+  /** Sourced attribute chips on the listing (migration 267) — shown on the
+   *  claim page's verify step so the owner can accept or reject each one. */
+  attributes: DirectoryListingAttribute[];
+  /** Stamp of the owner's claim-time consent (migration 274). */
+  ownerVerifiedAt: Date | null;
+  /** Owner-typed category labels awaiting operator acceptance (abuse gate —
+   *  only 'pending' entries are surfaced to the claim page). */
+  ownerProposedCategories: OwnerProposedCategory[];
   isExpired: boolean;
   isConsumed: boolean;
   expiresAt: Date;
   consumedAt: Date | null;
+}
+
+/** An owner-typed category label held for operator acceptance (migration 274). */
+export interface OwnerProposedCategory {
+  label: string;
+  role: 'primary' | 'secondary';
+  status: 'pending' | 'accepted' | 'rejected';
+  proposedAt: string;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+}
+
+/**
+ * Claim-time verification payload (migration 274). The claim page requires
+ * the owner to confirm categories + attributes before submit — the
+ * confirmation is a contract of consent minted on the seed.
+ *
+ * Categories the owner types that are NOT in the platform/vocab set are
+ * held as owner_proposed_categories (operator acceptance required) rather
+ * than written to the listing — this is the abuse gate.
+ */
+export interface OwnerClaimVerification {
+  /** Owner-confirmed primary category (must be a known vocab/platform label). */
+  primaryCategory: string;
+  /** Owner-accepted secondary labels. Unknown labels are diverted to
+   *  owner_proposed_categories instead of the listing. */
+  secondaryCategories: string[];
+  /** Owner-typed new labels (role: secondary). Belt-and-suspenders alongside
+   *  server-side vocab validation — anything not in vocab lands here. */
+  proposedCategories?: string[];
+  /** Final desired attribute set — owner is authoritative. Sourced chips the
+   *  owner left off are removed; entries not previously on the listing are
+   *  minted with sourcePlatform 'owner_confirmed'. */
+  attributes: Array<{ key?: string; label: string }>;
+  /** Explicit consent flag — must be true. */
+  confirmed: boolean;
 }
 
 export interface ClaimResult {
@@ -97,6 +142,14 @@ export interface InitiateClaimResult {
   sentTo?: string;
   operatorApprovalRequired?: boolean;
   requestId?: string;
+  /** True when the claim cannot proceed because the owner has not yet
+   *  submitted the required business-info verification (categories +
+   *  attributes consent gate, migration 274). */
+  ownerVerificationRequired?: boolean;
+  /** Labels diverted to operator review (owner-typed categories not in the
+   *  platform/vocab set). Returned so the UI can tell the owner these are
+   *  pending rather than live. */
+  proposedCategories?: string[];
   error?: string;
 }
 
@@ -132,7 +185,10 @@ class DirectoryClaimService {
         dl.snap_ebt_reported,
         dl.snap_ebt_as_of,
         dl.snap_ebt_source,
-        dl.snap_ebt_source_name
+        dl.snap_ebt_source_name,
+        dl.attributes,
+        dps.owner_verified_at,
+        dps.owner_proposed_categories
       FROM directory_claim_tokens dct
       JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
@@ -169,6 +225,18 @@ class DirectoryClaimService {
       snapEbtAsOf: r.snap_ebt_as_of ? new Date(r.snap_ebt_as_of) : null,
       snapEbtSource: r.snap_ebt_source,
       snapEbtSourceName: r.snap_ebt_source_name,
+      attributes: Array.isArray(r.attributes) ? r.attributes : [],
+      ownerVerifiedAt: r.owner_verified_at ? new Date(r.owner_verified_at) : null,
+      ownerProposedCategories: (Array.isArray(r.owner_proposed_categories) ? r.owner_proposed_categories : [])
+        .map((p: any) => ({
+          label: String(p?.label ?? ''),
+          role: p?.role === 'primary' ? 'primary' : 'secondary',
+          status: ['pending', 'accepted', 'rejected'].includes(p?.status) ? p.status : 'pending',
+          proposedAt: p?.proposed_at ?? null,
+          decidedAt: p?.decided_at ?? null,
+          decidedBy: p?.decided_by ?? null,
+        }))
+        .filter((p: OwnerProposedCategory) => p.label && p.status === 'pending'),
       isExpired: now > expiresAt,
       isConsumed: !!r.consumed_at,
       expiresAt,
@@ -188,6 +256,7 @@ class DirectoryClaimService {
   async initiateClaim(
     token: string,
     ctx?: ClaimAuditCtx,
+    verification?: OwnerClaimVerification,
   ): Promise<InitiateClaimResult> {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
@@ -201,7 +270,9 @@ class DirectoryClaimService {
         dct.single_use,
         dps.status AS seed_status,
         dps.id AS seed_id,
-        dps.tenant_id
+        dps.tenant_id,
+        dps.listing_id,
+        dps.owner_verified_at
       FROM directory_claim_tokens dct
       JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
       WHERE dct.token = ${token}
@@ -224,6 +295,30 @@ class DirectoryClaimService {
     }
     if (r.seed_status === 'claimed') {
       return { verificationRequired: false, error: 'already_claimed' };
+    }
+
+    // ── Owner verification consent gate (migration 274) ────────────────
+    // The owner must confirm categories + attributes before the claim can
+    // be initiated. Once minted (owner_verified_at set) the gate is
+    // satisfied — OTP resends and repeat initiates pass through without a
+    // fresh payload.
+    let proposedCategories: string[] | undefined;
+    if (!r.owner_verified_at) {
+      if (!verification) {
+        return {
+          verificationRequired: false,
+          ownerVerificationRequired: true,
+          error: 'verification_required',
+        };
+      }
+      if (!verification.confirmed) {
+        return { verificationRequired: false, error: 'verification_not_confirmed' };
+      }
+      const applied = await this.applyOwnerVerification(r, verification, ctx);
+      if (applied.error) {
+        return { verificationRequired: false, error: applied.error };
+      }
+      proposedCategories = applied.proposed;
     }
 
     // If verification required, generate + send OTP
@@ -295,6 +390,7 @@ class DirectoryClaimService {
       return {
         verificationRequired: true,
         sentTo: this.maskTarget(deliveryTarget),
+        proposedCategories,
       };
     }
 
@@ -429,11 +525,319 @@ Review at Settings → Directory → Presence Seeds.`,
         verificationRequired: false,
         operatorApprovalRequired: true,
         requestId,
+        proposedCategories,
       };
     }
 
     // No verification, no approval — direct claim
-    return { verificationRequired: false };
+    return { verificationRequired: false, proposedCategories };
+  }
+
+  /**
+   * Mint the owner's claim-time verification (migration 274).
+   *
+   * Called from initiateClaim before the OTP / operator-approval branching so
+   * the mint happens at the moment of consent and is identical for every
+   * claim path. Writes:
+   *   - directory_listings_list primary_category / secondary_categories /
+   *     attributes via DirectoryPresenceSeedService.updateFields
+   *   - directory_settings_list category columns (keeps the tenant's
+   *     directory options page in sync, same as publishSeed)
+   *   - directory_field_provenance rows (primary_category,
+   *     secondary_categories, attributes) with source_name='owner_claim',
+   *     confidence 'high', show_on_public — the consent-of-record
+   *   - directory_presence_seeds owner_verified_at + owner_verification
+   *     (consent snapshot) + category_fit='verified'
+   *
+   * Abuse gate: labels the owner typed that are not in the known category
+   * set (platform_categories ∪ mkt_service_categories_list, case-insensitive)
+   * are NOT written to the listing. They are appended to
+   * owner_proposed_categories with status 'pending' and surfaced to operators
+   * via a platform CRM alert — acceptance happens on the seed detail page.
+   */
+  private async applyOwnerVerification(
+    claim: { seed_id: string; tenant_id: string; listing_id: string },
+    verification: OwnerClaimVerification,
+    ctx?: ClaimAuditCtx,
+  ): Promise<{ error?: string; proposed?: string[] }> {
+    const { seed_id: seedId, tenant_id: tenantId, listing_id: listingId } = claim;
+
+    const listingRows = await prisma.$queryRaw<any[]>`
+      SELECT primary_category, secondary_categories, attributes, business_name
+      FROM directory_listings_list WHERE id = ${listingId} LIMIT 1
+    `;
+    const listing = listingRows[0] || {};
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT owner_proposed_categories FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    const existingProposals: any[] = Array.isArray(seedRows[0]?.owner_proposed_categories)
+      ? seedRows[0].owner_proposed_categories
+      : [];
+
+    // ── Known category set: platform_categories ∪ active vocab labels ──
+    const knownRows = await prisma.$queryRaw<any[]>`
+      SELECT LOWER(name) AS label FROM platform_categories WHERE name IS NOT NULL
+      UNION
+      SELECT LOWER(label) AS label FROM mkt_service_categories_list WHERE is_active = true
+    `;
+    const known = new Set<string>(knownRows.map((k) => String(k.label)));
+    const isKnown = (label: string) => known.has(label.trim().toLowerCase());
+
+    // ── Categories: mint known labels, divert unknown to proposals ──────
+    const nowIso = new Date().toISOString();
+    const proposals: OwnerProposedCategory[] = existingProposals.map((p: any) => ({
+      label: String(p?.label ?? ''),
+      role: p?.role === 'primary' ? 'primary' : 'secondary',
+      status: ['pending', 'accepted', 'rejected'].includes(p?.status) ? p.status : 'pending',
+      proposedAt: p?.proposed_at ?? nowIso,
+      decidedAt: p?.decided_at ?? null,
+      decidedBy: p?.decided_by ?? null,
+    }));
+    const proposalKeys = new Set(proposals.map((p) => p.label.trim().toLowerCase()));
+    const newProposals: OwnerProposedCategory[] = [];
+    const addProposal = (label: string, role: 'primary' | 'secondary') => {
+      const trimmed = label.trim().slice(0, 100);
+      if (!trimmed || isKnown(trimmed)) return;
+      const key = trimmed.toLowerCase();
+      if (proposalKeys.has(key)) return;
+      proposalKeys.add(key);
+      const entry: OwnerProposedCategory = {
+        label: trimmed,
+        role,
+        status: 'pending',
+        proposedAt: nowIso,
+      };
+      proposals.push(entry);
+      newProposals.push(entry);
+    };
+
+    const submittedPrimary = (verification.primaryCategory || '').trim().slice(0, 100);
+    let mintedPrimary: string | null = listing.primary_category ?? null;
+    if (submittedPrimary) {
+      if (isKnown(submittedPrimary)) {
+        mintedPrimary = submittedPrimary;
+      } else {
+        // Unknown primary — keep the current primary live, hold the owner's
+        // suggestion for operator acceptance (role 'primary').
+        addProposal(submittedPrimary, 'primary');
+      }
+    }
+
+    const primaryLower = (mintedPrimary || '').trim().toLowerCase();
+    const acceptedSecondary: string[] = [];
+    const seenSecondary = new Set<string>();
+    for (const raw of verification.secondaryCategories || []) {
+      const label = String(raw ?? '').trim().slice(0, 100);
+      if (!label) continue;
+      const key = label.toLowerCase();
+      if (key === primaryLower || seenSecondary.has(key)) continue;
+      seenSecondary.add(key);
+      if (isKnown(label)) acceptedSecondary.push(label);
+      else addProposal(label, 'secondary');
+    }
+    // Client-flagged proposals go through the same gate (deduped above).
+    for (const raw of verification.proposedCategories || []) {
+      addProposal(String(raw ?? ''), 'secondary');
+    }
+
+    // ── Attributes: owner-authoritative final set ──────────────────────
+    // Submitted entries win; sourced chips the owner left off are dropped.
+    // Confirmed sourced entries keep their evidence and gain an
+    // owner_confirmed marker; owner-added entries mint with
+    // sourcePlatform 'owner_confirmed'.
+    const currentAttrs: DirectoryListingAttribute[] = Array.isArray(listing.attributes)
+      ? listing.attributes
+      : [];
+    const currentByKey = new Map<string, DirectoryListingAttribute>(
+      currentAttrs
+        .map((a) => [String(a?.key ?? '').trim().toLowerCase(), a] as const)
+        .filter(([k]) => k),
+    );
+    const today = nowIso.slice(0, 10);
+    const mintedAttrs: DirectoryListingAttribute[] = [];
+    const confirmedAttrKeys: string[] = [];
+    const addedAttrKeys: string[] = [];
+    const submittedKeys = new Set<string>();
+    for (const raw of verification.attributes || []) {
+      const label = String(raw?.label ?? '').trim().slice(0, 100);
+      if (!label) continue;
+      const key = (String(raw?.key ?? '').trim().toLowerCase() || slugifyAttributeKey(label)).slice(0, 64);
+      if (!key || submittedKeys.has(key)) continue;
+      // SNAP/EBT keeps its dedicated columns + stricter contract (migration
+      // 207) — never mint it as a generic attribute.
+      if (key.includes('snap') || key.includes('ebt')) continue;
+      submittedKeys.add(key);
+      const existing = currentByKey.get(key);
+      if (existing) {
+        mintedAttrs.push({ ...existing, ownerConfirmed: true } as DirectoryListingAttribute);
+        confirmedAttrKeys.push(key);
+      } else {
+        mintedAttrs.push({
+          key,
+          label,
+          sourcePlatform: 'owner_confirmed',
+          asOf: today,
+          ownerConfirmed: true,
+        } as DirectoryListingAttribute);
+        addedAttrKeys.push(key);
+      }
+    }
+    const rejectedAttrKeys = [...currentByKey.keys()].filter((k) => !submittedKeys.has(k));
+
+    // ── Persist: listing + settings + provenance ───────────────────────
+    const { default: seedService } = await import('./DirectoryPresenceSeedService');
+    const provenance = [
+      { fieldKey: 'primary_category', value: mintedPrimary ?? '' },
+      { fieldKey: 'secondary_categories', value: acceptedSecondary.join(', ') },
+      { fieldKey: 'attributes', value: 'owner_confirmed' },
+    ].map((p) => ({
+      ...p,
+      sourceName: 'owner_claim',
+      confidence: 'high' as const,
+      showOnPublic: true,
+      accessedAt: new Date(),
+    }));
+    await seedService.updateFields(
+      seedId,
+      {
+        primaryCategory: mintedPrimary,
+        secondaryCategories: acceptedSecondary,
+        attributes: mintedAttrs,
+      },
+      provenance,
+      { actorType: ctx?.actorType, actorId: ctx?.actorId, ip: ctx?.ip, userAgent: ctx?.userAgent },
+    );
+
+    // Keep the tenant's directory settings row in sync (the post-claim
+    // directory options page reads this table — same sync publishSeed does).
+    await prisma.$executeRaw`
+      INSERT INTO directory_settings_list (
+        id, tenant_id, is_published, primary_category, secondary_categories, updated_at
+      ) VALUES (
+        ${tenantId}, ${tenantId}, false,
+        ${mintedPrimary}, ${acceptedSecondary}::text[], now()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        primary_category = EXCLUDED.primary_category,
+        secondary_categories = EXCLUDED.secondary_categories,
+        updated_at = now()
+    `;
+
+    // ── Consent-of-record on the seed ──────────────────────────────────
+    const verificationRecord = {
+      version: 'owner_claim_v1',
+      confirmedAt: nowIso,
+      confirmedBy: ctx?.actorId ?? null,
+      primaryCategory: mintedPrimary,
+      secondaryCategories: acceptedSecondary,
+      proposedCategories: newProposals.map((p) => ({ label: p.label, role: p.role })),
+      attributes: {
+        confirmed: confirmedAttrKeys,
+        added: addedAttrKeys,
+        rejected: rejectedAttrKeys,
+      },
+    };
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET owner_verified_at = now(),
+          owner_verification = ${JSON.stringify(verificationRecord)}::jsonb,
+          owner_proposed_categories = ${JSON.stringify(proposals)}::jsonb,
+          category_fit = 'verified',
+          updated_at = now()
+      WHERE id = ${seedId}
+    `;
+
+    // Surface pending proposals to operators — the claim itself may be
+    // OTP-verified (no human in the loop), so proposals need their own
+    // review surface.
+    if (newProposals.length > 0) {
+      const names = newProposals.map((p) => p.label).join(', ');
+      try {
+        const { generateCrmAlertId } = await import('../lib/id-generator.js');
+        await prisma.$executeRaw`
+          INSERT INTO crm_alerts (
+            id, tenant_id, type, title, body, icon, is_read, is_dismissed, metadata, created_at
+          ) VALUES (
+            ${generateCrmAlertId(PLATFORM_SCOPE)},
+            ${PLATFORM_SCOPE},
+            'directory_category_proposal',
+            'Owner-proposed categories need review',
+            ${`A business owner proposed new categories while claiming their listing.\n\nProposed: ${names}\n\nReview and accept/reject at Settings → Directory → Presence Seeds.`},
+            'tag',
+            false,
+            false,
+            ${JSON.stringify({ seedId, tenantId, proposals: newProposals.map((p) => p.label) })}::jsonb,
+            now()
+          )
+        `;
+      } catch (alertErr) {
+        logger.error('DirectoryClaimService.applyOwnerVerification — CRM alert insert failed', undefined, {
+          error: (alertErr as Error).message,
+        });
+      }
+
+      // Also file a CRM support ticket so the proposals land in the
+      // operator's Requests Hub (Settings → Admin → CRM → Requests) — the
+      // same inbox pattern the claim-request path uses. crm_alerts alone
+      // only feeds the customer-facing marketing feed, not an operator
+      // work queue.
+      try {
+        const businessName = listing.business_name || 'Unknown Business';
+        const ticket = await CrmTicketService.getInstance().create({
+          tenant_id: PLATFORM_SCOPE,
+          title: `Owner-proposed categories need review: ${businessName}`,
+          description: `A business owner proposed new categories while claiming their directory listing.
+
+Business: ${businessName}
+Seed ID: ${seedId}
+Tenant ID: ${tenantId}
+Proposed: ${names}
+
+Accept or reject each proposal at the seed's Owner Verification section.`,
+          priority: 'medium',
+          category: 'directory_claim',
+          inquiry_id: seedId,
+        });
+
+        await CrmTicketMessageService.getInstance().create({
+          ticket_id: ticket.id,
+          author_id: 'system',
+          author_type: 'platform',
+          author_name: 'Directory Claims',
+          content_blocks: {
+            version: '1',
+            blocks: [
+              { type: 'paragraph', text: `Owner-proposed categories awaiting review for ${businessName}: ${names}.` },
+              { type: 'paragraph', text: `Seed: ${seedId} · Tenant: ${tenantId}` },
+              { type: 'button', label: 'Review proposals on the seed', url: `/settings/admin/directory/presence-seeds/${seedId}`, variant: 'primary' },
+            ],
+          },
+        });
+      } catch (ticketErr) {
+        logger.error('DirectoryClaimService.applyOwnerVerification — CRM ticket create failed', undefined, {
+          error: (ticketErr as Error).message,
+        });
+        // Non-fatal — proposals are persisted on the seed regardless
+      }
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_claim.owner_verification',
+      payload: {
+        seedId,
+        tenantId,
+        primaryCategory: mintedPrimary,
+        secondaryCategories: acceptedSecondary,
+        proposedCount: newProposals.length,
+        attributesConfirmed: confirmedAttrKeys.length,
+        attributesAdded: addedAttrKeys.length,
+        attributesRejected: rejectedAttrKeys.length,
+      },
+    });
+
+    return { proposed: newProposals.map((p) => p.label) };
   }
 
   /**

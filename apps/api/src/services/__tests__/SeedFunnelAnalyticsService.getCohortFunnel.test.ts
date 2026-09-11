@@ -60,6 +60,9 @@ const perCampaignRow = {
   w4_count: 2n,
   touches: 12n,
   invite_scans: 5n,
+  invite_scans_mail: 3n,
+  invite_scans_walkin: 1n,
+  invite_scans_social: 1n,
 };
 
 const combinedRow = {
@@ -88,6 +91,9 @@ const combinedRow = {
   w4_count: 3n,
   touches: 20n,
   invite_scans: 8n,
+  invite_scans_mail: 5n,
+  invite_scans_walkin: 2n,
+  invite_scans_social: 1n,
 };
 
 const categoryRow = {
@@ -116,6 +122,9 @@ const categoryRow = {
   w4_count: 3n,
   touches: 20n,
   invite_scans: 8n,
+  invite_scans_mail: 5n,
+  invite_scans_walkin: 2n,
+  invite_scans_social: 1n,
 };
 
 const medianRow = { median_days: 5.25 };
@@ -239,9 +248,20 @@ describe('getCohortFunnel — SQL path', () => {
     expect(cohort.metrics.inviteScans).toBe(5);
     expect(cohort.metrics.inviteScanRate).toBeCloseTo(0.2778, 4);
 
+    // Per-channel split: 3 mail + 1 walkin + 1 social = 5 total
+    expect(cohort.metrics.inviteScansMail).toBe(3);
+    expect(cohort.metrics.inviteScansWalkin).toBe(1);
+    expect(cohort.metrics.inviteScansSocial).toBe(1);
+    expect(cohort.metrics.inviteScanRateMail).toBeCloseTo(0.1667, 4);
+    expect(cohort.metrics.inviteScanRateWalkin).toBeCloseTo(0.0556, 4);
+    expect(cohort.metrics.inviteScanRateSocial).toBeCloseTo(0.0556, 4);
+
     // Combined: 8 scans / 30 invited
     expect(report.combined.metrics.inviteScans).toBe(8);
     expect(report.combined.metrics.inviteScanRate).toBeCloseTo(0.2667, 4);
+    expect(report.combined.metrics.inviteScansMail).toBe(5);
+    expect(report.combined.metrics.inviteScansWalkin).toBe(2);
+    expect(report.combined.metrics.inviteScansSocial).toBe(1);
 
     // Zero invited → null rate (no divide-by-zero)
     queueQueries({
@@ -357,7 +377,7 @@ describe('getCohortFunnel — SQL path', () => {
 });
 
 
-describe('getCohortFunnel � dedup verdict exclusion (Migration 262)', () => {
+describe('getCohortFunnel � dedup verdict exclusion (Migration 262)', () => {
   it('excludes a surfaced group whose verdict was recorded (identity ledger)', async () => {
     queueQueries({
       verdicts: [{ seed_ids: ['seed-a', 'seed-b'], match_key: 'phone' }],

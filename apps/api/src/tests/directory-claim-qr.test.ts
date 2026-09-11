@@ -7,6 +7,7 @@
  *  3. Scan tracking failure → still 302 redirects (best-effort, never blocks claim)
  *  4. Redirect target uses the secret `token` string, not the row `id`
  *  5. Token lookup queries by `t.token`, not `t.id`
+ *  6. Walk-in variant URL → records scan with surface='claim_invite_walkin'
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express, { Request, Response } from 'express';
@@ -91,6 +92,41 @@ describe('GET /api/public/qr/claim/:token — claim-invite QR redirect (W10)', (
 
     expect(res.headers.location).toContain('/place/claim/no-such-token');
     expect(mockTrackQrScanEvent.mock.calls[0][0].tenantId).toBe('platform');
+  });
+
+  it('records a claim_invite_walkin scan event on the walk-in URL and 302-redirects', async () => {
+    mockQueryRaw.mockResolvedValueOnce([{ tenant_id: 'tenant-xyz' }]);
+
+    const res = await request(app).get(`/api/public/qr/claim/${SECRET_TOKEN}/walkin`).expect(302);
+
+    expect(res.headers.location).toContain(`/place/claim/${SECRET_TOKEN}`);
+    const scanInput = mockTrackQrScanEvent.mock.calls[0][0];
+    expect(scanInput.surface).toBe('claim_invite_walkin');
+    expect(scanInput.consumer).toBe('merchant');
+    expect(scanInput.tenantId).toBe('tenant-xyz');
+  });
+
+  it('records a claim_invite_social scan event on the social URL and 302-redirects', async () => {
+    mockQueryRaw.mockResolvedValueOnce([{ tenant_id: 'tenant-xyz' }]);
+
+    const res = await request(app).get(`/api/public/qr/claim/${SECRET_TOKEN}/social`).expect(302);
+
+    expect(res.headers.location).toContain(`/place/claim/${SECRET_TOKEN}`);
+    const scanInput = mockTrackQrScanEvent.mock.calls[0][0];
+    expect(scanInput.surface).toBe('claim_invite_social');
+    expect(scanInput.consumer).toBe('merchant');
+    expect(scanInput.tenantId).toBe('tenant-xyz');
+  });
+
+  it('keeps mail and walk-in scans on separate surfaces for channel attribution', async () => {
+    mockQueryRaw.mockResolvedValue([{ tenant_id: 'tenant-xyz' }]);
+
+    await request(app).get(`/api/public/qr/claim/${SECRET_TOKEN}`);
+    await request(app).get(`/api/public/qr/claim/${SECRET_TOKEN}/walkin`);
+
+    expect(mockTrackQrScanEvent).toHaveBeenCalledTimes(2);
+    expect(mockTrackQrScanEvent.mock.calls[0][0].surface).toBe('claim_invite');
+    expect(mockTrackQrScanEvent.mock.calls[1][0].surface).toBe('claim_invite_walkin');
   });
 
   it('still 302-redirects when scan tracking itself throws (best-effort, never blocks claim)', async () => {

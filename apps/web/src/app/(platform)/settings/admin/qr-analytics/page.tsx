@@ -28,6 +28,9 @@ const SURFACE_OPTIONS: { value: string; label: string }[] = [
   { value: 'promo', label: 'Promo' },
   { value: 'private_grant', label: 'Private Grant' },
   { value: 'general', label: 'General' },
+  { value: 'claim_invite', label: 'Claim Invite (Mail)' },
+  { value: 'claim_invite_walkin', label: 'Claim Invite (Walk-in)' },
+  { value: 'claim_invite_social', label: 'Claim Invite (Social/DM)' },
 ];
 
 export default function AdminQrAnalyticsPage() {

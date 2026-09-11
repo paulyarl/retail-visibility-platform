@@ -815,6 +815,16 @@ export default function DirectoryPresenceSeedsPage() {
                       {seed.businessName}
                     </Link>
                     <div className="text-xs text-gray-500">{seed.seedBatch}</div>
+                    {(seed.pendingOwnerProposals ?? 0) > 0 && (
+                      <Link
+                        href={`/settings/admin/directory/presence-seeds/${seed.id}`}
+                        className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100"
+                        title="Owner-proposed categories awaiting review"
+                      >
+                        <Tag className="w-3 h-3" />
+                        {seed.pendingOwnerProposals} categor{seed.pendingOwnerProposals === 1 ? 'y' : 'ies'} pending review
+                      </Link>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-gray-700">{seed.category}</td>
                   <td className="py-3 px-4 text-gray-700">

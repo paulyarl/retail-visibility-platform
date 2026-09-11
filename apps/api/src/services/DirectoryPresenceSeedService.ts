@@ -17,6 +17,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
@@ -155,6 +156,9 @@ export interface SeedSummary {
   outreachState?: string;
   outreachStateEnteredAt?: Date | null;
   outreachScheduledAt?: Date | null;
+  /** Count of owner-proposed categories still awaiting operator review
+   *  (migration 274 — abuse gate for owner-typed labels). */
+  pendingOwnerProposals?: number;
 }
 
 class DirectoryPresenceSeedService {
@@ -251,7 +255,8 @@ class DirectoryPresenceSeedService {
         (SELECT dct.expires_at FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL ORDER BY dct.created_at DESC LIMIT 1) AS claim_token_expires_at,
         dps.outreach_state,
         dps.outreach_state_entered_at,
-        dps.outreach_scheduled_at
+        dps.outreach_scheduled_at,
+        dps.owner_proposed_categories
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       ${whereClause}
@@ -283,6 +288,9 @@ class DirectoryPresenceSeedService {
       outreachState: s.outreach_state ?? 'not_started',
       outreachStateEnteredAt: s.outreach_state_entered_at ? new Date(s.outreach_state_entered_at) : null,
       outreachScheduledAt: s.outreach_scheduled_at ? new Date(s.outreach_scheduled_at) : null,
+      pendingOwnerProposals: Array.isArray(s.owner_proposed_categories)
+        ? s.owner_proposed_categories.filter((p: any) => p?.status === 'pending').length
+        : 0,
     }));
   }
 
@@ -981,9 +989,11 @@ class DirectoryPresenceSeedService {
     // Upsert provenance rows
     if (provenanceUpdates) {
       for (const p of provenanceUpdates) {
-        const isOperatorOverride = p.sourceName === 'operator_override';
-        const overrideBy = isOperatorOverride ? (ctx?.actorId || null) : null;
-        const overrideAt = isOperatorOverride ? new Date() : null;
+        // operator_override and owner_claim both record WHO confirmed the
+        // field value — the operator user id or the claiming customer id.
+        const stampsOverride = p.sourceName === 'operator_override' || p.sourceName === 'owner_claim';
+        const overrideBy = stampsOverride ? (ctx?.actorId || null) : null;
+        const overrideAt = stampsOverride ? new Date() : null;
         const provenanceId = generateDirectoryFieldProvenanceId(tenantId);
         await prisma.$executeRaw`
           INSERT INTO directory_field_provenance (
@@ -1076,6 +1086,163 @@ class DirectoryPresenceSeedService {
       prevStatus,
       newStatus,
     });
+  }
+
+  /**
+   * Operator decision on an owner-proposed category (migration 274).
+   *
+   * Owners can type category labels that aren't in the platform/vocab set at
+   * claim time; those are held on owner_proposed_categories with status
+   * 'pending' (abuse gate — nothing flows to the listing or the vocab until
+   * an operator accepts). On 'accepted' the label is registered into
+   * mkt_service_categories_list (same vocab the category-identification act
+   * flow writes) and minted onto the listing — primary_category when the
+   * proposal role is 'primary', otherwise appended to secondary_categories
+   * (deduped, capped at 9 like the selector). On 'rejected' only the
+   * proposal status changes.
+   */
+  async decideProposedCategory(
+    seedId: string,
+    label: string,
+    decision: 'accepted' | 'rejected',
+    ctx?: SeedAuditCtx,
+  ): Promise<{ label: string; role: string; status: string }> {
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT id, tenant_id, listing_id, owner_proposed_categories
+      FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+
+    const proposals: any[] = Array.isArray(seed[0].owner_proposed_categories)
+      ? [...seed[0].owner_proposed_categories]
+      : [];
+    const target = label.trim().toLowerCase();
+    const idx = proposals.findIndex(
+      (p) => String(p?.label ?? '').trim().toLowerCase() === target && p?.status === 'pending',
+    );
+    if (idx === -1) throw new Error('proposal_not_found');
+
+    const proposal = proposals[idx];
+    proposals[idx] = {
+      ...proposal,
+      status: decision,
+      decided_at: new Date().toISOString(),
+      decided_by: ctx?.actorId ?? null,
+    };
+
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET owner_proposed_categories = ${JSON.stringify(proposals)}::jsonb, updated_at = now()
+      WHERE id = ${seedId}
+    `;
+
+    // When the last pending proposal is decided, resolve the Requests-Hub
+    // ticket so the operator inbox reflects the work is done.
+    if (!proposals.some((p) => p?.status === 'pending')) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE crm_support_tickets
+          SET status = 'resolved', resolved_at = now(), updated_at = now()
+          WHERE tenant_id = ${PLATFORM_SCOPE}
+            AND inquiry_id = ${seedId}
+            AND category = 'directory_claim'
+            AND title LIKE 'Owner-proposed categories%'
+            AND status IN ('open', 'in_progress', 'waiting')
+        `;
+      } catch (err) {
+        logger.error('DirectoryPresenceSeedService.decideProposedCategory — ticket resolve failed', undefined, {
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    if (decision === 'accepted') {
+      const acceptedLabel = String(proposal.label).trim().slice(0, 100);
+
+      // Register into the service-category vocab so the accepted label
+      // becomes a known category everywhere (same registration the
+      // category-identification act flow performs).
+      const { default: serviceCategoryService } = await import('./MarketingServiceCategoryService');
+      const vocabValue =
+        acceptedLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || acceptedLabel;
+      await serviceCategoryService.upsertCategory(
+        { value: vocabValue, label: acceptedLabel, isActive: true },
+        ctx as any,
+      );
+
+      const listingRows = await prisma.$queryRaw<any[]>`
+        SELECT primary_category, secondary_categories
+        FROM directory_listings_list WHERE id = ${seed[0].listing_id} LIMIT 1
+      `;
+      const listing = listingRows[0] || {};
+      const currentSecondary: string[] = Array.isArray(listing.secondary_categories)
+        ? listing.secondary_categories
+        : [];
+
+      const fields: { primaryCategory?: string | null; secondaryCategories?: string[] } = {};
+      const provenanceUpdates: Array<{
+        fieldKey: string; value?: string; sourceName?: string;
+        accessedAt?: Date; confidence?: 'high' | 'medium' | 'low'; showOnPublic?: boolean;
+      }> = [];
+
+      if (proposal.role === 'primary') {
+        fields.primaryCategory = acceptedLabel;
+        provenanceUpdates.push({
+          fieldKey: 'primary_category', value: acceptedLabel, sourceName: 'owner_claim',
+          accessedAt: new Date(), confidence: 'high', showOnPublic: true,
+        });
+      } else {
+        const exists = currentSecondary.some(
+          (s) => String(s).trim().toLowerCase() === acceptedLabel.toLowerCase(),
+        );
+        if (!exists && currentSecondary.length < 9) {
+          fields.secondaryCategories = [...currentSecondary, acceptedLabel];
+          provenanceUpdates.push({
+            fieldKey: 'secondary_categories', value: fields.secondaryCategories.join(', '),
+            sourceName: 'owner_claim', accessedAt: new Date(), confidence: 'high', showOnPublic: true,
+          });
+        }
+      }
+
+      if (provenanceUpdates.length > 0) {
+        await this.updateFields(seedId, fields, provenanceUpdates, ctx);
+      }
+
+      // Keep the tenant's directory settings row in sync with the listing.
+      await prisma.$executeRaw`
+        INSERT INTO directory_settings_list (
+          id, tenant_id, is_published, primary_category, secondary_categories, updated_at
+        ) VALUES (
+          ${seed[0].tenant_id}, ${seed[0].tenant_id}, false,
+          ${fields.primaryCategory !== undefined ? fields.primaryCategory : listing.primary_category ?? null},
+          ${(fields.secondaryCategories ?? currentSecondary)}::text[], now()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          primary_category = EXCLUDED.primary_category,
+          secondary_categories = EXCLUDED.secondary_categories,
+          updated_at = now()
+      `;
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.proposed_category_decision',
+      payload: {
+        seedId,
+        tenantId: seed[0].tenant_id,
+        label: proposal.label,
+        role: proposal.role,
+        decision,
+      },
+    });
+    logger.info('DirectoryPresenceSeedService.decideProposedCategory', undefined, {
+      seedId,
+      label: proposal.label,
+      decision,
+    });
+
+    return { label: proposal.label, role: proposal.role, status: decision };
   }
 
   /**
@@ -2169,8 +2336,9 @@ class DirectoryPresenceSeedService {
     seedId: string,
     input: {
       // Migration 262 — 'form' + 'referral' added for the proving-ground
-      // channel ladder (spec §4.8).
-      channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
+      // channel ladder (spec §4.8). Migration 273 — 'visit' added for
+      // same-town walk-in touches (leave-behind QR cards).
+      channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'visit' | 'other';
       // Migration 262 — extended with the full cadence signal set
       // ('no_answer','no_reply','bounce','unread','read_no_reply',
       // 'form_submitted','referral_asked'); 'no_response' remains as the
@@ -2937,6 +3105,15 @@ class DirectoryPresenceSeedService {
       origin: string;
       matchedDefinitionKey: string | null;
     }>;
+    recommendations: Array<{
+      key: string;
+      label: string;
+      platform?: string | null;
+      basis?: string | null;
+      rationale?: string | null;
+      currentState?: string | null;
+      matchedDefinitionKey: string | null;
+    }>;
   }> {
     const seedRows = await prisma.$queryRaw<any[]>`
       SELECT dps.category, dl.attributes
@@ -2945,7 +3122,7 @@ class DirectoryPresenceSeedService {
       WHERE dps.id = ${seedId} LIMIT 1
     `;
     const seedRow = Array.isArray(seedRows) ? seedRows[0] : null;
-    if (!seedRow) return { suggestions: [] };
+    if (!seedRow) return { suggestions: [], recommendations: [] };
 
     const existingKeys = new Set<string>(
       (Array.isArray(seedRow.attributes) ? seedRow.attributes : [])
@@ -3018,7 +3195,48 @@ class DirectoryPresenceSeedService {
       if (out.length >= 40) break;
     }
 
-    return { suggestions: out };
+    // Advisory recommendations — business_analysis audits may emit a
+    // top-level recommended_attributes array. These are NOT sourced
+    // observations: no evidence URL, no as_of. They surface as a separate
+    // group so the operator can see "the audit thinks this chip is worth
+    // enabling/verifying" without it being confused with sourced chips.
+    // Deduped against the listing AND against observed suggestions.
+    const recByKey = new Map<string, any>();
+    for (const audit of Array.isArray(auditRows) ? auditRows : []) {
+      if (audit.platform !== 'business_analysis') continue;
+      const data = audit.audit_data;
+      if (!data || typeof data !== 'object') continue;
+      for (const r of Array.isArray(data.recommended_attributes) ? data.recommended_attributes : []) {
+        const key = String(r?.key ?? '').trim().toLowerCase();
+        const label = String(r?.label ?? '').trim();
+        if (!key || !label || existingKeys.has(key) || originByKey.has(key) || recByKey.has(key)) continue;
+        recByKey.set(key, r);
+        if (recByKey.size >= 40) break;
+      }
+    }
+    const recommendations: Array<{
+      key: string;
+      label: string;
+      platform?: string | null;
+      basis?: string | null;
+      rationale?: string | null;
+      currentState?: string | null;
+      matchedDefinitionKey: string | null;
+    }> = [];
+    for (const [key, r] of recByKey) {
+      const def = defByKey.get(key);
+      recommendations.push({
+        key: def?.attributeKey ?? key,
+        label: String(r.label),
+        platform: r.platform ?? null,
+        basis: r.basis ?? null,
+        rationale: r.rationale ?? null,
+        currentState: r.current_state ?? null,
+        matchedDefinitionKey: def?.attributeKey ?? null,
+      });
+    }
+
+    return { suggestions: out, recommendations };
   }
 }
 

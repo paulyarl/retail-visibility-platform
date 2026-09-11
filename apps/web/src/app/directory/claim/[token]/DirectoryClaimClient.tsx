@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DirectoryClaimListingEditor from './DirectoryClaimListingEditor';
+import ClaimVerificationPanel from './ClaimVerificationPanel';
 import {
   Container,
   Card,
@@ -41,6 +42,7 @@ import { getCategoryUrl } from '@/utils/slug';
 import directoryClaimPublicService, {
   DirectoryClaimSummary,
   DirectoryClaimAcceptResult,
+  OwnerClaimVerification,
 } from '@/services/DirectoryClaimPublicService';
 import directoryPresenceUpgradeService from '@/services/DirectoryPresenceUpgradeService';
 import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
@@ -83,6 +85,10 @@ export default function DirectoryClaimClient() {
   // Best-effort platform (Auth0) session presence — drives the session-aware
   // success-screen CTAs (see detectPlatformSession).
   const [hasPlatformSession, setHasPlatformSession] = useState(false);
+
+  // Claim-time owner verification (migration 274) — the consent gate. Null
+  // until the owner checks the confirmation box; required to submit.
+  const [verification, setVerification] = useState<OwnerClaimVerification | null>(null);
 
   // Claimant verification fields (for operator-approval claims)
   const [claimantFirstName, setClaimantFirstName] = useState('');
@@ -171,6 +177,8 @@ export default function DirectoryClaimClient() {
         // (PublicApiSingleton may not forward the Authorization header)
         customerEmail: customer?.email || undefined,
         customerId: customer?.id || undefined,
+        // Owner verification consent gate (migration 274)
+        verification: verification ?? undefined,
       });
       if (result.error) {
         setError(result.error);
@@ -800,6 +808,16 @@ export default function DirectoryClaimClient() {
             on every matching category shelf. This is not an online store.
           </Alert>
 
+          {/* Owner verification — required consent step (migration 274).
+              The owner's confirmed categories + attributes are minted on the
+              business at claim submit and flow through to the listing. */}
+          {summary && (
+            <ClaimVerificationPanel
+              summary={summary}
+              onChange={setVerification}
+            />
+          )}
+
           <Divider />
 
           {/* Claim action */}
@@ -857,14 +875,22 @@ export default function DirectoryClaimClient() {
                     ? 'Please sign in to claim this listing.'
                     : error === 'already_claimed'
                       ? 'This listing has already been claimed.'
-                      : 'Something went wrong. Please try again.'}
+                      : error === 'verification_required' || error === 'verification_not_confirmed'
+                        ? 'Please review and confirm your business info above before claiming.'
+                        : 'Something went wrong. Please try again.'}
                 </Alert>
+              )}
+              {!verification && (
+                <Text size="xs" c="dimmed" ta="center">
+                  Review and confirm your business info above to claim this listing.
+                </Text>
               )}
               <Button
                 size="md"
                 variant='gradient' style={{ color: 'white' }}
                 loading={initiating || accepting}
                 onClick={handleInitiate}
+                disabled={!verification}
                 leftSection={<IconCheck size={18} />}
               >
                 Claim This Listing

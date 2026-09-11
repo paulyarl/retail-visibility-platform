@@ -971,6 +971,27 @@ Closes the gap where `DirectoryClaimService.initiateClaim` returned `operatorApp
 - `apps/web/src/services/DirectoryPresenceAdminService.ts` — `listClaimRequests`, `approveClaimRequest`, `rejectClaimRequest` methods + `DirectoryClaimRequest` interface
 - `apps/web/src/app/(platform)/settings/admin/directory/presence-seeds/page.tsx` — "Pending Claim Requests" section at the top of the seeds page with Approve/Reject buttons (only renders when there are pending requests)
 
+## Owner Claim Verification (Migration 274)
+
+Owner must confirm categories + attributes (a consent contract) before a directory claim can be initiated; accepted values mint as official listing data, unknown owner-typed labels are held for operator review (abuse gate).
+
+### Schema (Migration 274)
+- `directory_presence_seeds.owner_verified_at` / `owner_verification` (consent snapshot) / `owner_proposed_categories` (JSONB array of `{label, role, status, proposed_at, decided_at, decided_by}`)
+
+### Backend
+- `DirectoryClaimService.initiateClaim` — hard gate: returns `verification_required`/`ownerVerificationRequired` until `owner_verified_at` is set; `applyOwnerVerification` mints known categories + owner-authoritative attributes to the listing via `DirectoryPresenceSeedService.updateFields` with `source_name='owner_claim'` provenance, syncs `directory_settings_list`, stamps `category_fit='verified'` + consent record
+- Abuse gate: labels not in `platform_categories ∪ mkt_service_categories_list` → `owner_proposed_categories` (pending), never the listing. `DirectoryPresenceSeedService.decideProposedCategory` (admin accept/reject) — accept registers into `mkt_service_categories_list` + mints to listing; last decision auto-resolves the Requests-Hub ticket
+- `POST /api/admin/directory-presence/presence-seeds/:id/proposed-categories/decision` (platform-staff)
+- `GET /api/public/directory/attribute-definitions` — public suggestion catalog for the owner picker
+
+### Operator notifications — SOP
+**Requests from public surfaces → Requests Hub.** `crm_alerts` is the *customer/tenant* notification feed (`tenant_id=<tenant>` = tenant CRM; `tenant_id='platform'` = marketing-customer portal with metadata read-time targeting — NOT an operator inbox; rows there also render in the broadcast-history page). For operator-facing work items, create a `crm_support_tickets` row: `tenant_id='platform'`, a `category` for grouping (`directory_claim` for claim flow), `inquiry_id` = the domain row id for linkage/auto-resolve, plus a `crm_ticket_messages` entry with a `button` block linking to the action page. These surface in the Requests Hub (`/settings/admin/crm/requests`) + admin CRM dashboard stats + personal CRM assigned queue. Established precedents: claim requests (DirectoryClaimService), owner category proposals (same), public-catalog inquiries + CCPA requests (`crm_inquiries` with `source=` origin tag).
+
+### Frontend
+- `/directory/claim/[token]` — `ClaimVerificationPanel` (valid state): category selector + create-new (flagged "sent for operator review"), attribute chips + suggestions + custom add, consent checkbox gating Claim
+- Seed detail page — "Owner Verification" section (consent stamp + per-proposal accept/reject); seeds list rows show an amber "N categories pending review" badge when `pendingOwnerProposals > 0`
+- Tests: `DirectoryClaimService.ownerVerification.test.ts` (gate, mint, abuse-gate diversion, resend pass-through)
+
 
 
 

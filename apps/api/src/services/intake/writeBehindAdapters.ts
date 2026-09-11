@@ -603,6 +603,130 @@ const adapters: Record<string, WriteBehindAdapter> = {
       WHERE tenant_id = ${adapterCtx.tenantId}
     `;
   },
+
+  // ─── directory_attributes_write ───────────────────────────────────
+  // Writes owner-confirmed attribute keys → directory_listings_list
+  // .attributes for the seed linked to this campaign (via
+  // directory_seed_campaign_links). Used by the attribute_verification
+  // intake kind (migration 272): the chips field's options resolve from
+  // the campaign audit's recommended_attributes; the owner's confirmed
+  // keys become listing attributes stamped with the configured source.
+  //
+  // Label resolution order: audit recommended_attributes →
+  // directory_attribute_definitions → humanized key. SNAP/EBT keys are
+  // refused — SNAP stays in its dedicated columns (migration 207).
+  // Payload-only (warn + return) when no seed listing is linked to the
+  // campaign — evidence_payload remains the system of record.
+  directory_attributes_write: async (value: any, adapterCtx: AdapterContext, config?: Record<string, any>) => {
+    if (!Array.isArray(value) || value.length === 0) return;
+
+    try {
+      // Resolve the listing via the seed's campaign link.
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT s.id AS seed_id, dl.id AS listing_id, dl.attributes, dl.tenant_id
+        FROM directory_seed_campaign_links l
+        JOIN directory_presence_seeds s ON s.id = l.seed_id
+        JOIN directory_listings_list dl ON dl.id = s.listing_id
+        WHERE l.campaign_id = ${adapterCtx.campaignId}
+        LIMIT 1
+      `;
+      const listing = rows[0];
+      if (!listing) {
+        logger.warn('directory_attributes_write: no seed listing linked to campaign — payload only', adapterCtx.ctx, {
+          campaignId: adapterCtx.campaignId,
+          intakeId: adapterCtx.intakeId,
+        });
+        return;
+      }
+
+      // Label resolution: audit recommended_attributes → attribute defs.
+      const audit = await prisma.mkt_audits_list.findFirst({
+        where: { campaign_id: adapterCtx.campaignId, platform: 'business_analysis' },
+        orderBy: { created_at: 'desc' },
+        select: { audit_data: true },
+      });
+      const recList = (audit?.audit_data as any)?.recommended_attributes;
+      const recByKey = new Map<string, any>(
+        (Array.isArray(recList) ? recList : [])
+          .map((r: any): [string, any] => [String(r?.key ?? '').trim().toLowerCase(), r])
+          .filter(([k]) => k),
+      );
+      const defRows = await prisma.$queryRaw<any[]>`
+        SELECT attribute_key, label FROM directory_attribute_definitions WHERE is_active = true
+      `;
+      const defByKey = new Map<string, string>(
+        defRows.map((d: any) => [String(d.attribute_key).toLowerCase(), String(d.label)]),
+      );
+
+      const merged: any[] = Array.isArray(listing.attributes) ? [...listing.attributes] : [];
+      const existingKeys = new Set(
+        merged.map((a: any) => String(a?.key ?? '').trim().toLowerCase()).filter(Boolean),
+      );
+
+      const source = config?.source || 'owner_intake';
+      const today = new Date().toISOString().slice(0, 10);
+      let added = 0;
+      for (const raw of value) {
+        const key = String(raw ?? '').trim().toLowerCase();
+        if (!key || existingKeys.has(key)) continue;
+        if (key.includes('snap') || key.includes('ebt')) continue;
+        const rec = recByKey.get(key);
+        const label = String(rec?.label ?? defByKey.get(key) ?? key.replace(/_/g, ' '));
+        merged.push({ key, label, sourcePlatform: source, asOf: today });
+        existingKeys.add(key);
+        added++;
+      }
+
+      if (added === 0) return;
+
+      await prisma.$executeRaw`
+        UPDATE directory_listings_list
+        SET attributes = ${JSON.stringify(merged)}::jsonb, updated_at = now()
+        WHERE id = ${listing.listing_id}
+      `;
+
+      // Provenance row — the attributes field's latest writer is the owner
+      // intake. Per-attribute evidence still rides on each entry's
+      // sourcePlatform inside the merged array.
+      const { generateDirectoryFieldProvenanceId } = await import('../../lib/id-generator.js');
+      const provenanceId = generateDirectoryFieldProvenanceId(listing.tenant_id ?? adapterCtx.tenantId ?? 'platform');
+      await prisma.$executeRaw`
+        INSERT INTO directory_field_provenance (
+          id, seed_id, tenant_id, field_key, value,
+          source_name, accessed_at, confidence, show_on_public,
+          created_at, updated_at
+        ) VALUES (
+          ${provenanceId},
+          ${listing.seed_id},
+          ${listing.tenant_id ?? adapterCtx.tenantId},
+          'attributes',
+          'owner_confirmed',
+          ${source},
+          now(),
+          'high',
+          true,
+          now(), now()
+        )
+        ON CONFLICT (seed_id, field_key) DO UPDATE
+        SET value = EXCLUDED.value,
+            source_name = EXCLUDED.source_name,
+            accessed_at = EXCLUDED.accessed_at,
+            confidence = EXCLUDED.confidence,
+            updated_at = now()
+      `;
+
+      logger.info('directory_attributes_write: owner-confirmed attributes written', adapterCtx.ctx, {
+        campaignId: adapterCtx.campaignId,
+        listingId: listing.listing_id,
+        added,
+      });
+    } catch (error) {
+      logger.error('directory_attributes_write failed', adapterCtx.ctx, {
+        error: (error as Error).message,
+        campaignId: adapterCtx.campaignId,
+      });
+    }
+  },
 };
 
 // ====================

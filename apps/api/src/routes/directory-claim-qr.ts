@@ -1,12 +1,20 @@
 /**
  * Directory Claim QR Redirect
  *
- *   GET /api/public/qr/claim/:token
+ *   GET /api/public/qr/claim/:token         — mailed claim invite
+ *   GET /api/public/qr/claim/:token/walkin  — hand-delivered (walk-in) invite
+ *   GET /api/public/qr/claim/:token/social  — DM/social-shared invite link
  *
- * Thin redirect that records a qr_scan_events row with surface='claim_invite',
- * then 302s to the claim page (/place/claim/{token}). Scan tracking stays out
- * of the claim flow entirely — this route is hit when the QR is scanned, not
- * when the claim page loads.
+ * Thin redirect that records a qr_scan_events row, then 302s to the claim
+ * page (/place/claim/{token}). Scan tracking stays out of the claim flow
+ * entirely — this route is hit when the QR is scanned (or the tracked link
+ * is tapped), not when the claim page loads.
+ *
+ * Three surfaces so delivery-channel attribution stays separable:
+ *   - 'claim_invite'        — printed/mailed postcard QR
+ *   - 'claim_invite_walkin' — leave-behind card QR handed over in person
+ *   - 'claim_invite_social' — tracked link sent via DM / social (remote
+ *                           prospects where a walk-in isn't possible)
  *
  * The QR encodes the secret `token` string (not the row `id`), matching what
  * the public claim page /place/claim/[token] expects.
@@ -24,14 +32,16 @@ const router = Router();
 const WEB_URL = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
 /**
- * GET /api/public/qr/claim/:token
- *
- * Records a QR scan event (surface='claim_invite', consumer='merchant') and
- * redirects to the claim page. The scan is recorded even if the token is
+ * Shared scan-record + redirect. Records a QR scan event (consumer='merchant')
+ * and 302s to the claim page. The scan is recorded even if the token is
  * invalid or expired — the scan itself is the analytics signal (warm lead),
  * not the claim outcome.
  */
-router.get('/qr/claim/:token', async (req: Request, res: Response) => {
+async function recordClaimScanAndRedirect(
+  surface: 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social',
+  req: Request,
+  res: Response,
+): Promise<void> {
   const { token } = req.params;
 
   try {
@@ -56,7 +66,7 @@ router.get('/qr/claim/:token', async (req: Request, res: Response) => {
 
     await trackQrScanEvent({
       tenantId,
-      surface: 'claim_invite',
+      surface,
       consumer: 'merchant',
       source: 'qr_code',
       referrer: req.headers.referer || undefined,
@@ -65,16 +75,29 @@ router.get('/qr/claim/:token', async (req: Request, res: Response) => {
 
     // Redirect to the claim page — always 302, even if the token is invalid
     // (the claim page will show the appropriate error state)
-    return res.redirect(302, `${WEB_URL}/place/claim/${token}`);
+    res.redirect(302, `${WEB_URL}/place/claim/${token}`);
   } catch (error) {
     logger.error('[GET /api/public/qr/claim/:token] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
       token,
+      surface,
     });
     // On failure, still redirect to the claim page — scan tracking is
     // best-effort and must not block the claim flow
-    return res.redirect(302, `${WEB_URL}/place/claim/${token}`);
+    res.redirect(302, `${WEB_URL}/place/claim/${token}`);
   }
-});
+}
+
+router.get('/qr/claim/:token', (req, res) =>
+  recordClaimScanAndRedirect('claim_invite', req, res),
+);
+
+router.get('/qr/claim/:token/walkin', (req, res) =>
+  recordClaimScanAndRedirect('claim_invite_walkin', req, res),
+);
+
+router.get('/qr/claim/:token/social', (req, res) =>
+  recordClaimScanAndRedirect('claim_invite_social', req, res),
+);
 
 export default router;

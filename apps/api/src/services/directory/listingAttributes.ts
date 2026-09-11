@@ -19,6 +19,9 @@ export interface DirectoryListingAttribute {
   sourcePlatform?: string;
   sourceUrl?: string;
   asOf?: string;
+  /** Set when the owner confirmed (or added) the chip at claim time
+   *  (migration 274) — distinguishes owner-minted truth from sourced hints. */
+  ownerConfirmed?: boolean;
 }
 
 /** Audit platforms whose audit_data carries extractable attributes. */export const ATTRIBUTE_AUDIT_PLATFORMS = [

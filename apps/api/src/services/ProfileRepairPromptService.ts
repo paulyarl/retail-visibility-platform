@@ -194,6 +194,23 @@ export class ProfileRepairPromptService extends BaseService {
       lines.push('');
     }
 
+    // 5. Recommended attributes — advisory chips the business may want to
+    // enable or verify on the named platform. Not observed facts; the
+    // fulfill package should frame these as enableable opportunities.
+    const recAttrs = auditData.recommended_attributes;
+    if (Array.isArray(recAttrs) && recAttrs.length > 0) {
+      lines.push('## Recommended Attributes (advisory — not observed on the profile)');
+      for (const r of recAttrs) {
+        if (!r || typeof r !== 'object') continue;
+        const parts = [r.label ?? r.key];
+        if (r.platform) parts.push(`platform: ${r.platform}`);
+        if (r.current_state) parts.push(`state: ${r.current_state}`);
+        if (r.rationale) parts.push(`— ${r.rationale}`);
+        lines.push(`- ${parts.join(' · ')}`);
+      }
+      lines.push('');
+    }
+
     return lines.join('\n').trim();
   }
 

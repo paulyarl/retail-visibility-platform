@@ -8,7 +8,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 
@@ -96,6 +96,8 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   private_grant: 'Private Grant',
   general: 'General',
   claim_invite: 'Claim Invite',
+  claim_invite_walkin: 'Claim Invite (Walk-in)',
+  claim_invite_social: 'Claim Invite (Social/DM)',
 };
 
 class QrAnalyticsServiceClass extends TenantApiSingleton {

@@ -40,6 +40,9 @@ export interface DirectoryPresenceSeedSummary {
   outreachState?: string;
   outreachStateEnteredAt?: string | null;
   outreachScheduledAt?: string | null;
+  /** Owner-typed category labels awaiting operator accept/reject
+   *  (migration 274 — see the seed detail's Owner Verification section). */
+  pendingOwnerProposals?: number;
 }
 
 export interface DirectoryPresenceSeedDetail {
@@ -151,6 +154,18 @@ export interface DirectoryAttributeSuggestion {
   matchedDefinitionKey: string | null;
 }
 
+/** An advisory attribute recommendation from a business audit's
+ *  recommended_attributes — NOT a sourced observation (no evidence). */
+export interface DirectoryAttributeRecommendation {
+  key: string;
+  label: string;
+  platform?: string | null;
+  basis?: string | null;
+  rationale?: string | null;
+  currentState?: string | null;
+  matchedDefinitionKey: string | null;
+}
+
 /** A full attribute-definition row (management view — includes id + active flag). */
 export interface DirectoryAttributeDefinitionRow extends DirectoryAttributeDefinition {
   id: string;
@@ -177,6 +192,12 @@ export interface CohortFunnelMetrics {
   cacEstimate: number | null;
   inviteScans: number;
   inviteScanRate: number | null;
+  inviteScansMail: number;
+  inviteScansWalkin: number;
+  inviteScansSocial: number;
+  inviteScanRateMail: number | null;
+  inviteScanRateWalkin: number | null;
+  inviteScanRateSocial: number | null;
 }
 
 export interface ConversionScoreBreakdown {
@@ -267,6 +288,8 @@ export interface ClaimInviteQrKitMeta {
   seedId: string;
   token: string;
   qrUrl: string;
+  qrUrlWalkin: string;
+  qrUrlSocial: string;
   claimUrl: string;
   businessName: string;
   addressLines: string[];
@@ -411,16 +434,22 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/:id/attribute-suggestions */
-  async listAttributeSuggestions(seedId: string): Promise<DirectoryAttributeSuggestion[]> {
+  async listAttributeSuggestions(seedId: string): Promise<{
+    suggestions: DirectoryAttributeSuggestion[];
+    recommendations: DirectoryAttributeRecommendation[];
+  }> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/attribute-suggestions`,
       { method: 'GET' },
       undefined,
       0,
     );
-    if (!result.success) return [];
+    if (!result.success) return { suggestions: [], recommendations: [] };
     const data = result.data?.data ?? result.data;
-    return (data as any)?.suggestions ?? [];
+    return {
+      suggestions: (data as any)?.suggestions ?? [],
+      recommendations: (data as any)?.recommendations ?? [],
+    };
   }
 
   async createSeed(input: CreateSeedRequest): Promise<DirectoryPresenceSeedSummary> {
@@ -512,8 +541,11 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   async addOutreachTouch(
     seedId: string,
     input: {
-      channel: 'call' | 'email' | 'sms' | 'mail' | 'other';
-      outcome?: 'connected' | 'no_response' | 'voicemail' | 'bad_number' | 'claimed' | 'not_interested';
+      channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'visit' | 'other';
+      outcome?:
+        | 'connected' | 'no_response' | 'no_answer' | 'no_reply' | 'voicemail'
+        | 'bad_number' | 'bounce' | 'unread' | 'read_no_reply' | 'form_submitted'
+        | 'referral_asked' | 'claimed' | 'not_interested';
       notes?: string;
       occurredAt?: string;
     },
@@ -559,10 +591,14 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return (data as any) ?? null;
   }
 
-  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/png — returns a Blob */
-  async downloadClaimInvitePng(seedId: string): Promise<Blob | null> {
+  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/png — returns a Blob.
+   *  variant selects the tracked URL surface (claim_invite / _walkin / _social). */
+  async downloadClaimInvitePng(
+    seedId: string,
+    variant: 'mail' | 'walkin' | 'social' = 'mail',
+  ): Promise<Blob | null> {
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/png`,
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/png${variant === 'mail' ? '' : `?variant=${variant}`}`,
       { method: 'GET' },
       undefined,
       0,
@@ -572,10 +608,14 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return (result.data as unknown as Blob) ?? null;
   }
 
-  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/postcard — returns a Blob */
-  async downloadClaimInvitePostcard(seedId: string): Promise<Blob | null> {
+  /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/postcard — returns a Blob.
+   *  variant selects the tracked URL + printed badge for that channel. */
+  async downloadClaimInvitePostcard(
+    seedId: string,
+    variant: 'mail' | 'walkin' | 'social' = 'mail',
+  ): Promise<Blob | null> {
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/postcard`,
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/postcard${variant === 'mail' ? '' : `?variant=${variant}`}`,
       { method: 'GET' },
       undefined,
       0,
@@ -632,6 +672,23 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/proposed-categories/decision
+   *  Operator accept/reject of an owner-proposed category (migration 274). */
+  async decideProposedCategory(
+    id: string,
+    label: string,
+    decision: 'accepted' | 'rejected',
+  ): Promise<{ label: string; role: string; status: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/proposed-categories/decision`,
+      { method: 'POST', body: JSON.stringify({ label, decision }) },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
   }
 
   /** DELETE /api/admin/directory-presence/presence-seeds/:id — permanently delete a seed and its tenant.
