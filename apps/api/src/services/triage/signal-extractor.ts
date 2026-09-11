@@ -7,9 +7,14 @@
  *
  * Extraction precedence (per Sprint 2A task 2):
  *   1. model_emitted — if audit_data.detected_signals[] is present (new audit
- *      prompt contract), use it directly as the canonical set.
- *   2. derived — for legacy audits without detected_signals[], derive codes
- *      from raw fields + thresholds (the bulk of this file).
+ *      prompt contract), it IS the canonical set — derived extraction does
+ *      not run at all. The analyst's signal judgment is authoritative: a
+ *      present array (even empty) must not be back-filled from raw fields,
+ *      since e.g. nap_consistency.*_variations is an inventory of observed
+ *      variants (cosmetic legal-suffix spellings, stale-aggregator leakage),
+ *      not a materiality claim — materiality lives in detected_signals.
+ *   2. derived — only for legacy audits that lack detected_signals[]:
+ *      derive codes from raw fields + thresholds (the bulk of this file).
  *   3. operator_input — BBB codes (RA_BBB_GRADE_SUPPRESSION,
  *      RA_UNANSWERED_COMPLAINTS) are only emitted when the operator supplies
  *      bbb grade / unanswered complaint count via the triage pre-flight form.
@@ -147,7 +152,7 @@ function unansweredPositiveReviews(auditData: BusinessAnalysisAuditData | null |
  * always added when supplied.
  */
 export function extractSignals(input: SignalExtractorInput): SignalCode[] {
-  const { campaign, auditData, bbb } = input;
+  const { auditData, bbb } = input;
   const signals = new Set<SignalCode>();
 
   // ── 1. model_emitted: detected_signals[] from the new audit prompt contract ──
@@ -161,7 +166,8 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
   // and must never flow into playbook rule evaluation. The INT family is
   // kept strictly separate from Business-Audit signal families (RA/DS/WC/CP/VP).
   const modelEmitted = (auditData as any)?.detected_signals;
-  if (Array.isArray(modelEmitted)) {
+  const canonicalDeclared = Array.isArray(modelEmitted);
+  if (canonicalDeclared) {
     for (const code of modelEmitted) {
       if (typeof code === 'string' && code.length > 0) {
         // §S1: filter out INT_* codes — they are discovery signals, not audit signals.
@@ -173,10 +179,35 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
     }
   }
 
-  // ── 2. derived: compute codes from raw fields (legacy audit fallback) ─────
-  //
-  // Only derive codes that are NOT already model-emitted (avoid duplicates).
-  // We still derive BBB codes below from operator input regardless.
+  // ── 2. derived: legacy fallback — runs ONLY when the audit did not emit ──
+  // detected_signals[] (pre-contract audits). When the array is present it is
+  // canonical: derived extraction must not re-add codes the analyst
+  // deliberately omitted.
+  if (!canonicalDeclared) {
+    deriveSignals(input, signals);
+  }
+
+  // ── 3. operator_input: BBB codes from pre-flight form ──────────────────
+  if (bbb) {
+    if (isCrisisBbbGrade(bbb.bbbGrade)) {
+      signals.add('RA_BBB_GRADE_SUPPRESSION');
+    }
+    if (typeof bbb.unansweredBbbComplaints === 'number' && bbb.unansweredBbbComplaints > 0) {
+      signals.add('RA_UNANSWERED_COMPLAINTS');
+    }
+  }
+
+  return Array.from(signals);
+}
+
+/**
+ * Derived signal extraction — legacy fallback for audits that predate the
+ * signal-aware prompt contract (no detected_signals[] array). Derives codes
+ * from raw audit fields, campaign columns, and thresholds. Never runs when
+ * the audit declared its own signal set.
+ */
+function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): void {
+  const { campaign, auditData } = input;
 
   // RA_REVIEW_DROUGHT — last_review_date older than 180 days
   if (!signals.has('RA_REVIEW_DROUGHT')) {
@@ -485,18 +516,6 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
       }
     }
   }
-
-  // ── 3. operator_input: BBB codes from pre-flight form ──────────────────
-  if (bbb) {
-    if (isCrisisBbbGrade(bbb.bbbGrade)) {
-      signals.add('RA_BBB_GRADE_SUPPRESSION');
-    }
-    if (typeof bbb.unansweredBbbComplaints === 'number' && bbb.unansweredBbbComplaints > 0) {
-      signals.add('RA_UNANSWERED_COMPLAINTS');
-    }
-  }
-
-  return Array.from(signals);
 }
 
 // ─── Labeling helper (for DetectedSignal[] in the recommendation) ────────

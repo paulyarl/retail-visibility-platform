@@ -614,6 +614,40 @@ describe('extractSignals — emits SignalCode[] from campaign + audit + BBB', ()
     expect(signals).toContain('FUTURE_SIGNAL');
   });
 
+  it('model_emitted: detected_signals[] is canonical — derived codes are NOT back-filled', () => {
+    // Audit declares its signal set; raw fields that would otherwise derive
+    // codes (name/phone variations, gbp_claimed=false) must not re-add them.
+    const signals = extractSignals(makeInput({
+      campaign: { ...makeInput().campaign, gbp_claimed: false },
+      auditData: {
+        detected_signals: ['DS_MISSING_PROFILE'],
+        nap_consistency: {
+          overall_status: 'minor_variations',
+          name_variations: ['Arsema Food Mart', 'Arsema G Food Mart LLC'],
+          phone_variations: ['(317) 555-0000', '(317) 555-1111'],
+        },
+      } as any,
+    }));
+    expect(signals).toEqual(['DS_MISSING_PROFILE']);
+  });
+
+  it('model_emitted: empty detected_signals[] suppresses all derived codes', () => {
+    const signals = extractSignals(makeInput({
+      campaign: { ...makeInput().campaign, nap_consistent: false },
+      auditData: { detected_signals: [] } as any,
+    }));
+    expect(signals).toEqual([]);
+  });
+
+  it('model_emitted: operator BBB input still applies on top of canonical signals', () => {
+    const signals = extractSignals(makeInput({
+      auditData: { detected_signals: ['DS_MISSING_PROFILE'] } as any,
+      bbb: { bbbGrade: 'D', unansweredBbbComplaints: 0 },
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+    expect(signals).toContain('RA_BBB_GRADE_SUPPRESSION');
+  });
+
   it('CP_NAP_NAME_DRIFT — audit nap_consistency has name_variations', () => {
     const signals = extractSignals(makeInput({
       auditData: {
