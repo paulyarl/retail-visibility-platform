@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-11-identity-origin -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-11-recommended-attributes -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -329,6 +329,31 @@ Rules:
 * Omit the attributes field entirely when the platform profile displays no attribute chips — do not fabricate an empty inventory.
 * SNAP/EBT is NEVER recorded here — it has dedicated fields (snap_ebt_reported) and a stricter regulatory contract.
 * Attributes are a VISIBILITY inventory only — they never represent payment processing capability.
+`;
+
+// ─── Directive: Recommended Attribute Suggestions (inserted immediately
+//     after the Sourced Attribute Capture section — its anchor is that
+//     section's closing rule, which step 4g/5b/0b guarantees is present).
+//     Advisory recommendations for attribute chips the owner could enable,
+//     derived from the Gold Standard block's per-platform expected
+//     attributes + the Category Intelligence attribute lists + verified
+//     audit evidence. Distinct from sourced attributes: recommendations
+//     fill gaps, they never restate observed chips.
+const RECOMMENDED_ATTRIBUTES_DIRECTIVE = `
+### Recommended Attribute Suggestions — ADVISORY
+
+Beyond the sourced inventory above, recommend attribute chips the owner could enable on each platform in \`recommended_attributes\` — a top-level array of:
+
+{ "key": "<snake_case_key>", "label": "<display label>", "platform": "<platform or null>", "basis": "gold_standard_expected|category_intelligence|audit_evidence", "rationale": "<string|null>", "current_state": "not_observed|unverifiable|verify_with_owner" }
+
+Rules:
+* Basis — recommendations may draw on the Gold Standard block's per-platform expected attributes, the Category Intelligence block's required/recommended attribute lists, and verified audit evidence (e.g. a delivery page observed on the business website). Unlike sourced attributes, inference from category and benchmark context is the purpose of this field.
+* current_state — "not_observed" when the profile rendered and the chip was absent; "unverifiable" when the profile could not be fully rendered (JavaScript-gated, login-walled); "verify_with_owner" when the attribute depends on a fact only the owner can confirm (identity designations, certification status, payment-program enrollment).
+* Never recommend an attribute already recorded in \`platforms.{platform}.attributes\` — recommendations fill gaps; they do not restate observed chips.
+* Owner-designated identity attributes (e.g. Black-owned, women-led, veteran-owned) are framed as slots the owner MAY enable if applicable — never assert the identity as fact.
+* Evidence-gated attributes (e.g. SNAP/EBT, delivery) recommend verification — "verify authorization and enable the chip" — never assume the underlying fact.
+* Omit the field entirely when no recommendation is warranted — do not fabricate suggestions.
+* Recommended attributes are advisory only — they are not evidence the attribute is enabled, and they never appear in \`platforms.{platform}.attributes\`.
 `;
 
 const NAP_ABSENCE_MD = `Do not add points solely because information is unavailable (per the Category Intelligence evidence rule \`absence_is_not_a_negative\`).
@@ -637,6 +662,10 @@ function transformCategoryIntegrated(body: string): string {
     }
   }
 
+  // 4h. Recommended Attribute Suggestions — immediately after the Sourced
+  //     Attribute Capture section (anchor is that section's closing rule).
+  out = insertAfter(out, 'they never represent payment processing capability.', RECOMMENDED_ATTRIBUTES_DIRECTIVE);
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -713,6 +742,10 @@ function transformSignalAligned(body: string): string {
       out = insertAfter(out, 'Do not estimate review-response counts unless an authorized source explicitly provides an estimate.', ATTRIBUTES_CAPTURE_DIRECTIVE);
     }
   }
+
+  // 5c. Recommended Attribute Suggestions — immediately after the Sourced
+  //     Attribute Capture section (anchor is that section's closing rule).
+  out = insertAfter(out, 'they never represent payment processing capability.', RECOMMENDED_ATTRIBUTES_DIRECTIVE);
 
   // 6. Absence rule — replace the existing NAP-score line in Digital
   //    Opportunity Score.
@@ -905,6 +938,10 @@ function transformBusinessAuditV1(body: string): string {
       out = insertAfter(out, 'Never invent or assume data.', ATTRIBUTES_CAPTURE_DIRECTIVE);
     }
   }
+
+  // 0c. Recommended Attribute Suggestions — immediately after the Sourced
+  //     Attribute Capture section (anchor is that section's closing rule).
+  out = insertAfter(out, 'they never represent payment processing capability.', RECOMMENDED_ATTRIBUTES_DIRECTIVE);
 
   // 1. Replace requested_business empty-string defaults with variable
   //    placeholders. Idempotent (no-op if already replaced).

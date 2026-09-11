@@ -288,6 +288,24 @@ const platformAttributeEntrySchema = z.union([
   }).passthrough(),
 ]);
 
+/**
+ * Recommended attribute entry — an advisory suggestion for an attribute chip
+ * the owner could enable on a platform profile. NOT sourced evidence: basis
+ * may be the gold-standard benchmark's expected attributes, the category
+ * intelligence attribute lists, or verified audit evidence. current_state
+ * records whether the chip's absence was observed on a rendered profile
+ * (not_observed), could not be checked (unverifiable), or depends on an
+ * owner-confirmable fact (verify_with_owner).
+ */
+const recommendedAttributeEntrySchema = z.object({
+  key: z.string().nullable().optional(),
+  label: z.string().nullable().optional(),
+  platform: z.string().nullable().optional(),
+  basis: z.string().nullable().optional(),
+  rationale: z.string().nullable().optional(),
+  current_state: z.string().nullable().optional(),
+}).passthrough();
+
 const platformSchema = z.object({
   profile_status: profileStatusEnum,
   rating: coercedNumberNullable,
@@ -562,6 +580,12 @@ export const businessAnalysisSchema = z.object({
   tier_rationale: z.string().nullable().optional(),
   estimated_monthly_service_fee: estimatedFeeSchema.optional(),
   recommended_services: z.array(z.string()).optional(),
+  // Advisory attribute-chip recommendations — chips the owner could enable
+  // per platform, derived from gold-standard expected attributes, category
+  // intelligence attribute lists, and verified audit evidence. Distinct
+  // from platforms.{platform}.attributes, which is the sourced inventory of
+  // chips the profile actually displays.
+  recommended_attributes: z.array(recommendedAttributeEntrySchema).optional(),
   data_quality: dataQualitySchema,
   sources: z.array(sourceSchema).optional(),
   // Gold Standard System — Sprint 0: gap analysis + quality gate results.
@@ -736,6 +760,11 @@ Return your response as JSON matching this exact schema:
   "tier_rationale": "<string>",
   "estimated_monthly_service_fee": { "minimum": <number>, "maximum": <number>, "currency": "<string>" },
   "recommended_services": ["<string>", ...],
+  "recommended_attributes": [
+    { "key": "<snake_case_key>", "label": "<display label>", "platform": "<string|null>",
+      "basis": "gold_standard_expected|category_intelligence|audit_evidence",
+      "rationale": "<string|null>", "current_state": "not_observed|unverifiable|verify_with_owner" }
+  ],
   "data_quality": {
     "confidence": "high|medium|low",
     "verified_fields": ["<string>", ...],
@@ -776,6 +805,7 @@ PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/invento
 - platforms.google.photo_types: ["storefront"|"exterior"|"interior"|"product"|"team"|"logo", ...] — categorize GBP photos by type
 - platforms.google.special_hours_present: <boolean|null> — are special/holiday hours present on GBP?
 - platforms.{platform}.attributes: [{ "key": "<snake_case_key>", "label": "<display label>", "source_url": "<url|null>", "as_of": "<ISO date|null>" }, ...] — the attribute chips the profile actually displays (payments accepted, accessibility, ownership, service options, certifications). Record each attribute only when the profile itself displays it (attribute chips, amenity sections, payment badges); NEVER infer attributes from the business's category, name, or neighborhood. Omit the field entirely when the profile displays no attribute chips — do not fabricate an empty inventory.
+- recommended_attributes: [{ "key", "label", "platform", "basis", "rationale", "current_state" }, ...] — advisory attribute chips the owner could enable per platform, derived by comparing the Gold Standard expected attributes and Category Intelligence attribute lists against what each profile actually displays. Unlike sourced attributes, basis may legitimately be category/benchmark context. current_state: "not_observed" (profile rendered, chip absent), "unverifiable" (profile could not be fully rendered — gated/walled), "verify_with_owner" (owner-confirmable fact such as identity designation or program enrollment). Never recommend a chip already present in platforms.{platform}.attributes; never assert owner-designated identity attributes as fact — frame them as enableable slots. Omit when no recommendation is warranted.
 
 CRITICAL JSON RULES:
 - Every element of a JSON array (e.g. "unanswered_negative_review_examples",
