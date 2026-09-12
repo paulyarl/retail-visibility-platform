@@ -623,7 +623,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           repair_issue_type: form.campaign_category === 'profile_repair' ? strOrUndef(form.repair_issue_type) : undefined,
           scope: form.scope,
           title: strOrUndef(form.title),
-          business_name: strOrUndef(form.business_name),
+          business_name: form.scope === 'business' ? strOrUndef(form.business_name) : undefined,
           category: form.category,
           secondary_categories: form.secondary_categories.length > 0 ? form.secondary_categories : undefined,
           city: form.city,
@@ -810,19 +810,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Campaign Category" required>
               <select value={form.campaign_category} onChange={(e) => {
                 const next = e.target.value as CampaignCategory;
+                if (next === form.campaign_category) return;
+                // Switching campaign category starts the title on a blank
+                // slate — the prior category's derived (or manually typed)
+                // title never carries over. Re-enabling autofill lets the
+                // new category's own derivation take over from the selected
+                // fields.
+                setTitleManuallyEdited(false);
+                setEnrichmentTitleSuffix('');
                 // Campaign Category is the primary selector — it renders
                 // first, so its choice drives scope, not the other way.
                 // Proving Ground is a city/category-scope workspace: selecting
                 // it from a business/intelligence scope coerces scope to city.
                 if (next === 'proving_ground' && (form.scope === 'business' || form.scope === 'intelligence')) {
-                  setForm((prev) => ({ ...prev, campaign_category: next, scope: 'city' }));
+                  setForm((prev) => ({ ...prev, campaign_category: next, scope: 'city', title: '' }));
                 } else if (next === 'directory_enrichment' && (form.scope === 'business' || form.scope === 'intelligence')) {
                   // Directory enrichment lives at category scope (category
                   // enrichment) or city scope (location enrichment) — coerce
                   // to category scope as the default lane.
-                  setForm((prev) => ({ ...prev, campaign_category: next, scope: 'category' }));
+                  setForm((prev) => ({ ...prev, campaign_category: next, scope: 'category', title: '' }));
                 } else {
-                  handleChange('campaign_category', next);
+                  setForm((prev) => ({ ...prev, campaign_category: next, title: '' }));
                 }
               }}
                 className={inputClass}>
@@ -981,11 +989,15 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 </FormField>
               </>
             )}
-            {/* Business Name — full width, own row */}
-            <FormField label="Business Name" required={form.scope === 'business'} className="sm:col-span-2">
-              <input type="text" required={form.scope === 'business'} value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
+            {/* Business Name — full width, own row. Only business-scope
+                campaigns target a specific business; hidden for
+                category/city/intelligence/enrichment scopes. */}
+            {form.scope === 'business' && (
+            <FormField label="Business Name" required className="sm:col-span-2">
+              <input type="text" required value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
                 className={inputClass} />
             </FormField>
+            )}
             {/* Platform (intelligence) — half width, pairs with Category below */}
             {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
               <FormField label="Platform" required>
