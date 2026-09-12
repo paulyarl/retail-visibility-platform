@@ -565,6 +565,50 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       );
       expect(result.steps[0].progress?.completedAt).toBeNull();
     });
+
+    // Regression: permanent (code-defined) steps bypass playbook validation
+    // and upsert progress directly with step_id = '_permanent_*'. The
+    // fk_checklist_progress_step FK was dropped (migration 277) so these
+    // rows can persist without a matching mkt_playbook_checklist_steps row.
+    it('upserts progress for a permanent step without playbook validation', async () => {
+      const PERMANENT_STEP_ID = '_permanent_identify_category';
+      mockProgress.upsert.mockResolvedValue({});
+      // getCampaignChecklist re-read after upsert (seek stage, business scope
+      // → permanent seed steps render without a playbook).
+      mockTriage.findUnique.mockResolvedValue(null);
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek', scope: 'business' });
+      mockProgress.findMany.mockResolvedValue([
+        { step_id: PERMANENT_STEP_ID, completed_at: new Date(), completed_by: 'uid-1', note: null },
+      ]);
+
+      const result = await PlaybookChecklistService.setStepProgress(
+        CAMPAIGN_ID,
+        PERMANENT_STEP_ID,
+        true,
+        undefined,
+        'uid-1',
+      );
+
+      // Must NOT have consulted the step table for the stale_step guard —
+      // permanent steps are code-defined and bypass playbook validation.
+      // (mockTriage.findUnique IS called by the follow-up getCampaignChecklist
+      // view load via resolveEffectivePlaybook — that's expected.)
+      expect(mockSteps.findUnique).not.toHaveBeenCalled();
+      // Progress row is written with the synthetic step id.
+      expect(mockProgress.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { campaign_id_step_id: { campaign_id: CAMPAIGN_ID, step_id: PERMANENT_STEP_ID } },
+          create: expect.objectContaining({
+            step_id: PERMANENT_STEP_ID,
+            completed_by: 'uid-1',
+          }),
+        }),
+      );
+      // The permanent step renders as completed in the returned view.
+      const step = result.steps.find((s) => s.id === PERMANENT_STEP_ID);
+      expect(step).toBeDefined();
+      expect(step?.progress?.completedBy).toBe('uid-1');
+    });
   });
 
   describe('getIncompleteRequiredSteps', () => {
