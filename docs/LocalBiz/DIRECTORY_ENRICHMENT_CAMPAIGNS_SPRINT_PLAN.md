@@ -113,9 +113,9 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
 
 ### Sprint A — schema + schemas + templates (backend foundation)
 
-- [x] Migration 279 written: CHECK resync + lineage columns + `body_copy` +
-      `idx_category_enrichment_source_campaign` (see above). **Pending: apply to local + prd.**
-- [ ] **Prisma client regen** (after migration applies in each env): from `apps/api`,
+- [x] Migration 279 written + applied to staging and prod (SOP): CHECK resync +
+      lineage columns + `body_copy` + `idx_category_enrichment_source_campaign`.
+- [x] **Prisma client regen** (after migration applies in each env): from `apps/api`,
       `doppler run --config local -- pnpm prisma db pull` then
       `doppler run --config local -- pnpm prisma generate`; repeat with `--config prd`.
       Required so the new `source_campaign_id` / `source_execution_id` columns are
@@ -280,9 +280,10 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
       (Unit coverage of the apply path + `assertScopeCompatible` exists; the
       route-level test is still open.)
 - [x] `pnpm checkapi`, `pnpm checkweb` — both clean (49/49 new+touched tests pass).
-- [ ] Seed scripts re-run (local + prd), verify `updated_at` on both templates.
-- [ ] Migration 279 applied to local + prd (`psql $DATABASE_URL -f …`), then
-      `prisma db pull` + `prisma generate` in each env (see Sprint A).
+- [x] Seed scripts re-run (local + prd) — both templates created 2026-09-12;
+      `updated_at` current on first-run create.
+- [x] Migration 279 applied to staging + prod (SOP), with `prisma db pull` +
+      `prisma generate` per env (see Sprint A).
 
 ## Guardrails (unchanged, must be preserved)
 

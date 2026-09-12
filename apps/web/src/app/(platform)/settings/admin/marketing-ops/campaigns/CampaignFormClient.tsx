@@ -227,6 +227,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
   // first keystroke in the Title field flips this to true and stops auto-fill.
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
+  // Directory-enrichment-only: optional freeform tail appended to the
+  // auto-generated title ("Enrichment - Indianapolis - IN" + suffix "test"
+  // → "Enrichment - Indianapolis - IN - test"). Not persisted separately —
+  // it is baked into the campaign title at autofill time.
+  const [enrichmentTitleSuffix, setEnrichmentTitleSuffix] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -466,17 +471,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     }
   }, [form.campaign_category, form.scope, form.category]);
 
-  // Title autofill for directory_enrichment campaigns.
+  // Title autofill for directory_enrichment campaigns — same dropdown-driven
+  // pattern as the establishment/discovery derivation above: the selected
+  // Category/City/State options fill the title, no typing needed. Format:
+  // "Enrichment - [Category] - [City] - [State] - [suffix]". The '__all__'
+  // national sentinel is omitted from the location part; the optional
+  // freeform suffix appends verbatim ("Enrichment - Indianapolis - IN - test").
   useEffect(() => {
     if (form.campaign_category !== 'directory_enrichment') return;
     if (titleManuallyEdited) return;
-    const loc = [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean).join(', ');
-    const isNational = form.city.trim().toLowerCase() === '__all__';
-    const derived = form.scope === 'city'
-      ? `Location Enrichment - ${loc}`
-      : `Category Enrichment - ${form.category || 'Category'} - ${isNational ? 'National' : loc}`;
+    const parts = ['Enrichment'];
+    if (form.scope === 'category' && form.category.trim() && form.category !== '__location__') {
+      parts.push(form.category.trim());
+    }
+    const city = form.city.trim();
+    const state = form.state.trim();
+    if (city && city.toLowerCase() !== '__all__') parts.push(city);
+    if (state) parts.push(state);
+    if (enrichmentTitleSuffix.trim()) parts.push(enrichmentTitleSuffix.trim());
+    const derived = parts.join(' - ');
     setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
-  }, [form.campaign_category, form.scope, form.category, form.city, form.state, titleManuallyEdited]);
+  }, [form.campaign_category, form.scope, form.category, form.city, form.state, enrichmentTitleSuffix, titleManuallyEdited]);
 
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -774,12 +789,22 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               <input type="text" value={form.title} onChange={(e) => { setTitleManuallyEdited(true); handleChange('title', e.target.value); }}
                 placeholder="Optional descriptive title (e.g. &quot;Q3 Austin restaurant review-gap test&quot;)"
                 className={inputClass} />
-              {form.scope === 'intelligence' ? (
+              {form.campaign_category === 'directory_enrichment' ? (
+                <p className="text-xs text-gray-400 mt-1">Auto-generated from the Scope, Category, City, and State selections — e.g. &quot;Enrichment - African Grocery Store - Indianapolis - IN&quot;. Use the suffix field below for a freeform tail; editing the title directly stops the auto-fill.</p>
+              ) : form.scope === 'intelligence' ? (
                 <p className="text-xs text-gray-400 mt-1">Auto-generated from Category, Kind, Focus, City, and State (e.g. &quot;African Grocery Store - Discovery - Emerging - Indianapolis, IN&quot;). Edit to customize — once you type, the auto-fill stops.</p>
               ) : (
                 <p className="text-xs text-gray-400 mt-1">Scope-neutral label for the campaign objective. When set, it appears as the primary heading in lists and detail pages; the business name / category / city remain as the secondary line.</p>
               )}
             </FormField>
+            {form.campaign_category === 'directory_enrichment' && (
+              <FormField label="Title Suffix" className="sm:col-span-2">
+                <input type="text" value={enrichmentTitleSuffix} onChange={(e) => setEnrichmentTitleSuffix(e.target.value)}
+                  placeholder="Optional freeform tail — e.g. test"
+                  className={inputClass} />
+                <p className="text-xs text-gray-400 mt-1">Appended to the auto-generated title — e.g. suffix &quot;test&quot; produces &quot;Enrichment - Indianapolis - IN - test&quot;.</p>
+              </FormField>
+            )}
             {form.scope !== 'intelligence' && (
             <>
             <FormField label="Campaign Category" required>
@@ -886,7 +911,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 }
               }}
                 className={inputClass}>
-                {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {(form.campaign_category === 'directory_enrichment'
+                  ? SCOPES.filter((s) => s === 'city' || s === 'category')
+                  : SCOPES
+                ).map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </FormField>
             {form.scope === 'intelligence' && (
