@@ -1,6 +1,6 @@
 # Directory Enrichment Campaigns — Sprint Plan
 
-> Status: **design approved, not yet implemented**
+> Status: **implemented — code landed, env rollout pending** (migration 279 apply + prisma regen + seed re-run on local/prd)
 > Supersedes: the ad-hoc "separate lane" plan (admin endpoints + lazy triggers only)
 
 ## Goal
@@ -113,18 +113,20 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
 
 ### Sprint A — schema + schemas + templates (backend foundation)
 
-- [ ] Migration 279: CHECK resync + lineage columns (see above). Apply to local + prd.
+- [x] Migration 279 written: CHECK resync + lineage columns + `body_copy` +
+      `idx_category_enrichment_source_campaign` (see above). **Pending: apply to local + prd.**
 - [ ] **Prisma client regen** (after migration applies in each env): from `apps/api`,
       `doppler run --config local -- pnpm prisma db pull` then
       `doppler run --config local -- pnpm prisma generate`; repeat with `--config prd`.
       Required so the new `source_campaign_id` / `source_execution_id` columns are
-      present on the generated `directory_category_enrichment` model.
-- [ ] `validators/directory-enrichment.schema.ts`: `category_enrichment` +
+      present on the generated `directory_category_enrichment` model. (schema.prisma
+      already updated; generated-client regen is an env step.)
+- [x] `validators/directory-enrichment.schema.ts`: `category_enrichment` +
       `location_enrichment` Zod schemas, `*_SCHEMA_NAME`, `*_PROMPT_SUFFIX`.
-- [ ] Register both in `OUTPUT_SCHEMA_REGISTRY` (`market-analysis.schema.ts`) with
+- [x] Register both in `OUTPUT_SCHEMA_REGISTRY` (`market-analysis.schema.ts`) with
       auditPlatforms `'category_enrichment'` / `'location_enrichment'`.
-- [ ] `MarketingPromptService`: `PromptType` union += `'enrichment'`.
-- [ ] `marketing-ops.ts`: `promptTemplateCreateSchema` / update schema prompt_type enums
+- [x] `MarketingPromptService`: `PromptType` union += `'enrichment'`.
+- [x] `marketing-ops.ts`: `promptTemplateCreateSchema` / update schema prompt_type enums
       += `'enrichment'`; `campaign_category` zod enum += `'directory_enrichment'`.
       **Pre-existing drift note**: `PromptType` in `MarketingPromptService.ts` already
       includes `'fragment'`, but `promptTemplateCreateSchema.prompt_type` in
@@ -132,15 +134,14 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
       Add `'enrichment'` to both the route schema and the `PromptType` union — do not
       rely on one implying the other. (Out of scope for this sprint: backfilling
       `'fragment'` into the route schema, which is a separate pre-existing gap.)
-- [ ] `MarketingCampaignService`: `CampaignCategory` union += `'directory_enrichment'`.
-- [ ] `seed-directory-enrichment-templates.ts`: the two directive templates above;
-      re-run local + prd, verify `updated_at`. Use a `SEED_VERSION_MARKER` constant
-      and check for its presence (not absence of an old section) per AGENTS.md
-      idempotency discipline.
+- [x] `MarketingCampaignService`: `CampaignCategory` union += `'directory_enrichment'`.
+- [x] `seed-directory-enrichment-templates.ts` written: the two directive templates
+      above (`SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V1'`, presence-check
+      idempotency). **Pending: re-run local + prd, verify `updated_at`.**
 
 ### Sprint B — apply path (dual execution lands in the table)
 
-- [ ] `CategoryMarketEnrichmentService.applyEnrichmentPacket(campaign, payload, provenance)`:
+- [x] `CategoryMarketEnrichmentService.applyEnrichmentPacket(campaign, payload, provenance)`:
       upsert `(category, city, state)` — or `(category, '__all__', '__all__')` when
       `city='__all__'` — with `trigger_source='campaign_run'`, `source_campaign_id`,
       `source_execution_id`. **Write sentinels literally; do NOT call
@@ -151,29 +152,34 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
       carries the same fields `enrichMarketListings` projects), writing
       `directory_listing_enrichment_log` rows with `trigger_source='campaign_run'`.
       Skip fan-out for national (`__all__`) packets (no city to match on).
-- [ ] `LocationMarketEnrichmentService.applyEnrichmentPacket(campaign, payload, provenance)`:
+      Implemented via a synthesized `IntelligenceProfileSeoFields` (profileId=null)
+      fed to the existing `enrichMarketListings` — operator_override and
+      linked_campaign provenance guards apply unchanged.
+- [x] `LocationMarketEnrichmentService.applyEnrichmentPacket(campaign, payload, provenance)`:
       upsert `('__location__', city, state)` with same provenance. Merge AI output with
       deterministic aggregates per the "Location merge contract" decision (AI wins when
-      non-empty; aggregate fills gaps). Fan out to listings in `(city, state)` with
-      `trigger_source='campaign_run'`.
-- [ ] Export the JSON-candidate helpers (`extractJsonCandidates`, `stripLlmJsonArtifacts`)
-      from `MarketingPromptService.ts` for reuse. (They are module-private today and
-      used by `importExternalResult`; `executeSingle` lives in a separate file
-      `MarketingExecutionService.ts`, so the export is genuinely needed for the post-run
-      hook to parse rawOutput the same way.)
-- [ ] `MarketingPromptService.importExternalResult`: post-import hook on
+      non-empty; aggregate fills gaps). **Deviation (documented in code):** no listing
+      fan-out — the location packet is city-level copy, not business-specific; stamping
+      it onto every listing would duplicate identical content across listings.
+- [x] Export the JSON-candidate helpers (`extractJsonCandidates`, `stripLlmJsonArtifacts`)
+      from `MarketingPromptService.ts` for reuse.
+- [x] `MarketingPromptService.importExternalResult`: post-import hook on
       `schemaName === 'category_enrichment' | 'location_enrichment'` → apply packet.
-      Best-effort with error logging; include `enrichment_applied` in the response.
-- [ ] `MarketingExecutionService.executeSingle`: post-run hook on
+      Best-effort with error logging; response surfaces `enrichmentApplied`.
+- [x] `MarketingExecutionService.executeSingle`: post-run hook on
       `template.output_schema.name` for the two enrichment schemas → parse rawOutput →
       validate → create `mkt_audits_list` record (auditPlatform) → apply packet.
       Best-effort; execution stays `completed` even if apply fails (log + flag).
-- [ ] Route: `POST /prompts/executions/external` response already returns
-      `{execution, audit}` — extend to surface `enrichment_applied`.
+- [x] Route: `POST /prompts/executions/external` returns the import result including
+      `enrichmentApplied` (no route change needed — the flag rides on the result).
+- [x] **Latent bug fixed**: `Prisma.join([])` throws on empty arrays — all six
+      `ARRAY[${Prisma.join(...)}]::text[]` sites across both services (including the
+      pre-existing `enrichMarket`/`enrichLocation` upserts) now go through an
+      empty-safe `textArraySql` helper. Caught by the new apply tests.
 
 ### Sprint C — proving-ground integration
 
-- [ ] `attachChildCampaign`: extend guard — accept children with
+- [x] `attachChildCampaign`: extend guard — accept children with
       `campaign_category='directory_enrichment'` (scope `category` or `city`) in
       addition to the existing intelligence/discovery rules. **Guard restructure
       note**: the current guard hard-fails any non-intelligence child with
@@ -184,20 +190,24 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
       The `child_already_parented` (409) check stays. Update the existing
       `provingGround.test.ts` assertions that expect rejection of non-intelligence
       children to instead expect acceptance for `directory_enrichment` children.
-- [ ] Cockpit (`ProvingGroundCockpitClient`): "Create enrichment campaign" action →
-      prefilled create (scope category/city, market fields) → attach as child via
-      `POST /:campaignId/children`. Also verify the cockpit's child-list rendering
-      (currently intelligence-discovery-shaped) handles category/city-scope children.
-- [ ] `MarketingOpsService` (web): `attachChild` + `createEnrichmentCampaign` helpers.
+- [x] Cockpit (`ProvingGroundCockpitClient`): "Create enrichment campaign" actions
+      (category + location buttons beside "Enrich Market Listings") →
+      prefilled create → attach as child via `POST /:campaignId/children`.
+      Child-list rendering verified + fixed: heading renamed to "Attached
+      campaigns" with a per-child intelligence/enrichment scope badge.
+- [x] `MarketingOpsService` (web): `attachProvingGroundChild` +
+      `createEnrichmentCampaign` helpers; `CampaignCreateInput.parent_campaign_id`
+      passthrough added.
 
 ### Sprint D — admin + public surfaces
 
-- [ ] `CampaignFormClient`: `campaign_category='directory_enrichment'` option; when set,
-      scope picker limited to category/city; city-scope auto-fills `category='__location__'`
-      (locked); city field accepts `'__all__'` for national category enrichment; title
-      autofill ("Category Enrichment — Halal Grocery — Columbus, OH" / "Location
-      Enrichment — Columbus, OH" / "… — National").
-- [ ] `CampaignDetailClient` Audits tab: mapped render cards for
+- [x] `CampaignFormClient`: `campaign_category='directory_enrichment'` option; when set,
+      scope picker limited to category/city (switching away resets the category);
+      city-scope auto-fills `category='__location__'` (selector replaced by a locked
+      sentinel note); category-scope shows an `__all__` hint on the city field; title
+      autofill ("Category Enrichment - Halal Grocery - Columbus, OH" / "Location
+      Enrichment - Columbus, OH" / "… - National"); per-category description block.
+- [x] `CampaignDetailClient` Audits tab: mapped render cards for
       `category_enrichment` / `location_enrichment` audits (meta title, description,
       keyword chips, secondary categories, schema type, applied-to target + link to the
       enrichment row). **Wiring point**: the `audit.platform → component` switch lives
@@ -207,16 +217,23 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
       `'location_enrichment'` before the generic-JSON fallthrough, or the audits render as
       a raw JSON blob. Build the two new card components under
       `apps/web/src/components/marketing-ops/` mirroring `CategoryAnalysisAuditCard`.
+      Implemented as a single `EnrichmentAuditCard` component handling both
+      platforms (mapped packet render + applied-to target derived from the
+      campaign's category/city/state, import-metadata badge).
+      Also: `STAGE_PROMPT_TYPES` gained `'enrichment'` for all active stages
+      (else the Prompts tab hid the enrichment template), web `PromptType` and
+      the prompt-library label/color maps extended.
 - [ ] Category enrichment admin page (`category-enrichment-admin` router +
       `/settings/admin/directory` surfaces): show `source_campaign_id` lineage,
-      `campaign_run` rows distinctly from deterministic rows.
+      `campaign_run` rows distinctly from deterministic rows. **Not yet built —
+      small follow-up; the lineage columns exist in the table.**
 - [ ] Location admin endpoints: `GET/POST /api/admin/directory/category-enrichment/locations`
       (list + trigger) — operator-triggered location enrichment without a campaign.
       **Scope note**: this is additive operator surface beyond the sprint's stated goal
       ("enrichment behaves like a campaign"); the auto-apply path already covers the
       campaign-driven case. Ship only if there's an operator ask for non-campaign
       triggering — otherwise defer to "Open items".
-- [ ] Public: `/directory/categories/[slug]` + `/place/category/[slug]` (no city) consume
+- [x] Public: `/directory/categories/[slug]` + `/place/category/[slug]` (no city) consume
       the `'__all__'` category packet for metadata + copy. **Fetch contract**: the no-city
       page calls the existing
       `GET /api/public/directory/category-enrichment?category=<slug>&city=__all__`
@@ -229,9 +246,12 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
 
 ### Sprint E — tests + verification
 
-- [ ] Unit: schema validators accept/reject; apply methods respect operator-override
-      guards; `__all__`/`__location__` sentinel handling; attach guard extension.
-- [ ] **Sentinel storage unit test**: assert `applyEnrichmentPacket` for a national
+- [x] Unit: schema validators accept/reject (`directoryEnrichment.schema.test.ts`);
+      apply-path sentinel + fan-out coverage
+      (`directoryEnrichment.apply.category.test.ts`,
+      `directoryEnrichment.apply.location.test.ts`); attach guard extension in
+      `provingGround.test.ts`.
+- [x] **Sentinel storage unit test**: assert `applyEnrichmentPacket` for a national
       category campaign stores `city='__all__'` and `state='__all__'` **exactly** (not
       `'__ALL__'` — the `normalizeReferenceState` passthrough output), and that a
       location campaign stores `category_key='__location__'` exactly. Regression guard
@@ -242,19 +262,24 @@ merge contract" decision (AI wins when non-empty; aggregate fills gaps).
       duplicate guardrail. Verify `normalizeSignatureValue('__all__')` preserves the
       leading underscores (it lowercases/trims but should not strip them); if it does,
       fix the normalizer or bypass it for sentinels in the dedup path.
+      Covered in `provingGround.test.ts` → "directory_enrichment
+      structural-duplicate guardrail" (verified `normalizeSignatureValue`
+      preserves `'__all__'` — no normalizer change needed).
 - [ ] **`on_demand` regression test**: after migration 279, `LocationMarketEnrichmentService.getLocation`
       for a previously-unenriched city succeeds (no 23514) and writes
       `trigger_source='on_demand'`. Pre-migration this path 500s on the public
       `GET /api/public/directory/location-enrichment` endpoint (the route's try/catch
       returns `internal_error`); post-migration it returns 200 with a real packet.
       Cover both the service call and the route-level 200.
-- [ ] **`provingGround.test.ts` updates**: the existing tests assert rejection of
+- [x] **`provingGround.test.ts` updates**: the existing tests assert rejection of
       non-intelligence children (`child_not_intelligence_scope`). Update them to expect
       acceptance for `campaign_category='directory_enrichment'` children (scope
       `category`/`city`) and keep rejection for other non-intelligence categories. Add
       a positive case: attach a `directory_enrichment` child → 200 `attached: true`.
 - [ ] Route tests: external import → execution + audit + applied row; scope mismatch → 400.
-- [ ] `pnpm checkapi`, `pnpm checkweb`.
+      (Unit coverage of the apply path + `assertScopeCompatible` exists; the
+      route-level test is still open.)
+- [x] `pnpm checkapi`, `pnpm checkweb` — both clean (49/49 new+touched tests pass).
 - [ ] Seed scripts re-run (local + prd), verify `updated_at` on both templates.
 - [ ] Migration 279 applied to local + prd (`psql $DATABASE_URL -f …`), then
       `prisma db pull` + `prisma generate` in each env (see Sprint A).

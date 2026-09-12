@@ -1181,7 +1181,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       {/* Children */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-          Intelligence campaigns ({children.length})
+          Attached campaigns ({children.length})
         </h2>
         {children.length > 0 && (
           <ul className="space-y-1.5 mb-3">
@@ -1195,6 +1195,16 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                   {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
                 </Link>
                 <div className="flex items-center gap-2">
+                  {/* The attach guard only admits intelligence or
+                      directory_enrichment children — a non-intelligence scope
+                      means it's an enrichment campaign. */}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                    c.scope === 'intelligence'
+                      ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                  }`}>
+                    {c.scope === 'intelligence' ? 'intelligence' : 'enrichment'}
+                  </span>
                   <span className="text-[10px] text-gray-400">{c.stage}</span>
                   <button
                     onClick={() => handleDetach(c.id)}

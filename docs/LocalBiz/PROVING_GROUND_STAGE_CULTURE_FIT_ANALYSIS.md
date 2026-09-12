@@ -18,6 +18,18 @@
 > - **The stage culture gains** a natural aggregation surface — the proving
 >   ground becomes the "deployment view" of the stage pipeline, a roll-up the
 >   per-business stages cannot produce on their own.
+>
+> **Review note (v2 — post-gap-analysis reconciliation):** the implementation
+> sketches in §6 have been corrected against the codebase and against
+> `PROVING_GROUND_PRE_IMPLEMENTATION_GAP_ANALYSIS.md` (which reviewed this
+> document). Corrections: the cockpit's status filter excludes `dismissed`;
+> stage buckets must count distinct campaigns, not queue rows; the endpoint's
+> `stillInQueue` must come from queue-status buckets, not subtraction;
+> business grandchildren linked via `parent_campaign_id` (not the queue) need
+> a union in the distribution and a third hop in `resolveBusinessProvingGround`;
+> `promoteToProvingGround` hard-requires `city` + `category`; and the
+> `seed` bucket is stage-based, while "has been seeded" today lives on
+> `queue.seed_id`. §9 carries the review changelog.
 
 ---
 
@@ -183,18 +195,28 @@ A stage distribution roll-up of its spawned business-scope campaigns:
 
 ```
 Proving Ground: Madison Grocery
-├── 24 prospects in the pipeline
-│   ├── seek:           8  (not yet seeded)
-│   ├── seed:           5  (seeded, claim invited)
-│   ├── preview_built:  4  (pitch built, awaiting show)
-│   ├── shown:           3  (pitch shown, awaiting payment)
-│   ├── paid:            2  (paid, in fulfillment)
-│   ├── delivered:       1  (delivered)
-│   ├── tenant_onboarded: 1 (converted)
-│   └── lost/dead:       0
-├── 6 prospects still in queue (not yet graduated to campaigns)
+├── 24 prospects in the pipeline (distinct graduated campaigns)
+│   ├── seek:            8
+│   ├── seed:            5  (stage — 0 until migration 280 ships AND the
+│   │                      operator transitions; see §7 for the seed_id caveat)
+│   ├── preview_built:   4
+│   ├── shown:           3
+│   ├── paid:            2
+│   ├── delivered:       1
+│   ├── tenant_onboarded:1
+│   ├── lost:            0  (terminal stages render separately — lost = said
+│   ├── dead:            0   no, dead = killed; see pre-impl gap §4.4)
+│   └── …other stages as they appear (retainer_*, *_submitted, recovery
+│       stages for escalated campaigns — render arbitrary keys, §6.3)
+├── 6 prospects still in queue (queued / hold / in_thread, pre-graduation)
+│   └── of which 4 seeded (queue.seed_id set — the wedge already deployed)
 └── 3 prospects dismissed
 ```
+
+Note the two different "seeded" signals: the `seed` **stage** bucket counts
+graduated campaigns the operator moved through `seek → seed`; the
+`seed_id`-based count measures the PG-preflight wedge on the queue side. They
+are related but not interchangeable (§7).
 
 This tells the launch operator: "most of my prospects are still in seek/seed —
 the wedge is working but the pitch hasn't landed yet. Two have paid. The launch
@@ -282,9 +304,9 @@ The PG concept can generalize along two axes:
 |---|---|---|
 | `CampaignScope` enum | `'business' \| 'category' \| 'city' \| 'intelligence'` | **No** — `city` and `category` already cover the geographic axis. State-scoped = `city` with city=null. Mixed = no fixed geo on the PG row. |
 | Guardrail signature | `scope + campaign_category + category + city + state` (line ~581) | **No** — already handles category/city scope + null city/state. A mixed PG with null city+state gets a nationwide signature (one active mixed PG at a time — may need a name-based discriminator). |
-| `promoteToProvingGround` | Hardcodes `scope: 'city'` (line ~994) | **Yes** — accept the source campaign's scope (city or category) and pass it through. |
-| `attachChildCampaign` guards | Child must be `scope='intelligence'` (or `directory_enrichment`) | **Yes** — relax to allow attaching business-scope campaigns directly (for the "mixture" case where a PG groups businesses from different cities without an intelligence intermediary). |
-| Queue → PG linkage | `source_campaign_id` → intelligence child → `parent_campaign_id` → PG | **No** — already works. A business campaign's PG is resolved through the queue entry's source. |
+| `promoteToProvingGround` | Hardcodes `scope: 'city'` (line ~994) AND hard-requires non-empty `category` + `city` (lines ~982-987) | **Yes** — accept the source campaign's scope (city or category), pass it through, and make the `city`/`category` requirements conditional on scope (§6.4). |
+| `attachChildCampaign` guards | Child must be `scope='intelligence'` (or `directory_enrichment`) | **Yes** — relax to allow attaching business-scope campaigns directly (for the "mixture" case) — AND update every linkage reader (`resolveBusinessProvingGround`, the distribution query, the cockpit attach/children UI). See §6.4. |
+| Queue → PG linkage | `source_campaign_id` → intelligence child → `parent_campaign_id` → PG | **Mostly** — works for queue-graduated campaigns, but business campaigns created via the `parent_campaign_id` create-time passthrough / derive flows (business grandchildren) bypass the queue entirely and are invisible to both the resolver and the distribution. Needs the `parent_campaign_id` union/hop (§6.2). |
 | Stage awareness (new) | Missing | **Yes** — the read-only aggregation from §4. |
 
 ### 5.4 The mixed-scoped PG (the hard case)
@@ -328,9 +350,13 @@ The queue-list initiation is the most interesting because it doesn't require
 an intelligence intermediary — the operator selects prospects from the queue
 and groups them into a deployment. This needs either:
 - A `proving_ground_id` column on `mkt_prospect_queue` (direct PG → queue
-  linkage without going through `source_campaign_id`), or
+  linkage without going through `source_campaign_id`) — every linkage reader
+  must learn the column with `OR` semantics and entry-level dedup; see §6.4
+  for the full reader list, or
 - Reusing `source_campaign_id` by creating a lightweight intelligence-scope
-  "shell" campaign as the intermediary (preserves the existing linkage path).
+  "shell" campaign as the intermediary (preserves the existing linkage path
+  but severs the entry's link to the discovery run that actually sourced it —
+  `source_audit_id`/`discovery_provenance` partially compensate).
 
 ---
 
@@ -340,27 +366,65 @@ and groups them into a deployment. This needs either:
 
 The cockpit already loads queue entries with `includeCampaigns: true`, and
 each entry carries `campaign_stage`. For the basic case (the cockpit's current
-200-entry load), the stage distribution is a frontend aggregation:
+200-entry load), the stage distribution is a frontend aggregation — **with
+four corrections** the naive version gets wrong:
+
+1. **`dismissed` is not in the cockpit's load.** The queue call filters
+   `status: ['queued','in_thread','hold','verify_then_outreach','campaign_created']`
+   — `dismissed` rows never arrive, so counting them in the loop always
+   yields 0. Either add `'dismissed'` to the status filter (cheap — they're
+   just more rows) or issue a separate `status=dismissed` count request.
+2. **Bucket by distinct campaign, not queue row.** Two queue entries for the
+   same business can both graduate into the *same* `processed_campaign_id`
+   (the AC84 `campaign_exists` path marks the second entry
+   `campaign_created` against the pre-existing campaign). Counting entries
+   double-counts the stage. Dedupe on `processed_campaign_id`.
+3. **Count by queue `status` first, stage second.** A `campaign_created`
+   entry with null `campaign_stage` is a data error, not "still in queue"
+   (pre-impl gap §4.2). And `hold`/`in_thread` are still-in-queue but worth
+   their own sub-buckets.
+4. **The 200-entry cap silently truncates.** If `queue.entries.length ===
+   limit`, the distribution is a partial view — surface a caveat or fall
+   back to the dedicated endpoint (§6.2).
 
 ```tsx
-// In ProvingGroundCockpitClient, after queue entries are loaded:
+// In ProvingGroundCockpitClient — request dismissed too, so the bucket works:
+//   status: ['queued','in_thread','hold','verify_then_outreach',
+//            'campaign_created','dismissed']
 const stageDistribution = useMemo(() => {
-  const byStage: Record<string, number> = {};
+  const campaignStageById = new Map<string, string | null>();
   let stillInQueue = 0;
+  let seededPreGraduation = 0;   // queue.seed_id set, no campaign yet
   let dismissed = 0;
   for (const e of queue.entries) {
     if (e.status === 'dismissed') { dismissed++; continue; }
-    if (e.campaign_stage) {
-      byStage[e.campaign_stage] = (byStage[e.campaign_stage] ?? 0) + 1;
+    if (e.status === 'campaign_created' && e.processed_campaign_id) {
+      // Dedupe: several queue rows can point at one campaign (AC84).
+      campaignStageById.set(e.processed_campaign_id, e.campaign_stage ?? 'seek');
     } else {
-      stillInQueue++;  // graduated campaign not yet created, or stage null
+      stillInQueue++;  // queued / hold / in_thread / verify_then_outreach
+      if (e.seed_id) seededPreGraduation++;
     }
   }
-  return { byStage, stillInQueue, dismissed, totalInPipeline: Object.values(byStage).reduce((a, b) => a + b, 0) };
+  const byStage: Record<string, number> = {};
+  for (const stage of campaignStageById.values()) {
+    byStage[stage ?? 'seek'] = (byStage[stage ?? 'seek'] ?? 0) + 1;
+  }
+  return {
+    byStage,
+    stillInQueue,
+    seededPreGraduation,
+    dismissed,
+    totalInPipeline: campaignStageById.size,
+    truncated: queue.entries.length >= 200,  // partial view — show caveat
+  };
 }, [queue.entries]);
 ```
 
-No new endpoint, no new query. The signal is already there.
+No new endpoint, no new query — but the status filter must include
+`dismissed`, and the renderer must label arbitrary stage keys (recovery-track
+stages like `audit_identified` appear on escalated campaigns; don't hardcode
+the review-stage map).
 
 ### 6.2 Stage distribution — dedicated endpoint (for large PGs + drill-down)
 
@@ -376,55 +440,101 @@ async getProvingGroundStageDistribution(
   totalInPipeline: number;
   byStage: Record<string, number>;
   stillInQueue: number;
+  seededPreGraduation: number;
   dismissed: number;
 }> {
-  // 1. Resolve the tree: PG + intelligence children
+  // 1. Resolve the tree: PG + children (one level — the attach guard +
+  //    create-time passthrough can produce deeper trees; if business
+  //    grandchildren are in scope, recurse or union as below).
   const children = await this.prisma.mkt_campaigns_list.findMany({
     where: { parent_campaign_id: provingGroundId },
     select: { id: true },
   });
   const treeIds = [provingGroundId, ...children.map(c => c.id)];
 
-  // 2. Find queue entries graduated to business campaigns
+  // 2a. Queue entries graduated to business campaigns (dedupe on
+  //     processed_campaign_id — multiple rows can share one campaign).
   const queueEntries = await this.prisma.mkt_prospect_queue.findMany({
     where: {
       source_campaign_id: { in: treeIds },
       processed_campaign_id: { not: null },
     },
-    select: { processed_campaign_id: true, status: true },
+    select: { processed_campaign_id: true },
   });
+  const campaignIds = new Set(
+    queueEntries.map(e => e.processed_campaign_id).filter((id): id is string => id != null),
+  );
 
-  // 3. Load the business campaigns' stages
-  const campaignIds = queueEntries
-    .map(e => e.processed_campaign_id)
-    .filter((id): id is string => id != null);
+  // 2b. UNION: business-scope campaigns linked DIRECTLY to the tree via
+  //     parent_campaign_id — derive flows (deriveFromParent sets
+  //     parentCampaignId at createCampaign, line ~1454) and any future
+  //     direct-attach business children never touch the queue. Without this
+  //     branch they are invisible to the distribution.
+  const directChildren = await this.prisma.mkt_campaigns_list.findMany({
+    where: { parent_campaign_id: { in: treeIds }, scope: 'business' },
+    select: { id: true },
+  });
+  directChildren.forEach(c => campaignIds.add(c.id));
 
+  // 3. Load the business campaigns' stages (Set → deduped groupBy input).
   const stageGroups = await this.prisma.mkt_campaigns_list.groupBy({
     by: ['stage'],
-    where: { id: { in: campaignIds } },
+    where: { id: { in: [...campaignIds] } },
     _count: { id: true },
   });
-
-  // 4. Build the distribution
   const byStage: Record<string, number> = {};
   stageGroups.forEach(g => { byStage[g.stage] = g._count.id; });
 
-  // 5. Count queue-only and dismissed
-  const allQueue = await this.prisma.mkt_prospect_queue.count({
-    where: { source_campaign_id: { in: treeIds } },
-  });
-  const dismissed = await this.prisma.mkt_prospect_queue.count({
-    where: { source_campaign_id: { in: treeIds }, status: 'dismissed' },
-  });
+  // 4. Queue-side buckets from STATUS, not subtraction. dismiss() has no
+  //    status guard — a campaign_created row can be dismissed while keeping
+  //    processed_campaign_id, so `total − graduated − dismissed`
+  //    double-subtracts those rows (can go negative).
+  const [stillInQueue, seededPreGraduation, dismissed] = await Promise.all([
+    this.prisma.mkt_prospect_queue.count({
+      where: {
+        source_campaign_id: { in: treeIds },
+        status: { in: ['queued', 'hold', 'in_thread', 'verify_then_outreach'] },
+      },
+    }),
+    this.prisma.mkt_prospect_queue.count({
+      where: {
+        source_campaign_id: { in: treeIds },
+        status: { in: ['queued', 'hold', 'in_thread', 'verify_then_outreach'] },
+        seed_id: { not: null },
+      },
+    }),
+    this.prisma.mkt_prospect_queue.count({
+      where: { source_campaign_id: { in: treeIds }, status: 'dismissed' },
+    }),
+  ]);
 
   return {
-    totalInPipeline: campaignIds.length,
+    totalInPipeline: campaignIds.size,
     byStage,
-    stillInQueue: allQueue - campaignIds.length - dismissed,
+    stillInQueue,
+    seededPreGraduation,
     dismissed,
   };
 }
 ```
+
+**Required alongside this endpoint:**
+
+- **Indexes (numbered migration):** `mkt_prospect_queue.source_campaign_id`
+  and `mkt_campaigns_list.parent_campaign_id` are both unindexed today
+  (verified in `schema.prisma`). Every tree query — including the existing
+  cockpit load — seq-scans. Ship `@@index([source_campaign_id])` and
+  `@@index([parent_campaign_id])` with this endpoint; it exists precisely for
+  the large-PG case where the scans hurt.
+- **`resolveBusinessProvingGround` third hop:** the resolver traces
+  queue → `source_campaign_id` → parent. Business campaigns linked directly
+  (`parent_campaign_id` → PG, or → intelligence child → PG) return null and
+  lose the "View Proving Ground" link. Add a `campaign.parent_campaign_id`
+  hop — and decide whether grandchildren resolve one or two levels up.
+- **Dedup-verdict exclusion (pre-impl gap §4.5 / D3):** merged-away seeds can
+  leave two graduated campaigns for one real business. Acceptable to
+  double-count in v1; add the `mkt_prospect_dedup_verdicts` exclusion join
+  here when this endpoint ships.
 
 Route: `GET /api/admin/marketing-ops/:campaignId/stage-distribution` (gated to
 `proving_ground` campaigns).
@@ -433,7 +543,7 @@ Route: `GET /api/admin/marketing-ops/:campaignId/stage-distribution` (gated to
 the dedicated endpoint (§6.2) when PGs grow past the entry-load limit or
 drill-down is needed.
 
-### 6.2 Frontend: cockpit stage distribution panel
+### 6.3 Frontend: cockpit stage distribution panel
 
 A new panel in the proving ground cockpit, between the funnel metrics and the
 preflight checklist, rendering the stage distribution as a horizontal bar or
@@ -454,19 +564,61 @@ aggregated across all spawned prospects:
 Each stage count links to a filtered campaign list (`?provingGround=<id>
 &stage=<stage>`), so the operator can drill into the prospects at each stage.
 
-### 6.3 PG scope flex (ships after stage awareness)
+**The drill-down link is not free — two pieces of work are required:**
+
+1. **Backend filter.** `listCampaigns` supports `stage` and
+   `parentCampaignId` (`CampaignListFilters`, `MarketingCampaignService.ts`
+   ~423) but `parentCampaignId=<pg>` returns the PG's *children* (intelligence
+   campaigns), not the graduated business campaigns. A new
+   `provingGroundId` filter must join through the queue —
+   `id IN (SELECT processed_campaign_id FROM mkt_prospect_queue WHERE
+   source_campaign_id IN (treeIds))` — plus the direct-`parent_campaign_id`
+   union for grandchildren (same linkage as the distribution endpoint).
+2. **Frontend wiring.** `CampaignListClient` has a stage dropdown but reads
+   no `searchParams` — add `useSearchParams` handling for `provingGround` +
+   `stage`, and pass `provingGroundId` through `listCampaigns`.
+
+### 6.4 PG scope flex (ships after stage awareness)
 
 - `promoteToProvingGround`: accept `scope?: 'city' | 'category'` (default
-  `city`); pass through to `createCampaign`.
+  `city`); pass through to `createCampaign`. **The hard requirements must
+  become conditional:** the function currently throws when `category` OR
+  `city` is empty (lines ~982-987). A category-scope PG legitimately has no
+  city; a state-scoped/mixed PG may have neither. Gate the `city` requirement
+  on `scope === 'city'` and the `category` requirement on non-mixed scopes.
 - `attachChildCampaign`: for mixed PGs, relax the `scope='intelligence'`
   guard to also accept `scope='business'` when the PG has no fixed geography
   (mixed case). The business campaign links directly to the PG as a child.
+  **This is not a one-line change** — relaxing the guard also requires:
+  - `resolveBusinessProvingGround`: add a `campaign.parent_campaign_id → PG`
+    hop, or directly-attached business campaigns silently lose the "View
+    Proving Ground" link.
+  - The stage-distribution union (§6.2 step 2b) — direct children are
+    already covered once that branch exists.
+  - The cockpit's `attachable` list (filters to intelligence discovery runs
+    only, ~line 217) and the children panel (renders by focus) — business
+    children need their own rendering.
 - Queue-list initiation: add `proving_ground_id` to `mkt_prospect_queue`
   (nullable FK → `mkt_campaigns_list`), set when an operator groups queue
-  entries into a PG from the queue board. The stage distribution query
-  includes `proving_ground_id` in its `treeIds` set.
+  entries into a PG from the queue board. **Every linkage reader must learn
+  the new column** — it is a second column, not an addition to `treeIds`
+  (`treeIds` feeds `source_campaign_id IN (...)`):
+  - cockpit queue load (`source_campaign_ids` filter → needs
+    `OR: [{ source_campaign_id IN treeIds }, { proving_ground_id = pgId }]`)
+  - the stage-distribution endpoint (same OR)
+  - `resolveBusinessProvingGround` (queue entry → `proving_ground_id` direct)
+  - `getCohortFunnel({ campaignIds })` tree scoping
+  - `ProvingGroundDedupService` scoping
+  Define exclusivity semantics up front: an entry carrying BOTH
+  `source_campaign_id` and `proving_ground_id` must not double-count —
+  dedupe on entry id across the OR. The shell-campaign alternative avoids
+  the column but re-points `source_campaign_id` away from the real discovery
+  run — provenance is partially preserved via `source_audit_id` /
+  `discovery_provenance`, but the "which run found this prospect" link is
+  lost. Also requires a numbered migration (column + FK + index) per the
+  migration discipline in AGENTS.md.
 
-### 6.4 What this does NOT change
+### 6.5 What this does NOT change
 
 - No new stage on the proving ground.
 - No transition map entry for the proving ground.
@@ -495,6 +647,20 @@ not coupled:
   first, it works with the current stages and gains `seed` for free when the
   stage sprint lands.
 
+**One caveat the mock in §4.1 glosses:** the `seed` stage and "has been
+seeded" are different signals. PG-preflight seeding
+(`createSeedsForProvingGround`) stamps `queue.seed_id` and leaves the row
+`queued` — the wedge executes *before* a campaign exists. And per the seed
+sprint's own scope, `seek → seed` stays operator-initiated (no auto-advance):
+a PG-seeded prospect that later graduates enters at `seek` and reaches `seed`
+only when the operator moves it. So the `seed` stage bucket systematically
+under-reports actual seeding activity — the true "seeded" number is
+`queue.seed_id IS NOT NULL`, which is why the corrected aggregation (§6.1,
+§6.2) carries a separate `seededPreGraduation` bucket. Whether the seed-stage
+checklist auto-completes / the stage auto-advances for pre-seeded PG
+graduates is open decision D2 in the pre-implementation gap analysis — if D2
+resolves to auto-advance, the two signals converge and the caveat disappears.
+
 **Recommended order:** ship the `seed` stage first (it's the structural
 change), then add the proving ground stage awareness (it's a read-only
 addition that benefits from the richer stage set), then flex the PG scope
@@ -502,7 +668,59 @@ addition that benefits from the richer stage set), then flex the PG scope
 
 ---
 
-## 8. Conclusion
+## 8. Test Plan & Ship Checklist
+
+The corrected design still ships in the same order (frontend aggregation →
+endpoint → scope flex), but each step carries verification the original
+sketch omitted:
+
+**Frontend aggregation (§6.1):**
+- [ ] `dismissed` added to the cockpit's queue status filter (or separate
+      count) — verify the dismissed bucket is non-zero on a PG with
+      dismissed rows.
+- [ ] Stage buckets count distinct `processed_campaign_id` — craft two queue
+      rows graduated to the same campaign (AC84 path) and confirm a single
+      count.
+- [ ] `campaign_created` + null `campaign_stage` surfaces as `seek` (or a
+      warning), never "still in queue".
+- [ ] `truncated` caveat renders when `entries.length === limit`.
+- [ ] `seededPreGraduation` counts `seed_id`-stamped rows without campaigns.
+- [ ] Unknown/recovery stage keys render with a fallback label.
+- [ ] `listProspectQueue` request bypasses the service `cacheTTL` (or the
+      panel tolerates its staleness) — the distribution reflects a just-run
+      transition after reload.
+
+**Dedicated endpoint (§6.2):**
+- [ ] `stillInQueue` computed from status buckets — dismiss a
+      `campaign_created` row and confirm no double-subtract (value stays
+      ≥ 0 and consistent).
+- [ ] A business grandchild linked via `parent_campaign_id` (derive flow —
+      `createCampaign` writes `parent_campaign_id` directly, ~line 773)
+      appears in `byStage` and in `totalInPipeline`.
+- [ ] Index migration applied to `mkt_prospect_queue.source_campaign_id`
+      and `mkt_campaigns_list.parent_campaign_id` on local + prd.
+- [ ] `resolveBusinessProvingGround` resolves direct-`parent_campaign_id`
+      campaigns (third hop) — "View Proving Ground" renders for them.
+- [ ] Dedup-verdict exclusion (pre-impl §4.5 / D3) — merged-away seeds'
+      campaigns excluded, or explicitly deferred with a code comment.
+
+**Drill-down (§6.3):**
+- [ ] `listCampaigns` `provingGroundId` filter returns queue-graduated AND
+      parent-linked business campaigns, combinable with `stage`.
+- [ ] `CampaignListClient` reads `?provingGround=<id>&stage=<stage>`.
+
+**Scope flex (§6.4 — deferred):**
+- [ ] `promoteToProvingGround` accepts `scope='category'`; `city` requirement
+      conditional on scope (new tests next to the provingGround.test.ts
+      suite).
+- [ ] Business-scope attach: resolver hop + distribution union + cockpit UI
+      all updated together.
+- [ ] `proving_ground_id` initiation: all linkage readers updated, OR-dedup
+      verified, migration shipped.
+
+---
+
+## 9. Conclusion
 
 The PG is a **batch label**, not a container — the same pattern as
 `seed_batch` on directory presence seeds. Each child (intelligence campaign)
@@ -536,3 +754,34 @@ The stage signal is already flowing (queue entries carry `campaign_stage`).
 The basic stage distribution is a **frontend-only aggregation** — no new
 endpoint required. The dedicated endpoint is a later optimization for large
 PGs and drill-down.
+
+### 9.1 Review changelog (v2)
+
+This document was reviewed against the codebase and against
+`PROVING_GROUND_PRE_IMPLEMENTATION_GAP_ANALYSIS.md`. Corrections applied in
+place:
+
+- §4.1 mock: terminal stages split; `seeded` shown as a `seed_id`-based
+  pre-graduation bucket distinct from the `seed` stage.
+- §5.3 table: `promoteToProvingGround`'s `city`/`category` hard requirements
+  added; queue→PG linkage row now flags business grandchildren; attach
+  relaxation notes the reader updates it drags.
+- §5.5: `proving_ground_id` reader list + OR/dedup semantics; shell-campaign
+  provenance loss.
+- §6.1: status-first counting, distinct-campaign dedup, `dismissed` load
+  fix, truncation caveat, `seededPreGraduation` bucket, arbitrary stage
+  labels, cache staleness check.
+- §6.2: `stillInQueue` from status buckets (dismissal of graduated rows made
+  the subtraction unsafe); `parent_campaign_id` union for grandchildren /
+  future direct business children; required indexes migration;
+  `resolveBusinessProvingGround` third hop; dedup-verdict exclusion.
+- §6.3: drill-down link priced — new `provingGroundId` listCampaigns filter
+  + `searchParams` wiring.
+- §6.4 (renumbered; the doc previously had two §6.2s): scope-conditional
+  `city`/`category` validation; full reader list for `proving_ground_id`.
+- §7: `seed` stage vs `queue.seed_id` semantic caveat (open decision D2).
+- §8: test plan & ship checklist added.
+
+Where this doc and the pre-implementation gap analysis diverge, the
+pre-implementation doc is canonical for decisions D1–D5; this doc is
+canonical for the stage-awareness implementation shape.

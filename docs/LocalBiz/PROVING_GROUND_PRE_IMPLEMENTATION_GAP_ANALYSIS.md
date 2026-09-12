@@ -356,6 +356,29 @@ const stageDistribution = useMemo(() => {
 }, [queue.entries]);
 ```
 
+**Post-review additions (v2 — verified against code):**
+
+- **`dismissed` is never loaded.** The cockpit's queue call filters
+  `status: ['queued','in_thread','hold','verify_then_outreach','campaign_created']`
+  — `dismissed` rows don't arrive, so the bucket above always reads 0. Add
+  `'dismissed'` to the filter or use a separate count request.
+- **Dedupe on `processed_campaign_id`.** AC84's `campaign_exists` path can
+  mark a second queue row `campaign_created` against the *same* campaign —
+  counting entries double-counts the stage. Bucket a `Map<campaignId, stage>`,
+  not rows.
+- **Truncation.** `limit: 200` silently caps the set; surface a caveat when
+  `entries.length === limit` or fall back to the dedicated endpoint.
+- **Endpoint formula fix.** The endpoint sketch's
+  `stillInQueue = allQueue − graduated − dismissed` double-subtracts:
+  `dismiss()` has no status guard, so a graduated row can be dismissed while
+  keeping `processed_campaign_id`. Compute `stillInQueue` from status
+  buckets instead. (Corrected sketch: culture-fit doc §6.2.)
+- **Business grandchildren are queue-invisible.** `createCampaign` writes
+  `parent_campaign_id` directly (~line 773; derive flows set it at ~1454), so
+  business campaigns can hang under intelligence children with no queue
+  linkage. The distribution needs a `parent_campaign_id IN treeIds` union,
+  and `resolveBusinessProvingGround` needs a `parent_campaign_id → PG` hop.
+
 ### 4.3 Multiple campaigns per child
 
 A single intelligence child can produce many queue entries, each graduating
@@ -411,7 +434,11 @@ dedicated endpoint ships.
 
 The culture-fit analysis (§5.3) identifies this as the main scope-flex gap.
 The guardrail already supports `scope='category'` and null-city/state
-signatures, but the promotion path forces `scope: 'city'`.
+signatures, but the promotion path forces `scope: 'city'` — **and hard-
+requires non-empty `category` AND `city` (lines ~982-987)**. Scope flex means
+making those validations conditional on scope, not just threading a scope
+param through: a category-scope PG has no city; a state/mixed PG may have
+neither.
 
 **Status:** Deferred enhancement, not a cohesion blocker. The stage-awareness
 layer works regardless of PG scope (it reads through the queue linkage, not
@@ -570,6 +597,7 @@ distribution.
 | Gap log panel | **Built** | Existing. |
 | Promote/dismiss/seed actions | **Built** | Existing. |
 | **Stage distribution panel** | **Missing** | The core awareness feature. Frontend-only for the basic case. |
+| **Campaign-list drill-down** (`?provingGround=<id>&stage=<stage>`) | **Missing** | Needs a new `provingGroundId` filter on `listCampaigns` (queue join + `parent_campaign_id` union) AND `useSearchParams` wiring in `CampaignListClient` — neither exists. |
 | Due-today mini-list | **Built** | Existing (queue entries with `next_touch_at`). |
 
 **Gap:** Only the stage distribution panel is missing. Everything else is
@@ -632,8 +660,12 @@ is opaque to child internals.
   `VARCHAR(50)` with no CHECK constraint — verified).
 - The `seed` stage requires `date_seed` column addition (migration 280 per
   the seed-stage sprint plan).
-- The PG stage-awareness layer requires **no migration** (it reads existing
-  columns).
+- The PG stage-awareness frontend aggregation requires **no migration** (it
+  reads existing columns). The **dedicated endpoint does:** neither
+  `mkt_prospect_queue.source_campaign_id` nor
+  `mkt_campaigns_list.parent_campaign_id` is indexed — ship a numbered
+  migration adding both `@@index`es with the endpoint, since it exists for
+  the large-PG case where the seq-scans hurt.
 - The PG scope flex requires **no migration** (the guardrail already supports
   category/city scope + null city/state).
 
@@ -679,12 +711,23 @@ is opaque to child internals.
 
 2. **Dedicated stage-distribution endpoint** (§4.5, culture-fit §6.2) —
    needed only when PGs grow past the entry-load limit or drill-down is
-   needed.
+   needed. Ships with the two tree-column indexes (§10.2) and the
+   `parent_campaign_id` union for queue-invisible business grandchildren
+   (§4.2 v2 notes).
 
-3. **Dedup-verdict exclusion in stage distribution** (§4.5) — exclude
+3. **Campaign-list drill-down filter** (§9.1) — `provingGroundId` on
+   `listCampaigns` + `useSearchParams` in `CampaignListClient`. Only needed
+   when the stage counts become links.
+
+4. **`resolveBusinessProvingGround` third hop** — `parent_campaign_id → PG`
+   (directly or via an intelligence parent) so non-queue-linked business
+   campaigns keep the "View Proving Ground" link. Bundles with §5 attach
+   relaxation.
+
+5. **Dedup-verdict exclusion in stage distribution** (§4.5) — exclude
    merged-away seeds from the count. Acceptable to double-count for v1.
 
-4. **GBP enrichment dedup** (§3.3) — avoid redundant enrichment when the
+6. **GBP enrichment dedup** (§3.3) — avoid redundant enrichment when the
    preflight already enriched the listing.
 
 ---
