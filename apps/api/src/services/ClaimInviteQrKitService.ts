@@ -215,10 +215,15 @@ export async function generateClaimInvitePng(
 
 /**
  * Generate a 4x6" postcard PDF with the claim-invite QR code.
+ *
+ * qrDataUrlOverride lets the admin QR designer (ClaimQrDesignerModal) ship a
+ * client-rendered styled QR — logo overlay, dot/corner styles — into the same
+ * postcard layout. When absent, falls back to the classic B/W qrcode render.
  */
 export async function generateClaimInvitePostcard(
   seedId: string,
   variant: ClaimInviteQrVariant = 'mail',
+  qrDataUrlOverride?: string,
 ): Promise<GeneratedClaimPostcard> {
   const kit = await resolveClaimInviteKit(seedId);
   if (!kit) throw new Error('no_active_claim_token');
@@ -281,7 +286,7 @@ export async function generateClaimInvitePostcard(
   // ── QR code ───────────────────────────────────────────────────────────
   const qrSize = 1.4;
   const qrX = (pageWidth - qrSize) / 2;
-  const qrDataUrl = await QRCode.toDataURL(qrUrl, {
+  const qrDataUrl = qrDataUrlOverride ?? await QRCode.toDataURL(qrUrl, {
     width: 400,
     margin: 1,
     errorCorrectionLevel: 'H',

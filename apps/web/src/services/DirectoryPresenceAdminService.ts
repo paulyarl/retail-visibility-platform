@@ -629,6 +629,26 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return (result.data as unknown as Blob) ?? null;
   }
 
+  /** POST /api/admin/directory-presence/presence-seeds/:id/qr-kit/postcard — styled variant.
+   *  Sends a client-rendered QR data URL (from the ClaimQrDesignerModal shared
+   *  qr-engine) so the printed postcard embeds the styled code instead of the
+   *  classic B/W render. */
+  async downloadClaimInvitePostcardStyled(
+    seedId: string,
+    variant: 'mail' | 'walkin' | 'social',
+    qrDataUrl: string,
+  ): Promise<Blob | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/postcard`,
+      { method: 'POST', body: JSON.stringify({ variant, qrDataUrl }) },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
+  }
+
   async updateFields(
     id: string,
     fields: {

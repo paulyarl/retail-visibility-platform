@@ -1857,6 +1857,38 @@ router.get('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (r
   }
 });
 
+/** POST /api/admin/directory/presence-seeds/:id/qr-kit/postcard — styled postcard.
+ *  Body: { variant?, qrDataUrl? }. The admin QR designer (ClaimQrDesignerModal)
+ *  posts its client-rendered styled QR (data:image/png;base64,...) so the
+ *  printed postcard carries the same styled code the operator previewed.
+ *  qrDataUrl is optional — omitting it yields the classic B/W render. */
+router.post('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const variant = parseQrVariant(req.body?.variant ?? req.query.variant);
+    const qrDataUrl = typeof req.body?.qrDataUrl === 'string' ? req.body.qrDataUrl : undefined;
+    if (
+      qrDataUrl &&
+      (!qrDataUrl.startsWith('data:image/png;base64,') || qrDataUrl.length > 8_000_000)
+    ) {
+      return res.status(400).json({ error: 'invalid_qr_data_url' });
+    }
+    const { pdfBuffer, filename } = await generateClaimInvitePostcard(id, variant, qrDataUrl);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.send(pdfBuffer);
+  } catch (error: any) {
+    if (error?.message === 'no_active_claim_token') {
+      return res.status(404).json({ error: 'no_active_claim_token' });
+    }
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/qr-kit/postcard] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /**
  * POST /api/admin/directory-presence/presence-seeds/:id/compose
  * Return the deterministic composed enrichment for a seed (audit: null, market profile).

@@ -37,9 +37,11 @@ import {
   Ban,
   QrCode,
   Download,
+  Palette,
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
+import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import { slugify } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -227,6 +229,9 @@ export default function PresenceSeedDetailPage() {
   const [qrKit, setQrKit] = useState<ClaimInviteQrKitMeta | null>(null);
   const [qrDownloading, setQrDownloading] = useState<string | null>(null);
   const [copiedQrLink, setCopiedQrLink] = useState<string | null>(null);
+  const [qrDesignerVariant, setQrDesignerVariant] = useState<
+    'mail' | 'walkin' | 'social' | null
+  >(null);
   const [touches, setTouches] = useState<OutreachTouch[]>([]);
   const [touchChannel, setTouchChannel] = useState<
     'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'visit' | 'other'
@@ -582,6 +587,37 @@ export default function PresenceSeedDetailPage() {
   // Claimed seeds have been promoted to a real customer relationship — refuse
   // to delete them from the UI to prevent destroying customer data.
   const canDelete = status !== 'claimed';
+
+  // Claim QR kit variants — one tracked redirect URL per delivery channel.
+  // Shared by the artifact cards and the QR designer modal.
+  const qrVariants = qrKit
+    ? [
+        {
+          variant: 'mail' as const,
+          title: 'Mail postcard',
+          desc: 'Mailed 4×6 invite — scans record as claim_invite.',
+          url: qrKit.qrUrl,
+          postcard: true,
+        },
+        {
+          variant: 'walkin' as const,
+          title: 'Walk-in leave-behind',
+          desc: 'Hand-delivered card — scans record as claim_invite_walkin.',
+          url: qrKit.qrUrlWalkin,
+          postcard: true,
+        },
+        {
+          variant: 'social' as const,
+          title: 'Social / DM link',
+          desc: 'Send the tracked link in a DM or post — taps record as claim_invite_social.',
+          url: qrKit.qrUrlSocial,
+          postcard: false,
+        },
+      ]
+    : [];
+  const qrDesignerConfig = qrDesignerVariant
+    ? qrVariants.find((v) => v.variant === qrDesignerVariant) ?? null
+    : null;
 
   // Public shelf page for a category name. Unclaimed seeds render on
   // /place/category shelves (primary + secondaries); claiming flips
@@ -1582,7 +1618,9 @@ export default function PresenceSeedDetailPage() {
         <h2 className="text-lg font-semibold text-gray-900">Claim Tokens</h2>
         {claimTokens.length === 0 ? (
           <p className="text-sm text-gray-500">
-            No claim tokens minted. Use “Generate Claim Invite” to mint one.
+            {status === 'draft' || status === 'suppressed'
+              ? 'No claim tokens minted. Publish the listing first, then use “Generate Claim Invite” to mint one.'
+              : 'No claim tokens minted. Use “Generate Claim Invite” to mint one.'}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -1725,36 +1763,14 @@ export default function PresenceSeedDetailPage() {
 
         {!qrKit ? (
           <p className="text-sm text-gray-500">
-            No active claim token — use “Generate Claim Invite” above to mint one.
+            {status === 'draft' || status === 'suppressed'
+              ? 'No active claim token — publish the listing first, then use “Generate Claim Invite” to mint one.'
+              : 'No active claim token — use “Generate Claim Invite” above to mint one.'}{' '}
             QR artifacts are available once a token exists.
           </p>
         ) : (
           <div className="grid md:grid-cols-3 gap-4">
-            {(
-              [
-                {
-                  variant: 'mail' as const,
-                  title: 'Mail postcard',
-                  desc: 'Mailed 4×6 invite — scans record as claim_invite.',
-                  url: qrKit.qrUrl,
-                  postcard: true,
-                },
-                {
-                  variant: 'walkin' as const,
-                  title: 'Walk-in leave-behind',
-                  desc: 'Hand-delivered card — scans record as claim_invite_walkin.',
-                  url: qrKit.qrUrlWalkin,
-                  postcard: true,
-                },
-                {
-                  variant: 'social' as const,
-                  title: 'Social / DM link',
-                  desc: 'Send the tracked link in a DM or post — taps record as claim_invite_social.',
-                  url: qrKit.qrUrlSocial,
-                  postcard: false,
-                },
-              ]
-            ).map((v) => (
+            {qrVariants.map((v) => (
               <div
                 key={v.variant}
                 className="border border-gray-200 rounded-lg p-4 space-y-3"
@@ -1785,6 +1801,14 @@ export default function PresenceSeedDetailPage() {
                     </button>
                   )}
                   <button
+                    onClick={() => setQrDesignerVariant(v.variant)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+                    title="Open the styled QR designer — templates, colors, platform logo"
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    Design
+                  </button>
+                  <button
                     onClick={() => handleQrDownload(v.variant, 'png')}
                     disabled={qrDownloading !== null}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
@@ -1810,6 +1834,18 @@ export default function PresenceSeedDetailPage() {
           </div>
         )}
       </section>
+
+      {qrDesignerConfig && (
+        <ClaimQrDesignerModal
+          open
+          onClose={() => setQrDesignerVariant(null)}
+          seedId={seedId}
+          variant={qrDesignerConfig.variant}
+          title={qrDesignerConfig.title}
+          url={qrDesignerConfig.url}
+          allowPostcard={qrDesignerConfig.postcard}
+        />
+      )}
 
       {/* Outreach & Enrichment */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
