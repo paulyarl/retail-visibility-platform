@@ -163,7 +163,7 @@ export class OutreachChecklistBridgeService extends BaseService {
         case 'contact_log': {
           const channel = step.actionConfig?.channel ?? null;
           const where: any = { campaign_id: campaignId };
-          if (channel) where.channel = channel;
+          if (channel) where.contact_channel = channel;
           const row = await this.prisma.mkt_outreach_log.findFirst({
             where,
             orderBy: { created_at: 'desc' },

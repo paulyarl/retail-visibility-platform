@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Flame, Globe, AlertTriangle, ShieldCheck, ShieldAlert, Copy, RefreshCw, CheckCircle2, MapPin, ExternalLink, Phone } from 'lucide-react';
 import type { Audit } from '@/services/MarketingOpsService';
 import marketingOpsService from '@/services/MarketingOpsService';
@@ -71,9 +71,25 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function YesNo({ v, label }: { v: boolean | null | undefined; label: string }) {
+// Website fields arrive as tri-state strings ('yes'|'no'|'unable_to_verify')
+// in the V2 audit schema — a raw truthiness check would render
+// 'unable_to_verify' as "Yes". Normalize first.
+function triState(v: boolean | string | null | undefined): 'yes' | 'no' | 'unknown' | null {
   if (v == null) return null;
-  return <Badge cls={v ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}>{label}: {v ? 'Yes' : 'No'}</Badge>;
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  const s = v.toLowerCase();
+  if (s === 'yes' || s === 'true' || s === 'present') return 'yes';
+  if (s === 'no' || s === 'false' || s === 'absent' || s === 'missing') return 'no';
+  return 'unknown';
+}
+
+function YesNo({ v, label }: { v: boolean | string | null | undefined; label: string }) {
+  const t = triState(v);
+  if (t == null) return null;
+  if (t === 'unknown') {
+    return <Badge cls="bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{label}: {String(v).replace(/_/g, ' ')}</Badge>;
+  }
+  return <Badge cls={t === 'yes' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}>{label}: {t === 'yes' ? 'Yes' : 'No'}</Badge>;
 }
 
 function formatFee(fee: { minimum?: number | null; maximum?: number | null; currency?: string }): string {
@@ -103,6 +119,25 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const [attrVerifyUrl, setAttrVerifyUrl] = useState<string | null>(null);
   const [attrVerifyError, setAttrVerifyError] = useState<string | null>(null);
   const [attrVerifyCopied, setAttrVerifyCopied] = useState(false);
+  // Latest logged-call verdict on operating status. The Log Contact phone
+  // flow records call_details.operating_status_confirmed; the log returns
+  // newest-first so the first entry carrying a verdict wins — a live call
+  // is fresher evidence than the audit's inferred status, either direction.
+  const [opCallVerdict, setOpCallVerdict] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    marketingOpsService.listOutreach(campaignId)
+      .then((entries) => {
+        if (cancelled) return;
+        const latest = entries.find(
+          (e) => e.call_details?.operating_status_confirmed === true
+            || e.call_details?.operating_status_confirmed === false,
+        );
+        if (latest) setOpCallVerdict(latest.call_details!.operating_status_confirmed!);
+      })
+      .catch(() => { /* soft-fail — the audit-status gate still applies */ });
+    return () => { cancelled = true; };
+  }, [campaignId]);
 
   const d = (audit.audit_data ?? {}) as any;
   const meta = d.audit_metadata ?? {};
@@ -137,7 +172,17 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
       : requested.phone
         ? [requested.phone]
         : [];
-  const isOperationalBlocked = opStatus !== 'active';
+  // 'active' and 'likely_active' both unblock seeding — likely_active means
+  // the audit found operational evidence but nothing inside the recency
+  // window, which is common for thin-footprint businesses. 'inactive' and
+  // 'unable_to_verify' stay blocked pending phone verification — a logged
+  // call with operating_status_confirmed overrides the audit either way.
+  const auditStatusBlocked = opStatus === 'inactive' || opStatus === 'unable_to_verify';
+  const isOperationalBlocked = opCallVerdict === true
+    ? false
+    : opCallVerdict === false
+      ? true
+      : auditStatusBlocked;
 
   // Sourced attribute chips (observed on profiles) + advisory recommendations
   const recAttrs: any[] = Array.isArray(d.recommended_attributes) ? d.recommended_attributes : [];
@@ -248,14 +293,14 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
               disabled={addingToPlace || identityStatus === 'mismatched' || placeResult != null || isOperationalBlocked}
               title={
                 isOperationalBlocked
-                  ? 'Cannot seed: business reported as not operational'
+                  ? opCallVerdict === false
+                    ? 'Cannot seed: a verification call reported the business as not operating'
+                    : `Cannot seed: audit reports '${opStatus.replace(/_/g, ' ')}' — log a verification call (Log Contact → phone → operating status confirmed) first`
                   : placeResult != null
                     ? 'Already added to place listing'
                     : identityStatus === 'mismatched'
                       ? 'Cannot seed: identity mismatch'
-                      : isOperationalBlocked
-                        ? 'Call to verify operating status before creating place listing'
-                  : 'Create place listing (draft for review)'
+                      : 'Create place listing (draft for review)'
               }
               className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-default"
             >
@@ -546,7 +591,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {website.status && <Badge cls={websiteStatusColor(website.status)}>{website.status.replace(/_/g, ' ')}</Badge>}
             {website.mobile_friendly && <Badge cls="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Mobile: {website.mobile_friendly}</Badge>}
-            {website.https != null && <Badge cls={website.https ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}>HTTPS: {website.https ? 'Yes' : 'No'}</Badge>}
+            <YesNo v={website.https} label="HTTPS" />
             <YesNo v={website.contact_information_visible} label="Contact info" />
             <YesNo v={website.click_to_call_available} label="Click-to-call" />
             <YesNo v={website.call_to_action_present} label="CTA" />

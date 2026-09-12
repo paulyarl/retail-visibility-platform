@@ -122,6 +122,7 @@ const PERMANENT_STEP_IDS = {
   identifyCategory: '_permanent_identify_category',
   setCategories: '_permanent_set_categories',
   auditBusiness: '_permanent_audit_business',
+  verifyOperational: '_permanent_verify_operational',
   seedPlaceListing: '_permanent_seed_place_listing',
   qcSeed: '_permanent_qc_seed',
   mintClaimToken: '_permanent_mint_claim_token',
@@ -140,10 +141,10 @@ const PERMANENT_STEP_IDS = {
 // preview_built, framed as the upgrade that eases the pain the audit
 // surfaced (migration 276 retags the "Review triage signals" steps).
 //
-// The wedge is a fixed 8-step sub-flow so every business campaign runs the
+// The wedge is a fixed 9-step sub-flow so every business campaign runs the
 // same seed pipeline: identify the category → set categories → business
-// audit → create the seed → QC → mint the claim token → verify live →
-// invite the owner to claim.
+// audit → verify operational status by phone (optional) → create the seed
+// → QC → mint the claim token → verify live → invite the owner to claim.
 //
 // These steps are code-defined (not DB template rows) because they must be
 // visible BEFORE a playbook is assigned — the seed precedes triage. They
@@ -198,9 +199,24 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     updatedAt: new Date(0),
   },
   {
-    id: PERMANENT_STEP_IDS.seedPlaceListing,
+    id: PERMANENT_STEP_IDS.verifyOperational,
     playbookId: '_permanent',
     stepOrder: 4,
+    title: 'Call to verify operational status',
+    instructions:
+      'Optional — the business audit reports an operating status (active / likely_active / unable_to_verify / inactive). When it reads unable_to_verify or inactive, call the business phone (listed in the audit card\'s Operating Status Verification section) and log the outcome via Log Contact with "operating status confirmed" — a confirmed call unblocks "Add to Place Listing". Skippable when the audit already reports active or likely_active, or when calls aren\'t possible (off-hours).',
+    stepType: 'outreach',
+    actionConfig: { outreach_kind: 'contact_log', channel: 'phone', auto_complete: true },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.seedPlaceListing,
+    playbookId: '_permanent',
+    stepOrder: 5,
     title: 'Create the seed ("Add to Place Listing")',
     instructions:
       'On the business_analysis audit card, click "Add to Place Listing" — createFromCampaign builds the seed SEO-enriched and campaign-linked, parked in draft for QC. The free listing is the good-faith wedge: we improved their visibility before asking for anything.',
@@ -215,7 +231,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
   {
     id: PERMANENT_STEP_IDS.qcSeed,
     playbookId: '_permanent',
-    stepOrder: 5,
+    stepOrder: 6,
     title: 'QC the seeded listing',
     instructions:
       'Open the seed from Overview → Spawned Place Listings → "seed". Verify NAP, hours, description, attributes, and secondary categories — fix anything via Edit Fields so every public-facing field carries provenance (show_on_public).',
@@ -230,7 +246,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
   {
     id: PERMANENT_STEP_IDS.publishSeed,
     playbookId: '_permanent',
-    stepOrder: 6,
+    stepOrder: 7,
     title: 'Publish the listing',
     instructions:
       'After QC, use the seed detail page\'s "Publish Listing" button to take the listing live. Publishing also fires the outreach courtesy window for campaign-linked seeds.',
@@ -245,7 +261,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
   {
     id: PERMANENT_STEP_IDS.mintClaimToken,
     playbookId: '_permanent',
-    stepOrder: 7,
+    stepOrder: 8,
     title: 'Mint the claim token',
     instructions:
       'On the seed detail, use "Generate Claim Invite" to mint the owner claim token (90-day default). Copy the /place/claim/:token link — it is what the owner receives in the claim pitch. The Claim QR Kit (mail postcard, walk-in card, social link) becomes available once the token exists.',
@@ -260,7 +276,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
   {
     id: PERMANENT_STEP_IDS.pitchFreeClaim,
     playbookId: '_permanent',
-    stepOrder: 8,
+    stepOrder: 9,
     title: 'Invite the owner to claim (free, no obligation)',
     instructions:
       'Share the claim link with the owner — claiming is free and lets them fix hours, phone, and photos. Contact the owner on the best channel and log the outcome. The demonstrated goodwill becomes the wedge: the paid pitch lands at preview_built as the upgrade that eases the pain the audit surfaced.',

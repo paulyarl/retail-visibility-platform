@@ -282,6 +282,7 @@ export interface OutreachLogEntry {
   } | null;
   data_fresh_at: string | null;
   preview_token: string | null;
+  call_details?: CallDetails | null;
   created_at: string;
 }
 

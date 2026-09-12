@@ -418,12 +418,13 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
       expect(result.playbook).toBeNull();
-      // 8 seed-first wedge steps + 3 outreach-access steps.
-      expect(result.steps).toHaveLength(11);
+      // 9 seed-first wedge steps + 3 outreach-access steps.
+      expect(result.steps).toHaveLength(12);
       expect(result.steps[0].title).toBe('Run category identification');
-      expect(result.steps[3].title).toBe('Create the seed ("Add to Place Listing")');
-      expect(result.steps[7].title).toBe('Invite the owner to claim (free, no obligation)');
-      expect(result.steps[8].title).toBe('Open Pitch Construction');
+      expect(result.steps[3].title).toBe('Call to verify operational status');
+      expect(result.steps[4].title).toBe('Create the seed ("Add to Place Listing")');
+      expect(result.steps[8].title).toBe('Invite the owner to claim (free, no obligation)');
+      expect(result.steps[9].title).toBe('Open Pitch Construction');
       // Seed-first steps are guidance, not gates — never required.
       expect(result.steps.every((s) => s.isRequired === false)).toBe(true);
       expect(result.requiredTotal).toBe(0);
@@ -440,14 +441,15 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
 
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
-      // 8 seed steps + 3 outreach steps lead; 2 DB steps follow.
-      expect(result.steps).toHaveLength(13);
-      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+      // 9 seed steps + 3 outreach steps lead; 2 DB steps follow.
+      expect(result.steps).toHaveLength(14);
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
       expect(result.steps[0].id).toBe('_permanent_identify_category');
-      expect(result.steps[3].id).toBe('_permanent_seed_place_listing');
-      expect(result.steps[7].id).toBe('_permanent_pitch_free_claim');
-      expect(result.steps[8].title).toBe('Open Pitch Construction');
-      expect(result.steps[11].id).toBe(STEP_ID);
+      expect(result.steps[3].id).toBe('_permanent_verify_operational');
+      expect(result.steps[4].id).toBe('_permanent_seed_place_listing');
+      expect(result.steps[8].id).toBe('_permanent_pitch_free_claim');
+      expect(result.steps[9].title).toBe('Open Pitch Construction');
+      expect(result.steps[12].id).toBe(STEP_ID);
       // Only the required DB step counts toward the gate.
       expect(result.requiredTotal).toBe(1);
     });
