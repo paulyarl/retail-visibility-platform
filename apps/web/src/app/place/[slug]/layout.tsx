@@ -27,15 +27,26 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
     const image = listing.logoUrl || `${baseUrl}/favicon.ico`;
     const title = listing.metaTitle || `${businessName} - VisibleShelf Place`;
+    const canonicalUrl = `${baseUrl}/place/${listing.slug || slug}`;
+    // listing.keywords may carry key:value annotations (neighborhood:, origin_country:) —
+    // strip the prefix so the meta tag stays human-legible.
+    const keywords = Array.isArray(listing.keywords)
+      ? listing.keywords.map((kw: string) =>
+          kw.includes(':') ? kw.split(':').slice(1).join(':') : kw,
+        )
+      : undefined;
 
     return {
       metadataBase: new URL(baseUrl),
       title,
       description,
+      keywords,
+      alternates: { canonical: canonicalUrl },
       openGraph: {
         title: businessName,
         description,
         type: 'website',
+        url: canonicalUrl,
         images: [image],
       },
       twitter: {
