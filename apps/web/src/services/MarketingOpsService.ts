@@ -1041,6 +1041,9 @@ export interface ProspectQueueListFilters {
   // Migration 262 — tree filter: queue rows whose source_campaign_id is any
   // of these campaign ids (proving ground + its intelligence children).
   source_campaign_ids?: string[];
+  // Migration 282 — direct PG membership (queue-list-initiated proving
+  // grounds). OR'd with source_campaign_ids server-side.
+  proving_ground_id?: string;
 }
 
 export interface ProspectQueuePatch {
@@ -1109,6 +1112,9 @@ export interface ProspectQueueEntry {
   verification?: VerificationRecord | null;
   // Proving ground (Migration 262)
   seed_id?: string | null;
+  // Migration 282 — direct PG membership for queue-list-initiated proving
+  // grounds (OR'd with source_campaign_id in all tree readers).
+  proving_ground_id?: string | null;
   channel_sequence?: Array<{
     channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
     contact?: string;
@@ -4684,6 +4690,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.source_kind) params.set('source_kind', filters.source_kind);
     if (filters?.assigned_to) params.set('assigned_to', filters.assigned_to);
     if (filters?.source_campaign_ids?.length) params.set('source_campaign_ids', filters.source_campaign_ids.join(','));
+    if (filters?.proving_ground_id) params.set('proving_ground_id', filters.proving_ground_id);
     if (filters?.limit) params.set('limit', String(filters.limit));
     if (filters?.includeCampaigns) params.set('include', 'campaigns');
     const query = params.toString();
@@ -4746,6 +4753,35 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to dismiss queue entry');
     }
     await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Queue-list PG initiation (Migration 282) ─────────────────────────
+
+  async groupIntoProvingGround(input: {
+    queueEntryIds: string[];
+    title?: string;
+    scope?: 'city' | 'category';
+    category?: string;
+    city?: string;
+    state?: string;
+  }): Promise<{
+    provingGround: Campaign;
+    reusedExisting: boolean;
+    stamped: number;
+    notFound: string[];
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/group-into-proving-ground`,
+      { method: 'POST', body: JSON.stringify(input) },
+      'mkt-ops-prospect-queue-group-pg',
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to group entries into proving ground');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
     return result.data?.data ?? result.data;
   }
 

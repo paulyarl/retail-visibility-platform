@@ -184,6 +184,19 @@ export default function ProspectQueueClient() {
   const [logNotes, setLogNotes] = useState('');
   const [loggingTouch, setLoggingTouch] = useState(false);
 
+  // Queue-list PG initiation (Migration 282) — multi-select + group action.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [groupForm, setGroupForm] = useState({
+    title: '',
+    scope: '' as '' | 'city' | 'category',
+    category: '',
+    city: '',
+    state: '',
+  });
+  const [grouping, setGrouping] = useState(false);
+  const [groupResult, setGroupResult] = useState<{ provingGroundId: string; stamped: number; reusedExisting: boolean } | null>(null);
+
   // "Add to Queue" modal — lets operators capture a hot prospect discovered
   // during a deep dive, outside the audit "Add to queue" context.
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -235,6 +248,66 @@ export default function ProspectQueueClient() {
   }, [fetchQueue]);
 
   // ─── Row actions ──────────────────────────────────────────────────────
+
+  // ── Queue-list PG grouping (Migration 282) ────────────────────────────
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === displayEntries.length ? new Set() : new Set(displayEntries.map((e) => e.id)));
+  };
+
+  const openGroupModal = () => {
+    // Prefill with the modal values across the selection — a dominant
+    // category/city is a good guess for the PG's domain; conflicting values
+    // leave the field blank (mixed group).
+    const picked = displayEntries.filter((e) => selectedIds.has(e.id));
+    const modal = (vals: Array<string | null | undefined>) => {
+      const uniq = new Set(vals.filter((v): v is string => !!v));
+      return uniq.size === 1 ? [...uniq][0] : '';
+    };
+    setGroupForm({
+      title: '',
+      scope: '',
+      category: modal(picked.map((e) => e.category)),
+      city: modal(picked.map((e) => e.city)),
+      state: modal(picked.map((e) => e.state)),
+    });
+    setGroupResult(null);
+    setGroupModalOpen(true);
+  };
+
+  const handleGroupIntoPg = async () => {
+    setGrouping(true);
+    setError(null);
+    try {
+      const res = await marketingOpsService.groupIntoProvingGround({
+        title: groupForm.title.trim(),
+        scope: groupForm.scope || undefined,
+        category: groupForm.category.trim() || undefined,
+        city: groupForm.city.trim() || undefined,
+        state: groupForm.state.trim() || undefined,
+        queueEntryIds: [...selectedIds],
+      });
+      setGroupResult({
+        provingGroundId: res.provingGround.id,
+        stamped: res.stamped,
+        reusedExisting: res.reusedExisting,
+      });
+      await fetchQueue(); // proving_ground_id now stamped on the rows
+    } catch (err: any) {
+      setError(err.message || 'Failed to group into proving ground');
+    } finally {
+      setGrouping(false);
+    }
+  };
 
   const handleCreateCampaign = async (id: string) => {
     setCreatingId(id);
@@ -698,6 +771,30 @@ export default function ProspectQueueClient() {
           </div>
         )}
 
+        {/* Selection action bar — group the checked rows into a PG
+            (queue-list initiation, culture-fit §6.5). */}
+        {viewMode === 'list' && selectedIds.size > 0 && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 px-4 py-2">
+            <span className="text-sm text-violet-800 dark:text-violet-200 font-medium">
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={openGroupModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
+              title="Stamp these queue entries with a shared proving_ground_id — creates (or reuses) the PG campaign"
+            >
+              <Flag className="w-3.5 h-3.5" />
+              Group into Proving Ground
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
+
         {/* Table — list view only */}
         {viewMode === 'list' && !loading && entries.length > 0 && (
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
@@ -705,6 +802,15 @@ export default function ProspectQueueClient() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-neutral-700/30 border-b border-gray-200 dark:border-neutral-700">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    <th className="px-3 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={displayEntries.length > 0 && selectedIds.size === displayEntries.length}
+                        onChange={toggleSelectAll}
+                        className="rounded"
+                        title="Select all visible rows"
+                      />
+                    </th>
                     <th className="px-3 py-2">Business</th>
                     <th className="px-3 py-2">Signals</th>
                     <th className="px-3 py-2">Rating</th>
@@ -723,6 +829,16 @@ export default function ProspectQueueClient() {
                     const assigneeLabel = staffDisplayName(staffUsers, entry.assigned_to);
                     return (
                       <tr key={entry.id} className={`border-l-4 ${rowBorderClass(entry)} hover:bg-gray-50 dark:hover:bg-neutral-700/20`}>
+                        {/* PG-group selection */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(entry.id)}
+                            onChange={() => toggleSelected(entry.id)}
+                            className="rounded"
+                            title="Select for grouping into a proving ground"
+                          />
+                        </td>
                         {/* Business / Title */}
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1.5">
@@ -1244,6 +1360,172 @@ export default function ProspectQueueClient() {
                   Log touch
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Group into Proving Ground modal — stamps proving_ground_id on the
+          selected queue entries and creates (or reuses) the PG campaign.
+          Queue-list initiation path from culture-fit §6.5. */}
+      {groupModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !grouping && setGroupModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Group {selectedIds.size} prospect{selectedIds.size !== 1 ? 's' : ''} into a Proving Ground
+              </h2>
+              <button
+                onClick={() => !grouping && setGroupModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                disabled={grouping}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 space-y-3">
+              {groupResult ? (
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 px-3 py-2">
+                  <p className="text-sm text-emerald-800 dark:text-emerald-200">
+                    {groupResult.reusedExisting
+                      ? `Reused the existing proving ground — ${groupResult.stamped} row${groupResult.stamped !== 1 ? 's' : ''} stamped.`
+                      : `Proving ground created — ${groupResult.stamped} row${groupResult.stamped !== 1 ? 's' : ''} stamped.`}
+                  </p>
+                  <Link
+                    href={`/settings/admin/marketing-ops/proving-grounds/${groupResult.provingGroundId}`}
+                    className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
+                  >
+                    Open cockpit <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Creates a proving-ground campaign and stamps <code className="font-mono">proving_ground_id</code> on
+                    the selected rows. Leave city blank for a mixed (geography-free) PG — it can
+                    attach business children directly.
+                  </p>
+
+                  {/* Title */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      PG title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={groupForm.title}
+                      onChange={(e) => setGroupForm((f) => ({ ...f, title: e.target.value }))}
+                      disabled={grouping}
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      placeholder="e.g. Homer Hills Fleet — Q3 Proving Ground"
+                    />
+                  </div>
+
+                  {/* Domain scope — optional; omit both fields for mixed */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Category <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={groupForm.category}
+                        onChange={(e) => setGroupForm((f) => ({ ...f, category: e.target.value }))}
+                        disabled={grouping}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        placeholder="e.g. Fleet Services"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        City <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={groupForm.city}
+                        onChange={(e) => setGroupForm((f) => ({ ...f, city: e.target.value }))}
+                        disabled={grouping}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        placeholder="(mixed geography)"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={groupForm.state}
+                      onChange={(e) => setGroupForm((f) => ({ ...f, state: e.target.value }))}
+                      disabled={grouping}
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      placeholder="(optional)"
+                    />
+                  </div>
+                  {groupForm.city && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Domain scope
+                      </label>
+                      <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
+                        {(['', 'city', 'category'] as const).map((s) => (
+                          <button
+                            key={s || 'both'}
+                            type="button"
+                            onClick={() => setGroupForm((f) => ({ ...f, scope: s }))}
+                            disabled={grouping}
+                            className={`px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                              groupForm.scope === s
+                                ? 'bg-violet-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-neutral-900 dark:text-gray-300 dark:hover:bg-neutral-700'
+                            }`}
+                          >
+                            {s === '' ? 'City + Category' : s === 'city' ? 'City only' : 'Category only'}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                        Which domain axes this PG proves on. Only relevant when a city is set.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-neutral-700">
+              {groupResult ? (
+                <button
+                  onClick={() => { setGroupModalOpen(false); setSelectedIds(new Set()); }}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
+                >
+                  Done
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setGroupModalOpen(false)}
+                    disabled={grouping}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleGroupIntoPg}
+                    disabled={grouping || !groupForm.title.trim() || !groupForm.category.trim()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {grouping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Flag className="w-3.5 h-3.5" />}
+                    Create &amp; stamp
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

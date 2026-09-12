@@ -336,7 +336,7 @@ export default function PresenceSeedDetailPage() {
   const [qrDownloading, setQrDownloading] = useState<string | null>(null);
   const [copiedQrLink, setCopiedQrLink] = useState<string | null>(null);
   const [qrDesignerVariant, setQrDesignerVariant] = useState<
-    'mail' | 'walkin' | 'social' | null
+    'mail' | 'walkin' | 'social' | 'email' | null
   >(null);
   const [touches, setTouches] = useState<OutreachTouch[]>([]);
   const [touchChannel, setTouchChannel] = useState<
@@ -485,7 +485,7 @@ export default function PresenceSeedDetailPage() {
   };
 
   const handleQrDownload = async (
-    variant: 'mail' | 'walkin' | 'social',
+    variant: 'mail' | 'walkin' | 'social' | 'email',
     kind: 'png' | 'postcard',
   ) => {
     const key = `${variant}-${kind}`;
@@ -722,6 +722,13 @@ export default function PresenceSeedDetailPage() {
           title: 'Social / DM link',
           desc: 'Send the tracked link in a DM or post — taps record as claim_invite_social.',
           url: qrKit.qrUrlSocial,
+          postcard: false,
+        },
+        {
+          variant: 'email' as const,
+          title: 'Email link',
+          desc: 'Embed the tracked link in an outreach email — taps record as claim_invite_email.',
+          url: qrKit.qrUrlEmail,
           postcard: false,
         },
       ]

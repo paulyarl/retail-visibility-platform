@@ -19,7 +19,7 @@ import { generateQrAnalyticsId, generateQrScanEventId } from '../lib/id-generato
 // TYPES
 // ====================
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
@@ -140,6 +140,7 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   claim_invite: 'Claim Invite QR',
   claim_invite_walkin: 'Claim Invite QR (Walk-in)',
   claim_invite_social: 'Claim Invite (Social/DM)',
+  claim_invite_email: 'Claim Invite (Email)',
 };
 
 function getSurfaceLabel(surface: string): string {

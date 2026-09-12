@@ -14,6 +14,7 @@
  *   - mail   → `/q/{shortCode}`   (surface='claim_invite')
  *   - walkin → `/qw/{shortCode}`  (surface='claim_invite_walkin')
  *   - social → `/qs/{shortCode}`  (surface='claim_invite_social')
+ *   - email  → `/qe/{shortCode}`  (surface='claim_invite_email')
  * The short-code variants use Next.js frontend redirect pages (mirrors the
  * /s/ coupon and /g/ gallery short-URL patterns) — the page calls a combined
  * resolve + track API endpoint, then redirects to /place/claim/{token}.
@@ -60,7 +61,7 @@ const WEB_BASE_URL = (
 
 const DEFAULT_QR_SIZE = 512;
 
-export type ClaimInviteQrVariant = 'mail' | 'walkin' | 'social';
+export type ClaimInviteQrVariant = 'mail' | 'walkin' | 'social' | 'email';
 
 export interface ClaimInviteQrKit {
   seedId: string;
@@ -69,6 +70,7 @@ export interface ClaimInviteQrKit {
   qrUrl: string;
   qrUrlWalkin: string;
   qrUrlSocial: string;
+  qrUrlEmail: string;
   claimUrl: string;
   shortClaimUrl: string | null;
   businessName: string;
@@ -156,6 +158,9 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   const qrUrlSocial = shortCode
     ? `${WEB_BASE_URL}/qs/${shortCode}`
     : `${QR_BASE_URL}/api/public/qr/claim/${token}/social`;
+  const qrUrlEmail = shortCode
+    ? `${WEB_BASE_URL}/qe/${shortCode}`
+    : `${QR_BASE_URL}/api/public/qr/claim/${token}/email`;
   const claimUrl = `${WEB_BASE_URL}/place/claim/${token}`;
   const shortClaimUrl = shortCode
     ? `${WEB_BASE_URL}/c/${shortCode}`
@@ -175,6 +180,7 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
     qrUrl,
     qrUrlWalkin,
     qrUrlSocial,
+    qrUrlEmail,
     claimUrl,
     shortClaimUrl,
     businessName: row.business_name || 'Business Owner',
@@ -187,6 +193,7 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
 function kitUrlForVariant(kit: ClaimInviteQrKit, variant: ClaimInviteQrVariant): string {
   if (variant === 'walkin') return kit.qrUrlWalkin;
   if (variant === 'social') return kit.qrUrlSocial;
+  if (variant === 'email') return kit.qrUrlEmail;
   return kit.qrUrl;
 }
 
@@ -194,6 +201,7 @@ function kitUrlForVariant(kit: ClaimInviteQrKit, variant: ClaimInviteQrVariant):
 function badgeForVariant(variant: ClaimInviteQrVariant): string {
   if (variant === 'walkin') return 'Claim Invite — Walk-in';
   if (variant === 'social') return 'Claim Invite — Social';
+  if (variant === 'email') return 'Claim Invite — Email';
   return 'Claim Invite';
 }
 

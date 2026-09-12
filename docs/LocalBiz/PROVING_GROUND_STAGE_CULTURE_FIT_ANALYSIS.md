@@ -701,7 +701,7 @@ Mutations stay out of the matrix: promote, create-campaign, and dismiss
 remain explicit actions in the promote panel, not chips — the matrix is
 read-only navigation, consistent with the observer role.
 
-### 6.5 PG scope flex (ships after stage awareness)
+### 6.5 PG scope flex (shipped)
 
 - `promoteToProvingGround`: accept `scope?: 'city' | 'category'` (default
   `city`); pass through to `createCampaign`. **The hard requirements must
@@ -797,73 +797,89 @@ The corrected design still ships in the same order (frontend aggregation →
 endpoint → scope flex), but each step carries verification the original
 sketch omitted:
 
-**Frontend aggregation (§6.1):**
-- [ ] `dismissed` added to the cockpit's queue status filter (or separate
+**Frontend aggregation (§6.1):** — *shipped via the dedicated endpoint
+(the panel is endpoint-fed, so these all hold server-side)*
+- [x] `dismissed` added to the cockpit's queue status filter (or separate
       count) — verify the dismissed bucket is non-zero on a PG with
       dismissed rows.
-- [ ] Stage buckets count distinct `processed_campaign_id` — craft two queue
+- [x] Stage buckets count distinct `processed_campaign_id` — craft two queue
       rows graduated to the same campaign (AC84 path) and confirm a single
       count.
-- [ ] `campaign_created` + null `campaign_stage` surfaces as `seek` (or a
+- [x] `campaign_created` + null `campaign_stage` surfaces as `seek` (or a
       warning), never "still in queue".
-- [ ] `truncated` caveat renders when `entries.length === limit`.
-- [ ] `seededPreGraduation` counts `seed_id`-stamped rows without campaigns.
-- [ ] Unknown/recovery stage keys render with a fallback label.
-- [ ] `listProspectQueue` request bypasses the service `cacheTTL` (or the
+- [x] `truncated` caveat renders when `entries.length === limit`.
+- [x] `seededPreGraduation` counts `seed_id`-stamped rows without campaigns.
+- [x] Unknown/recovery stage keys render with a fallback label.
+- [x] `listProspectQueue` request bypasses the service `cacheTTL` (or the
       panel tolerates its staleness) — the distribution reflects a just-run
       transition after reload.
 
 **Dedicated endpoint (§6.2):**
-- [ ] `stillInQueue` computed from status buckets — dismiss a
+- [x] `stillInQueue` computed from status buckets — dismiss a
       `campaign_created` row and confirm no double-subtract (value stays
       ≥ 0 and consistent).
-- [ ] A business grandchild linked via `parent_campaign_id` (derive flow —
+- [x] A business grandchild linked via `parent_campaign_id` (derive flow —
       `createCampaign` writes `parent_campaign_id` directly, ~line 773)
       appears in `byStage` and in `totalInPipeline`.
-- [ ] Index migration applied to `mkt_prospect_queue.source_campaign_id`
+- [x] Index migration applied to `mkt_prospect_queue.source_campaign_id`
       and `mkt_campaigns_list.parent_campaign_id` on local + prd.
-- [ ] `resolveBusinessProvingGround` resolves direct-`parent_campaign_id`
+      *(Correction: migration 281 ships only `source_campaign_id` — the
+      `parent_campaign_id` index already existed as a partial index from
+      migration 138, invisible to `prisma db pull`.)*
+- [x] `resolveBusinessProvingGround` resolves direct-`parent_campaign_id`
       campaigns (third hop) — "View Proving Ground" renders for them.
 - [ ] Dedup-verdict exclusion (pre-impl §4.5 / D3) — merged-away seeds'
       campaigns excluded, or explicitly deferred with a code comment.
+      *(Deferred.)*
 
 **Drill-down (§6.3):**
-- [ ] `listCampaigns` `provingGroundId` filter returns queue-graduated AND
+- [x] `listCampaigns` `provingGroundId` filter returns queue-graduated AND
       parent-linked business campaigns, combinable with `stage`.
-- [ ] `CampaignListClient` reads `?provingGround=<id>&stage=<stage>`.
+- [x] `CampaignListClient` reads `?provingGround=<id>&stage=<stage>`.
 
 **Click-to-open matrix (§6.4):**
-- [ ] `ProspectArtifactChips` renders locked/available states from decorated
+- [x] `ProspectArtifactChips` renders locked/available states from decorated
       fields only (tier 0): seed, campaign, audit, checklist, outreach-prep,
       openers, gallery, deliverables, siblings.
-- [ ] Locked chips show unlock tooltips; pre-graduation rows show only seed
+- [x] Locked chips show unlock tooltips; pre-graduation rows show only seed
       + queue-visible chips.
-- [ ] The existing `audited`/`no audit` badge in the promote panel is
+- [x] The existing `audited`/`no audit` badge in the promote panel is
       replaced by the audit chip (links `?tab=audits`).
-- [ ] Chips navigate only — no mutation affordances in the matrix.
+- [x] Chips navigate only — no mutation affordances in the matrix.
 - [ ] Tier 1 (when needed): decoration pass adds gallery-token, deliverable,
       opener counts + `demo_tenant_id`, upgrading those chips to true
-      present/absent states.
-- [ ] `/follow-ups` gains `?campaign=` via the openers deep-link pattern —
+      present/absent states. *(Deferred.)*
+- [x] `/follow-ups` gains `?campaign=` via the openers deep-link pattern —
       `page.tsx` searchParams passthrough + one effect that sets
       `selectedCampaignId` on load (~15 lines, no new plumbing).
-- [ ] Tier 1b: checklist chip emits progress — cheap version shows
-      completed count (one `groupBy` query); full version shows per-stage
-      fractions + required-remaining-at-current-stage (soft-gate number),
-      batched by effective playbook, not per-campaign `getCampaignChecklist`
-      calls.
-- [ ] Decide the windowed-step rule: permanent-step progress counts toward
-      emitted status even after the campaign leaves the stage window
-      (recommended for the seed wedge).
+- [x] Tier 1b (cheap level): checklist chip emits a completed count via one
+      batched `groupBy` over `mkt_campaign_checklist_progress` in the queue
+      decoration. *(Full level — per-stage fractions + required-remaining —
+      deferred: needs per-playbook denominators.)*
+- [x] Windowed-step rule resolved as recommended: the emitted count reads
+      raw progress rows, so permanent-step progress counts even after the
+      campaign leaves the stage window.
 
-**Scope flex (§6.4 — deferred):**
-- [ ] `promoteToProvingGround` accepts `scope='category'`; `city` requirement
-      conditional on scope (new tests next to the provingGround.test.ts
-      suite).
-- [ ] Business-scope attach: resolver hop + distribution union + cockpit UI
-      all updated together.
-- [ ] `proving_ground_id` initiation: all linkage readers updated, OR-dedup
-      verified, migration shipped.
+**Scope flex (§6.5 — shipped):**
+- [x] `promoteToProvingGround` accepts `scope='category'`; `city` requirement
+      conditional on scope — `scope` + `category`/`city`/`state`/`title`
+      overrides on the route schema
+      (`MarketingCampaignService.pgScopeFlex.test.ts`).
+- [x] Business-scope attach: `attachChildCampaign` accepts `scope='business'`
+      when the PG has no city; `resolveBusinessProvingGround` parent-chain
+      fallback (≤2 hops) covers direct attaches + derive-flow grandchildren;
+      distribution union already covered direct children; cockpit attachable
+      list + children panel render business scope.
+- [x] `proving_ground_id` initiation: migration 282 (column + FK + index);
+      queue `list` ORs the column with `source_campaign_ids`; the stage
+      distribution + `resolveProvingGroundCampaignIds` + cockpit queue load
+      OR both linkages; seed fan-out links PG-created seeds to the PG id for
+      cohort-funnel visibility (`COUNT(DISTINCT dps.id)` keeps them
+      deduped); `POST /prospect-queue/group-into-proving-ground` +
+      queue-board multi-select UI shipped.
+- [ ] `ProvingGroundDedupService` scoping — *not needed: dedup verdicts live
+      on seed groups, not queue linkage (verified — the service reads no
+      queue columns).*
 
 ---
 
@@ -946,6 +962,46 @@ place:
   `mkt_campaign_checklist_progress` + step `stage_tag`s, the
   required-remaining soft-gate number, and the stage-window caveat for
   permanent steps.
+
+### 9.3 Implementation changelog (v4 — shipped)
+
+All three ship phases landed. As-built notes vs. the spec:
+
+- **Endpoint over aggregation:** the cockpit's "Prospect pipeline" panel is
+  fed by `GET /:campaignId/stage-distribution` (the §6.2 endpoint), not the
+  §6.1 frontend aggregation — the server-side version was the accurate one
+  (dismissed rows, dedup, grandchild union, no 200-row truncation). The
+  truncation caveat still renders when the queue payload hits `limit`.
+- **Migration 281** ships only `idx_mpq_source_campaign`; the
+  `parent_campaign_id` index already existed as a *partial* index
+  (migration 138) which `prisma db pull` cannot represent — do not re-add
+  it to `schema.prisma`.
+- **Migration 282** adds `mkt_prospect_queue.proving_ground_id` (FK + index).
+  Every linkage reader ORs it with `source_campaign_id`: queue `list`, the
+  stage distribution, `resolveProvingGroundCampaignIds`, the cockpit queue
+  load, and `resolveBusinessProvingGround` (which also walks the
+  parent-chain ≤2 hops for derive-flow grandchildren).
+- **Queue-list initiation shipped as specified:**
+  `POST /prospect-queue/group-into-proving-ground` +
+  `groupQueueEntriesIntoProvingGround` create-or-reuse the PG via
+  `findDuplicateCampaign` (never trips the duplicate guardrail) and stamp
+  `proving_ground_id` via `updateMany`. Queue board gained multi-select +
+  a "Group into Proving Ground" modal (title/category/city/state, modal
+  defaults, category required, city optional → mixed PG).
+- **Seed fan-out:** `createSeedsForProvingGround` links each seed to
+  `entry.proving_ground_id` as well as the source campaign — cohort funnels
+  stay correct for queue-grouped PGs; `COUNT(DISTINCT dps.id)` prevents
+  double-counting under dual linkage.
+- **`attachChildCampaign`:** business children attach only when
+  `parent.city` is null (mixed/geography-free PGs); cockpit attachable list
+  fetches unparented business campaigns for city-less PGs and the children
+  panel renders a `business` badge.
+- **Deferred (unchanged):** dedup-verdict exclusion (D3), tier-1 decoration
+  counts (gallery tokens / deliverables / `demo_tenant_id` / opener sent),
+  per-stage checklist fractions.
+- **Tests:** `MarketingCampaignService.pgStageDistribution.test.ts` (10) +
+  `MarketingCampaignService.pgScopeFlex.test.ts` (16) + the `list` OR-filter
+  tests in `MarketingProspectQueueService.test.ts`.
 
 Where this doc and the pre-implementation gap analysis diverge, the
 pre-implementation doc is canonical for decisions D1–D5; this doc is

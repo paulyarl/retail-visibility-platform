@@ -174,10 +174,16 @@ describe('getProvingGroundStageDistribution', () => {
     wireScenario({});
     await MarketingCampaignService.getProvingGroundStageDistribution(PG_ID);
 
+    // Migration 282 — the linkage is OR'd: legacy source_campaign_id tree
+    // membership OR direct proving_ground_id stamping (queue-list-initiated
+    // PGs have no discovery source).
     expect(mockProspectQueue.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          source_campaign_id: { in: expect.arrayContaining([PG_ID, INTEL_CHILD_ID]) },
+          OR: [
+            { source_campaign_id: { in: expect.arrayContaining([PG_ID, INTEL_CHILD_ID]) } },
+            { proving_ground_id: PG_ID },
+          ],
           processed_campaign_id: { not: null },
         },
       }),

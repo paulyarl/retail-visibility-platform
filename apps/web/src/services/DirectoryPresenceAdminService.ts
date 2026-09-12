@@ -293,6 +293,7 @@ export interface ClaimInviteQrKitMeta {
   qrUrl: string;
   qrUrlWalkin: string;
   qrUrlSocial: string;
+  qrUrlEmail: string;
   claimUrl: string;
   shortClaimUrl: string | null;
   businessName: string;
@@ -596,10 +597,10 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/:id/qr-kit/png — returns a Blob.
-   *  variant selects the tracked URL surface (claim_invite / _walkin / _social). */
+   *  variant selects the tracked URL surface (claim_invite / _walkin / _social / _email). */
   async downloadClaimInvitePng(
     seedId: string,
-    variant: 'mail' | 'walkin' | 'social' = 'mail',
+    variant: 'mail' | 'walkin' | 'social' | 'email' = 'mail',
   ): Promise<Blob | null> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/png${variant === 'mail' ? '' : `?variant=${variant}`}`,
@@ -616,7 +617,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
    *  variant selects the tracked URL + printed badge for that channel. */
   async downloadClaimInvitePostcard(
     seedId: string,
-    variant: 'mail' | 'walkin' | 'social' = 'mail',
+    variant: 'mail' | 'walkin' | 'social' | 'email' = 'mail',
   ): Promise<Blob | null> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/qr-kit/postcard${variant === 'mail' ? '' : `?variant=${variant}`}`,
@@ -635,7 +636,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
    *  classic B/W render. */
   async downloadClaimInvitePostcardStyled(
     seedId: string,
-    variant: 'mail' | 'walkin' | 'social',
+    variant: 'mail' | 'walkin' | 'social' | 'email',
     qrDataUrl: string,
   ): Promise<Blob | null> {
     const result = await this.makeDefaultRequest<any>(

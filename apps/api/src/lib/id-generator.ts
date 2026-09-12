@@ -2197,8 +2197,8 @@ export function generateGalleryShortCode(): string {
 // ─── Directory Claim Short Codes (compact claim-invite URLs) ────────────
 // Same curated 32-char alphabet as gallery short codes. 6-char codes back
 // the /c/{shortCode} redirect → /place/claim/{token} and the short QR
-// tracked redirect /api/public/qr/c/{shortCode}. Fewer QR modules at small
-// print sizes = more legible scans.
+// tracked redirect /q/{shortCode} (via the /qw/ and /qs/ surface variants).
+// Fewer QR modules at small print sizes = more legible scans.
 const CLAIM_SHORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const generateClaimShortCodeNano = customAlphabet(CLAIM_SHORT_CODE_ALPHABET, 6);
 

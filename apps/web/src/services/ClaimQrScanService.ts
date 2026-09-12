@@ -15,7 +15,7 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { clientLogger } from '@/lib/client-logger';
 
-export type ClaimQrSurface = 'mail' | 'walkin' | 'social';
+export type ClaimQrSurface = 'mail' | 'walkin' | 'social' | 'email';
 
 export class ClaimQrScanService extends PublicApiSingleton {
   protected defaultContext: AppContext = AppContext.SHOP;

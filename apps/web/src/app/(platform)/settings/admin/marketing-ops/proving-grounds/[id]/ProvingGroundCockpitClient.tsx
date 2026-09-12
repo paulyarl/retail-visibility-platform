@@ -193,6 +193,9 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         directoryPresenceAdminService.getCohortFunnel({ campaignIds: ids }),
         marketingOpsService.listProspectQueue({
           source_campaign_ids: ids,
+          // Migration 282 — entries grouped directly into this PG carry
+          // proving_ground_id; the API ORs the two linkage columns.
+          proving_ground_id: campaignId,
           // campaign_created included: a prospect that graduated to a campaign
           // is exactly the audit-first promotion candidate — it must stay on
           // the promote panel, not vanish from it.
@@ -251,15 +254,25 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       // produce profiles, not prospects, and are often state/nationwide
       // scoped, so they are excluded here too.
       const intel = await marketingOpsService.listCampaigns({ scope: 'intelligence', limit: 100 });
-      setAttachable(
-        intel.items
-          .filter((c) =>
-            !c.parent_campaign_id
-            && !ids.includes(c.id)
-            && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
-            && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging'))
-          .map((c) => ({ id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage, category: c.category, city: c.city })),
-      );
+      const discoveryAttachable = intel.items
+        .filter((c) =>
+          !c.parent_campaign_id
+          && !ids.includes(c.id)
+          && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
+          && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging'))
+        .map((c) => ({ id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage, category: c.category, city: c.city }));
+
+      // Mixed PGs (no fixed geography) also accept direct business children
+      // (culture-fit §6.5 — the backend guard allows scope='business' only
+      // when the PG has no city).
+      let businessAttachable: typeof discoveryAttachable = [];
+      if (!camp.city) {
+        const biz = await marketingOpsService.listCampaigns({ scope: 'business', limit: 100 });
+        businessAttachable = biz.items
+          .filter((c) => !c.parent_campaign_id && !ids.includes(c.id))
+          .map((c) => ({ id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage, category: c.category, city: c.city }));
+      }
+      setAttachable([...discoveryAttachable, ...businessAttachable]);
     } catch (err: any) {
       setError(err.message || 'Failed to load proving ground');
     } finally {
@@ -1283,15 +1296,17 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                   {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
                 </Link>
                 <div className="flex items-center gap-2">
-                  {/* The attach guard only admits intelligence or
-                      directory_enrichment children — a non-intelligence scope
-                      means it's an enrichment campaign. */}
+                  {/* Scope badge: intelligence discovery runs, directory
+                      enrichment campaigns, and (geography-free PGs only)
+                      directly-attached business campaigns. */}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                     c.scope === 'intelligence'
                       ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
-                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                      : c.scope === 'business'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                   }`}>
-                    {c.scope === 'intelligence' ? 'intelligence' : 'enrichment'}
+                    {c.scope === 'intelligence' ? 'intelligence' : c.scope === 'business' ? 'business' : 'enrichment'}
                   </span>
                   <span className="text-[10px] text-gray-400">{c.stage}</span>
                   <button
@@ -1312,10 +1327,12 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             onChange={(e) => setAttachId(e.target.value)}
             className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
           >
-            <option value="">Attach an unparented discovery campaign…</option>
+            <option value="">
+              {campaign?.city ? 'Attach an unparented discovery campaign…' : 'Attach a discovery or business campaign…'}
+            </option>
             {attachable.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
+                {c.scope === 'business' ? '[biz] ' : ''}{c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
               </option>
             ))}
           </select>

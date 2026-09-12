@@ -3436,6 +3436,7 @@ model mkt_campaigns_list {
   mkt_owner_voice_profile                                                         mkt_owner_voice_profile?
   mkt_playbook_checklist_suggestions                                              mkt_playbook_checklist_suggestions[]
   mkt_prompt_executions_list                                                      mkt_prompt_executions_list[]
+  mkt_prospect_queue_mkt_prospect_queue_proving_ground_idTomkt_campaigns_list     mkt_prospect_queue[]                 @relation("mkt_prospect_queue_proving_ground_idTomkt_campaigns_list")
   mkt_prospect_queue_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_prospect_queue[]                 @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list")
   mkt_prospect_queue_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_prospect_queue[]                 @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list")
   mkt_review_response_pipeline                                                    mkt_review_response_pipeline[]
@@ -4265,6 +4266,8 @@ model mkt_prospect_queue {
   next_touch_at                                                                   DateTime?                 @db.Timestamptz(6)
   seed_id                                                                         String?                   @db.VarChar(60)
   account_family                                                                  String?                   @db.VarChar(255)
+  proving_ground_id                                                               String?                   @db.VarChar(255)
+  mkt_campaigns_list_mkt_prospect_queue_proving_ground_idTomkt_campaigns_list     mkt_campaigns_list?       @relation("mkt_prospect_queue_proving_ground_idTomkt_campaigns_list", fields: [proving_ground_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mpq_proving_ground")
   directory_presence_seeds                                                        directory_presence_seeds? @relation(fields: [seed_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mpq_seed")
   mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list mkt_campaigns_list?       @relation("mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list", fields: [processed_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_processed_campaign")
   mkt_campaigns_list_mkt_prospect_queue_source_campaign_idTomkt_campaigns_list    mkt_campaigns_list?       @relation("mkt_prospect_queue_source_campaign_idTomkt_campaigns_list", fields: [source_campaign_id], references: [id], onUpdate: NoAction, map: "fk_prospect_queue_source_campaign")
@@ -4276,6 +4279,7 @@ model mkt_prospect_queue {
   @@index([status, priority(sort: Desc), signal_count(sort: Desc), created_at], map: "idx_mkt_prospect_queue_status_sort")
   @@index([seek_batch_id], map: "idx_mpq_seek_batch")
   @@index([status, next_touch_at], map: "idx_mpq_next_touch")
+  @@index([proving_ground_id], map: "idx_mpq_proving_ground")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

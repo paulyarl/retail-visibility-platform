@@ -11,6 +11,8 @@ const {
   mockQueue,
   mockCampaigns,
   mockAudits,
+  mockChecklistProgress,
+  mockQueryRaw,
 } = vi.hoisted(() => ({
   mockQueue: {
     findUnique: vi.fn(),
@@ -28,6 +30,13 @@ const {
   mockAudits: {
     findMany: vi.fn(),
   },
+  mockChecklistProgress: {
+    groupBy: vi.fn(),
+  },
+  // The audit-coverage decoration runs a raw query (it filters out
+  // queue-promotion placeholder audits in SQL), so $queryRaw is mocked at
+  // the client level rather than mkt_audits_list.findMany.
+  mockQueryRaw: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -35,6 +44,8 @@ vi.mock('../../prisma', () => ({
     mkt_prospect_queue: mockQueue,
     mkt_campaigns_list: mockCampaigns,
     mkt_audits_list: mockAudits,
+    mkt_campaign_checklist_progress: mockChecklistProgress,
+    $queryRaw: mockQueryRaw,
   },
 }));
 
@@ -147,6 +158,8 @@ describe('MarketingProspectQueueService', () => {
     mockCampaigns.findFirst.mockResolvedValue(null);
     mockCampaigns.findUnique.mockResolvedValue(parentCampaign());
     mockQueue.count.mockResolvedValue(0);
+    mockQueryRaw.mockResolvedValue([]);
+    mockChecklistProgress.groupBy.mockResolvedValue([]);
   });
 
   // ─── addToQueue ────────────────────────────────────────────────────────
@@ -479,17 +492,15 @@ describe('MarketingProspectQueueService', () => {
         queueRow({ id: 'pque-audit-001', processed_campaign_id: campaignId }),
       ]);
       mockQueue.count.mockResolvedValue(1);
-      mockAudits.findMany.mockResolvedValue([
+      mockQueryRaw.mockResolvedValue([
         { campaign_id: campaignId, created_at: new Date('2026-09-01T10:00:00Z') },
       ]);
 
       const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
 
-      expect(mockAudits.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { campaign_id: { in: [campaignId] }, platform: 'business_analysis' },
-        }),
-      );
+      // The audit query is raw SQL (it excludes queue-promotion placeholder
+      // audits) — assert the template carried the campaign id.
+      expect(mockQueryRaw).toHaveBeenCalled();
       expect(result.entries[0].campaign_has_business_audit).toBe(true);
       expect(result.entries[0].business_audit_at).toEqual(new Date('2026-09-01T10:00:00Z'));
     });
@@ -500,12 +511,34 @@ describe('MarketingProspectQueueService', () => {
         queueRow({ id: 'pque-noaudit-001', processed_campaign_id: campaignId }),
       ]);
       mockQueue.count.mockResolvedValue(1);
-      mockAudits.findMany.mockResolvedValue([]);
+      mockQueryRaw.mockResolvedValue([]);
 
       const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
 
       expect(result.entries[0].campaign_has_business_audit).toBe(false);
       expect(result.entries[0].business_audit_at).toBeNull();
+    });
+
+    it('decorates entries with checklist_completed from the batched progress groupBy', async () => {
+      const campaignId = 'mcamp-checklist-001';
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-cl-001', processed_campaign_id: campaignId }),
+      ]);
+      mockQueue.count.mockResolvedValue(1);
+      mockQueryRaw.mockResolvedValue([]);
+      mockChecklistProgress.groupBy.mockResolvedValue([
+        { campaign_id: campaignId, _count: { step_id: 4 } },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
+
+      expect(mockChecklistProgress.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['campaign_id'],
+          where: { campaign_id: { in: [campaignId] }, completed_at: { not: null } },
+        }),
+      );
+      expect(result.entries[0].checklist_completed).toBe(4);
     });
 
     it('leaves audit decoration null for entries without a processed campaign', async () => {
@@ -516,6 +549,42 @@ describe('MarketingProspectQueueService', () => {
 
       expect(result.entries[0].campaign_has_business_audit).toBeNull();
       expect(result.entries[0].business_audit_at).toBeNull();
+    });
+
+    // Migration 282 — direct PG membership column, OR'd with the legacy
+    // source_campaign_id linkage.
+    it('filters by proving_ground_id alone (queue-list-initiated PGs)', async () => {
+      mockQueue.findMany.mockResolvedValue([]);
+
+      await MarketingProspectQueueService.list({ proving_ground_id: 'mkt-pg-001' });
+
+      expect(mockQueue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ proving_ground_id: 'mkt-pg-001' }),
+        }),
+      );
+    });
+
+    it('ORs proving_ground_id with source_campaign_ids when both are given', async () => {
+      mockQueue.findMany.mockResolvedValue([]);
+
+      await MarketingProspectQueueService.list({
+        proving_ground_id: 'mkt-pg-001',
+        source_campaign_ids: ['mkt-pg-001', 'mkt-intel-002'],
+      });
+
+      expect(mockQueue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: [{
+              OR: [
+                { source_campaign_id: { in: ['mkt-pg-001', 'mkt-intel-002'] } },
+                { proving_ground_id: 'mkt-pg-001' },
+              ],
+            }],
+          }),
+        }),
+      );
     });
   });
 

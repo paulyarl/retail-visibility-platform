@@ -167,6 +167,10 @@ export interface ListQueueFilters {
   // Migration 262 — proving-ground tree scope: queue rows whose
   // source_campaign_id is any of these (the parent's intelligence children).
   source_campaign_ids?: string[];
+  // Migration 282 — queue-list PG initiation: rows grouped directly into a
+  // proving ground carry proving_ground_id. OR'd with source_campaign_ids
+  // (dedup on row id is inherent — OR returns each row once).
+  proving_ground_id?: string;
   assigned_to?: string; // 'me' resolved to userId at route layer; 'unassigned' → null filter
   // When true, the assigned_to filter is OR'd with assigned_to IS NULL
   // (matches the "Assigned to me + unassigned" checkbox label on the queue page).
@@ -408,8 +412,20 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (filters.source_kind) where.source_kind = filters.source_kind;
       // Migration 262 — proving-ground tree scope: the worklist queries
       // `source_campaign_id IN (children of this proving ground)` (spec §5.2).
+      // Migration 282 adds the direct proving_ground_id column — grouped
+      // entries may have no source campaign, so the two linkages OR together
+      // (each row returns once regardless of how many columns match).
+      const pgLinkageOr: any[] = [];
       if (filters.source_campaign_ids?.length) {
-        where.source_campaign_id = { in: filters.source_campaign_ids };
+        pgLinkageOr.push({ source_campaign_id: { in: filters.source_campaign_ids } });
+      }
+      if (filters.proving_ground_id) {
+        pgLinkageOr.push({ proving_ground_id: filters.proving_ground_id });
+      }
+      if (pgLinkageOr.length === 1) {
+        Object.assign(where, pgLinkageOr[0]);
+      } else if (pgLinkageOr.length > 1) {
+        where.AND = [...(where.AND ?? []), { OR: pgLinkageOr }];
       }
       if (filters.assigned_to === 'unassigned') {
         where.assigned_to = null;

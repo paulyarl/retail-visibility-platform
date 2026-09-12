@@ -1807,7 +1807,7 @@ router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Reque
 /** Parse the qr-kit ?variant= query param; anything unrecognized falls back
  *  to 'mail' so a bad param can't produce a misattributed artifact. */
 function parseQrVariant(raw: unknown): ClaimInviteQrVariant {
-  return raw === 'walkin' || raw === 'social' ? raw : 'mail';
+  return raw === 'walkin' || raw === 'social' || raw === 'email' ? raw : 'mail';
 }
 
 /** GET /api/admin/directory/presence-seeds/:id/qr-kit/png — downloadable QR PNG.

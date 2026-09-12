@@ -866,10 +866,18 @@ export class MarketingCampaignService extends BaseService {
       // Branch on campaign_category first: directory_enrichment children
       // (category/city-scope enrichment campaigns) attach without the
       // intelligence kind/focus checks — they carry no intelligence_* fields.
-      // All other children must be intelligence-scope discovery runs.
+      // Business-scope children attach only on geography-free (mixed) PGs —
+      // a city-scope PG's members come through the queue, not direct attach
+      // (culture-fit §6.5). All other children must be intelligence-scope
+      // discovery runs.
       const childCategory = (child.campaign_category as string | null) || 'review_management';
-      if (childCategory !== 'directory_enrichment') {
-        if ((child.scope as string | null) !== 'intelligence') {
+      const childScope = child.scope as string | null;
+      if (childScope === 'business') {
+        if (parent.city) {
+          throw new ValidationError('business_children_require_geography_free_pg');
+        }
+      } else if (childCategory !== 'directory_enrichment') {
+        if (childScope !== 'intelligence') {
           throw new ValidationError('child_not_intelligence_scope');
         }
         const childKind = (child.intelligence_campaign_kind as string | null) || 'discovery';
@@ -877,7 +885,7 @@ export class MarketingCampaignService extends BaseService {
         if (childKind !== 'discovery' || (childFocus !== 'emerging' && childFocus !== 'competitive')) {
           throw new ValidationError('child_not_discovery_prospect_run');
         }
-      } else if (child.scope !== 'category' && child.scope !== 'city') {
+      } else if (childScope !== 'category' && childScope !== 'city') {
         // Enrichment children are category- or city-scope only.
         throw new ValidationError('child_not_enrichment_scope');
       }
@@ -947,6 +955,7 @@ export class MarketingCampaignService extends BaseService {
     sourceId: string,
     input: {
       title?: string;
+      scope?: 'city' | 'category';
       category?: string;
       city?: string;
       state?: string;
@@ -986,14 +995,22 @@ export class MarketingCampaignService extends BaseService {
         throw new ValidationError('source_not_discovery_prospect_run');
       }
 
+      const pgScope = input.scope ?? 'city';
+      if (pgScope !== 'city' && pgScope !== 'category') {
+        throw new ValidationError('scope must be city or category');
+      }
       const category = (input.category ?? source.category ?? '').trim();
       const city = (input.city ?? source.city ?? '').trim();
       const state = (input.state ?? source.state ?? '').trim();
+      // Scope-conditional requirements (PG scope flex, culture-fit §6.5):
+      // category is the market identity — required for both scopes. city is
+      // only required for a city-scope PG; a category-scope PG legitimately
+      // spans cities.
       if (!category) {
         throw new ValidationError('category is required to create a proving ground');
       }
-      if (!city) {
-        throw new ValidationError('city is required to create a proving ground');
+      if (pgScope === 'city' && !city) {
+        throw new ValidationError('city is required to create a city-scope proving ground');
       }
 
       // Reuse an existing active proving ground for this signature rather
@@ -1001,18 +1018,18 @@ export class MarketingCampaignService extends BaseService {
       // second discovery run for the same market is a merge, not a
       // duplicate create.
       let provingGround = await this.findDuplicateCampaign(
-        { scope: 'city', campaignCategory: 'proving_ground', category, city, state },
+        { scope: pgScope, campaignCategory: 'proving_ground', category, city, state },
         ctx,
       );
       const reusedExisting = !!provingGround;
       if (!provingGround) {
         provingGround = await this.createCampaign({
-          scope: 'city',
+          scope: pgScope,
           campaignCategory: 'proving_ground',
           category,
-          city,
+          city: city || undefined,
           state: state || undefined,
-          title: input.title || `${city} ${category} Proving Ground`,
+          title: input.title || `${[city, category].filter(Boolean).join(' ')} Proving Ground`,
         }, ctx);
       }
 
@@ -1041,6 +1058,109 @@ export class MarketingCampaignService extends BaseService {
       return { provingGround, reusedExisting, attached, skipped };
     } catch (error) {
       logger.error('Failed to promote campaign to proving ground', ctx, { error: (error as Error).message, sourceId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Queue-list PG initiation (Migration 282, culture-fit §5.5/§6.5): group
+   * selected queue entries directly into a proving ground — no intelligence
+   * discovery intermediary. Creates (or reuses) the PG campaign and stamps
+   * `mkt_prospect_queue.proving_ground_id` on each entry. Entries keep their
+   * `source_campaign_id` discovery provenance; the new column marks PG
+   * membership. Every linkage reader treats the two columns with OR
+   * semantics, so dual-linked rows never double-count.
+   *
+   * Re-grouping is a move: stamping overwrites a prior proving_ground_id.
+   */
+  async groupQueueEntriesIntoProvingGround(
+    input: {
+      queueEntryIds: string[];
+      title?: string;
+      scope?: 'city' | 'category';
+      category?: string;
+      city?: string;
+      state?: string;
+    },
+    ctx?: RequestCtx,
+  ): Promise<{
+    provingGround: any;
+    reusedExisting: boolean;
+    stamped: number;
+    notFound: string[];
+  }> {
+    try {
+      const entryIds = [...new Set(input.queueEntryIds)];
+      if (entryIds.length === 0) {
+        throw new ValidationError('queueEntryIds is required');
+      }
+
+      const entries = await this.prisma.mkt_prospect_queue.findMany({
+        where: { id: { in: entryIds } },
+        select: { id: true, category: true, city: true, state: true },
+      });
+      const foundIds = new Set(entries.map((e) => e.id));
+      const notFound = entryIds.filter((id) => !foundIds.has(id));
+
+      // Defaults: operator input wins; otherwise the most common non-empty
+      // value across the grouped entries (a queue group usually shares a
+      // market — city or category may still vary).
+      const modal = (values: Array<string | null>): string => {
+        const counts = new Map<string, number>();
+        for (const v of values) {
+          const t = (v ?? '').trim();
+          if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+        }
+        return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+      };
+      const category = (input.category ?? '').trim() || modal(entries.map((e) => e.category));
+      const city = (input.city ?? '').trim() || modal(entries.map((e) => e.city));
+      const state = (input.state ?? '').trim() || modal(entries.map((e) => e.state));
+      const pgScope = input.scope ?? (city ? 'city' : 'category');
+      if (pgScope !== 'city' && pgScope !== 'category') {
+        throw new ValidationError('scope must be city or category');
+      }
+      if (!category) {
+        throw new ValidationError('category is required to create a proving ground');
+      }
+      if (pgScope === 'city' && !city) {
+        throw new ValidationError('city is required to create a city-scope proving ground');
+      }
+
+      let provingGround = await this.findDuplicateCampaign(
+        { scope: pgScope, campaignCategory: 'proving_ground', category, city, state },
+        ctx,
+      );
+      const reusedExisting = !!provingGround;
+      if (!provingGround) {
+        provingGround = await this.createCampaign({
+          scope: pgScope,
+          campaignCategory: 'proving_ground',
+          category,
+          city: city || undefined,
+          state: state || undefined,
+          title: input.title || `${[city, category].filter(Boolean).join(' ')} Proving Ground`,
+        }, ctx);
+      }
+
+      const stampResult = entries.length > 0
+        ? await this.prisma.mkt_prospect_queue.updateMany({
+            where: { id: { in: [...foundIds] } },
+            data: { proving_ground_id: provingGround.id, updated_at: new Date() },
+          })
+        : { count: 0 };
+
+      logger.info('groupQueueEntriesIntoProvingGround: completed', ctx, {
+        provingGroundId: provingGround.id,
+        reusedExisting,
+        stamped: stampResult.count,
+        notFound: notFound.length,
+      });
+      return { provingGround, reusedExisting, stamped: stampResult.count, notFound };
+    } catch (error) {
+      logger.error('Failed to group queue entries into proving ground', ctx, {
+        error: (error as Error).message,
+      });
       throw this.handleError(error, ctx);
     }
   }
@@ -1224,8 +1344,21 @@ export class MarketingCampaignService extends BaseService {
     try {
       const queueEntry = await this.prisma.mkt_prospect_queue.findFirst({
         where: { processed_campaign_id: campaignId },
-        select: { source_campaign_id: true },
+        select: { source_campaign_id: true, proving_ground_id: true },
       });
+
+      // Queue-list initiation (Migration 282): the entry carries the PG id
+      // directly — resolve it without walking the discovery-source chain.
+      if (queueEntry?.proving_ground_id) {
+        const pg = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: queueEntry.proving_ground_id },
+          select: pgSelect,
+        });
+        if (pg?.campaign_category === 'proving_ground') {
+          const { campaign_category, ...lineage } = pg as any;
+          return lineage;
+        }
+      }
 
       if (queueEntry?.source_campaign_id) {
         const source = await this.prisma.mkt_campaigns_list.findUnique({
@@ -1333,12 +1466,23 @@ export class MarketingCampaignService extends BaseService {
       });
       const treeIds = [provingGroundId, ...children.map((c) => c.id)];
 
+      // Queue linkage (Migration 262 + 282): entries reached either through
+      // their discovery source campaign (treeIds) or by direct
+      // proving_ground_id membership (queue-list initiation). OR'd — a row
+      // carrying both still returns once.
+      const queueLinkage = {
+        OR: [
+          { source_campaign_id: { in: treeIds } },
+          { proving_ground_id: provingGroundId },
+        ],
+      };
+
       // Queue-graduated campaigns — dedupe on processed_campaign_id: AC84's
       // campaign_exists path can mark a second queue row campaign_created
       // against the SAME campaign.
       const queueEntries = await this.prisma.mkt_prospect_queue.findMany({
         where: {
-          source_campaign_id: { in: treeIds },
+          ...queueLinkage,
           processed_campaign_id: { not: null },
         },
         select: { processed_campaign_id: true },
@@ -1369,13 +1513,13 @@ export class MarketingCampaignService extends BaseService {
       const OPEN_QUEUE_STATUSES = ['queued', 'hold', 'in_thread', 'verify_then_outreach'];
       const [stillInQueue, seededPreGraduation, dismissed] = await Promise.all([
         this.prisma.mkt_prospect_queue.count({
-          where: { source_campaign_id: { in: treeIds }, status: { in: OPEN_QUEUE_STATUSES } },
+          where: { ...queueLinkage, status: { in: OPEN_QUEUE_STATUSES } },
         }),
         this.prisma.mkt_prospect_queue.count({
-          where: { source_campaign_id: { in: treeIds }, status: { in: OPEN_QUEUE_STATUSES }, seed_id: { not: null } },
+          where: { ...queueLinkage, status: { in: OPEN_QUEUE_STATUSES }, seed_id: { not: null } },
         }),
         this.prisma.mkt_prospect_queue.count({
-          where: { source_campaign_id: { in: treeIds }, status: 'dismissed' },
+          where: { ...queueLinkage, status: 'dismissed' },
         }),
       ]);
 
@@ -1413,7 +1557,10 @@ export class MarketingCampaignService extends BaseService {
     const [queueEntries, directChildren] = await Promise.all([
       this.prisma.mkt_prospect_queue.findMany({
         where: {
-          source_campaign_id: { in: treeIds },
+          OR: [
+            { source_campaign_id: { in: treeIds } },
+            { proving_ground_id: provingGroundId },
+          ],
           processed_campaign_id: { not: null },
         },
         select: { processed_campaign_id: true },

@@ -4,12 +4,14 @@
  *   GET /api/public/qr/claim/:token         — mailed claim invite
  *   GET /api/public/qr/claim/:token/walkin  — hand-delivered (walk-in) invite
  *   GET /api/public/qr/claim/:token/social  — DM/social-shared invite link
+ *   GET /api/public/qr/claim/:token/email   — email-shared invite link
  *   GET /api/public/qr/c/:shortCode          — short-code variant (mail)
  *   GET /api/public/qr/c/:shortCode/walkin   — short-code variant (walk-in)
  *   GET /api/public/qr/c/:shortCode/social   — short-code variant (social)
- *   GET /api/public/qr/claim-scan/:shortCode?surface=mail|walkin|social
+ *   GET /api/public/qr/c/:shortCode/email    — short-code variant (email)
+ *   GET /api/public/qr/claim-scan/:shortCode?surface=mail|walkin|social|email
  *                                          — JSON resolve + track for /q/, /qw/,
- *                                            /qs/ frontend redirect pages
+ *                                            /qs/, /qe/ frontend redirect pages
  *
  * Thin redirect that records a qr_scan_events row, then 302s to the claim
  * page (/place/claim/{token}). Scan tracking stays out of the claim flow
@@ -49,7 +51,7 @@ const WEB_URL = (
  * not the claim outcome.
  */
 async function recordClaimScanAndRedirect(
-  surface: 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social',
+  surface: 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email',
   req: Request,
   res: Response,
 ): Promise<void> {
@@ -111,6 +113,10 @@ router.get('/qr/claim/:token/social', (req, res) =>
   recordClaimScanAndRedirect('claim_invite_social', req, res),
 );
 
+router.get('/qr/claim/:token/email', (req, res) =>
+  recordClaimScanAndRedirect('claim_invite_email', req, res),
+);
+
 // ─── Short-code QR tracked redirects (migration 278) ─────────────────────
 // Compact variants of the claim QR redirect. QR codes encoding the short
 // URL have fewer modules → more legible at small print sizes. Resolves the
@@ -118,7 +124,7 @@ router.get('/qr/claim/:token/social', (req, res) =>
 // 302s to /place/claim/{token} (same destination as the long-URL variant).
 
 async function recordShortCodeScanAndRedirect(
-  surface: 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social',
+  surface: 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email',
   req: Request,
   res: Response,
 ): Promise<void> {
@@ -174,10 +180,14 @@ router.get('/qr/c/:shortCode/social', (req, res) =>
   recordShortCodeScanAndRedirect('claim_invite_social', req, res),
 );
 
+router.get('/qr/c/:shortCode/email', (req, res) =>
+  recordShortCodeScanAndRedirect('claim_invite_email', req, res),
+);
+
 // ─── Combined resolve + track endpoint for short frontend redirect pages ──
-// GET /api/public/qr/claim-scan/:shortCode?surface=mail|walkin|social
+// GET /api/public/qr/claim-scan/:shortCode?surface=mail|walkin|social|email
 //
-// Used by the /q/, /qw/, /qs/ Next.js server-component redirect pages. Unlike
+// Used by the /q/, /qw/, /qs/, /qe/ Next.js server-component redirect pages. Unlike
 // the /qr/c/:shortCode routes above (which 302 redirect), this returns JSON
 // { success, token } so the frontend page can redirect to /place/claim/{token}
 // after recording the scan. Combines resolution + scan tracking in one call
@@ -187,18 +197,24 @@ router.get('/qr/c/:shortCode/social', (req, res) =>
 //   - mail   → 'claim_invite'
 //   - walkin → 'claim_invite_walkin'
 //   - social → 'claim_invite_social'
-//   - (default / unknown) → 'claim_invite'
+//   - email  → 'claim_invite_email'
+// Unknown / missing surface → 400 (reject, do NOT silently default — a typo
+// would cross-contaminate per-surface scan attribution).
 
-const SURFACE_MAP: Record<string, 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social'> = {
+const SURFACE_MAP: Record<string, 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email'> = {
   mail: 'claim_invite',
   walkin: 'claim_invite_walkin',
   social: 'claim_invite_social',
+  email: 'claim_invite_email',
 };
 
 router.get('/qr/claim-scan/:shortCode', async (req, res) => {
   const { shortCode } = req.params;
   const surfaceParam = (req.query.surface as string) || 'mail';
-  const surface = SURFACE_MAP[surfaceParam] || 'claim_invite';
+  const surface = SURFACE_MAP[surfaceParam];
+  if (!surface) {
+    return res.status(400).json({ success: false, error: 'invalid_surface' });
+  }
 
   let token: string | null = null;
   let tenantId = 'platform';

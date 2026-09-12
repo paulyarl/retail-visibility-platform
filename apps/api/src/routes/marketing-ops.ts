@@ -1195,6 +1195,7 @@ router.delete('/:campaignId/children/:childId', async (req: any, res: Response) 
 // parent.
 const promoteToProvingGroundSchema = z.object({
   title: z.string().max(255).optional(),
+  scope: z.enum(['city', 'category']).optional(),
   category: z.string().max(100).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
@@ -4465,6 +4466,8 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       city: req.query.city as string | undefined,
       source_kind: req.query.source_kind as any,
       source_campaign_ids: sourceCampaignIds,
+      // Migration 282 — direct PG membership for queue-list-initiated PGs.
+      proving_ground_id: req.query.proving_ground_id as string | undefined,
       assigned_to: resolvedAssignedTo,
       include_unassigned: isMeFilter,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
@@ -4473,6 +4476,35 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
 
     res.json({ success: true, data: result.entries, queuedCount: result.queuedCount });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /prospect-queue/group-into-proving-ground — queue-list PG initiation
+// (Migration 282, culture-fit §5.5): group selected queue entries directly
+// into a proving ground without an intelligence intermediary. Creates or
+// reuses the PG campaign and stamps proving_ground_id on the entries.
+const groupIntoProvingGroundSchema = z.object({
+  queueEntryIds: z.array(z.string().min(1)).min(1).max(200),
+  title: z.string().max(255).optional(),
+  scope: z.enum(['city', 'category']).optional(),
+  category: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+});
+
+router.post('/prospect-queue/group-into-proving-ground', async (req: any, res: Response) => {
+  try {
+    const parsed = groupIntoProvingGroundSchema.parse(req.body ?? {});
+    const result = await MarketingCampaignService.groupQueueEntriesIntoProvingGround(
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

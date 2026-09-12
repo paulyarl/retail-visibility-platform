@@ -12,7 +12,7 @@
  *     card carries the same styled code (GET variant stays classic B/W)
  *
  * The QR always encodes the variant's tracked redirect URL — scans still
- * record as claim_invite / _walkin / _social regardless of styling.
+ * record as claim_invite / _walkin / _social / _email regardless of styling.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -37,7 +37,7 @@ export interface ClaimQrDesignerModalProps {
   open: boolean;
   onClose: () => void;
   seedId: string;
-  variant: 'mail' | 'walkin' | 'social';
+  variant: 'mail' | 'walkin' | 'social' | 'email';
   title: string;
   /** The variant's tracked redirect URL — what the QR encodes. */
   url: string;

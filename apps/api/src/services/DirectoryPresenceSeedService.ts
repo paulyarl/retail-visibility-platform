@@ -745,8 +745,10 @@ class DirectoryPresenceSeedService {
   /**
    * Resolve a 6-char claim short code to the underlying token string.
    * Used by the public /api/public/directory/claim-code/:shortCode endpoint
-   * that backs the /c/[shortCode] redirect page, and by the short-code QR
-   * tracked redirect /api/public/qr/c/:shortCode.
+   * that backs the /c/[shortCode] redirect page, by the short-code QR
+   * tracked redirect /api/public/qr/c/:shortCode, and by the combined
+   * resolve + track endpoint /api/public/qr/claim-scan/:shortCode that
+   * backs the /q/, /qw/, /qs/ frontend redirect pages.
    *
    * Returns null for expired or consumed tokens (do not leak existence).
    */
@@ -1703,6 +1705,27 @@ class DirectoryPresenceSeedService {
           await DirectorySeedCampaignLinkService.linkCampaign(
             result.id, entry.source_campaign_id, 'primary', ctx,
           );
+        }
+
+        // Migration 282 (queue-list PG initiation): entries grouped directly
+        // into a proving ground carry proving_ground_id — link the seed to
+        // the PG too so campaignIds=[pgId] cohorts see it. 'sibling' role
+        // when the discovery source already holds the primary link; the
+        // funnel's COUNT(DISTINCT dps.id) keeps dual-linked seeds from
+        // double-counting inside one cohort. Non-fatal — the seed is already
+        // live; a link failure shouldn't fail the entry.
+        if (entry.proving_ground_id) {
+          try {
+            await DirectorySeedCampaignLinkService.linkCampaign(
+              result.id, entry.proving_ground_id,
+              entry.source_campaign_id ? 'sibling' : 'primary', ctx,
+            );
+          } catch (linkErr) {
+            logger.warn('createSeedsForProvingGround: PG seed link failed (non-fatal)', undefined, {
+              queueEntryId: entry.id, seedId: result.id,
+              error: linkErr instanceof Error ? linkErr.message : String(linkErr),
+            });
+          }
         }
 
         // Mint the claim token — QR kits resolve through

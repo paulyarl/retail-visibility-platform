@@ -2,12 +2,12 @@ import { resolveClaimQrAndRedirect } from '@/lib/claim-qr-redirect';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ClaimQrWalkinPage({
+export default async function ClaimQrEmailPage({
   params,
 }: {
   params: Promise<{ shortCode: string }>;
 }) {
   const { shortCode } = await params;
-  // Surface 'walkin' → qr_scan_events surface 'claim_invite_walkin'
-  return resolveClaimQrAndRedirect(shortCode, 'walkin');
+  // Surface 'email' → qr_scan_events surface 'claim_invite_email'
+  return resolveClaimQrAndRedirect(shortCode, 'email');
 }
