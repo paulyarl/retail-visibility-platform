@@ -97,10 +97,6 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     fetchSettings();
   }, [authLoading, isAuthenticated]);
 
-  if (authLoading) {
-    return null;
-  }
-
   return (
     <PlatformSettingsContext.Provider value={{ settings, loading, error, refetch: fetchSettings }}>
       {children}

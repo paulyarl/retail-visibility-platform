@@ -198,8 +198,8 @@ export default function PlaceEntryEditorialLayout({
 
         {/* Full-width provenance callout — the conversion pitch */}
         <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">
-          <section className="bg-white rounded-xl p-8 border border-neutral-200 shadow-sm">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+          <section className="bg-white rounded-xl p-6 border border-neutral-200 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               <div className="lg:col-span-2">
                 <h2 className="text-2xl font-bold text-neutral-900 mb-3">About this listing</h2>
                 {listing.description && (
@@ -259,7 +259,7 @@ export default function PlaceEntryEditorialLayout({
         </div>
 
         {/* Product slot teaser — shows what claiming unlocks (E4) */}
-        <div className="max-w-6xl mx-auto px-6 mb-12">
+        <div className="max-w-6xl mx-auto px-6 mb-6">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl p-8 border border-blue-100 dark:border-blue-900/30">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
               <div>
@@ -299,7 +299,7 @@ export default function PlaceEntryEditorialLayout({
         </div>
 
         {/* Balanced content grid — map on left (wider), NAP data on right */}
-        <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left — Location + Contact stacked */}
             <div className="lg:col-span-7 space-y-8">
