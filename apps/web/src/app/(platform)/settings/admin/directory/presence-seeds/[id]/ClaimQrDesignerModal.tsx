@@ -31,9 +31,7 @@ import {
   SIZE_OPTIONS,
 } from '@/lib/qr-style-constants';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
-
-/** Platform logo centered on the QR — same-origin public PWA icon. */
-const PLATFORM_LOGO_PATH = '/icons/icon-512x512.png';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 
 export interface ClaimQrDesignerModalProps {
   open: boolean;
@@ -73,6 +71,9 @@ export default function ClaimQrDesignerModal({
   const [gradientOnCornerDots, setGradientOnCornerDots] = useState(true);
   const [logoEnabled, setLogoEnabled] = useState(true);
   const [logoShape, setLogoShape] = useState('square');
+  const [platformLogoUrl, setPlatformLogoUrl] = useState<string | null>(null);
+  const [logoLoading, setLogoLoading] = useState(false);
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [size, setSize] = useState(512);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -115,9 +116,50 @@ export default function ClaimQrDesignerModal({
     gradientOnDots,
     gradientOnCorners,
     gradientOnCornerDots,
-    logoUrl: logoEnabled ? PLATFORM_LOGO_PATH : null,
+    logoUrl: logoEnabled && platformLogoUrl ? platformLogoUrl : null,
     logoShape,
   });
+
+  // Platform logo — same pattern as BotConfigPage: the logo lives in
+  // platform_settings_list.logo_url, served via /api/platform-settings
+  // (cached 15min by the singleton). Not a static file under /public.
+  // Preload with crossOrigin='anonymous' to mirror overlayLogoOnQRAsync —
+  // a URL the canvas can't read (missing CORS headers) would otherwise
+  // fail silently and render a plain QR.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLogoLoading(true);
+    setLogoLoadFailed(false);
+    (async () => {
+      try {
+        const s = await platformSettingsService.getPlatformSettings();
+        const url = s?.logoUrl ?? null;
+        if (!url) {
+          if (!cancelled) setPlatformLogoUrl(null);
+          return;
+        }
+        await new Promise<void>((resolve, reject) => {
+          const probe = new Image();
+          probe.crossOrigin = 'anonymous';
+          probe.onload = () => resolve();
+          probe.onerror = () => reject(new Error('logo probe failed'));
+          probe.src = url;
+        });
+        if (!cancelled) setPlatformLogoUrl(url);
+      } catch {
+        if (!cancelled) {
+          setPlatformLogoUrl(null);
+          setLogoLoadFailed(true);
+        }
+      } finally {
+        if (!cancelled) setLogoLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Live preview — always via generateQrDataUrl so the logo overlay shows.
   useEffect(() => {
@@ -140,7 +182,7 @@ export default function ClaimQrDesignerModal({
     customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor,
     gradientEnabled, gradientStart, gradientEnd,
     gradientOnDots, gradientOnCorners, gradientOnCornerDots,
-    logoEnabled, logoShape,
+    logoEnabled, logoShape, platformLogoUrl,
   ]);
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
@@ -332,6 +374,13 @@ export default function ClaimQrDesignerModal({
               <ImageIcon className="w-3.5 h-3.5 text-neutral-400" />
               Center platform logo
             </label>
+            {logoEnabled && !logoLoading && !platformLogoUrl && (
+              <p className="text-[11px] text-amber-600 mt-1">
+                {logoLoadFailed
+                  ? 'The configured platform logo could not be loaded (CORS or unreachable URL) — the QR renders without one.'
+                  : 'No platform logo is configured in platform settings — the QR renders without one.'}
+              </p>
+            )}
             {logoEnabled && (
               <div className="flex gap-2 mt-2">
                 {(['square', 'circle'] as const).map((shape) => (
