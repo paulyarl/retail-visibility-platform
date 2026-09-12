@@ -50,8 +50,8 @@ export default function UnclaimedDirectoryBanner({
           href={claimHref}
           size="xs"
           leftSection={<IconShieldCheck size={16} />}
-          color="blue"
-          variant="filled"
+          color="white"
+          variant="gradient"
         >
           Claim this listing
         </Button>
