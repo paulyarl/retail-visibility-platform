@@ -75,7 +75,7 @@ export type CampaignStage =
 // workspace for city-launch campaigns. Not a triage outcome — set directly at
 // creation; filtered out of triage candidate playbooks in
 // CampaignTriageService.loadSignalsAndPlaybooks.
-export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management' | 'proving_ground';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management' | 'proving_ground' | 'directory_enrichment';
 
 export type RepairTrack = 'standard' | 'escalated';
 
@@ -852,13 +852,24 @@ export class MarketingCampaignService extends BaseService {
       if (!child) {
         throw new NotFoundError(`Child campaign ${childId} not found`);
       }
-      if ((child.scope as string | null) !== 'intelligence') {
-        throw new ValidationError('child_not_intelligence_scope');
-      }
-      const childKind = (child.intelligence_campaign_kind as string | null) || 'discovery';
-      const childFocus = (child.intelligence_focus as string | null) || 'emerging';
-      if (childKind !== 'discovery' || (childFocus !== 'emerging' && childFocus !== 'competitive')) {
-        throw new ValidationError('child_not_discovery_prospect_run');
+
+      // Branch on campaign_category first: directory_enrichment children
+      // (category/city-scope enrichment campaigns) attach without the
+      // intelligence kind/focus checks — they carry no intelligence_* fields.
+      // All other children must be intelligence-scope discovery runs.
+      const childCategory = (child.campaign_category as string | null) || 'review_management';
+      if (childCategory !== 'directory_enrichment') {
+        if ((child.scope as string | null) !== 'intelligence') {
+          throw new ValidationError('child_not_intelligence_scope');
+        }
+        const childKind = (child.intelligence_campaign_kind as string | null) || 'discovery';
+        const childFocus = (child.intelligence_focus as string | null) || 'emerging';
+        if (childKind !== 'discovery' || (childFocus !== 'emerging' && childFocus !== 'competitive')) {
+          throw new ValidationError('child_not_discovery_prospect_run');
+        }
+      } else if (child.scope !== 'category' && child.scope !== 'city') {
+        // Enrichment children are category- or city-scope only.
+        throw new ValidationError('child_not_enrichment_scope');
       }
       if (child.parent_campaign_id) {
         throw new ConflictError('child_already_parented');

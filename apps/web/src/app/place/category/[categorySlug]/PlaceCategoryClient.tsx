@@ -53,7 +53,8 @@ export default function PlaceCategoryClient({
         setLoading(true);
         const [placesData, enrichmentData] = await Promise.all([
           placesBrowsePublicService.getPlacesByCategory(categorySlug, city),
-          city ? placesBrowsePublicService.getCategoryEnrichment(categorySlug, city, state) : Promise.resolve(null),
+          // No city → national category view; fetch the '__all__' packet.
+          placesBrowsePublicService.getCategoryEnrichment(categorySlug, city ?? '__all__', state),
         ]);
         if (placesData) {
           setPlaces(placesData.places);

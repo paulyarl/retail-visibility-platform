@@ -19,6 +19,7 @@ import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import placesBrowsePublicService, { CategoryEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
 import { clientLogger } from '@/lib/client-logger';
 
 // Dynamically import Google Maps to avoid SSR issues
@@ -96,6 +97,9 @@ export default function CategoryViewClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
+  // National ('__all__') category enrichment packet — written by a
+  // directory_enrichment campaign; renders as the page description when present.
+  const [enrichment, setEnrichment] = useState<CategoryEnrichmentResponse | null>(null);
   
   // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
@@ -156,7 +160,12 @@ export default function CategoryViewClient({
         }
 
         // 2. Fetch stores in this category using directory categories API
-        const storesData = await recommendationsService.getStoresByCategory(decodedSlug);
+        //    (+ the national enrichment packet in parallel — best-effort)
+        const [storesData, enrichmentData] = await Promise.all([
+          recommendationsService.getStoresByCategory(decodedSlug),
+          placesBrowsePublicService.getCategoryEnrichment(decodedSlug, '__all__'),
+        ]);
+        setEnrichment(enrichmentData);
 
         if (!storesData) {
           throw new Error('Failed to fetch stores');
@@ -233,6 +242,12 @@ export default function CategoryViewClient({
               </Link>
             </div>
           </div>
+
+          {enrichment?.effective?.description && (
+            <p className="mt-2 text-neutral-600 dark:text-neutral-400 max-w-3xl">
+              {enrichment.effective.description}
+            </p>
+          )}
 
           <div className="flex items-center gap-4 mt-2 text-sm">
             <p className="text-neutral-600 dark:text-neutral-400">

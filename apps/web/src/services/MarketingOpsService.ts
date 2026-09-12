@@ -32,7 +32,10 @@ export type CampaignStage =
 // app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
 export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management'
   // Migration 262 — city/category proving ground (spec §4.2)
-  | 'proving_ground';
+  | 'proving_ground'
+  // Directory enrichment lane — category/location enrichment campaigns
+  // (docs/LocalBiz/DIRECTORY_ENRICHMENT_CAMPAIGNS_SPRINT_PLAN.md)
+  | 'directory_enrichment';
 export type RepairTrack = 'standard' | 'escalated';
 
 export type ConversionSource =
@@ -56,6 +59,7 @@ export type PromptType =
   | 'retainer'
   | 'category_analysis'
   | 'city_analysis'
+  | 'enrichment'
   | 'fragment';
 
 export type ExecutionStatus = 'pending' | 'completed' | 'failed' | 'filtered' | 'reviewed' | 'delivered' | 'archived';
@@ -1430,6 +1434,10 @@ export interface CampaignCreateInput {
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country?: string;
   business_origin_region?: string;
+  // Migration 262 — proving-ground children normally attach via the guarded
+  // POST /:id/children endpoint; this passthrough exists for explicit creation
+  // flows (e.g. directory_enrichment campaigns created under a PG parent).
+  parent_campaign_id?: string;
 }
 
 export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
@@ -4791,6 +4799,56 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-campaigns-list');
     await this.invalidateCachePattern(`mkt-ops-campaign-${parentId}`);
     return result.data?.data ?? result.data;
+  }
+
+  /**
+   * Directory Enrichment lane — create an enrichment campaign for a market.
+   *
+   * kind='category' → scope='category' campaign targeting
+   *   (category, city, state); pass city='__all__' for a national
+   *   category packet.
+   * kind='location' → scope='city' campaign targeting the
+   *   ('__location__', city, state) row; the required `category` column is
+   *   stamped with the '__location__' sentinel.
+   *
+   * When parentCampaignId (a proving_ground campaign) is provided, the new
+   * campaign is attached as a child — the backend attach guard accepts
+   * directory_enrichment children under proving-ground parents.
+   */
+  async createEnrichmentCampaign(input: {
+    kind: 'category' | 'location';
+    category?: string;
+    city: string;
+    state?: string;
+    title?: string;
+    parentCampaignId?: string;
+  }): Promise<Campaign> {
+    const isLocation = input.kind === 'location';
+    const isNational = input.city.trim().toLowerCase() === '__all__';
+    const title = input.title?.trim() || (isLocation
+      ? `Location Enrichment - ${input.city}${input.state ? `, ${input.state}` : ''}`
+      : `Category Enrichment - ${input.category ?? 'Category'} - ${isNational ? 'National' : `${input.city}${input.state ? `, ${input.state}` : ''}`}`);
+
+    const campaign = await this.createCampaign({
+      scope: isLocation ? 'city' : 'category',
+      campaign_category: 'directory_enrichment',
+      category: isLocation ? '__location__' : (input.category ?? ''),
+      city: input.city,
+      state: input.state,
+      title,
+      parent_campaign_id: input.parentCampaignId,
+    });
+
+    if (input.parentCampaignId) {
+      // Belt-and-suspenders: attach via the guarded endpoint too so the
+      // child relationship is validated even if the passthrough is removed.
+      try {
+        await this.attachProvingGroundChild(input.parentCampaignId, campaign.id);
+      } catch {
+        // Already parented via the create passthrough — ignore.
+      }
+    }
+    return campaign;
   }
 
   /** DELETE /:id/children/:childId — release a child (breadcrumbs-only). */

@@ -73,6 +73,16 @@ import {
   CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
   type CategoryIdentificationOutput,
 } from './category-identification.schema';
+import {
+  categoryEnrichmentSchema,
+  CATEGORY_ENRICHMENT_SCHEMA_NAME,
+  CATEGORY_ENRICHMENT_PROMPT_SUFFIX,
+  locationEnrichmentSchema,
+  LOCATION_ENRICHMENT_SCHEMA_NAME,
+  LOCATION_ENRICHMENT_PROMPT_SUFFIX,
+  type CategoryEnrichmentOutput,
+  type LocationEnrichmentOutput,
+} from './directory-enrichment.schema';
 
 export {
   profileRepairTriageSchema,
@@ -95,6 +105,14 @@ export {
   CATEGORY_IDENTIFICATION_SCHEMA_NAME,
   CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
   type CategoryIdentificationOutput,
+  categoryEnrichmentSchema,
+  CATEGORY_ENRICHMENT_SCHEMA_NAME,
+  CATEGORY_ENRICHMENT_PROMPT_SUFFIX,
+  locationEnrichmentSchema,
+  LOCATION_ENRICHMENT_SCHEMA_NAME,
+  LOCATION_ENRICHMENT_PROMPT_SUFFIX,
+  type CategoryEnrichmentOutput,
+  type LocationEnrichmentOutput,
 };
 
 // ============================================================================
@@ -310,6 +328,24 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     // payload is stored in audit_data.
     auditPlatform: 'category_identification',
     promptSuffix: CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
+  },
+  [CATEGORY_ENRICHMENT_SCHEMA_NAME]: {
+    validator: categoryEnrichmentSchema,
+    // Enrichment imports land in mkt_audits_list so the campaign's Audits tab
+    // renders a mapped card of the applied packet. The post-import hook in
+    // importExternalResult() also upserts the directory_category_enrichment
+    // row for the campaign's (category, city, state) — or ('__all__',
+    // '__all__') for national packets.
+    auditPlatform: 'category_enrichment',
+    promptSuffix: CATEGORY_ENRICHMENT_PROMPT_SUFFIX,
+  },
+  [LOCATION_ENRICHMENT_SCHEMA_NAME]: {
+    validator: locationEnrichmentSchema,
+    // Same audit + auto-apply contract as category_enrichment, targeting the
+    // ('__location__', city, state) row via the location merge contract
+    // (AI wins when non-empty; deterministic aggregates fill gaps).
+    auditPlatform: 'location_enrichment',
+    promptSuffix: LOCATION_ENRICHMENT_PROMPT_SUFFIX,
   },
 };
 

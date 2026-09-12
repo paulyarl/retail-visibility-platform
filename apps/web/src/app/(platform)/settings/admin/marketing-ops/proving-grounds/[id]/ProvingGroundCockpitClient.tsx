@@ -70,6 +70,13 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [enrichResult, setEnrichResult] = useState<string | null>(null);
   const [enrichError, setEnrichError] = useState<string | null>(null);
 
+  // Directory enrichment lane — create a category/location enrichment
+  // campaign prefilled with this proving ground's market and attach it as a
+  // child (the attach guard accepts directory_enrichment children).
+  const [enrichCampaignBusy, setEnrichCampaignBusy] = useState<'category' | 'location' | null>(null);
+  const [enrichCampaignError, setEnrichCampaignError] = useState<string | null>(null);
+  const [enrichCampaignCreated, setEnrichCampaignCreated] = useState<{ id: string; title: string | null } | null>(null);
+
   // Public copy — the market SEO the enrichment feeds the public category×city
   // surfaces (meta title / description / keywords). Viewer + operator override
   // with the same semantics as the category-enrichment markets page: blank
@@ -271,6 +278,37 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setEnrichError(err.message || 'Failed to enrich market');
     } finally {
       setEnrichBusy(false);
+    }
+  };
+
+  // Directory enrichment lane — spawn a category- or location-scope
+  // enrichment campaign prefilled with this market and attach it as a child.
+  const handleCreateEnrichmentCampaign = async (kind: 'category' | 'location') => {
+    if (!campaign || campaign.campaign_category !== 'proving_ground' || !campaign.city || !campaign.state) {
+      setEnrichCampaignError('Campaign is missing city/state for enrichment');
+      return;
+    }
+    if (kind === 'category' && !campaign.category) {
+      setEnrichCampaignError('Campaign is missing category for category enrichment');
+      return;
+    }
+    setEnrichCampaignBusy(kind);
+    setEnrichCampaignError(null);
+    setEnrichCampaignCreated(null);
+    try {
+      const created = await marketingOpsService.createEnrichmentCampaign({
+        kind,
+        category: kind === 'category' ? campaign.category : undefined,
+        city: campaign.city,
+        state: campaign.state,
+        parentCampaignId: campaignId,
+      });
+      setEnrichCampaignCreated({ id: created.id, title: created.title });
+      await load();
+    } catch (err: any) {
+      setEnrichCampaignError(err.message || 'Failed to create enrichment campaign');
+    } finally {
+      setEnrichCampaignBusy(null);
     }
   };
 
@@ -599,8 +637,44 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                   {enrichBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   Enrich Market Listings
                 </button>
+                <button
+                  onClick={() => handleCreateEnrichmentCampaign('category')}
+                  disabled={enrichCampaignBusy !== null}
+                  title="Create a directory_enrichment campaign for this category market and attach it under this proving ground"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800"
+                >
+                  {enrichCampaignBusy === 'category' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
+                  Category enrichment campaign
+                </button>
+                <button
+                  onClick={() => handleCreateEnrichmentCampaign('location')}
+                  disabled={enrichCampaignBusy !== null}
+                  title="Create a directory_enrichment campaign for this location (city) and attach it under this proving ground"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800"
+                >
+                  {enrichCampaignBusy === 'location' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                  Location enrichment campaign
+                </button>
               </div>
             </div>
+            {(enrichCampaignCreated || enrichCampaignError) && (
+              <div className="mt-2">
+                {enrichCampaignCreated && (
+                  <p className="text-xs text-green-700 dark:text-green-400">
+                    Enrichment campaign created and attached —{' '}
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${enrichCampaignCreated.id}`}
+                      className="font-medium underline"
+                    >
+                      {enrichCampaignCreated.title || enrichCampaignCreated.id}
+                    </Link>
+                  </p>
+                )}
+                {enrichCampaignError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{enrichCampaignError}</p>
+                )}
+              </div>
+            )}
 
             {/* Public copy panel — effective copy + operator override editor */}
             {copyOpen && marketStatus && (

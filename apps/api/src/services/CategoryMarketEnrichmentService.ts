@@ -21,11 +21,20 @@ import {
   generateCategoryMarketEnrichmentId,
   generateListingEnrichmentLogId,
 } from '../lib/id-generator';
+import type { CategoryEnrichmentOutput } from '../validators/directory-enrichment.schema';
 import { audit } from '../audit';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 
 const LOCATION_SENTINEL_KEY = '__location__';
+
+// composer_version=1 is the deterministic SeedSeoComposer output; 2 marks
+// rows written by a directory_enrichment campaign run (AI-produced packet).
+const CAMPAIGN_COMPOSER_VERSION = 2;
+
+// Prisma.join throws on an empty array — emit a literal empty text[] instead.
+const textArraySql = (arr: string[]) =>
+  arr.length ? Prisma.sql`ARRAY[${Prisma.join(arr)}]::text[]` : Prisma.sql`ARRAY[]::text[]`;
 
 export interface MarketState {
   id: string;
@@ -143,8 +152,8 @@ class CategoryMarketEnrichmentService extends BaseService {
       VALUES (
         ${id}, ${categoryKey}, ${profile.category_name}, ${normalizedCity}, ${normalizedState},
         ${packet.metaTitle}, ${packet.description},
-        ARRAY[${Prisma.join(keywords)}]::text[],
-        ARRAY[${Prisma.join(secondary)}]::text[],
+        ${textArraySql(keywords)},
+        ${textArraySql(secondary)},
         ${packet.schemaTypeHint},
         ${packet.inputs.intelligenceProfileId}, ${packet.inputs.goldStandardProfileId}, ${packet.composerVersion},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource}, now(), now()
@@ -185,8 +194,9 @@ class CategoryMarketEnrichmentService extends BaseService {
 
     const listingResult = await this.enrichMarketListings(
       { categoryKey, city: normalizedCity, state: normalizedState },
-      profile,
-      goldStandard,
+      profile.category_name,
+      profileSeo,
+      goldSeo,
       { triggerSource, enrichedBy },
       ctx,
     );
@@ -213,6 +223,164 @@ class CategoryMarketEnrichmentService extends BaseService {
     };
   }
 
+  /**
+   * Apply a validated AI-produced enrichment packet to a category market row.
+   *
+   * Entry point for the directory_enrichment campaign lane (both internal-run
+   * and external-import executions). Differences from enrichMarket:
+   *   - No intelligence profile required — the packet IS the content source.
+   *   - Sentinel handling: campaign city '__all__' writes the national
+   *     (category, '__all__', '__all__') row literally; normalizers are
+   *     bypassed for sentinels (normalizeReferenceState('__all__') would
+   *     return '__ALL__' via its unknown-format passthrough).
+   *   - Writes trigger_source='campaign_run' + source_campaign_id /
+   *     source_execution_id lineage + body_copy.
+   *   - Fans out to published listings in the market using a synthesized
+   *     IntelligenceProfileSeoFields built from the AI packet (no profile row).
+   *     National packets skip fan-out — there is no city to match on.
+   */
+  async applyEnrichmentPacket(
+    input: {
+      campaign: { id: string; category?: string | null; city?: string | null; state?: string | null };
+      packet: CategoryEnrichmentOutput;
+      executionId?: string | null;
+      enrichedBy?: string | null;
+    },
+    ctx?: RequestCtx,
+  ): Promise<EnrichMarketResult> {
+    const { campaign, packet } = input;
+    const categoryKey = normalizeCategoryKey(campaign.category ?? packet.category_key ?? '');
+    const isNational = (campaign.city ?? '').trim().toLowerCase() === '__all__';
+
+    // Sentinels are written literally — do NOT run them through
+    // normalizeReferenceCity/normalizeReferenceState.
+    const normalizedCity = isNational ? '__all__' : normalizeReferenceCity(campaign.city);
+    const normalizedState = isNational ? '__all__' : normalizeReferenceState(campaign.state);
+
+    if (!categoryKey || !normalizedCity || !normalizedState) {
+      return {
+        marketKey: { categoryKey, city: campaign.city ?? '', state: campaign.state ?? '' },
+        categoryEnrichmentId: null,
+        listingsEnriched: 0,
+        listingsSkipped: 0,
+        skipReasons: { invalid_market: 1 },
+      };
+    }
+
+    const categoryName =
+      packet.category_name?.trim() ||
+      (campaign.category ?? '')
+        .replace(/[-_]+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (c) => c.toUpperCase()) ||
+      categoryKey;
+
+    const id = generateCategoryMarketEnrichmentId();
+    const enrichedAt = new Date();
+    const enrichedBy = input.enrichedBy ?? null;
+    const triggerSource = 'campaign_run';
+
+    const keywords = (packet.keywords ?? []).map((k) => k.trim()).filter(Boolean);
+    const secondary = (packet.secondary_categories ?? []).map((s) => s.trim()).filter(Boolean);
+    const bodyCopy = packet.body_copy?.trim() || null;
+
+    const upsert = Prisma.sql`
+      INSERT INTO directory_category_enrichment (
+        id, category_key, category_name, city, state,
+        meta_title, description, keywords, secondary_categories, schema_type_hint,
+        body_copy, intelligence_profile_id, gold_standard_profile_id, composer_version,
+        enriched_at, enriched_by, trigger_source,
+        source_campaign_id, source_execution_id, created_at, updated_at
+      )
+      VALUES (
+        ${id}, ${categoryKey}, ${categoryName}, ${normalizedCity}, ${normalizedState},
+        ${packet.meta_title}, ${packet.description},
+        ${textArraySql(keywords)},
+        ${textArraySql(secondary)},
+        ${packet.schema_type_hint ?? null},
+        ${bodyCopy},
+        ${null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
+        ${enrichedAt}, ${enrichedBy}, ${triggerSource},
+        ${campaign.id}, ${input.executionId ?? null}, now(), now()
+      )
+      ON CONFLICT (category_key, city, state) DO UPDATE SET
+        category_name = EXCLUDED.category_name,
+        meta_title = EXCLUDED.meta_title,
+        description = EXCLUDED.description,
+        keywords = EXCLUDED.keywords,
+        secondary_categories = EXCLUDED.secondary_categories,
+        schema_type_hint = EXCLUDED.schema_type_hint,
+        body_copy = EXCLUDED.body_copy,
+        composer_version = EXCLUDED.composer_version,
+        enriched_at = EXCLUDED.enriched_at,
+        enriched_by = EXCLUDED.enriched_by,
+        trigger_source = EXCLUDED.trigger_source,
+        source_campaign_id = EXCLUDED.source_campaign_id,
+        source_execution_id = EXCLUDED.source_execution_id,
+        updated_at = now()
+      WHERE directory_category_enrichment.category_key = EXCLUDED.category_key
+        AND directory_category_enrichment.city = EXCLUDED.city
+        AND directory_category_enrichment.state = EXCLUDED.state
+    `;
+
+    await this.prisma.$queryRaw(upsert);
+
+    await audit({
+      tenantId: undefined,
+      actor: enrichedBy,
+      actorType: 'user',
+      action: 'directory_market_enrichment.campaign_apply',
+      payload: {
+        market: { categoryKey, city: normalizedCity, state: normalizedState },
+        categoryEnrichmentId: id,
+        campaignId: campaign.id,
+        executionId: input.executionId ?? null,
+        triggerSource,
+      },
+    });
+
+    let listingResult = { enriched: 0, skipped: 0, skipReasons: {} as Record<string, number> };
+    if (!isNational) {
+      // Synthesize profile-shaped SEO fields from the AI packet so the
+      // existing per-listing composer + guards apply unchanged. profileId is
+      // null — no intelligence profile backs a campaign run.
+      const pseudoProfileSeo: IntelligenceProfileSeoFields = {
+        profileId: null,
+        synonyms: keywords,
+        subcategories: secondary,
+        schemaOrgType: packet.schema_type_hint ?? null,
+      };
+      listingResult = await this.enrichMarketListings(
+        { categoryKey, city: normalizedCity, state: normalizedState },
+        categoryName,
+        pseudoProfileSeo,
+        null,
+        { triggerSource, enrichedBy },
+        ctx,
+      );
+
+      // Keep the city-level location SEO in sync after a market enrichment.
+      try {
+        const { default: locationService } = await import('./LocationMarketEnrichmentService');
+        await locationService.enrichLocation(normalizedCity, normalizedState, { triggerSource, enrichedBy }, ctx);
+      } catch (locationErr) {
+        logger.warn('[CategoryMarketEnrichmentService] location enrichment failed', ctx, {
+          error: (locationErr as Error).message,
+          city: normalizedCity,
+          state: normalizedState,
+        });
+      }
+    }
+
+    return {
+      marketKey: { categoryKey, city: normalizedCity, state: normalizedState },
+      categoryEnrichmentId: id,
+      listingsEnriched: listingResult.enriched,
+      listingsSkipped: listingResult.skipped,
+      skipReasons: listingResult.skipReasons,
+    };
+  }
+
   async getMarket(
     category: string,
     city: string,
@@ -220,11 +388,18 @@ class CategoryMarketEnrichmentService extends BaseService {
     ctx?: RequestCtx,
   ): Promise<MarketState | null> {
     const categoryKey = normalizeCategoryKey(category);
-    const normalizedCity = normalizeReferenceCity(city);
+    // National ('__all__') packets are stored literally — bypass the
+    // reference normalizers for the sentinel (normalizeReferenceState would
+    // corrupt '__all__' to '__ALL__' via its passthrough) and pin state to
+    // '__all__' regardless of what the caller passed.
+    const isNational = city.trim().toLowerCase() === '__all__';
+    const normalizedCity = isNational ? '__all__' : normalizeReferenceCity(city);
     if (!normalizedCity) return null;
 
     let normalizedState: string | null = null;
-    if (state) {
+    if (isNational) {
+      normalizedState = '__all__';
+    } else if (state) {
       normalizedState = normalizeReferenceState(state);
     }
 
@@ -284,8 +459,9 @@ class CategoryMarketEnrichmentService extends BaseService {
     ctx?: RequestCtx,
   ): Promise<MarketState | null> {
     const normalizedKey = normalizeCategoryKey(categoryKey);
-    const normalizedCity = normalizeReferenceCity(city);
-    const normalizedState = normalizeReferenceState(state);
+    const isNational = city.trim().toLowerCase() === '__all__';
+    const normalizedCity = isNational ? '__all__' : normalizeReferenceCity(city);
+    const normalizedState = isNational ? '__all__' : normalizeReferenceState(state);
     if (!normalizedCity || !normalizedState) {
       throw new Error('invalid_market_key');
     }
@@ -418,16 +594,19 @@ class CategoryMarketEnrichmentService extends BaseService {
    * For seed listings, guard against operator_override provenance and audit-powered
    * linked-campaign content. For tenant listings, guard against owner_edit and
    * operator_override log rows.
+   *
+   * Accepts resolved SEO fields (not raw profile rows) so the campaign-run path
+   * can feed a packet synthesized from AI output — there is no intelligence
+   * profile in that lane.
    */
   private async enrichMarketListings(
     marketKey: { categoryKey: string; city: string; state: string },
-    profile: { id: string; category_name: string; configuration_json: any },
-    goldStandard: { id: string; configuration_json: any } | null,
+    categoryName: string,
+    profileSeo: IntelligenceProfileSeoFields | null,
+    goldSeo: GoldStandardSeoFields | null,
     opts: { triggerSource: string; enrichedBy: string | null },
     ctx?: RequestCtx,
   ): Promise<{ enriched: number; skipped: number; skipReasons: Record<string, number> }> {
-    const profileSeo = this.toIntelligenceProfileSeoFields(profile);
-    const goldSeo = this.toGoldStandardSeoFields(goldStandard);
     const pageSize = 200;
     let skip = 0;
     let enriched = 0;
@@ -438,7 +617,7 @@ class CategoryMarketEnrichmentService extends BaseService {
       const listings = await this.prisma.directory_listings_list.findMany({
         where: {
           is_published: true,
-          primary_category: { equals: profile.category_name, mode: 'insensitive' },
+          primary_category: { equals: categoryName, mode: 'insensitive' },
           city: { equals: marketKey.city, mode: 'insensitive' },
           state: { equals: marketKey.state, mode: 'insensitive' },
         },
@@ -475,7 +654,7 @@ class CategoryMarketEnrichmentService extends BaseService {
         try {
           const campaignFields: CampaignSeoFields = {
             businessName: listing.business_name || 'Business',
-            category: listing.primary_category || profile.category_name,
+            category: listing.primary_category || categoryName,
             addressCity: listing.city || null,
             addressState: listing.state || null,
           };

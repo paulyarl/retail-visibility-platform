@@ -140,6 +140,93 @@ describe('proving_ground structural-duplicate guardrail', () => {
 });
 
 // ====================
+// DIRECTORY_ENRICHMENT DEDUP (sprint plan M4)
+// ====================
+// Enrichment campaigns dedup on scope + campaign_category + category + city +
+// state â€” sentinel values ('__all__', '__location__') participate in the
+// signature like any other value.
+
+describe('directory_enrichment structural-duplicate guardrail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStageHistory.create.mockResolvedValue({});
+    mockCampaignsList.findFirst.mockResolvedValue(null);
+    mockCampaignsList.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...data, id: data.id }),
+    );
+  });
+
+  it('blocks a duplicate national category enrichment campaign (__all__ sentinel)', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-enr-001',
+      display_id: 'MC-ENR1',
+      scope: 'category',
+      campaign_category: 'directory_enrichment',
+      category: 'Halal Grocery',
+      city: '__all__',
+      state: '__all__',
+      stage: 'seek',
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'category',
+        campaignCategory: 'directory_enrichment',
+        category: 'Halal Grocery',
+        city: '__all__',
+        state: '__all__',
+        title: 'Category Enrichment â€” Halal Grocery â€” National',
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+
+    expect(mockCampaignsList.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks a duplicate location enrichment campaign (__location__ sentinel)', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-enr-002',
+      display_id: 'MC-ENR2',
+      scope: 'city',
+      campaign_category: 'directory_enrichment',
+      category: '__location__',
+      city: 'Columbus',
+      state: 'OH',
+      stage: 'seek',
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'city',
+        campaignCategory: 'directory_enrichment',
+        category: '__location__',
+        city: 'Columbus',
+        state: 'OH',
+        title: 'Location Enrichment â€” Columbus, OH',
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+
+    expect(mockCampaignsList.create).not.toHaveBeenCalled();
+  });
+
+  it('does not collide with a proving_ground campaign on the same market', async () => {
+    // campaign_category differs â†’ different signature.
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    const result = await service.createCampaign({
+      scope: 'city',
+      campaignCategory: 'directory_enrichment',
+      category: '__location__',
+      city: 'Madison',
+      state: 'WI',
+      title: 'Location Enrichment â€” Madison, WI',
+    });
+
+    expect(mockCampaignsList.create).toHaveBeenCalled();
+    expect(result.campaign_category).toBe('directory_enrichment');
+  });
+});
+
+// ====================
 // ATTACH / DETACH CHILD (Â§4.2)
 // ====================
 
@@ -207,6 +294,82 @@ describe('attachChildCampaign', () => {
       service.attachChildCampaign('mcamp-missing', 'mcamp-int-001'),
     ).rejects.toThrow();
   });
+
+  // Directory enrichment children (sprint plan C): category/city-scope
+  // enrichment campaigns attach without the intelligence kind/focus checks.
+  const enrichCategoryChild = {
+    id: 'mcamp-enr-001',
+    scope: 'category',
+    campaign_category: 'directory_enrichment',
+    parent_campaign_id: null,
+  };
+  const enrichLocationChild = {
+    id: 'mcamp-enr-002',
+    scope: 'city',
+    campaign_category: 'directory_enrichment',
+    parent_campaign_id: null,
+  };
+
+  it('attaches a category-scope directory_enrichment child (skips intelligence checks)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce(enrichCategoryChild);
+
+    const result = await service.attachChildCampaign('mcamp-pg-001', 'mcamp-enr-001');
+
+    expect(result).toEqual({ attached: true, parentId: 'mcamp-pg-001', childId: 'mcamp-enr-001' });
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: 'mcamp-enr-001' },
+      data: { parent_campaign_id: 'mcamp-pg-001' },
+    });
+  });
+
+  it('attaches a city-scope directory_enrichment child', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce(enrichLocationChild);
+
+    const result = await service.attachChildCampaign('mcamp-pg-001', 'mcamp-enr-002');
+    expect(result.attached).toBe(true);
+  });
+
+  it('rejects a directory_enrichment child at a non-enrichment scope (400)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce({ ...enrichCategoryChild, scope: 'business' });
+
+    await expect(
+      service.attachChildCampaign('mcamp-pg-001', 'mcamp-enr-001'),
+    ).rejects.toThrow('child_not_enrichment_scope');
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('still rejects unrelated non-intelligence children (e.g. review_management category scope)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce({
+        id: 'mcamp-rm-001',
+        scope: 'category',
+        campaign_category: 'review_management',
+        parent_campaign_id: null,
+      });
+
+    await expect(
+      service.attachChildCampaign('mcamp-pg-001', 'mcamp-rm-001'),
+    ).rejects.toThrow('child_not_intelligence_scope');
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects an already-parented directory_enrichment child (409)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce({ ...enrichCategoryChild, parent_campaign_id: 'mcamp-pg-other' });
+
+    await expect(
+      service.attachChildCampaign('mcamp-pg-001', 'mcamp-enr-001'),
+    ).rejects.toThrow('child_already_parented');
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('detachChildCampaign', () => {
@@ -243,7 +406,7 @@ describe('detachChildCampaign', () => {
 
 
 // ====================
-// GAP LOG — append-only incident record (§4.5)
+// GAP LOG ï¿½ append-only incident record (ï¿½4.5)
 // ====================
 
 describe('appendGapLog', () => {
@@ -300,10 +463,10 @@ describe('appendGapLog', () => {
 });
 
 // ====================
-// QUEUE — account_family identity patch (§4.9)
+// QUEUE ï¿½ account_family identity patch (ï¿½4.9)
 // ====================
 
-describe('queue update — account_family', () => {
+describe('queue update ï¿½ account_family', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQueue.update.mockImplementation(({ data }: any) => Promise.resolve({ id: 'pque-001', ...data }));

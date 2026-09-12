@@ -452,6 +452,32 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
   }, [form.scope, form.category, form.intelligence_campaign_kind, form.intelligence_focus, form.intelligence_platform, form.city, form.state, titleManuallyEdited]);
 
+  // Directory enrichment lane — sentinel + title management.
+  // - scope=city (location enrichment): the required `category` column is
+  //   stamped '__location__' and locked (the Categories selector is hidden).
+  // - scope=category: the '__location__' sentinel is cleared so a real
+  //   category is picked; city may be '__all__' for the national packet.
+  useEffect(() => {
+    if (form.campaign_category !== 'directory_enrichment') return;
+    if (form.scope === 'city' && form.category !== '__location__') {
+      setForm((prev) => ({ ...prev, category: '__location__' }));
+    } else if (form.scope === 'category' && form.category === '__location__') {
+      setForm((prev) => ({ ...prev, category: '' }));
+    }
+  }, [form.campaign_category, form.scope, form.category]);
+
+  // Title autofill for directory_enrichment campaigns.
+  useEffect(() => {
+    if (form.campaign_category !== 'directory_enrichment') return;
+    if (titleManuallyEdited) return;
+    const loc = [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean).join(', ');
+    const isNational = form.city.trim().toLowerCase() === '__all__';
+    const derived = form.scope === 'city'
+      ? `Location Enrichment - ${loc}`
+      : `Category Enrichment - ${form.category || 'Category'} - ${isNational ? 'National' : loc}`;
+    setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
+  }, [form.campaign_category, form.scope, form.category, form.city, form.state, titleManuallyEdited]);
+
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -765,12 +791,17 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 // it from a business/intelligence scope coerces scope to city.
                 if (next === 'proving_ground' && (form.scope === 'business' || form.scope === 'intelligence')) {
                   setForm((prev) => ({ ...prev, campaign_category: next, scope: 'city' }));
+                } else if (next === 'directory_enrichment' && (form.scope === 'business' || form.scope === 'intelligence')) {
+                  // Directory enrichment lives at category scope (category
+                  // enrichment) or city scope (location enrichment) — coerce
+                  // to category scope as the default lane.
+                  setForm((prev) => ({ ...prev, campaign_category: next, scope: 'category' }));
                 } else {
                   handleChange('campaign_category', next);
                 }
               }}
                 className={inputClass}>
-                {[...CATEGORIES, 'proving_ground' as CampaignCategory].map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : cat === 'proving_ground' ? 'Proving Ground' : 'Triage Management'}</option>)}
+                {[...CATEGORIES, 'proving_ground' as CampaignCategory, 'directory_enrichment' as CampaignCategory].map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : cat === 'proving_ground' ? 'Proving Ground' : cat === 'directory_enrichment' ? 'Directory Enrichment' : 'Triage Management'}</option>)}
               </select>
               <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
                 {form.campaign_category === 'review_management' ? (
@@ -805,6 +836,13 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     <p className="mt-1"><strong>Checklist:</strong> PG-01 preflight attaches automatically — no triage step. Manage it from the cockpit at Marketing Ops → Proving Grounds.</p>
                     <p className="mt-1"><strong>Stages:</strong> Created at seek and never transitions — funnel gates (G1–G4) are read off linked seed cohorts, not the campaign stage.</p>
                   </>
+                ) : form.campaign_category === 'directory_enrichment' ? (
+                  <>
+                    <p className="font-medium">Directory Enrichment</p>
+                    <p className="mt-1"><strong>Purpose:</strong> Produce SEO + content for public directory pages. <strong>Scope=category</strong> enriches a category market (category + city + state; set city to <span className="font-mono">__all__</span> for the national page). <strong>Scope=city</strong> enriches the location page (city + state).</p>
+                    <p className="mt-1"><strong>Execution:</strong> Run the enrichment prompt internally (Prompts tab → Run) or paste an external AI's JSON output via Import — validated output auto-applies to the directory enrichment row and lands on the Audits tab.</p>
+                    <p className="mt-1"><strong>Proving ground:</strong> Can be attached as a child of a proving-ground campaign from its cockpit.</p>
+                  </>
                 ) : (
                   <>
                     <p className="font-medium">Triage Management</p>
@@ -838,9 +876,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Scope" required>
               <select value={form.scope} onChange={(e) => {
                 const next = e.target.value as CampaignScope;
-                // proving_ground is only valid for city/category scope — reset
-                // if the operator switches away after selecting it.
-                if (next !== 'city' && next !== 'category' && form.campaign_category === 'proving_ground') {
+                // proving_ground and directory_enrichment are only valid for
+                // city/category scope — reset if the operator switches away
+                // after selecting one of them.
+                if (next !== 'city' && next !== 'category' && (form.campaign_category === 'proving_ground' || form.campaign_category === 'directory_enrichment')) {
                   setForm((prev) => ({ ...prev, scope: next, campaign_category: 'review_management' }));
                 } else {
                   handleChange('scope', next);
@@ -969,12 +1008,21 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 onPrimaryChange returns the category name string; the campaign
                 form stores it directly in form.category. */}
             <FormField label="Categories" className="sm:col-span-2">
-              <DirectoryCategorySelectorAdapter
-                primary={form.category}
-                secondary={form.secondary_categories}
-                onPrimaryChange={(v) => handleChange('category', v)}
-                onSecondaryChange={(v) => handleChange('secondary_categories', v)}
-              />
+              {form.campaign_category === 'directory_enrichment' && form.scope === 'city' ? (
+                // Location enrichment campaigns target a city, not a category —
+                // the required `category` column carries the '__location__'
+                // sentinel and is not operator-editable.
+                <div className="px-3 py-2 rounded-lg bg-gray-50 dark:bg-neutral-800/50 border border-dashed border-gray-200 dark:border-neutral-700 text-xs text-gray-500 dark:text-gray-400">
+                  Location enrichment targets <span className="font-mono">__location__</span> (city + state only) — no category needed.
+                </div>
+              ) : (
+                <DirectoryCategorySelectorAdapter
+                  primary={form.category}
+                  secondary={form.secondary_categories}
+                  onPrimaryChange={(v) => handleChange('category', v)}
+                  onSecondaryChange={(v) => handleChange('secondary_categories', v)}
+                />
+              )}
               {form.scope === 'business' && !form.category && (
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
               )}
@@ -987,6 +1035,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 newInputPlaceholder="Enter new city" className={inputClass} />
               {citiesSeenInState && (
                 <p className="text-xs text-gray-400 mt-1">Showing cities observed in {form.state} — use <span className="font-medium">+ New city</span> for a new market.</p>
+              )}
+              {form.campaign_category === 'directory_enrichment' && form.scope === 'category' && (
+                <p className="text-xs text-gray-400 mt-1">Enter <span className="font-mono">__all__</span> (via + New city) for the national category page.</p>
               )}
             </FormField>
             )}

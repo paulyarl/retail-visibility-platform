@@ -62,7 +62,9 @@ export interface AuditSeoFields {
  * non-gold_standards focus.
  */
 export interface IntelligenceProfileSeoFields {
-  profileId: string;
+  /** Null for campaign-synthesized packets (directory_enrichment lane) that
+   *  carry profile-shaped fields without a backing profile row. */
+  profileId: string | null;
   synonyms?: string[];
   subcategories?: string[];
   /** Phase 2 structured denylist — empty/absent filters nothing in v1 */

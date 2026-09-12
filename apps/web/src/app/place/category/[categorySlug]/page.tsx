@@ -24,9 +24,12 @@ export async function generateMetadata({
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
+  // With no city the page shows the national category view — fetch the
+  // '__all__' (national) enrichment packet written by a national-scope
+  // directory_enrichment campaign. Falls back to boilerplate when none exists.
   const enrichment = city
     ? await placesBrowsePublicService.getCategoryEnrichment(categorySlug, city, state)
-    : null;
+    : await placesBrowsePublicService.getCategoryEnrichment(categorySlug, '__all__');
 
   if (enrichment?.market) {
     return {

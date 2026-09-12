@@ -15,6 +15,7 @@ import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { normalizeIntelligenceDiscoveryPayload, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
+import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import MarketingCampaignService from './MarketingCampaignService';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -29,7 +30,7 @@ function computeBodyHash(body: string): string {
   return createHash('sha256').update(body).digest('hex');
 }
 
-export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis' | 'fragment';
+export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis' | 'enrichment' | 'fragment';
 
 export type PromptScope = 'business' | 'category' | 'city' | 'intelligence';
 
@@ -101,7 +102,7 @@ function normalizeExternalJsonText(raw: string): string {
   return text;
 }
 
-function stripLlmJsonArtifacts(raw: string): string {
+export function stripLlmJsonArtifacts(raw: string): string {
   try {
     let text = raw;
 
@@ -166,7 +167,7 @@ function stripLlmJsonArtifacts(raw: string): string {
  * collected and scanned alongside any unfenced JSON. Returns candidates in
  * order of appearance.
  */
-function extractJsonCandidates(raw: string): string[] {
+export function extractJsonCandidates(raw: string): string[] {
   const candidates: string[] = [];
   let text = raw;
 
@@ -680,7 +681,7 @@ export class MarketingPromptService extends BaseService {
     };
     /** Intelligence focus for intelligence-scope imports (§41 run record). */
     focus?: 'emerging' | 'competitive' | 'gold_standards';
-  }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null }> {
+  }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null; enrichmentApplied: boolean }> {
     try {
       // 1. Load template + campaign
       const template = await this.getTemplate(input.templateId, ctx);
@@ -1105,7 +1106,58 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
-      return result;
+      // Directory Enrichment lane — post-import hook for the two enrichment
+      // output schemas (Sprint Plan B). A validated category_enrichment or
+      // location_enrichment payload auto-applies to
+      // directory_category_enrichment with trigger_source='campaign_run' and
+      // campaign/execution lineage. The campaign's category/city/state are
+      // authoritative for the upsert key — payload echoes are ignored, which
+      // preserves the '__all__'/'__location__' sentinels. Best-effort — a
+      // failed apply does not fail the import; the response surfaces
+      // enrichmentApplied so the operator can see and retry.
+      let enrichmentApplied = false;
+      if (schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME || schemaName === LOCATION_ENRICHMENT_SCHEMA_NAME) {
+        try {
+          const enrichmentCampaign = await this.prisma.mkt_campaigns_list.findUnique({
+            where: { id: input.campaignId },
+            select: { id: true, category: true, city: true, state: true },
+          });
+          if (schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
+            const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
+            const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
+              campaign: enrichmentCampaign ?? { id: input.campaignId },
+              packet: parsedJson,
+              executionId,
+              enrichedBy: input.executedBy ?? null,
+            }, ctx);
+            enrichmentApplied = !!applied?.categoryEnrichmentId;
+          } else {
+            const { default: LocationMarketEnrichmentService } = await import('./LocationMarketEnrichmentService.js');
+            const applied = await LocationMarketEnrichmentService.applyEnrichmentPacket({
+              campaign: enrichmentCampaign ?? { id: input.campaignId },
+              packet: parsedJson,
+              executionId,
+              enrichedBy: input.executedBy ?? null,
+            }, ctx);
+            enrichmentApplied = !!applied;
+          }
+          logger.info('Enrichment packet applied from external import', ctx, {
+            campaignId: input.campaignId,
+            executionId,
+            schemaName,
+            enrichmentApplied,
+          });
+        } catch (enrichErr) {
+          logger.error('Enrichment apply failed (best-effort)', ctx, {
+            error: (enrichErr as Error).message,
+            campaignId: input.campaignId,
+            executionId,
+            schemaName,
+          });
+        }
+      }
+
+      return { ...result, enrichmentApplied };
     } catch (error) {
       if (error instanceof ScopeMismatchError) {
         logger.warn('External import scope mismatch', ctx, { error: error.message });

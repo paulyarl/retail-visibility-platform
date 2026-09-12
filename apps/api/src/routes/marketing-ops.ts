@@ -218,7 +218,7 @@ const campaignBaseSchema = z.object({
   // categories are still normally assigned by triage.
   campaign_category: z.enum([
     'review_management', 'recovery_management', 'profile_repair',
-    'triage_management', 'proving_ground',
+    'triage_management', 'proving_ground', 'directory_enrichment',
   ]).optional(),
   // Migration 262 — proving-ground children normally attach via the guarded
   // POST /:campaignId/children endpoint; this passthrough exists for explicit
@@ -652,7 +652,7 @@ const fileCreateSchema = z.object({
 
 const promptTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
-  prompt_type: z.enum(['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis']),
+  prompt_type: z.enum(['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis', 'enrichment']),
   scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   category: z.string().max(100).optional(),
   tone: z.string().max(50).optional(),

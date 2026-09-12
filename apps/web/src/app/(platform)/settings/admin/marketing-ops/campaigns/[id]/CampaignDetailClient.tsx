@@ -18,6 +18,7 @@ import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCatego
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
+import EnrichmentAuditCard from '@/components/marketing-ops/EnrichmentAuditCard';
 import CategoryIdentificationAuditCard from '@/components/marketing-ops/CategoryIdentificationAuditCard';
 import IntelligenceEstablishmentPanel from '@/components/marketing-ops/IntelligenceEstablishmentPanel';
 import GoldStandardDiscoveryPanel from '@/components/marketing-ops/GoldStandardDiscoveryPanel';
@@ -65,13 +66,13 @@ const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'pai
  *   scope-matching prompts so the operator can still run ad-hoc work.
  */
 const STAGE_PROMPT_TYPES: Record<CampaignStage, PromptType[]> = {
-  seek: ['seek', 'category_analysis', 'city_analysis', 'filter'],
-  preview_built: ['seek', 'category_analysis', 'city_analysis', 'filter'],
-  shown: ['seek', 'category_analysis', 'city_analysis', 'filter'],
-  paid: ['fulfill', 'filter'],
-  delivered: ['fulfill', 'filter'],
-  retainer_pitched: ['retainer', 'filter'],
-  retainer_won: ['retainer', 'filter'],
+  seek: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
+  preview_built: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
+  shown: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
+  paid: ['fulfill', 'enrichment', 'filter'],
+  delivered: ['fulfill', 'enrichment', 'filter'],
+  retainer_pitched: ['retainer', 'enrichment', 'filter'],
+  retainer_won: ['retainer', 'enrichment', 'filter'],
   lost: [],
   dead: [],
   tenant_onboarded: [],
@@ -84,6 +85,7 @@ const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   retainer: 'Retainer',
   category_analysis: 'Category Analysis',
   city_analysis: 'City Analysis',
+  enrichment: 'Enrichment',
   fragment: 'Fragment',
 };
 
@@ -1837,6 +1839,14 @@ export default function CampaignDetailClient({
                             </details>
                           )}
                         </div>
+                      ) : (audit.platform === 'category_enrichment' || audit.platform === 'location_enrichment') && audit.audit_data ? (
+                        <EnrichmentAuditCard
+                          key={audit.id}
+                          audit={audit}
+                          campaignCategory={campaign.category}
+                          campaignCity={campaign.city}
+                          campaignState={campaign.state}
+                        />
                       ) : (
                         <div key={audit.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">

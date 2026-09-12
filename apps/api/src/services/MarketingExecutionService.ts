@@ -12,8 +12,10 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { MarketingPromptService } from './MarketingPromptService';
+import { MarketingPromptService, extractJsonCandidates, stripLlmJsonArtifacts } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
+import { generateMarketingAuditId } from '../lib/id-generator';
+import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
@@ -213,6 +215,35 @@ export class MarketingExecutionService extends BaseService {
           model: result.model,
         });
 
+        // Directory Enrichment lane — post-run hook for the two enrichment
+        // output schemas. Parse + validate the raw output, persist an audit
+        // row so the campaign's Audits tab renders a mapped card, then
+        // auto-apply the packet to directory_category_enrichment with
+        // campaign/execution lineage (trigger_source='campaign_run').
+        // Best-effort: the execution stays 'completed' even if apply fails.
+        const outputSchemaName = (template.output_schema as any)?.name;
+        if (
+          outputSchemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME ||
+          outputSchemaName === LOCATION_ENRICHMENT_SCHEMA_NAME
+        ) {
+          try {
+            await this.applyEnrichmentFromOutput({
+              schemaName: outputSchemaName,
+              campaign,
+              rawOutput: result.content,
+              executionId: execution.id,
+              enrichedBy: input.executedBy ?? null,
+            }, ctx);
+          } catch (enrichErr) {
+            logger.error('Enrichment apply failed (best-effort)', ctx, {
+              error: (enrichErr as Error).message,
+              executionId: execution.id,
+              campaignId: input.campaignId,
+              schemaName: outputSchemaName,
+            });
+          }
+        }
+
         // Sprint 3: best-effort City Pain Scan → hot-prospect sync hook.
         // Catches + logs errors so a sync failure never fails the execution.
         if (template.prompt_type === 'city_analysis') {
@@ -245,6 +276,107 @@ export class MarketingExecutionService extends BaseService {
       logger.error('Single execution failed', ctx, { error: (error as Error).message, campaignId: input.campaignId });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * Directory Enrichment lane — apply a completed internal execution's output.
+   *
+   * Mirrors the external-import path in
+   * MarketingPromptService.importExternalResult(): parse the raw output with
+   * the same candidate-extraction helpers, validate against the registered
+   * output schema, persist an audit row (auditPlatform) so the campaign's
+   * Audits tab renders a mapped card, then auto-apply the packet to
+   * directory_category_enrichment via the campaign-scope-appropriate service.
+   *
+   * Throws on parse/validation/apply failure — the caller wraps this in a
+   * best-effort try/catch.
+   */
+  private async applyEnrichmentFromOutput(input: {
+    schemaName: string;
+    campaign: any;
+    rawOutput: string;
+    executionId: string;
+    enrichedBy: string | null;
+  }, ctx?: RequestCtx): Promise<void> {
+    const resolved = resolveOutputSchema(input.schemaName);
+    if (!resolved) {
+      throw new Error(`No registered output schema "${input.schemaName}"`);
+    }
+
+    let parsedJson: any | null = null;
+    for (const candidate of extractJsonCandidates(input.rawOutput)) {
+      try {
+        const candidateJson = JSON.parse(stripLlmJsonArtifacts(candidate));
+        if (resolved.validator.safeParse(candidateJson).success) {
+          parsedJson = candidateJson;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (!parsedJson) {
+      throw new Error(`Execution output does not match the "${input.schemaName}" output schema`);
+    }
+
+    // Audit row so the result is visible on the campaign Audits tab —
+    // mirrors the audit creation in importExternalResult (scalar columns at
+    // their defaults; full payload in audit_data).
+    if (resolved.auditPlatform) {
+      await this.prisma.mkt_audits_list.create({
+        data: {
+          id: generateMarketingAuditId(),
+          campaign_id: input.campaign.id,
+          platform: resolved.auditPlatform,
+          review_count: 0,
+          unaddressed_reviews: 0,
+          owner_response_rate: 0,
+          photo_count: 0,
+          audit_data: parsedJson,
+          import_metadata: {
+            source: 'internal_run',
+            execution_id: input.executionId,
+          },
+        },
+      });
+    }
+
+    const campaignRef = {
+      id: input.campaign.id,
+      category: input.campaign.category ?? null,
+      city: input.campaign.city ?? null,
+      state: input.campaign.state ?? null,
+    };
+
+    if (input.schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
+      const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
+      const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
+        campaign: campaignRef,
+        packet: parsedJson,
+        executionId: input.executionId,
+        enrichedBy: input.enrichedBy,
+      }, ctx);
+      if (!applied?.categoryEnrichmentId) {
+        throw new Error(`Enrichment apply produced no row (skipReasons: ${JSON.stringify(applied?.skipReasons ?? {})})`);
+      }
+    } else {
+      const { default: LocationMarketEnrichmentService } = await import('./LocationMarketEnrichmentService.js');
+      const applied = await LocationMarketEnrichmentService.applyEnrichmentPacket({
+        campaign: campaignRef,
+        packet: parsedJson,
+        executionId: input.executionId,
+        enrichedBy: input.enrichedBy,
+      }, ctx);
+      if (!applied) {
+        throw new Error('Location enrichment apply produced no row (invalid campaign city/state)');
+      }
+    }
+
+    logger.info('Enrichment packet applied from internal run', ctx, {
+      executionId: input.executionId,
+      campaignId: input.campaign.id,
+      schemaName: input.schemaName,
+    });
   }
 
   /**
