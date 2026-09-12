@@ -194,6 +194,7 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
           </div>
           <Link
             href={claimHref}
+            variant='gradient' style={{ color: 'white' }}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-semibold text-sm whitespace-nowrap"
           >
             <ShieldCheck className="w-4 h-4" />
