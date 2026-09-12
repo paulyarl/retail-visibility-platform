@@ -14,6 +14,7 @@ import directoryPresenceAdminService, {
   OutreachTouch,
 } from '@/services/DirectoryPresenceAdminService';
 import { clientLogger } from '@/lib/client-logger';
+import { generateQrDataUrl } from '@/lib/qr-engine';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import {
   ArrowLeft,
@@ -167,6 +168,48 @@ function formatDate(value: string | Date | null | undefined): string {
   return d.toLocaleString();
 }
 
+/**
+ * Live preview of the exact URL the downloaded PNG/postcard encodes —
+ * rendered via the shared qr-engine (classic B/W path, same `qrcode` lib and
+ * error-correction level as ClaimInviteQrKitService) so what the operator
+ * sees is what scans off the printed card.
+ */
+function ClaimQrPreview({ url }: { url: string }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    generateQrDataUrl({
+      data: url,
+      exportSize: 512,
+      styled: false,
+      errorCorrection: 'H',
+    })
+      .then((d) => {
+        if (!cancelled) setDataUrl(d);
+      })
+      .catch(() => {
+        if (!cancelled) setDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  if (!dataUrl) {
+    return (
+      <div className="w-28 h-28 rounded border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
+        <QrCode className="w-6 h-6 text-gray-300" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={dataUrl}
+      alt="Claim QR preview"
+      className="w-28 h-28 rounded border border-gray-200"
+    />
+  );
+}
+
 export default function PresenceSeedDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -180,6 +223,7 @@ export default function PresenceSeedDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteShortCode, setInviteShortCode] = useState<string | null>(null);
   const [qrKit, setQrKit] = useState<ClaimInviteQrKitMeta | null>(null);
   const [qrDownloading, setQrDownloading] = useState<string | null>(null);
   const [copiedQrLink, setCopiedQrLink] = useState<string | null>(null);
@@ -307,9 +351,11 @@ export default function PresenceSeedDetailPage() {
     setActionError(null);
     setActionSuccess(null);
     setInviteToken(null);
+    setInviteShortCode(null);
     try {
       const result = await directoryPresenceAdminService.inviteSeed(seedId);
       setInviteToken(result.token);
+      setInviteShortCode(result.shortCode);
       setActionSuccess(
         'Claim token generated. Share the link below with the business owner.',
       );
@@ -981,6 +1027,28 @@ export default function PresenceSeedDetailPage() {
         <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg space-y-3">
           <div>
             <p className="text-sm font-medium text-blue-900 mb-1">Claim Link</p>
+            {inviteShortCode && (
+              <div className="mb-2">
+                <p className="text-xs text-blue-600 mb-0.5">Short link (preferred for SMS / DM)</p>
+                <p className="text-sm text-blue-700 break-all font-mono">
+                  {typeof window !== 'undefined'
+                    ? `${window.location.origin}/c/${inviteShortCode}`
+                    : `/c/${inviteShortCode}`}
+                </p>
+                <button
+                  className="mt-1 text-xs text-blue-600 underline"
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      const link = `${window.location.origin}/c/${inviteShortCode}`;
+                      navigator.clipboard.writeText(link);
+                    }
+                  }}
+                >
+                  Copy short link
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-blue-600 mb-0.5">Full link</p>
             <p className="text-sm text-blue-700 break-all font-mono">
               {typeof window !== 'undefined'
                 ? `${window.location.origin}/place/claim/${inviteToken}`
@@ -1539,6 +1607,12 @@ export default function PresenceSeedDetailPage() {
                       : t.token
                         ? `/place/claim/${t.token}`
                         : '';
+                  const shortUrl =
+                    t.shortCode && typeof window !== 'undefined'
+                      ? `${window.location.origin}/c/${t.shortCode}`
+                      : t.shortCode
+                        ? `/c/${t.shortCode}`
+                        : null;
                   return (
                     <tr key={t.id} className="border-b border-gray-100">
                       <td className="py-2 px-3 font-mono text-xs text-gray-700">
@@ -1547,7 +1621,30 @@ export default function PresenceSeedDetailPage() {
                       <td className="py-2 px-3 text-gray-700">
                         {isActive && t.token ? (
                           <div className="space-y-1">
-                            <p className="text-xs text-blue-700 break-all font-mono">
+                            {shortUrl && (
+                              <div>
+                                <p className="text-xs text-blue-700 break-all font-mono">
+                                  {shortUrl}
+                                </p>
+                                <button
+                                  className="text-xs text-blue-600 underline"
+                                  onClick={() => {
+                                    if (
+                                      typeof navigator !== 'undefined' &&
+                                      navigator.clipboard &&
+                                      typeof window !== 'undefined'
+                                    ) {
+                                      navigator.clipboard.writeText(
+                                        `${window.location.origin}/c/${t.shortCode}`,
+                                      );
+                                    }
+                                  }}
+                                >
+                                  Copy short link
+                                </button>
+                              </div>
+                            )}
+                            <p className="text-xs text-gray-400 break-all font-mono">
                               {claimUrl}
                             </p>
                             <button
@@ -1564,7 +1661,7 @@ export default function PresenceSeedDetailPage() {
                                 }
                               }}
                             >
-                              Copy link
+                              Copy full link
                             </button>
                           </div>
                         ) : (
@@ -1665,6 +1762,9 @@ export default function PresenceSeedDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-900">{v.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{v.desc}</p>
+                </div>
+                <div className="flex justify-center">
+                  <ClaimQrPreview url={v.url} />
                 </div>
                 <p className="text-xs font-mono text-gray-600 break-all bg-gray-50 rounded px-2 py-1.5">
                   {v.url}

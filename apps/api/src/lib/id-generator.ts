@@ -2194,6 +2194,23 @@ export function generateGalleryShortCode(): string {
   return generateGalleryShortCodeNano();
 }
 
+// ─── Directory Claim Short Codes (compact claim-invite URLs) ────────────
+// Same curated 32-char alphabet as gallery short codes. 6-char codes back
+// the /c/{shortCode} redirect → /place/claim/{token} and the short QR
+// tracked redirect /api/public/qr/c/{shortCode}. Fewer QR modules at small
+// print sizes = more legible scans.
+const CLAIM_SHORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const generateClaimShortCodeNano = customAlphabet(CLAIM_SHORT_CODE_ALPHABET, 6);
+
+/**
+ * Generate a 6-char claim short code for compact claim-invite URLs.
+ * Used in /c/{shortCode} redirects to /place/claim/{token}.
+ * No prefix — the short code IS the URL segment.
+ */
+export function generateClaimShortCode(): string {
+  return generateClaimShortCodeNano();
+}
+
 // ─── Intelligence Profiles (Sprint 1 — Seek Intelligence Scope) ──────────
 // Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
 // Profile IDs are human-readable slugs (e.g. 'auto_repair_us'), not nanoid-based,

@@ -61,6 +61,7 @@ export interface DirectoryPresenceSeedDetail {
   claimTokens: Array<{
     id: string;
     token: string;
+    shortCode: string | null;
     expiresAt: string;
     consumedAt: string | null;
     consumedBy: string | null;
@@ -109,6 +110,7 @@ export interface CreateSeedRequest {
 
 export interface InviteResult {
   token: string;
+  shortCode: string | null;
   expiresAt: string;
 }
 
@@ -287,10 +289,12 @@ export interface OutreachTouch {
 export interface ClaimInviteQrKitMeta {
   seedId: string;
   token: string;
+  shortCode: string | null;
   qrUrl: string;
   qrUrlWalkin: string;
   qrUrlSocial: string;
   claimUrl: string;
+  shortClaimUrl: string | null;
   businessName: string;
   addressLines: string[];
   expiresAt: string | null;
@@ -499,7 +503,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       0,
     );
     const data = result.data?.data ?? result.data;
-    return { token: (data as any)?.token, expiresAt: (data as any)?.expiresAt };
+    return { token: (data as any)?.token, shortCode: (data as any)?.shortCode ?? null, expiresAt: (data as any)?.expiresAt };
   }
 
   // ============================

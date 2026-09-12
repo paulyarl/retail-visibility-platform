@@ -24,9 +24,34 @@ import QRCode from 'qrcode';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { loadPlatformBranding } from './marketing/MarketingReceiptPdfService';
+import { unifiedConfig } from '../config/unifiedConfig';
 
-const API_BASE_URL =
-  process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+// Public-facing base URL the QR encodes. An explicit API origin wins when
+// configured (local dev sets NEXT_PUBLIC_API_URL=http://localhost:4000). When
+// neither var is set — the deployed API runtime — fall back to the web
+// origin: Next.js rewrites proxy /api/* to the API, so
+// https://<web>/api/public/qr/... still reaches the tracked redirect.
+// Never default to localhost here — a QR encoding it can never resolve when
+// scanned from a phone. Same pattern as PostalMailerService.resolveQrDestination.
+const QR_BASE_URL = (
+  unifiedConfig.get('API_URL') ||
+  unifiedConfig.get('API_BASE_URL') ||
+  unifiedConfig.get('NEXT_PUBLIC_API_URL') ||
+  unifiedConfig.get('NEXT_PUBLIC_API_BASE_URL') ||
+  unifiedConfig.frontendUrl ||
+  unifiedConfig.webUrl ||
+  'https://app.visibleshelf.com'
+)
+  .replace(/\/+$/, '')
+  .replace(/\/api$/i, '');
+
+// Human-facing claim links (/place/claim, /c) live on the web app, not the
+// API host.
+const WEB_BASE_URL = (
+  unifiedConfig.frontendUrl ||
+  unifiedConfig.webUrl ||
+  'https://app.visibleshelf.com'
+).replace(/\/+$/, '');
 
 const DEFAULT_QR_SIZE = 512;
 
@@ -35,10 +60,12 @@ export type ClaimInviteQrVariant = 'mail' | 'walkin' | 'social';
 export interface ClaimInviteQrKit {
   seedId: string;
   token: string;
+  shortCode: string | null;
   qrUrl: string;
   qrUrlWalkin: string;
   qrUrlSocial: string;
   claimUrl: string;
+  shortClaimUrl: string | null;
   businessName: string;
   addressLines: string[];
   expiresAt: Date | null;
@@ -61,7 +88,9 @@ export interface GeneratedClaimPostcard {
 async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit | null> {
   const rows = await prisma.$queryRaw<
     Array<{
+      token_id: string;
       token: string;
+      short_code: string | null;
       expires_at: Date | null;
       business_name: string | null;
       address: string | null;
@@ -71,7 +100,9 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
     }>
   >`
     SELECT
+      dct.id AS token_id,
       dct.token,
+      dct.short_code,
       dct.expires_at,
       dl.business_name,
       dl.address,
@@ -91,10 +122,35 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
 
   const row = rows[0];
   const token = row.token;
-  const qrUrl = `${API_BASE_URL}/api/public/qr/claim/${token}`;
-  const qrUrlWalkin = `${qrUrl}/walkin`;
-  const qrUrlSocial = `${qrUrl}/social`;
-  const claimUrl = `${API_BASE_URL.replace(/\/api$/, '')}/place/claim/${token}`;
+  // Lazily backfill a short_code on legacy tokens minted before migration 278.
+  // The compact /qr/c/{shortCode} URL has far fewer QR modules than the
+  // long-token URL — critical for legibility at postcard print sizes.
+  let shortCode = row.short_code ?? null;
+  if (!shortCode) {
+    try {
+      const { default: DirectoryPresenceSeedService } = await import('./DirectoryPresenceSeedService');
+      shortCode = await DirectoryPresenceSeedService.ensureClaimShortCode(row.token_id);
+    } catch {
+      // Best-effort — fall through to the long-token URL below.
+    }
+  }
+
+  // Prefer the short-code QR tracked redirect when a short code exists —
+  // fewer QR modules = more legible at small print sizes. Falls back to the
+  // long-token URL for legacy tokens without a short code.
+  const qrUrl = shortCode
+    ? `${QR_BASE_URL}/api/public/qr/c/${shortCode}`
+    : `${QR_BASE_URL}/api/public/qr/claim/${token}`;
+  const qrUrlWalkin = shortCode
+    ? `${QR_BASE_URL}/api/public/qr/c/${shortCode}/walkin`
+    : `${QR_BASE_URL}/api/public/qr/claim/${token}/walkin`;
+  const qrUrlSocial = shortCode
+    ? `${QR_BASE_URL}/api/public/qr/c/${shortCode}/social`
+    : `${QR_BASE_URL}/api/public/qr/claim/${token}/social`;
+  const claimUrl = `${WEB_BASE_URL}/place/claim/${token}`;
+  const shortClaimUrl = shortCode
+    ? `${WEB_BASE_URL}/c/${shortCode}`
+    : null;
 
   const addressLines: string[] = [];
   if (row.business_name) addressLines.push(row.business_name);
@@ -106,10 +162,12 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   return {
     seedId,
     token,
+    shortCode,
     qrUrl,
     qrUrlWalkin,
     qrUrlSocial,
     claimUrl,
+    shortClaimUrl,
     businessName: row.business_name || 'Business Owner',
     addressLines,
     expiresAt: row.expires_at,

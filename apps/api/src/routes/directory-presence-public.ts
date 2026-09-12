@@ -64,6 +64,28 @@ router.get('/claim/:token', async (req: Request, res: Response) => {
   }
 });
 
+/** GET /api/public/directory/claim-code/:shortCode — resolve 6-char short code to token */
+router.get('/claim-code/:shortCode', async (req: Request, res: Response) => {
+  try {
+    const { shortCode } = req.params;
+    if (!shortCode || !/^[A-Za-z0-9]{4,8}$/.test(shortCode)) {
+      return res.status(404).json({ error: 'claim_link_not_found' });
+    }
+
+    const resolved = await DirectoryPresenceSeedService.resolveClaimShortCode(shortCode);
+    if (!resolved) {
+      return res.status(404).json({ error: 'claim_link_not_found' });
+    }
+
+    return res.json({ success: true, token: resolved.token });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/claim-code/:shortCode] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** POST /api/public/directory/suggestions — suggest a missing business */
 router.post('/suggestions', async (req: Request, res: Response) => {
   try {

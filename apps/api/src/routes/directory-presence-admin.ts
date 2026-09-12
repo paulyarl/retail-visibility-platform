@@ -635,7 +635,7 @@ router.post('/presence-seeds/:id/invite', requirePlatformAdmin, async (req: Requ
       ip: req.ip,
       userAgent: req.get('User-Agent'),
     } as any);
-    res.status(201).json({ success: true, token: result.token, expiresAt: result.expiresAt });
+    res.status(201).json({ success: true, token: result.token, shortCode: result.shortCode, expiresAt: result.expiresAt });
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'seed_already_claimed') return res.status(409).json({ error: 'seed_already_claimed' });
@@ -1786,10 +1786,12 @@ router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Reque
       success: true,
       seedId: kit.seedId,
       token: kit.token,
+      shortCode: kit.shortCode,
       qrUrl: kit.qrUrl,
       qrUrlWalkin: kit.qrUrlWalkin,
       qrUrlSocial: kit.qrUrlSocial,
       claimUrl: kit.claimUrl,
+      shortClaimUrl: kit.shortClaimUrl,
       businessName: kit.businessName,
       addressLines: kit.addressLines,
       expiresAt: kit.expiresAt,

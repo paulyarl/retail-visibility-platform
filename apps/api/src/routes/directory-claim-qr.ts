@@ -26,10 +26,15 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { trackQrScanEvent } from '../services/QrAnalyticsService';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
-const WEB_URL = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+const WEB_URL = (
+  unifiedConfig.get('WEB_URL') ||
+  unifiedConfig.get('NEXT_PUBLIC_WEB_URL') ||
+  unifiedConfig.webUrl
+).replace(/\/+$/, '');
 
 /**
  * Shared scan-record + redirect. Records a QR scan event (consumer='merchant')
@@ -98,6 +103,69 @@ router.get('/qr/claim/:token/walkin', (req, res) =>
 
 router.get('/qr/claim/:token/social', (req, res) =>
   recordClaimScanAndRedirect('claim_invite_social', req, res),
+);
+
+// ─── Short-code QR tracked redirects (migration 278) ─────────────────────
+// Compact variants of the claim QR redirect. QR codes encoding the short
+// URL have fewer modules → more legible at small print sizes. Resolves the
+// 6-char short code to the underlying token, records the scan event, then
+// 302s to /place/claim/{token} (same destination as the long-URL variant).
+
+async function recordShortCodeScanAndRedirect(
+  surface: 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social',
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const { shortCode } = req.params;
+
+  let token: string | null = null;
+  let tenantId = 'platform';
+
+  try {
+    // Resolve short code → token + tenant for scan attribution.
+    const { default: DirectoryPresenceSeedService } = await import('../services/DirectoryPresenceSeedService');
+    const resolved = await DirectoryPresenceSeedService.resolveClaimShortCode(shortCode);
+    if (resolved) {
+      token = resolved.token;
+      tenantId = resolved.tenantId;
+    }
+  } catch {
+    // Short code lookup failure — still record the scan with platform tenant
+  }
+
+  try {
+    await trackQrScanEvent({
+      tenantId,
+      surface,
+      consumer: 'merchant',
+      source: 'qr_code',
+      referrer: req.headers.referer || undefined,
+      userAgent: req.headers['user-agent'] || undefined,
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/qr/c/:shortCode] scan tracking error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+      shortCode,
+      surface,
+    });
+  }
+
+  // Redirect to the claim page. If the short code didn't resolve, redirect to
+  // the claim page root (it will show an appropriate error state).
+  const target = token ? `${WEB_URL}/place/claim/${token}` : `${WEB_URL}/place/claim/`;
+  res.redirect(302, target);
+}
+
+router.get('/qr/c/:shortCode', (req, res) =>
+  recordShortCodeScanAndRedirect('claim_invite', req, res),
+);
+
+router.get('/qr/c/:shortCode/walkin', (req, res) =>
+  recordShortCodeScanAndRedirect('claim_invite_walkin', req, res),
+);
+
+router.get('/qr/c/:shortCode/social', (req, res) =>
+  recordShortCodeScanAndRedirect('claim_invite_social', req, res),
 );
 
 export default router;

@@ -32,6 +32,7 @@ import {
   generateDirectoryEnrichmentTokenId,
   generateDirectoryEnrichmentTokenString,
   generateTenantId,
+  generateClaimShortCode,
 } from '../lib/id-generator';
 import {
   buildSeedSeoPacket,
@@ -313,7 +314,7 @@ class DirectoryPresenceSeedService {
       SELECT * FROM directory_field_provenance WHERE seed_id = ${seedId} ORDER BY field_key
     `;
     const tokens = await prisma.$queryRaw<any[]>`
-      SELECT id, token, expires_at, consumed_at, consumed_by, created_at
+      SELECT id, token, short_code, expires_at, consumed_at, consumed_by, created_at
       FROM directory_claim_tokens WHERE seed_id = ${seedId} ORDER BY created_at DESC
     `;
 
@@ -333,6 +334,7 @@ class DirectoryPresenceSeedService {
       claimTokens: tokens.map((t) => ({
         id: t.id,
         token: t.token,
+        shortCode: t.short_code ?? null,
         expiresAt: new Date(t.expires_at),
         consumedAt: t.consumed_at ? new Date(t.consumed_at) : null,
         consumedBy: t.consumed_by,
@@ -664,8 +666,11 @@ class DirectoryPresenceSeedService {
 
   /**
    * Mint a claim token for a seed. Expires in 90 days by default.
+   * Also mints a 6-char short_code (migration 278) for compact /c/{shortCode}
+   * claim links and short QR tracked redirects. Retry on the vanishingly-rare
+   * unique-index collision (32^6 ≈ 1B space).
    */
-  async inviteSeed(seedId: string, expiresInDays: number = 90, ctx?: SeedAuditCtx): Promise<{ token: string; expiresAt: Date }> {
+  async inviteSeed(seedId: string, expiresInDays: number = 90, ctx?: SeedAuditCtx): Promise<{ token: string; expiresAt: Date; shortCode: string | null }> {
     const seed = await prisma.$queryRaw<any[]>`
       SELECT tenant_id, status, owner_email, owner_phone FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
@@ -683,15 +688,34 @@ class DirectoryPresenceSeedService {
     const verificationRequired = !!(boundEmail || boundPhone);
     const operatorApprovalRequired = !verificationRequired;
 
+    // Mint a unique 6-char short code for compact claim links + QR URLs.
+    let shortCode: string | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const candidate = generateClaimShortCode();
+      const clash = await prisma.$queryRaw<any[]>`
+        SELECT 1 FROM directory_claim_tokens WHERE short_code = ${candidate} LIMIT 1
+      `;
+      if (!clash[0]) {
+        shortCode = candidate;
+        break;
+      }
+      logger.warn('Claim short code collision, retrying', undefined, { candidate, attempt });
+    }
+    if (!shortCode) {
+      // Exhausted retries — insert without a short code; long URL still works.
+      logger.error('Claim short code generation exhausted retries', undefined, { seedId });
+    }
+
     await prisma.$executeRaw`
       INSERT INTO directory_claim_tokens (
-        id, seed_id, tenant_id, token, expires_at, single_use, created_at,
+        id, seed_id, tenant_id, token, short_code, expires_at, single_use, created_at,
         bound_email, bound_phone, verification_required, operator_approval_required
       ) VALUES (
         ${tokenId},
         ${seedId},
         ${seed[0].tenant_id},
         ${token},
+        ${shortCode},
         ${expiresAt},
         true,
         now(),
@@ -711,11 +735,70 @@ class DirectoryPresenceSeedService {
       actor: ctx?.actorId,
       actorType: ctx?.actorType,
       action: 'directory_presence_seed.invite',
-      payload: { seedId, tenantId: seed[0].tenant_id, tokenId, verificationRequired, operatorApprovalRequired },
+      payload: { seedId, tenantId: seed[0].tenant_id, tokenId, verificationRequired, operatorApprovalRequired, shortCode },
     });
-    logger.info('DirectoryPresenceSeedService.inviteSeed', undefined, { seedId, tokenId, verificationRequired });
+    logger.info('DirectoryPresenceSeedService.inviteSeed', undefined, { seedId, tokenId, verificationRequired, shortCode });
 
-    return { token, expiresAt };
+    return { token, expiresAt, shortCode };
+  }
+
+  /**
+   * Resolve a 6-char claim short code to the underlying token string.
+   * Used by the public /api/public/directory/claim-code/:shortCode endpoint
+   * that backs the /c/[shortCode] redirect page, and by the short-code QR
+   * tracked redirect /api/public/qr/c/:shortCode.
+   *
+   * Returns null for expired or consumed tokens (do not leak existence).
+   */
+  async resolveClaimShortCode(shortCode: string): Promise<{ token: string; tenantId: string } | null> {
+    const normalized = shortCode.toUpperCase();
+    const rows = await prisma.$queryRaw<
+      Array<{ token: string; tenant_id: string; expires_at: Date | null; consumed_at: Date | null }>
+    >`
+      SELECT t.token, t.tenant_id, t.expires_at, t.consumed_at
+      FROM directory_claim_tokens t
+      WHERE t.short_code = ${normalized}
+      LIMIT 1
+    `;
+    if (!rows[0]) return null;
+    // Expired or consumed tokens are not resolvable via short code.
+    if (rows[0].consumed_at) return null;
+    if (rows[0].expires_at && new Date(rows[0].expires_at) < new Date()) return null;
+    return { token: rows[0].token, tenantId: rows[0].tenant_id };
+  }
+
+  /**
+   * Lazily backfill a short_code on a legacy claim token that doesn't have one.
+   * Called when an admin fetches the seed detail / QR kit and finds a token
+   * missing a short code. Returns the updated short_code (or null on failure).
+   */
+  async ensureClaimShortCode(tokenId: string, ctx?: SeedAuditCtx): Promise<string | null> {
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT short_code FROM directory_claim_tokens WHERE id = ${tokenId} LIMIT 1
+    `;
+    if (!existing[0]) return null;
+    if (existing[0].short_code) return existing[0].short_code;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const candidate = generateClaimShortCode();
+      const clash = await prisma.$queryRaw<any[]>`
+        SELECT 1 FROM directory_claim_tokens WHERE short_code = ${candidate} LIMIT 1
+      `;
+      if (clash[0]) continue;
+      try {
+        await prisma.$executeRaw`
+          UPDATE directory_claim_tokens SET short_code = ${candidate} WHERE id = ${tokenId}
+        `;
+        logger.info('Backfilled claim short code', undefined, { tokenId, shortCode: candidate });
+        return candidate;
+      } catch (error: any) {
+        // Unique constraint violation (code 23505) — retry with a new code.
+        if (error?.code === '23505') continue;
+        throw error;
+      }
+    }
+    logger.warn('Claim short code backfill exhausted retries', undefined, { tokenId });
+    return null;
   }
 
   /**
