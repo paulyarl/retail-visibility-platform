@@ -39,6 +39,8 @@ import {
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
+import { slugify } from '@/utils/slug';
+import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
 const PROVENANCE_FIELD_KEYS = [
   'name',
@@ -227,6 +229,10 @@ export default function PresenceSeedDetailPage() {
   const [composedEnrichment, setComposedEnrichment] = useState<any | null>(null);
   const [composedLoading, setComposedLoading] = useState(false);
   const [resettingEnrichment, setResettingEnrichment] = useState(false);
+
+  // Platform category vocabulary — resolves canonical shelf slugs for the
+  // public category-page links rendered in the Listing summary.
+  const { categories: directoryCategories } = useDirectoryCategories();
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -530,6 +536,42 @@ export default function PresenceSeedDetailPage() {
   // Claimed seeds have been promoted to a real customer relationship — refuse
   // to delete them from the UI to prevent destroying customer data.
   const canDelete = status !== 'claimed';
+
+  // Public shelf page for a category name. Unclaimed seeds render on
+  // /place/category shelves (primary + secondaries); claiming flips
+  // listing_origin to 'claimed' and moves the listing onto
+  // /directory/categories shelves. Canonical platform_categories slugs are
+  // required by the /directory surface; the /place endpoint also resolves
+  // name-derived slugs, so slugify() is a safe fallback for unregistered
+  // labels.
+  const categoryShelfHref = (categoryName: string): string => {
+    if (!categoryName) return '#';
+    const canonical = directoryCategories.find(
+      (c) => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase(),
+    )?.slug;
+    const slug = canonical || slugify(categoryName);
+    if (status === 'claimed') {
+      return `/directory/categories/${slug}`;
+    }
+    const cityQs = listing?.city
+      ? `?city=${encodeURIComponent(listing.city)}${
+          listing.state ? `&state=${encodeURIComponent(listing.state)}` : ''
+        }`
+      : '';
+    return `/place/category/${slug}${cityQs}`;
+  };
+
+  // City shelf page — /place/city/{city-slug} for unclaimed seeds,
+  // /directory/location/{city}-{state} once claimed (that surface needs a
+  // state segment to parse, so no link without one).
+  const cityShelf =
+    status === 'claimed'
+      ? listing?.city && listing?.state
+        ? `/directory/location/${slugify(listing.city)}-${slugify(listing.state)}`
+        : null
+      : listing?.city
+        ? `/place/city/${slugify(listing.city)}`
+        : null;
 
   const handleGetCoordinates = async () => {
     if (!editAddress.trim() || !editCity.trim() || !editZipCode.trim()) {
@@ -1129,7 +1171,17 @@ export default function PresenceSeedDetailPage() {
               <Tag className="w-4 h-4 text-gray-400 mt-0.5" />
               <div>
                 <dt className="text-gray-500">Primary category</dt>
-                <dd className="text-gray-900">{seed.category}</dd>
+                <dd className="text-gray-900">
+                  <Link
+                    href={categoryShelfHref(seed.category)}
+                    target="_blank"
+                    title="Open the public category shelf page"
+                    className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                  >
+                    {seed.category}
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </dd>
               </div>
             </div>
             <div className="flex gap-2">
@@ -1142,6 +1194,26 @@ export default function PresenceSeedDetailPage() {
                 </dd>
               </div>
             </div>
+            {cityShelf && (
+              <div className="flex gap-2">
+                <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                <div>
+                  <dt className="text-gray-500">City shelf</dt>
+                  <dd className="text-gray-900">
+                    <Link
+                      href={cityShelf}
+                      target="_blank"
+                      title="Open the public city shelf page"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                    >
+                      {listing.city}
+                      {listing.state ? `, ${listing.state}` : ''}
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </dd>
+                </div>
+              </div>
+            )}
             {listing?.phone && (
               <div className="flex gap-2">
                 <Phone className="w-4 h-4 text-gray-400 mt-0.5" />
@@ -1172,8 +1244,24 @@ export default function PresenceSeedDetailPage() {
             {listing?.secondary_categories?.length > 0 && (
               <div>
                 <dt className="text-gray-500">Secondary categories</dt>
-                <dd className="text-gray-900">
-                  {listing.secondary_categories.join(', ')}
+                <dd className="mt-1 flex flex-wrap gap-1.5">
+                  {listing.secondary_categories.map((cat: string) => (
+                    <Link
+                      key={cat}
+                      href={categoryShelfHref(cat)}
+                      target="_blank"
+                      title={`Open the public "${cat}" shelf page`}
+                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      {cat}
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  ))}
+                  {(status === 'draft' || status === 'suppressed') && (
+                    <span className="text-xs text-gray-400 self-center">
+                      Listing appears on these shelves once published.
+                    </span>
+                  )}
                 </dd>
               </div>
             )}
