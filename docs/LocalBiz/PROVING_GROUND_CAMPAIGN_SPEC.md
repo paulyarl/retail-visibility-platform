@@ -2,6 +2,7 @@
 
 **Status:** Draft spec (v2 — consolidated with full-spectrum gap analysis; every reuse claim verified against code)
 **Companion docs:**
+- `docs/LocalBiz/PROVING_GROUND_USER_GUIDE.md` (operator-facing guide — cockpit, queue workflows, scope flex)
 - `docs/LocalBiz/proving_ground_sprint_plan.md` (phased implementation — Phase 1→6, dependencies, acceptance criteria)
 - `docs/campaigns/madison-proving-ground-operator-playbook.md` (the runbook this UX operationalizes)
 - `docs/campaigns/madison-east-washington-leadership-pitch.md`

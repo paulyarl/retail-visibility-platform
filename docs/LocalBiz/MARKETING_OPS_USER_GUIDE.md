@@ -12,6 +12,7 @@
 - `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
 - `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
 - `docs/LocalBiz/MARKETING_OPS_CUSTOMER_PORTAL_SPEC.md` — customer portal (§34)
+- `docs/LocalBiz/PROVING_GROUND_USER_GUIDE.md` — proving-ground operator workspaces (§35)
 
 ---
 

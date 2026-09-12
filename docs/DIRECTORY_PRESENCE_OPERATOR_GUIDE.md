@@ -210,6 +210,57 @@ The owner receives an email with a link to `/directory/claim/[token]`. The claim
 - A "Claim This Business" call-to-action.
 - Instructions for verifying their identity.
 
+### Claim QR Kit
+
+Beyond the email invite, every published seed with an active claim token has a **Claim QR Kit** on the seed detail page (**Settings → Admin → Directory Presence → Presence Seeds → [Seed] → Claim QR Kit**). The kit generates downloadable QR artifacts — one per delivery channel — so you can reach owners through whichever channel fits the prospect.
+
+Each artifact encodes a **tracked redirect URL**, not the claim page directly. When the owner scans the QR (or taps the link), a `qr_scan_events` row is recorded with the channel's surface *before* the owner lands on the claim page. This means a scan with no claim is a **warm-lead signal** — the prospect saw the invite; the next touch is a phone call, not another mailer.
+
+#### Delivery Channels
+
+Four channels, each with its own scan surface so attribution stays separable in QR analytics:
+
+| Channel | Short URL | Scan surface | Artifact | Use when |
+|---------|-----------|--------------|----------|----------|
+| **Mail postcard** | `/q/{shortCode}` | `claim_invite` | PNG + 4×6" postcard PDF | Mailed 4×6 invite — the default printed mailer |
+| **Walk-in leave-behind** | `/qw/{shortCode}` | `claim_invite_walkin` | PNG + 4×6" postcard PDF | Hand-delivered card for in-person visits |
+| **Social / DM link** | `/qs/{shortCode}` | `claim_invite_social` | PNG + copy-link | Send as a DM or post — remote prospects where a walk-in isn't possible |
+| **Email link** | `/qe/{shortCode}` | `claim_invite_email` | PNG + copy-link | Embed in an outreach email — distinct from social/DM because email has different conversion dynamics and cost structure |
+
+The short URLs (e.g. `https://visibleshelf.com/q/H7FZQJ`) are deliberately compact — fewer characters means fewer QR modules, which is critical for legibility at postcard print sizes. They resolve through a Next.js frontend redirect page that records the scan event and 302s to `/place/claim/{token}` in a single request.
+
+> **Why email is its own surface.** Email recipients are warmer (you have their address = some prior relationship). Social/DM recipients are a colder audience. Lumping them would hide the conversion-rate difference and break per-channel follow-up branching. Email scans that don't convert should trigger an email follow-up sequence; social scans should trigger retargeting. Keeping them separate preserves that branch.
+
+#### Operator Workflow
+
+1. **Publish the seed** — the QR kit is unavailable until the seed is published and has an active claim token. If no token exists, use the "Generate Claim Invite" button above the kit.
+2. **Pick the channel** — match the channel to the prospect:
+   - Mailed postcard for prospects with a verified mailing address.
+   - Walk-in leave-behind for prospects you visit in person.
+   - Social/DM link for prospects reachable via social platforms.
+   - Email link for prospects with a known email address.
+3. **Download the artifact**:
+   - **QR PNG** — a high-resolution QR image for embedding in your own mailers, emails, or social posts.
+   - **Postcard PDF** — a print-ready 4×6" postcard with the QR, platform branding, headline, body copy, and the business mailing address. Available for mail and walk-in channels.
+   - **Copy link** (social + email) — copies the tracked short URL to your clipboard for pasting into a DM or email.
+4. **Design (optional)** — click **Design** on any variant to open the styled QR designer. Pick a dot style, corner style, color, and optional platform logo overlay. The styled QR can be downloaded as PNG or baked into the postcard PDF so the printed card carries the same styled code the operator previewed.
+5. **Track scans** — scans appear in QR analytics (`/settings/admin/qr-analytics`) filtered by surface. A scan with no claim is a warm-lead signal — log a follow-up touch in the seed's outreach log.
+
+#### Scan Analytics
+
+Scans are recorded in `qr_scan_events` with the channel's surface, the prospect's device type, geo (country/city), and referrer. View them at **Settings → Admin → QR Analytics**, filtered by surface:
+
+- `claim_invite` — mail postcard scans
+- `claim_invite_walkin` — walk-in leave-behind scans
+- `claim_invite_social` — social/DM link taps
+- `claim_invite_email` — email link taps
+
+The funnel signal `invite_scan_rate` (seeds with ≥1 scan / invited seeds) slots between `invite_issued` and `claim_accepted` in the growth-engine event spine.
+
+#### Backward Compatibility
+
+Seeds minted before the short-URL feature carry long-token QR URLs (`/api/public/qr/claim/{token}/...`). Those URLs still work — already-printed QRs redirect to the same claim page and record scans with the same surfaces. New tokens get the short URLs automatically. You don't need to re-print existing artifacts.
+
 ---
 
 ## Claim Flow & Identity Verification
@@ -514,6 +565,10 @@ Each target shows:
 | City Page | `/place/city/[citySlug]` |
 | Individual Listing | `/place/[slug]` |
 | Claim Flow | `/directory/claim/[token]` |
+| Claim QR (mail) | `/q/[shortCode]` |
+| Claim QR (walk-in) | `/qw/[shortCode]` |
+| Claim QR (social) | `/qs/[shortCode]` |
+| Claim QR (email) | `/qe/[shortCode]` |
 | Enrichment Flow | `/directory/enrich/[token]` |
 | Sitemap | `/api/public/directory/places-sitemap.xml` |
 
@@ -535,6 +590,10 @@ Each target shows:
 | POST | `/api/admin/directory-presence/presence-seeds/:id/campaign-links` | Link a campaign (body: `{ campaignId, role }`) |
 | DELETE | `/api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId` | Unlink a campaign |
 | POST | `/api/admin/directory-presence/presence-seeds/:id/campaign-links/:campaignId/sync` | Project selected fields (body: `{ fields[] }`) |
+| GET | `/api/admin/directory-presence/presence-seeds/:id/qr-kit` | Claim QR kit metadata (tracked URLs per channel) |
+| GET | `/api/admin/directory-presence/presence-seeds/:id/qr-kit/png?variant=mail\|walkin\|social\|email` | Download QR PNG for a channel |
+| GET | `/api/admin/directory-presence/presence-seeds/:id/qr-kit/postcard?variant=mail\|walkin\|social\|email` | Download 4×6" postcard PDF for a channel |
+| POST | `/api/admin/directory-presence/presence-seeds/:id/qr-kit/postcard` | Styled postcard PDF (body: `{ variant, qrDataUrl }`) |
 
 ### API Endpoints (Public)
 
@@ -548,6 +607,7 @@ Each target shows:
 | GET | `/api/public/directory/claim/[token]` | Resolve claim token |
 | POST | `/api/public/directory/claim/[token]/initiate` | Initiate claim (sends OTP) |
 | POST | `/api/public/directory/claim/[token]/accept` | Accept claim (verify OTP) |
+| GET | `/api/public/qr/claim-scan/[shortCode]?surface=mail\|walkin\|social\|email` | Resolve short code + record scan (JSON, backs the /q/, /qw/, /qs/, /qe/ pages) |
 
 ### Seed Status Flow
 
@@ -565,8 +625,8 @@ draft → published → invited → claimed → (tenant promoted)
 4. **Create seeds** — create directory seeds from qualified prospects (or directly from lead gen prospects).
 5. **Link campaigns to seeds** — when a seed and a campaign describe the same business, link them from the seed detail page's **Linked Campaigns** panel. High-confidence NAP matches auto-project campaign signals (origin country/region, neighborhood, reconciled NAP) onto the seed listing for SEO. See [Linking Campaigns to Seeds](#linking-campaigns-to-seeds).
 6. **Publish seeds** — bulk publish from the batch dashboard, or publish individually from seed detail pages.
-7. **Send claim invitations** — bulk invite from the batch dashboard, or invite individually.
-8. **Monitor claims** — watch for claims entering review (unbound/self-discovered claims need operator approval).
+7. **Send claim invitations** — bulk invite from the batch dashboard, invite individually, or use the **Claim QR Kit** on the seed detail page to generate tracked QR artifacts per delivery channel (mail postcard, walk-in leave-behind, social/DM link, email link). See [Claim QR Kit](#claim-qr-kit).
+8. **Monitor scans + claims** — watch QR analytics for warm-lead scans (scan with no claim = next touch is a call), and watch for claims entering review (unbound/self-discovered claims need operator approval).
 9. **Review enrichment** — approve or reject enrichment submissions from claimed owners.
 10. **Watch upgrade conversion** — track how many claimed owners upgrade to retail/ecommerce capabilities.
 11. **Repeat** — the loop reinforces as more listings go live and generate more demand signals.
