@@ -188,15 +188,21 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Intelligence profile subcategories use the "<name>: <description>" format
- * required by the establishment schema (intelligence-profile.schema.ts) —
- * the description is analyst context, not part of the public label. Extract
- * the name segment, humanize snake_case slugs (same treatment as
- * store_format in resolveCategoryLabel), and drop entries whose label would
- * still exceed the downstream 100-char contract.
+ * Intelligence profile subcategories carry analyst-context glosses that are
+ * not part of the public label — "<name>: <description>" per the
+ * establishment schema, and variants like "<name> (<qualifier>)" or
+ * "<name> — <qualifier>". Extract the bare name segment, humanize
+ * snake_case slugs (same treatment as store_format in resolveCategoryLabel),
+ * and drop entries whose label would still exceed the downstream 100-char
+ * contract.
  */
 function subcategoryLabel(sub: string): string | null {
-  const label = sub.split(':')[0].replace(/_/g, ' ').trim();
+  const label = sub
+    .split(':')[0]
+    .replace(/(\s*\([^)]*\)\s*)+$/, '')
+    .split(/\s+[—–-]\s+/)[0]
+    .replace(/_/g, ' ')
+    .trim();
   if (!label || label.length > CATEGORY_LABEL_MAX) return null;
   return label;
 }

@@ -1032,8 +1032,8 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   /** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId */
   async createSeedFromCampaign(
     campaignId: string,
-    publish = true,
-  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean }> {
+    publish = false,
+  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean; published: boolean }> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/from-campaign/${encodeURIComponent(campaignId)}`,
       { method: 'POST', body: JSON.stringify({ publish }) },
@@ -1046,7 +1046,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       throw new Error(message || 'Failed to create seed from campaign');
     }
     const data = result.data?.data ?? result.data;
-    return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean };
+    return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean; published: boolean };
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/by-campaign/:campaignId

@@ -119,7 +119,13 @@ const STAGE_PIPELINE_ORDER: Record<string, number> = {
 // Approach Kit step that depends on Pitch Construction output.
 
 const PERMANENT_STEP_IDS = {
+  identifyCategory: '_permanent_identify_category',
+  setCategories: '_permanent_set_categories',
+  auditBusiness: '_permanent_audit_business',
   seedPlaceListing: '_permanent_seed_place_listing',
+  qcSeed: '_permanent_qc_seed',
+  mintClaimToken: '_permanent_mint_claim_token',
+  publishSeed: '_permanent_publish_seed',
   pitchFreeClaim: '_permanent_pitch_free_claim',
   pitchConstruction: '_permanent_pitch_construction',
   previewDeliverable: '_permanent_preview_deliverable',
@@ -134,6 +140,11 @@ const PERMANENT_STEP_IDS = {
 // preview_built, framed as the upgrade that eases the pain the audit
 // surfaced (migration 276 retags the "Review triage signals" steps).
 //
+// The wedge is a fixed 8-step sub-flow so every business campaign runs the
+// same seed pipeline: identify the category → set categories → business
+// audit → create the seed → QC → mint the claim token → verify live →
+// invite the owner to claim.
+//
 // These steps are code-defined (not DB template rows) because they must be
 // visible BEFORE a playbook is assigned — the seed precedes triage. They
 // only apply to business-scope campaigns (aggregate scopes seed from the
@@ -142,12 +153,27 @@ const PERMANENT_STEP_IDS = {
 
 const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachStatus' | 'internalLink'>[] = [
   {
-    id: PERMANENT_STEP_IDS.seedPlaceListing,
+    id: PERMANENT_STEP_IDS.identifyCategory,
     playbookId: '_permanent',
     stepOrder: 1,
-    title: 'Seed the place listing',
+    title: 'Run category identification',
     instructions:
-      'Create and publish a free directory place listing for this business from public data — the Audits tab\'s "Add to Place Listing" builds it from the business audit (SEO-enriched, published, campaign-linked) and auto-schedules the claim outreach. The free listing is the good-faith wedge: we improved their visibility before asking for anything.',
+      'Run the Category Identification prompt from the Prompts tab — it takes the business name + location (no category input) and imports as a category_identification audit with ranked candidate categories and evidence.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'prompts' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.setCategories,
+    playbookId: '_permanent',
+    stepOrder: 2,
+    title: 'Set primary and secondary categories',
+    instructions:
+      'On the category_identification audit card (Audits tab), use "+ Secondary" to register the identified categories on the campaign — the first registration fills the primary slot, the rest append to secondary_categories. The business audit prompt stays hidden until a primary category exists.',
     stepType: 'internal_link',
     actionConfig: { target: 'campaign_tab', params: { tab: 'audits' } },
     isRequired: false,
@@ -157,12 +183,87 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     updatedAt: new Date(0),
   },
   {
+    id: PERMANENT_STEP_IDS.auditBusiness,
+    playbookId: '_permanent',
+    stepOrder: 3,
+    title: 'Run the business audit',
+    instructions:
+      'Run the business_analysis prompt from the Prompts tab (unlocked once the primary category is set). This audit feeds the seed\'s SEO packet — description, keywords, same-as — and the triage signals for the later upgrade pitch.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'prompts' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.seedPlaceListing,
+    playbookId: '_permanent',
+    stepOrder: 4,
+    title: 'Create the seed ("Add to Place Listing")',
+    instructions:
+      'On the business_analysis audit card, click "Add to Place Listing" — createFromCampaign builds the seed SEO-enriched and campaign-linked, parked in draft for QC. The free listing is the good-faith wedge: we improved their visibility before asking for anything.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'audits' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.qcSeed,
+    playbookId: '_permanent',
+    stepOrder: 5,
+    title: 'QC the seeded listing',
+    instructions:
+      'Open the seed from Overview → Spawned Place Listings → "seed". Verify NAP, hours, description, attributes, and secondary categories — fix anything via Edit Fields so every public-facing field carries provenance (show_on_public).',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.publishSeed,
+    playbookId: '_permanent',
+    stepOrder: 6,
+    title: 'Publish the listing',
+    instructions:
+      'After QC, use the seed detail page\'s "Publish Listing" button to take the listing live. Publishing also fires the outreach courtesy window for campaign-linked seeds.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.mintClaimToken,
+    playbookId: '_permanent',
+    stepOrder: 7,
+    title: 'Mint the claim token',
+    instructions:
+      'On the seed detail, use "Generate Claim Invite" to mint the owner claim token (90-day default). Copy the /place/claim/:token link — it is what the owner receives in the claim pitch. The Claim QR Kit (mail postcard, walk-in card, social link) becomes available once the token exists.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seek',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
     id: PERMANENT_STEP_IDS.pitchFreeClaim,
     playbookId: '_permanent',
-    stepOrder: 2,
+    stepOrder: 8,
     title: 'Invite the owner to claim (free, no obligation)',
     instructions:
-      'Share the claim link with the owner — claiming is free and lets them fix hours, phone, and photos. Open the linked seed from Overview → Spawned Place Listings to mint or copy the claim invite, contact the owner on the best channel, and log the outcome. The demonstrated goodwill becomes the wedge: the paid pitch lands at preview_built as the upgrade that eases the pain the audit surfaced.',
+      'Share the claim link with the owner — claiming is free and lets them fix hours, phone, and photos. Contact the owner on the best channel and log the outcome. The demonstrated goodwill becomes the wedge: the paid pitch lands at preview_built as the upgrade that eases the pain the audit surfaced.',
     stepType: 'internal_link',
     actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
     isRequired: false,

@@ -32,6 +32,7 @@ import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignL
 import BatchSeekService from '../services/BatchSeekService';
 import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
+import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import {
   generateClaimInvitePng,
   generateClaimInvitePostcard,
@@ -582,12 +583,36 @@ router.post('/presence-seeds', requirePlatformAdmin, async (req: Request, res: R
 router.post('/presence-seeds/:id/publish', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await DirectoryPresenceSeedService.publishSeed(id, {
-      actorType: 'user',
+    const ctx = {
+      actorType: 'user' as const,
       actorId: (req as any).user?.id,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-    } as any);
+    };
+    await DirectoryPresenceSeedService.publishSeed(id, ctx as any);
+
+    // ★ Seed Outreach Courtesy Window: seeds are now parked in 'draft' at
+    // creation (operator QC gate), so the courtesy-window trigger fires here
+    // on operator publish instead. Scoped to seeds with a primary campaign
+    // link (the "Add to place listing" / spawn-campaign paths) — batch and
+    // non-campaign seeds stay quiet. Idempotent by seed_id; fire-and-forget.
+    try {
+      const links = await DirectorySeedCampaignLinkService.listLinks(id);
+      const primary = links.find((l) => l.linkRole === 'primary');
+      if (primary) {
+        await SeedOutreachTriggerService.getInstance().onSeedCreated({
+          campaignId: primary.campaignId,
+          seedId: id,
+          ctx,
+        });
+      }
+    } catch (err) {
+      logger.warn('SeedOutreachTriggerService.onSeedCreated failed on publish', undefined, {
+        seedId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
@@ -1537,7 +1562,7 @@ router.post('/claim-requests/:id/verify', requirePlatformAdmin, async (req: Requ
 
 /** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId — create a seed from a campaign audit */
 const fromCampaignSchema = z.object({
-  publish: z.boolean().optional().default(true),
+  publish: z.boolean().optional().default(false),
 });
 
 router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, async (req: Request, res: Response) => {

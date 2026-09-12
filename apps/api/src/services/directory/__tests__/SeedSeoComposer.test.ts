@@ -558,6 +558,35 @@ describe('SeedSeoComposer', () => {
       }
     });
 
+    it('strips parenthetical and dash glosses from subcategory entries', () => {
+      const profile: IntelligenceProfileSeoFields = {
+        profileId: 'p1',
+        subcategories: [
+          'pan-african / international hybrid (the established-leader tier)',
+          'west african market (nigerian/ghanaian/ivorian)',
+          'halal butcher-grocer (somali/horn of africa)',
+          'east african market — ethiopian and eritrean focus',
+        ],
+      };
+
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'african grocery store' },
+        audit: null,
+        intelligenceProfile: profile,
+        goldStandard: null,
+      });
+
+      expect(packet.secondaryCategories).toContain('pan-african / international hybrid');
+      expect(packet.secondaryCategories).toContain('west african market');
+      // hyphenated words without surrounding spaces are preserved
+      expect(packet.secondaryCategories).toContain('halal butcher-grocer');
+      expect(packet.secondaryCategories).toContain('east african market');
+      for (const cat of packet.secondaryCategories) {
+        expect(cat).not.toContain('(');
+        expect(cat).not.toContain('tier');
+      }
+    });
+
     it('humanizes snake_case subcategory slugs and drops over-long labels', () => {
       const profile: IntelligenceProfileSeoFields = {
         profileId: 'p1',

@@ -97,7 +97,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [addingToPlace, setAddingToPlace] = useState(false);
-  const [placeResult, setPlaceResult] = useState<{ publicUrl: string; seedId: string; created: boolean; seoEnriched: boolean } | null>(null);
+  const [placeResult, setPlaceResult] = useState<{ publicUrl: string; seedId: string; created: boolean; seoEnriched: boolean; published: boolean } | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [attrVerifyLoading, setAttrVerifyLoading] = useState(false);
   const [attrVerifyUrl, setAttrVerifyUrl] = useState<string | null>(null);
@@ -255,7 +255,7 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
                       ? 'Cannot seed: identity mismatch'
                       : isOperationalBlocked
                         ? 'Call to verify operating status before creating place listing'
-                        : 'Create and publish place listing'
+                  : 'Create place listing (draft for review)'
               }
               className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-default"
             >
@@ -277,15 +277,17 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
           <p className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-2 flex-wrap">
             <CheckCircle2 className="h-3 w-3" />
             {placeResult.created ? 'Added' : 'Already linked'}{placeResult.seoEnriched ? ' (SEO enriched)' : ''}:
-            <a href={placeResult.publicUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline hover:text-green-700">
-              <ExternalLink className="h-3 w-3" /> {placeResult.publicUrl}
-            </a>
+            {placeResult.published && (
+              <a href={placeResult.publicUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline hover:text-green-700">
+                <ExternalLink className="h-3 w-3" /> {placeResult.publicUrl}
+              </a>
+            )}
             <a href={`/settings/admin/directory/presence-seeds/${placeResult.seedId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 underline ml-1">
               seed
             </a>
-            {placeResult.created && (
-              <span className="text-cyan-600 dark:text-cyan-400 ml-1">
-                · outreach triggered
+            {!placeResult.published && (
+              <span className="text-amber-600 dark:text-amber-400 ml-1">
+                · draft — review then publish
               </span>
             )}
           </p>

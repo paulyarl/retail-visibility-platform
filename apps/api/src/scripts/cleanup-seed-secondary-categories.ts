@@ -52,12 +52,23 @@ function cleanKeyword(kw: string): string | null {
   if (colon > 0) {
     const prefix = trimmed.slice(0, colon).trim().toLowerCase();
     if (KNOWN_KEY_PREFIXES.has(prefix)) return trimmed.toLowerCase();
-    const label = trimmed.slice(0, colon).replace(/_/g, ' ').trim();
+    const label = stripGloss(trimmed.slice(0, colon));
     if (!label || label.length > KEYWORD_LABEL_MAX) return null;
     return label.toLowerCase();
   }
-  if (trimmed.length > KEYWORD_LABEL_MAX) return null;
-  return trimmed.toLowerCase();
+  const label = stripGloss(trimmed);
+  if (!label || label.length > KEYWORD_LABEL_MAX) return null;
+  return label.toLowerCase();
+}
+
+// Mirror of SeedSeoComposer.subcategoryLabel's gloss stripping — trailing
+// parenthetical groups and spaced-dash qualifiers are analyst context.
+function stripGloss(s: string): string {
+  return s
+    .replace(/(\s*\([^)]*\)\s*)+$/, '')
+    .split(/\s+[—–-]\s+/)[0]
+    .replace(/_/g, ' ')
+    .trim();
 }
 
 async function main() {
@@ -163,7 +174,7 @@ async function main() {
     JOIN directory_listings_list dl ON dl.id = dps.listing_id
     WHERE EXISTS (
       SELECT 1 FROM unnest(dl.secondary_categories) s
-      WHERE position(':' in s) > 0 OR length(s) > 100
+      WHERE position(':' in s) > 0 OR position('(' in s) > 0 OR length(s) > 100
     )
   `;
   for (const row of suspicious) {
@@ -182,6 +193,7 @@ async function main() {
       WHERE (position(':' in k) > 0
              AND lower(split_part(k, ':', 1)) <> ALL
                (ARRAY['neighborhood','origin_country','origin_region']))
+         OR position('(' in k) > 0
          OR length(k) > 100
     )
   `;

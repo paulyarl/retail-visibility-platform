@@ -67,7 +67,7 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
       address: string | null;
       city: string | null;
       state: string | null;
-      postal_code: string | null;
+      zip_code: string | null;
     }>
   >`
     SELECT
@@ -77,7 +77,7 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
       dl.address,
       dl.city,
       dl.state,
-      dl.postal_code
+      dl.zip_code
     FROM directory_claim_tokens dct
     JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
     JOIN directory_listings_list dl ON dl.id = dps.listing_id
@@ -101,7 +101,7 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   if (row.address) addressLines.push(row.address);
   const cityState = [row.city, row.state].filter(Boolean).join(', ');
   if (cityState) addressLines.push(cityState);
-  if (row.postal_code) addressLines.push(row.postal_code);
+  if (row.zip_code) addressLines.push(row.zip_code);
 
   return {
     seedId,

@@ -2015,7 +2015,7 @@ class DirectoryPresenceSeedService {
     campaignId: string,
     opts: { publish?: boolean } = {},
     ctx?: SeedAuditCtx,
-  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean }> {
+  ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean; published: boolean }> {
     const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
       where: { id: campaignId },
     });
@@ -2066,7 +2066,7 @@ class DirectoryPresenceSeedService {
 
     // Idempotency: return an existing primary-linked seed
     const existing = await prisma.$queryRaw<any[]>`
-      SELECT dscl.seed_id, dps.listing_id, dps.tenant_id, dl.slug
+      SELECT dscl.seed_id, dps.listing_id, dps.tenant_id, dl.slug, dl.is_published
       FROM directory_seed_campaign_links dscl
       JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
@@ -2082,6 +2082,7 @@ class DirectoryPresenceSeedService {
         publicUrl: `/place/${existing[0].slug}`,
         created: false,
         seoEnriched: false,
+        published: !!existing[0].is_published,
       };
     }
 
@@ -2179,27 +2180,33 @@ class DirectoryPresenceSeedService {
 
     const seed = await this.createSeed(seedInput, ctx);
 
-    if (opts.publish !== false) {
-      await this.publishSeed(seed.id, ctx);
-    }
-
     await DirectorySeedCampaignLinkService.linkCampaign(seed.id, campaignId, 'primary', ctx);
 
-    // ★ Seed Outreach Courtesy Window: trigger campaign-aware outreach
-    // after the seed is created, published, and linked. Fire-and-forget —
-    // outreach trigger failure must not roll back seed creation.
-    try {
-      await SeedOutreachTriggerService.getInstance().onSeedCreated({
-        campaignId,
-        seedId: seed.id,
-        ctx,
-      });
-    } catch (err) {
-      logger.warn('SeedOutreachTriggerService.onSeedCreated failed', undefined, {
-        campaignId,
-        seedId: seed.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    // By default the seed is parked in 'draft' so the operator can QC the
+    // mined data (hours, attributes, categories, SEO, NAP) on the seed detail
+    // page before publishing. Only publish (and fire the outreach courtesy
+    // window) when the caller explicitly opts in.
+    let published = false;
+    if (opts.publish === true) {
+      await this.publishSeed(seed.id, ctx);
+      published = true;
+
+      // ★ Seed Outreach Courtesy Window: trigger campaign-aware outreach
+      // after the seed is published and linked. Fire-and-forget — outreach
+      // trigger failure must not roll back seed creation.
+      try {
+        await SeedOutreachTriggerService.getInstance().onSeedCreated({
+          campaignId,
+          seedId: seed.id,
+          ctx,
+        });
+      } catch (err) {
+        logger.warn('SeedOutreachTriggerService.onSeedCreated failed', undefined, {
+          campaignId,
+          seedId: seed.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     const listingRows = await prisma.$queryRaw<any[]>`
@@ -2215,6 +2222,7 @@ class DirectoryPresenceSeedService {
       publicUrl: `/place/${slug}`,
       created: true,
       seoEnriched: true,
+      published,
     };
   }
 
