@@ -881,7 +881,7 @@ export default function CampaignDetailClient({
                   </p>
                 )}
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {campaign.scope} · {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
+                  {campaign.scope} · {campaign.category} · {campaign.city}{campaign.state ? `, ${campaign.state}` : ''}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
                   {campaign.display_id && ` · ${campaign.display_id}`}
                 </p>
                 {(campaign.secondary_categories?.length ?? 0) > 0 && (
