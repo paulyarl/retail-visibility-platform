@@ -26,20 +26,20 @@ import { logger } from '../logger';
 import { loadPlatformBranding } from './marketing/MarketingReceiptPdfService';
 import { unifiedConfig } from '../config/unifiedConfig';
 
-// Public-facing base URL the QR encodes. An explicit API origin wins when
-// configured (local dev sets NEXT_PUBLIC_API_URL=http://localhost:4000). When
-// neither var is set — the deployed API runtime — fall back to the web
-// origin: Next.js rewrites proxy /api/* to the API, so
-// https://<web>/api/public/qr/... still reaches the tracked redirect.
-// Never default to localhost here — a QR encoding it can never resolve when
-// scanned from a phone. Same pattern as PostalMailerService.resolveQrDestination.
+// Public-facing base URL the QR encodes. The web origin wins: printed
+// artifacts carry the branded public domain, and Next.js rewrites proxy
+// /api/* to the API so https://<web>/api/public/qr/... still reaches the
+// tracked redirect. API-origin vars remain as a fallback for environments
+// where the rewrite isn't in play. Never default to localhost — a QR
+// encoding it can never resolve when scanned from a phone. Same pattern as
+// PostalMailerService.resolveQrDestination.
 const QR_BASE_URL = (
+  unifiedConfig.frontendUrl ||
+  unifiedConfig.webUrl ||
   unifiedConfig.get('API_URL') ||
   unifiedConfig.get('API_BASE_URL') ||
   unifiedConfig.get('NEXT_PUBLIC_API_URL') ||
   unifiedConfig.get('NEXT_PUBLIC_API_BASE_URL') ||
-  unifiedConfig.frontendUrl ||
-  unifiedConfig.webUrl ||
   'https://app.visibleshelf.com'
 )
   .replace(/\/+$/, '')

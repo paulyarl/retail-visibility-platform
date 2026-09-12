@@ -74,6 +74,8 @@ export default function ClaimQrDesignerModal({
   const [platformLogoUrl, setPlatformLogoUrl] = useState<string | null>(null);
   const [logoLoading, setLogoLoading] = useState(false);
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
+  const [customLogoDataUrl, setCustomLogoDataUrl] = useState<string | null>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
   const [size, setSize] = useState(512);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -116,7 +118,10 @@ export default function ClaimQrDesignerModal({
     gradientOnDots,
     gradientOnCorners,
     gradientOnCornerDots,
-    logoUrl: logoEnabled && platformLogoUrl ? platformLogoUrl : null,
+    // Custom upload wins over the platform logo — lets the operator center
+    // the prospect's own logo on the artifact. Data URLs are same-origin so
+    // overlayLogoOnQRAsync draws them without CORS risk.
+    logoUrl: logoEnabled ? (customLogoDataUrl ?? platformLogoUrl) : null,
     logoShape,
   });
 
@@ -182,8 +187,25 @@ export default function ClaimQrDesignerModal({
     customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor,
     gradientEnabled, gradientStart, gradientEnd,
     gradientOnDots, gradientOnCorners, gradientOnCornerDots,
-    logoEnabled, logoShape, platformLogoUrl,
+    logoEnabled, logoShape, platformLogoUrl, customLogoDataUrl,
   ]);
+
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Logo must be an image file');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomLogoDataUrl(typeof reader.result === 'string' ? reader.result : null);
+      setError(null);
+    };
+    reader.onerror = () => setError('Failed to read logo file');
+    reader.readAsDataURL(file);
+  };
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -374,7 +396,41 @@ export default function ClaimQrDesignerModal({
               <ImageIcon className="w-3.5 h-3.5 text-neutral-400" />
               Center platform logo
             </label>
-            {logoEnabled && !logoLoading && !platformLogoUrl && (
+            {logoEnabled && (
+              <div className="mt-2 space-y-2">
+                {customLogoDataUrl ? (
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={customLogoDataUrl}
+                      alt="Custom logo"
+                      className="h-8 w-8 object-contain rounded border border-neutral-200 bg-white"
+                    />
+                    <span className="text-[11px] text-neutral-600">Prospect logo</span>
+                    <button
+                      onClick={() => setCustomLogoDataUrl(null)}
+                      className="text-[11px] text-red-600 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => logoFileRef.current?.click()}
+                    className="text-[11px] text-blue-600 hover:underline"
+                  >
+                    Upload prospect logo instead
+                  </button>
+                )}
+                <input
+                  ref={logoFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={handleLogoFile}
+                />
+              </div>
+            )}
+            {logoEnabled && !customLogoDataUrl && !logoLoading && !platformLogoUrl && (
               <p className="text-[11px] text-amber-600 mt-1">
                 {logoLoadFailed
                   ? 'The configured platform logo could not be loaded (CORS or unreachable URL) — the QR renders without one.'
