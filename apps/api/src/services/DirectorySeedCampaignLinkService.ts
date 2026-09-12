@@ -20,6 +20,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import { generateDirectorySeedCampaignLinkId } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import {
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
@@ -564,10 +565,14 @@ class DirectorySeedCampaignLinkService {
           const keywordsOverridden = isOverridden('keywords');
           const sameAsOverridden = isOverridden('same_as');
 
-          const auditRow = await (prisma as any).mkt_audits_list.findFirst({
+          const auditRows = await (prisma as any).mkt_audits_list.findMany({
             where: { campaign_id: campaignId, platform: 'business_analysis' },
             orderBy: { created_at: 'desc' },
+            take: 10,
           }).catch(() => null);
+          const auditRow = (Array.isArray(auditRows) ? auditRows : []).find(
+            (a: any) => !isStubBusinessAnalysisAudit(a),
+          ) ?? null;
 
           if (auditRow) {
             const ad = (auditRow.audit_data ?? {}) as any;

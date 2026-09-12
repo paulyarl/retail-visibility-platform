@@ -21,6 +21,7 @@ import { NotFoundError } from '../middleware/errorHandler';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { generateMarketingAuditId, generateCampaignId } from '../lib/id-generator';
 import { addressParser } from '../lib/address-parser';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import CampaignTriageService from './CampaignTriageService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -664,6 +665,14 @@ export class MarketingHotProspectService extends BaseService {
       if (!audit) throw new NotFoundError('Audit not found');
       if (audit.platform !== 'business_analysis') {
         throw new Error(`Audit ${auditId} is not a business_analysis audit (platform=${audit.platform})`);
+      }
+
+      // Queue-promotion placeholder audits carry signals only — nothing to sync.
+      if (isStubBusinessAnalysisAudit(audit)) {
+        report.campaignId = audit.campaign_id ?? '';
+        report.skipped = true;
+        report.skipReason = 'stub audit (queue placeholder) — no audit fields to sync';
+        return report;
       }
 
       const campaign = audit.mkt_campaigns_list;

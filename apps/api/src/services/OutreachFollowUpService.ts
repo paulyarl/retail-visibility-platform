@@ -25,6 +25,7 @@ import { logger } from '../logger';
 import { ConflictError, NotFoundError, ValidationError } from '../middleware/errorHandler';
 import type { RequestCtx } from '../context';
 import { generateOutreachOpenerId } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import MarketingCampaignService from './MarketingCampaignService';
 import { MarketingOutreachService } from './MarketingOutreachService';
 import aiProviderFactory from './ai-providers';
@@ -153,7 +154,7 @@ export class OutreachFollowUpService extends BaseService {
     // Find the latest business_analysis audit (same pattern as opener service).
     const audits = campaign.audits ?? [];
     const businessAudits = audits
-      .filter((a: any) => a.platform === 'business_analysis')
+      .filter((a: any) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a))
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     if (businessAudits.length === 0) {

@@ -20,6 +20,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateCampaignTriageId } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { extractSignals, evaluateTriage, fallbackRecommendation, evaluateAllMatchingPlaybooks } from './triage';
 import type {
@@ -620,8 +621,14 @@ export class CampaignTriageService extends BaseService {
   private selectAuditForTriage(audits: any[]): any | null {
     if (audits.length === 0) return null;
 
-    // 1. Prefer latest business_analysis audit
-    const businessAnalysis = audits.find((a) => a.platform === 'business_analysis');
+    // 1. Prefer latest business_analysis audit. Queue-promotion stubs
+    //    (manual_queue / queue_promotion / derived_from_parent) are skipped —
+    //    they are not business_analysis audits; step 2 still picks them up as
+    //    generic detected_signals carriers when no real audit exists, which
+    //    is their designed role.
+    const businessAnalysis = audits.find(
+      (a) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a),
+    );
     if (businessAnalysis) return businessAnalysis;
 
     // 2. Fall back to latest audit with detected_signals[] in audit_data

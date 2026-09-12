@@ -31,6 +31,7 @@ import {
   validateEvidenceForIssueType,
 } from '../validators/profile-repair-intake.schema';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 
 const router = express.Router();
 
@@ -312,11 +313,13 @@ router.get(
         case 'campaign_recommended_attributes': {
           // Per-campaign options for the attribute_verification intake —
           // the campaign's latest business audit's recommended_attributes.
-          const audit = await prisma.mkt_audits_list.findFirst({
+          const auditCandidates = await prisma.mkt_audits_list.findMany({
             where: { campaign_id: (resolved as any).campaignId, platform: 'business_analysis' },
             orderBy: { created_at: 'desc' },
+            take: 10,
             select: { audit_data: true },
           });
+          const audit = auditCandidates.find((a) => !isStubBusinessAnalysisAudit(a));
           const recs = (audit?.audit_data as any)?.recommended_attributes;
           if (Array.isArray(recs)) {
             const seen = new Set<string>();

@@ -18,6 +18,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
@@ -2021,10 +2022,16 @@ class DirectoryPresenceSeedService {
     });
     if (!campaign) throw new Error('campaign_not_found');
 
-    const audit = await (prisma as any).mkt_audits_list.findFirst({
+    const auditCandidates = await (prisma as any).mkt_audits_list.findMany({
       where: { campaign_id: campaignId, platform: 'business_analysis' },
       orderBy: { created_at: 'desc' },
+      take: 10,
     });
+    // Skip queue-promotion placeholder audits — they carry signals/attributes
+    // only and must not satisfy the "latest business_analysis audit" lookup.
+    const audit = (Array.isArray(auditCandidates) ? auditCandidates : []).find(
+      (a: any) => !isStubBusinessAnalysisAudit(a),
+    );
     if (!audit) throw new Error('business_analysis_audit_not_found');
 
     const d = (audit.audit_data ?? {}) as any;
@@ -2343,10 +2350,14 @@ class DirectoryPresenceSeedService {
     });
     if (!campaign) return null;
 
-    const audit = await (prisma as any).mkt_audits_list.findFirst({
+    const auditCandidates = await (prisma as any).mkt_audits_list.findMany({
       where: { campaign_id: campaignId, platform: 'business_analysis' },
       orderBy: { created_at: 'desc' },
+      take: 10,
     });
+    const audit = (Array.isArray(auditCandidates) ? auditCandidates : []).find(
+      (a: any) => !isStubBusinessAnalysisAudit(a),
+    ) ?? null;
     const d = (audit?.audit_data ?? {}) as any;
     const meta = d.audit_metadata ?? {};
     const businessName =

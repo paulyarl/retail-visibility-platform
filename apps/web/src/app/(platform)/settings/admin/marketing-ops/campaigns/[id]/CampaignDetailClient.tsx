@@ -128,6 +128,16 @@ const PLAYBOOK_CATEGORY_TO_PROMPT_CATEGORIES: Record<string, string[]> = {
   triage_management: ['profile_repair', 'Digital Audit'],
 };
 
+// Queue-promotion placeholder audits carry detected_signals only — they are
+// seeded at queue/promotion time so triage can run pre-audit, and must not
+// render as a business_analysis audit card.
+const STUB_AUDIT_SOURCES = new Set(['manual_queue', 'queue_promotion', 'derived_from_parent']);
+function isStubBusinessAnalysisAudit(audit: Audit): boolean {
+  if (audit.platform !== 'business_analysis') return false;
+  const source = (audit.audit_data as any)?.audit_metadata?.source;
+  return typeof source === 'string' && STUB_AUDIT_SOURCES.has(source);
+}
+
 /**
  * Compute triage-based prompt recommendations from the triage result +
  * the stage-relevant prompt templates. Returns matched templates (with
@@ -1764,6 +1774,16 @@ export default function CampaignDetailClient({
                         <CityCategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'category_analysis' && audit.audit_data ? (
                         <CategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : audit.platform === 'business_analysis' && isStubBusinessAnalysisAudit(audit) ? (
+                        <div key={audit.id} className="border border-dashed border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-gray-50/50 dark:bg-neutral-800/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Queue placeholder — not a business audit</span>
+                            <span className="text-[10px] text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {(audit.audit_data as any)?.summary ?? 'Detected signals seeded at queue promotion.'}
+                          </p>
+                        </div>
                       ) : audit.platform === 'business_analysis' && audit.audit_data ? (
                         <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} />
                       ) : audit.platform === 'city_analysis' && audit.audit_data ? (

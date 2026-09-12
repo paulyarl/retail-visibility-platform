@@ -16,6 +16,7 @@
 
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
 import type { RequestCtx } from '../../context';
 
 // ====================
@@ -640,11 +641,13 @@ const adapters: Record<string, WriteBehindAdapter> = {
       }
 
       // Label resolution: audit recommended_attributes → attribute defs.
-      const audit = await prisma.mkt_audits_list.findFirst({
+      const auditCandidates = await prisma.mkt_audits_list.findMany({
         where: { campaign_id: adapterCtx.campaignId, platform: 'business_analysis' },
         orderBy: { created_at: 'desc' },
+        take: 10,
         select: { audit_data: true },
       });
+      const audit = auditCandidates.find((a) => !isStubBusinessAnalysisAudit(a));
       const recList = (audit?.audit_data as any)?.recommended_attributes;
       const recByKey = new Map<string, any>(
         (Array.isArray(recList) ? recList : [])

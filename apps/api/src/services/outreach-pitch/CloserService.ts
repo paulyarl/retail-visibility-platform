@@ -18,6 +18,7 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateOutreachCloserId } from '../../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
 import MarketingCampaignService from '../MarketingCampaignService';
 import aiProviderFactory from '../ai-providers';
 import {
@@ -86,7 +87,7 @@ export class CloserService extends BaseService {
 
     const audits = campaign.audits ?? [];
     const businessAudits = audits
-      .filter((a: any) => a.platform === 'business_analysis')
+      .filter((a: any) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a))
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     if (businessAudits.length === 0) {

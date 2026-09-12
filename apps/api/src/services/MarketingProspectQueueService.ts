@@ -470,10 +470,17 @@ class MarketingProspectQueueServiceClass extends BaseService {
           .map((e: any) => e.processed_campaign_id)
           .filter(Boolean);
         if (campaignIds.length > 0) {
-          const audits = await this.prisma.mkt_audits_list.findMany({
-            where: { campaign_id: { in: campaignIds }, platform: 'business_analysis' },
-            select: { campaign_id: true, created_at: true },
-          });
+          // Only real audits count — queue-promotion placeholder audits
+          // (audit_metadata.source = manual_queue/queue_promotion/
+          // derived_from_parent) carry signals, not audit data.
+          const audits = await this.prisma.$queryRaw<{ campaign_id: string; created_at: Date }[]>`
+            SELECT campaign_id, created_at
+            FROM mkt_audits_list
+            WHERE campaign_id = ANY(${campaignIds})
+              AND platform = 'business_analysis'
+              AND COALESCE(audit_data->'audit_metadata'->>'source', '')
+                NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent')
+          `;
           for (const a of audits) {
             const prev = auditDates.get(a.campaign_id);
             if (!prev || a.created_at > prev) auditDates.set(a.campaign_id, a.created_at);

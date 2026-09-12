@@ -168,15 +168,17 @@ export class SeedOutreachTriggerService extends BaseService {
     let profileQualityFindings: Array<{ signal: string; severity: string; label: string }> | null = null;
     try {
       const auditRow = await prisma.$queryRaw<any[]>`
-        SELECT audit_payload FROM mkt_audits_list
+        SELECT audit_data FROM mkt_audits_list
         WHERE campaign_id = ${campaignId}
           AND platform = 'business_analysis'
+          AND COALESCE(audit_data->'audit_metadata'->>'source', '')
+            NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent')
         ORDER BY created_at DESC LIMIT 1
       `;
-      if (auditRow[0]?.audit_payload) {
-        const payload = typeof auditRow[0].audit_payload === 'string'
-          ? JSON.parse(auditRow[0].audit_payload)
-          : auditRow[0].audit_payload;
+      if (auditRow[0]?.audit_data) {
+        const payload = typeof auditRow[0].audit_data === 'string'
+          ? JSON.parse(auditRow[0].audit_data)
+          : auditRow[0].audit_data;
         const signals: string[] = payload?.detected_signals || [];
         if (signals.length > 0) {
           profileQualityFindings = signals.slice(0, 10).map((signal: string) => ({

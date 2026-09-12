@@ -14,6 +14,7 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateOwnerVoiceProfileId } from '../../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
 import aiProviderFactory from '../ai-providers';
 import { buildVoiceInferencePrompt } from './prompts';
 import type { OwnerVoiceFields } from './prompts';
@@ -152,7 +153,7 @@ export class OwnerVoiceService extends BaseService {
       if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
       const businessAudits = (campaign.mkt_audits_list || [])
-        .filter((a: any) => a.platform === 'business_analysis')
+        .filter((a: any) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a))
         .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       if (businessAudits.length === 0) {
