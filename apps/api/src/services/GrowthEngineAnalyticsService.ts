@@ -373,7 +373,7 @@ class GrowthEngineAnalyticsService {
        FROM directory_search_demand_log d
        LEFT JOIN (
          SELECT category, city, COUNT(*) AS listing_count
-         FROM directory_presence_seeds WHERE status = 'published'
+         FROM directory_presence_seeds WHERE status IN ('published', 'invited', 'claimed')
          GROUP BY category, city
        ) s ON LOWER(s.category) = LOWER(d.resolved_category) AND LOWER(s.city) = LOWER(d.resolved_city)
        WHERE d.result_count < 5
@@ -472,7 +472,7 @@ class GrowthEngineAnalyticsService {
        ),
        listings AS (
          SELECT category, city, COUNT(*) AS listing_count
-         FROM directory_presence_seeds WHERE status = 'published'
+         FROM directory_presence_seeds WHERE status IN ('published', 'invited', 'claimed')
          GROUP BY category, city
        )
        SELECT

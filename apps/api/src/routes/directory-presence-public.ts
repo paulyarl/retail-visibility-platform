@@ -462,14 +462,14 @@ router.get('/places', async (req: Request, res: Response) => {
          SELECT dps.category AS category, dps.city, dps.state
          FROM directory_presence_seeds dps
          JOIN directory_listings_list dll ON dll.id = dps.listing_id
-         WHERE dps.status = 'published' AND dll.is_published = true
+         WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
            AND dll.listing_origin = 'directory_seed'
          UNION ALL
          SELECT TRIM(sec), dps.city, dps.state
          FROM directory_presence_seeds dps
          JOIN directory_listings_list dll ON dll.id = dps.listing_id
          CROSS JOIN LATERAL unnest(dll.secondary_categories) sec
-         WHERE dps.status = 'published' AND dll.is_published = true
+         WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
            AND dll.listing_origin = 'directory_seed'
            AND NULLIF(TRIM(sec), '') IS NOT NULL
            AND LOWER(TRIM(sec)) <> LOWER(TRIM(dps.category))
@@ -584,7 +584,7 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
-       WHERE dps.status = 'published'
+       WHERE dps.status IN ('published', 'invited', 'claimed')
          AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
          AND (
@@ -727,7 +727,7 @@ router.get('/places/search', async (req: Request, res: Response) => {
     const pool = getDirectPool();
 
     // Build query with optional full-text search
-    let whereClause = `WHERE dps.status = 'published' AND dll.is_published = true AND dll.listing_origin = 'directory_seed'`;
+    let whereClause = `WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true AND dll.listing_origin = 'directory_seed'`;
     const params: any[] = [];
     let paramIdx = 1;
 
@@ -854,7 +854,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       `SELECT COUNT(*) as total
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       WHERE dps.status = 'published' AND dll.is_published = true
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
          AND LOWER(dps.city) = LOWER($1)`,
       [cityName],
@@ -872,7 +872,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
-       WHERE dps.status = 'published' AND dll.is_published = true
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
          AND LOWER(dps.city) = LOWER($1)
        ORDER BY ${orderBy}
@@ -951,7 +951,7 @@ router.get('/places-map', async (req: Request, res: Response) => {
     const city = req.query.city as string | undefined;
     const pool = getDirectPool();
 
-    let whereClause = `WHERE dps.status = 'published' AND dll.is_published = true AND dll.listing_origin = 'directory_seed' AND dll.latitude IS NOT NULL AND dll.longitude IS NOT NULL`;
+    let whereClause = `WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true AND dll.listing_origin = 'directory_seed' AND dll.latitude IS NOT NULL AND dll.longitude IS NOT NULL`;
     const params: any[] = [];
     let paramIdx = 1;
 
@@ -1020,7 +1020,7 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
       `SELECT dll.slug, dll.updated_at
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       WHERE dps.status = 'published' AND dll.is_published = true
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'`,
     );
 
@@ -1034,14 +1034,14 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
          SELECT dps.category AS category
          FROM directory_presence_seeds dps
          JOIN directory_listings_list dll ON dll.id = dps.listing_id
-         WHERE dps.status = 'published' AND dll.is_published = true
+         WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
            AND dll.listing_origin = 'directory_seed'
          UNION
          SELECT TRIM(sec)
          FROM directory_presence_seeds dps
          JOIN directory_listings_list dll ON dll.id = dps.listing_id
          CROSS JOIN LATERAL unnest(dll.secondary_categories) sec
-         WHERE dps.status = 'published' AND dll.is_published = true
+         WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
            AND dll.listing_origin = 'directory_seed'
            AND NULLIF(TRIM(sec), '') IS NOT NULL
        ) shelf
@@ -1053,7 +1053,7 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
       `SELECT DISTINCT LOWER(dps.city) AS city_slug
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       WHERE dps.status = 'published' AND dll.is_published = true
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'`,
     );
 
