@@ -11,7 +11,7 @@ import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { addressParser } from '@/lib/address-parser';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 
-const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+const STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair', 'triage_management'];
 

@@ -176,7 +176,7 @@ Frontend checkout:
 
 - `apps/api/src/services/__tests__/MarketingCustomerProjection.test.ts` (24 tests):
   - Status mapper: every internal stage maps to a customer status or is hidden
-  - Hidden stages (seek, preview_built, shown, lost, dead) return null
+  - Hidden stages (seek, seed, preview_built, shown, lost, dead) return null
   - Active subscription overrides stage
   - `projectCampaign` whitelists fields (no notes, pain_score, estimated_*, assigned_to)
   - `projectCampaigns` filters out hidden-stage campaigns

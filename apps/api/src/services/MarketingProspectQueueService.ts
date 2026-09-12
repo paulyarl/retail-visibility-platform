@@ -465,6 +465,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // seed data for the public listings). Keyed on the processed_campaign_id
       // FK column, not the join, so the flag reflects the row's own state.
       const auditDates = new Map<string, Date>();
+      const checklistCounts = new Map<string, number>();
       if (filters.includeCampaigns) {
         const campaignIds = entries
           .map((e: any) => e.processed_campaign_id)
@@ -485,6 +486,26 @@ class MarketingProspectQueueServiceClass extends BaseService {
             const prev = auditDates.get(a.campaign_id);
             if (!prev || a.created_at > prev) auditDates.set(a.campaign_id, a.created_at);
           }
+
+          // Checklist emission (stage-culture fit §6.4 tier-1b, cheap
+          // level): completed-step count per processed campaign in ONE
+          // groupBy — no per-row getCampaignChecklist calls. Denominators
+          // vary by effective playbook, so emit the raw completed count;
+          // the checklist chip renders "checklist · N done" and the
+          // campaign's checklist tab remains the full fraction view.
+          // Progress rows persist after permanent steps leave their stage
+          // window, so seed-wedge completions keep counting post-seek.
+          const checklist = await this.prisma.mkt_campaign_checklist_progress.groupBy({
+            by: ['campaign_id'],
+            where: {
+              campaign_id: { in: campaignIds },
+              completed_at: { not: null },
+            },
+            _count: { step_id: true },
+          });
+          for (const p of checklist) {
+            checklistCounts.set(p.campaign_id, p._count.step_id);
+          }
         }
       }
 
@@ -504,6 +525,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
               stage_entered_at: camp?.stage_entered_at ?? null,
               campaign_has_business_audit: e.processed_campaign_id ? auditDates.has(e.processed_campaign_id) : null,
               business_audit_at: e.processed_campaign_id ? auditDates.get(e.processed_campaign_id) ?? null : null,
+              checklist_completed: e.processed_campaign_id ? checklistCounts.get(e.processed_campaign_id) ?? 0 : null,
             };
           })
         : entries;
@@ -881,6 +903,58 @@ class MarketingProspectQueueServiceClass extends BaseService {
           processed_at: new Date(),
         },
       });
+
+      // PG retrofit (D2 — CAMPAIGN_SEED_STAGE_SPRINT_PLAN): a queue entry
+      // carrying seed_id was preflight-seeded by its proving ground — the
+      // seed wedge (listing created + published, claim token minted +
+      // invited) is already done. Graduate the campaign straight into
+      // `seed` instead of `seek`, and mark the objectively-complete
+      // seed-wedge checklist steps done so the checklist reflects the
+      // preflight work. qcSeed stays unchecked — field-level QC is still
+      // human review. Non-fatal: graduation must never fail on the
+      // advance. The stage guard keeps dedup-attached campaigns that have
+      // already progressed past seek untouched.
+      if (entry.seed_id && result.campaign?.id && result.campaign.stage === 'seek') {
+        try {
+          await MarketingCampaignService.transitionStage({
+            campaignId: result.campaign.id,
+            toStage: 'seed',
+            triggerType: 'automated',
+            notes: `Auto-advanced on queue graduation — proving-ground preflight minted seed ${entry.seed_id}.`,
+          }, ctx);
+          result.campaign = { ...result.campaign, stage: 'seed' };
+
+          const { generateCampaignChecklistProgressId } = await import('../lib/id-generator.js');
+          for (const stepId of [
+            '_permanent_seed_place_listing',
+            '_permanent_publish_seed',
+            '_permanent_mint_claim_token',
+            '_permanent_pitch_free_claim',
+          ]) {
+            await this.prisma.mkt_campaign_checklist_progress.upsert({
+              where: { campaign_id_step_id: { campaign_id: result.campaign.id, step_id: stepId } },
+              create: {
+                id: generateCampaignChecklistProgressId(),
+                campaign_id: result.campaign.id,
+                step_id: stepId,
+                completed_at: new Date(),
+                completed_by: 'pg_preflight',
+                note: `Auto-completed — proving-ground preflight minted seed ${entry.seed_id}.`,
+              },
+              update: {
+                completed_at: new Date(),
+                completed_by: 'pg_preflight',
+              },
+            });
+          }
+        } catch (advanceError) {
+          logger.warn('createCampaignFromQueue: seed auto-advance failed (non-fatal)', ctx, {
+            queueEntryId: input.queueEntryId,
+            campaignId: result.campaign?.id,
+            error: (advanceError as Error).message,
+          });
+        }
+      }
 
       logger.info('createCampaignFromQueue: campaign created/attached', ctx, {
         queueEntryId: input.queueEntryId,

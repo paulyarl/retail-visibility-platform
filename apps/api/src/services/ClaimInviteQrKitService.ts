@@ -11,9 +11,14 @@
  * The QR encodes the *tracked redirect URL*, not the claim page URL directly,
  * so that scans are recorded in `qr_scan_events` before the merchant lands on
  * the claim page. Three URL variants exist so delivery channel stays separable:
- *   - mail   → `/api/public/qr/claim/{token}`         (surface='claim_invite')
- *   - walkin → `/api/public/qr/claim/{token}/walkin`  (surface='claim_invite_walkin')
- *   - social → `/api/public/qr/claim/{token}/social`  (surface='claim_invite_social')
+ *   - mail   → `/q/{shortCode}`   (surface='claim_invite')
+ *   - walkin → `/qw/{shortCode}`  (surface='claim_invite_walkin')
+ *   - social → `/qs/{shortCode}`  (surface='claim_invite_social')
+ * The short-code variants use Next.js frontend redirect pages (mirrors the
+ * /s/ coupon and /g/ gallery short-URL patterns) — the page calls a combined
+ * resolve + track API endpoint, then redirects to /place/claim/{token}.
+ * Legacy tokens without a short code fall back to the long-token API redirect
+ * `/api/public/qr/claim/{token}[/walkin|/social]`.
  * The social variant is a tracked link for DM/social sharing — remote
  * prospects where a walk-in isn't possible.
  *
@@ -123,7 +128,7 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   const row = rows[0];
   const token = row.token;
   // Lazily backfill a short_code on legacy tokens minted before migration 278.
-  // The compact /qr/c/{shortCode} URL has far fewer QR modules than the
+  // The compact /q/{shortCode} URL has far fewer QR modules than the
   // long-token URL — critical for legibility at postcard print sizes.
   let shortCode = row.short_code ?? null;
   if (!shortCode) {
@@ -136,16 +141,20 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   }
 
   // Prefer the short-code QR tracked redirect when a short code exists —
-  // fewer QR modules = more legible at small print sizes. Falls back to the
-  // long-token URL for legacy tokens without a short code.
+  // fewer QR modules = more legible at small print sizes. The short-code
+  // variant uses the /q/, /qw/, /qs/ frontend redirect pages (mirrors the
+  // /s/ coupon and /g/ gallery short-URL patterns), which resolve the code,
+  // record the scan event, then redirect to /place/claim/{token}. Falls back
+  // to the long-token API redirect URL for legacy tokens without a short
+  // code.
   const qrUrl = shortCode
-    ? `${QR_BASE_URL}/api/public/qr/c/${shortCode}`
+    ? `${WEB_BASE_URL}/q/${shortCode}`
     : `${QR_BASE_URL}/api/public/qr/claim/${token}`;
   const qrUrlWalkin = shortCode
-    ? `${QR_BASE_URL}/api/public/qr/c/${shortCode}/walkin`
+    ? `${WEB_BASE_URL}/qw/${shortCode}`
     : `${QR_BASE_URL}/api/public/qr/claim/${token}/walkin`;
   const qrUrlSocial = shortCode
-    ? `${QR_BASE_URL}/api/public/qr/c/${shortCode}/social`
+    ? `${WEB_BASE_URL}/qs/${shortCode}`
     : `${QR_BASE_URL}/api/public/qr/claim/${token}/social`;
   const claimUrl = `${WEB_BASE_URL}/place/claim/${token}`;
   const shortClaimUrl = shortCode

@@ -1,7 +1,15 @@
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import CampaignListClient from './CampaignListClient';
 
-export default function CampaignsPage() {
+interface PageProps {
+  // proving_ground + stage support the cockpit's stage-distribution
+  // drill-down (PG stage-culture fit §6.4). Optional — the tenant-scoped
+  // wrapper at /t/[tenantId]/... renders this page without props.
+  searchParams?: Promise<{ proving_ground?: string; stage?: string }>;
+}
+
+export default async function CampaignsPage({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
   return (
     <MarketingOpsPageShell
       title="Campaigns"
@@ -13,7 +21,7 @@ export default function CampaignsPage() {
         { label: 'Campaigns' },
       ]}
     >
-      <CampaignListClient />
+      <CampaignListClient initialProvingGroundId={params.proving_ground} initialStage={params.stage} />
     </MarketingOpsPageShell>
   );
 }

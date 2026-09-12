@@ -4,6 +4,12 @@
  *   GET /api/public/qr/claim/:token         — mailed claim invite
  *   GET /api/public/qr/claim/:token/walkin  — hand-delivered (walk-in) invite
  *   GET /api/public/qr/claim/:token/social  — DM/social-shared invite link
+ *   GET /api/public/qr/c/:shortCode          — short-code variant (mail)
+ *   GET /api/public/qr/c/:shortCode/walkin   — short-code variant (walk-in)
+ *   GET /api/public/qr/c/:shortCode/social   — short-code variant (social)
+ *   GET /api/public/qr/claim-scan/:shortCode?surface=mail|walkin|social
+ *                                          — JSON resolve + track for /q/, /qw/,
+ *                                            /qs/ frontend redirect pages
  *
  * Thin redirect that records a qr_scan_events row, then 302s to the claim
  * page (/place/claim/{token}). Scan tracking stays out of the claim flow
@@ -167,5 +173,69 @@ router.get('/qr/c/:shortCode/walkin', (req, res) =>
 router.get('/qr/c/:shortCode/social', (req, res) =>
   recordShortCodeScanAndRedirect('claim_invite_social', req, res),
 );
+
+// ─── Combined resolve + track endpoint for short frontend redirect pages ──
+// GET /api/public/qr/claim-scan/:shortCode?surface=mail|walkin|social
+//
+// Used by the /q/, /qw/, /qs/ Next.js server-component redirect pages. Unlike
+// the /qr/c/:shortCode routes above (which 302 redirect), this returns JSON
+// { success, token } so the frontend page can redirect to /place/claim/{token}
+// after recording the scan. Combines resolution + scan tracking in one call
+// so the frontend page makes a single API request.
+//
+// surface param maps to the qr_scan_events surface:
+//   - mail   → 'claim_invite'
+//   - walkin → 'claim_invite_walkin'
+//   - social → 'claim_invite_social'
+//   - (default / unknown) → 'claim_invite'
+
+const SURFACE_MAP: Record<string, 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social'> = {
+  mail: 'claim_invite',
+  walkin: 'claim_invite_walkin',
+  social: 'claim_invite_social',
+};
+
+router.get('/qr/claim-scan/:shortCode', async (req, res) => {
+  const { shortCode } = req.params;
+  const surfaceParam = (req.query.surface as string) || 'mail';
+  const surface = SURFACE_MAP[surfaceParam] || 'claim_invite';
+
+  let token: string | null = null;
+  let tenantId = 'platform';
+
+  try {
+    const { default: DirectoryPresenceSeedService } = await import('../services/DirectoryPresenceSeedService');
+    const resolved = await DirectoryPresenceSeedService.resolveClaimShortCode(shortCode);
+    if (resolved) {
+      token = resolved.token;
+      tenantId = resolved.tenantId;
+    }
+  } catch {
+    // Short code lookup failure — still record the scan with platform tenant
+  }
+
+  try {
+    await trackQrScanEvent({
+      tenantId,
+      surface,
+      consumer: 'merchant',
+      source: 'qr_code',
+      referrer: req.headers.referer || undefined,
+      userAgent: req.headers['user-agent'] || undefined,
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/qr/claim-scan/:shortCode] scan tracking error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+      shortCode,
+      surface,
+    });
+  }
+
+  if (!token) {
+    return res.status(404).json({ success: false, error: 'claim_link_not_found' });
+  }
+
+  return res.json({ success: true, token });
+});
 
 export default router;

@@ -59,6 +59,7 @@ export type SuggestionStatus = (typeof SUGGESTION_STATUSES)[number];
  */
 export const CHECKLIST_STAGE_TAGS = [
   'seek',
+  'seed',
   'preview_built',
   'shown',
   'paid',
@@ -77,17 +78,18 @@ export type ChecklistStageTag = (typeof CHECKLIST_STAGE_TAGS)[number];
  * later stages (e.g. fulfillment work tagged 'paid') must not warn on early
  * pre-sale transitions.
  */
-const STAGE_PIPELINE_ORDER: Record<string, number> = {
+export const STAGE_PIPELINE_ORDER: Record<string, number> = {
   seek: 0,
-  preview_built: 1,
-  shown: 2,
-  paid: 3,
-  delivered: 4,
-  retainer_pitched: 5,
-  retainer_won: 6,
-  lost: 7,
-  dead: 8,
-  tenant_onboarded: 9,
+  seed: 1,
+  preview_built: 2,
+  shown: 3,
+  paid: 4,
+  delivered: 5,
+  retainer_pitched: 6,
+  retainer_won: 7,
+  lost: 8,
+  dead: 9,
+  tenant_onboarded: 10,
 };
 
 // ─── Permanent outreach-access steps ────────────────────────────────────
@@ -224,7 +226,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     actionConfig: { target: 'campaign_tab', params: { tab: 'audits' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'seed',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -239,7 +241,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'seed',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -254,7 +256,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'seed',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -269,7 +271,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'seed',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -284,7 +286,7 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'seed',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -301,7 +303,7 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
     actionConfig: { target: 'openers_workspace', params: { tab: 'pitch' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'preview_built',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -315,7 +317,7 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
     actionConfig: { target: 'openers_workspace', params: { tab: 'preview' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'preview_built',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
@@ -329,14 +331,14 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
     actionConfig: { target: 'openers_workspace', params: { tab: 'call' } },
     isRequired: false,
     isActive: true,
-    stageTag: 'seek',
+    stageTag: 'preview_built',
     createdAt: new Date(0),
     updatedAt: new Date(0),
   },
 ];
 
 /** Stages where the permanent outreach-access steps are visible. */
-const PERMANENT_STEP_STAGES = new Set(['seek', 'preview_built']);
+export const PERMANENT_STEP_STAGES = new Set(['seek', 'seed', 'preview_built']);
 
 /** Check if a step ID is a permanent (code-defined) step. */
 function isPermanentStepId(stepId: string): boolean {

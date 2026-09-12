@@ -18,6 +18,7 @@ import { clientLogger } from '../lib/client-logger';
 
 export type CampaignStage =
   | 'seek'
+  | 'seed'
   | 'preview_built'
   | 'shown'
   | 'paid'
@@ -165,6 +166,7 @@ export interface Campaign {
   stage: CampaignStage;
   stage_entered_at: string | null;
   date_entered: string | null;
+  date_seed?: string | null;
   date_preview_built: string | null;
   date_shown: string | null;
   date_paid: string | null;
@@ -1090,6 +1092,11 @@ export interface ProspectQueueEntry {
   // entry has no processed campaign yet.
   campaign_has_business_audit?: boolean | null;
   business_audit_at?: string | null;
+  // Checklist emission (stage-culture fit §6.4) — completed-step count on
+  // the processed campaign. Raw count only: denominators vary by effective
+  // playbook, so cross-campaign comparisons need the fraction view on the
+  // campaign's checklist tab.
+  checklist_completed?: number | null;
   // Intelligence scope fields (Sprint 2 — Migration 197)
   category_fit?: string | null;
   identity_confidence?: string | null;
@@ -1684,6 +1691,8 @@ class MarketingOpsService extends AdminApiSingleton {
     page?: number;
     limit?: number;
     intelligenceCampaignKind?: 'discovery' | 'establishment';
+    // Proving-ground drill-down: business campaigns in this PG's tree.
+    provingGroundId?: string;
   }): Promise<{ items: Campaign[]; total: number }> {
     const params = new URLSearchParams();
     if (filters?.stage) params.set('stage', filters.stage);
@@ -1699,6 +1708,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.page) params.set('page', String(filters.page));
     if (filters?.limit) params.set('limit', String(filters.limit));
     if (filters?.intelligenceCampaignKind) params.set('intelligence_campaign_kind', filters.intelligenceCampaignKind);
+    if (filters?.provingGroundId) params.set('proving_ground_id', filters.provingGroundId);
     const query = params.toString();
     const url = `${BASE_URL}${query ? `?${query}` : ''}`;
 
@@ -1719,6 +1729,28 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch campaign');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  /** GET /:campaignId/stage-distribution — proving-ground stage roll-up
+   * (PG stage-culture fit §6.2). Read-only aggregation over the PG tree's
+   * business campaigns + queue buckets. */
+  async getProvingGroundStageDistribution(campaignId: string): Promise<{
+    totalInPipeline: number;
+    byStage: Record<string, number>;
+    stillInQueue: number;
+    seededPreGraduation: number;
+    dismissed: number;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/stage-distribution`,
+      {},
+      `mkt-ops-pg-stage-dist-${campaignId}`,
+      0, // no cache — the panel reflects just-run transitions
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch stage distribution');
     }
     return result.data?.data ?? result.data;
   }
@@ -6082,6 +6114,7 @@ export type SuggestionPosition = (typeof SUGGESTION_POSITIONS)[number];
  */
 export const CHECKLIST_STAGE_TAGS = [
   'seek',
+  'seed',
   'preview_built',
   'shown',
   'paid',
@@ -6096,6 +6129,7 @@ export type ChecklistStageTag = (typeof CHECKLIST_STAGE_TAGS)[number];
 
 export const CHECKLIST_STAGE_TAG_LABELS: Record<ChecklistStageTag, string> = {
   seek: 'Seek',
+  seed: 'Seed',
   preview_built: 'Preview Built',
   shown: 'Shown',
   paid: 'Paid',

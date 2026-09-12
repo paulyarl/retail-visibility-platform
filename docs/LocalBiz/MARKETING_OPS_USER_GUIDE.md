@@ -21,7 +21,7 @@ Marketing Ops turns each local business prospect into a **campaign journey**. An
 
 Campaigns belong to one of three categories:
 
-- **Review Management** — the default pipeline (seek → preview → paid → retainer). Covers prospecting, audit, deliverable generation, payment, and tenant conversion.
+- **Review Management** — the default pipeline (seek → seed → preview → paid → retainer). Covers prospecting, audit, the free-listing seed wedge, deliverable generation, payment, and tenant conversion.
 - **Recovery Management** — dispute resolution for businesses that have received complaints on review platforms. The engine drafts a professional response on behalf of the owner, provides a submission guide, and delivers the approved resolution via email.
 - **Triage Management** — dual-signal footprint campaigns where the business has both repair issues (NAP drift, dead URL) and review gaps (drought, unanswered reviews). Assigned by the Intelligent Triage Engine when PB-05 matches. See §31.
 
@@ -49,8 +49,9 @@ The stage names are shown as color-coded badges across the module (`StageBadge.t
 
 | Stage | Meaning |
 |-------|---------|
-| **Seek** | Prospect identified; audit data being captured. |
-| **Preview Built** | A deliverable preview has been generated. |
+| **Seek** | Prospect identified; category identified + business audit captured. |
+| **Seed** | Good-faith wedge in progress — free place listing created, QC'd, published, claim token minted, owner invited to claim. |
+| **Preview Built** | A deliverable preview has been generated; the paid pitch is framed as the upgrade that eases the pain the audit surfaced. |
 | **Shown** | Preview presented to the business. |
 | **Paid** | Payment received; full deliverable in production. |
 | **Delivered** | Package delivered to the business. |

@@ -49,7 +49,7 @@ const PIPELINE_TABS: readonly string[] = [
   'outreach-prep', 'history', 'lineage', 'cascade', 'gallery', 'siblings',
 ] as const;
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
 /**
  * Stage → prompt_type mapping used by the Prompts tab to surface only
@@ -67,6 +67,9 @@ const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'pai
  */
 const STAGE_PROMPT_TYPES: Record<CampaignStage, PromptType[]> = {
   seek: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
+  // Seed-stage campaigns run the same seek/audit prompts — the business
+  // audit feeds the seed's SEO packet.
+  seed: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
   preview_built: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
   shown: ['seek', 'category_analysis', 'city_analysis', 'enrichment', 'filter'],
   paid: ['fulfill', 'enrichment', 'filter'],
@@ -291,7 +294,7 @@ export default function CampaignDetailClient({
       marketingOpsService.getCampaignRevenue(campaignId).then(setRevenue).catch(() => {});
       // Pre-fetch contact readiness so the warning dot can render on the
       // preview_built pipeline button before the operator clicks it.
-      if (data.stage === 'seek') {
+      if (data.stage === 'seek' || data.stage === 'seed') {
         marketingOpsService.getContactReadiness(campaignId).then(setContactReadiness).catch(() => {});
       }
     } catch (err: any) {
@@ -571,9 +574,11 @@ export default function CampaignDetailClient({
       setError(`Stage transitions are only allowed for business-scope campaigns. This campaign has scope "${campaign.scope}". Manage it from the Non-Business Campaigns table on the Intelligence Profiles page.`);
       return;
     }
-    // Soft stage-gate: seek → preview_built with incomplete contact data
-    // prompts the operator to enrich or proceed. Cancel aborts the transition.
-    if (campaign?.stage === 'seek' && toStage === 'preview_built') {
+    // Soft stage-gate: seed → preview_built with incomplete contact data
+    // prompts the operator to enrich or proceed. Cancel aborts the
+    // transition. (The seed-stage sprint moved this edge — seek → seed
+    // relies on the backend's best-effort GBP enrichment instead.)
+    if (campaign?.stage === 'seed' && toStage === 'preview_built') {
       setReadinessChecking(true);
       try {
         const readiness = await marketingOpsService.getContactReadiness(campaignId);
@@ -1065,7 +1070,7 @@ export default function CampaignDetailClient({
                     const isCurrent = idx === currentIdx;
                     // Warning dot on preview_built when contact readiness is incomplete.
                     const showReadinessDot = stage === 'preview_built'
-                      && campaign.stage === 'seek'
+                      && (campaign.stage === 'seek' || campaign.stage === 'seed')
                       && contactReadiness != null
                       && !contactReadiness.complete;
                     // Focus-stage highlight (from ?focus=preview_built deep-link).
@@ -1163,7 +1168,7 @@ export default function CampaignDetailClient({
                     campaigns in pre-paid stages (a paid campaign that turns out
                     to be closed needs a refund flow, not a kill switch). */}
                 {campaign.scope === 'business'
-                  && ['seek', 'preview_built', 'shown'].includes(campaign.stage)
+                  && ['seek', 'seed', 'preview_built', 'shown'].includes(campaign.stage)
                   && (
                   <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-900/10 p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -1481,8 +1486,8 @@ export default function CampaignDetailClient({
                   )}
                 </div>
 
-                {/* Postal Mailer — business-scope seek/preview_built only */}
-                {campaign.scope === 'business' && (campaign.stage === 'seek' || campaign.stage === 'preview_built') && (
+                {/* Postal Mailer — business-scope seek/seed/preview_built only */}
+                {campaign.scope === 'business' && ['seek', 'seed', 'preview_built'].includes(campaign.stage) && (
                   <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Postal Mailer</h3>
                     <div className="space-y-3">

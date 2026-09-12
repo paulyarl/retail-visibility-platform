@@ -84,7 +84,7 @@ describe('mapCustomerStatus', () => {
   });
 
   // Hidden stages — never exposed to the customer
-  it.each(['seek', 'preview_built', 'shown', 'lost', 'dead'])(
+  it.each(['seek', 'seed', 'preview_built', 'shown', 'lost', 'dead'])(
     'hides stage "%s" (returns null)',
     (stage) => {
       expect(mapCustomerStatus(stage)).toBeNull();

@@ -5,6 +5,7 @@ import { CampaignStage } from '@/services/MarketingOpsService';
 const STAGE_LABELS: Record<string, string> = {
   // Review pipeline stages
   seek: 'Seek',
+  seed: 'Seed',
   preview_built: 'Preview Built',
   shown: 'Shown',
   paid: 'Paid',
@@ -28,6 +29,7 @@ const STAGE_LABELS: Record<string, string> = {
 const STAGE_COLORS: Record<string, string> = {
   // Review pipeline stages
   seek: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  seed: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
   preview_built: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
   shown: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',

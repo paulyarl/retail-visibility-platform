@@ -1,7 +1,14 @@
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import FollowUpWorkspaceClient from './FollowUpWorkspaceClient';
 
-export default function FollowUpsPage() {
+interface PageProps {
+  // ?campaign=<id> prefills the campaign dropdown on load — the openers
+  // deep-link pattern, used by the PG cockpit's artifact chips (§6.4).
+  searchParams: Promise<{ campaign?: string }>;
+}
+
+export default async function FollowUpsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
   return (
     <MarketingOpsPageShell
       title="Follow-Ups"
@@ -13,7 +20,7 @@ export default function FollowUpsPage() {
         { label: 'Follow-Ups' },
       ]}
     >
-      <FollowUpWorkspaceClient />
+      <FollowUpWorkspaceClient initialCampaignId={params.campaign} />
     </MarketingOpsPageShell>
   );
 }

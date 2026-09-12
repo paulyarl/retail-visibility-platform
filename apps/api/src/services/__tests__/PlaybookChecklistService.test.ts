@@ -80,7 +80,11 @@ vi.mock('../../lib/id-generator', () => ({
   generatePlaybookChecklistSuggestionId: () => 'pbsg-test-001',
 }));
 
-import PlaybookChecklistService from '../PlaybookChecklistService';
+import PlaybookChecklistService, {
+  CHECKLIST_STAGE_TAGS,
+  STAGE_PIPELINE_ORDER,
+  PERMANENT_STEP_STAGES,
+} from '../PlaybookChecklistService';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -430,6 +434,73 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       expect(result.requiredTotal).toBe(0);
     });
 
+    it('renders the seed-wedge steps for a seed-stage business campaign (stage window)', async () => {
+      mockTriage.findUnique.mockResolvedValue(null);
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seed', scope: 'business' });
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+      // 9 seed-wedge + 3 outreach-access steps still render at seed stage.
+      expect(result.steps).toHaveLength(12);
+      expect(result.steps[4].id).toBe('_permanent_seed_place_listing');
+      expect(result.steps[8].id).toBe('_permanent_pitch_free_claim');
+    });
+  });
+
+  describe('seed stage tags (Migration 280)', () => {
+    it('CHECKLIST_STAGE_TAGS includes seed', () => {
+      expect(CHECKLIST_STAGE_TAGS).toContain('seed');
+    });
+
+    it('STAGE_PIPELINE_ORDER inserts seed between seek and preview_built', () => {
+      expect(STAGE_PIPELINE_ORDER['seek']).toBe(0);
+      expect(STAGE_PIPELINE_ORDER['seed']).toBe(1);
+      expect(STAGE_PIPELINE_ORDER['preview_built']).toBe(2);
+    });
+
+    it('PERMANENT_STEP_STAGES covers the seek/seed/preview_built window', () => {
+      expect(PERMANENT_STEP_STAGES.has('seek')).toBe(true);
+      expect(PERMANENT_STEP_STAGES.has('seed')).toBe(true);
+      expect(PERMANENT_STEP_STAGES.has('preview_built')).toBe(true);
+    });
+
+    it('tags wedge steps 1–4 seek, 5–9 seed, and outreach steps preview_built', async () => {
+      mockTriage.findUnique.mockResolvedValue(null);
+      mockCampaigns.findUnique.mockResolvedValue({ stage: 'seed', scope: 'business' });
+      mockProgress.findMany.mockResolvedValue([]);
+
+      const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+      const byId = new Map(result.steps.map((s) => [s.id, s]));
+
+      for (const id of [
+        '_permanent_identify_category',
+        '_permanent_set_categories',
+        '_permanent_audit_business',
+        '_permanent_verify_operational',
+      ]) {
+        expect(byId.get(id)?.stageTag).toBe('seek');
+      }
+      for (const id of [
+        '_permanent_seed_place_listing',
+        '_permanent_qc_seed',
+        '_permanent_publish_seed',
+        '_permanent_mint_claim_token',
+        '_permanent_pitch_free_claim',
+      ]) {
+        expect(byId.get(id)?.stageTag).toBe('seed');
+      }
+      for (const id of [
+        '_permanent_pitch_construction',
+        '_permanent_preview_deliverable',
+        '_permanent_call_script',
+      ]) {
+        expect(byId.get(id)?.stageTag).toBe('preview_built');
+      }
+    });
+  });
+
+  describe('getCampaignChecklist (continued)', () => {
     it('leads with the permanent block (seed + outreach) ahead of DB steps for business scope', async () => {
       mockTriage.findUnique.mockResolvedValue(triageAcceptedRow());
       mockCampaigns.findUnique.mockResolvedValue({ stage: 'seek', scope: 'business' });

@@ -9,7 +9,8 @@
 export type PipelineMode = 'review' | 'recovery';
 
 export const REVIEW_TRANSITIONS: Record<string, string[]> = {
-  seek:             ['preview_built', 'dead'],
+  seek:             ['seed', 'dead'],
+  seed:             ['preview_built', 'dead'],
   preview_built:    ['shown', 'dead'],
   shown:            ['paid', 'lost', 'tenant_onboarded'],
   paid:             ['delivered', 'tenant_onboarded'],
@@ -34,7 +35,7 @@ export const RECOVERY_TRANSITIONS: Record<string, string[]> = {
 
 /** Column order for each pipeline (excludes Queued, which is always first). */
 export const REVIEW_COLUMNS = [
-  'seek', 'preview_built', 'shown', 'paid', 'delivered',
+  'seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered',
   'retainer_pitched', 'retainer_won', 'tenant_onboarded',
 ] as const;
 

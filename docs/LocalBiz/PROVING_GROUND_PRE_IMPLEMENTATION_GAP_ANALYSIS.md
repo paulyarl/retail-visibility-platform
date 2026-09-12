@@ -598,6 +598,7 @@ distribution.
 | Promote/dismiss/seed actions | **Built** | Existing. |
 | **Stage distribution panel** | **Missing** | The core awareness feature. Frontend-only for the basic case. |
 | **Campaign-list drill-down** (`?provingGround=<id>&stage=<stage>`) | **Missing** | Needs a new `provingGroundId` filter on `listCampaigns` (queue join + `parent_campaign_id` union) AND `useSearchParams` wiring in `CampaignListClient` — neither exists. |
+| **Per-business click-to-open matrix** | **Missing** | Coverage-style prospects × artifact chips (seed, campaign, audit, checklist, outreach-prep, openers, gallery, deliverables, demo, siblings). Tier 0 needs no backend — all targets verified (culture-fit §6.4). `/follow-ups` lacks `?campaign=` — copy the openers `initialCampaignId` pattern (~15 lines). Checklist chip can emit per-stage-tag completion fractions (`mkt_campaign_checklist_progress` + step `stage_tag`) — tier 1b, culture-fit §6.4. |
 | Due-today mini-list | **Built** | Existing (queue entries with `next_touch_at`). |
 
 **Gap:** Only the stage distribution panel is missing. Everything else is
@@ -661,11 +662,12 @@ is opaque to child internals.
 - The `seed` stage requires `date_seed` column addition (migration 280 per
   the seed-stage sprint plan).
 - The PG stage-awareness frontend aggregation requires **no migration** (it
-  reads existing columns). The **dedicated endpoint does:** neither
-  `mkt_prospect_queue.source_campaign_id` nor
-  `mkt_campaigns_list.parent_campaign_id` is indexed — ship a numbered
-  migration adding both `@@index`es with the endpoint, since it exists for
-  the large-PG case where the seq-scans hurt.
+  reads existing columns). The **dedicated endpoint ships one index:**
+  `mkt_prospect_queue.source_campaign_id` is unindexed and every tree query
+  seq-scans (migration 281). `mkt_campaigns_list.parent_campaign_id` is
+  already indexed — migration 138 created `idx_mkt_campaigns_parent` as a
+  partial index (`WHERE parent_campaign_id IS NOT NULL`); it doesn't appear
+  in `schema.prisma` because Prisma can't model partial indexes.
 - The PG scope flex requires **no migration** (the guardrail already supports
   category/city scope + null city/state).
 
@@ -711,7 +713,7 @@ is opaque to child internals.
 
 2. **Dedicated stage-distribution endpoint** (§4.5, culture-fit §6.2) —
    needed only when PGs grow past the entry-load limit or drill-down is
-   needed. Ships with the two tree-column indexes (§10.2) and the
+   needed. Ships with the `source_campaign_id` index (§10.2) and the
    `parent_campaign_id` union for queue-invisible business grandchildren
    (§4.2 v2 notes).
 

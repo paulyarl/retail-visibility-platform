@@ -10,7 +10,7 @@ import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 /** Recovery pipeline column order (excludes dead — shown behind "Show closed"). */
 const RECOVERY_PIPELINE_STAGES: string[] = [
   'audit_identified', 'framework_preview_generated', 'outreach_dispatched',
@@ -51,14 +51,23 @@ function matchesFollowUpFilter(c: Campaign, filter: FollowUpFilter): boolean {
   return true;
 }
 
-export default function CampaignListClient() {
+interface Props {
+  /** Deep-link drill-down from the PG cockpit (stage-culture fit §6.4):
+   *  ?proving_ground=<id>&stage=<stage>. The PG filter resolves through
+   *  queue linkage + parent lineage server-side. */
+  initialProvingGroundId?: string;
+  initialStage?: string;
+}
+
+export default function CampaignListClient({ initialProvingGroundId, initialStage }: Props) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [kanbanPipeline, setKanbanPipeline] = useState<'review' | 'recovery'>('review');
   const [search, setSearch] = useState('');
-  const [stageFilter, setStageFilter] = useState<CampaignStage | ''>('');
+  const [stageFilter, setStageFilter] = useState<CampaignStage | ''>((initialStage as CampaignStage) || '');
+  const [provingGroundId, setProvingGroundId] = useState(initialProvingGroundId || '');
   const [scopeFilter, setScopeFilter] = useState<CampaignScope | ''>('');
   const [toneFilter, setToneFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -94,6 +103,7 @@ export default function CampaignListClient() {
         city: cityFilter || undefined,
         retainer: retainerFilter || undefined,
         attributes: attributeFilter ? [attributeFilter] : undefined,
+        provingGroundId: provingGroundId || undefined,
         limit: 200,
       });
       setCampaigns(result.items);
@@ -102,7 +112,7 @@ export default function CampaignListClient() {
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, scopeFilter, toneFilter, categoryFilter, cityFilter, retainerFilter, attributeFilter]);
+  }, [search, stageFilter, scopeFilter, toneFilter, categoryFilter, cityFilter, retainerFilter, attributeFilter, provingGroundId]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -291,6 +301,25 @@ export default function CampaignListClient() {
             ))}
           </div>
         </div>
+
+        {/* Active proving-ground drill-down filter (from the cockpit's
+            stage distribution — ?proving_ground=<id>). Clearable chip;
+            the filter resolves through queue linkage + parent lineage
+            server-side, not a column. */}
+        {provingGroundId && (
+          <div className="flex items-center gap-2 mb-4">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
+              Proving ground: {provingGroundId}
+              <button
+                onClick={() => setProvingGroundId('')}
+                className="text-violet-500 hover:text-violet-800 dark:hover:text-violet-200"
+                title="Clear the proving-ground filter"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* Follow-up quick filter chips */}
         <div className="flex items-center gap-2 mb-4">

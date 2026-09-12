@@ -78,9 +78,9 @@ class PostalMailerService {
       throw new NotFoundError('Campaign not found');
     }
 
-    const allowedStages = ['seek', 'preview_built'];
+    const allowedStages = ['seek', 'seed', 'preview_built'];
     if (campaign.scope !== 'business' || !allowedStages.includes(campaign.stage)) {
-      throw new ValidationError('Mailer is only available for business-scope campaigns in seek or preview_built stage');
+      throw new ValidationError('Mailer is only available for business-scope campaigns in seek, seed, or preview_built stage');
     }
 
     if (!this.hasMailingAddress(campaign)) {
@@ -236,7 +236,7 @@ class PostalMailerService {
     }
 
     // Diagnostic gallery: the cold-outreach default.
-    const galleryStages = ['seek', 'preview_built', 'shown'];
+    const galleryStages = ['seek', 'seed', 'preview_built', 'shown'];
     if (galleryStages.includes(campaign.stage)) {
       const tokenRow = await MarketingDeliverableService.generateCampaignToken(
         campaign.id,

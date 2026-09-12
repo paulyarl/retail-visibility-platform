@@ -250,6 +250,10 @@ is alive but not yet converting."
 
 - The proving ground **reads** the `stage` column of business-scope campaigns.
   It does not **write** to it. No transition, no scope guard issue.
+- The same boundary covers the click-to-open layer (§6.4): artifact chips
+  **navigate** to the surfaces that own each business artifact — the PG
+  renders links, never performs the mutation itself. Mutations (promote,
+  graduate, dismiss) remain explicit actions gated by their own services.
 - The aggregation is a `groupBy` query joining through the queue's
   `processed_campaign_id` → `mkt_campaigns_list.stage`. No new stage machine,
   no new transition map entry, no change to `transitionStage`.
@@ -520,12 +524,15 @@ async getProvingGroundStageDistribution(
 
 **Required alongside this endpoint:**
 
-- **Indexes (numbered migration):** `mkt_prospect_queue.source_campaign_id`
-  and `mkt_campaigns_list.parent_campaign_id` are both unindexed today
-  (verified in `schema.prisma`). Every tree query — including the existing
-  cockpit load — seq-scans. Ship `@@index([source_campaign_id])` and
-  `@@index([parent_campaign_id])` with this endpoint; it exists precisely for
-  the large-PG case where the scans hurt.
+- **Index (numbered migration):** `mkt_prospect_queue.source_campaign_id`
+  is unindexed today — every tree query, including the existing cockpit
+  load, seq-scans. Ship `@@index([source_campaign_id])` with this endpoint
+  (migration 281); it exists precisely for the large-PG case where the scan
+  hurts. `mkt_campaigns_list.parent_campaign_id` needs nothing — migration
+  138 already created `idx_mkt_campaigns_parent` as a *partial* index
+  (`WHERE parent_campaign_id IS NOT NULL`), which covers every
+  tree-resolution query; it is absent from `schema.prisma` only because
+  Prisma cannot model partial indexes.
 - **`resolveBusinessProvingGround` third hop:** the resolver traces
   queue → `source_campaign_id` → parent. Business campaigns linked directly
   (`parent_campaign_id` → PG, or → intelligence child → PG) return null and
@@ -578,7 +585,123 @@ Each stage count links to a filtered campaign list (`?provingGround=<id>
    no `searchParams` — add `useSearchParams` handling for `provingGround` +
    `stage`, and pass `provingGroundId` through `listCampaigns`.
 
-### 6.4 PG scope flex (ships after stage awareness)
+### 6.4 Per-business artifact coverage — the click-to-open matrix
+
+The stage distribution answers "where is the cohort?"; the click-to-open
+layer answers "open this one business's artifacts." The PG never mutates a
+business — chips are navigation only; every click lands on the surface that
+owns the artifact, under that surface's own guards. This is the same
+state-chip pattern as `/settings/admin/marketing-ops/coverage`: a stable
+matrix where each cell's state determines its color and click target. Here
+the matrix is **prospects × artifact surfaces** — one row per queue entry,
+one chip per artifact.
+
+**Cell states** (simpler than coverage's seven — two, plus a highlight):
+
+| State | Render | Click |
+|---|---|---|
+| `locked` | pale gray + lock icon, tooltip names the unlock ("seed first", "graduate to campaign") | none |
+| `available` | colored chip (green = ready, amber = available-but-empty, e.g. `no audit`) | deep link |
+| `due` (optional) | red/outline emphasis on the follow-up chip when `next_touch_at <= now` | deep link |
+
+**Chip inventory** — every target verified against the app router:
+
+| Chip | Unlock signal (already on the decorated queue entry) | Target |
+|---|---|---|
+| Seed | `seed_id` | `/settings/admin/directory/presence-seeds/{seed_id}` |
+| Campaign | `processed_campaign_id` | `/settings/admin/marketing-ops/campaigns/{id}` |
+| Audit | `campaign_has_business_audit` → green `audited`; else amber `no audit` (still links — the audits tab shows what to run) | `…/campaigns/{id}?tab=audits` |
+| Checklist | `processed_campaign_id` (+ progress fraction — tier 1b) | `…/campaigns/{id}?tab=checklist` |
+| Outreach prep | `processed_campaign_id` | `…/campaigns/{id}?tab=outreach-prep` |
+| Openers | `processed_campaign_id` | `/settings/admin/marketing-ops/openers?campaign={id}` |
+| Follow-ups | `next_touch_at` (pre-graduation); `processed_campaign_id` (post) | `/settings/admin/marketing-ops/follow-ups?campaign={id}` — **needs the openers deep-link pattern** (gap, below) |
+| Diagnostic gallery | `processed_campaign_id` (+ token presence — tier 1) | `…/campaigns/{id}?tab=gallery` |
+| Deliverables | `processed_campaign_id` (+ presence count — tier 1) | `…/campaigns/{id}?tab=deliverables` or `/deliverables/{id}` |
+| Demo storefront | `demo_tenant_id` on the campaign (**not decorated — tier 1**) | `…/campaigns/{id}/demo` |
+| Siblings | `processed_campaign_id` | `…/campaigns/{id}?tab=siblings` |
+| Discovery source | `source_campaign_id`, `intelligence_run_id` | `…/campaigns/{source_campaign_id}` / run viewer |
+
+All twelve campaign-detail tabs are already deep-linkable via `?tab=`
+(`PIPELINE_TABS` in `CampaignDetailClient.tsx` — overview, audits, files,
+deliverables, prompts, checklist, outreach-prep, history, lineage, cascade,
+gallery, siblings). The openers workspace already accepts `?campaign=`.
+
+**Two tiers of work:**
+
+- **Tier 0 — zero backend.** Every chip above derives from fields the queue
+  decoration already returns (`seed_id`, `processed_campaign_id`,
+  `campaign_stage`, `campaign_has_business_audit`, `next_touch_at`,
+  `source_campaign_id`). For `?tab=` chips, "available" only needs the
+  campaign id — the tab's own empty state covers "nothing there yet."
+  Ship as a single `ProspectArtifactChips` component rendered per row,
+  reused by the promote panel (which today hand-builds its campaign/audit/
+  seed links), the due-today list, and future stage-distribution drill rows.
+  The existing `audited`/`no audit` badge simply becomes a link — it is
+  already the exact two-state chip the pattern wants.
+- **Tier 1 — one decoration pass.** Presence signals for gallery tokens
+  (`mkt_deliverable_preview_tokens`), deliverables
+  (`mkt_deliverables_list`), openers sent (`mkt_outreach_openers_list` /
+  `mkt_outreach_log`), and `demo_tenant_id` — extend `list()`'s
+  `includeCampaigns` batch query the same way the `auditDates` map works
+  (`$queryRaw` grouped by `campaign_id`), upgrading those chips from
+  "always available" to true present/absent states.
+- **Tier 1b — checklist status emission.** Checklists are data-driven:
+  `mkt_campaign_checklist_progress` holds per-(campaign, step) completion
+  rows, and step templates carry `stage_tag` — so each stage (`seek`,
+  `seed` once migration 280 lands, `preview_built`, …) can emit its own
+  completion fraction to the cockpit instead of a bare link. Two levels:
+  - **Cheap:** one `groupBy campaign_id` over progress rows
+    (`completed_at IS NOT NULL`) in the same batch pass → the chip reads
+    `checklist · 4 done`.
+  - **Full:** per-stage-tag fractions (`seek 3/5 · seed 2/4 ·
+    preview_built 0/3`) — numerator from progress joined to each step's
+    `stage_tag` (permanent-step tags are code constants), denominator from
+    the campaign's effective playbook's active steps grouped by tag plus
+    the code-defined permanent set. This is the level the dedicated
+    endpoint (§6.2) should emit — it's a per-campaign resolve, so batch it
+    by grouping campaigns on effective playbook rather than calling
+    `getCampaignChecklist` per row (N+1). Also emit **required-remaining at
+    current stage** — the soft-gate number (`requiredCompleted` /
+    `requiredTotal` filtered to `stage_tag` ≤ current stage per
+    `STAGE_PIPELINE_ORDER`) — which turns "stuck at seek" into
+    "seek, ready to advance."
+  - **Caveats:** permanent steps are stage-windowed
+    (`PERMANENT_STEP_STAGES`) — they leave the resolved view once the
+    campaign advances, though their progress rows persist. Decide whether
+    emission counts windowed-out steps (recommend yes for the seed wedge —
+    "was the seed work done" stays meaningful after the window closes;
+    this is also the checklist-side counterpart of `queue.seed_id`, which
+    partially bridges the §7 seed-signal gap). Denominators vary per
+    playbook, so emit fractions, not raw counts, and never cross-compare
+    them.
+
+**Frontend gaps the pattern exposes:**
+
+- `/follow-ups` (`FollowUpWorkspaceClient`) reads no `searchParams`, but it
+  doesn't need new plumbing — **copy the openers pattern, ~15 lines.** Both
+  workspaces are built on the same shape: a campaign `<select>` driving a
+  `selectedCampaignId` state variable, with an effect that resolves data off
+  the selection. Openers already implements deep-linking: `page.tsx` passes
+  `searchParams.campaign` → `initialCampaignId` prop → an effect
+  (`OpenerWorkspaceClient` ~line 216) finds the id in the loaded campaign
+  list and calls `setSelectedCampaignId(initialCampaignId)` — prefill the
+  dropdown, let the existing selection-driven flow execute. Follow-ups needs
+  the identical wiring: `page.tsx` accepts `{ campaign?: string }` in
+  searchParams, passes `initialCampaignId` to `FollowUpWorkspaceClient`, and
+  one `useEffect` sets `selectedCampaignId` once campaigns load. The
+  resolution effect (`listFollowUps(selectedCampaignId)`) then runs
+  unchanged.
+- The queue page has no per-row anchor — low value, since the cockpit's own
+  rows ARE the queue surface for tree prospects. Skip unless needed.
+- Lock semantics mirror coverage's locked-discovery chip: artifact chips
+  stay locked until `processed_campaign_id` exists — pre-graduation
+  prospects legitimately only have seed + queue-row artifacts.
+
+Mutations stay out of the matrix: promote, create-campaign, and dismiss
+remain explicit actions in the promote panel, not chips — the matrix is
+read-only navigation, consistent with the observer role.
+
+### 6.5 PG scope flex (ships after stage awareness)
 
 - `promoteToProvingGround`: accept `scope?: 'city' | 'category'` (default
   `city`); pass through to `createCampaign`. **The hard requirements must
@@ -618,7 +741,7 @@ Each stage count links to a filtered campaign list (`?provingGround=<id>
   lost. Also requires a numbered migration (column + FK + index) per the
   migration discipline in AGENTS.md.
 
-### 6.5 What this does NOT change
+### 6.6 What this does NOT change
 
 - No new stage on the proving ground.
 - No transition map entry for the proving ground.
@@ -709,6 +832,30 @@ sketch omitted:
       parent-linked business campaigns, combinable with `stage`.
 - [ ] `CampaignListClient` reads `?provingGround=<id>&stage=<stage>`.
 
+**Click-to-open matrix (§6.4):**
+- [ ] `ProspectArtifactChips` renders locked/available states from decorated
+      fields only (tier 0): seed, campaign, audit, checklist, outreach-prep,
+      openers, gallery, deliverables, siblings.
+- [ ] Locked chips show unlock tooltips; pre-graduation rows show only seed
+      + queue-visible chips.
+- [ ] The existing `audited`/`no audit` badge in the promote panel is
+      replaced by the audit chip (links `?tab=audits`).
+- [ ] Chips navigate only — no mutation affordances in the matrix.
+- [ ] Tier 1 (when needed): decoration pass adds gallery-token, deliverable,
+      opener counts + `demo_tenant_id`, upgrading those chips to true
+      present/absent states.
+- [ ] `/follow-ups` gains `?campaign=` via the openers deep-link pattern —
+      `page.tsx` searchParams passthrough + one effect that sets
+      `selectedCampaignId` on load (~15 lines, no new plumbing).
+- [ ] Tier 1b: checklist chip emits progress — cheap version shows
+      completed count (one `groupBy` query); full version shows per-stage
+      fractions + required-remaining-at-current-stage (soft-gate number),
+      batched by effective playbook, not per-campaign `getCampaignChecklist`
+      calls.
+- [ ] Decide the windowed-step rule: permanent-step progress counts toward
+      emitted status even after the campaign leaves the stage window
+      (recommended for the seed wedge).
+
 **Scope flex (§6.4 — deferred):**
 - [ ] `promoteToProvingGround` accepts `scope='category'`; `city` requirement
       conditional on scope (new tests next to the provingGround.test.ts
@@ -781,6 +928,24 @@ place:
   `city`/`category` validation; full reader list for `proving_ground_id`.
 - §7: `seed` stage vs `queue.seed_id` semantic caveat (open decision D2).
 - §8: test plan & ship checklist added.
+
+### 9.2 Review changelog (v3 — click-to-open layer)
+
+- §4.3: navigation-vs-mutation boundary stated for the artifact matrix.
+- **§6.4 (new):** per-business artifact coverage — a prospects × artifacts
+  click-to-open chip matrix emulating the `/coverage` slot-state pattern.
+  Full verified link inventory (all 12 `?tab=` keys, `/openers?campaign=`,
+  presence-seed workspace, demo page), two-tier build (zero-backend chips
+  from decorated fields now; one decoration pass for presence counts
+  later), and the frontend gap it exposes (`/follow-ups` `?campaign=` — a
+  ~15-line copy of the openers `initialCampaignId` pattern; queue-row
+  anchor skipped).
+- §6.4/§6.5 renumbered → §6.5/§6.6 to make room.
+- §8: click-to-open checklist items.
+- §6.4 tier 1b: checklist status emission — per-stage-tag fractions from
+  `mkt_campaign_checklist_progress` + step `stage_tag`s, the
+  required-remaining soft-gate number, and the stage-window caveat for
+  permanent steps.
 
 Where this doc and the pre-implementation gap analysis diverge, the
 pre-implementation doc is canonical for decisions D1–D5; this doc is

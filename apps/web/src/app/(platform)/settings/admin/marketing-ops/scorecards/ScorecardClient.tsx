@@ -7,7 +7,7 @@ import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/Sug
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 
 const SCOPE_LABELS: Record<CampaignScope, string> = {

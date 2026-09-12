@@ -29,10 +29,33 @@ import directoryPresenceAdminService, {
 } from '@/services/DirectoryPresenceAdminService';
 import CampaignChecklistTab from '@/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignChecklistTab';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
+import ProspectArtifactChips from '@/components/marketing-ops/ProspectArtifactChips';
+import { STAGE_LABELS, STAGE_COLORS } from '@/components/marketing-ops/StageBadge';
 
 interface Props {
   campaignId: string;
 }
+
+interface StageDistribution {
+  totalInPipeline: number;
+  byStage: Record<string, number>;
+  stillInQueue: number;
+  seededPreGraduation: number;
+  dismissed: number;
+}
+
+// Canonical render order for the distribution chips — review pipeline,
+// intake/close stages, recovery pipeline, then terminal stages. Stage keys
+// outside this list (future stages) sort alphabetically at the end and
+// still render via the StageBadge fallback label.
+const STAGE_ORDER = [
+  'seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered',
+  'retainer_pitched', 'retainer_won', 'tenant_onboarded', 'closed',
+  'gbp_intake_submitted', 'review_setup_submitted',
+  'audit_identified', 'framework_preview_generated', 'outreach_dispatched',
+  'awaiting_owner_intake', 'intake_submitted', 'final_resolution_drafted',
+  'owner_approved', 'resolved_and_closed', 'lost', 'dead',
+];
 
 const GATE_LABELS: Record<string, string> = {
   G1: 'Trust',
@@ -109,6 +132,14 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [promoteResult, setPromoteResult] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState<string | null>(null);
 
+  // Stage distribution (stage-culture fit §6.2) — authoritative counts from
+  // the dedicated endpoint: includes dismissed rows, dedupes AC84 double
+  // graduations, and counts business grandchildren the queue can't see.
+  const [stageDist, setStageDist] = useState<StageDistribution | null>(null);
+  // The queue payload is capped at 200 rows — the promote list below can be
+  // partial even though the endpoint's distribution counts are complete.
+  const [queueTruncated, setQueueTruncated] = useState(false);
+
   // Per-row dismiss — removes a prospect from the promote list and the
   // worklist (status='dismissed'). Inline reason picker; rows already
   // promoted (seed_id set) are not dismissible here — the published listing
@@ -158,7 +189,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       const childList = camp.children ?? [];
       setChildren(childList);
       const ids = [campaignId, ...childList.map((c) => c.id)];
-      const [funnelReport, queue] = await Promise.all([
+      const [funnelReport, queue, dist] = await Promise.all([
         directoryPresenceAdminService.getCohortFunnel({ campaignIds: ids }),
         marketingOpsService.listProspectQueue({
           source_campaign_ids: ids,
@@ -169,8 +200,13 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           includeCampaigns: true,
           limit: 200,
         }),
+        // Read-only roll-up — non-blocking so the cockpit still renders if
+        // the endpoint rejects (e.g. non-PG campaign during dev).
+        marketingOpsService.getProvingGroundStageDistribution(campaignId).catch(() => null),
       ]);
       setFunnel(funnelReport);
+      setStageDist(dist);
+      setQueueTruncated(queue.entries.length >= 200);
       const sorted = queue.entries
         .filter((e) => e.seed_id && e.next_touch_at)
         .sort((a, b) => new Date(a.next_touch_at!).getTime() - new Date(b.next_touch_at!).getTime());
@@ -890,6 +926,65 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         </div>
       </div>
 
+      {/* Prospect pipeline — read-only stage distribution across the PG
+          tree's business campaigns (stage-culture fit §6.2/§6.4). Counts
+          come from the dedicated endpoint, so dismissed rows, AC84
+          duplicate graduations, and queue-invisible business grandchildren
+          are already correct; each stage chip drills into the filtered
+          campaign list. Navigation only — no stage transitions fire here. */}
+      {stageDist && (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <GitBranch className="w-4 h-4" /> Prospect pipeline
+              <span className="text-[10px] font-normal text-gray-400">
+                {stageDist.totalInPipeline} business campaign{stageDist.totalInPipeline !== 1 ? 's' : ''} in the tree
+              </span>
+            </h2>
+            <Link
+              href={`/settings/admin/marketing-ops/campaigns?proving_ground=${campaignId}`}
+              className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              all campaigns →
+            </Link>
+          </div>
+          {Object.keys(stageDist.byStage).length === 0 ? (
+            <p className="text-xs text-gray-400">
+              No graduated campaigns yet — promote prospects to the queue below, then graduate them to business campaigns.
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                ...STAGE_ORDER.filter((s) => stageDist.byStage[s] != null),
+                ...Object.keys(stageDist.byStage).filter((s) => !STAGE_ORDER.includes(s)).sort(),
+              ].map((stage) => (
+                <Link
+                  key={stage}
+                  href={`/settings/admin/marketing-ops/campaigns?proving_ground=${campaignId}&stage=${stage}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium hover:opacity-80 ${STAGE_COLORS[stage] ?? 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-gray-300'}`}
+                  title={`${STAGE_LABELS[stage] ?? stage} — open these campaigns in the filtered campaign list`}
+                >
+                  {STAGE_LABELS[stage] ?? stage}
+                  <span className="font-bold">{stageDist.byStage[stage]}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700 text-[10px] text-gray-500 dark:text-gray-400">
+            <span>{stageDist.stillInQueue} still in queue</span>
+            <span title="Queue prospects with a minted directory seed (queue.seed_id) but no business campaign yet — pre-graduation seeding is distinct from the campaign 'seed' stage">
+              · {stageDist.seededPreGraduation} seeded pre-graduation
+            </span>
+            <span>· {stageDist.dismissed} dismissed</span>
+            {queueTruncated && (
+              <span className="text-amber-600 dark:text-amber-400">
+                · queue list capped at 200 rows — counts above are authoritative, the promote list below may be partial
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Preflight checklist — PG-01 attaches directly, no triage needed */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Preflight checklist (PG-01)</h2>
@@ -998,7 +1093,6 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
               {promoteEntries.map((e) => {
                 const isHold = e.business_seek_priority === 'hold';
                 const promoted = !!e.seed_id;
-                const audited = e.campaign_has_business_audit === true;
                 const checked = promoted || promoteSelected.has(e.id);
                 return (
                   <li
@@ -1071,26 +1165,20 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                                 className="text-blue-600 dark:text-blue-400 hover:underline"
                                 title="Open the prospect's campaign"
                               >
-                                campaign{e.campaign_stage ? ` · ${e.campaign_stage}` : ''}
+                                campaign{e.campaign_stage ? ` · ${STAGE_LABELS[e.campaign_stage] ?? e.campaign_stage}` : ''}
                               </Link>
-                              {audited ? (
-                                <span
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800"
-                                  title={e.business_audit_at ? `Business audit ${new Date(e.business_audit_at).toLocaleDateString()}` : 'Business audit on file'}
-                                >
-                                  audited
-                                </span>
-                              ) : (
-                                <span
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
-                                  title="No business_analysis audit yet — run the audit before seeding for richer listing data"
-                                >
-                                  no audit
-                                </span>
-                              )}
+                              <ProspectArtifactChips
+                                processedCampaignId={e.processed_campaign_id}
+                                hasBusinessAudit={e.campaign_has_business_audit}
+                                businessAuditAt={e.business_audit_at}
+                                checklistCompleted={e.checklist_completed}
+                              />
                             </>
                           ) : (
-                            <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                            <>
+                              <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                              <ProspectArtifactChips processedCampaignId={null} />
+                            </>
                           )}
                           {promoted && e.seed_id && (
                             <>

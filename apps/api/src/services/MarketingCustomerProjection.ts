@@ -42,7 +42,7 @@ export function mapCustomerStatus(
   hasActiveSubscription: boolean = false,
 ): CustomerStatusInfo | null {
   // Hidden stages — never exposed to the customer
-  const hiddenStages = ['seek', 'preview_built', 'shown', 'lost', 'dead'];
+  const hiddenStages = ['seek', 'seed', 'preview_built', 'shown', 'lost', 'dead'];
   if (hiddenStages.includes(stage)) return null;
 
   // Active subscription/retainer takes priority

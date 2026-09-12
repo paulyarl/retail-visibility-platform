@@ -326,7 +326,7 @@ const campaignCreateSchema = campaignBaseSchema
   });
 
 const campaignUpdateSchema = campaignBaseSchema.partial().extend({
-  stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
+  stage: z.enum(['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
   tone: z.string().max(50).optional(),
   retainer: z.enum(['Fast', 'Medium', 'Slow']).nullable().optional(),
   attributes: z.array(z.string()).optional(),
@@ -349,7 +349,7 @@ const campaignUpdateSchema = campaignBaseSchema.partial().extend({
 });
 
 const stageTransitionSchema = z.object({
-  to_stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']),
+  to_stage: z.enum(['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']),
   notes: z.string().optional(),
   trigger_type: z.enum(['manual', 'automated', 'system']).optional(),
   acknowledge_incomplete: z.boolean().optional(),
@@ -851,7 +851,7 @@ const playbookReorderSchema = z.object({
 const checklistStepTypeEnum = z.enum(['manual', 'url_check', 'ai_prompt', 'deliverable', 'outreach', 'credentials']);
 
 const checklistStageTagEnum = z.enum([
-  'seek', 'preview_built', 'shown', 'paid', 'delivered',
+  'seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered',
   'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded',
 ]);
 
@@ -937,7 +937,7 @@ const createSiblingSchema = z.object({
 );
 
 const cycleEngagementSchema = z.object({
-  reset_to_stage: z.enum(['seek', 'preview_built']).optional(),
+  reset_to_stage: z.enum(['seek', 'seed', 'preview_built']).optional(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -1033,6 +1033,9 @@ router.get('/', async (req: any, res: Response) => {
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 50,
       intelligenceCampaignKind: req.query.intelligence_campaign_kind,
+      // Proving-ground drill-down: business campaigns in this PG's tree
+      // (queue-graduated + direct parent-linked).
+      provingGroundId: req.query.proving_ground_id as string | undefined,
     }, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
@@ -1211,6 +1214,21 @@ router.post('/:campaignId/promote-to-proving-ground', async (req: any, res: Resp
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /:campaignId/stage-distribution — read-only stage roll-up for a
+// proving ground (PG stage-culture fit §6.2). Gated to
+// campaign_category='proving_ground' inside the service.
+router.get('/:campaignId/stage-distribution', async (req: any, res: Response) => {
+  try {
+    const result = await MarketingCampaignService.getProvingGroundStageDistribution(
+      req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

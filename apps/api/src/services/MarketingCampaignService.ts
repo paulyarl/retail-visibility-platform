@@ -57,6 +57,7 @@ const MAX_SECONDARY_CATEGORIES = 9;
 
 export type CampaignStage =
   | 'seek'
+  | 'seed'
   | 'preview_built'
   | 'shown'
   | 'paid'
@@ -99,8 +100,12 @@ export type CampaignOrigin = 'prospect' | 'upsell';
 export type CampaignScope = 'business' | 'category' | 'city' | 'intelligence';
 
 // Review track — existing sales-pipeline machine (unchanged).
+// 'seed' (Migration 280 / CAMPAIGN_SEED_STAGE_SPRINT_PLAN) splits the old
+// seek → preview_built edge: seek owns discovery+audit, seed owns the
+// good-faith wedge (listing → QC → publish → claim token → invite).
 const REVIEW_TRANSITIONS: Record<string, string[]> = {
-  seek:           ['preview_built', 'dead'],
+  seek:           ['seed', 'dead'],
+  seed:           ['preview_built', 'dead'],
   preview_built:  ['shown', 'dead'],
   // 'dead' is reachable from shown so an operator can kill a campaign when a
   // permanently-closed business is discovered mid-outreach (verify-operating-
@@ -230,6 +235,7 @@ function normalizePlatformValue(value: string | null | undefined): string {
 }
 
 const STAGE_DATE_FIELDS: Record<string, string> = {
+  seed:             'date_seed',
   preview_built:    'date_preview_built',
   shown:            'date_shown',
   paid:             'date_paid',
@@ -435,6 +441,10 @@ export interface CampaignListFilters {
   limit?: number;
   parentCampaignId?: string;
   businessProspectId?: string;
+  // Proving-ground drill-down: business campaigns belonging to this PG's
+  // tree (queue-graduated + direct parent-linked). Resolves through
+  // mkt_prospect_queue + parent_campaign_id, not a direct column.
+  provingGroundId?: string;
   // Migration 201 — filter intelligence-scope campaigns by kind
   intelligenceCampaignKind?: 'discovery' | 'establishment';
 }
@@ -1207,46 +1217,68 @@ export class MarketingCampaignService extends BaseService {
     campaignId: string,
     ctx?: RequestCtx,
   ): Promise<{ id: string; business_name: string | null; title?: string | null; category?: string | null; city?: string | null; scope: string; stage: string } | null> {
+    const pgSelect = {
+      id: true, business_name: true, title: true, category: true, city: true,
+      scope: true, stage: true, campaign_category: true,
+    } as const;
     try {
       const queueEntry = await this.prisma.mkt_prospect_queue.findFirst({
         where: { processed_campaign_id: campaignId },
         select: { source_campaign_id: true },
       });
-      if (!queueEntry?.source_campaign_id) return null;
 
-      const source = await this.prisma.mkt_campaigns_list.findUnique({
-        where: { id: queueEntry.source_campaign_id },
-        select: {
-          id: true, scope: true, campaign_category: true, parent_campaign_id: true,
-          business_name: true, title: true, category: true, city: true, stage: true,
-        },
-      });
-      if (!source) return null;
+      if (queueEntry?.source_campaign_id) {
+        const source = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: queueEntry.source_campaign_id },
+          select: {
+            id: true, scope: true, campaign_category: true, parent_campaign_id: true,
+            business_name: true, title: true, category: true, city: true, stage: true,
+          },
+        });
 
-      const pgSelect = {
-        id: true, business_name: true, title: true, category: true, city: true,
-        scope: true, stage: true, campaign_category: true,
-      } as const;
+        // Source is the PG itself (city/category scope proving ground).
+        if (source?.campaign_category === 'proving_ground') {
+          return {
+            id: source.id, business_name: source.business_name, title: source.title,
+            category: source.category, city: source.city, scope: source.scope, stage: source.stage,
+          };
+        }
 
-      // Source is the PG itself (city/category scope proving ground).
-      if (source.campaign_category === 'proving_ground') {
-        return {
-          id: source.id, business_name: source.business_name, title: source.title,
-          category: source.category, city: source.city, scope: source.scope, stage: source.stage,
-        };
+        // Source is an intelligence discovery child of a PG — resolve the parent
+        // and verify it is actually a proving ground before surfacing the link.
+        if (source?.parent_campaign_id) {
+          const parent = await this.prisma.mkt_campaigns_list.findUnique({
+            where: { id: source.parent_campaign_id },
+            select: pgSelect,
+          });
+          if (parent?.campaign_category === 'proving_ground') {
+            const { campaign_category, ...lineage } = parent as any;
+            return lineage;
+          }
+        }
       }
 
-      // Source is an intelligence discovery child of a PG — resolve the parent
-      // and verify it is actually a proving ground before surfacing the link.
-      if (source.parent_campaign_id) {
-        const parent = await this.prisma.mkt_campaigns_list.findUnique({
-          where: { id: source.parent_campaign_id },
-          select: pgSelect,
+      // Parent-chain fallback: business campaigns linked to the tree via
+      // parent_campaign_id have no queue entry — derive flows create
+      // business grandchildren under intelligence children, and mixed-PG
+      // direct attach puts business campaigns straight under the PG.
+      // Walk up to 2 hops (campaign → parent → grandparent).
+      const self = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { parent_campaign_id: true },
+      });
+      let hopId = self?.parent_campaign_id ?? null;
+      for (let depth = 0; depth < 2 && hopId; depth++) {
+        const hop = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: hopId },
+          select: { ...pgSelect, parent_campaign_id: true },
         });
-        if (parent?.campaign_category === 'proving_ground') {
-          const { campaign_category, ...lineage } = parent as any;
+        if (!hop) break;
+        if (hop.campaign_category === 'proving_ground') {
+          const { campaign_category, parent_campaign_id, ...lineage } = hop as any;
           return lineage;
         }
+        hopId = (hop as any).parent_campaign_id ?? null;
       }
 
       return null;
@@ -1256,6 +1288,146 @@ export class MarketingCampaignService extends BaseService {
       });
       return null;
     }
+  }
+
+  /**
+   * Read-only stage distribution for a proving ground (spec: PG stage-culture
+   * fit analysis §6.2). Aggregates the `stage` column of business-scope
+   * campaigns spawned from the PG's tree — queue-graduated campaigns
+   * (queue.source_campaign_id → processed_campaign_id) UNION direct
+   * parent_campaign_id children (derive flows / future direct-attach
+   * business children never touch the queue).
+   *
+   * stillInQueue / seededPreGraduation are computed from queue STATUS
+   * buckets, not subtraction — dismiss() has no status guard, so a
+   * campaign_created row can be dismissed while keeping
+   * processed_campaign_id and a subtraction would double-count.
+   */
+  async getProvingGroundStageDistribution(
+    provingGroundId: string,
+    ctx?: RequestCtx,
+  ): Promise<{
+    totalInPipeline: number;
+    byStage: Record<string, number>;
+    stillInQueue: number;
+    seededPreGraduation: number;
+    dismissed: number;
+  }> {
+    try {
+      const pg = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: provingGroundId },
+        select: { id: true, campaign_category: true },
+      });
+      if (!pg) {
+        throw new NotFoundError(`Proving ground ${provingGroundId} not found`);
+      }
+      if ((pg.campaign_category as string | null) !== 'proving_ground') {
+        throw new ValidationError('not_a_proving_ground');
+      }
+
+      // The tree: PG + direct children. Business grandchildren linked via
+      // parent_campaign_id are captured below through the treeIds union.
+      const children = await this.prisma.mkt_campaigns_list.findMany({
+        where: { parent_campaign_id: provingGroundId },
+        select: { id: true },
+      });
+      const treeIds = [provingGroundId, ...children.map((c) => c.id)];
+
+      // Queue-graduated campaigns — dedupe on processed_campaign_id: AC84's
+      // campaign_exists path can mark a second queue row campaign_created
+      // against the SAME campaign.
+      const queueEntries = await this.prisma.mkt_prospect_queue.findMany({
+        where: {
+          source_campaign_id: { in: treeIds },
+          processed_campaign_id: { not: null },
+        },
+        select: { processed_campaign_id: true },
+      });
+      const campaignIds = new Set(
+        queueEntries
+          .map((e) => e.processed_campaign_id)
+          .filter((id): id is string => id != null),
+      );
+
+      // Direct parent-linked business campaigns — queue-invisible lineage.
+      const directChildren = await this.prisma.mkt_campaigns_list.findMany({
+        where: { parent_campaign_id: { in: treeIds }, scope: 'business' },
+        select: { id: true },
+      });
+      directChildren.forEach((c) => campaignIds.add(c.id));
+
+      const byStage: Record<string, number> = {};
+      if (campaignIds.size > 0) {
+        const stageGroups = await this.prisma.mkt_campaigns_list.groupBy({
+          by: ['stage'],
+          where: { id: { in: [...campaignIds] } },
+          _count: { id: true },
+        });
+        stageGroups.forEach((g) => { byStage[g.stage] = g._count.id; });
+      }
+
+      const OPEN_QUEUE_STATUSES = ['queued', 'hold', 'in_thread', 'verify_then_outreach'];
+      const [stillInQueue, seededPreGraduation, dismissed] = await Promise.all([
+        this.prisma.mkt_prospect_queue.count({
+          where: { source_campaign_id: { in: treeIds }, status: { in: OPEN_QUEUE_STATUSES } },
+        }),
+        this.prisma.mkt_prospect_queue.count({
+          where: { source_campaign_id: { in: treeIds }, status: { in: OPEN_QUEUE_STATUSES }, seed_id: { not: null } },
+        }),
+        this.prisma.mkt_prospect_queue.count({
+          where: { source_campaign_id: { in: treeIds }, status: 'dismissed' },
+        }),
+      ]);
+
+      return {
+        totalInPipeline: campaignIds.size,
+        byStage,
+        stillInQueue,
+        seededPreGraduation,
+        dismissed,
+      };
+    } catch (error) {
+      logger.error('getProvingGroundStageDistribution failed', ctx, {
+        error: (error as Error).message, provingGroundId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Resolve the campaign ids belonging to a proving ground's tree — the
+   * same union as getProvingGroundStageDistribution: queue-graduated
+   * business campaigns plus direct parent-linked business children. Used
+   * by the provingGroundId list filter (drill-down from the cockpit's
+   * stage distribution).
+   */
+  private async resolveProvingGroundCampaignIds(
+    provingGroundId: string,
+  ): Promise<Set<string>> {
+    const children = await this.prisma.mkt_campaigns_list.findMany({
+      where: { parent_campaign_id: provingGroundId },
+      select: { id: true },
+    });
+    const treeIds = [provingGroundId, ...children.map((c) => c.id)];
+
+    const [queueEntries, directChildren] = await Promise.all([
+      this.prisma.mkt_prospect_queue.findMany({
+        where: {
+          source_campaign_id: { in: treeIds },
+          processed_campaign_id: { not: null },
+        },
+        select: { processed_campaign_id: true },
+      }),
+      this.prisma.mkt_campaigns_list.findMany({
+        where: { parent_campaign_id: { in: treeIds }, scope: 'business' },
+        select: { id: true },
+      }),
+    ]);
+
+    const ids = new Set<string>();
+    queueEntries.forEach((e) => { if (e.processed_campaign_id) ids.add(e.processed_campaign_id); });
+    directChildren.forEach((c) => ids.add(c.id));
+    return ids;
   }
 
   /**
@@ -1671,6 +1843,12 @@ export class MarketingCampaignService extends BaseService {
     if (filters.parentCampaignId) where.parent_campaign_id = filters.parentCampaignId;
     if (filters.businessProspectId) where.business_prospect_id = filters.businessProspectId;
     if (filters.intelligenceCampaignKind) where.intelligence_campaign_kind = filters.intelligenceCampaignKind;
+    if (filters.provingGroundId) {
+      const pgIds = await this.resolveProvingGroundCampaignIds(filters.provingGroundId);
+      // Explicit empty set — `id: { in: [] }` is a valid never-match in
+      // Prisma, so a PG with no graduated prospects returns an empty page.
+      where.id = { in: [...pgIds] };
+    }
     if (filters.attributes && filters.attributes.length > 0) {
       where.attributes = { hasEvery: filters.attributes };
     }
@@ -2001,14 +2179,16 @@ export class MarketingCampaignService extends BaseService {
         throw new Error(`Invalid stage transition: ${fromStage} → ${toStage}`);
       }
 
-      // Best-effort GBP enrichment on seek → preview_built when no phone AND
+      // Best-effort GBP enrichment on seek → seed when no phone AND
       // no website_url are present. Soft gate: enrichment failure must NOT
       // block the transition (some campaigns advance on in-person context).
-      if (fromStage === 'seek' && toStage === 'preview_built' && !campaign.phone && !campaign.website_url) {
+      // The audit-informed contact data should land before seeding, not
+      // after (moved from seek → preview_built by the seed-stage sprint).
+      if (fromStage === 'seek' && toStage === 'seed' && !campaign.phone && !campaign.website_url) {
         try {
           const { MarketingGbpEnhancerService } = await import('./MarketingGbpEnhancerService.js');
           await MarketingGbpEnhancerService.getInstance().populateContactFields(campaignId, ctx);
-          logger.info('Best-effort GBP enrichment completed for seek → preview_built', ctx, { campaignId });
+          logger.info('Best-effort GBP enrichment completed for seek → seed', ctx, { campaignId });
         } catch (enrichError) {
           logger.warn('Best-effort GBP enrichment failed, proceeding with transition', ctx, {
             campaignId,
@@ -2208,6 +2388,7 @@ export class MarketingCampaignService extends BaseService {
    */
   private static readonly TRACK_REMAP_REVIEW_TO_RECOVERY: Record<string, string | null> = {
     seek: 'audit_identified',
+    seed: 'audit_identified',
     preview_built: 'framework_preview_generated',
     shown: 'outreach_dispatched',
     // paid and later → blocked (return null)
@@ -2457,7 +2638,7 @@ export class MarketingCampaignService extends BaseService {
 
       const totalCampaigns = await this.prisma.mkt_campaigns_list.count();
 
-      const activeStages = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched'];
+      const activeStages = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched'];
       const activeCampaigns = await this.prisma.mkt_campaigns_list.count({
         where: { stage: { in: activeStages } },
       });

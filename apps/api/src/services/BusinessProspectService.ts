@@ -42,7 +42,7 @@ export interface CreateSiblingInput {
 
 export interface CycleInput {
   campaignId: string;
-  resetToStage?: 'seek' | 'preview_built';
+  resetToStage?: 'seek' | 'seed' | 'preview_built';
   notes?: string;
   changedBy?: string;
 }
@@ -474,6 +474,7 @@ export class BusinessProspectService extends BaseService {
         stage: targetStage,
         stage_entered_at: new Date(),
         date_entered: new Date(),
+        date_seed: targetStage === 'seed' ? campaign.date_seed : null,
         date_preview_built: targetStage === 'preview_built' ? campaign.date_preview_built : null,
         date_shown: null,
         date_paid: null,

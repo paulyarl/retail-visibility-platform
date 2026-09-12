@@ -3408,6 +3408,7 @@ model mkt_campaigns_list {
   intelligence_run_id                                                             String?                              @db.VarChar(64)
   gap_log                                                                         Json?
   secondary_categories                                                            String[]                             @default([])
+  date_seed                                                                       DateTime?                            @db.Timestamptz(6)
   directory_seed_campaign_links                                                   directory_seed_campaign_links[]
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
@@ -4271,6 +4272,7 @@ model mkt_prospect_queue {
 
   @@index([assigned_to], map: "idx_mkt_prospect_queue_assigned")
   @@index([processed_campaign_id], map: "idx_mkt_prospect_queue_processed_campaign")
+  @@index([source_campaign_id], map: "idx_mpq_source_campaign")
   @@index([status, priority(sort: Desc), signal_count(sort: Desc), created_at], map: "idx_mkt_prospect_queue_status_sort")
   @@index([seek_batch_id], map: "idx_mpq_seek_batch")
   @@index([status, next_touch_at], map: "idx_mpq_next_touch")

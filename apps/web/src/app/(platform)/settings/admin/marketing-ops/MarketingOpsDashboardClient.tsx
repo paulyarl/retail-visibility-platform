@@ -11,6 +11,7 @@ import ProspectQueueWidget from '@/components/marketing-ops/ProspectQueueWidget'
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
   seek: 'Seek',
+  seed: 'Seed',
   preview_built: 'Preview Built',
   shown: 'Shown',
   paid: 'Paid',
@@ -24,6 +25,7 @@ const STAGE_LABELS: Record<CampaignStage, string> = {
 
 const STAGE_COLORS: Record<CampaignStage, string> = {
   seek: 'bg-blue-100 text-blue-800',
+  seed: 'bg-violet-100 text-violet-800',
   preview_built: 'bg-indigo-100 text-indigo-800',
   shown: 'bg-cyan-100 text-cyan-800',
   paid: 'bg-green-100 text-green-800',
@@ -35,7 +37,7 @@ const STAGE_COLORS: Record<CampaignStage, string> = {
   tenant_onboarded: 'bg-teal-100 text-teal-800',
 };
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'tenant_onboarded'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'tenant_onboarded'];
 
 function SourceBreakdown({ title, data }: { title: string; data: Record<string, number> }) {
   const entries = Object.entries(data || {});

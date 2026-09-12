@@ -58,7 +58,14 @@ const FOLLOWUP_TYPE_LABELS: Record<FollowUpType, { label: string; color: string;
   },
 };
 
-export default function FollowUpWorkspaceClient() {
+interface Props {
+  /** Deep-link prefill (?campaign=<id>) — the openers pattern: selects the
+   *  campaign once the list loads, which fires the existing resolution
+   *  effect automatically. Used by the PG cockpit's artifact chips (§6.4). */
+  initialCampaignId?: string;
+}
+
+export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [followUps, setFollowUps] = useState<OutreachFollowUp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +125,19 @@ export default function FollowUpWorkspaceClient() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Apply the ?campaign= URL param after campaigns load — mirrors
+  // OpenerWorkspaceClient's appliedUrlParams effect. Setting
+  // selectedCampaignId triggers fetchResolution + listFollowUps below, so
+  // the deep link lands fully resolved.
+  const [appliedUrlParams, setAppliedUrlParams] = useState(false);
+  useEffect(() => {
+    if (appliedUrlParams || loading) return;
+    if (initialCampaignId && campaigns.some((c) => c.id === initialCampaignId)) {
+      setSelectedCampaignId(initialCampaignId);
+    }
+    setAppliedUrlParams(true);
+  }, [appliedUrlParams, loading, campaigns, initialCampaignId]);
 
   // Prefill operator name from branding config (same as opener workspace).
   useEffect(() => {

@@ -433,7 +433,7 @@ export class ReviewResponseService extends BaseService {
       if (!campaign) return;
 
       const currentStage = campaign.stage as string;
-      const PRE_PAID_STAGES = ['seek', 'preview_built', 'shown'];
+      const PRE_PAID_STAGES = ['seek', 'seed', 'preview_built', 'shown'];
       if (!PRE_PAID_STAGES.includes(currentStage)) {
         logger.info('Review response paid conversion: campaign not in pre-paid stage, skipping stage transition', ctx, {
           pipelineId, campaignId: pipeline.campaign_id, currentStage,

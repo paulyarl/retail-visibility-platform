@@ -51,7 +51,8 @@ describe('review track transitions (regression)', () => {
   it('transitionsFor(review_management) returns the existing map unchanged', () => {
     const map = transitionsFor('review_management');
     expect(map).toEqual({
-      seek:             ['preview_built', 'dead'],
+      seek:             ['seed', 'dead'],
+      seed:             ['preview_built', 'dead'],
       preview_built:    ['shown', 'dead'],
       shown:            ['paid', 'lost', 'dead', 'tenant_onboarded'],
       paid:             ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
@@ -75,7 +76,9 @@ describe('review track transitions (regression)', () => {
   });
 
   it('isValidTransition uses review map by default', () => {
-    expect(service.isValidTransition('seek', 'preview_built')).toBe(true);
+    expect(service.isValidTransition('seek', 'seed')).toBe(true);
+    expect(service.isValidTransition('seed', 'preview_built')).toBe(true);
+    expect(service.isValidTransition('seek', 'preview_built')).toBe(false);
     expect(service.isValidTransition('seek', 'paid')).toBe(false);
     expect(service.isValidTransition('delivered', 'closed')).toBe(true);
     expect(service.isValidTransition('lost', 'seek')).toBe(true);
@@ -241,11 +244,11 @@ describe('transitionStage reads campaign_category', () => {
 
     const result = await service.transitionStage({
       campaignId: 'mcamp-4',
-      toStage: 'preview_built',
+      toStage: 'seed',
       triggerType: 'manual',
     });
 
-    expect(result.stage).toBe('preview_built');
+    expect(result.stage).toBe('seed');
   });
 });
 
