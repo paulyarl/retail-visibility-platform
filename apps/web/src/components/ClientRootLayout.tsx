@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { QueryClientWrapper } from "@/components/QueryClientWrapper";
-import dynamic from "next/dynamic";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { PlatformThemeProvider } from "@/contexts/PlatformThemeProvider";
 import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
@@ -20,11 +20,6 @@ import { Toaster } from "@/components/ui/Toaster";
 import { UTMTracker } from "@/components/tracking/UTMTracker";
 import { MetaPixel } from "@/components/tracking/MetaPixel";
 import type { ServerResolvedAuth } from "@/components/tenant/ServerResolvedContextProvider";
-
-const ThemeProvider = dynamic(
-  () => import("@/components/ThemeProvider").then((mod) => mod.ThemeProvider),
-  { ssr: false }
-);
 
 interface ClientRootLayoutProps {
   children: React.ReactNode;
