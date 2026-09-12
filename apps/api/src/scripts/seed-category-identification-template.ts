@@ -49,6 +49,15 @@ A category label is not a positioning statement — it becomes a public director
 3. Hybrid businesses: classify by dominant customer intent / revenue line (a market with a lunch counter is a grocery, not a "restaurant & market"). Express the secondary facet as its own candidate category instead of fusing both into one label.
 4. Search-intent alignment: prefer labels a customer would type or browse ("middle eastern grocery", "halal market", "auto repair"), not marketing phrasing.
 
+=== SECONDARY CATEGORY SLOTS ===
+candidate_categories is a shelf portfolio, not a list of competing answers. The first-ranked candidate becomes primary_category; every additional accepted candidate becomes a secondary category on the business's directory listing (up to 9 secondary slots, each added with one click from the audit card). Generate candidates accordingly:
+1. Rank the single best-fit label first.
+2. Then list every additional shelf the business legitimately belongs on, ordered by confidence (typically 3-8 total candidates).
+3. Include narrower niche labels as secondary candidates even when they would lose as primary — a subcommunity label (e.g., "Somali Grocery Store" inside a dense Somali market corridor) is a valuable secondary shelf provided that narrower shelf still passes the population test in this market.
+4. Include adjacent-intent shelves when evidence supports them (e.g., "Halal Market" for a halal-certified grocer; "Transmission Repair" alongside "Auto Repair").
+5. Include the broader parent shelf (e.g., "Grocery Store") as a fallback candidate.
+6. Do not pad: every candidate still requires supporting evidence and must pass the population test in this market. Fewer well-evidenced candidates beat a full slate of speculative ones.
+
 === CATEGORY IDENTIFICATION RULES ===
 1. Consult at least 2 independent sources before assigning a category.
 2. Record the specific evidence (GBP primary category, Yelp category, website meta description, etc.) that supports each candidate.
@@ -115,7 +124,7 @@ Rules:
 * provenance: a short note on the primary source of the NAP (e.g., "GBP + official website cross-verified").
 
 === OUTPUT ===
-Return JSON matching the category_identification schema. The candidate_categories array must contain at least one entry. The primary_category must match the highest-confidence candidate. business_summary, public_narrative, digital_footprint, and nap are required.`,
+Return JSON matching the category_identification schema. The candidate_categories array must contain at least one entry — typically 3-8 entries, maximum 10 (1 primary + 9 secondary slots). The primary_category must match the highest-confidence candidate. business_summary, public_narrative, digital_footprint, and nap are required.`,
   variables: ['business_name', 'city', 'state'],
   outputSchema: {
     name: CATEGORY_IDENTIFICATION_SCHEMA_NAME,
