@@ -3,7 +3,7 @@ import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { clientLogger } from '@/lib/client-logger';
 
 export async function GET() {
-  const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const webUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || process.env.WEB_URL || 'http://localhost:3000';
 
   try {
     // Fetch all published listings

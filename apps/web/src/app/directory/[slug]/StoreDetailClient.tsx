@@ -257,7 +257,7 @@ export default function StoreDetailClient({
   ].filter(Boolean).join(', ');
 
   // Use NEXT_PUBLIC_ prefixed var for client-side access, fallback to window.location.origin
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/${identifier}`;
 
   if (listing.listingOrigin === 'directory_seed' || !directoryEntryOptions?.enabled) {

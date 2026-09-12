@@ -30,6 +30,7 @@ export default function PlacePageClient({
 
   const baseUrl =
     process.env.NEXT_PUBLIC_WEB_URL ||
+    process.env.NEXT_PUBLIC_APP_ORIGIN ||
     (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) ||
     'http://localhost:3000';
   const currentUrl = `${baseUrl}/place/${slug}`;

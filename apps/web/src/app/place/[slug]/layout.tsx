@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       listing.description ||
       listing.publicDisclaimer ||
       `${businessName} is listed on VisibleShelf from public information (address and phone). Claim this listing to verify and update details.`;
-    const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || process.env.WEB_URL || 'http://localhost:3000';
     const image = listing.logoUrl || `${baseUrl}/favicon.ico`;
     const title = listing.metaTitle || `${businessName} - VisibleShelf Place`;
     const canonicalUrl = `${baseUrl}/place/${listing.slug || slug}`;
