@@ -884,6 +884,78 @@ export class MarketingExecutionService extends BaseService {
         ? 'signal_triage'
         : 'category_audit';
 
+    // ─── Enrichment prompt: Gold Standard market reference injection ──────
+    // Directory enrichment campaigns (category or location scope) spawned
+    // from a Proving Ground parent get the PG's category gold-standard
+    // profile injected as a MARKET REFERENCE. For category enrichment, the
+    // campaign's own category is used. For location enrichment (category
+    // = '__location__' sentinel), the parent PG's category is used. The
+    // block gives the copywriter category-specific market context to shape
+    // SEO copy without surfacing internal profile data.
+    if (promptType === 'enrichment') {
+      const profileService = IntelligenceProfileService.getInstance();
+      const campaignCity = (input.campaign as any).city || null;
+      const campaignState = (input.campaign as any).state || null;
+
+      // Resolve the effective category for gold standard lookup.
+      // Category enrichment → campaign.category (real category).
+      // Location enrichment → '__location__' sentinel; use parent PG's category.
+      let enrichmentCategory = category;
+      if (category === '__location__' && input.campaign.parent_campaign_id) {
+        try {
+          const parent = await MarketingCampaignService.getCampaign(input.campaign.parent_campaign_id, ctx);
+          if (parent?.category) {
+            enrichmentCategory = parent.category;
+          }
+        } catch (err) {
+          logger.warn('Failed to load parent PG for enrichment category resolution', ctx, {
+            campaignId: input.campaign.id,
+            parentCampaignId: input.campaign.parent_campaign_id,
+            error: (err as Error).message,
+          });
+        }
+      }
+
+      if (enrichmentCategory && enrichmentCategory !== '__location__') {
+        const goldStandard = await profileService.resolveGoldStandard(
+          enrichmentCategory, null, campaignCity, campaignState, ctx,
+        );
+        if (goldStandard) {
+          const marketRefBlock = profileService.serializeGoldStandard(goldStandard, 'market_reference');
+          if (marketRefBlock) {
+            const amplified = baseRendered + '\n' + marketRefBlock;
+            logger.info('Gold standard market reference injected into enrichment prompt', ctx, {
+              campaignId: input.campaign.id,
+              enrichmentCategory,
+              goldStandardProfileId: goldStandard.id,
+              goldStandardProfileVersion: goldStandard.version,
+            });
+            return {
+              renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
+              resolution: {
+                profile_id: goldStandard.id,
+                profile_version: goldStandard.version,
+                intelligence_mode: 'profile',
+              },
+            };
+          }
+        } else {
+          logger.info('No gold standard profile for enrichment market reference (degraded)', ctx, {
+            campaignId: input.campaign.id,
+            enrichmentCategory,
+            city: campaignCity,
+            state: campaignState,
+          });
+        }
+      }
+
+      // No gold standard found — return base render + suffix.
+      return {
+        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+      };
+    }
+
     if (promptRole === 'none' || !hasCategory) {
       // No amplification — return byte-identical base render (plus suffix).
       return {

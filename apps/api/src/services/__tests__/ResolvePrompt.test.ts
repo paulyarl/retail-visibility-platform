@@ -670,4 +670,112 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).toContain('PRESENT on Facebook');
     });
   });
+
+  // ─── Enrichment prompt: Gold Standard market reference injection ──────
+  describe('enrichment prompt — gold standard market reference', () => {
+    const makeEnrichmentTemplate = (scope: string, body = 'CITY: {{city}} STATE: {{state}}') => ({
+      body,
+      prompt_type: 'enrichment',
+      scope,
+      output_schema: { name: 'location_enrichment' },
+    });
+
+    const makeCategoryEnrichmentCampaign = (category: string, city: string, state: string, parentCampaignId?: string) => ({
+      id: 'camp-enr-1',
+      scope: 'category',
+      category,
+      city,
+      state,
+      parent_campaign_id: parentCampaignId ?? null,
+    });
+
+    const makeLocationEnrichmentCampaign = (city: string, state: string, parentCampaignId?: string) => ({
+      id: 'camp-enr-loc-1',
+      scope: 'city',
+      category: '__location__',
+      city,
+      state,
+      parent_campaign_id: parentCampaignId ?? null,
+    });
+
+    it('category enrichment + gold standard → market reference block injected', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce({
+        id: 'gs-african-grocery',
+        version: 2,
+        category_name: 'African Grocery Store',
+        reference_city: null,
+        reference_state: null,
+      });
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce(
+        '=== GOLD STANDARD MARKET REFERENCE ===\nCategory: African Grocery Store\nDIRECTIVE: ...',
+      );
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeEnrichmentTemplate('category'),
+        campaign: makeCategoryEnrichmentCampaign('African Grocery Store', 'Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('GOLD STANDARD MARKET REFERENCE');
+      expect(resolution.profile_id).toBe('gs-african-grocery');
+      expect(resolution.intelligence_mode).toBe('profile');
+    });
+
+    it('location enrichment + PG parent → resolves gold standard from parent PG category', async () => {
+      mockCampaignService.getCampaign.mockResolvedValueOnce({
+        id: 'mcamp-pg-001',
+        category: 'African Grocery Store',
+        campaign_category: 'proving_ground',
+      });
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce({
+        id: 'gs-african-grocery',
+        version: 2,
+        category_name: 'African Grocery Store',
+        reference_city: 'Indianapolis',
+        reference_state: 'IN',
+      });
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce(
+        '=== GOLD STANDARD MARKET REFERENCE ===\nCategory: African Grocery Store\nMarket scope: Indianapolis, IN',
+      );
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeEnrichmentTemplate('city'),
+        campaign: makeLocationEnrichmentCampaign('Indianapolis', 'IN', 'mcamp-pg-001'),
+        variables: undefined,
+      });
+
+      expect(mockCampaignService.getCampaign).toHaveBeenCalledWith('mcamp-pg-001', undefined);
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith(
+        'African Grocery Store', null, 'Indianapolis', 'IN', undefined,
+      );
+      expect(renderedPrompt).toContain('GOLD STANDARD MARKET REFERENCE');
+      expect(resolution.profile_id).toBe('gs-african-grocery');
+    });
+
+    it('enrichment + no gold standard → base render only, intelligence_mode none', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeEnrichmentTemplate('category'),
+        campaign: makeCategoryEnrichmentCampaign('African Grocery Store', 'Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('GOLD STANDARD');
+      expect(resolution.profile_id).toBeNull();
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('location enrichment without PG parent → no gold standard lookup, base render only', async () => {
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeEnrichmentTemplate('city'),
+        campaign: makeLocationEnrichmentCampaign('Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolveGoldStandard).not.toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('GOLD STANDARD');
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+  });
 });

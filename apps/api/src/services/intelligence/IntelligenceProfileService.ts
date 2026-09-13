@@ -71,7 +71,7 @@ export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 
  *     intelligence_platform = 'google' rates candidates against google-specific
  *     expected fields.
  */
-export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery_benchmark';
+export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery_benchmark' | 'market_reference';
 
 /**
  * Maximum number of pattern exemplars emitted PER PLATFORM when injecting a
@@ -2038,6 +2038,8 @@ export class IntelligenceProfileService extends BaseService {
       ? 'TARGET'
       : role === 'discovery_benchmark'
       ? 'DISCOVERY BENCHMARK'
+      : role === 'market_reference'
+      ? 'MARKET REFERENCE'
       : 'DISCOVERY CRITERIA';
     const roleAction = role === 'benchmark'
       ? 'Compare the business\'s actual profile against these expected fields and quality gates. Flag any field where the business\'s actual value differs from the expected value as a gap.'
@@ -2045,6 +2047,8 @@ export class IntelligenceProfileService extends BaseService {
       ? 'Generate fix instructions that move the business\'s profile toward these expected field values. Use the pattern exemplar as the concrete adaptation source.'
       : role === 'discovery_benchmark'
       ? 'Rate each discovered candidate against these established expected fields and quality gates. For each candidate, evaluate per-platform: a candidate may meet the gold standard on one platform but fail on another. This evaluation is informational and must follow the surrounding focus directive. It must not determine prospect eligibility by itself: in EMERGING focus, gold-standard gaps are opportunity signals rather than disqualifiers, while in COMPETITIVE focus, established leaders remain in scope. Pattern Exemplars establish the high reference bar for comparison in both focuses; they are not automatically candidate-selection targets in this shared block. In EMERGING focus, lower quality means lower digital-profile quality or lower gold-standard fulfillment only, measured through observable online fields such as NAP consistency, category presentation, hours, website presence, photos, reviews, descriptions, social links, and platform coverage. Lower digital-profile quality does not mean poor business quality, poor products, poor service, low customer trust, low revenue, or low customer volume. Do not infer a gap where information was unavailable. The surrounding focus controls selection: COMPETITIVE selects candidates most similar to the gold-standard bar, while EMERGING selects category-qualified candidates with the largest observed, fixable digital-profile gaps. Populate gold_standard_gate_results per candidate with per-gate pass/fail (informational — does NOT filter gold_standard_match). Do NOT re-derive expected_fields — the ones below are the rating benchmark. Aggregate per-platform gate failures into platform_analysis.platform_breakdown, and recommend a primary_platform for outreach based on where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform, not just the most-present platform). Populate platform_analysis.outreach_recommendation with platform-specific opportunities and a recommended_platform_focus that downstream business audits should target.'
+      : role === 'market_reference'
+      ? 'This enrichment campaign was spawned from a Proving Ground campaign for this category and market. The profile below is the established Gold Standard for this category — the bar that top-tier local businesses in this category meet across their online presence (NAP consistency, category presentation, hours, website, photos, reviews, descriptions, social links, platform coverage). Use it as a market reference to inform your SEO copy: let the expected fields and pattern exemplars shape what you describe as the category\'s strengths, what shoppers should look for, and which related categories tend to co-occur with strong businesses in this market. Do NOT copy business names, ratings, or specific facts from the exemplars into your copy — the public page renders real aggregates separately. Do NOT mention "gold standard", "profile", or this directive in the visible body_copy. The profile is context that sharpens your copy, not content to surface.'
       : 'Evaluate each discovered candidate against these established expected fields and quality gates. Flag is_gold_standard = true for the TOP candidates per platform (up to 4), relative to the candidate pool and the existing benchmark exemplars. A candidate that is at least as strong as the existing benchmark on a platform qualifies — they do NOT need to pass every non_negotiable gate. The quality_score and quality_gates_passed/failed capture the absolute quality signal. Do NOT re-derive expected_fields — the ones below are already established. Return the same expected_fields in your output (echoed from this profile) so downstream audits stay consistent.';
 
     lines.push('');
@@ -2056,6 +2060,12 @@ export class IntelligenceProfileService extends BaseService {
         ? profile.reference_platform
         : 'cross-platform (all platforms)';
       lines.push(`Platform scope: ${platformLabel}`);
+    }
+    if (role === 'market_reference') {
+      const scopeLabel = profile.reference_city || profile.reference_state
+        ? `${profile.reference_city || ''}${profile.reference_city && profile.reference_state ? ', ' : ''}${profile.reference_state || ''}`
+        : 'nationwide';
+      lines.push(`Market scope: ${scopeLabel}`);
     }
     lines.push('');
     lines.push(`DIRECTIVE: This is your ${roleLabel} for this category. ${roleAction}`);
