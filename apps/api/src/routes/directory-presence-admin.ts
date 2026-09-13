@@ -1790,6 +1790,7 @@ router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Reque
       qrUrl: kit.qrUrl,
       qrUrlWalkin: kit.qrUrlWalkin,
       qrUrlSocial: kit.qrUrlSocial,
+      qrUrlEmail: kit.qrUrlEmail,
       claimUrl: kit.claimUrl,
       shortClaimUrl: kit.shortClaimUrl,
       businessName: kit.businessName,
