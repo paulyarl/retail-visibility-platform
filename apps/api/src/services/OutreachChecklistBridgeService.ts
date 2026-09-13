@@ -82,6 +82,14 @@ function resolveInternalLinkUrl(
       return `${BASE}/proving-grounds/${campaignId}#worklist`;
     case 'seed_claim_kit':
       return `${BASE}/proving-grounds/${campaignId}#queue`;
+    // Generic PG cockpit section link — params.section picks the panel.
+    // Unknown/blank sections resolve to the cockpit top (no fragment).
+    case 'proving_ground_section': {
+      const section = String(params?.section ?? '').trim();
+      const known = new Set(['children', 'prospects', 'queue', 'worklist', 'enrich']);
+      const fragment = known.has(section) ? `#${section}` : '';
+      return `${BASE}/proving-grounds/${campaignId}${fragment}`;
+    }
     default:
       return `${BASE}/campaigns/${campaignId}`;
   }

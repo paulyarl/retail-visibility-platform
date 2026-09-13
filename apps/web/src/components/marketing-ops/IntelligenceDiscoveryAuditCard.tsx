@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Search, Plus, Loader2, Inbox, Check, ChevronDown, ChevronRight, MapPin, AlertTriangle, Phone, Flag } from 'lucide-react';
 import Link from 'next/link';
-import type { Audit } from '@/services/MarketingOpsService';
+import type { Audit, ProspectQueueEntry } from '@/services/MarketingOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
 
 /**
@@ -117,6 +117,7 @@ export default function IntelligenceDiscoveryAuditCard({
   campaignId,
   onLogGap,
   onQueued,
+  queueEntries,
 }: {
   audit: Audit;
   campaignId: string;
@@ -127,6 +128,12 @@ export default function IntelligenceDiscoveryAuditCard({
   /** Optional callback fired after a business lands in the prospect queue
    *  (Queue or Verify path) so host pages can refresh queue-backed panels. */
   onQueued?: () => void;
+  /** Optional queue awareness (proving-ground cockpit): the host's
+   *  tree-scoped prospect queue. A discovered business whose identity
+   *  (business_name + city) matches a live queue row renders "In queue"
+   *  — plus a campaign link when the row already graduated — instead of
+   *  the Queue/Verify/Campaign actions. */
+  queueEntries?: ProspectQueueEntry[];
 }) {
   const data = parseDiscovery(audit);
   const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
@@ -155,6 +162,23 @@ export default function IntelligenceDiscoveryAuditCard({
       return (priorityOrder[a.business_seek_priority] ?? 9) - (priorityOrder[b.business_seek_priority] ?? 9);
     });
   }, [data]);
+
+  // Queue awareness — collapse the host's queue rows to the most-advanced
+  // entry per business identity (same business_name|city key + seeded >
+  // campaign_created > live rank as the cockpit's promote panel) so each
+  // discovered business can resolve its queue state.
+  const queueByIdentity = useMemo(() => {
+    const rank = (e: ProspectQueueEntry) =>
+      e.seed_id ? 3 : e.status === 'campaign_created' ? 2 : 1;
+    const m = new Map<string, ProspectQueueEntry>();
+    for (const e of queueEntries ?? []) {
+      if (e.status === 'dismissed' || !e.business_name) continue;
+      const key = `${e.business_name.toLowerCase().trim()}|${(e.city ?? '').toLowerCase().trim()}`;
+      const existing = m.get(key);
+      if (!existing || rank(e) > rank(existing)) m.set(key, e);
+    }
+    return m;
+  }, [queueEntries]);
 
   if (!data) return null;
 
@@ -365,6 +389,13 @@ export default function IntelligenceDiscoveryAuditCard({
             const isLowConfidence = biz.identity_confidence === 'low';
             const isInsufficientFit = biz.category_fit === 'insufficient';
             const provenanceOpen = expandedProvenance.has(idx);
+            // Queue match (host-provided awareness) — a live queue row for
+            // this business suppresses Queue/Verify, and a graduated row
+            // links to its campaign instead of offering derive.
+            const queueEntry = queueByIdentity.get(
+              `${(biz.business_name ?? '').toLowerCase().trim()}|${(biz.city ?? '').toLowerCase().trim()}`,
+            );
+            const linkedCampaignId = queueEntry?.processed_campaign_id ?? derivedCampaignId[idx];
             return (
               <div
                 key={`${biz.business_name}-${idx}`}
@@ -470,7 +501,16 @@ export default function IntelligenceDiscoveryAuditCard({
                         Gap
                       </button>
                     )}
-                    {queuedFeedback[idx] === 'queued' && queuedEntryId[idx] ? (
+                    {queueEntry ? (
+                      <Link
+                        href={`/settings/admin/marketing-ops/queue?status=${queueEntry.status}`}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700/70 bg-green-50/60 border border-green-200/70 rounded dark:bg-green-900/10 dark:text-green-300/70 dark:border-green-800/60"
+                        title={`Already in the prospect queue (status: ${queueEntry.status}) — click to view`}
+                      >
+                        <Check className="w-3 h-3" />
+                        In queue
+                      </Link>
+                    ) : queuedFeedback[idx] === 'queued' && queuedEntryId[idx] ? (
                       <Link
                         href={`/settings/admin/marketing-ops/queue?status=queued`}
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40"
@@ -499,7 +539,7 @@ export default function IntelligenceDiscoveryAuditCard({
                         Queue
                       </button>
                     )}
-                    {queuedFeedback[idx] === 'verify' && queuedEntryId[idx] ? (
+                    {!queueEntry && (queuedFeedback[idx] === 'verify' && queuedEntryId[idx] ? (
                       <Link
                         href={`/settings/admin/marketing-ops/queue?status=verify_then_outreach`}
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40"
@@ -518,17 +558,17 @@ export default function IntelligenceDiscoveryAuditCard({
                         {queueingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3" />}
                         Verify
                       </button>
-                    )}
-                    {derivedCampaignId[idx] ? (
+                    ))}
+                    {linkedCampaignId ? (
                       <Link
-                        href={`/settings/admin/marketing-ops/campaigns/${derivedCampaignId[idx]}`}
+                        href={`/settings/admin/marketing-ops/campaigns/${linkedCampaignId}`}
                         className={
-                          queuedFeedback[idx] === 'exists'
+                          queueEntry?.processed_campaign_id || queuedFeedback[idx] === 'exists'
                             ? 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700/70 bg-green-50/60 border border-green-200/70 rounded dark:bg-green-900/10 dark:text-green-300/70 dark:border-green-800/60'
                             : 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800 dark:hover:bg-green-900/40'
                         }
                         title={
-                          queuedFeedback[idx] === 'exists'
+                          queueEntry?.processed_campaign_id || queuedFeedback[idx] === 'exists'
                             ? 'A campaign already exists for this business — click to view'
                             : 'Campaign created — click to view'
                         }
@@ -536,7 +576,7 @@ export default function IntelligenceDiscoveryAuditCard({
                         <Check className="w-3 h-3" />
                         Campaign
                       </Link>
-                    ) : (
+                    ) : queueEntry ? null : (
                       <button
                         onClick={() => handleDerive(biz)}
                         disabled={derivingIdx !== null}

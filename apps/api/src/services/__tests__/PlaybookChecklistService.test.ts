@@ -1249,4 +1249,48 @@ describe('PlaybookChecklistService � proving ground PG-01', () => {
     expect(mockPlaybook.findFirst).not.toHaveBeenCalled();
     expect(result.playbook).toBeNull();
   });
+
+  it('never injects permanent outreach steps on a proving-ground campaign', async () => {
+    // PG campaigns stay at 'seek' forever, so the stage window alone would
+    // splice the per-business outreach steps (Pitch Construction etc.) into
+    // the PG-01 list — meaningless on an aggregate campaign.
+    mockTriage.findUnique.mockResolvedValue(null);
+    mockCampaigns.findUnique.mockResolvedValue(PG_CAMPAIGN);
+    mockPlaybook.findFirst.mockResolvedValue(PG_PLAYBOOK);
+    mockSteps.findMany.mockResolvedValue([
+      stepRow({ id: 'pstep-pg01-s1', playbook_id: 'pbk-pg01', title: 'Attach profiles & discovery campaigns', step_type: 'manual', action_config: {} }),
+      stepRow({ id: 'pstep-pg01-s2', playbook_id: 'pbk-pg01', step_order: 2, title: 'Load discovery prospects', step_type: 'manual', action_config: {} }),
+    ]);
+    mockProgress.findMany.mockResolvedValue([]);
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+    expect(result.steps).toHaveLength(2);
+    expect(result.steps.every((s) => !s.id.startsWith('_permanent_'))).toBe(true);
+    expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2]);
+  });
+
+  it('still loads step progress on a proving-ground campaign (no permanent steps)', async () => {
+    // Regression: progress rows used to load only when permanent steps
+    // injected — on a PG (or late-stage) campaign every check-off rendered
+    // incomplete.
+    mockTriage.findUnique.mockResolvedValue(null);
+    mockCampaigns.findUnique.mockResolvedValue(PG_CAMPAIGN);
+    mockPlaybook.findFirst.mockResolvedValue(PG_PLAYBOOK);
+    mockSteps.findMany.mockResolvedValue([
+      stepRow({ id: 'pstep-pg01-s1', playbook_id: 'pbk-pg01', step_type: 'manual', action_config: {} }),
+    ]);
+    mockProgress.findMany.mockResolvedValue([
+      { step_id: 'pstep-pg01-s1', completed_at: new Date(), completed_by: 'uid-1', note: 'done' },
+    ]);
+
+    const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
+
+    expect(mockProgress.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { campaign_id: CAMPAIGN_ID } }),
+    );
+    expect(result.steps[0].progress?.completedAt).not.toBeNull();
+    expect(result.completedCount).toBe(1);
+    expect(result.requiredCompleted).toBe(1);
+  });
 });

@@ -163,6 +163,8 @@ describe('promoteToProvingGround — scope-conditional validation', () => {
     vi.spyOn(service, 'createCampaign').mockResolvedValue({ id: PG_ID } as any);
     vi.spyOn(service, 'attachChildCampaign').mockResolvedValue({ attached: true, parentId: PG_ID, childId: SOURCE_ID });
     mockCampaignsList.findFirst.mockResolvedValue(null); // no duplicate PG
+    // Attached-children load for domain expansion (Migration 283).
+    mockCampaignsList.findMany.mockResolvedValue([]);
   });
 
   it('creates a category-scope PG without requiring a city', async () => {
@@ -305,5 +307,159 @@ describe('groupQueueEntriesIntoProvingGround — queue-list initiation', () => {
 
     await expect(service.groupQueueEntriesIntoProvingGround({ queueEntryIds: ['pque-1'] }))
       .rejects.toThrow('category is required to create a proving ground');
+  });
+});
+
+describe('PG domain model (Migration 283 — describe + auto-expand)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 3 });
+    mockCampaignsList.update.mockResolvedValue({});
+  });
+
+  it('derives secondary_categories + member_geos from grouped entries on create', async () => {
+    mockProspectQueue.findMany.mockResolvedValue([
+      { id: 'pque-1', category: 'African Grocery', city: 'Indianapolis', state: 'IN' },
+      { id: 'pque-2', category: 'African Grocery', city: 'Indianapolis', state: 'IN' },
+      { id: 'pque-3', category: 'India Grocery', city: 'Plainfield', state: 'IN' },
+    ]);
+    mockCampaignsList.findFirst.mockResolvedValue(null);
+    vi.spyOn(service, 'createCampaign').mockResolvedValue({
+      id: PG_ID,
+      campaign_category: 'proving_ground',
+      category: 'African Grocery',
+      city: 'Indianapolis',
+      state: 'IN',
+      secondary_categories: [],
+      member_geos: null,
+    } as any);
+
+    const result = await service.groupQueueEntriesIntoProvingGround({
+      queueEntryIds: ['pque-1', 'pque-2', 'pque-3'],
+    });
+
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: PG_ID },
+      data: expect.objectContaining({
+        secondary_categories: ['India Grocery'],
+        member_geos: [{ city: 'Plainfield', state: 'IN' }],
+      }),
+    });
+    expect(result.domainExpanded).toEqual({
+      categories: ['India Grocery'],
+      geos: [{ city: 'Plainfield', state: 'IN' }],
+    });
+  });
+
+  it('adds to an explicit PG target and expands its domain (no signature lookup)', async () => {
+    mockProspectQueue.findMany.mockResolvedValue([
+      { id: 'pque-1', category: 'African Grocery', city: 'Milwaukee', state: 'WI' },
+    ]);
+    mockCampaignsList.findUnique.mockResolvedValue(
+      pgParent({
+        category: 'African Grocery',
+        city: 'Madison',
+        state: 'WI',
+        secondary_categories: [],
+        member_geos: [{ city: 'Plainfield', state: 'WI' }],
+      }),
+    );
+
+    const result = await service.groupQueueEntriesIntoProvingGround({
+      queueEntryIds: ['pque-1'],
+      provingGroundId: PG_ID,
+    });
+
+    expect(result.reusedExisting).toBe(true);
+    expect(mockCampaignsList.findFirst).not.toHaveBeenCalled();
+    expect(service.createCampaign).not.toHaveBeenCalled();
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: PG_ID },
+      data: expect.objectContaining({
+        member_geos: [
+          { city: 'Plainfield', state: 'WI' },
+          { city: 'Milwaukee', state: 'WI' },
+        ],
+      }),
+    });
+    expect(result.domainExpanded.geos).toEqual([{ city: 'Milwaukee', state: 'WI' }]);
+    expect(mockProspectQueue.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ proving_ground_id: PG_ID }) }),
+    );
+  });
+
+  it('rejects an explicit target that is not a proving ground', async () => {
+    mockProspectQueue.findMany.mockResolvedValue([
+      { id: 'pque-1', category: 'fleet services', city: 'Austin', state: 'TX' },
+    ]);
+    mockCampaignsList.findUnique.mockResolvedValue({ id: 'mkt-biz-1', campaign_category: 'review_management' });
+
+    await expect(
+      service.groupQueueEntriesIntoProvingGround({ queueEntryIds: ['pque-1'], provingGroundId: 'mkt-biz-1' }),
+    ).rejects.toThrow('target_not_proving_ground');
+  });
+
+  it('does not record member_geos on a geography-free PG (unconstrained geo domain)', async () => {
+    mockProspectQueue.findMany.mockResolvedValue([
+      { id: 'pque-1', category: 'Nigerian Grocery', city: 'Chicago', state: 'IL' },
+    ]);
+    vi.spyOn(service, 'createCampaign').mockResolvedValue({
+      id: PG_ID,
+      campaign_category: 'proving_ground',
+      category: 'African Grocery',
+      city: null,
+      state: null,
+      secondary_categories: [],
+      member_geos: null,
+    } as any);
+    mockCampaignsList.findFirst.mockResolvedValue(null);
+
+    const result = await service.groupQueueEntriesIntoProvingGround({ queueEntryIds: ['pque-1'] });
+
+    // Category widens; geography stays unconstrained — no member_geos write.
+    expect(result.domainExpanded).toEqual({ categories: ['Nigerian Grocery'], geos: [] });
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: PG_ID },
+      data: expect.objectContaining({
+        secondary_categories: ['Nigerian Grocery'],
+        member_geos: null,
+      }),
+    });
+  });
+
+  it('expands the domain from merged runs on promoteToProvingGround', async () => {
+    vi.spyOn(service, 'createCampaign').mockResolvedValue({
+      id: PG_ID,
+      campaign_category: 'proving_ground',
+      category: 'fleet services',
+      city: 'Austin',
+      state: 'TX',
+      secondary_categories: [],
+      member_geos: null,
+    } as any);
+    vi.spyOn(service, 'attachChildCampaign').mockResolvedValue({ attached: true } as any);
+    mockCampaignsList.findUnique.mockResolvedValue(discoverySource());
+    mockCampaignsList.findFirst.mockResolvedValue(null);
+    // The attached load: source + merged run spanning a new category + geo.
+    mockCampaignsList.findMany.mockResolvedValue([
+      { category: 'fleet services', city: 'Austin', state: 'TX' },
+      { category: 'logistics', city: 'Dallas', state: 'TX' },
+    ]);
+
+    const result = await service.promoteToProvingGround(SOURCE_ID, {
+      mergeCampaignIds: ['mkt-intel-2'],
+    });
+
+    expect(result.domainExpanded).toEqual({
+      categories: ['logistics'],
+      geos: [{ city: 'Dallas', state: 'TX' }],
+    });
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: PG_ID },
+      data: expect.objectContaining({
+        secondary_categories: ['logistics'],
+        member_geos: [{ city: 'Dallas', state: 'TX' }],
+      }),
+    });
   });
 });

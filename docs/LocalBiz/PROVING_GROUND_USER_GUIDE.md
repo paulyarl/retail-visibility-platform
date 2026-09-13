@@ -40,7 +40,7 @@ Proving Ground (scope = city or category, category = proving_ground)
 On any **intelligence-scope discovery campaign** (focus `emerging` or `competitive`), use **Promote to Proving Ground** on the campaign detail page.
 
 - Creates a city-scope (default) or category-scope PG and attaches the discovery run as a child in one action.
-- If an *active* PG already exists for the same signature, the run **merges into it** — this is how `emerging` + `competitive` runs for one market fold into a single workspace. `mergeCampaignIds` can fold additional runs in at the same time.
+- If an *active* PG already exists for the same signature, the run **merges into it** — this is how `emerging` + `competitive` runs for one market fold into a single workspace. `mergeCampaignIds` can fold additional runs in at the same time. **Only discovery runs are mergeable** — establishment campaigns produce the market's intelligence profile, not prospects, so they don't appear in the merge list (the PG already consumes the profile their activation produced via market enrichment; the campaign container adds nothing to the tree).
 - Category/city/state/title are overridable — e.g. promote an umbrella `Grocery` category when merging ethnic sub-categories.
 - Validation is scope-conditional: `category` is always required (it's the market identity); `city` is required only for city-scope PGs.
 
@@ -48,11 +48,14 @@ On any **intelligence-scope discovery campaign** (focus `emerging` or `competiti
 
 On the **Prospect Queue** page (List view), check any rows and click **Group into Proving Ground**. The modal asks for:
 
-- **Title** (required) and **Category** (required — defaults to the group's dominant value).
+- **Target** (optional) — pick an existing PG to add into it, or leave **Auto** to create-or-reuse by signature. When a target resolves (picked, or the form signature matches an existing PG), the modal shows that PG's **ID constraints** (categories · geos · mode) and checks the selected rows against them: rows asserting a category or geo outside the declared domain get a soft-gate warning ("consider a new PG — or proceed and the domain auto-expands"). It never blocks.
+- **Title** (required) and **Category** (required — defaults to the group's dominant value). Hidden when adding to an explicit target.
 - **City** (optional — leave blank for a mixed/geography-free PG).
 - **Domain scope** (city vs. category — only shown when a city is set).
 
 The action creates-or-reuses the PG (a matching active PG is reused, never duplicated) and stamps `proving_ground_id` on each selected row. The rows keep their `source_campaign_id` for discovery provenance — the new column marks *membership*, the old one records *where the prospect was found*.
+
+**Domain auto-expand (Migration 283).** A PG's declared domain is two axes: `category ∪ secondary_categories` × `{city,state} ∪ member_geos`. Grouped rows that assert values outside the domain are still stamped — the domain widens to describe them (new categories append to `secondary_categories`, new geos to `member_geos`). The response reports what expanded. Geo expansion only applies to fixed-city PGs: a geography-free PG's geo domain is already unconstrained, so `member_geos` stays empty by design. The merge path (§2.1) expands the same way — merged runs' categories/geos flow into the domain.
 
 ### 2.3 New Campaign
 
@@ -65,6 +68,28 @@ The index page's **+ New Campaign** button pre-fills `scope=city` + `campaignCat
 ### 3.1 Header
 
 Title, market, gate chips (seed-funnel benchmark gates with pass/hollow state), market enrichment status, and the **Public copy** panel (the SEO copy the market feeds public category pages — viewable and overridable).
+
+**ID card** — the declared constraint domain that drives every behavior on the page, each field with a tooltip naming what it controls:
+
+| Field | Drives |
+|---|---|
+| **Scope** | Which domain axis the PG proves on — `city` = one market, `category` = spans cities |
+| **Category** / **Categories** | Market identity — required; keys the profile slots, market enrichment, and the duplicate-signature match. Shows `+N` when `secondary_categories` widen the domain |
+| **City** / **Cities** | Declared geo domain — anchor city plus `member_geos` extras (`Indianapolis +1` for city + suburbs); `nationwide` when unconstrained |
+| **State** | Anchor state qualifier for the market and profile slot matching |
+| **Mode** | `fixed` (has city) — members join via queue/graduation; `mixed` (no city, teal) — business campaigns may attach directly and rows join via `proving_ground_id` |
+
+**Profile readiness strip** — the PG's one enforcement surface, enumerated across the declared domain: one chip per (category × geo × focus) pair. Chips carry the category/geo prefix only on axes where the domain is multi-valued; beyond 12 slots the strip truncates with a "+N more → Coverage" link. Each chip mirrors the `/coverage` page's state model:
+
+| Chip | Meaning | Click |
+|---|---|---|
+| `· active` (green) | Active profile covers this market — discovery runs can be created | Profiles workspace |
+| `· draft` (yellow) | Draft profile exists, not yet activated | Profiles workspace (review & activate) |
+| `· in flight` (blue) | Establishment campaign underway, no profile yet | Opens that campaign |
+| `· fallback` (sky) | No profile scoped to this market, but an active one exists elsewhere — `resolve()` would succeed via the city-agnostic/cross-city chain (contamination risk logged server-side) | Coverage page |
+| `· missing` (red, dashed) | No active profile for the category at all — discovery creation will fail the establishment-before-discovery guard | Pre-filled establishment campaign form |
+
+This matters because a PG can exist for a profile-less market: manual **New Campaign**, queue-list grouping, or a profile retired after promotion all bypass the create-time prerequisite. The strip surfaces the gap at the cockpit instead of letting it fail later at discovery-run creation.
 
 ### 3.2 Funnel metrics + Due today
 
@@ -205,5 +230,9 @@ What stays the same: the stage distribution, funnel metrics, artifact chips, and
 | Queue-list PG initiation | `proving_ground_id` column (migration 282) + group action |
 | Seed fan-out linkage | PG-grouped seeds dual-linked for cohort funnels |
 | "View Proving Ground" via parent chain | `resolveBusinessProvingGround` ≤2-hop fallback |
+| Profile readiness strip (coverage 4-state model + fallback distinction) | cockpit §3.1 header |
+| Merge list filtered to discovery runs | promote modal (establishment excluded — it produces the profile, not prospects) |
+| PG domain model (categories × geos, describe + auto-expand) | `secondary_categories` reuse + `member_geos` (migration 283); group/promote expansion; ID card + per-slot profile chips |
+| Populated-PG adds with soft gate | group modal target picker + ID-constraints preview + off-domain warning |
 
 **Known deferrals:** dedup-verdict exclusion from the distribution (D3), presence-count chip upgrades (gallery tokens / deliverables / opener counts / `demo_tenant_id`), and per-stage checklist fractions (needs per-playbook denominators).

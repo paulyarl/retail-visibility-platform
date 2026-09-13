@@ -9,7 +9,7 @@ import {
 import Link from 'next/link';
 import marketingOpsService, {
   ProspectQueueEntry, ProspectStatus, ProspectPriority, ProspectDismissReason,
-  AddToQueueInput, AddToQueueResult, CampaignScope,
+  AddToQueueInput, AddToQueueResult, CampaignScope, Campaign,
   VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
 } from '@/services/MarketingOpsService';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
@@ -195,7 +195,17 @@ export default function ProspectQueueClient() {
     state: '',
   });
   const [grouping, setGrouping] = useState(false);
-  const [groupResult, setGroupResult] = useState<{ provingGroundId: string; stamped: number; reusedExisting: boolean } | null>(null);
+  const [groupResult, setGroupResult] = useState<{
+    provingGroundId: string;
+    stamped: number;
+    reusedExisting: boolean;
+    domainExpanded: { categories: string[]; geos: Array<{ city: string; state: string | null }> };
+  } | null>(null);
+  // Migration 283 — populated-PG adds: an explicit target picker lets the
+  // operator confirm the PG's ID constraints before the add; off-domain rows
+  // soft-warn (the domain auto-expands server-side).
+  const [pgOptions, setPgOptions] = useState<Campaign[]>([]);
+  const [groupTargetId, setGroupTargetId] = useState('');
 
   // "Add to Queue" modal — lets operators capture a hot prospect discovered
   // during a deep dive, outside the audit "Add to queue" context.
@@ -281,14 +291,81 @@ export default function ProspectQueueClient() {
       state: modal(picked.map((e) => e.state)),
     });
     setGroupResult(null);
+    setGroupTargetId('');
     setGroupModalOpen(true);
+    // Load existing PGs for the "add to populated PG" target picker — the
+    // modal shows the target's ID constraints before the add.
+    marketingOpsService
+      .listCampaigns({ campaignCategory: 'proving_ground', limit: 50 })
+      .then((r) => setPgOptions(r.items))
+      .catch(() => setPgOptions([]));
   };
+
+  // Resolved target PG — explicit pick wins; otherwise a best-effort
+  // signature match previews which existing PG the auto-reuse path would hit
+  // (mirrors findDuplicateCampaign's scope+category+city+state signature).
+  const normStr = (v?: string | null) => (v ?? '').trim().toLowerCase();
+  const resolvedTargetPg: Campaign | null = (() => {
+    if (groupTargetId) return pgOptions.find((p) => p.id === groupTargetId) ?? null;
+    const cat = normStr(groupForm.category);
+    if (!cat) return null;
+    const city = normStr(groupForm.city);
+    const st = normStr(groupForm.state);
+    return (
+      pgOptions.find(
+        (p) => normStr(p.category) === cat && normStr(p.city) === city && normStr(p.state) === st,
+      ) ?? null
+    );
+  })();
+
+  // Proving ground (Migration 262, spec §4.6): seeded rows sort by
+  // next_touch_at — the operator's "due today" worklist. Unseeded rows keep
+  // queue order after the seeded block.
+  const displayEntries = useMemo(() => {
+    const seeded = entries.filter((e) => e.seed_id);
+    const unseeded = entries.filter((e) => !e.seed_id);
+    seeded.sort((a, b) => {
+      const ta = a.next_touch_at ? new Date(a.next_touch_at).getTime() : 0;
+      const tb = b.next_touch_at ? new Date(b.next_touch_at).getTime() : 0;
+      return ta - tb;
+    });
+    return [...seeded, ...unseeded];
+  }, [entries]);
+
+  // Off-domain check — asserted values that fall outside the target's
+  // declared domain (blank entry fields don't count as violations).
+  const offDomainEntries: ProspectQueueEntry[] = (() => {
+    if (!resolvedTargetPg) return [];
+    const domainCats = new Set(
+      [resolvedTargetPg.category, ...(resolvedTargetPg.secondary_categories ?? [])]
+        .map(normStr)
+        .filter(Boolean),
+    );
+    const geoConstrained = !!normStr(resolvedTargetPg.city);
+    const domainGeos = new Set(
+      [
+        { city: resolvedTargetPg.city, state: resolvedTargetPg.state },
+        ...((resolvedTargetPg.member_geos ?? []) as Array<{ city?: string; state?: string | null }>),
+      ].map((g) => `${normStr(g.city)}|${normStr(g.state)}`),
+    );
+    return displayEntries
+      .filter((e) => selectedIds.has(e.id))
+      .filter((e) => {
+        const catMiss = !!normStr(e.category) && !domainCats.has(normStr(e.category));
+        const geoMiss =
+          geoConstrained &&
+          !!normStr(e.city) &&
+          !domainGeos.has(`${normStr(e.city)}|${normStr(e.state)}`);
+        return catMiss || geoMiss;
+      });
+  })();
 
   const handleGroupIntoPg = async () => {
     setGrouping(true);
     setError(null);
     try {
       const res = await marketingOpsService.groupIntoProvingGround({
+        provingGroundId: groupTargetId || undefined,
         title: groupForm.title.trim(),
         scope: groupForm.scope || undefined,
         category: groupForm.category.trim() || undefined,
@@ -300,6 +377,7 @@ export default function ProspectQueueClient() {
         provingGroundId: res.provingGround.id,
         stamped: res.stamped,
         reusedExisting: res.reusedExisting,
+        domainExpanded: res.domainExpanded ?? { categories: [], geos: [] },
       });
       await fetchQueue(); // proving_ground_id now stamped on the rows
     } catch (err: any) {
@@ -612,20 +690,6 @@ export default function ProspectQueueClient() {
     { key: 'campaign_created', label: 'Created', count: entries.filter((e) => e.status === 'campaign_created').length },
     { key: 'dismissed', label: 'Dismissed', count: entries.filter((e) => e.status === 'dismissed').length },
   ];
-
-  // Proving ground (Migration 262, spec §4.6): seeded rows sort by
-  // next_touch_at — the operator's "due today" worklist. Unseeded rows keep
-  // queue order after the seeded block.
-  const displayEntries = useMemo(() => {
-    const seeded = entries.filter((e) => e.seed_id);
-    const unseeded = entries.filter((e) => !e.seed_id);
-    seeded.sort((a, b) => {
-      const ta = a.next_touch_at ? new Date(a.next_touch_at).getTime() : 0;
-      const tb = b.next_touch_at ? new Date(b.next_touch_at).getTime() : 0;
-      return ta - tb;
-    });
-    return [...seeded, ...unseeded];
-  }, [entries]);
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -1398,6 +1462,16 @@ export default function ProspectQueueClient() {
                       ? `Reused the existing proving ground — ${groupResult.stamped} row${groupResult.stamped !== 1 ? 's' : ''} stamped.`
                       : `Proving ground created — ${groupResult.stamped} row${groupResult.stamped !== 1 ? 's' : ''} stamped.`}
                   </p>
+                  {(groupResult.domainExpanded.categories.length > 0 ||
+                    groupResult.domainExpanded.geos.length > 0) && (
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                      Domain expanded to cover the new rows:
+                      {groupResult.domainExpanded.categories.length > 0 &&
+                        ` +${groupResult.domainExpanded.categories.length} categor${groupResult.domainExpanded.categories.length !== 1 ? 'ies' : 'y'} (${groupResult.domainExpanded.categories.join(', ')})`}
+                      {groupResult.domainExpanded.geos.length > 0 &&
+                        ` +${groupResult.domainExpanded.geos.length} geo${groupResult.domainExpanded.geos.length !== 1 ? 's' : ''} (${groupResult.domainExpanded.geos.map((g) => g.city).join(', ')})`}
+                    </p>
+                  )}
                   <Link
                     href={`/settings/admin/marketing-ops/proving-grounds/${groupResult.provingGroundId}`}
                     className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
@@ -1413,6 +1487,77 @@ export default function ProspectQueueClient() {
                     attach business children directly.
                   </p>
 
+                  {/* Target — add to a populated PG, or let the signature
+                      decide create-vs-reuse. Picking a target shows its ID
+                      constraints so the operator can confirm the match. */}
+                  {pgOptions.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Target
+                      </label>
+                      <select
+                        value={groupTargetId}
+                        onChange={(e) => setGroupTargetId(e.target.value)}
+                        disabled={grouping}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      >
+                        <option value="">Auto — create or reuse by signature</option>
+                        {pgOptions.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title || [p.city, p.category].filter(Boolean).join(' ') || p.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Target ID card — the resolved PG's declared domain, plus
+                      a soft-gate warning when selected rows fall outside it
+                      (proceeding auto-expands the domain). */}
+                  {resolvedTargetPg && (
+                    <div className="rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/60 dark:bg-neutral-900/40 px-3 py-2 space-y-1.5">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        {groupTargetId ? 'Target PG constraints' : 'Matches existing PG'}
+                      </p>
+                      <p className="text-xs text-gray-700 dark:text-gray-300">
+                        <span className="font-medium">{resolvedTargetPg.title || 'Proving ground'}</span>
+                        {' · '}
+                        {[resolvedTargetPg.category, ...(resolvedTargetPg.secondary_categories ?? [])]
+                          .filter(Boolean)
+                          .join(', ')}
+                        {' · '}
+                        {resolvedTargetPg.city
+                          ? [resolvedTargetPg.city, resolvedTargetPg.state].filter(Boolean).join(', ') +
+                            ((resolvedTargetPg.member_geos?.length ?? 0) > 0
+                              ? ` +${resolvedTargetPg.member_geos!.length}`
+                              : '')
+                          : 'nationwide'}
+                        {' · '}
+                        <span className={resolvedTargetPg.city ? '' : 'text-teal-700 dark:text-teal-300'}>
+                          {resolvedTargetPg.city ? 'fixed' : 'mixed'}
+                        </span>
+                      </p>
+                      {offDomainEntries.length > 0 ? (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          {offDomainEntries.length} of {selectedIds.size} selected row
+                          {selectedIds.size !== 1 ? 's are' : ' is'} outside this PG&apos;s domain
+                          ({offDomainEntries
+                            .slice(0, 3)
+                            .map((e) => e.business_name || [e.city, e.category].filter(Boolean).join(' '))
+                            .join(', ')}
+                          {offDomainEntries.length > 3 ? `, +${offDomainEntries.length - 3} more` : ''}).
+                          Consider a new PG — or proceed and the domain auto-expands.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                          All selected rows match this PG&apos;s domain.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {!groupTargetId && (
+                  <>
                   {/* Title */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1495,6 +1640,8 @@ export default function ProspectQueueClient() {
                       </p>
                     </div>
                   )}
+                  </>
+                  )}
                 </>
               )}
             </div>
@@ -1518,11 +1665,14 @@ export default function ProspectQueueClient() {
                   </button>
                   <button
                     onClick={handleGroupIntoPg}
-                    disabled={grouping || !groupForm.title.trim() || !groupForm.category.trim()}
+                    disabled={
+                      grouping ||
+                      (!groupTargetId && (!groupForm.title.trim() || !groupForm.category.trim()))
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
                   >
                     {grouping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Flag className="w-3.5 h-3.5" />}
-                    Create &amp; stamp
+                    {groupTargetId ? 'Add & stamp' : 'Create & stamp'}
                   </button>
                 </>
               )}

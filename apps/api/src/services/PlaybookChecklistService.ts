@@ -544,6 +544,9 @@ export class PlaybookChecklistService extends BaseService {
     // Migration 262 — proving-ground cockpit surfaces (spec §4.3)
     'proving_ground_worklist',
     'seed_claim_kit',
+    // Generic PG cockpit section link — params.section picks the panel
+    // (children | prospects | queue | worklist | enrich).
+    'proving_ground_section',
   ] as const;
   static readonly INTERNAL_LINK_TARGET_SET: ReadonlySet<string> = new Set(PlaybookChecklistService.INTERNAL_LINK_TARGETS);
 
@@ -785,27 +788,39 @@ export class PlaybookChecklistService extends BaseService {
     // wedge steps apply (business scope only).
     let campaignStage: string | null = null;
     let campaignScope: string | null = null;
+    let campaignCategory: string | null = null;
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
-        select: { stage: true, scope: true },
+        select: { stage: true, scope: true, campaign_category: true },
       });
       campaignStage = campaign?.stage ?? null;
       campaignScope = campaign?.scope ?? null;
+      campaignCategory = (campaign?.campaign_category as string | null) ?? null;
     } catch {
       // Best-effort — if the lookup fails, skip permanent steps
     }
 
-    const showPermanent = campaignStage != null && PERMANENT_STEP_STAGES.has(campaignStage);
+    // Proving-ground campaigns never get permanent steps — the outreach
+    // workspaces (Pitch Construction / Preview Deliverable / Call Script)
+    // and the seed wedge are per-business tools; the PG runs its own PG-01
+    // cockpit flow instead. Same predicate as resolveProvingGroundPlaybook.
+    const isProvingGround =
+      (campaignScope === 'city' || campaignScope === 'category') &&
+      campaignCategory === 'proving_ground';
+    const showPermanent =
+      !isProvingGround &&
+      campaignStage != null &&
+      PERMANENT_STEP_STAGES.has(campaignStage);
     const showSeedSteps = showPermanent && campaignScope === 'business';
 
     // Progress is loaded even without a playbook so permanent-step
-    // check-offs (e.g. the seed step completed before triage) render.
-    const progressRows = showPermanent
-      ? (await this.prisma.mkt_campaign_checklist_progress.findMany({
-          where: { campaign_id: campaignId },
-        })) ?? []
-      : [];
+    // check-offs (e.g. the seed step completed before triage) render —
+    // and it must load for late-stage / proving-ground campaigns too,
+    // where no permanent steps inject but DB-step progress still exists.
+    const progressRows = (await this.prisma.mkt_campaign_checklist_progress.findMany({
+      where: { campaign_id: campaignId },
+    })) ?? [];
     const progressByStep = new Map(progressRows.map((p: any) => [p.step_id, p]));
 
     const buildPermanentViews = () => [

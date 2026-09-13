@@ -21,6 +21,7 @@ import marketingOpsService, {
   type CampaignDetail,
   type CampaignLineageEntry,
   type ProspectDismissReason,
+  type ProspectPriority,
   type ProspectQueueEntry,
 } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
@@ -69,6 +70,71 @@ function gateChip(pass: boolean | null): string {
   if (pass === false) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
   return 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400';
 }
+
+// ─── PG domain model (Migration 283 — describe + auto-expand) ────────────
+// A proving ground's constraint domain is two axes:
+//   categories = category ∪ secondary_categories
+//   geos       = {city,state} ∪ member_geos, or a single "unconstrained"
+//                slot (city null) when the anchor city is blank.
+// The ID card renders this domain; the profile strip enumerates one
+// establishment slot per (category × geo × focus).
+interface PgDomain {
+  categories: string[];
+  geos: Array<{ city: string | null; state: string | null }>;
+}
+
+interface PgProfileSlot {
+  category: string;
+  city: string | null;
+  state: string | null;
+  focus: 'emerging' | 'competitive';
+  status: 'pending' | 'inflight' | 'draft' | 'active';
+  profileId?: string;
+  coveredByFallback: boolean;
+}
+
+function pgDomainOf(
+  camp: {
+    category?: string | null;
+    city?: string | null;
+    state?: string | null;
+    secondary_categories?: string[] | null;
+    member_geos?: unknown;
+  } | null | undefined,
+): PgDomain {
+  const trim = (v?: string | null) => (v ?? '').trim();
+  const categories = [camp?.category, ...(camp?.secondary_categories ?? [])]
+    .map(trim)
+    .filter(Boolean)
+    .filter((v, i, a) => a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i);
+  const memberGeos = (
+    (Array.isArray(camp?.member_geos) ? camp!.member_geos : []) as Array<{
+      city?: string;
+      state?: string | null;
+    }>
+  )
+    .map((g) => ({ city: trim(g.city), state: trim(g.state) || null }))
+    .filter((g) => g.city)
+    .filter(
+      (g, i, a) =>
+        a.findIndex(
+          (x) =>
+            x.city.toLowerCase() === g.city.toLowerCase() &&
+            (x.state ?? '').toLowerCase() === (g.state ?? '').toLowerCase(),
+        ) === i,
+    );
+  const geos = trim(camp?.city)
+    ? [{ city: trim(camp?.city), state: trim(camp?.state) || null }, ...memberGeos]
+    : [{ city: null, state: null }];
+  return { categories, geos };
+}
+
+// Priority ordering for the promote panel: the list reads top-to-bottom
+// in work order — un-promoted high-priority rows first, everything else
+// keeps the queue's order (stable sort). `priority` (high/normal) is the
+// operator-set queue flag; distinct from discovery's business_seek_priority.
+const promoteRank = (e: ProspectQueueEntry) =>
+  !e.seed_id && e.priority === 'high' ? 0 : 1;
 
 export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
@@ -123,6 +189,12 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [discoveryAudits, setDiscoveryAudits] = useState<Array<{ childId: string; childTitle: string; audit: Audit }>>([]);
   const gapLogRef = useRef<HTMLDivElement | null>(null);
 
+  // Queue awareness — the PG's tree-scoped prospect queue, raw entries.
+  // Drives the promote panel + worklist, and is handed to the discovery
+  // prospects list so already-queued businesses render "In queue" instead
+  // of Queue/Verify/Campaign.
+  const [queueEntries, setQueueEntries] = useState<ProspectQueueEntry[]>([]);
+
   // Promote to listings (preflight step 2) — selective seeding of tree-scoped
   // queue entries via proving-ground-seed. Hold-priority prospects default to
   // unchecked so analysts' holds are not promoted by accident.
@@ -131,6 +203,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [promoteBusy, setPromoteBusy] = useState(false);
   const [promoteResult, setPromoteResult] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [priorityBusy, setPriorityBusy] = useState<string | null>(null);
+
+  // Profile readiness (coverage §state-model) — one establishment slot per
+  // (domain category × domain geo × focus), sourced from the same coverage
+  // endpoint as the /coverage page. A PG can exist with no active profile
+  // (manual create, queue grouping, retired profile) — this strip makes
+  // every gap in the declared domain visible before an operator hits the
+  // establishment-before-discovery create guard.
+  const [profileSlots, setProfileSlots] = useState<PgProfileSlot[] | null>(null);
 
   // Stage distribution (stage-culture fit §6.2) — authoritative counts from
   // the dedicated endpoint: includes dismissed rows, dedupes AC84 double
@@ -159,6 +240,69 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     [campaignId, children],
   );
 
+  // The PG's declared constraint domain (anchor ∪ secondary_categories ∪
+  // member_geos) — drives the ID card and the per-slot profile chips.
+  const pgDomain = useMemo(() => pgDomainOf(campaign), [campaign]);
+
+  // Tree-scoped queue refresh — fetches the PG's prospect queue and derives
+  // due-today, the promote panel, and the discovery-list queue awareness.
+  // Called by load() and by the discovery-prospects reload so "Reload
+  // prospects" re-renders already-queued businesses as "In queue".
+  const refreshQueue = useCallback(async (ids: string[]) => {
+    const queue = await marketingOpsService.listProspectQueue({
+      source_campaign_ids: ids,
+      // Migration 282 — entries grouped directly into this PG carry
+      // proving_ground_id; the API ORs the two linkage columns.
+      proving_ground_id: campaignId,
+      // campaign_created included: a prospect that graduated to a campaign
+      // is exactly the audit-first promotion candidate — it must stay on
+      // the promote panel, not vanish from it.
+      status: ['queued', 'in_thread', 'hold', 'verify_then_outreach', 'campaign_created'],
+      includeCampaigns: true,
+      limit: 200,
+    });
+    setQueueEntries(queue.entries);
+    setQueueTruncated(queue.entries.length >= 200);
+    const sorted = queue.entries
+      .filter((e) => e.seed_id && e.next_touch_at)
+      .sort((a, b) => new Date(a.next_touch_at!).getTime() - new Date(b.next_touch_at!).getTime());
+    setDueToday(sorted.slice(0, 10));
+
+    // Promotion panel: every non-dismissed tree prospect — including
+    // campaign_created rows, since graduation to campaign + audit is the
+    // pre-condition for promotion, not an exit. Duplicate identities (same
+    // business + city — legacy rows queued twice around a graduation) are
+    // collapsed to the most-advanced row: seeded > campaign_created >
+    // live-queue statuses, so the panel can never offer the same business
+    // twice (promoting both would mint duplicate listings). Rows without a
+    // business_name (category/city scope) are never collapsed.
+    const identityRank = (e: ProspectQueueEntry) =>
+      e.seed_id ? 3 : e.status === 'campaign_created' ? 2 : 1;
+    const byIdentity = new Map<string, ProspectQueueEntry>();
+    for (const e of queue.entries) {
+      if (e.status === 'dismissed') continue;
+      const key = e.business_name
+        ? `${e.business_name.toLowerCase().trim()}|${(e.city ?? '').toLowerCase().trim()}`
+        : `id:${e.id}`;
+      const existing = byIdentity.get(key);
+      if (!existing) {
+        byIdentity.set(key, e);
+      } else if (identityRank(e) > identityRank(existing)) {
+        byIdentity.set(key, e);
+      }
+    }
+    const promotable = [...byIdentity.values()];
+    promotable.sort((a, b) => promoteRank(a) - promoteRank(b));
+    setPromoteEntries(promotable);
+    setPromoteSelected(
+      new Set(
+        promotable
+          .filter((e) => !e.seed_id && e.business_seek_priority !== 'hold' && e.campaign_has_business_audit === true)
+          .map((e) => e.id),
+      ),
+    );
+  }, [campaignId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -186,67 +330,59 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         }
       }
 
+      // Profile readiness — reuse the coverage endpoint (same data the
+      // /coverage page renders) and enumerate one establishment slot per
+      // (domain category × domain geo × focus). coveredByFallback mirrors
+      // resolve()'s city-agnostic/cross-city fallback chain: a missing city
+      // slot only blocks discovery when NO active profile exists for the
+      // category.
+      if (camp.campaign_category === 'proving_ground' && camp.category) {
+        const domain = pgDomainOf(camp);
+        marketingOpsService.getIntelligenceCoverage()
+          .then((cov) => {
+            const norm = (v?: string | null) => (v ?? '').trim().toLowerCase();
+            const next: PgProfileSlot[] = [];
+            for (const catName of domain.categories) {
+              const catRow = cov.categories.find(
+                (c) => norm(c.category_name) === norm(catName) || norm(c.category_key) === norm(catName),
+              );
+              for (const geo of domain.geos) {
+                for (const focus of ['emerging', 'competitive'] as const) {
+                  const focusSlots = (catRow?.slots ?? []).filter((s) => s.focus === focus);
+                  const exact = focusSlots.find((s) => norm(s.city) === norm(geo.city));
+                  next.push({
+                    category: catName,
+                    city: geo.city,
+                    state: geo.state,
+                    focus,
+                    status: exact?.status ?? 'pending',
+                    profileId: exact?.profile_id || undefined,
+                    coveredByFallback:
+                      (!exact || exact.status !== 'active') &&
+                      focusSlots.some((s) => s.status === 'active' && norm(s.city) !== norm(geo.city)),
+                  });
+                }
+              }
+            }
+            setProfileSlots(next);
+          })
+          .catch(() => setProfileSlots(null));
+      } else {
+        setProfileSlots(null);
+      }
+
       const childList = camp.children ?? [];
       setChildren(childList);
       const ids = [campaignId, ...childList.map((c) => c.id)];
-      const [funnelReport, queue, dist] = await Promise.all([
+      const [funnelReport, dist] = await Promise.all([
         directoryPresenceAdminService.getCohortFunnel({ campaignIds: ids }),
-        marketingOpsService.listProspectQueue({
-          source_campaign_ids: ids,
-          // Migration 282 — entries grouped directly into this PG carry
-          // proving_ground_id; the API ORs the two linkage columns.
-          proving_ground_id: campaignId,
-          // campaign_created included: a prospect that graduated to a campaign
-          // is exactly the audit-first promotion candidate — it must stay on
-          // the promote panel, not vanish from it.
-          status: ['queued', 'in_thread', 'hold', 'verify_then_outreach', 'campaign_created'],
-          includeCampaigns: true,
-          limit: 200,
-        }),
         // Read-only roll-up — non-blocking so the cockpit still renders if
         // the endpoint rejects (e.g. non-PG campaign during dev).
         marketingOpsService.getProvingGroundStageDistribution(campaignId).catch(() => null),
+        refreshQueue(ids),
       ]);
       setFunnel(funnelReport);
       setStageDist(dist);
-      setQueueTruncated(queue.entries.length >= 200);
-      const sorted = queue.entries
-        .filter((e) => e.seed_id && e.next_touch_at)
-        .sort((a, b) => new Date(a.next_touch_at!).getTime() - new Date(b.next_touch_at!).getTime());
-      setDueToday(sorted.slice(0, 10));
-
-      // Promotion panel: every non-dismissed tree prospect — including
-      // campaign_created rows, since graduation to campaign + audit is the
-      // pre-condition for promotion, not an exit. Duplicate identities (same
-      // business + city — legacy rows queued twice around a graduation) are
-      // collapsed to the most-advanced row: seeded > campaign_created >
-      // live-queue statuses, so the panel can never offer the same business
-      // twice (promoting both would mint duplicate listings). Rows without a
-      // business_name (category/city scope) are never collapsed.
-      const identityRank = (e: ProspectQueueEntry) =>
-        e.seed_id ? 3 : e.status === 'campaign_created' ? 2 : 1;
-      const byIdentity = new Map<string, ProspectQueueEntry>();
-      for (const e of queue.entries) {
-        if (e.status === 'dismissed') continue;
-        const key = e.business_name
-          ? `${e.business_name.toLowerCase().trim()}|${(e.city ?? '').toLowerCase().trim()}`
-          : `id:${e.id}`;
-        const existing = byIdentity.get(key);
-        if (!existing) {
-          byIdentity.set(key, e);
-        } else if (identityRank(e) > identityRank(existing)) {
-          byIdentity.set(key, e);
-        }
-      }
-      const promotable = [...byIdentity.values()];
-      setPromoteEntries(promotable);
-      setPromoteSelected(
-        new Set(
-          promotable
-            .filter((e) => !e.seed_id && e.business_seek_priority !== 'hold' && e.campaign_has_business_audit === true)
-            .map((e) => e.id),
-        ),
-      );
 
       // Attachable = unparented intelligence *discovery prospect* runs
       // (kind = discovery, focus = emerging | competitive) — the same gate
@@ -278,7 +414,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [campaignId]);
+  }, [campaignId, refreshQueue]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -462,6 +598,30 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     }
   };
 
+  // Per-row priority toggle — the "prioritize" step's control. `priority`
+  // (high/normal) is the queue's own flag; high rows float to the top of
+  // this list and the queue page. Patchable on open statuses only
+  // (queued / verify_then_outreach — the service 409s anything else).
+  const handleTogglePriority = async (entry: ProspectQueueEntry) => {
+    const next: ProspectPriority = entry.priority === 'high' ? 'normal' : 'high';
+    setPriorityBusy(entry.id);
+    setPromoteError(null);
+    try {
+      await marketingOpsService.updateProspectQueue(entry.id, { priority: next });
+      const bump = (e: ProspectQueueEntry) => (e.id === entry.id ? { ...e, priority: next } : e);
+      setQueueEntries((prev) => prev.map(bump));
+      setPromoteEntries((prev) => {
+        const list = prev.map(bump);
+        list.sort((a, b) => promoteRank(a) - promoteRank(b));
+        return list;
+      });
+    } catch (err: any) {
+      setPromoteError(err.message || 'Failed to update priority');
+    } finally {
+      setPriorityBusy(null);
+    }
+  };
+
   // Dismiss removes a prospect from the promote list and the worklist
   // (status='dismissed' — idempotent, row retained as history; viewable on
   // the queue page under the dismissed filter).
@@ -530,7 +690,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     setProspectsLoading(true);
     setProspectsError(null);
     try {
-      const details = await Promise.all(children.map((c) => marketingOpsService.getCampaign(c.id)));
+      // Refresh queue awareness alongside the audit pull — prospects that
+      // landed in the queue since the last load must render "In queue"
+      // instead of the Queue/Verify/Campaign actions. Non-blocking: a queue
+      // read failure keeps the last-known awareness rather than blocking
+      // the discovery list.
+      const [details] = await Promise.all([
+        Promise.all(children.map((c) => marketingOpsService.getCampaign(c.id))),
+        refreshQueue(treeIds).catch(() => {}),
+      ]);
       const found: Array<{ childId: string; childTitle: string; audit: Audit }> = [];
       children.forEach((child, i) => {
         const detail = details[i];
@@ -555,7 +723,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     } finally {
       setProspectsLoading(false);
     }
-  }, [children]);
+  }, [children, refreshQueue, treeIds]);
 
   // Log a gap against a specific prospect: prefill the campaign gap form with
   // the prospect identity so the entry lands on the proving ground's
@@ -628,6 +796,58 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           </div>
         </div>
 
+        {/* ID card — the constraint attributes that drive every behavior on
+            this page. The declared domain is two axes: categories (anchor ∪
+            secondary_categories) × geos (anchor ∪ member_geos, or
+            unconstrained when city is blank). Out-of-domain members widen
+            the domain automatically (describe + auto-expand). */}
+        <div className="mt-3 rounded-lg border border-gray-100 dark:border-neutral-700 bg-gray-50/60 dark:bg-neutral-900/40 px-3 py-2">
+          <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-1.5">
+            <div title="Which domain axis this PG proves on — city = one market, category = spans cities.">
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Scope</dt>
+              <dd className="text-xs font-medium text-gray-800 dark:text-gray-200">{campaign.scope ?? '—'}</dd>
+            </div>
+            <div
+              title={`Market identity — required. Drives the profile chips below, market enrichment, and the duplicate-signature match. Domain: ${pgDomain.categories.join(', ')}`}
+            >
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {pgDomain.categories.length > 1 ? 'Categories' : 'Category'}
+              </dt>
+              <dd className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                {pgDomain.categories[0] ?? '—'}
+                {pgDomain.categories.length > 1 && (
+                  <span className="text-gray-400 dark:text-gray-500"> +{pgDomain.categories.length - 1}</span>
+                )}
+              </dd>
+            </div>
+            <div
+              title={`Declared geo domain${pgDomain.geos[0]?.city ? ': ' + pgDomain.geos.map((g) => [g.city, g.state].filter(Boolean).join(', ')).join(' · ') : ' — unconstrained (nationwide)'}. Auto-expands when out-of-domain members are grouped in.`}
+            >
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {pgDomain.geos.length > 1 ? 'Cities' : 'City'}
+              </dt>
+              <dd className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                {pgDomain.geos[0]?.city ?? 'nationwide'}
+                {pgDomain.geos.length > 1 && (
+                  <span className="text-gray-400 dark:text-gray-500"> +{pgDomain.geos.length - 1}</span>
+                )}
+              </dd>
+            </div>
+            <div title="State qualifier for the anchor market and for profile slot matching.">
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">State</dt>
+              <dd className="text-xs font-medium text-gray-800 dark:text-gray-200">{campaign.state ?? '—'}</dd>
+            </div>
+            <div title={campaign.city
+              ? 'Fixed-geography PG — members join through the queue/graduation path; direct business attach is blocked.'
+              : 'Mixed PG — no fixed geography; business campaigns may attach directly and queue rows join via proving_ground_id.'}>
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Mode</dt>
+              <dd className={`text-xs font-medium ${campaign.city ? 'text-gray-800 dark:text-gray-200' : 'text-teal-700 dark:text-teal-300'}`}>
+                {campaign.city ? 'fixed' : 'mixed'}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
         {/* Gate chips */}
         {gates.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700">
@@ -647,9 +867,98 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           </div>
         )}
 
+        {/* Profile readiness — the PG's one enforcement surface, enumerated
+            across the declared domain: one slot per (category × geo × focus).
+            Chips mirror the coverage page's 4-state establishment model:
+            pending → create the establishment run, inflight → open it,
+            draft → activate the profile, active → done. "fallback" means
+            resolve() would still succeed via a city-agnostic/other-city
+            profile — usable, but flagged for contamination risk. */}
+        {profileSlots && profileSlots.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              Profiles
+            </span>
+            {profileSlots.slice(0, 12).map((slot, i) => {
+              const slotKey = `${slot.category}|${slot.city}|${slot.focus}|${i}`;
+              const geoLabel = slot.city || 'nationwide';
+              const createHref = (() => {
+                const sp = new URLSearchParams();
+                sp.set('scope', 'intelligence');
+                sp.set('focus', slot.focus);
+                sp.set('kind', 'establishment');
+                if (slot.category) sp.set('category', slot.category);
+                if (slot.city) sp.set('city', slot.city);
+                if (slot.state) sp.set('state', slot.state);
+                return `/settings/admin/marketing-ops/campaigns/new?${sp.toString()}`;
+              })();
+              // Prefix the slot identity only on the axes the domain is
+              // multi-valued on — single-domain chips stay terse.
+              const prefix = [
+                pgDomain.categories.length > 1 ? slot.category : null,
+                pgDomain.geos.length > 1 ? geoLabel : null,
+              ].filter(Boolean).join(' · ');
+              const label = (statusWord: string) =>
+                `${prefix ? prefix + ' · ' : ''}${slot.focus} · ${statusWord}`;
+              const chip = (href: string, className: string, text: string, title: string) => (
+                <Link key={slotKey} href={href} title={title}
+                  className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium ${className}`}>
+                  {text}
+                </Link>
+              );
+              if (slot.status === 'active') {
+                return chip(
+                  '/settings/admin/marketing-ops/intelligence-profiles',
+                  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                  label('active'),
+                  `Active ${slot.focus} profile covers ${slot.category} / ${geoLabel} — discovery runs can be created.`,
+                );
+              }
+              if (slot.status === 'inflight') {
+                return chip(
+                  `/settings/admin/marketing-ops/campaigns/${slot.profileId}`,
+                  'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+                  label('in flight'),
+                  `An establishment campaign for ${slot.focus} / ${slot.category} / ${geoLabel} is underway but hasn't produced a profile yet — click to open it.`,
+                );
+              }
+              if (slot.status === 'draft') {
+                return chip(
+                  '/settings/admin/marketing-ops/intelligence-profiles',
+                  'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+                  label('draft'),
+                  `A draft ${slot.focus} profile exists for ${slot.category} / ${geoLabel} — click to review & activate it.`,
+                );
+              }
+              // pending
+              return chip(
+                slot.coveredByFallback
+                  ? '/settings/admin/marketing-ops/coverage'
+                  : createHref,
+                slot.coveredByFallback
+                  ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
+                  : 'bg-red-50 text-red-700 border border-dashed border-red-300 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800',
+                label(slot.coveredByFallback ? 'fallback' : 'missing'),
+                slot.coveredByFallback
+                  ? `No ${slot.focus} profile scoped to ${slot.category} / ${geoLabel}, but an active one exists elsewhere — discovery resolves it via fallback (cross-market contamination risk). See Coverage.`
+                  : `No active ${slot.focus} profile for ${slot.category} / ${geoLabel} — discovery runs can't be created until an establishment campaign produces one. Click to create it.`,
+              );
+            })}
+            {profileSlots.length > 12 && (
+              <Link
+                href="/settings/admin/marketing-ops/coverage"
+                className="text-[10px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                title="This PG's domain spans more profile slots than fit here — the coverage page shows them all."
+              >
+                +{profileSlots.length - 12} more → Coverage
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Market enrichment status line + public copy */}
         {campaign.campaign_category === 'proving_ground' && campaign.category && campaign.city && campaign.state && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700">
+          <div id="enrich" className="mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700 scroll-mt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {marketStatus ? (
@@ -913,7 +1222,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         </div>
 
         {/* Due today */}
-        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+        <div id="worklist" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
             <ListChecks className="w-4 h-4" /> Due today
           </h2>
@@ -1047,8 +1356,10 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       </div>
 
       {/* Promote to listings — preflight step 2's data surface: selective
-          seeding of tree prospects. Hold-priority rows default unchecked. */}
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          seeding of tree prospects. Hold-priority rows default unchecked.
+          id="queue" — this panel IS the PG's tree-filtered queue view;
+          the seed_claim_kit deep-link target resolves here. */}
+      <div id="queue" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
         <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <MapPin className="w-4 h-4" /> Promote to listings (preflight step 2)
@@ -1213,6 +1524,22 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                               </button>
                             </>
                           )}
+                          {!promoted && (e.status === 'queued' || e.status === 'verify_then_outreach') && (
+                            <button
+                              onClick={() => handleTogglePriority(e)}
+                              disabled={priorityBusy === e.id || promoteBusy || dismissBusy}
+                              className={`text-[10px] px-1.5 py-0.5 rounded border disabled:opacity-50 ${
+                                e.priority === 'high'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800'
+                                  : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-neutral-700/40 dark:text-gray-400 dark:border-neutral-600'
+                              }`}
+                              title={e.priority === 'high'
+                                ? 'High priority — works first, top of this list. Click to lower.'
+                                : 'Normal priority — click to raise (floats to the top of this list)'}
+                            >
+                              {priorityBusy === e.id ? '…' : (e.priority ?? 'normal')}
+                            </button>
+                          )}
                           <span>
                             {e.status}
                             {e.identity_confidence ? ` · conf: ${e.identity_confidence}` : ''}
@@ -1280,7 +1607,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       )}
 
       {/* Children */}
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+      <div id="children" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
           Attached campaigns ({children.length})
         </h2>
@@ -1348,7 +1675,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       </div>
 
       {/* Discovery prospects — loaded on demand from the attached intelligence campaigns */}
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+      <div id="prospects" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
         <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <Users className="w-4 h-4" /> Discovery prospects
@@ -1392,6 +1719,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                 <IntelligenceDiscoveryAuditCard
                   audit={audit}
                   campaignId={childId}
+                  queueEntries={queueEntries}
                   onLogGap={(biz) => handleProspectGap(biz.business_name, biz.city, biz.state)}
                   onQueued={load}
                 />

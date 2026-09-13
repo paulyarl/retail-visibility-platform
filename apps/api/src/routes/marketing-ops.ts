@@ -4486,6 +4486,10 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
 // reuses the PG campaign and stamps proving_ground_id on the entries.
 const groupIntoProvingGroundSchema = z.object({
   queueEntryIds: z.array(z.string().min(1)).min(1).max(200),
+  // Migration 283 — explicit add-to-existing target for populated-PG adds.
+  // When set, the anchor fields are ignored (the PG keeps its declared
+  // domain; out-of-domain entries auto-expand it).
+  provingGroundId: z.string().min(1).optional(),
   title: z.string().max(255).optional(),
   scope: z.enum(['city', 'category']).optional(),
   category: z.string().max(100).optional(),

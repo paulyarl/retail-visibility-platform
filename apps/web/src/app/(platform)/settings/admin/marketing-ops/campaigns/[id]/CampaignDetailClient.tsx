@@ -534,6 +534,12 @@ export default function CampaignDetailClient({
         items.filter((c) =>
           c.id !== campaign.id &&
           !c.parent_campaign_id &&
+          // Only discovery prospect runs can merge — the server rejects
+          // establishment runs (child_not_discovery_prospect_run): they
+          // produce the market's profile, not prospects, so attaching one
+          // would add a child no cockpit surface reads.
+          (c.intelligence_campaign_kind ?? 'discovery') === 'discovery' &&
+          ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging') &&
           norm(c.city) === norm(campaign.city) &&
           norm(c.state) === norm(campaign.state)
         ),
@@ -2527,7 +2533,7 @@ export default function CampaignDetailClient({
                   </p>
                 ) : pgCandidates.length === 0 ? (
                   <p className="text-xs text-gray-400">
-                    No other unparented intelligence campaigns in {[campaign.city, campaign.state].filter(Boolean).join(', ') || 'this market'}.
+                    No other unparented discovery runs in {[campaign.city, campaign.state].filter(Boolean).join(', ') || 'this market'}.
                   </p>
                 ) : (
                   <ul className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 p-2">

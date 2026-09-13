@@ -967,6 +967,7 @@ export class MarketingCampaignService extends BaseService {
     reusedExisting: boolean;
     attached: string[];
     skipped: Array<{ id: string; reason: string }>;
+    domainExpanded: { categories: string[]; geos: Array<{ city: string; state: string | null }> };
   }> {
     try {
       const source = await this.prisma.mkt_campaigns_list.findUnique({
@@ -982,13 +983,13 @@ export class MarketingCampaignService extends BaseService {
         throw new ConflictError('source_already_parented');
       }
       // Only discovery prospect runs (emerging / competitive focus) may
-      // *originate* a proving ground — they carry the market's candidate
-      // businesses and a real city. Establishment runs produce the profile,
-      // not prospects, and are often state/nationwide-scoped (city null),
-      // which would fail the city requirement below or key the proving
-      // ground to the wrong geography. Establishment campaigns can still be
-      // attached to an existing proving ground via attachChildCampaign as
-      // provenance children.
+      // *originate* or merge into a proving ground — they carry the
+      // market's candidate businesses. Establishment runs produce the
+      // profile, not prospects, and are often state/nationwide-scoped
+      // (city null); the PG already consumes the profile their activation
+      // produces (profile_activated market enrichment), so the campaign
+      // container adds nothing to the tree. attachChildCampaign enforces
+      // the same discovery-only guard for children.
       const sourceKind = (source.intelligence_campaign_kind as string | null) || 'discovery';
       const sourceFocus = (source.intelligence_focus as string | null) || 'emerging';
       if (sourceKind !== 'discovery' || (sourceFocus !== 'emerging' && sourceFocus !== 'competitive')) {
@@ -1048,14 +1049,43 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
+      // Migration 283 — merged runs widen the PG's declared domain: their
+      // categories flow into secondary_categories, their geos into
+      // member_geos (umbrella + multi-city PGs describe what they contain).
+      let domainExpanded: { categories: string[]; geos: Array<{ city: string; state: string | null }> } = {
+        categories: [],
+        geos: [],
+      };
+      if (attached.length > 0) {
+        const attachedCampaigns = await this.prisma.mkt_campaigns_list.findMany({
+          where: { id: { in: attached } },
+          select: { category: true, city: true, state: true },
+        });
+        domainExpanded = await this.expandProvingGroundDomain(provingGround, attachedCampaigns);
+        if (domainExpanded.categories.length || domainExpanded.geos.length) {
+          provingGround = {
+            ...provingGround,
+            secondary_categories: [
+              ...(provingGround.secondary_categories ?? []),
+              ...domainExpanded.categories,
+            ],
+            member_geos: [
+              ...((Array.isArray(provingGround.member_geos) ? provingGround.member_geos : []) as unknown[]),
+              ...domainExpanded.geos,
+            ],
+          };
+        }
+      }
+
       logger.info('promoteToProvingGround: completed', ctx, {
         sourceId,
         provingGroundId: provingGround.id,
         reusedExisting,
         attachedCount: attached.length,
         skippedCount: skipped.length,
+        domainExpanded: domainExpanded.categories.length + domainExpanded.geos.length,
       });
-      return { provingGround, reusedExisting, attached, skipped };
+      return { provingGround, reusedExisting, attached, skipped, domainExpanded };
     } catch (error) {
       logger.error('Failed to promote campaign to proving ground', ctx, { error: (error as Error).message, sourceId });
       throw this.handleError(error, ctx);
@@ -1073,9 +1103,90 @@ export class MarketingCampaignService extends BaseService {
    *
    * Re-grouping is a move: stamping overwrites a prior proving_ground_id.
    */
+  /**
+   * PG domain expansion (Migration 283 — describe + auto-expand). A proving
+   * ground's constraint domain is two axes:
+   *   categories = category ∪ secondary_categories
+   *   geos       = {city,state} ∪ member_geos   (only when the anchor city is
+   *                set — a geography-free PG's geo domain is unconstrained)
+   * Members that arrive out-of-domain are never rejected — the domain widens
+   * to describe them. Returns what was appended so callers can report it.
+   */
+  private async expandProvingGroundDomain(
+    pg: {
+      id: string;
+      category?: string | null;
+      city?: string | null;
+      state?: string | null;
+      secondary_categories?: string[] | null;
+      member_geos?: unknown;
+    },
+    members: Array<{ category?: string | null; city?: string | null; state?: string | null }>,
+  ): Promise<{ categories: string[]; geos: Array<{ city: string; state: string | null }> }> {
+    const norm = (v?: string | null) => (v ?? '').trim().toLowerCase();
+
+    const existingCats = new Set(
+      [pg.category, ...(pg.secondary_categories ?? [])].map(norm).filter(Boolean),
+    );
+    const newCategories: string[] = [];
+    const seenCats = new Set<string>();
+    for (const m of members) {
+      const c = (m.category ?? '').trim();
+      const key = norm(c);
+      if (key && !existingCats.has(key) && !seenCats.has(key)) {
+        seenCats.add(key);
+        newCategories.push(c);
+      }
+    }
+
+    const newGeos: Array<{ city: string; state: string | null }> = [];
+    if (norm(pg.city)) {
+      const geoKey = (city?: string | null, state?: string | null) =>
+        `${norm(city)}|${norm(state)}`;
+      const declared = new Set<string>([
+        geoKey(pg.city, pg.state),
+        ...((Array.isArray(pg.member_geos) ? pg.member_geos : []) as Array<{
+          city?: string;
+          state?: string | null;
+        }>).map((g) => geoKey(g.city, g.state)),
+      ]);
+      const seenGeos = new Set<string>();
+      for (const m of members) {
+        const city = (m.city ?? '').trim();
+        const state = (m.state ?? '').trim();
+        const key = geoKey(city, state);
+        if (norm(city) && !declared.has(key) && !seenGeos.has(key)) {
+          seenGeos.add(key);
+          newGeos.push({ city, state: state || null });
+        }
+      }
+    }
+
+    if (newCategories.length === 0 && newGeos.length === 0) {
+      return { categories: [], geos: [] };
+    }
+    const memberGeos = [
+      ...((Array.isArray(pg.member_geos) ? pg.member_geos : []) as unknown[]),
+      ...newGeos,
+    ];
+    await this.prisma.mkt_campaigns_list.update({
+      where: { id: pg.id },
+      data: {
+        secondary_categories: [...(pg.secondary_categories ?? []), ...newCategories] as any,
+        member_geos: (memberGeos.length ? memberGeos : null) as any,
+        updated_at: new Date(),
+      },
+    });
+    return { categories: newCategories, geos: newGeos };
+  }
+
   async groupQueueEntriesIntoProvingGround(
     input: {
       queueEntryIds: string[];
+      // Explicit add-to-existing target (populated-PG adds). When omitted the
+      // anchor signature is derived and findDuplicateCampaign decides
+      // create-vs-reuse.
+      provingGroundId?: string;
       title?: string;
       scope?: 'city' | 'category';
       category?: string;
@@ -1088,6 +1199,7 @@ export class MarketingCampaignService extends BaseService {
     reusedExisting: boolean;
     stamped: number;
     notFound: string[];
+    domainExpanded: { categories: string[]; geos: Array<{ city: string; state: string | null }> };
   }> {
     try {
       const entryIds = [...new Set(input.queueEntryIds)];
@@ -1102,45 +1214,77 @@ export class MarketingCampaignService extends BaseService {
       const foundIds = new Set(entries.map((e) => e.id));
       const notFound = entryIds.filter((id) => !foundIds.has(id));
 
-      // Defaults: operator input wins; otherwise the most common non-empty
-      // value across the grouped entries (a queue group usually shares a
-      // market — city or category may still vary).
-      const modal = (values: Array<string | null>): string => {
-        const counts = new Map<string, number>();
-        for (const v of values) {
-          const t = (v ?? '').trim();
-          if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+      let provingGround: any;
+      let reusedExisting = false;
+      if (input.provingGroundId) {
+        provingGround = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: input.provingGroundId },
+        });
+        if (!provingGround) {
+          throw new NotFoundError(`Proving ground ${input.provingGroundId} not found`);
         }
-        return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
-      };
-      const category = (input.category ?? '').trim() || modal(entries.map((e) => e.category));
-      const city = (input.city ?? '').trim() || modal(entries.map((e) => e.city));
-      const state = (input.state ?? '').trim() || modal(entries.map((e) => e.state));
-      const pgScope = input.scope ?? (city ? 'city' : 'category');
-      if (pgScope !== 'city' && pgScope !== 'category') {
-        throw new ValidationError('scope must be city or category');
-      }
-      if (!category) {
-        throw new ValidationError('category is required to create a proving ground');
-      }
-      if (pgScope === 'city' && !city) {
-        throw new ValidationError('city is required to create a city-scope proving ground');
+        if (provingGround.campaign_category !== 'proving_ground') {
+          throw new ValidationError('target_not_proving_ground');
+        }
+        reusedExisting = true;
+      } else {
+        // Defaults: operator input wins; otherwise the most common non-empty
+        // value across the grouped entries (a queue group usually shares a
+        // market — city or category may still vary).
+        const modal = (values: Array<string | null>): string => {
+          const counts = new Map<string, number>();
+          for (const v of values) {
+            const t = (v ?? '').trim();
+            if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+          }
+          return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+        };
+        const category = (input.category ?? '').trim() || modal(entries.map((e) => e.category));
+        const city = (input.city ?? '').trim() || modal(entries.map((e) => e.city));
+        const state = (input.state ?? '').trim() || modal(entries.map((e) => e.state));
+        const pgScope = input.scope ?? (city ? 'city' : 'category');
+        if (pgScope !== 'city' && pgScope !== 'category') {
+          throw new ValidationError('scope must be city or category');
+        }
+        if (!category) {
+          throw new ValidationError('category is required to create a proving ground');
+        }
+        if (pgScope === 'city' && !city) {
+          throw new ValidationError('city is required to create a city-scope proving ground');
+        }
+
+        provingGround = await this.findDuplicateCampaign(
+          { scope: pgScope, campaignCategory: 'proving_ground', category, city, state },
+          ctx,
+        );
+        reusedExisting = !!provingGround;
+        if (!provingGround) {
+          provingGround = await this.createCampaign({
+            scope: pgScope,
+            campaignCategory: 'proving_ground',
+            category,
+            city: city || undefined,
+            state: state || undefined,
+            title: input.title || `${[city, category].filter(Boolean).join(' ')} Proving Ground`,
+          }, ctx);
+        }
       }
 
-      let provingGround = await this.findDuplicateCampaign(
-        { scope: pgScope, campaignCategory: 'proving_ground', category, city, state },
-        ctx,
-      );
-      const reusedExisting = !!provingGround;
-      if (!provingGround) {
-        provingGround = await this.createCampaign({
-          scope: pgScope,
-          campaignCategory: 'proving_ground',
-          category,
-          city: city || undefined,
-          state: state || undefined,
-          title: input.title || `${[city, category].filter(Boolean).join(' ')} Proving Ground`,
-        }, ctx);
+      // Domain auto-expand — grouped entries outside the declared domain
+      // widen it rather than being rejected (soft gate is the caller's UI).
+      const domainExpanded = await this.expandProvingGroundDomain(provingGround, entries);
+      if (domainExpanded.categories.length || domainExpanded.geos.length) {
+        provingGround = {
+          ...provingGround,
+          secondary_categories: [
+            ...(provingGround.secondary_categories ?? []),
+            ...domainExpanded.categories,
+          ],
+          member_geos: [
+            ...((Array.isArray(provingGround.member_geos) ? provingGround.member_geos : []) as unknown[]),
+            ...domainExpanded.geos,
+          ],
+        };
       }
 
       const stampResult = entries.length > 0
@@ -1155,8 +1299,15 @@ export class MarketingCampaignService extends BaseService {
         reusedExisting,
         stamped: stampResult.count,
         notFound: notFound.length,
+        domainExpanded: domainExpanded.categories.length + domainExpanded.geos.length,
       });
-      return { provingGround, reusedExisting, stamped: stampResult.count, notFound };
+      return {
+        provingGround,
+        reusedExisting,
+        stamped: stampResult.count,
+        notFound,
+        domainExpanded,
+      };
     } catch (error) {
       logger.error('Failed to group queue entries into proving ground', ctx, {
         error: (error as Error).message,

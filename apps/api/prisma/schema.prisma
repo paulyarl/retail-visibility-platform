@@ -3409,6 +3409,7 @@ model mkt_campaigns_list {
   gap_log                                                                         Json?
   secondary_categories                                                            String[]                             @default([])
   date_seed                                                                       DateTime?                            @db.Timestamptz(6)
+  member_geos                                                                     Json?
   directory_seed_campaign_links                                                   directory_seed_campaign_links[]
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]

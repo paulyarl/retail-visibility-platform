@@ -135,6 +135,10 @@ export interface Campaign {
   // Migration 271 — additional categories beyond the primary, populated by
   // the category-identification act flow and the campaign edit form.
   secondary_categories?: string[];
+  // Migration 283 — proving-ground domain extras: extra declared {city,state}
+  // pairs beyond the anchor geo (city + suburbs, auto-expanded membership).
+  // Only meaningful when the anchor city is set.
+  member_geos?: Array<{ city: string; state?: string | null }> | null;
   city: string;
   neighborhood: string | null;
   contact_method: string | null;
@@ -4760,6 +4764,9 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async groupIntoProvingGround(input: {
     queueEntryIds: string[];
+    // Migration 283 — explicit add-to-existing target; when set, the anchor
+    // fields are ignored and the PG's domain auto-expands to cover the rows.
+    provingGroundId?: string;
     title?: string;
     scope?: 'city' | 'category';
     category?: string;
@@ -4770,6 +4777,7 @@ class MarketingOpsService extends AdminApiSingleton {
     reusedExisting: boolean;
     stamped: number;
     notFound: string[];
+    domainExpanded?: { categories: string[]; geos: Array<{ city: string; state: string | null }> };
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/prospect-queue/group-into-proving-ground`,
@@ -6108,6 +6116,8 @@ export const INTERNAL_LINK_TARGETS = [
   // Migration 262 — proving-ground cockpit surfaces (spec §4.3)
   'proving_ground_worklist',
   'seed_claim_kit',
+  // Generic PG cockpit section link (params.section picks the panel)
+  'proving_ground_section',
 ] as const;
 export type InternalLinkTarget = (typeof INTERNAL_LINK_TARGETS)[number];
 
@@ -6120,6 +6130,7 @@ export const INTERNAL_LINK_TARGET_LABELS: Record<InternalLinkTarget, string> = {
   intake_form: 'Intake Form',
   proving_ground_worklist: 'Proving Ground Worklist',
   seed_claim_kit: 'Seed Claim Kit / Worklist',
+  proving_ground_section: 'Proving Ground Section',
 };
 
 // ─── Outreach kind (bridge sprint) ───────────────────────────────────────
