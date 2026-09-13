@@ -81,6 +81,19 @@ const PLATFORM_LABELS: Record<string, string> = {
   bbb: 'BBB',
 };
 
+const KIND_LABELS: Record<string, string> = {
+  discovery: 'Discovery',
+  establishment: 'Establishment',
+};
+
+function focusLabel(key: string): string {
+  return FOCUS_LABELS[key as IntelligenceFocus] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function kindLabel(key: string): string {
+  return KIND_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
 function platformLabel(key: string): string {
   return PLATFORM_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
 }
@@ -116,6 +129,8 @@ export default function IntelligenceProfilesClient() {
   const [nbScopeFilter, setNbScopeFilter] = useState<CampaignScope | ''>('');
   const [nbCategoryFilter, setNbCategoryFilter] = useState('');
   const [nbCityFilter, setNbCityFilter] = useState('');
+  const [nbFocusFilter, setNbFocusFilter] = useState('');
+  const [nbKindFilter, setNbKindFilter] = useState('');
   const [nbSearch, setNbSearch] = useState('');
   const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
   const [promotingCampaignId, setPromotingCampaignId] = useState<string | null>(null);
@@ -233,6 +248,8 @@ export default function IntelligenceProfilesClient() {
       if (nbScopeFilter && c.scope !== nbScopeFilter) return false;
       if (nbCategoryFilter && c.category !== nbCategoryFilter) return false;
       if (nbCityFilter && c.city !== nbCityFilter) return false;
+      if (nbFocusFilter && c.intelligence_focus !== nbFocusFilter) return false;
+      if (nbKindFilter && c.intelligence_campaign_kind !== nbKindFilter) return false;
       if (nbSearch) {
         const q = nbSearch.toLowerCase();
         const haystack = [c.title, c.business_name, c.category, c.city, c.display_id]
@@ -241,7 +258,7 @@ export default function IntelligenceProfilesClient() {
       }
       return true;
     });
-  }, [nonBusinessCampaigns, nbScopeFilter, nbCategoryFilter, nbCityFilter, nbSearch]);
+  }, [nonBusinessCampaigns, nbScopeFilter, nbCategoryFilter, nbCityFilter, nbFocusFilter, nbKindFilter, nbSearch]);
 
   const nbCategoryOptions = useMemo(
     () => [...new Set(nonBusinessCampaigns.map((c) => c.category).filter(Boolean))].sort(),
@@ -249,6 +266,14 @@ export default function IntelligenceProfilesClient() {
   );
   const nbCityOptions = useMemo(
     () => [...new Set(nonBusinessCampaigns.map((c) => c.city).filter(Boolean))].sort(),
+    [nonBusinessCampaigns],
+  );
+  const nbFocusOptions = useMemo(
+    () => [...new Set(nonBusinessCampaigns.map((c) => c.intelligence_focus).filter(Boolean) as string[])].sort(),
+    [nonBusinessCampaigns],
+  );
+  const nbKindOptions = useMemo(
+    () => [...new Set(nonBusinessCampaigns.map((c) => c.intelligence_campaign_kind).filter(Boolean) as string[])].sort(),
     [nonBusinessCampaigns],
   );
 
@@ -630,7 +655,7 @@ export default function IntelligenceProfilesClient() {
               )}
 
               {/* Filters */}
-              <Group gap="xs" mb="sm" grow>
+              <Group gap="xs" mb="sm" grow wrap="wrap">
                 <TextInput
                   placeholder="Search title, category, city…"
                   value={nbSearch}
@@ -666,6 +691,22 @@ export default function IntelligenceProfilesClient() {
                   data={nbCityOptions.map((c) => ({ value: c, label: c }))}
                   clearable
                   searchable
+                  size="xs"
+                />
+                <Select
+                  placeholder="All focus"
+                  value={nbFocusFilter || ''}
+                  onChange={(v) => setNbFocusFilter(v || '')}
+                  data={nbFocusOptions.map((f) => ({ value: f, label: focusLabel(f) }))}
+                  clearable
+                  size="xs"
+                />
+                <Select
+                  placeholder="All kinds"
+                  value={nbKindFilter || ''}
+                  onChange={(v) => setNbKindFilter(v || '')}
+                  data={nbKindOptions.map((k) => ({ value: k, label: kindLabel(k) }))}
+                  clearable
                   size="xs"
                 />
               </Group>
@@ -740,15 +781,17 @@ export default function IntelligenceProfilesClient() {
                                 >
                                   <IconEdit size={14} />
                                 </ActionIcon>
-                                {/* PG: only discovery prospect runs (emerging / competitive
-                                    focus) may originate a proving ground — they carry the
-                                    candidate businesses and a real city. Establishment and
-                                    gold-standards runs produce profiles, not prospects, and
-                                    are often state/nationwide-scoped. Existing proving
-                                    grounds jump straight to the cockpit. */}
-                                {c.scope === 'intelligence' && !c.parent_campaign_id
-                                  && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
-                                  && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging') && (
+                                {/* PG: show a "create proving ground" icon for
+                                    intelligence-scope campaigns that don't already
+                                    have one (campaign_category !== 'proving_ground').
+                                    Excludes gold_standards focus and establishment
+                                    kind runs — those produce profiles, not prospects,
+                                    and are often state/nationwide-scoped. Existing
+                                    proving grounds jump straight to the cockpit. */}
+                                {c.scope === 'intelligence'
+                                  && c.campaign_category !== 'proving_ground'
+                                  && c.intelligence_focus !== 'gold_standards'
+                                  && c.intelligence_campaign_kind !== 'establishment' && (
                                   <ActionIcon
                                     variant="light"
                                     color="violet"
