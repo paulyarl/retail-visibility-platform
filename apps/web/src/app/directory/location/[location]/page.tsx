@@ -132,6 +132,11 @@ export default async function LocationPage({ params, searchParams }: LocationPag
 
   const effectiveDescription = enrichment?.effective?.description;
   const effectiveSecondaryCategories = enrichment?.effective?.secondaryCategories || [];
+  const bodyCopy = enrichment?.bodyCopy;
+  const topCategories = enrichment?.topCategories || [];
+  const shopperGuide = enrichment?.shopperGuide;
+  const faq = enrichment?.faq || [];
+  const areaBreakdown = enrichment?.areaBreakdown || [];
 
   if (!data) {
     return (
@@ -206,6 +211,21 @@ export default async function LocationPage({ params, searchParams }: LocationPag
                     {category}
                   </span>
                 ))}
+              </div>
+            )}
+            {topCategories.length > 0 && (
+              <div className="mt-3">
+                <p className="text-sm text-gray-500 mb-1">Top categories in {locationName}</p>
+                <div className="flex flex-wrap gap-2 max-w-3xl">
+                  {topCategories.slice(0, 8).map((category: string) => (
+                    <span
+                      key={category}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+                    >
+                      {category}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -291,7 +311,9 @@ export default async function LocationPage({ params, searchParams }: LocationPag
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
                   About {locationName}
                 </h2>
-                {effectiveDescription ? (
+                {bodyCopy ? (
+                  <p className="text-gray-700 mb-4 whitespace-pre-line">{bodyCopy}</p>
+                ) : effectiveDescription ? (
                   <p className="text-gray-700 mb-4">{effectiveDescription}</p>
                 ) : (
                   <>
@@ -306,6 +328,80 @@ export default async function LocationPage({ params, searchParams }: LocationPag
                   </>
                 )}
               </div>
+
+              {/* Shopper Guide */}
+              {shopperGuide && (
+                <div className="mt-8 prose max-w-none">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                    Shopping in {locationName}
+                  </h2>
+                  <p className="text-gray-700 whitespace-pre-line">{shopperGuide}</p>
+                </div>
+              )}
+
+              {/* Browse by Area */}
+              {areaBreakdown.length > 0 && (
+                <div className="mt-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                    Browse by Area
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {areaBreakdown.map((area, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-4 border border-gray-200">
+                        <h3 className="font-semibold text-gray-900 mb-1">{area.area_name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{area.description}</p>
+                        {area.strong_categories && area.strong_categories.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {area.strong_categories.map((cat) => (
+                              <span
+                                key={cat}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* FAQ */}
+              {faq.length > 0 && (
+                <div className="mt-8 prose max-w-none">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                    Frequently Asked Questions
+                  </h2>
+                  <div className="space-y-4">
+                    {faq.map((item, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-4 border border-gray-200">
+                        <h3 className="font-semibold text-gray-900 mb-1">{item.question}</h3>
+                        <p className="text-gray-700 text-sm">{item.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* FAQ Schema */}
+                  <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                      __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'FAQPage',
+                        mainEntity: faq.map((item) => ({
+                          '@type': 'Question',
+                          name: item.question,
+                          acceptedAnswer: {
+                            '@type': 'Answer',
+                            text: item.answer,
+                          },
+                        })),
+                      }),
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}

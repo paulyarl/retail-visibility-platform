@@ -157,7 +157,11 @@ export default function PlaceCategoryClient({
                   {categoryName}
                 </h1>
               </div>
-              {enrichment?.effective?.description && (
+              {enrichment?.bodyCopy ? (
+                <p className="text-neutral-600 dark:text-neutral-400 max-w-3xl whitespace-pre-line">
+                  {enrichment.bodyCopy}
+                </p>
+              ) : enrichment?.effective?.description && (
                 <p className="text-neutral-600 dark:text-neutral-400 max-w-3xl">
                   {enrichment.effective.description}
                 </p>
@@ -279,6 +283,79 @@ export default function PlaceCategoryClient({
           source={`/place/category/${categorySlug}`}
         />
       </div>
+
+      {/* Enrichment Content: Shopper Guide + Notable Areas + FAQ */}
+      {(enrichment?.shopperGuide || (enrichment?.notableAreas && enrichment.notableAreas.length > 0) || (enrichment?.faq && enrichment.faq.length > 0)) && (
+        <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800">
+          <div className="container mx-auto px-4 py-12">
+            {/* Shopper Guide */}
+            {enrichment?.shopperGuide && (
+              <div className="max-w-3xl mb-8">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+                  What to Look For
+                </h2>
+                <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-line">
+                  {enrichment.shopperGuide}
+                </p>
+              </div>
+            )}
+
+            {/* Notable Areas */}
+            {enrichment?.notableAreas && enrichment.notableAreas.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+                  Where to Find {categoryName}
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.notableAreas.map((area, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                    >
+                      {area}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* FAQ */}
+            {enrichment?.faq && enrichment.faq.length > 0 && (
+              <div className="max-w-3xl">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+                  Frequently Asked Questions
+                </h2>
+                <div className="space-y-4">
+                  {enrichment.faq.map((item, idx) => (
+                    <div key={idx} className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
+                      <h3 className="font-semibold text-neutral-900 dark:text-white mb-1">{item.question}</h3>
+                      <p className="text-neutral-700 dark:text-neutral-300 text-sm">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* FAQ Schema */}
+                <script
+                  type="application/ld+json"
+                  dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                      '@context': 'https://schema.org',
+                      '@type': 'FAQPage',
+                      mainEntity: enrichment.faq.map((item) => ({
+                        '@type': 'Question',
+                        name: item.question,
+                        acceptedAnswer: {
+                          '@type': 'Answer',
+                          text: item.answer,
+                        },
+                      })),
+                    }),
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <PoweredByFooter />
     </div>

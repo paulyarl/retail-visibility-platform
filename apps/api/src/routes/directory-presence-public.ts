@@ -1457,6 +1457,10 @@ router.get('/category-enrichment', async (req: Request, res: Response) => {
         keywords: market.override.keywords !== null,
       },
       enrichedAt: market.enrichedAt.toISOString(),
+      bodyCopy: market.bodyCopy,
+      shopperGuide: market.shopperGuide,
+      faq: market.faq,
+      notableAreas: market.notableAreas,
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/category-enrichment] Error:', undefined, {
@@ -1501,6 +1505,11 @@ router.get('/location-enrichment', async (req: Request, res: Response) => {
         keywords: market.override.keywords !== null,
       },
       enrichedAt: market.enrichedAt.toISOString(),
+      bodyCopy: market.bodyCopy,
+      topCategories: market.topCategories,
+      shopperGuide: market.shopperGuide,
+      faq: market.faq,
+      areaBreakdown: market.areaBreakdown,
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/location-enrichment] Error:', undefined, {

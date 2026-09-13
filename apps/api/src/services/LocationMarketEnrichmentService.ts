@@ -45,6 +45,13 @@ export interface LocationState {
   composerVersion: number;
   overrideBy: string | null;
   overrideAt: Date | null;
+  // Multi-task enrichment fields (migration 284)
+  bodyCopy: string | null;
+  topCategories: string[];
+  shopperGuide: string | null;
+  faq: any | null;
+  areaBreakdown: any | null;
+  context: any | null;
 }
 
 export interface EnrichLocationResult {
@@ -326,6 +333,12 @@ class LocationMarketEnrichmentService extends BaseService {
       bodyCopy: packet.body_copy?.trim() || null,
     };
 
+    // New task fields — AI-only, no aggregate fallback.
+    const shopperGuide = packet.shopper_guide?.trim() || null;
+    const faq = packet.faq ?? null;
+    const areaBreakdown = packet.area_breakdown ?? null;
+    const context = packet.context ?? null;
+
     const id = generateCategoryMarketEnrichmentId();
     const enrichedAt = new Date();
     const triggerSource = 'campaign_run';
@@ -334,7 +347,8 @@ class LocationMarketEnrichmentService extends BaseService {
       INSERT INTO directory_category_enrichment (
         id, category_key, category_name, city, state,
         meta_title, description, keywords, secondary_categories, schema_type_hint,
-        body_copy, intelligence_profile_id, gold_standard_profile_id, composer_version,
+        body_copy, shopper_guide, faq, area_breakdown, context,
+        intelligence_profile_id, gold_standard_profile_id, composer_version,
         enriched_at, enriched_by, trigger_source,
         source_campaign_id, source_execution_id, created_at, updated_at
       )
@@ -345,6 +359,10 @@ class LocationMarketEnrichmentService extends BaseService {
         ${textArraySql(merged.secondaryCategories)},
         ${merged.schemaTypeHint},
         ${merged.bodyCopy},
+        ${shopperGuide},
+        ${faq as any},
+        ${areaBreakdown as any},
+        ${context as any},
         ${null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource},
         ${campaign.id}, ${input.executionId ?? null}, now(), now()
@@ -357,6 +375,10 @@ class LocationMarketEnrichmentService extends BaseService {
         secondary_categories = EXCLUDED.secondary_categories,
         schema_type_hint = EXCLUDED.schema_type_hint,
         body_copy = EXCLUDED.body_copy,
+        shopper_guide = EXCLUDED.shopper_guide,
+        faq = EXCLUDED.faq,
+        area_breakdown = EXCLUDED.area_breakdown,
+        context = EXCLUDED.context,
         composer_version = EXCLUDED.composer_version,
         enriched_at = EXCLUDED.enriched_at,
         enriched_by = EXCLUDED.enriched_by,
@@ -479,6 +501,12 @@ class LocationMarketEnrichmentService extends BaseService {
       composerVersion: row.composer_version ?? 1,
       overrideBy: row.override_by ?? null,
       overrideAt: row.override_at ?? null,
+      bodyCopy: row.body_copy ?? null,
+      topCategories: row.context?.top_categories ?? [],
+      shopperGuide: row.shopper_guide ?? null,
+      faq: row.faq ?? null,
+      areaBreakdown: row.area_breakdown ?? null,
+      context: row.context ?? null,
     };
   }
 }

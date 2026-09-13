@@ -897,6 +897,69 @@ export class MarketingExecutionService extends BaseService {
       const campaignCity = (input.campaign as any).city || null;
       const campaignState = (input.campaign as any).state || null;
 
+      // ── City market context injection ──────────────────────────────
+      // For category enrichment campaigns with a real city (not '__all__'),
+      // load the persisted city context from a prior location enrichment
+      // run (the ('__location__', city, state) row's context JSONB). This
+      // gives the AI real city landscape context — what the city is known
+      // for, its top categories, notable areas — so category copy is
+      // grounded in the actual market rather than inferred from the gold
+      // standard alone. Location enrichment campaigns skip this (they
+      // produce the context, they don't consume it).
+      let cityContextBlock = '';
+      if (category !== '__location__' && campaignCity && campaignState &&
+          campaignCity.trim().toLowerCase() !== '__all__') {
+        try {
+          const ctxRow = await this.prisma.$queryRaw`
+            SELECT context FROM directory_category_enrichment
+            WHERE category_key = '__location__'
+              AND LOWER(city) = LOWER(${campaignCity})
+              AND LOWER(state) = LOWER(${campaignState})
+            LIMIT 1
+          `;
+          const ctx = Array.isArray(ctxRow) && ctxRow.length > 0
+            ? (ctxRow[0] as any).context
+            : null;
+          if (ctx && ctx.market_summary) {
+            const lines: string[] = [
+              '=== CITY MARKET CONTEXT ===',
+              `City: ${campaignCity}, ${campaignState}`,
+              '',
+              ctx.market_summary,
+            ];
+            if (ctx.top_categories && Array.isArray(ctx.top_categories) && ctx.top_categories.length > 0) {
+              lines.push('', `Top categories: ${ctx.top_categories.join(', ')}`);
+            }
+            if (ctx.secondary_categories && Array.isArray(ctx.secondary_categories) && ctx.secondary_categories.length > 0) {
+              lines.push(`Secondary categories: ${ctx.secondary_categories.join(', ')}`);
+            }
+            if (ctx.notable_areas && Array.isArray(ctx.notable_areas) && ctx.notable_areas.length > 0) {
+              lines.push(`Notable areas: ${ctx.notable_areas.join(', ')}`);
+            }
+            if (ctx.market_notes) {
+              lines.push('', `Notes: ${ctx.market_notes}`);
+            }
+            lines.push(
+              '',
+              'DIRECTIVE: This is the established market context for this city, produced by a prior location enrichment run. Use it to ground your category copy in the real city landscape — what the city is known for, which categories are strong, where businesses concentrate. Do NOT copy this text verbatim into body_copy or shopper_guide. Do NOT mention "market context", "location enrichment", or this directive in the visible output. The context sharpens your copy, it is not content to surface.',
+            );
+            cityContextBlock = lines.join('\n');
+            logger.info('City market context injected into enrichment prompt', ctx, {
+              campaignId: input.campaign.id,
+              city: campaignCity,
+              state: campaignState,
+            });
+          }
+        } catch (err) {
+          logger.warn('Failed to load city context for enrichment prompt', ctx, {
+            campaignId: input.campaign.id,
+            city: campaignCity,
+            state: campaignState,
+            error: (err as Error).message,
+          });
+        }
+      }
+
       // Resolve the effective category for gold standard lookup.
       // Category enrichment → campaign.category (real category).
       // Location enrichment → '__location__' sentinel; use parent PG's category.
@@ -923,12 +986,16 @@ export class MarketingExecutionService extends BaseService {
         if (goldStandard) {
           const marketRefBlock = profileService.serializeGoldStandard(goldStandard, 'market_reference');
           if (marketRefBlock) {
-            const amplified = baseRendered + '\n' + marketRefBlock;
+            // City context first (what the city is), then gold standard
+            // (what good looks like in this category).
+            const blocks = [cityContextBlock, marketRefBlock].filter(Boolean);
+            const amplified = baseRendered + (blocks.length ? '\n' + blocks.join('\n') : '');
             logger.info('Gold standard market reference injected into enrichment prompt', ctx, {
               campaignId: input.campaign.id,
               enrichmentCategory,
               goldStandardProfileId: goldStandard.id,
               goldStandardProfileVersion: goldStandard.version,
+              hasCityContext: Boolean(cityContextBlock),
             });
             return {
               renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
@@ -949,9 +1016,12 @@ export class MarketingExecutionService extends BaseService {
         }
       }
 
-      // No gold standard found — return base render + suffix.
+      // No gold standard found — return base render + city context + suffix.
+      const amplified = cityContextBlock
+        ? baseRendered + '\n' + cityContextBlock
+        : baseRendered;
       return {
-        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+        renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
       };
     }

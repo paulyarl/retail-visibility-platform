@@ -68,11 +68,20 @@ export interface CategoryEnrichmentEffective {
   synonyms: string[];
 }
 
+export interface FaqEntry {
+  question: string;
+  answer: string;
+}
+
 export interface CategoryEnrichmentResponse {
   market: CategoryEnrichmentMarket | null;
   effective: CategoryEnrichmentEffective;
   overridden: { description: boolean; metaTitle: boolean; keywords: boolean };
   enrichedAt: string;
+  bodyCopy: string | null;
+  shopperGuide: string | null;
+  faq: FaqEntry[] | null;
+  notableAreas: string[];
 }
 
 export interface LocationEnrichmentMarket {
@@ -89,11 +98,22 @@ export interface LocationEnrichmentEffective {
   secondaryCategories: string[];
 }
 
+export interface AreaBreakdownEntry {
+  area_name: string;
+  description: string;
+  strong_categories?: string[];
+}
+
 export interface LocationEnrichmentResponse {
   market: LocationEnrichmentMarket | null;
   effective: LocationEnrichmentEffective;
   overridden: { description: boolean; metaTitle: boolean; keywords: boolean };
   enrichedAt: string;
+  bodyCopy: string | null;
+  topCategories: string[];
+  shopperGuide: string | null;
+  faq: FaqEntry[] | null;
+  areaBreakdown: AreaBreakdownEntry[] | null;
 }
 
 export interface CategoryVocabEntry {
@@ -203,6 +223,10 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         effective: data.effective,
         overridden: data.overridden,
         enrichedAt: data.enrichedAt,
+        bodyCopy: data.bodyCopy ?? null,
+        shopperGuide: data.shopperGuide ?? null,
+        faq: data.faq ?? null,
+        notableAreas: data.notableAreas ?? [],
       };
     } catch {
       return null;
@@ -232,6 +256,11 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         effective: data.effective,
         overridden: data.overridden,
         enrichedAt: data.enrichedAt,
+        bodyCopy: data.bodyCopy ?? null,
+        topCategories: data.topCategories ?? [],
+        shopperGuide: data.shopperGuide ?? null,
+        faq: data.faq ?? null,
+        areaBreakdown: data.areaBreakdown ?? null,
       };
     } catch {
       return null;

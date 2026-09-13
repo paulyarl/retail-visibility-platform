@@ -7817,6 +7817,10 @@ model directory_category_enrichment {
   source_campaign_id            String?   @db.VarChar(255)
   source_execution_id           String?   @db.VarChar(255)
   body_copy                     String?
+  shopper_guide                 String?
+  faq                           Json?
+  area_breakdown                Json?
+  context                       Json?
 
   @@unique([category_key, city, state])
   @@index([category_key, state, city], map: "idx_dce_markets")
