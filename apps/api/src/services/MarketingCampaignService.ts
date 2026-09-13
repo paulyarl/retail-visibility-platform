@@ -890,6 +890,16 @@ export class MarketingCampaignService extends BaseService {
         throw new ValidationError('child_not_enrichment_scope');
       }
       if (child.parent_campaign_id) {
+        // Idempotent: re-attaching a child to its existing parent is a no-op
+        // success. This lets the governed attach endpoint be called as a
+        // belt-and-suspenders validation after a create passthrough already
+        // stamped parent_campaign_id, and tolerates retries/double-clicks
+        // without surfacing a 409. A child parented to a DIFFERENT campaign
+        // is still a real conflict.
+        if (child.parent_campaign_id === parentId) {
+          logger.info('attachChildCampaign: already attached (idempotent)', ctx, { parentId, childId });
+          return { attached: true, parentId, childId };
+        }
         throw new ConflictError('child_already_parented');
       }
 

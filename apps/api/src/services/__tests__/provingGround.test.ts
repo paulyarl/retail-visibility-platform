@@ -265,14 +265,14 @@ describe('attachChildCampaign', () => {
     expect(mockCampaignsList.update).not.toHaveBeenCalled();
   });
 
-  it('rejects when the child is not intelligence scope (400)', async () => {
+  it('rejects a business-scope child under a geography-having PG (400)', async () => {
     mockCampaignsList.findUnique
-      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce({ ...pgParent, city: 'Indianapolis' })
       .mockResolvedValueOnce({ ...intChild, scope: 'business' });
 
     await expect(
       service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001'),
-    ).rejects.toThrow('child_not_intelligence_scope');
+    ).rejects.toThrow('business_children_require_geography_free_pg');
     expect(mockCampaignsList.update).not.toHaveBeenCalled();
   });
 
@@ -284,6 +284,17 @@ describe('attachChildCampaign', () => {
     await expect(
       service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001'),
     ).rejects.toThrow('child_already_parented');
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent when re-attaching to the same parent (no-op success)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(pgParent)
+      .mockResolvedValueOnce({ ...intChild, parent_campaign_id: 'mcamp-pg-001' });
+
+    const result = await service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001');
+
+    expect(result).toEqual({ attached: true, parentId: 'mcamp-pg-001', childId: 'mcamp-int-001' });
     expect(mockCampaignsList.update).not.toHaveBeenCalled();
   });
 
@@ -336,7 +347,7 @@ describe('attachChildCampaign', () => {
   it('rejects a directory_enrichment child at a non-enrichment scope (400)', async () => {
     mockCampaignsList.findUnique
       .mockResolvedValueOnce(pgParent)
-      .mockResolvedValueOnce({ ...enrichCategoryChild, scope: 'business' });
+      .mockResolvedValueOnce({ ...enrichCategoryChild, scope: 'intelligence' });
 
     await expect(
       service.attachChildCampaign('mcamp-pg-001', 'mcamp-enr-001'),
