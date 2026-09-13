@@ -35,7 +35,7 @@ import {
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V1';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V2';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -67,6 +67,9 @@ If CITY is "__all__", this is a NATIONAL category page — write city-agnostic c
 - Do NOT invent business counts, ratings, or specific business names.
 - Do NOT include claims about business quality ("best", "top-rated") — the directory lists from public information.
 - Category name in copy should use natural casing (e.g. "African grocery stores").
+
+=== GOLD STANDARD MARKET REFERENCE (conditional) ===
+If this campaign was spawned from a Proving Ground, a "=== GOLD STANDARD MARKET REFERENCE ===" section will be appended below this directive. It contains the established Gold Standard profile for this category — the bar that top-tier local businesses in this category meet across their online presence (NAP consistency, category presentation, hours, website, photos, reviews, descriptions, social links, platform coverage). Use it as market context to sharpen your copy: let the expected fields and pattern exemplars shape what you describe as the category's strengths, what shoppers should look for, and which related categories tend to co-occur with strong businesses in this market. Do NOT copy business names, ratings, or specific facts from the exemplars into your copy. Do NOT mention "gold standard", "profile", or this directive in the visible body_copy. If no section is appended, no gold standard profile exists for this category — proceed without it.
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
@@ -106,6 +109,9 @@ Produce the SEO + content packet that will power the public location page for {{
 - Do NOT invent business counts, ratings, or specific business names — the page renders real aggregates separately.
 - Do NOT include claims about business quality ("best", "top-rated").
 - If you are not confident about a city-specific fact, keep copy generic to the location rather than fabricating local detail.
+
+=== GOLD STANDARD MARKET REFERENCE (conditional) ===
+If this campaign was spawned from a Proving Ground, a "=== GOLD STANDARD MARKET REFERENCE ===" section will be appended below this directive. It contains the established Gold Standard profile for the Proving Ground's category — the bar that top-tier local businesses in that category meet across their online presence (NAP consistency, category presentation, hours, website, photos, reviews, descriptions, social links, platform coverage). Use it as market context to sharpen your copy: let the expected fields and pattern exemplars shape which categories you describe as strong in this location, what shoppers should look for, and the related categories that tend to co-occur with strong businesses in this market. Do NOT copy business names, ratings, or specific facts from the exemplars into your copy. Do NOT mention "gold standard", "profile", or this directive in the visible body_copy. If no section is appended, no gold standard profile exists for this market — proceed without it.
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
