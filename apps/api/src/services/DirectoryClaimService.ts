@@ -23,6 +23,7 @@ import bcrypt from 'bcryptjs';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
 import { buildTenantUpgradeOptions, UpgradeOptionsPayload } from './DirectoryPresenceUpgradeOptionsService';
+import { MarketIntelAccessService } from './MarketIntelAccessService';
 import { slugifyAttributeKey, type DirectoryListingAttribute } from './directory/listingAttributes';
 
 /** Audit context for claim operations */
@@ -1317,6 +1318,20 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       await this.provisionGbpBridge(r.customer_id, r.tenant_id);
     }
 
+    // Grant the owner free Market Intel access (spec §13). Fire-and-forget
+    // — a failure here must not roll back the claim. The unlock is keyed
+    // on (tenant_id, 'place', slug, 'owner_claim') so it's idempotent.
+    if (r.customer_id) {
+      void this.grantOwnerMarketIntelUnlock(r.customer_id, r.tenant_id, r.seed_id)
+        .catch((e) => {
+          logger.warn('DirectoryClaimService.approveClaimRequest — Market Intel unlock failed', undefined, {
+            error: (e as Error).message,
+            seedId: r.seed_id,
+            tenantId: r.tenant_id,
+          });
+        });
+    }
+
     audit({
       actor: adminUserId,
       actorType: 'user',
@@ -1510,6 +1525,18 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     // catch-all path for claims approved without a customer_id.
     await this.provisionGbpBridge(customerId, r.tenant_id);
 
+    // Grant the owner free Market Intel access (spec §13). Fire-and-forget
+    // — a failure here must not roll back the link. The unlock is keyed
+    // on (tenant_id, 'place', slug, 'owner_claim') so it's idempotent.
+    void this.grantOwnerMarketIntelUnlock(customerId, r.tenant_id, r.seed_id)
+      .catch((e) => {
+        logger.warn('DirectoryClaimService.linkCustomerToClaimRequest — Market Intel unlock failed', undefined, {
+          error: (e as Error).message,
+          seedId: r.seed_id,
+          tenantId: r.tenant_id,
+        });
+      });
+
     audit({
       actor: adminUserId,
       actorType: 'user',
@@ -1553,6 +1580,50 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         status,
       });
     }
+  }
+
+  /**
+   * Grant the claimed owner free Market Intel access (spec §13).
+   *
+   * Resolves the seed's listing slug, then records an `owner_claim`
+   * unlock row. Idempotent — the unique constraint on
+   * (tenant_id, surface_type, surface_key, unlock_type) means a re-claim
+   * updates the row rather than failing.
+   *
+   * Fire-and-forget from the caller — a failure here is logged but does
+   * not roll back the claim. The owner can still claim again later.
+   */
+  private async grantOwnerMarketIntelUnlock(
+    customerId: string,
+    tenantId: string,
+    seedId: string,
+  ): Promise<void> {
+    // Resolve the listing slug from the seed.
+    const seed = await prisma.directory_presence_seeds.findUnique({
+      where: { id: seedId },
+      select: { listing_id: true },
+    });
+    if (!seed?.listing_id) return;
+
+    const listing = await prisma.directory_listings_list.findUnique({
+      where: { id: seed.listing_id },
+      select: { slug: true },
+    });
+    if (!listing?.slug) return;
+
+    await MarketIntelAccessService.getInstance().recordUnlock({
+      tenantId,
+      customerId,
+      surfaceType: 'place',
+      surfaceKey: listing.slug,
+      unlockType: 'owner_claim',
+    });
+
+    logger.info('DirectoryClaimService — granted owner Market Intel unlock', undefined, {
+      seedId,
+      tenantId,
+      slug: listing.slug,
+    });
   }
 
   /**
