@@ -1458,6 +1458,41 @@ export interface DirectoryClaimRequest {
 // Category Market Enrichment (spec §6.3)
 // ============================
 
+/** Analyst-facing context stored in the enrichment row's context JSONB.
+ *  Shopper-facing taxonomy fields (category_overview, super/sub/adjacent
+ *  categories) are merged into this same JSONB by the campaign applier —
+ *  no dedicated columns. The analyst-facing fields (category_profile,
+ *  category_signals, market_density, prospect_signals) are seed-only. */
+export interface EnrichedMarketContext {
+  // Shopper-facing taxonomy (merged by applier)
+  category_overview?: string | null;
+  super_categories?: string[] | null;
+  sub_categories?: string[] | null;
+  adjacent_categories?: string[] | null;
+  // Analyst-facing (seed/audit only)
+  category_summary?: string;
+  keywords?: string[];
+  secondary_categories?: string[];
+  category_notes?: string;
+  category_profile?: {
+    business_model?: string;
+    typical_products?: string;
+    customer_base?: string;
+    online_presence_pattern?: string;
+    competitive_landscape?: string;
+    typical_scale?: string;
+  };
+  category_signals?: string[];
+  market_density?: string;
+  prospect_signals?: string[];
+  [key: string]: any;
+}
+
+export interface EnrichedMarketFaqEntry {
+  question: string;
+  answer: string;
+}
+
 export interface EnrichedMarket {
   id: string;
   categoryKey: string;
@@ -1492,6 +1527,11 @@ export interface EnrichedMarket {
   intelligenceProfileId: string | null;
   goldStandardProfileId: string | null;
   composerVersion: number;
+  // Multi-task enrichment fields (migration 284 + campaign applier merge)
+  bodyCopy: string | null;
+  shopperGuide: string | null;
+  faq: EnrichedMarketFaqEntry[] | null;
+  context: EnrichedMarketContext | null;
 }
 
 export interface EnrichMarketResult {

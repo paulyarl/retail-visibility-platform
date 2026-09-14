@@ -274,15 +274,15 @@ CLAIMED OWNER (verified ownership of this seed):
 ┌─────────────────────────────┐
 │ 🔑 Claim This Business       │
 │                              │
-│ Owner? Get the full picture  │
-│ and unlock all intelligence  │
-│ for free.                     │
+│ Owner? Claim and unlock your │
+│ free audit + market intel —  │
+│ already generated.           │
 │                              │
 │ [Verify Ownership →]         │
 └─────────────────────────────┘
 ```
 
-This card always shows. The claim flow is the owner's path to full access without paying. It reuses the existing `DirectoryClaimPublicService` and token-based claim flow.
+This card always shows. The claim flow is the owner's path to full access without paying — and the audit they're unlocking **already exists** (every seed flows through the PG business audit; see §13). It reuses the existing `DirectoryClaimPublicService` and token-based claim flow.
 
 - CTA href = `/place/claim/${listing.activeClaimToken}` when a live token exists — `active_claim_token` is already returned by the consolidated listing endpoint; do not mint or fetch a new one. When absent, fall back to `#claim-inquiry` (same as the hero CTA).
 - Canonical claim path is `/place/claim/:token`; `/directory/claim/:token` is a legacy redirect.
@@ -843,3 +843,40 @@ No audit resolution (§8.4), no audit schema changes (§8.5), no claim
 integration, no owner tier — just the context split (§12.2), the
 sidebar, generalized unlock keying (§9.1), and the lead-gen CTA. The
 intelligence is already persisted and already fetched.
+
+---
+
+## 13. Claim-triggered unlock — self-serve by construction
+
+Every seed flows through the PG business audit (stage 5) — **the audit
+already exists before the owner ever sees the page.** Claim therefore
+requires NO post-claim audit run and NO operator work:
+
+```
+claim verified (claim-completion path — existing claim flow)
+  → write market_intel_unlocks row
+    (unlock_type='owner_claim', tenant_id = seed's tenant,
+     surface_key = place slug)
+  → owner's next page load resolves Tier 3
+    → full sidebar content + PDF download, instantly
+```
+
+The claim card is the conversion motivator: "claim and get your free
+audit + market intelligence." The product stocks itself — PG produces
+the seed, the seed advertises locked intelligence, the owner claims to
+unlock it. No operator intervention anywhere in the loop.
+
+Implementation notes:
+
+- **Hook point is claim confirmation, not claim-link click.** A token
+  holder is not yet a verified owner — firing on click would hand a
+  free audit to anyone holding the link.
+- **Idempotent** via the §9.1 `UNIQUE (tenant_id, surface_type,
+  surface_key, unlock_type)` + `recordUnlock` UPSERT — a re-claim or
+  repeat claim event updates `unlocked_at` rather than violating the
+  constraint.
+- **Applies to `place` surfaces only** — `owner_claim` is the one
+  unlock type with no category/city analogue (§9.1).
+- The unlock write is fire-and-forget relative to claim completion:
+  a failed write logs and retries on next claim event — it must never
+  block or fail the claim itself.

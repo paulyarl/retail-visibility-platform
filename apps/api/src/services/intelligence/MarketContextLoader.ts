@@ -68,6 +68,14 @@ export interface CategoryIntelligence {
   category_signals?: string[];
   market_density?: string;
   prospect_signals?: string[];
+  // Structural taxonomy (merged into context JSONB by the campaign applier).
+  // Same structural nature as category_profile — describes what the category
+  // IS in the taxonomy tree, not shopper-facing sentiment. Consumed by
+  // intelligence campaign formatters to give the analyst category placement
+  // context (breadcrumbs, specializations, siblings).
+  super_categories?: string[];
+  sub_categories?: string[];
+  adjacent_categories?: string[];
 }
 
 export interface LocationIntelligence {
@@ -185,6 +193,55 @@ export class MarketContextLoader extends BaseService {
   }
 
   /**
+   * Load location intelligence for a (city, state) market WITHOUT a category.
+   *
+   * Used by category-identification seeks: the analyst is determining the
+   * category, so category intelligence is unavailable, but the location
+   * profile (city_profile, market_gaps, metro_dynamics, notable_areas) is
+   * category-agnostic and informs the population test for candidate shelves.
+   *
+   * Returns an empty LocationIntelligence when enrichment hasn't run.
+   * National campaigns (city = '__all__') have no city profile — returns empty.
+   */
+  async loadLocationContext(
+    city: string | null,
+    state: string | null,
+    ctx?: RequestCtx,
+  ): Promise<LocationIntelligence> {
+    const empty: LocationIntelligence = {};
+    if (!city) return empty;
+    const isNational = city.trim().toLowerCase() === '__all__';
+    if (isNational || !state) return empty;
+
+    const cacheKey = `__location__|${city.trim().toLowerCase()}|${state.trim().toLowerCase()}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.data.location;
+
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ category_key: string; context: any }>>`
+        SELECT category_key, context FROM directory_category_enrichment
+        WHERE LOWER(city) = LOWER(${city})
+          AND LOWER(state) = LOWER(${state})
+          AND category_key = '__location__'
+      `;
+      const locationCtx = Array.isArray(rows)
+        ? rows.find((r) => r.category_key === '__location__')?.context
+        : undefined;
+
+      const data: MarketContext = { category: {}, location: locationCtx ?? {} };
+      this.cache.set(cacheKey, { data, expiresAt: Date.now() + MarketContextLoader.CACHE_TTL_MS });
+      return data.location;
+    } catch (err) {
+      logger.warn('Failed to load location context', ctx, {
+        city,
+        state,
+        error: (err as Error).message,
+      });
+      return empty;
+    }
+  }
+
+  /**
    * Check whether any category intelligence is available.
    */
   hasCategoryIntelligence(ctx: CategoryIntelligence): boolean {
@@ -193,7 +250,10 @@ export class MarketContextLoader extends BaseService {
       ctx.category_profile ||
       (ctx.category_signals && ctx.category_signals.length > 0) ||
       ctx.market_density ||
-      (ctx.prospect_signals && ctx.prospect_signals.length > 0),
+      (ctx.prospect_signals && ctx.prospect_signals.length > 0) ||
+      (ctx.super_categories && ctx.super_categories.length > 0) ||
+      (ctx.sub_categories && ctx.sub_categories.length > 0) ||
+      (ctx.adjacent_categories && ctx.adjacent_categories.length > 0),
     );
   }
 

@@ -230,13 +230,13 @@ export const CATEGORY_ENRICHMENT_PROMPT_SUFFIX = `
 
 Return your response as JSON matching this exact schema:
 {
-  "category_key": "<normalized category key, lowercase, spaces collapsed>",
+  "category_key": "<normalized category key, lowercase, spaces replaced with underscores, e.g. 'african_grocery'>",
   "category_name": "<display name>",
-  "meta_title": "<SEO title, <= 70 chars, include category + city + state>",
+  "meta_title": "<SEO title, <= 70 chars — category + city + state for market pages; category only for national ('__all__')>",
   "description": "<meta description, <= 300 chars, browse-oriented local-SEO copy>",
   "keywords": ["<keyword>", ...],
-  "secondary_categories": ["<related category strong in this market>", ...],
-  "schema_type_hint": "<schema.org type hint, e.g. CollectionPage or Store>",
+  "secondary_categories": ["<closely related category a shopper might also browse>", ...],
+  "schema_type_hint": "<schema.org type hint, e.g. CollectionPage>",
   "body_copy": "<1-2 short paragraphs of visible on-page copy for the category page top>",
   "category_overview": "<1-2 paragraphs: what this category IS — what businesses in it do, who they serve, definitional. For shoppers who don't know the category>",
   "super_categories": ["<containing category>", ...],
@@ -250,7 +250,7 @@ Return your response as JSON matching this exact schema:
   "context": {
     "category_summary": "<analyst-facing summary of this category in this market>",
     "keywords": ["<category-level search term>", ...],
-    "secondary_categories": ["<related category strong in this market>", ...],
+    "secondary_categories": ["<same set as top-level secondary_categories>", ...],
     "category_notes": "<optional free-text notes for downstream work>",
     "category_profile": {
       "business_model": "<qualitative: e.g. 'typically independent, family-owned, single-location'>",
@@ -258,7 +258,7 @@ Return your response as JSON matching this exact schema:
       "customer_base": "<qualitative: e.g. 'diaspora communities, cuisine explorers, restaurants'>",
       "online_presence_pattern": "<qualitative: e.g. 'varies widely — many rely on Google/Yelp only'>",
       "competitive_landscape": "<qualitative: e.g. 'sparse in most US cities, concentrated in metro areas with large diaspora'>",
-      "typical_scale": "<qualitative: e.g. 'single-location, 1-5 employees'>"
+      "typical_scale": "<qualitative: e.g. 'single-location, small team'>"
     },
     "category_signals": ["<signal that indicates a strong business in this category>", ...],
     "market_density": "<qualitative density in this city: e.g. 'sparse — few dedicated stores'>",

@@ -35,7 +35,7 @@ import {
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V8';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V9';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -58,12 +58,12 @@ If CITY is "__all__", this is a NATIONAL category page — write city-agnostic c
 - meta_title: <= 70 chars. Pattern: "{Category} in {City}, {ST} — VisibleShelf Places" for market pages; "{Category} — VisibleShelf Places" for national. Front-load the category noun.
 - description: <= 300 chars meta description. Browse-oriented: who is listed, that listings come from public information, and 1-2 related terms shoppers search.
 - keywords: 8-15 search terms — the category name, synonyms, "near me" variants, related product/service terms. No keyword stuffing, no competitor brand names.
-- secondary_categories: 3-6 closely related category names a shopper might also browse (real categories, not invented niches).
-- schema_type_hint: the schema.org type that best fits the page — usually "CollectionPage"; use "Store" only for single-business categories.
-- body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what the category is, what shoppers find here, how listings are sourced. Plain, factual, no hype.
+- secondary_categories: 3-6 closely related category names relevant in this market that a shopper might also browse (real categories, not invented niches).
+- schema_type_hint: the schema.org type that best fits the page — typically "CollectionPage" for a category listing page.
+- body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what shoppers find on this page and how listings are sourced. Plain, factual, no hype. Definitional "what is this category" content belongs in category_overview, not here.
 - category_overview: 1-2 paragraphs (<= 5000 chars) of definitional content — what this category IS, what businesses in it do, who they serve. For shoppers who don't know the category (e.g. "African grocery stores sell pantry staples, fresh produce, frozen foods, and specialty products from African countries"). Distinct from body_copy (page intro) and shopper_guide (how to choose). This is "what is this category."
 - super_categories: 2-4 containing categories that this one belongs to (e.g. "grocery stores", "food retail", "retail"). Used for breadcrumbs on the category page.
-- sub_categories: 2-6 specializations within this category (e.g. "West African grocery", "Afro-Caribbean grocery", "pan-African grocery"). Used for drill-down on the category page. Omit if the category has no meaningful sub-specializations.
+- sub_categories: 2-6 specializations within this category (e.g. "West African grocery", "Afro-Caribbean grocery", "pan-African grocery"). Used for drill-down on the category page. Return an empty array if the category has no meaningful sub-specializations.
 - adjacent_categories: 2-5 sibling categories at the same taxonomy level (e.g. "Asian grocery store", "Latin American grocery store", "Middle Eastern grocery store"). Used for "Related categories" on the category page.
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this category, what makes a listing worth visiting, what to check (hours, website, product scope, reviews). Plain, helpful, no hype. Distinct from body_copy (which is intro copy); this is "how to choose" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about this category. Each answer 1-3 sentences, plain and factual. Used for an FAQ section + FAQ schema on the page.
@@ -72,12 +72,12 @@ If CITY is "__all__", this is a NATIONAL category page — write city-agnostic c
 Produce a context object consumed by business audit campaigns (the seed) for category-specific market awareness. All context fields → seed only. This context does NOT bleed onto the location surface.
 
 - context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context. For national ('__all__') campaigns, describe the category's national landscape.
-- context.keywords: category-level search terms for downstream use.
-- context.secondary_categories: related categories strong in this market, for downstream use.
-- context.category_notes: optional free-text notes useful for downstream work (e.g. "strong in immigrant communities on the north side", "limited to 2-3 independent stores").
-- context.category_profile: STRUCTURAL category characteristics (NO business names, NO city names). Qualitative + quantitative dimensions of the category as a business type. Fields: { business_model (qualitative: e.g. "typically independent, family-owned, single-location"), typical_products (qualitative: what they sell), customer_base (qualitative: who they serve), online_presence_pattern (qualitative: e.g. "varies widely — many rely on Google/Yelp only"), competitive_landscape (qualitative: e.g. "sparse in most US cities, concentrated in metro areas with large diaspora"), typical_scale (qualitative: e.g. "single-location, 1-5 employees") }. Use qualitative descriptors, NOT specific revenue figures or employee counts.
+- context.keywords: category-level search terms for downstream use — exclude "near me" variants and page-level phrasing from the SEO keywords.
+- context.secondary_categories: the same set as the SEO packet's secondary_categories, for downstream use.
+- context.category_notes: optional free-text notes useful for downstream work (e.g. "strong in immigrant communities on the north side", "limited to a handful of independent stores").
+- context.category_profile: STRUCTURAL category characteristics (NO business names, NO city names). Qualitative + quantitative dimensions of the category as a business type. Fields: { business_model (qualitative: e.g. "typically independent, family-owned, single-location"), typical_products (qualitative: what they sell), customer_base (qualitative: who they serve), online_presence_pattern (qualitative: e.g. "varies widely — many rely on Google/Yelp only"), competitive_landscape (qualitative: e.g. "sparse in most US cities, concentrated in metro areas with large diaspora"), typical_scale (qualitative: e.g. "single-location, small team") }. Use qualitative descriptors, NOT specific revenue figures or employee counts.
 - context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns, not platform-by-platform checklists (e.g. "published hours with daily coverage", "clear category positioning", "community presence"). Lighter than a gold standard; helps the seed audit know what to look for.
-- context.market_density: qualitative density assessment for this category in this city (e.g. "sparse — 2-3 dedicated stores", "moderate — several established businesses", "dense — competitive market"). For national campaigns, describe the category's typical density across US cities. Use qualitative descriptors, NOT specific counts.
+- context.market_density: qualitative density assessment for this category in this city (e.g. "sparse — few dedicated stores", "moderate — several established businesses", "dense — competitive market"). For national campaigns, describe the category's typical density across US cities. Use qualitative descriptors, NOT specific counts.
 - context.prospect_signals: 3-5 signals to look for when prospecting businesses in this category (e.g. "businesses with 'international grocery' in their Google category", "businesses near existing international markets", "businesses with incomplete online presence — high opportunity"). Helps prospecting queue prioritization.
 
 === RULES ===

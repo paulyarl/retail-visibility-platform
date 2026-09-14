@@ -42,6 +42,19 @@ function formatCategoryProfileBlock(ctx: CategoryIntelligence): string[] {
   return lines;
 }
 
+function formatCategoryTaxonomyBlock(ctx: CategoryIntelligence): string[] {
+  const lines: string[] = [];
+  const hasSuper = ctx.super_categories && ctx.super_categories.length > 0;
+  const hasSub = ctx.sub_categories && ctx.sub_categories.length > 0;
+  const hasAdj = ctx.adjacent_categories && ctx.adjacent_categories.length > 0;
+  if (!hasSuper && !hasSub && !hasAdj) return lines;
+  lines.push('', 'CATEGORY TAXONOMY (where this category sits in the hierarchy):');
+  if (hasSuper) lines.push(`  - Super categories (breadcrumbs): ${ctx.super_categories!.join(' › ')}`);
+  if (hasSub) lines.push(`  - Sub categories (specializations): ${ctx.sub_categories!.join(', ')}`);
+  if (hasAdj) lines.push(`  - Adjacent categories (siblings): ${ctx.adjacent_categories!.join(', ')}`);
+  return lines;
+}
+
 function formatCityProfileBlock(ctx: LocationIntelligence): string[] {
   const lines: string[] = [];
   if (!ctx.city_profile) return lines;
@@ -145,6 +158,7 @@ export function formatEstablishmentMarketContext(
     catLines.push(`  ${catCtx.category_summary}`);
   }
   catLines.push(...formatCategoryProfileBlock(catCtx));
+  catLines.push(...formatCategoryTaxonomyBlock(catCtx));
   catLines.push(...formatCategorySignalsBlock(catCtx));
   catLines.push(...formatMarketDensityBlock(catCtx));
 
@@ -153,6 +167,11 @@ export function formatEstablishmentMarketContext(
     lines.push(...catLines);
     lines.push('', 'Use the category profile to recognize qualifying businesses — a business');
     lines.push('that matches the profile is more likely to be a strong gold-standard candidate.');
+    lines.push('Use the category taxonomy to understand where this category sits in the hierarchy');
+    lines.push('— super categories show the broader market, sub categories show specializations');
+    lines.push('a candidate may focus on, and adjacent categories help you distinguish this');
+    lines.push('category from siblings (a business matching an adjacent category is NOT a');
+    lines.push('candidate for THIS category).');
     lines.push('Use category signals to evaluate candidates — a candidate meeting more signals');
     lines.push('is a stronger candidate. Use market density to calibrate expectations — in a');
     lines.push('sparse market, your candidate pool will be small; that is expected.');
@@ -185,6 +204,99 @@ export function formatEstablishmentMarketContext(
     lines.push('', '--- LOCATION INTELLIGENCE: not available ---');
     lines.push('Location enrichment has not run for this market yet. Proceed with general');
     lines.push('knowledge of the city for candidate discovery.');
+  }
+
+  lines.push('', 'If any blocks above are missing, proceed with your existing instructions —');
+  lines.push('the intelligence is additive, not blocking. Note the absence in scan_metadata.');
+
+  return lines.join('\n');
+}
+
+// ─── Category identification binding ─────────────────────────────────────
+
+/**
+ * Format location intelligence for a business category identification scan.
+ *
+ * The category identification scan takes a business name + location (NO
+ * category) and determines which niche category the business belongs to.
+ * Category intelligence is unavailable (the category is what we're finding),
+ * so this formatter emits ONLY the location block. The location profile
+ * informs the population test the analyst applies to every candidate shelf:
+ *   - city_profile tells the analyst WHAT the market looks like (a city with
+ *     large immigrant communities points toward ethnic-grocery candidates;
+ *     a logistics hub points toward distribution businesses)
+ *   - market_gaps tell the analyst WHERE demand is unmet — a business sitting
+ *     in a gap area is a strong signal for which shelf it fills
+ *   - top_categories / secondary_categories are shelves already known active
+ *     in this market — direct candidate matches
+ *   - metro_dynamics give nearby-market context for the population test
+ *
+ * Unlike the enrichment path (which shares only the structural city_profile
+ * subset to avoid sentiment bleed into public copy), category identification
+ * is an internal categorization analysis of a specific named business at a
+ * specific location, so the FULL location intelligence is appropriate.
+ */
+export function formatCategoryIdentificationMarketContext(
+  locCtx: LocationIntelligence,
+  city: string,
+  state: string,
+): string {
+  const hasLoc = loader.hasLocationIntelligence(locCtx);
+  if (!hasLoc) return '';
+
+  const lines: string[] = [
+    '=== MARKET CONTEXT (from prior location enrichment) ===',
+    '',
+    `Location: ${city}, ${state}`,
+    '',
+    'This categorization benefits from location intelligence produced by a prior',
+    'location enrichment run for this market. The category is unknown (that is',
+    'what you are determining), so only the location profile is provided — no',
+    'category intelligence. Use the location profile to inform the population',
+    'test you apply to every candidate shelf: a label should naturally host',
+    'multiple businesses in THIS market, and the city\'s character tells you',
+    'which shelves plausibly hold a population here.',
+  ];
+
+  const locLines: string[] = [];
+  if (locCtx.market_summary) {
+    locLines.push('', 'CITY MARKET SUMMARY:');
+    locLines.push(`  ${locCtx.market_summary}`);
+  }
+  locLines.push(...formatCityProfileBlock(locCtx));
+  if (locCtx.top_categories && locCtx.top_categories.length > 0) {
+    locLines.push('', 'TOP CATEGORIES (shelves already active in this market):');
+    locLines.push(`  ${locCtx.top_categories.join(', ')}`);
+  }
+  if (locCtx.secondary_categories && locCtx.secondary_categories.length > 0) {
+    locLines.push('', 'SECONDARY CATEGORIES (additional active shelves):');
+    locLines.push(`  ${locCtx.secondary_categories.join(', ')}`);
+  }
+  if (locCtx.notable_areas && locCtx.notable_areas.length > 0) {
+    locLines.push('', 'NOTABLE AREAS:');
+    locLines.push(`  ${locCtx.notable_areas.join(', ')}`);
+  }
+  locLines.push(...formatMarketGapsBlock(locCtx));
+  locLines.push(...formatMetroDynamicsBlock(locCtx));
+
+  if (locLines.length > 0) {
+    lines.push('', '--- LOCATION INTELLIGENCE ---');
+    lines.push(...locLines);
+    lines.push('', 'Use the city profile to understand the market the business operates in.');
+    lines.push('A city with large immigrant communities makes ethnic-grocery candidates more');
+    lines.push('plausible; a logistics hub makes distribution-oriented candidates more');
+    lines.push('plausible. Let the city\'s character guide which shelves you consider.');
+    lines.push('Use market gaps as a signal — a business sitting in a gap area may be');
+    lines.push('filling unmet demand, which supports the shelf it fills.');
+    lines.push('Use top/secondary categories as direct candidate matches — if the business');
+    lines.push('plausibly fits a shelf already active in this market, that shelf passes the');
+    lines.push('population test by construction.');
+    lines.push('Use metro dynamics for the population test when the local population would');
+    lines.push('be thin — a nearby complementary market can host peer businesses.');
+  } else {
+    lines.push('', '--- LOCATION INTELLIGENCE: not available ---');
+    lines.push('Location enrichment has not run for this market yet. Proceed with general');
+    lines.push('knowledge of the city for categorization.');
   }
 
   lines.push('', 'If any blocks above are missing, proceed with your existing instructions —');
@@ -240,6 +352,7 @@ export function formatDiscoveryMarketContext(
     catLines.push(`  ${catCtx.category_summary}`);
   }
   catLines.push(...formatCategoryProfileBlock(catCtx));
+  catLines.push(...formatCategoryTaxonomyBlock(catCtx));
   catLines.push(...formatCategorySignalsBlock(catCtx));
   catLines.push(...formatMarketDensityBlock(catCtx));
   catLines.push(...formatProspectSignalsBlock(catCtx));
@@ -251,6 +364,11 @@ export function formatDiscoveryMarketContext(
     lines.push('matching this profile are your primary targets. Businesses that partially');
     lines.push('match may be conversion opportunities (e.g., an international grocery that');
     lines.push('could reposition as African grocery).');
+    lines.push('Use the category taxonomy to target your discovery — super categories show');
+    lines.push('the broader market the category lives in, sub categories show specializations');
+    lines.push('to prospect (businesses in a sub-category may be convertible to this category),');
+    lines.push('and adjacent categories help you avoid false positives (businesses matching an');
+    lines.push('adjacent category are siblings, not prospects for THIS category).');
     lines.push('Use category signals to evaluate discovered candidates — a candidate that');
     lines.push('meets more signals is a stronger prospect.');
     lines.push('Use prospect signals to identify prospects — a business matching these');

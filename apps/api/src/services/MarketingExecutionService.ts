@@ -22,7 +22,7 @@ import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
-import { formatEstablishmentMarketContext, formatDiscoveryMarketContext } from './intelligence/MarketContextBindingFormatters';
+import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext } from './intelligence/MarketContextBindingFormatters';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { discoveryContextSchema, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 
@@ -1087,6 +1087,42 @@ export class MarketingExecutionService extends BaseService {
       };
     }
 
+    // ─── Category identification seek: location profile injection ────────
+    // The category identification template (output_schema =
+    // 'category_identification') takes a business name + location with NO
+    // category — the category is what the scan determines. Category
+    // intelligence is therefore unavailable, but the location profile
+    // (city_profile, market_gaps, metro_dynamics, notable_areas) is
+    // category-agnostic and informs the population test the analyst applies
+    // to every candidate shelf. This branch runs BEFORE the !hasCategory
+    // early return so the location block is injected even though no
+    // category is set.
+    if (isSeek && isBusinessScope && outputSchemaName === 'category_identification') {
+      const campaignCity = (input.campaign as any).city || null;
+      const campaignState = (input.campaign as any).state || null;
+      let catIdMarketBlock = '';
+      if (campaignCity && campaignState) {
+        const locCtx = await MarketContextLoader.getInstance().loadLocationContext(
+          campaignCity, campaignState, ctx,
+        );
+        catIdMarketBlock = formatCategoryIdentificationMarketContext(locCtx, campaignCity, campaignState);
+        if (catIdMarketBlock) {
+          logger.info('Location profile injected into category identification scan', ctx, {
+            campaignId: input.campaign.id,
+            city: campaignCity,
+            state: campaignState,
+          });
+        }
+      }
+      return {
+        renderedPrompt: this.appendPromptSuffix(
+          baseRendered + (catIdMarketBlock ? '\n' + catIdMarketBlock : ''),
+          promptSuffix,
+        ),
+        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+      };
+    }
+
     if (promptRole === 'none' || !hasCategory) {
       // No amplification — return byte-identical base render (plus suffix).
       return {
@@ -1412,6 +1448,16 @@ export class MarketingExecutionService extends BaseService {
           if (p.online_presence_pattern) lines.push(`  Online presence: ${p.online_presence_pattern}`);
           if (p.competitive_landscape) lines.push(`  Competitive landscape: ${p.competitive_landscape}`);
           if (p.typical_scale) lines.push(`  Typical scale: ${p.typical_scale}`);
+        }
+        if (categoryCtx.super_categories && Array.isArray(categoryCtx.super_categories) && categoryCtx.super_categories.length > 0) {
+          lines.push('', 'Category taxonomy (where this category sits in the hierarchy):');
+          lines.push(`  Super categories: ${categoryCtx.super_categories.join(' › ')}`);
+          if (categoryCtx.sub_categories && Array.isArray(categoryCtx.sub_categories) && categoryCtx.sub_categories.length > 0) {
+            lines.push(`  Sub categories: ${categoryCtx.sub_categories.join(', ')}`);
+          }
+          if (categoryCtx.adjacent_categories && Array.isArray(categoryCtx.adjacent_categories) && categoryCtx.adjacent_categories.length > 0) {
+            lines.push(`  Adjacent categories: ${categoryCtx.adjacent_categories.join(', ')}`);
+          }
         }
         if (categoryCtx.category_signals && Array.isArray(categoryCtx.category_signals) && categoryCtx.category_signals.length > 0) {
           lines.push('', 'Category signals (what strong looks like):');
