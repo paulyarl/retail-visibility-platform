@@ -884,19 +884,86 @@ export class MarketingExecutionService extends BaseService {
         ? 'signal_triage'
         : 'category_audit';
 
-    // ─── Enrichment prompt: clean passthrough (no sentiment bleed) ────────
-    // Directory enrichment campaigns (category or location scope) produce
-    // self-aware content for their own surface only. No cross-surface
-    // sentiment injection:
-    //   - No Gold Standard (business-scope, mis-cast for market surfaces)
-    //   - No city context into category enrichment (location sentiment
-    //     would bleed onto the category surface)
-    //   - No category context into location enrichment (category sentiment
-    //     would bleed onto the location surface)
-    // Each enrichment surface is its own source of truth. The persisted
-    // `context` JSONB from each is consumed by the SEED (business audit)
-    // only, where both sentiments converge to form market awareness.
+    // ─── Enrichment prompt: city profile injection (structural only) ──────
+    // Directory enrichment campaigns produce self-aware content for their
+    // own surface. The only cross-surface injection is the city_profile —
+    // a STRUCTURAL subset of the location context (no place names) that
+    // grounds category enrichment in the city's market characteristics
+    // without bleeding place-specific sentiment.
+    //
+    // Sentiment boundary:
+    //   - city_profile (structural: metro size, industries, demographics)
+    //     → shared with category enrichment ✓
+    //   - market_summary, notable_areas, market_gaps, metro_dynamics
+    //     (place-specific) → seed only, NOT shared with category enrichment
+    //   - Gold Standard → seed only (business-scope, mis-cast for markets)
     if (promptType === 'enrichment') {
+      const campaignCity = (input.campaign as any).city || null;
+      const campaignState = (input.campaign as any).state || null;
+
+      // Category enrichment with a real city gets the structural city profile.
+      // Location enrichment and national ('__all__') category enrichment skip.
+      if (category !== '__location__' && campaignCity && campaignState &&
+          campaignCity.trim().toLowerCase() !== '__all__') {
+        try {
+          const ctxRow = await this.prisma.$queryRaw`
+            SELECT context FROM directory_category_enrichment
+            WHERE category_key = '__location__'
+              AND LOWER(city) = LOWER(${campaignCity})
+              AND LOWER(state) = LOWER(${campaignState})
+            LIMIT 1
+          `;
+          const ctx = Array.isArray(ctxRow) && ctxRow.length > 0
+            ? (ctxRow[0] as any).context
+            : null;
+          const profile = ctx?.city_profile;
+          if (profile && (profile.metro_description || profile.market_character)) {
+            const lines: string[] = [
+              '=== CITY PROFILE (structural) ===',
+              `City: ${campaignCity}, ${campaignState}`,
+            ];
+            if (profile.metro_description) {
+              lines.push('', profile.metro_description);
+            }
+            if (profile.major_industries && Array.isArray(profile.major_industries) && profile.major_industries.length > 0) {
+              lines.push(`Major industries: ${profile.major_industries.join(', ')}`);
+            }
+            if (profile.growth_trajectory) {
+              lines.push(`Growth: ${profile.growth_trajectory}`);
+            }
+            if (profile.demographic_character) {
+              lines.push(`Demographics: ${profile.demographic_character}`);
+            }
+            if (profile.market_character) {
+              lines.push('', profile.market_character);
+            }
+            lines.push(
+              '',
+              'DIRECTIVE: This is the structural city profile (no place names) from a prior location enrichment run. Use it to ground your category copy in the city\'s market characteristics — metro size, industries, demographics, growth. Do NOT copy this text verbatim into body_copy or shopper_guide. Do NOT mention "city profile", "location enrichment", or this directive in the visible output. The profile sharpens your copy, it is not content to surface.',
+            );
+            const profileBlock = lines.join('\n');
+            logger.info('City profile injected into category enrichment prompt', ctx, {
+              campaignId: input.campaign.id,
+              city: campaignCity,
+              state: campaignState,
+            });
+            return {
+              renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + profileBlock, promptSuffix),
+              resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+            };
+          }
+        } catch (err) {
+          logger.warn('Failed to load city profile for category enrichment prompt', ctx, {
+            campaignId: input.campaign.id,
+            city: campaignCity,
+            state: campaignState,
+            error: (err as Error).message,
+          });
+        }
+      }
+
+      // No city profile available (location enrichment, national category,
+      // or no prior location run) — clean passthrough.
       return {
         renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
@@ -1219,6 +1286,31 @@ export class MarketingExecutionService extends BaseService {
         if (categoryCtx.category_notes) {
           lines.push('', `Notes: ${categoryCtx.category_notes}`);
         }
+        if (categoryCtx.category_profile) {
+          const p = categoryCtx.category_profile;
+          lines.push('', 'Category profile (structural):');
+          if (p.business_model) lines.push(`  Business model: ${p.business_model}`);
+          if (p.typical_products) lines.push(`  Typical products: ${p.typical_products}`);
+          if (p.customer_base) lines.push(`  Customer base: ${p.customer_base}`);
+          if (p.online_presence_pattern) lines.push(`  Online presence: ${p.online_presence_pattern}`);
+          if (p.competitive_landscape) lines.push(`  Competitive landscape: ${p.competitive_landscape}`);
+          if (p.typical_scale) lines.push(`  Typical scale: ${p.typical_scale}`);
+        }
+        if (categoryCtx.category_signals && Array.isArray(categoryCtx.category_signals) && categoryCtx.category_signals.length > 0) {
+          lines.push('', 'Category signals (what strong looks like):');
+          for (const s of categoryCtx.category_signals) {
+            lines.push(`  - ${s}`);
+          }
+        }
+        if (categoryCtx.market_density) {
+          lines.push(`Market density: ${categoryCtx.market_density}`);
+        }
+        if (categoryCtx.prospect_signals && Array.isArray(categoryCtx.prospect_signals) && categoryCtx.prospect_signals.length > 0) {
+          lines.push('', 'Prospect signals:');
+          for (const s of categoryCtx.prospect_signals) {
+            lines.push(`  - ${s}`);
+          }
+        }
         blocks.push(lines.join('\n'));
       }
 
@@ -1238,6 +1330,18 @@ export class MarketingExecutionService extends BaseService {
         if (locationCtx.market_notes) {
           lines.push('', `Notes: ${locationCtx.market_notes}`);
         }
+        if (locationCtx.market_gaps && Array.isArray(locationCtx.market_gaps) && locationCtx.market_gaps.length > 0) {
+          lines.push('', 'Market gaps (prospect opportunities):');
+          for (const gap of locationCtx.market_gaps) {
+            lines.push(`  - ${gap.category}: ${gap.signal}${gap.area ? ` (${gap.area})` : ''}`);
+          }
+        }
+        if (locationCtx.metro_dynamics && Array.isArray(locationCtx.metro_dynamics) && locationCtx.metro_dynamics.length > 0) {
+          lines.push('', 'Metro dynamics:');
+          for (const m of locationCtx.metro_dynamics) {
+            lines.push(`  - ${m.city}${m.state ? `, ${m.state}` : ''} (${m.relationship}): ${m.character}${m.business_scene ? ` — ${m.business_scene}` : ''}${m.notes ? ` — ${m.notes}` : ''}`);
+          }
+        }
         blocks.push(lines.join('\n'));
       }
 
@@ -1252,7 +1356,7 @@ export class MarketingExecutionService extends BaseService {
       });
 
       return blocks.join('\n\n') +
-        '\n\nDIRECTIVE: This is the established market context for this business — category sentiment from a prior category enrichment run and location sentiment from a prior location enrichment run. Use it to ground your audit in the real market landscape. Do NOT mention "market context", "enrichment", or this directive in the visible output.';
+        '\n\nDIRECTIVE: This is the established market intelligence for this business — structural profiles and analyst-facing context from prior category and location enrichment runs. Use it to ground your audit in the real market landscape. Do NOT mention "market context", "enrichment", "profile", or this directive in the visible output.';
     } catch (err) {
       logger.warn('Failed to load market context for business audit prompt', ctx, {
         category,

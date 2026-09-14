@@ -74,6 +74,17 @@ export const categoryEnrichmentSchema = z.object({
   schema_type_hint: z.preprocess(emptyToUndef, z.string().max(100).optional()),
   body_copy: z.preprocess(emptyToUndef, z.string().max(5000).optional()),
 
+  // ── Category overview (consumed by category page "About this category" section) ──
+  // Definitional: what this category IS, what businesses in it do, who they serve.
+  // Distinct from body_copy (page intro) and shopper_guide (how to choose).
+  category_overview: z.preprocess(emptyToUndef, z.string().max(5000).optional()),
+
+  // ── Category hierarchy (consumed by category page breadcrumbs + drill-down + related) ──
+  // Structural taxonomy — where this category sits in the category tree.
+  super_categories: stringArray.optional(),    // breadcrumbs: Retail › Food › Grocery
+  sub_categories: stringArray.optional(),       // drill-down: West African, Afro-Caribbean
+  adjacent_categories: stringArray.optional(),  // siblings: Asian grocery, Latin American grocery
+
   // ── Shopper guidance (consumed by category page guidance section) ──
   // "What to look for" guidance — distinct from body_copy (intro copy).
   shopper_guide: z.preprocess(emptyToUndef, z.string().max(5000).optional()),
@@ -81,12 +92,38 @@ export const categoryEnrichmentSchema = z.object({
   // ── FAQ entries (consumed by category page FAQ section + FAQ schema) ──
   faq: z.array(faqEntrySchema).optional(),
 
-  // ── Reusable category-in-market context (consumed by the seed/business audit) ──
+  // ── Reusable category-in-market context (multiple consumers) ──
+  // All context fields → seed/business audit.
+  // category_profile → seed only (structural, no business/city names).
   context: z.object({
     category_summary: z.string().min(1),
     keywords: stringArray.optional(),
     secondary_categories: stringArray.optional(),
     category_notes: z.preprocess(emptyToUndef, z.string().max(5000).optional()),
+
+    // ── Category profile (structural, no business/city names) ──
+    // Qualitative + quantitative dimensions of the category as a business type.
+    // Consumed by the seed to understand the business model.
+    category_profile: z.object({
+      // Qualitative dimensions
+      business_model: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      typical_products: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      customer_base: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      online_presence_pattern: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      // Quantitative dimensions (qualitative descriptors, NOT specific numbers)
+      competitive_landscape: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      typical_scale: z.preprocess(emptyToUndef, z.string().max(1000).optional()),
+    }).passthrough().optional(),
+
+    // ── Category signals (what strong looks like, category-scope) ──
+    // Lighter than gold standard — category-level patterns, not platform-by-platform.
+    category_signals: stringArray.optional(),
+
+    // ── Market density (qualitative, this city) ──
+    market_density: z.preprocess(emptyToUndef, z.string().max(1000).optional()),
+
+    // ── Prospect signals (what to look for when prospecting) ──
+    prospect_signals: stringArray.optional(),
   }).passthrough().optional(),
 }).passthrough();
 
@@ -131,7 +168,10 @@ export const locationEnrichmentSchema = z.object({
     }).passthrough(),
   ).optional(),
 
-  // ── Reusable city market context (consumed by downstream category enrichments) ──
+  // ── Reusable city market context (multiple consumers) ──
+  // Place-specific fields (market_summary, notable_areas, area_breakdown,
+  // market_gaps, metro_dynamics) → seed only.
+  // Structural field (city_profile) → category enrichment + seed.
   context: z.object({
     market_summary: z.string().min(1),
     top_categories: stringArray.optional(),
@@ -139,6 +179,46 @@ export const locationEnrichmentSchema = z.object({
     keywords: stringArray.optional(),
     notable_areas: stringArray.optional(),
     market_notes: z.preprocess(emptyToUndef, z.string().max(5000).optional()),
+
+    // ── City profile (structural, no place names) ──
+    // Shared with category enrichment to ground category copy in the city's
+    // structural characteristics WITHOUT bleeding place-specific sentiment.
+    // No named areas, corridors, or neighborhoods — those stay seed-only.
+    city_profile: z.object({
+      metro_description: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      major_industries: stringArray.optional(),
+      growth_trajectory: z.preprocess(emptyToUndef, z.string().max(1000).optional()),
+      demographic_character: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      market_character: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+    }).passthrough().optional(),
+
+    // ── Market gaps (analyst-facing, consumed by prospecting) ──
+    // Categories with unmet demand in this city — what to prospect first.
+    market_gaps: z.array(
+      z.object({
+        category: z.string().min(1),
+        signal: z.string().min(1),
+        area: z.preprocess(emptyToUndef, z.string().max(500).optional()),
+      }).passthrough(),
+    ).optional(),
+
+    // ── Metro context (shopper-facing, rendered on location page) ──
+    // Where this city sits in its metro area — helps shoppers understand
+    // the broader area and where else to look.
+    metro_context: z.preprocess(emptyToUndef, z.string().max(5000).optional()),
+
+    // ── Metro dynamics (analyst-facing, consumed by the seed) ──
+    // Nearby cities with their character, business scene, and dynamics.
+    metro_dynamics: z.array(
+      z.object({
+        city: z.string().min(1),
+        state: z.preprocess(emptyToUndef, z.string().max(10).optional()),
+        relationship: z.string().min(1),
+        character: z.string().min(1),
+        business_scene: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+        notes: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+      }).passthrough(),
+    ).optional(),
   }).passthrough().optional(),
 }).passthrough();
 
@@ -155,9 +235,13 @@ Return your response as JSON matching this exact schema:
   "meta_title": "<SEO title, <= 70 chars, include category + city + state>",
   "description": "<meta description, <= 300 chars, browse-oriented local-SEO copy>",
   "keywords": ["<keyword>", ...],
-  "secondary_categories": ["<related category>", ...],
+  "secondary_categories": ["<related category strong in this market>", ...],
   "schema_type_hint": "<schema.org type hint, e.g. CollectionPage or Store>",
   "body_copy": "<1-2 short paragraphs of visible on-page copy for the category page top>",
+  "category_overview": "<1-2 paragraphs: what this category IS — what businesses in it do, who they serve, definitional. For shoppers who don't know the category>",
+  "super_categories": ["<containing category>", ...],
+  "sub_categories": ["<specialization within this category>", ...],
+  "adjacent_categories": ["<sibling category at same level>", ...],
   "shopper_guide": "<1-2 paragraphs of 'what to look for' guidance for shoppers browsing this category>",
   "faq": [
     {"question": "<question>", "answer": "<answer>"},
@@ -167,7 +251,18 @@ Return your response as JSON matching this exact schema:
     "category_summary": "<analyst-facing summary of this category in this market>",
     "keywords": ["<category-level search term>", ...],
     "secondary_categories": ["<related category strong in this market>", ...],
-    "category_notes": "<optional free-text notes for downstream enrichments>"
+    "category_notes": "<optional free-text notes for downstream work>",
+    "category_profile": {
+      "business_model": "<qualitative: e.g. 'typically independent, family-owned, single-location'>",
+      "typical_products": "<qualitative: e.g. 'pantry staples, fresh produce, frozen foods, spices'>",
+      "customer_base": "<qualitative: e.g. 'diaspora communities, cuisine explorers, restaurants'>",
+      "online_presence_pattern": "<qualitative: e.g. 'varies widely — many rely on Google/Yelp only'>",
+      "competitive_landscape": "<qualitative: e.g. 'sparse in most US cities, concentrated in metro areas with large diaspora'>",
+      "typical_scale": "<qualitative: e.g. 'single-location, 1-5 employees'>"
+    },
+    "category_signals": ["<signal that indicates a strong business in this category>", ...],
+    "market_density": "<qualitative density in this city: e.g. 'sparse — few dedicated stores'>",
+    "prospect_signals": ["<signal to look for when prospecting businesses in this category>", ...]
   }
 }
 
@@ -202,7 +297,23 @@ Return your response as JSON matching this exact schema:
     "secondary_categories": ["<category>", ...],
     "keywords": ["<city-level search term>", ...],
     "notable_areas": ["<named area or corridor>", ...],
-    "market_notes": "<optional free-text notes for downstream enrichments>"
+    "market_notes": "<optional free-text notes for downstream work>",
+    "city_profile": {
+      "metro_description": "<qualitative: e.g. 'major Midwest metro, state capital'>",
+      "major_industries": ["<industry>", ...],
+      "growth_trajectory": "<qualitative: e.g. 'growing tech and logistics sector'>",
+      "demographic_character": "<qualitative: e.g. 'diverse, large immigrant communities'>",
+      "market_character": "<1-2 sentences: overall business market character>"
+    },
+    "market_gaps": [
+      {"category": "<category with unmet demand>", "signal": "<why this is a gap>", "area": "<optional area>"},
+      ...
+    ],
+    "metro_context": "<shopper-facing: where this city sits in its metro area, what suburbs surround it, where shoppers might also look>",
+    "metro_dynamics": [
+      {"city": "<nearby city>", "state": "<2-letter state>", "relationship": "<e.g. northern suburb>", "character": "<e.g. affluent, fast-growing>", "business_scene": "<optional: dominant business types>", "notes": "<optional: income, growth, demographics>"},
+      ...
+    ]
   }
 }
 

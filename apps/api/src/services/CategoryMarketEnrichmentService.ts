@@ -290,7 +290,16 @@ class CategoryMarketEnrichmentService extends BaseService {
     const bodyCopy = packet.body_copy?.trim() || null;
     const shopperGuide = packet.shopper_guide?.trim() || null;
     const faq = packet.faq ?? null;
-    const context = packet.context ?? null;
+    // Merge top-level shopper-facing fields (category_overview, hierarchy) into
+    // the context JSONB alongside the analyst-facing context. No dedicated
+    // columns — the context JSONB is already exposed to the frontend.
+    const context = {
+      ...(packet.context ?? {}),
+      category_overview: packet.category_overview?.trim() || null,
+      super_categories: packet.super_categories ?? null,
+      sub_categories: packet.sub_categories ?? null,
+      adjacent_categories: packet.adjacent_categories ?? null,
+    };
 
     const upsert = Prisma.sql`
       INSERT INTO directory_category_enrichment (

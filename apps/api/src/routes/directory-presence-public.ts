@@ -1460,6 +1460,7 @@ router.get('/category-enrichment', async (req: Request, res: Response) => {
       bodyCopy: market.bodyCopy,
       shopperGuide: market.shopperGuide,
       faq: market.faq,
+      context: market.context,
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/category-enrichment] Error:', undefined, {
@@ -1509,6 +1510,7 @@ router.get('/location-enrichment', async (req: Request, res: Response) => {
       shopperGuide: market.shopperGuide,
       faq: market.faq,
       areaBreakdown: market.areaBreakdown,
+      context: market.context,
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/location-enrichment] Error:', undefined, {

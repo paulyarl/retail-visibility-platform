@@ -35,7 +35,7 @@ import {
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V5';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V8';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -61,16 +61,24 @@ If CITY is "__all__", this is a NATIONAL category page — write city-agnostic c
 - secondary_categories: 3-6 closely related category names a shopper might also browse (real categories, not invented niches).
 - schema_type_hint: the schema.org type that best fits the page — usually "CollectionPage"; use "Store" only for single-business categories.
 - body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what the category is, what shoppers find here, how listings are sourced. Plain, factual, no hype.
+- category_overview: 1-2 paragraphs (<= 5000 chars) of definitional content — what this category IS, what businesses in it do, who they serve. For shoppers who don't know the category (e.g. "African grocery stores sell pantry staples, fresh produce, frozen foods, and specialty products from African countries"). Distinct from body_copy (page intro) and shopper_guide (how to choose). This is "what is this category."
+- super_categories: 2-4 containing categories that this one belongs to (e.g. "grocery stores", "food retail", "retail"). Used for breadcrumbs on the category page.
+- sub_categories: 2-6 specializations within this category (e.g. "West African grocery", "Afro-Caribbean grocery", "pan-African grocery"). Used for drill-down on the category page. Omit if the category has no meaningful sub-specializations.
+- adjacent_categories: 2-5 sibling categories at the same taxonomy level (e.g. "Asian grocery store", "Latin American grocery store", "Middle Eastern grocery store"). Used for "Related categories" on the category page.
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this category, what makes a listing worth visiting, what to check (hours, website, product scope, reviews). Plain, helpful, no hype. Distinct from body_copy (which is intro copy); this is "how to choose" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about this category. Each answer 1-3 sentences, plain and factual. Used for an FAQ section + FAQ schema on the page.
 
-=== REUSABLE CONTEXT (analyst-facing) ===
-Produce a context object that will be consumed by business audit campaigns (the seed) to give them category-specific market awareness. This is analyst-facing context, not shopper-facing copy. It does NOT bleed onto the location surface — only the seed consumes it.
+=== REUSABLE CONTEXT (multiple consumers) ===
+Produce a context object consumed by business audit campaigns (the seed) for category-specific market awareness. All context fields → seed only. This context does NOT bleed onto the location surface.
 
 - context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context. For national ('__all__') campaigns, describe the category's national landscape.
 - context.keywords: category-level search terms for downstream use.
 - context.secondary_categories: related categories strong in this market, for downstream use.
 - context.category_notes: optional free-text notes useful for downstream work (e.g. "strong in immigrant communities on the north side", "limited to 2-3 independent stores").
+- context.category_profile: STRUCTURAL category characteristics (NO business names, NO city names). Qualitative + quantitative dimensions of the category as a business type. Fields: { business_model (qualitative: e.g. "typically independent, family-owned, single-location"), typical_products (qualitative: what they sell), customer_base (qualitative: who they serve), online_presence_pattern (qualitative: e.g. "varies widely — many rely on Google/Yelp only"), competitive_landscape (qualitative: e.g. "sparse in most US cities, concentrated in metro areas with large diaspora"), typical_scale (qualitative: e.g. "single-location, 1-5 employees") }. Use qualitative descriptors, NOT specific revenue figures or employee counts.
+- context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns, not platform-by-platform checklists (e.g. "published hours with daily coverage", "clear category positioning", "community presence"). Lighter than a gold standard; helps the seed audit know what to look for.
+- context.market_density: qualitative density assessment for this category in this city (e.g. "sparse — 2-3 dedicated stores", "moderate — several established businesses", "dense — competitive market"). For national campaigns, describe the category's typical density across US cities. Use qualitative descriptors, NOT specific counts.
+- context.prospect_signals: 3-5 signals to look for when prospecting businesses in this category (e.g. "businesses with 'international grocery' in their Google category", "businesses near existing international markets", "businesses with incomplete online presence — high opportunity"). Helps prospecting queue prioritization.
 
 === RULES ===
 - Write for shoppers, not operators. No internal jargon, no "campaign", no "enrichment".
@@ -115,8 +123,12 @@ Produce the SEO + content packet that will power the public location page for {{
 - faq: 3-6 question/answer pairs shoppers might have about businesses in this city. Each answer 1-3 sentences, plain and factual. Used for an FAQ section + FAQ schema on the page.
 - area_breakdown: 3-6 named areas, corridors, or neighborhoods in this city with a short description and the categories strong there. Used for a "Browse by Area" section on the page.
 
-=== REUSABLE CONTEXT (analyst-facing) ===
-Produce a context object that will be consumed by business audit campaigns (the seed) to give them city-level market awareness. This is analyst-facing context, not shopper-facing copy. It does NOT bleed onto the category surface — only the seed consumes it.
+=== REUSABLE CONTEXT (multiple consumers) ===
+Produce a context object with multiple consumers:
+- Business audit campaigns (the seed) consume ALL context fields for market awareness.
+- Category enrichment campaigns consume context.city_profile ONLY (structural city characteristics, no place names) to ground category copy in the city's market without bleeding place-specific sentiment.
+- The location page renders context.metro_context as a shopper-facing "Metro Area" section.
+Place-specific fields (market_summary, notable_areas, market_gaps, metro_dynamics) do NOT bleed onto the category surface — only city_profile is shared.
 
 - context.market_summary: 1-2 paragraphs describing this city's business landscape — major industries, well-known commercial districts, categories the city is known for, community and cultural context that shapes the local market.
 - context.top_categories: 3-8 representative categories (same set as the SEO packet's top_categories).
@@ -124,6 +136,10 @@ Produce a context object that will be consumed by business audit campaigns (the 
 - context.keywords: city-level search terms for downstream use.
 - context.notable_areas: named areas (simplified list — the structured area_breakdown is the page-rendered version).
 - context.market_notes: optional free-text notes useful for downstream work (e.g. "strong tech corridor on the north side", "large immigrant communities drive specialty grocery demand").
+- context.city_profile: STRUCTURAL city characteristics (NO place names — no neighborhoods, corridors, or districts). This is shared with category enrichment to ground category copy in the city's market. Fields: { metro_description (qualitative, e.g. "major Midwest metro, state capital"), major_industries (string[]), growth_trajectory (qualitative, e.g. "growing tech and logistics sector"), demographic_character (qualitative, e.g. "diverse, large immigrant communities"), market_character (1-2 sentences: overall business market character) }. Use qualitative descriptors, NOT specific population counts or income figures.
+- context.market_gaps: 2-5 categories with unmet demand in this city — what to prospect first. Each entry: { category, signal, area }. The signal explains why this is a gap (e.g. "large West African community, few dedicated stores"). The area is optional (e.g. "south side"). Use general knowledge — do not fabricate counts or specific business names.
+- context.metro_context: 1-2 paragraphs (shopper-facing) describing where this city sits in its metro area — surrounding suburbs, how they relate, where shoppers might also look. Helps shoppers understand the broader area. Plain, factual, no hype.
+- context.metro_dynamics: 2-6 nearby cities/suburbs with their character and dynamics. Each entry: { city, state, relationship, character, business_scene, notes }. Use qualitative descriptors (e.g. "affluent", "fast-growing"), NOT specific income figures or population counts. relationship = how it relates to this city (e.g. "northern suburb"). character = overall feel (e.g. "affluent planned community"). business_scene = dominant business types (optional). notes = income level, growth, demographics (optional).
 
 === RULES ===
 - Write for shoppers, not operators. No internal jargon, no "campaign", no "enrichment".

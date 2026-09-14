@@ -81,6 +81,24 @@ export interface CategoryEnrichmentResponse {
   bodyCopy: string | null;
   shopperGuide: string | null;
   faq: FaqEntry[] | null;
+  context: {
+    category_overview?: string;
+    super_categories?: string[];
+    sub_categories?: string[];
+    adjacent_categories?: string[];
+    category_profile?: {
+      business_model?: string;
+      typical_products?: string;
+      customer_base?: string;
+      online_presence_pattern?: string;
+      competitive_landscape?: string;
+      typical_scale?: string;
+    };
+    category_signals?: string[];
+    market_density?: string;
+    prospect_signals?: string[];
+    [key: string]: any;
+  } | null;
 }
 
 export interface LocationEnrichmentMarket {
@@ -113,6 +131,12 @@ export interface LocationEnrichmentResponse {
   shopperGuide: string | null;
   faq: FaqEntry[] | null;
   areaBreakdown: AreaBreakdownEntry[] | null;
+  context: {
+    metro_context?: string;
+    market_gaps?: Array<{ category: string; signal: string; area?: string }>;
+    metro_dynamics?: Array<{ city: string; state?: string; relationship: string; character: string; business_scene?: string; notes?: string }>;
+    [key: string]: any;
+  } | null;
 }
 
 export interface CategoryVocabEntry {
@@ -225,6 +249,7 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         bodyCopy: data.bodyCopy ?? null,
         shopperGuide: data.shopperGuide ?? null,
         faq: data.faq ?? null,
+        context: data.context ?? null,
       };
     } catch {
       return null;
@@ -259,6 +284,7 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         shopperGuide: data.shopperGuide ?? null,
         faq: data.faq ?? null,
         areaBreakdown: data.areaBreakdown ?? null,
+        context: data.context ?? null,
       };
     } catch {
       return null;

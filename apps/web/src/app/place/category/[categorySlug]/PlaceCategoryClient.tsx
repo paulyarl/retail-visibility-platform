@@ -284,10 +284,26 @@ export default function PlaceCategoryClient({
         />
       </div>
 
-      {/* Enrichment Content: Shopper Guide + FAQ */}
-      {(enrichment?.shopperGuide || (enrichment?.faq && enrichment.faq.length > 0)) && (
+      {/* Enrichment Content: About + Shopper Guide + Hierarchy + FAQ */}
+      {(enrichment?.shopperGuide ||
+        enrichment?.context?.category_overview ||
+        (enrichment?.context?.sub_categories && enrichment.context.sub_categories.length > 0) ||
+        (enrichment?.context?.adjacent_categories && enrichment.context.adjacent_categories.length > 0) ||
+        (enrichment?.faq && enrichment.faq.length > 0)) && (
         <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800">
           <div className="container mx-auto px-4 py-12">
+            {/* About this category */}
+            {enrichment?.context?.category_overview && (
+              <div className="max-w-3xl mb-8">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+                  About {categoryName}
+                </h2>
+                <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-line">
+                  {enrichment.context.category_overview}
+                </p>
+              </div>
+            )}
+
             {/* Shopper Guide */}
             {enrichment?.shopperGuide && (
               <div className="max-w-3xl mb-8">
@@ -332,6 +348,44 @@ export default function PlaceCategoryClient({
                     }),
                   }}
                 />
+              </div>
+            )}
+
+            {/* Sub-categories */}
+            {enrichment?.context?.sub_categories && enrichment.context.sub_categories.length > 0 && (
+              <div className="max-w-3xl mt-8">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+                  Browse {categoryName} by Type
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.context.sub_categories.map((sub) => (
+                    <span
+                      key={sub}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                    >
+                      {sub}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Related categories */}
+            {enrichment?.context?.adjacent_categories && enrichment.context.adjacent_categories.length > 0 && (
+              <div className="max-w-3xl mt-8">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+                  Related Categories
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.context.adjacent_categories.map((adj) => (
+                    <span
+                      key={adj}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                    >
+                      {adj}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
