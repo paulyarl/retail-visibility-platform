@@ -81,10 +81,7 @@ export const categoryEnrichmentSchema = z.object({
   // ── FAQ entries (consumed by category page FAQ section + FAQ schema) ──
   faq: z.array(faqEntrySchema).optional(),
 
-  // ── Where this category concentrates (city-specific only; omit for national) ──
-  notable_areas: stringArray.optional(),
-
-  // ── Reusable category-in-market context (consumed by downstream enrichments) ──
+  // ── Reusable category-in-market context (consumed by the seed/business audit) ──
   context: z.object({
     category_summary: z.string().min(1),
     keywords: stringArray.optional(),
@@ -166,7 +163,6 @@ Return your response as JSON matching this exact schema:
     {"question": "<question>", "answer": "<answer>"},
     ...
   ],
-  "notable_areas": ["<area or corridor where this category concentrates>", ...],
   "context": {
     "category_summary": "<analyst-facing summary of this category in this market>",
     "keywords": ["<category-level search term>", ...],

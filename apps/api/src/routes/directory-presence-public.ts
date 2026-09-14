@@ -1460,7 +1460,6 @@ router.get('/category-enrichment', async (req: Request, res: Response) => {
       bodyCopy: market.bodyCopy,
       shopperGuide: market.shopperGuide,
       faq: market.faq,
-      notableAreas: market.notableAreas,
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/category-enrichment] Error:', undefined, {

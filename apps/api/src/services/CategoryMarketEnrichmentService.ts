@@ -62,7 +62,6 @@ export interface MarketState {
   bodyCopy: string | null;
   shopperGuide: string | null;
   faq: any | null;
-  notableAreas: string[];
   context: any | null;
 }
 
@@ -291,11 +290,6 @@ class CategoryMarketEnrichmentService extends BaseService {
     const bodyCopy = packet.body_copy?.trim() || null;
     const shopperGuide = packet.shopper_guide?.trim() || null;
     const faq = packet.faq ?? null;
-    // Category enrichment stores notable_areas (string[]) in the area_breakdown
-    // JSONB column; location enrichment stores structured objects there. The
-    // frontend distinguishes by checking element type (string vs object).
-    const notableAreas = (packet.notable_areas ?? []).map((s) => s.trim()).filter(Boolean);
-    const areaBreakdown = notableAreas.length > 0 ? notableAreas : null;
     const context = packet.context ?? null;
 
     const upsert = Prisma.sql`
@@ -316,7 +310,7 @@ class CategoryMarketEnrichmentService extends BaseService {
         ${bodyCopy},
         ${shopperGuide},
         ${faq as any},
-        ${areaBreakdown as any},
+        ${null as any},
         ${context as any},
         ${null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource},
@@ -1043,7 +1037,6 @@ class CategoryMarketEnrichmentService extends BaseService {
       bodyCopy: row.body_copy ?? null,
       shopperGuide: row.shopper_guide ?? null,
       faq: row.faq ?? null,
-      notableAreas: Array.isArray(row.area_breakdown) ? row.area_breakdown : [],
       context: row.context ?? null,
     };
   }

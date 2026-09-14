@@ -81,7 +81,6 @@ export interface CategoryEnrichmentResponse {
   bodyCopy: string | null;
   shopperGuide: string | null;
   faq: FaqEntry[] | null;
-  notableAreas: string[];
 }
 
 export interface LocationEnrichmentMarket {
@@ -226,7 +225,6 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         bodyCopy: data.bodyCopy ?? null,
         shopperGuide: data.shopperGuide ?? null,
         faq: data.faq ?? null,
-        notableAreas: data.notableAreas ?? [],
       };
     } catch {
       return null;

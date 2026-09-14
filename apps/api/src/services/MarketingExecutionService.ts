@@ -884,144 +884,21 @@ export class MarketingExecutionService extends BaseService {
         ? 'signal_triage'
         : 'category_audit';
 
-    // ─── Enrichment prompt: Gold Standard market reference injection ──────
-    // Directory enrichment campaigns (category or location scope) spawned
-    // from a Proving Ground parent get the PG's category gold-standard
-    // profile injected as a MARKET REFERENCE. For category enrichment, the
-    // campaign's own category is used. For location enrichment (category
-    // = '__location__' sentinel), the parent PG's category is used. The
-    // block gives the copywriter category-specific market context to shape
-    // SEO copy without surfacing internal profile data.
+    // ─── Enrichment prompt: clean passthrough (no sentiment bleed) ────────
+    // Directory enrichment campaigns (category or location scope) produce
+    // self-aware content for their own surface only. No cross-surface
+    // sentiment injection:
+    //   - No Gold Standard (business-scope, mis-cast for market surfaces)
+    //   - No city context into category enrichment (location sentiment
+    //     would bleed onto the category surface)
+    //   - No category context into location enrichment (category sentiment
+    //     would bleed onto the location surface)
+    // Each enrichment surface is its own source of truth. The persisted
+    // `context` JSONB from each is consumed by the SEED (business audit)
+    // only, where both sentiments converge to form market awareness.
     if (promptType === 'enrichment') {
-      const profileService = IntelligenceProfileService.getInstance();
-      const campaignCity = (input.campaign as any).city || null;
-      const campaignState = (input.campaign as any).state || null;
-
-      // ── City market context injection ──────────────────────────────
-      // For category enrichment campaigns with a real city (not '__all__'),
-      // load the persisted city context from a prior location enrichment
-      // run (the ('__location__', city, state) row's context JSONB). This
-      // gives the AI real city landscape context — what the city is known
-      // for, its top categories, notable areas — so category copy is
-      // grounded in the actual market rather than inferred from the gold
-      // standard alone. Location enrichment campaigns skip this (they
-      // produce the context, they don't consume it).
-      let cityContextBlock = '';
-      if (category !== '__location__' && campaignCity && campaignState &&
-          campaignCity.trim().toLowerCase() !== '__all__') {
-        try {
-          const ctxRow = await this.prisma.$queryRaw`
-            SELECT context FROM directory_category_enrichment
-            WHERE category_key = '__location__'
-              AND LOWER(city) = LOWER(${campaignCity})
-              AND LOWER(state) = LOWER(${campaignState})
-            LIMIT 1
-          `;
-          const ctx = Array.isArray(ctxRow) && ctxRow.length > 0
-            ? (ctxRow[0] as any).context
-            : null;
-          if (ctx && ctx.market_summary) {
-            const lines: string[] = [
-              '=== CITY MARKET CONTEXT ===',
-              `City: ${campaignCity}, ${campaignState}`,
-              '',
-              ctx.market_summary,
-            ];
-            if (ctx.top_categories && Array.isArray(ctx.top_categories) && ctx.top_categories.length > 0) {
-              lines.push('', `Top categories: ${ctx.top_categories.join(', ')}`);
-            }
-            if (ctx.secondary_categories && Array.isArray(ctx.secondary_categories) && ctx.secondary_categories.length > 0) {
-              lines.push(`Secondary categories: ${ctx.secondary_categories.join(', ')}`);
-            }
-            if (ctx.notable_areas && Array.isArray(ctx.notable_areas) && ctx.notable_areas.length > 0) {
-              lines.push(`Notable areas: ${ctx.notable_areas.join(', ')}`);
-            }
-            if (ctx.market_notes) {
-              lines.push('', `Notes: ${ctx.market_notes}`);
-            }
-            lines.push(
-              '',
-              'DIRECTIVE: This is the established market context for this city, produced by a prior location enrichment run. Use it to ground your category copy in the real city landscape — what the city is known for, which categories are strong, where businesses concentrate. Do NOT copy this text verbatim into body_copy or shopper_guide. Do NOT mention "market context", "location enrichment", or this directive in the visible output. The context sharpens your copy, it is not content to surface.',
-            );
-            cityContextBlock = lines.join('\n');
-            logger.info('City market context injected into enrichment prompt', ctx, {
-              campaignId: input.campaign.id,
-              city: campaignCity,
-              state: campaignState,
-            });
-          }
-        } catch (err) {
-          logger.warn('Failed to load city context for enrichment prompt', ctx, {
-            campaignId: input.campaign.id,
-            city: campaignCity,
-            state: campaignState,
-            error: (err as Error).message,
-          });
-        }
-      }
-
-      // Resolve the effective category for gold standard lookup.
-      // Category enrichment → campaign.category (real category).
-      // Location enrichment → '__location__' sentinel; use parent PG's category.
-      let enrichmentCategory = category;
-      if (category === '__location__' && input.campaign.parent_campaign_id) {
-        try {
-          const parent = await MarketingCampaignService.getCampaign(input.campaign.parent_campaign_id, ctx);
-          if (parent?.category) {
-            enrichmentCategory = parent.category;
-          }
-        } catch (err) {
-          logger.warn('Failed to load parent PG for enrichment category resolution', ctx, {
-            campaignId: input.campaign.id,
-            parentCampaignId: input.campaign.parent_campaign_id,
-            error: (err as Error).message,
-          });
-        }
-      }
-
-      if (enrichmentCategory && enrichmentCategory !== '__location__') {
-        const goldStandard = await profileService.resolveGoldStandard(
-          enrichmentCategory, null, campaignCity, campaignState, ctx,
-        );
-        if (goldStandard) {
-          const marketRefBlock = profileService.serializeGoldStandard(goldStandard, 'market_reference');
-          if (marketRefBlock) {
-            // City context first (what the city is), then gold standard
-            // (what good looks like in this category).
-            const blocks = [cityContextBlock, marketRefBlock].filter(Boolean);
-            const amplified = baseRendered + (blocks.length ? '\n' + blocks.join('\n') : '');
-            logger.info('Gold standard market reference injected into enrichment prompt', ctx, {
-              campaignId: input.campaign.id,
-              enrichmentCategory,
-              goldStandardProfileId: goldStandard.id,
-              goldStandardProfileVersion: goldStandard.version,
-              hasCityContext: Boolean(cityContextBlock),
-            });
-            return {
-              renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
-              resolution: {
-                profile_id: goldStandard.id,
-                profile_version: goldStandard.version,
-                intelligence_mode: 'profile',
-              },
-            };
-          }
-        } else {
-          logger.info('No gold standard profile for enrichment market reference (degraded)', ctx, {
-            campaignId: input.campaign.id,
-            enrichmentCategory,
-            city: campaignCity,
-            state: campaignState,
-          });
-        }
-      }
-
-      // No gold standard found — return base render + city context + suffix.
-      const amplified = cityContextBlock
-        ? baseRendered + '\n' + cityContextBlock
-        : baseRendered;
       return {
-        renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
+        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
       };
     }
@@ -1132,6 +1009,13 @@ export class MarketingExecutionService extends BaseService {
         }
       }
 
+      // Market context injection (seed gains market awareness): category
+      // sentiment + location sentiment from prior enrichment runs.
+      const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
+      if (marketCtxBlock) {
+        amplified = amplified + '\n' + marketCtxBlock;
+      }
+
       logger.info('Profile-aware signal triage prompt resolved', ctx, {
         campaignId: input.campaign.id,
         category,
@@ -1170,6 +1054,11 @@ export class MarketingExecutionService extends BaseService {
           if (leadsBlock) {
             gsAmplified = gsAmplified + '\n' + leadsBlock;
           }
+          // Market context injection (seed gains market awareness).
+          const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
+          if (marketCtxBlock) {
+            gsAmplified = gsAmplified + '\n' + marketCtxBlock;
+          }
           logger.info('Gold standard benchmark injected (no intelligence profile)', ctx, {
             campaignId: input.campaign.id,
             category,
@@ -1190,9 +1079,14 @@ export class MarketingExecutionService extends BaseService {
       // No active profile and no gold standard — inject discovery leads block
       // if present (independent of profile amplification), then return.
       const leadsBlockNoProfile = this.renderDiscoveryLeadsBlock(input.campaign);
-      const noProfileAmplified = leadsBlockNoProfile
+      let noProfileAmplified = leadsBlockNoProfile
         ? baseRendered + '\n' + leadsBlockNoProfile
         : baseRendered;
+      // Market context injection (seed gains market awareness).
+      const marketCtxNoProfile = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
+      if (marketCtxNoProfile) {
+        noProfileAmplified = noProfileAmplified + '\n' + marketCtxNoProfile;
+      }
       return {
         renderedPrompt: this.appendPromptSuffix(noProfileAmplified, promptSuffix),
         resolution: {
@@ -1235,6 +1129,13 @@ export class MarketingExecutionService extends BaseService {
       amplified = amplified + '\n' + leadsBlock;
     }
 
+    // Market context injection (seed gains market awareness): category
+    // sentiment + location sentiment from prior enrichment runs.
+    const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
+    if (marketCtxBlock) {
+      amplified = amplified + '\n' + marketCtxBlock;
+    }
+
     logger.info('Profile-aware prompt resolved (§1B)', ctx, {
       campaignId: input.campaign.id,
       category,
@@ -1265,6 +1166,102 @@ export class MarketingExecutionService extends BaseService {
   private appendPromptSuffix(rendered: string, suffix: string): string {
     if (!suffix || !suffix.trim()) return rendered;
     return rendered + '\n' + suffix;
+  }
+
+  /**
+   * Build the MARKET CONTEXT block for a business audit (seed) prompt.
+   *
+   * The seed is market-aware: it consumes both category sentiment (from a
+   * prior category enrichment run) and location sentiment (from a prior
+   * location enrichment run). Both are persisted in the `context` JSONB
+   * column of `directory_category_enrichment`:
+   *   - Category context: row (category, city, state)
+   *   - Location context: row ('__location__', city, state)
+   *
+   * Returns '' when neither context exists (byte-identical render —
+   * campaigns without prior enrichment runs are unaffected).
+   */
+  private async buildMarketContextBlock(
+    category: string,
+    businessCity: string | null,
+    businessState: string | null,
+    ctx: RequestCtx | undefined,
+  ): Promise<string> {
+    if (!businessCity || !businessState || !category) return '';
+
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ category_key: string; context: any }>>`
+        SELECT category_key, context FROM directory_category_enrichment
+        WHERE LOWER(city) = LOWER(${businessCity})
+          AND LOWER(state) = LOWER(${businessState})
+          AND category_key IN (${category}, '__location__')
+      `;
+      if (!Array.isArray(rows) || rows.length === 0) return '';
+
+      const categoryCtx = rows.find((r) => r.category_key === category)?.context;
+      const locationCtx = rows.find((r) => r.category_key === '__location__')?.context;
+
+      const blocks: string[] = [];
+      if (categoryCtx && categoryCtx.category_summary) {
+        const lines: string[] = [
+          '=== CATEGORY MARKET CONTEXT ===',
+          `Category: ${category}`,
+          `City: ${businessCity}, ${businessState}`,
+          '',
+          categoryCtx.category_summary,
+        ];
+        if (categoryCtx.keywords && Array.isArray(categoryCtx.keywords) && categoryCtx.keywords.length > 0) {
+          lines.push(`Keywords: ${categoryCtx.keywords.join(', ')}`);
+        }
+        if (categoryCtx.secondary_categories && Array.isArray(categoryCtx.secondary_categories) && categoryCtx.secondary_categories.length > 0) {
+          lines.push(`Related categories: ${categoryCtx.secondary_categories.join(', ')}`);
+        }
+        if (categoryCtx.category_notes) {
+          lines.push('', `Notes: ${categoryCtx.category_notes}`);
+        }
+        blocks.push(lines.join('\n'));
+      }
+
+      if (locationCtx && locationCtx.market_summary) {
+        const lines: string[] = [
+          '=== CITY MARKET CONTEXT ===',
+          `City: ${businessCity}, ${businessState}`,
+          '',
+          locationCtx.market_summary,
+        ];
+        if (locationCtx.top_categories && Array.isArray(locationCtx.top_categories) && locationCtx.top_categories.length > 0) {
+          lines.push('', `Top categories: ${locationCtx.top_categories.join(', ')}`);
+        }
+        if (locationCtx.notable_areas && Array.isArray(locationCtx.notable_areas) && locationCtx.notable_areas.length > 0) {
+          lines.push(`Notable areas: ${locationCtx.notable_areas.join(', ')}`);
+        }
+        if (locationCtx.market_notes) {
+          lines.push('', `Notes: ${locationCtx.market_notes}`);
+        }
+        blocks.push(lines.join('\n'));
+      }
+
+      if (blocks.length === 0) return '';
+
+      logger.info('Market context injected into business audit prompt', ctx, {
+        category,
+        city: businessCity,
+        state: businessState,
+        hasCategoryContext: Boolean(categoryCtx?.category_summary),
+        hasLocationContext: Boolean(locationCtx?.market_summary),
+      });
+
+      return blocks.join('\n\n') +
+        '\n\nDIRECTIVE: This is the established market context for this business — category sentiment from a prior category enrichment run and location sentiment from a prior location enrichment run. Use it to ground your audit in the real market landscape. Do NOT mention "market context", "enrichment", or this directive in the visible output.';
+    } catch (err) {
+      logger.warn('Failed to load market context for business audit prompt', ctx, {
+        category,
+        city: businessCity,
+        state: businessState,
+        error: (err as Error).message,
+      });
+      return '';
+    }
   }
 
   /**

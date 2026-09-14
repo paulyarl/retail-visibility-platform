@@ -1606,6 +1606,174 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         </div>
       )}
 
+      {/* Sentiment flow — the 3-stage PG pipeline */}
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+          Sentiment flow
+        </h2>
+        <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-3">
+          Establish location and category sentiments before auditing seeds. The business audit consumes both to gain market awareness.
+        </p>
+        <div className="flex items-stretch gap-2">
+          {/* Stage 1: Location enrichment */}
+          {(() => {
+            const locCampaigns = children.filter((c) => c.scope === 'city');
+            const loc = locCampaigns[0];
+            const locDone = loc && loc.stage !== 'seek';
+            return (
+              <div className={`flex-1 rounded-lg border p-3 ${
+                locDone
+                  ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
+                  : loc
+                    ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                    : 'border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-900/30'
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {locDone
+                    ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    : loc
+                      ? <Circle className="w-3.5 h-3.5 text-amber-500" />
+                      : <Circle className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />}
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    1 · Location
+                  </span>
+                </div>
+                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 mb-0.5">
+                  Location enrichment
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+                  Persists location sentiment (city context)
+                </p>
+                {loc ? (
+                  <Link
+                    href={`/settings/admin/marketing-ops/campaigns/${loc.id}`}
+                    className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {loc.stage} →
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => handleCreateEnrichmentCampaign('location')}
+                    disabled={enrichCampaignBusy !== null}
+                    className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+                  >
+                    create →
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Arrow */}
+          <div className="flex items-center text-gray-300 dark:text-gray-600">
+            <GitBranch className="w-4 h-4 rotate-90" />
+          </div>
+
+          {/* Stage 2: Category enrichment */}
+          {(() => {
+            const catCampaigns = children.filter((c) => c.scope === 'category');
+            const cat = catCampaigns[0];
+            const catDone = (cat && cat.stage !== 'seek') || !!marketStatus?.enrichedAt;
+            return (
+              <div className={`flex-1 rounded-lg border p-3 ${
+                catDone
+                  ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
+                  : cat
+                    ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                    : 'border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-900/30'
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {catDone
+                    ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    : cat
+                      ? <Circle className="w-3.5 h-3.5 text-amber-500" />
+                      : <Circle className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />}
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    2 · Category
+                  </span>
+                </div>
+                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 mb-0.5">
+                  Category enrichment
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+                  Persists category sentiment (category context)
+                </p>
+                {cat ? (
+                  <Link
+                    href={`/settings/admin/marketing-ops/campaigns/${cat.id}`}
+                    className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {cat.stage} →
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => handleCreateEnrichmentCampaign('category')}
+                    disabled={enrichCampaignBusy !== null}
+                    className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+                  >
+                    create →
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Arrow */}
+          <div className="flex items-center text-gray-300 dark:text-gray-600">
+            <GitBranch className="w-4 h-4 rotate-90" />
+          </div>
+
+          {/* Stage 3: Business audit (seed) */}
+          {(() => {
+            const bizCampaigns = children.filter((c) => c.scope === 'business');
+            const biz = bizCampaigns[0];
+            const locCampaigns = children.filter((c) => c.scope === 'city');
+            const catCampaigns = children.filter((c) => c.scope === 'category');
+            const locDone = locCampaigns.some((c) => c.stage !== 'seek');
+            const catDone = catCampaigns.some((c) => c.stage !== 'seek') || !!marketStatus?.enrichedAt;
+            const hasContext = locDone && catDone;
+            return (
+              <div className={`flex-1 rounded-lg border p-3 ${
+                biz
+                  ? hasContext
+                    ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
+                    : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                  : 'border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-900/30'
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {biz
+                    ? hasContext
+                      ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                      : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                    : <Circle className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />}
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    3 · Seed audit
+                  </span>
+                </div>
+                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 mb-0.5">
+                  Business audit
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+                  Consumes both sentiments {biz && !hasContext && <span className="text-amber-600 dark:text-amber-400">· context incomplete</span>}
+                </p>
+                {biz ? (
+                  <Link
+                    href={`/settings/admin/marketing-ops/campaigns/${biz.id}`}
+                    className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {biz.stage} →
+                  </Link>
+                ) : (
+                  <span className="text-[10px] text-gray-400">
+                    {hasContext ? 'attach a business campaign' : 'awaiting stages 1-2'}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
       {/* Children */}
       <div id="children" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">

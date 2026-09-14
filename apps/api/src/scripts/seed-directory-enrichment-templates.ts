@@ -35,7 +35,7 @@ import {
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V3';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V5';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -63,10 +63,9 @@ If CITY is "__all__", this is a NATIONAL category page — write city-agnostic c
 - body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what the category is, what shoppers find here, how listings are sourced. Plain, factual, no hype.
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this category, what makes a listing worth visiting, what to check (hours, website, product scope, reviews). Plain, helpful, no hype. Distinct from body_copy (which is intro copy); this is "how to choose" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about this category. Each answer 1-3 sentences, plain and factual. Used for an FAQ section + FAQ schema on the page.
-- notable_areas: 3-6 named areas, corridors, or neighborhoods where this category concentrates in this city. Omit for national ('__all__') campaigns — there is no city.
 
 === REUSABLE CONTEXT (analyst-facing) ===
-Produce a context object that will be reused by downstream enrichment campaigns in this market. This is analyst-facing context, not shopper-facing copy.
+Produce a context object that will be consumed by business audit campaigns (the seed) to give them category-specific market awareness. This is analyst-facing context, not shopper-facing copy. It does NOT bleed onto the location surface — only the seed consumes it.
 
 - context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context. For national ('__all__') campaigns, describe the category's national landscape.
 - context.keywords: category-level search terms for downstream use.
@@ -79,9 +78,6 @@ Produce a context object that will be reused by downstream enrichment campaigns 
 - Do NOT include claims about business quality ("best", "top-rated") — the directory lists from public information.
 - Category name in copy should use natural casing (e.g. "African grocery stores").
 - You may draw on general knowledge about this category and market. Do not fabricate specific business names, counts, or ratings. If you are genuinely uncertain whether a category is strong in this market, omit it rather than guess.
-
-=== GOLD STANDARD MARKET REFERENCE (conditional) ===
-If this campaign was spawned from a Proving Ground, a "=== GOLD STANDARD MARKET REFERENCE ===" section will be appended below this directive. It contains the established Gold Standard profile for this category — the bar that top-tier local businesses in this category meet across their online presence (NAP consistency, category presentation, hours, website, photos, reviews, descriptions, social links, platform coverage). Use it as market context to sharpen your copy: let the expected fields and pattern exemplars shape what you describe as the category's strengths, what shoppers should look for, and which related categories tend to co-occur with strong businesses in this market. Do NOT copy business names, ratings, or specific facts from the exemplars into your copy. Do NOT mention "gold standard", "profile", or this directive in the visible body_copy. If no section is appended, no gold standard profile exists for this category — proceed without it.
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
@@ -120,23 +116,20 @@ Produce the SEO + content packet that will power the public location page for {{
 - area_breakdown: 3-6 named areas, corridors, or neighborhoods in this city with a short description and the categories strong there. Used for a "Browse by Area" section on the page.
 
 === REUSABLE CONTEXT (analyst-facing) ===
-Produce a context object that will be reused by downstream category enrichment campaigns in this city. This is analyst-facing context, not shopper-facing copy.
+Produce a context object that will be consumed by business audit campaigns (the seed) to give them city-level market awareness. This is analyst-facing context, not shopper-facing copy. It does NOT bleed onto the category surface — only the seed consumes it.
 
 - context.market_summary: 1-2 paragraphs describing this city's business landscape — major industries, well-known commercial districts, categories the city is known for, community and cultural context that shapes the local market.
 - context.top_categories: 3-8 representative categories (same set as the SEO packet's top_categories).
 - context.secondary_categories: supporting categories for downstream use.
 - context.keywords: city-level search terms for downstream use.
 - context.notable_areas: named areas (simplified list — the structured area_breakdown is the page-rendered version).
-- context.market_notes: optional free-text notes useful for downstream category work (e.g. "strong tech corridor on the north side", "large immigrant communities drive specialty grocery demand").
+- context.market_notes: optional free-text notes useful for downstream work (e.g. "strong tech corridor on the north side", "large immigrant communities drive specialty grocery demand").
 
 === RULES ===
 - Write for shoppers, not operators. No internal jargon, no "campaign", no "enrichment".
 - Do NOT invent business counts, ratings, or specific business names — the page renders real aggregates separately.
 - Do NOT include claims about business quality ("best", "top-rated").
 - You may draw on general knowledge about this city's business landscape — major industries, well-known commercial districts, categories the city is known for. Do not fabricate specific business names, counts, or ratings. If you are genuinely uncertain whether a category is strong in this city, omit it rather than guess.
-
-=== GOLD STANDARD MARKET REFERENCE (conditional) ===
-If this campaign was spawned from a Proving Ground, a "=== GOLD STANDARD MARKET REFERENCE ===" section will be appended below this directive. It contains the established Gold Standard profile for the Proving Ground's category — the bar that top-tier local businesses in that category meet across their online presence (NAP consistency, category presentation, hours, website, photos, reviews, descriptions, social links, platform coverage). Use it as market context to sharpen your copy: let the expected fields and pattern exemplars shape which categories you describe as strong in this location, what shoppers should look for, and the related categories that tend to co-occur with strong businesses in this market. Do NOT copy business names, ratings, or specific facts from the exemplars into your copy. Do NOT mention "gold standard", "profile", or this directive in the visible body_copy. If no section is appended, no gold standard profile exists for this market — proceed without it.
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,

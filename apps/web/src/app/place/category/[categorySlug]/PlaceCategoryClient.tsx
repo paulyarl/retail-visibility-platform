@@ -284,8 +284,8 @@ export default function PlaceCategoryClient({
         />
       </div>
 
-      {/* Enrichment Content: Shopper Guide + Notable Areas + FAQ */}
-      {(enrichment?.shopperGuide || (enrichment?.notableAreas && enrichment.notableAreas.length > 0) || (enrichment?.faq && enrichment.faq.length > 0)) && (
+      {/* Enrichment Content: Shopper Guide + FAQ */}
+      {(enrichment?.shopperGuide || (enrichment?.faq && enrichment.faq.length > 0)) && (
         <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800">
           <div className="container mx-auto px-4 py-12">
             {/* Shopper Guide */}
@@ -297,25 +297,6 @@ export default function PlaceCategoryClient({
                 <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-line">
                   {enrichment.shopperGuide}
                 </p>
-              </div>
-            )}
-
-            {/* Notable Areas */}
-            {enrichment?.notableAreas && enrichment.notableAreas.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
-                  Where to Find {categoryName}
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {enrichment.notableAreas.map((area, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
-                    >
-                      {area}
-                    </span>
-                  ))}
-                </div>
               </div>
             )}
 
