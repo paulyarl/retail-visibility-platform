@@ -309,6 +309,8 @@ import directoryClaimQrRoutes from '../routes/directory-claim-qr';
 import growthEngineAdminRoutes from '../routes/growth-engine-admin';
 import marketIntelPublicRoutes from '../routes/market-intel-public';
 import marketIntelCustomerRoutes from '../routes/market-intel-customer';
+import marketIntelSurfacePublicRoutes from '../routes/market-intel-surface-public';
+import marketIntelSurfaceCustomerRoutes from '../routes/market-intel-surface-customer';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
@@ -1106,6 +1108,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
     comment: 'Market Intel customer routes — /partial for logged-in shoppers (§4.2, requireCustomerAuth only)',
+  },
+  {
+    path: '/api/customer/directory',
+    router: marketIntelSurfaceCustomerRoutes,
+    domain: 'customer',
+    authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
+    comment: 'Market Intel customer routes for category + city surfaces (§12.4, requireCustomerAuth only)',
   },
   {
     path: '/api/customer-addresses',
@@ -2113,6 +2122,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public Market Intel teaser summary at /api/public/place/:slug/market-intel/summary (§4.1)',
+  },
+  {
+    path: '/api/public/directory',
+    router: marketIntelSurfacePublicRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public Market Intel teaser for category + city surfaces (§12.4)',
   },
   {
     path: '/api/tenant',

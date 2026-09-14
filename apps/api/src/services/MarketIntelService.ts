@@ -545,6 +545,192 @@ export class MarketIntelService extends BaseService {
       },
     };
   }
+
+  // ─── Category surface (§12.3) ─────────────────────────────────────────
+  // No audit chain — the enrichment context IS the intel.
+
+  /**
+   * Category teaser summary (§12.3). The category enrichment context
+   * is the intelligence — no audit chain needed.
+   *
+   * @param categorySlug  The category key (e.g. "indian-grocery").
+   * @param city           City name or "__all__" for national.
+   * @param state          State code (required when city !== "__all__").
+   */
+  async getCategoryTeaserSummary(
+    categorySlug: string,
+    city: string,
+    state: string | null,
+  ): Promise<CategoryMarketIntelTeaser> {
+    const marketLoader = MarketContextLoader.getInstance();
+    const marketCtx = await marketLoader.loadMarketContext(categorySlug, city, state);
+    const cat = marketCtx.category;
+    const hasCat = marketLoader.hasCategoryIntelligence(cat);
+
+    const signalCount = cat.category_signals?.length ?? 0;
+    const hasProfile = Boolean(cat.category_profile);
+    const hasDensity = Boolean(cat.market_density);
+
+    return {
+      surfaceType: 'category',
+      categorySlug,
+      city,
+      state,
+      hasIntelligence: hasCat,
+      cards: {
+        categorySignals: {
+          available: signalCount > 0,
+          teaser: signalCount > 0
+            ? `${signalCount} benchmark signals tracked`
+            : 'Category signal evaluation pending',
+          count: signalCount,
+        },
+        categoryProfile: {
+          available: hasProfile,
+          teaser: hasProfile
+            ? 'Business model, customer base, competitive landscape'
+            : 'Category profile not yet available',
+        },
+        marketDensity: {
+          available: hasDensity,
+          teaser: hasDensity
+            ? cat.market_density!
+            : 'Market density analysis pending',
+        },
+        addYourBusiness: {
+          available: true,
+          teaser: 'List your business in this category',
+        },
+        fullReport: {
+          available: hasCat,
+          teaser: 'Download the full category market brief',
+        },
+      },
+    };
+  }
+
+  /**
+   * Category full content (§12.3). Returns the complete category
+   * intelligence context for paid/admin viewers.
+   */
+  async getCategoryFullContent(
+    categorySlug: string,
+    city: string,
+    state: string | null,
+  ): Promise<CategoryMarketIntelFull> {
+    const marketLoader = MarketContextLoader.getInstance();
+    const marketCtx = await marketLoader.loadMarketContext(categorySlug, city, state);
+    const cat = marketCtx.category;
+    const hasCat = marketLoader.hasCategoryIntelligence(cat);
+
+    return {
+      surfaceType: 'category',
+      categorySlug,
+      city,
+      state,
+      hasIntelligence: hasCat,
+      categorySignals: cat.category_signals ?? [],
+      categoryProfile: cat.category_profile ?? null,
+      marketDensity: cat.market_density ?? null,
+      categorySummary: cat.category_summary ?? null,
+      prospectSignals: cat.prospect_signals ?? [],
+      marketContext: {
+        hasCategoryIntelligence: hasCat,
+        hasLocationIntelligence: marketLoader.hasLocationIntelligence(marketCtx.location),
+        category: cat,
+        location: marketCtx.location,
+      },
+    };
+  }
+
+  // ─── City surface (§12.3) ─────────────────────────────────────────────
+  // No audit chain — the location enrichment context IS the intel.
+
+  /**
+   * City teaser summary (§12.3). The location enrichment context is
+   * the intelligence — no audit chain needed.
+   *
+   * @param city   City name.
+   * @param state  State code.
+   */
+  async getCityTeaserSummary(
+    city: string,
+    state: string,
+  ): Promise<CityMarketIntelTeaser> {
+    const marketLoader = MarketContextLoader.getInstance();
+    const loc = await marketLoader.loadLocationContext(city, state);
+    const hasLoc = marketLoader.hasLocationIntelligence(loc);
+
+    const gapCount = loc.market_gaps?.length ?? 0;
+    const hasMetro = Boolean(loc.metro_dynamics?.length);
+    const hasSummary = Boolean(loc.market_summary);
+    const hasProfile = Boolean(loc.city_profile);
+
+    return {
+      surfaceType: 'city',
+      city,
+      state,
+      hasIntelligence: hasLoc,
+      cards: {
+        marketGaps: {
+          available: gapCount > 0,
+          teaser: gapCount > 0
+            ? `${gapCount} unmet demand ${gapCount === 1 ? 'signal' : 'signals'} in ${city}`
+            : 'Market gap analysis pending',
+          count: gapCount,
+        },
+        metroDynamics: {
+          available: hasMetro || hasProfile,
+          teaser: hasMetro || hasProfile
+            ? `Metro dynamics for ${city}`
+            : 'Metro dynamics not yet available',
+        },
+        marketSummary: {
+          available: hasSummary,
+          teaser: hasSummary
+            ? loc.market_summary!.slice(0, 120) + (loc.market_summary!.length > 120 ? '...' : '')
+            : 'Market summary not yet available',
+        },
+        addYourBusiness: {
+          available: true,
+          teaser: `List your business in ${city}`,
+        },
+        fullReport: {
+          available: hasLoc,
+          teaser: 'Download the full city market brief',
+        },
+      },
+    };
+  }
+
+  /**
+   * City full content (§12.3). Returns the complete location
+   * intelligence context for paid/admin viewers.
+   */
+  async getCityFullContent(
+    city: string,
+    state: string,
+  ): Promise<CityMarketIntelFull> {
+    const marketLoader = MarketContextLoader.getInstance();
+    const loc = await marketLoader.loadLocationContext(city, state);
+    const hasLoc = marketLoader.hasLocationIntelligence(loc);
+
+    return {
+      surfaceType: 'city',
+      city,
+      state,
+      hasIntelligence: hasLoc,
+      marketGaps: loc.market_gaps ?? [],
+      metroDynamics: loc.metro_dynamics ?? [],
+      cityProfile: loc.city_profile ?? null,
+      marketSummary: loc.market_summary ?? null,
+      notableAreas: loc.notable_areas ?? [],
+      marketContext: {
+        hasLocationIntelligence: hasLoc,
+        location: loc,
+      },
+    };
+  }
 }
 
 // ─── Teaser summary types (§4.1) ──────────────────────────────────────────
@@ -615,4 +801,72 @@ export interface MarketIntelFullContent {
     category: unknown;
     location: unknown;
   } | null;
+}
+
+// ─── Category surface types (§12.3) ────────────────────────────────────────
+
+export interface CategoryMarketIntelTeaser {
+  surfaceType: 'category';
+  categorySlug: string;
+  city: string;
+  state: string | null;
+  hasIntelligence: boolean;
+  cards: {
+    categorySignals: { available: boolean; teaser: string; count: number };
+    categoryProfile: { available: boolean; teaser: string };
+    marketDensity: { available: boolean; teaser: string };
+    addYourBusiness: { available: boolean; teaser: string };
+    fullReport: { available: boolean; teaser: string };
+  };
+}
+
+export interface CategoryMarketIntelFull {
+  surfaceType: 'category';
+  categorySlug: string;
+  city: string;
+  state: string | null;
+  hasIntelligence: boolean;
+  categorySignals: string[];
+  categoryProfile: unknown | null;
+  marketDensity: string | null;
+  categorySummary: string | null;
+  prospectSignals: string[];
+  marketContext: {
+    hasCategoryIntelligence: boolean;
+    hasLocationIntelligence: boolean;
+    category: unknown;
+    location: unknown;
+  };
+}
+
+// ─── City surface types (§12.3) ────────────────────────────────────────────
+
+export interface CityMarketIntelTeaser {
+  surfaceType: 'city';
+  city: string;
+  state: string;
+  hasIntelligence: boolean;
+  cards: {
+    marketGaps: { available: boolean; teaser: string; count: number };
+    metroDynamics: { available: boolean; teaser: string };
+    marketSummary: { available: boolean; teaser: string };
+    addYourBusiness: { available: boolean; teaser: string };
+    fullReport: { available: boolean; teaser: string };
+  };
+}
+
+export interface CityMarketIntelFull {
+  surfaceType: 'city';
+  city: string;
+  state: string;
+  hasIntelligence: boolean;
+  marketGaps: unknown[];
+  metroDynamics: unknown[];
+  cityProfile: unknown | null;
+  marketSummary: string | null;
+  notableAreas: string[];
+  marketContext: {
+    hasLocationIntelligence: boolean;
+    location: unknown;
+  };
 }

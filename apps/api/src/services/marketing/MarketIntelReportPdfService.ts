@@ -19,6 +19,7 @@
  */
 import { prisma } from '../../prisma';
 import type { MarketIntelFullContent } from '../MarketIntelService';
+import type { CategoryMarketIntelFull, CityMarketIntelFull } from '../MarketIntelService';
 import { loadPlatformBranding, type ReceiptBranding } from './MarketingReceiptPdfService';
 
 export interface ReportPdfInput {
@@ -357,11 +358,247 @@ export async function generateReportPdf(input: ReportPdfInput): Promise<Generate
   return { pdfBuffer, filename };
 }
 
+// ─── Category Market Brief (§12.5) ─────────────────────────────────────────
+
+export interface CategoryReportPdfInput {
+  categorySlug: string;
+  city: string;
+  state: string | null;
+  fullContent: CategoryMarketIntelFull;
+}
+
+export async function generateCategoryReportPdf(input: CategoryReportPdfInput): Promise<GeneratedReport> {
+  const { categorySlug, city, state, fullContent } = input;
+  const branding = await loadPlatformBranding();
+
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  let yPos = 20;
+
+  const ensureSpace = (needed: number) => {
+    if (yPos + needed > pageHeight - 30) { doc.addPage(); yPos = 20; }
+  };
+  const sectionHeading = (title: string) => {
+    ensureSpace(20); yPos += 6;
+    doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(branding.primaryColor);
+    doc.text(title, margin, yPos); yPos += 8;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+  };
+  const bodyText = (text: string, indent = 0) => {
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+    const lines = doc.splitTextToSize(text, pageWidth - 2 * margin - indent);
+    for (const line of lines) { ensureSpace(6); doc.text(line, margin + indent, yPos); yPos += 5; }
+  };
+  const bullet = (text: string, indent = 0) => {
+    ensureSpace(6); doc.text(`• ${text}`, margin + indent, yPos); yPos += 5;
+  };
+
+  // Header
+  doc.setFontSize(20); doc.setTextColor(branding.primaryColor);
+  doc.text(branding.platformName, margin, yPos);
+  doc.setFontSize(16); doc.setTextColor(0, 0, 0);
+  doc.text('Category Market Brief', pageWidth - margin, 20, { align: 'right' });
+  yPos = 38;
+  doc.setFontSize(12); doc.setTextColor(80, 80, 80);
+  const cityName = city === '__all__' ? 'National' : `${city}${state ? `, ${state}` : ''}`;
+  doc.text(`${categorySlug} — ${cityName}`, margin, yPos);
+  yPos += 6;
+  doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, yPos);
+  yPos += 6;
+  doc.setDrawColor(200, 200, 200); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 6;
+
+  // 1. Category Summary
+  sectionHeading('Category Summary');
+  if (fullContent.categorySummary) {
+    bodyText(fullContent.categorySummary);
+  } else {
+    bodyText('Category summary not yet available.');
+  }
+
+  // 2. Category Signals
+  sectionHeading('Benchmark Signals');
+  if (fullContent.categorySignals.length > 0) {
+    for (const s of fullContent.categorySignals) {
+      bullet(s);
+    }
+  } else {
+    bodyText('No benchmark signals tracked yet.');
+  }
+
+  // 3. Category Profile
+  sectionHeading('Category Profile');
+  const profile = fullContent.categoryProfile as any;
+  if (profile) {
+    if (profile.business_model) { bullet(`Business model: ${profile.business_model}`); }
+    if (profile.customer_base) { bullet(`Customer base: ${profile.customer_base}`); }
+    if (profile.competitive_landscape) { bullet(`Competitive landscape: ${profile.competitive_landscape}`); }
+    if (profile.typical_scale) { bullet(`Typical scale: ${profile.typical_scale}`); }
+    if (profile.online_presence_pattern) { bullet(`Online presence: ${profile.online_presence_pattern}`); }
+  } else {
+    bodyText('Category profile not yet available.');
+  }
+
+  // 4. Market Density
+  sectionHeading('Market Density');
+  if (fullContent.marketDensity) {
+    bodyText(fullContent.marketDensity);
+  } else {
+    bodyText('Market density analysis not yet available.');
+  }
+
+  // 5. Prospect Signals
+  sectionHeading('Prospect Signals');
+  if (fullContent.prospectSignals.length > 0) {
+    for (const s of fullContent.prospectSignals) {
+      bullet(s);
+    }
+  } else {
+    bodyText('No prospect signals available.');
+  }
+
+  // Footer
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+    doc.text(`${branding.platformName} — Category Market Brief — ${categorySlug}`, margin, pageHeight - 10);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+  }
+
+  const filename = `category-market-brief-${categorySlug}.pdf`;
+  const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+  return { pdfBuffer, filename };
+}
+
+// ─── City Market Brief (§12.5) ─────────────────────────────────────────────
+
+export interface CityReportPdfInput {
+  city: string;
+  state: string;
+  fullContent: CityMarketIntelFull;
+}
+
+export async function generateCityReportPdf(input: CityReportPdfInput): Promise<GeneratedReport> {
+  const { city, state, fullContent } = input;
+  const branding = await loadPlatformBranding();
+
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  let yPos = 20;
+
+  const ensureSpace = (needed: number) => {
+    if (yPos + needed > pageHeight - 30) { doc.addPage(); yPos = 20; }
+  };
+  const sectionHeading = (title: string) => {
+    ensureSpace(20); yPos += 6;
+    doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(branding.primaryColor);
+    doc.text(title, margin, yPos); yPos += 8;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+  };
+  const bodyText = (text: string, indent = 0) => {
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+    const lines = doc.splitTextToSize(text, pageWidth - 2 * margin - indent);
+    for (const line of lines) { ensureSpace(6); doc.text(line, margin + indent, yPos); yPos += 5; }
+  };
+  const bullet = (text: string, indent = 0) => {
+    ensureSpace(6); doc.text(`• ${text}`, margin + indent, yPos); yPos += 5;
+  };
+
+  // Header
+  doc.setFontSize(20); doc.setTextColor(branding.primaryColor);
+  doc.text(branding.platformName, margin, yPos);
+  doc.setFontSize(16); doc.setTextColor(0, 0, 0);
+  doc.text('City Market Brief', pageWidth - margin, 20, { align: 'right' });
+  yPos = 38;
+  doc.setFontSize(12); doc.setTextColor(80, 80, 80);
+  doc.text(`${city}, ${state}`, margin, yPos);
+  yPos += 6;
+  doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, yPos);
+  yPos += 6;
+  doc.setDrawColor(200, 200, 200); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 6;
+
+  // 1. Market Summary
+  sectionHeading('Market Summary');
+  if (fullContent.marketSummary) {
+    bodyText(fullContent.marketSummary);
+  } else {
+    bodyText('Market summary not yet available.');
+  }
+
+  // 2. City Profile
+  sectionHeading('City Profile');
+  const profile = fullContent.cityProfile as any;
+  if (profile) {
+    if (profile.metro_description) { bullet(`Metro description: ${profile.metro_description}`); }
+    if (profile.major_industries?.length) { bullet(`Major industries: ${profile.major_industries.join(', ')}`); }
+    if (profile.growth_trajectory) { bullet(`Growth trajectory: ${profile.growth_trajectory}`); }
+    if (profile.demographic_character) { bullet(`Demographics: ${profile.demographic_character}`); }
+    if (profile.market_character) { bullet(`Market character: ${profile.market_character}`); }
+  } else {
+    bodyText('City profile not yet available.');
+  }
+
+  // 3. Market Gaps
+  sectionHeading('Market Gaps');
+  if (fullContent.marketGaps.length > 0) {
+    for (const gap of fullContent.marketGaps as any[]) {
+      bullet(`${gap.category}: ${gap.signal}`);
+      if (gap.area) { bodyText(`Area: ${gap.area}`, 5); }
+    }
+  } else {
+    bodyText('No market gaps identified.');
+  }
+
+  // 4. Metro Dynamics
+  sectionHeading('Metro Dynamics');
+  if (fullContent.metroDynamics.length > 0) {
+    for (const dyn of fullContent.metroDynamics as any[]) {
+      bullet(`${dyn.city}${dyn.state ? `, ${dyn.state}` : ''} — ${dyn.relationship}`);
+      if (dyn.character) { bodyText(dyn.character, 5); }
+    }
+  } else {
+    bodyText('Metro dynamics not yet available.');
+  }
+
+  // 5. Notable Areas
+  sectionHeading('Notable Areas');
+  if (fullContent.notableAreas.length > 0) {
+    for (const area of fullContent.notableAreas) {
+      bullet(area);
+    }
+  } else {
+    bodyText('No notable areas listed.');
+  }
+
+  // Footer
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+    doc.text(`${branding.platformName} — City Market Brief — ${city}, ${state}`, margin, pageHeight - 10);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+  }
+
+  const filename = `city-market-brief-${city}-${state}.pdf`.replace(/\s+/g, '-').toLowerCase();
+  const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+  return { pdfBuffer, filename };
+}
+
 /**
  * MarketIntelReportPdfService — namespace export.
  */
 export const MarketIntelReportPdfService = {
   generate: generateReportPdf,
+  generateCategoryReport: generateCategoryReportPdf,
+  generateCityReport: generateCityReportPdf,
 };
 
 export default MarketIntelReportPdfService;

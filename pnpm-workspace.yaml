@@ -6,6 +6,7 @@ allowBuilds:
   '@google/genai': true
   '@newrelic/fn-inspect': false
   '@newrelic/native-metrics': false
+  '@parcel/watcher': false
   '@prisma/client': false
   '@prisma/engines': false
   '@railway/cli': false
@@ -19,22 +20,6 @@ allowBuilds:
   sharp: false
   stripe-cli: false
   unrs-resolver: false
-
-ignoredBuiltDependencies:
-  - '@prisma/client'
-  - '@prisma/engines'
-  - esbuild
-  - prisma
-
-onlyBuiltDependencies:
-  - '@newrelic/fn-inspect'
-  - '@newrelic/native-metrics'
-  - '@sentry/cli'
-  - '@tailwindcss/oxide'
-  - aws-sdk
-  - protobufjs
-  - sharp
-  - unrs-resolver
 
 patchedDependencies:
   next-themes@0.4.6: patches/next-themes@0.4.6.patch
