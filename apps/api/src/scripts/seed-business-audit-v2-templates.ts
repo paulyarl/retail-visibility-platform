@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-14-market-context-binding -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-14-market-context-binding-3 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -615,15 +615,6 @@ function transformCategoryIntegrated(body: string): string {
     '\n' + GOLD_STANDARD_BINDING,
   );
 
-  // 1b. Insert Market Context binding section after the Gold Standard
-  //     binding section (which ends with the "If the Gold Standard block is
-  //     missing or empty..." line).
-  out = insertAfter(
-    out,
-    'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
-    '\n' + MARKET_CONTEXT_BINDING,
-  );
-
   // 2. Add profile_url to each platform object in the embedded JSON schema.
   //    All four platform objects end with `"data_status": "unavailable"`.
   //    Idempotent: skip if profile_url is already present.
@@ -711,6 +702,19 @@ function transformCategoryIntegrated(body: string): string {
   //     Attribute Capture section (anchor is that section's closing rule).
   out = insertAfter(out, 'they never represent payment processing capability.', RECOMMENDED_ATTRIBUTES_DIRECTIVE);
 
+  // 4i. Market Context binding — after the Gold Standard binding section's
+  //     last line. This MUST run after step 4c's removeSection('### Public
+  //     Narrative (required)'): the PN directive's fallback anchor is the
+  //     Gold Standard binding's last line, which can interleave the PN
+  //     heading before this headingless binding — and removeSection would
+  //     then swallow the binding on the next run. Inserting it last
+  //     guarantees the final body contains it.
+  out = insertAfter(
+    out,
+    'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
+    '\n' + MARKET_CONTEXT_BINDING,
+  );
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -734,13 +738,22 @@ function transformSignalAligned(body: string): string {
   out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
   out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
 
-  // 1. Insert both binding sections after the business identity block's
+  // 1. Insert the binding sections after the business identity block's
   //    last line (the "do not treat blank as a negative signal" note).
   //    This keeps the bindings AFTER the business identity, not before it.
+  //    The Market Context binding is a SEPARATE insertAfter — combining it
+  //    with the CI+GS bindings would let insertAfter's fingerprint check
+  //    (first 80 chars = the CI binding) skip the whole insertion on bodies
+  //    already wired with CI+GS, silently dropping the market binding.
   out = insertAfter(
     out,
     'Audit the business above. If address or phone is blank, the field was not provided — do not treat blank as a negative signal.',
-    '\n\n' + CATEGORY_INTELLIGENCE_BINDING + '\n' + GOLD_STANDARD_BINDING + '\n' + MARKET_CONTEXT_BINDING,
+    '\n\n' + CATEGORY_INTELLIGENCE_BINDING + '\n' + GOLD_STANDARD_BINDING,
+  );
+  out = insertAfter(
+    out,
+    'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
+    '\n' + MARKET_CONTEXT_BINDING,
   );
 
   // 2. Store format classification — after the identity-verification conflict

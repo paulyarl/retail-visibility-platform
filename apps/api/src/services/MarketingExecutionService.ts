@@ -652,13 +652,15 @@ export class MarketingExecutionService extends BaseService {
           const degradedDirective = this.renderGoldStandardRegionDirective(
             campaignCity, campaignState, null,
           );
-          // Market context injection (degraded gold-standard discovery)
+          // Market context injection (degraded gold-standard discovery).
+          // Appended after the body, BEFORE the JSON schema suffix — the
+          // region directive remains the final word after the suffix.
           let degradedMarketBlock = '';
           if (campaignCity && campaignState && category) {
             const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
               category, campaignCity, campaignState, ctx,
             );
-            degradedMarketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, 'emerging');
+            degradedMarketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, 'gold_standards');
             if (degradedMarketBlock) {
               logger.info('Market context injected into degraded gold-standard discovery scan', ctx, {
                 campaignId: input.campaign.id,
@@ -669,7 +671,10 @@ export class MarketingExecutionService extends BaseService {
             }
           }
           return {
-            renderedPrompt: this.appendPromptSuffix(baseRendered + warning, promptSuffix) + '\n' + degradedDirective + (degradedMarketBlock ? '\n' + degradedMarketBlock : ''),
+            renderedPrompt: this.appendPromptSuffix(
+              baseRendered + warning + (degradedMarketBlock ? '\n' + degradedMarketBlock : ''),
+              promptSuffix,
+            ) + '\n' + degradedDirective,
             resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
           };
         }
@@ -679,8 +684,28 @@ export class MarketingExecutionService extends BaseService {
             campaignCity, campaignState,
             { reference_city: goldStandard.reference_city, reference_state: goldStandard.reference_state },
           );
+          // Market context injection (unserializable gold-standard profile —
+          // same coverage as the other gold-standard discovery branches).
+          let emptyGsMarketBlock = '';
+          if (campaignCity && campaignState && category) {
+            const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
+              category, campaignCity, campaignState, ctx,
+            );
+            emptyGsMarketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, 'gold_standards');
+            if (emptyGsMarketBlock) {
+              logger.info('Market context injected into gold-standard discovery scan (empty profile block)', ctx, {
+                campaignId: input.campaign.id,
+                category,
+                city: campaignCity,
+                state: campaignState,
+              });
+            }
+          }
           return {
-            renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix) + '\n' + emptyDirective,
+            renderedPrompt: this.appendPromptSuffix(
+              baseRendered + (emptyGsMarketBlock ? '\n' + emptyGsMarketBlock : ''),
+              promptSuffix,
+            ) + '\n' + emptyDirective,
             resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
           };
         }
@@ -696,14 +721,15 @@ export class MarketingExecutionService extends BaseService {
           campaignState,
           { reference_city: goldStandard.reference_city, reference_state: goldStandard.reference_state },
         );
-        const withSuffix = this.appendPromptSuffix(baseRendered + '\n' + discoveryBlock, promptSuffix);
-        // Market context injection (gold-standard discovery scan)
+        // Market context injection (gold-standard discovery scan). Appended
+        // after the body + discovery block, BEFORE the JSON schema suffix —
+        // the region directive remains the final word after the suffix.
         let gsMarketBlock = '';
         if (campaignCity && campaignState && category) {
           const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
             category, campaignCity, campaignState, ctx,
           );
-          gsMarketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, 'emerging');
+          gsMarketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, 'gold_standards');
           if (gsMarketBlock) {
             logger.info('Market context injected into gold-standard discovery scan', ctx, {
               campaignId: input.campaign.id,
@@ -713,6 +739,10 @@ export class MarketingExecutionService extends BaseService {
             });
           }
         }
+        const withSuffix = this.appendPromptSuffix(
+          baseRendered + '\n' + discoveryBlock + (gsMarketBlock ? '\n' + gsMarketBlock : ''),
+          promptSuffix,
+        );
         logger.info('Gold standard discovery profile injected', ctx, {
           campaignId: input.campaign.id,
           category,
@@ -724,7 +754,7 @@ export class MarketingExecutionService extends BaseService {
             : 'nationwide',
         });
         return {
-          renderedPrompt: withSuffix + '\n' + regionDirective + (gsMarketBlock ? '\n' + gsMarketBlock : ''),
+          renderedPrompt: withSuffix + '\n' + regionDirective,
           resolution: {
             profile_id: goldStandard.id,
             profile_version: goldStandard.version,
@@ -753,14 +783,15 @@ export class MarketingExecutionService extends BaseService {
           ? `${estCampaignCity || ''}${estCampaignCity && estCampaignState ? ', ' : ''}${estCampaignState || ''}`
           : 'nationwide',
       });
-      const withSuffix = this.appendPromptSuffix(baseRendered, promptSuffix);
-
       // ─── Market context injection (establishment scan) ──────────────
       // The establishment scan discovers best-in-class businesses for a
       // category in a city. It benefits from category_profile (WHAT to
       // look for), city_profile (WHERE/HOW), category_signals (HOW to
       // evaluate), and market_density (expectation setting).
-      // National campaigns (no city) skip — no city profile to load.
+      // National campaigns (city = '__all__') load category intelligence
+      // only — no city profile exists at national scope.
+      // Appended after the body, BEFORE the JSON schema suffix — the
+      // region directive remains the final word after the suffix.
       let estMarketBlock = '';
       if (estCampaignCity && estCampaignState && category) {
         const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
@@ -776,9 +807,13 @@ export class MarketingExecutionService extends BaseService {
           });
         }
       }
+      const withSuffix = this.appendPromptSuffix(
+        baseRendered + (estMarketBlock ? '\n' + estMarketBlock : ''),
+        promptSuffix,
+      );
 
       return {
-        renderedPrompt: withSuffix + '\n' + estRegionDirective + (estMarketBlock ? '\n' + estMarketBlock : ''),
+        renderedPrompt: withSuffix + '\n' + estRegionDirective,
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
       };
     }
@@ -886,12 +921,13 @@ export class MarketingExecutionService extends BaseService {
       // market_gaps (WHERE demand is unmet), prospect_signals (WHAT to
       // look for), category_signals (HOW to evaluate), market_density
       // (expectation setting), and metro_dynamics (nearby context).
-      // National campaigns (no city) skip — no city profile to load.
+      // National campaigns (city = '__all__') load category intelligence
+      // only — no city profile exists at national scope.
       if (campaignCity && campaignState && category) {
         const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
           category, campaignCity, campaignState, ctx,
         );
-        const marketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, focus as 'emerging' | 'competitive');
+        const marketBlock = formatDiscoveryMarketContext(marketCtx, category, campaignCity, campaignState, focus as 'emerging' | 'competitive' | 'gold_standards');
         if (marketBlock) {
           rendered = rendered + '\n' + marketBlock;
           logger.info('Market context injected into emerging/competitive discovery scan', ctx, {

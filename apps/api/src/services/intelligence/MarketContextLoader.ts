@@ -92,6 +92,10 @@ export interface MarketContext {
 
 export class MarketContextLoader extends BaseService {
   private static instance: MarketContextLoader;
+  // Spec open question #4: cache the loader result per (category, city,
+  // state) with a 5-minute TTL, same as the enrichment public API.
+  private static readonly CACHE_TTL_MS = 5 * 60 * 1000;
+  private readonly cache = new Map<string, { data: MarketContext; expiresAt: number }>();
 
   private constructor() {
     super();
@@ -104,11 +108,20 @@ export class MarketContextLoader extends BaseService {
     return MarketContextLoader.instance;
   }
 
+  /** Clear the in-memory cache (used by tests). */
+  resetCache(): void {
+    this.cache.clear();
+  }
+
   /**
    * Load market intelligence for a (category, city, state) market.
    *
    * Returns empty objects when enrichment hasn't run — callers should
    * check for the presence of specific fields before using them.
+   *
+   * National campaigns (city = '__all__') have no city profile — only the
+   * national category enrichment row (written literally as (category,
+   * '__all__', '__all__') by CategoryMarketEnrichmentService) is loaded.
    */
   async loadMarketContext(
     category: string,
@@ -117,26 +130,49 @@ export class MarketContextLoader extends BaseService {
     ctx?: RequestCtx,
   ): Promise<MarketContext> {
     const empty: MarketContext = { category: {}, location: {} };
-    if (!city || !state || !category) return empty;
-    // National campaigns (city = '__all__') have no city profile.
-    if (city.trim().toLowerCase() === '__all__') return empty;
+    if (!city || !category) return empty;
+    const isNational = city.trim().toLowerCase() === '__all__';
+    if (!isNational && !state) return empty;
+
+    const cacheKey = `${category.toLowerCase()}|${city.trim().toLowerCase()}|${(state ?? '').trim().toLowerCase()}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
 
     try {
+      if (isNational) {
+        const rows = await this.prisma.$queryRaw<Array<{ category_key: string; context: any }>>`
+          SELECT category_key, context FROM directory_category_enrichment
+          WHERE LOWER(city) = '__all__'
+            AND category_key = ${category}
+        `;
+        const categoryCtx = Array.isArray(rows)
+          ? rows.find((r) => r.category_key === category)?.context
+          : undefined;
+        const data: MarketContext = { category: categoryCtx ?? {}, location: {} };
+        this.cache.set(cacheKey, { data, expiresAt: Date.now() + MarketContextLoader.CACHE_TTL_MS });
+        return data;
+      }
+
       const rows = await this.prisma.$queryRaw<Array<{ category_key: string; context: any }>>`
         SELECT category_key, context FROM directory_category_enrichment
         WHERE LOWER(city) = LOWER(${city})
           AND LOWER(state) = LOWER(${state})
           AND category_key IN (${category}, '__location__')
       `;
-      if (!Array.isArray(rows) || rows.length === 0) return empty;
 
-      const categoryCtx = rows.find((r) => r.category_key === category)?.context;
-      const locationCtx = rows.find((r) => r.category_key === '__location__')?.context;
+      const categoryCtx = Array.isArray(rows)
+        ? rows.find((r) => r.category_key === category)?.context
+        : undefined;
+      const locationCtx = Array.isArray(rows)
+        ? rows.find((r) => r.category_key === '__location__')?.context
+        : undefined;
 
-      return {
+      const data: MarketContext = {
         category: categoryCtx ?? {},
         location: locationCtx ?? {},
       };
+      this.cache.set(cacheKey, { data, expiresAt: Date.now() + MarketContextLoader.CACHE_TTL_MS });
+      return data;
     } catch (err) {
       logger.warn('Failed to load market context', ctx, {
         category,

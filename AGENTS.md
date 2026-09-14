@@ -38,6 +38,10 @@ Repeat each command with `--config prd` for production.
 
 **Idempotency check pattern:** seed scripts must check for the **presence of the new marker** (e.g. `BRIEFING_MARKER`), NOT the absence of an old section (e.g. `!body.includes('## Output')`). The absence-of-old pattern is unsafe because old bodies may never have had the old section either, causing the seed to skip every time.
 
+**Two subtler failure modes (bit us 2026-09-14, seed-business-audit-v2-templates):**
+- **`insertAfter` fingerprints only the first 80 chars of the insertion.** Never combine multiple bindings into one `insertAfter` call — if the first chunk is already present, the whole insertion is skipped and the later chunks are silently dropped while the version marker still gets appended.
+- **`removeSection` deletes up to the next `##`/`###` heading and swallows headingless content.** A binding inserted between a removable directive and the next heading gets eaten on the next run. Insert headingless bindings (e.g. `MARKET_CONTEXT_BINDING`) AFTER all `removeSection` calls in the transform so each run self-heals.
+
 ## DB CHECK Constraints — Enum Sync Discipline
 
 `mkt_prospect_queue` (and other mkt_* tables) carry Postgres CHECK constraints that are **not** managed by Prisma (schema.prisma is db-pulled and ignores them). When you add a value to an app-layer enum, you MUST also ship a numbered migration that drops + re-adds the CHECK with the full value set, or inserts with the new value fail with `23514 check constraint violated` (500 `internal_error` at runtime).

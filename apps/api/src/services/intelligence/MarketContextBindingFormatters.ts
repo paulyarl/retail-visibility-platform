@@ -212,7 +212,7 @@ export function formatDiscoveryMarketContext(
   category: string,
   city: string,
   state: string,
-  focus: 'emerging' | 'competitive',
+  focus: 'emerging' | 'competitive' | 'gold_standards',
 ): string {
   const { category: catCtx, location: locCtx } = marketCtx;
   const hasCat = loader.hasCategoryIntelligence(catCtx);
@@ -295,16 +295,25 @@ export function formatDiscoveryMarketContext(
   }
 
   // Focus-specific framing
-  lines.push('', '--- FOCUS GUIDANCE ---');
+  const focusLines: string[] = [];
   if (focus === 'emerging') {
-    lines.push('For EMERGING discovery, prioritize businesses that DON\'T appear in the');
-    lines.push('category profile\'s online_presence_pattern — businesses with thin online');
-    lines.push('presence are the emerging targets this intelligence helps you find.');
-    lines.push('Prioritize market gap areas — emerging businesses often fill unmet demand.');
-  } else {
-    lines.push('For COMPETITIVE discovery, prioritize businesses that DO match the');
-    lines.push('category profile and meet the most category_signals — these are the');
-    lines.push('established competitors. Use market_density to understand how many to expect.');
+    focusLines.push('For EMERGING discovery, prioritize businesses that DON\'T appear in the');
+    focusLines.push('category profile\'s online_presence_pattern — businesses with thin online');
+    focusLines.push('presence are the emerging targets this intelligence helps you find.');
+    focusLines.push('Prioritize market gap areas — emerging businesses often fill unmet demand.');
+  } else if (focus === 'competitive') {
+    focusLines.push('For COMPETITIVE discovery, prioritize businesses that DO match the');
+    focusLines.push('category profile and meet the most category_signals — these are the');
+    focusLines.push('established competitors. Use market_density to understand how many to expect.');
+  } else if (focus === 'gold_standards') {
+    focusLines.push('For GOLD STANDARD discovery, the established gold-standard profile is your');
+    focusLines.push('benchmark — evaluate candidates against it. Use category_signals as a');
+    focusLines.push('supporting checklist and market_density to calibrate how many strong');
+    focusLines.push('candidates to expect in this market.');
+  }
+  if (focusLines.length > 0) {
+    lines.push('', '--- FOCUS GUIDANCE ---');
+    lines.push(...focusLines);
   }
 
   lines.push('', 'If any blocks above are missing, proceed with your existing instructions —');
