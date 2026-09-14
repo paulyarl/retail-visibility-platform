@@ -32,6 +32,22 @@ vi.mock('../../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+const { mockLoadMarketContext, mockHasCategoryIntelligence, mockHasLocationIntelligence } = vi.hoisted(() => ({
+  mockLoadMarketContext: vi.fn(),
+  mockHasCategoryIntelligence: vi.fn(),
+  mockHasLocationIntelligence: vi.fn(),
+}));
+
+vi.mock('../intelligence/MarketContextLoader', () => ({
+  MarketContextLoader: {
+    getInstance: () => ({
+      loadMarketContext: mockLoadMarketContext,
+      hasCategoryIntelligence: mockHasCategoryIntelligence,
+      hasLocationIntelligence: mockHasLocationIntelligence,
+    }),
+  },
+}));
+
 import { MarketIntelService } from '../MarketIntelService';
 
 const service = MarketIntelService.getInstance();
@@ -41,14 +57,20 @@ beforeEach(() => {
   mockSeed.mockReset();
   mockCampaignLink.mockReset();
   mockAudit.mockReset();
+  mockLoadMarketContext.mockReset();
+  mockLoadMarketContext.mockResolvedValue({ category: {}, location: {} });
+  mockHasCategoryIntelligence.mockReset();
+  mockHasCategoryIntelligence.mockReturnValue(false);
+  mockHasLocationIntelligence.mockReset();
+  mockHasLocationIntelligence.mockReturnValue(false);
 });
 
 // ─── Slug → audit resolution (§8.4) ──────────────────────────────────────
 
 describe('resolveSeedAuditBySlug (§8.4)', () => {
   it('resolves the full chain to the latest business_analysis audit', async () => {
-    mockListing.mockResolvedValue({ id: 'listing-1' });
-    mockSeed.mockResolvedValue({ id: 'seed-1' });
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'African Grocery Store' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'African Grocery Store', city: 'Indianapolis', state: 'IN' });
     mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
     const later = new Date('2026-09-10');
     const earlier = new Date('2026-09-01');
@@ -66,6 +88,10 @@ describe('resolveSeedAuditBySlug (§8.4)', () => {
     expect(result!.campaignId).toBe('camp-1');
     expect(result!.seedId).toBe('seed-1');
     expect(result!.listingId).toBe('listing-1');
+    expect(result!.businessName).toBe('African Grocery Store');
+    expect(result!.category).toBe('African Grocery Store');
+    expect(result!.city).toBe('Indianapolis');
+    expect(result!.state).toBe('IN');
     expect(result!.auditData).toEqual({ summary: 'latest' });
     expect(result!.createdAt).toEqual(later);
 
@@ -95,7 +121,7 @@ describe('resolveSeedAuditBySlug (§8.4)', () => {
   });
 
   it('returns null when the seed is missing (listing has no presence seed)', async () => {
-    mockListing.mockResolvedValue({ id: 'listing-1' });
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
     mockSeed.mockResolvedValue(null);
 
     const result = await service.resolveSeedAuditBySlug('some-slug');
@@ -106,8 +132,8 @@ describe('resolveSeedAuditBySlug (§8.4)', () => {
   });
 
   it('returns null when no campaign link exists for the seed', async () => {
-    mockListing.mockResolvedValue({ id: 'listing-1' });
-    mockSeed.mockResolvedValue({ id: 'seed-1' });
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
     mockCampaignLink.mockResolvedValue(null);
 
     const result = await service.resolveSeedAuditBySlug('some-slug');
@@ -117,8 +143,8 @@ describe('resolveSeedAuditBySlug (§8.4)', () => {
   });
 
   it('returns null when no business_analysis audit exists for the campaign', async () => {
-    mockListing.mockResolvedValue({ id: 'listing-1' });
-    mockSeed.mockResolvedValue({ id: 'seed-1' });
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
     mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
     mockAudit.mockResolvedValue(null);
 
@@ -135,8 +161,8 @@ describe('resolveSeedAuditBySlug (§8.4)', () => {
   });
 
   it('prefers a primary campaign link over a secondary one', async () => {
-    mockListing.mockResolvedValue({ id: 'listing-1' });
-    mockSeed.mockResolvedValue({ id: 'seed-1' });
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
     mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-primary' });
     mockAudit.mockResolvedValue({
       id: 'audit-1',
@@ -264,5 +290,364 @@ describe('readSignalChecklist (§8.5.4 card availability)', () => {
     const result = service.readSignalChecklist(auditData);
 
     expect(result).toBeNull();
+  });
+});
+
+// ─── getTeaserSummary (§4.1) ──────────────────────────────────────────────
+
+describe('getTeaserSummary (§4.1)', () => {
+  it('returns hasAudit:false when the resolution chain breaks', async () => {
+    mockListing.mockResolvedValue(null);
+
+    const result = await service.getTeaserSummary('no-such-slug');
+
+    expect(result.hasAudit).toBe(false);
+    expect(result.businessName).toBeNull();
+    expect(result.cards.growthOpportunities.available).toBe(false);
+    expect(result.cards.howItStacksUp.available).toBe(false);
+    expect(result.cards.fullReport.available).toBe(false);
+    // Claim card always available.
+    expect(result.cards.claimBusiness.available).toBe(true);
+  });
+
+  it('returns the full teaser payload when audit + structured fields exist', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'African Grocery Store' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'African Grocery Store', city: 'Indianapolis', state: 'IN' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        market_opportunities: [
+          { title: 'No website', impact: 'HIGH' },
+          { title: 'Limited hours', impact: 'MEDIUM' },
+          { title: 'South side demand', impact: 'HIGH' },
+        ],
+        signal_checklist: [
+          { signal: 'Published hours', met: true, evidence: 'GBP hours current' },
+          { signal: 'Clear category positioning', met: true, evidence: null },
+          { signal: 'Community presence', met: true, evidence: null },
+          { signal: 'NAP consistency', met: true, evidence: null },
+          { signal: 'No website', met: false, evidence: null },
+          { signal: 'Below review volume', met: false, evidence: null },
+        ],
+      },
+      created_at: new Date('2026-09-10'),
+    });
+
+    const result = await service.getTeaserSummary('african-grocery-indianapolis');
+
+    expect(result.businessSlug).toBe('african-grocery-indianapolis');
+    expect(result.businessName).toBe('African Grocery Store');
+    expect(result.hasAudit).toBe(true);
+    expect(result.cards.growthOpportunities).toEqual({
+      available: true,
+      teaser: '3 actionable gaps identified',
+      count: 3,
+    });
+    expect(result.cards.howItStacksUp).toEqual({
+      available: true,
+      teaser: 'Meets 4 of 6 category signals',
+    });
+    expect(result.cards.fullReport.available).toBe(true);
+    expect(result.cards.claimBusiness.available).toBe(true);
+  });
+
+  it('uses gap_analysis fallback when market_opportunities is absent', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test Biz' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        gap_analysis: { gaps: [{ field: 'website_present', severity: 'non_negotiable' }] },
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getTeaserSummary('some-slug');
+
+    expect(result.cards.growthOpportunities).toEqual({
+      available: true,
+      teaser: '1 actionable gap identified',
+      count: 1,
+    });
+  });
+
+  it('renders howItStacksUp available:false when signal_checklist is absent', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test Biz' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: { summary: 'no checklist, no opportunities' },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getTeaserSummary('some-slug');
+
+    expect(result.cards.howItStacksUp.available).toBe(false);
+    expect(result.cards.howItStacksUp.teaser).toBe('Category signal evaluation pending');
+    // Growth opportunities also unavailable (count 0).
+    expect(result.cards.growthOpportunities.available).toBe(false);
+    expect(result.cards.growthOpportunities.teaser).toBe('0 actionable gaps identified');
+  });
+
+  it('loads market context via MarketContextLoader with seed category/city/state', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test Biz' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'African Grocery Store', city: 'Indianapolis', state: 'IN' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: { market_opportunities: [{ title: 'A', impact: 'HIGH' }] },
+      created_at: new Date('2026-09-01'),
+    });
+
+    await service.getTeaserSummary('some-slug');
+
+    expect(mockLoadMarketContext).toHaveBeenCalledWith('African Grocery Store', 'Indianapolis', 'IN');
+  });
+});
+
+// ─── getPartialContent (§4.2) ────────────────────────────────────────────
+
+describe('getPartialContent (§4.2)', () => {
+  it('returns hasAudit:false when the resolution chain breaks', async () => {
+    mockListing.mockResolvedValue(null);
+
+    const result = await service.getPartialContent('no-such-slug', 'cust-1');
+
+    expect(result.hasAudit).toBe(false);
+    expect(result.growthOpportunities.available).toBe(false);
+    expect(result.growthOpportunities.items).toEqual([]);
+    expect(result.howItStacksUp.available).toBe(false);
+    expect(result.howItStacksUp.signals).toEqual([]);
+  });
+
+  it('returns top 2 opportunities unlocked, rest locked', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        market_opportunities: [
+          { title: 'No website', impact: 'HIGH' },
+          { title: 'Limited hours', impact: 'MEDIUM' },
+          { title: 'South side demand', impact: 'HIGH' },
+        ],
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getPartialContent('some-slug', 'cust-1');
+
+    expect(result.hasAudit).toBe(true);
+    expect(result.growthOpportunities.available).toBe(true);
+    expect(result.growthOpportunities.items).toHaveLength(3);
+    expect(result.growthOpportunities.items[0]).toEqual({ title: 'No website', impact: 'HIGH', locked: false });
+    expect(result.growthOpportunities.items[1]).toEqual({ title: 'Limited hours', impact: 'MEDIUM', locked: false });
+    expect(result.growthOpportunities.items[2]).toEqual({ title: 'South side demand', impact: 'HIGH', locked: true });
+    expect(result.growthOpportunities.lockedCount).toBe(1);
+  });
+
+  it('falls back to gap_analysis.gaps when market_opportunities is absent', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        gap_analysis: {
+          gaps: [
+            { field: 'website_present', severity: 'non_negotiable' },
+            { field: 'hours_coverage', severity: 'recommended' },
+          ],
+        },
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getPartialContent('some-slug', 'cust-1');
+
+    expect(result.growthOpportunities.available).toBe(true);
+    expect(result.growthOpportunities.items).toHaveLength(2);
+    expect(result.growthOpportunities.items[0]).toEqual({ title: 'website_present', impact: 'HIGH', locked: false });
+    expect(result.growthOpportunities.items[1]).toEqual({ title: 'hours_coverage', impact: 'MEDIUM', locked: false });
+    expect(result.growthOpportunities.lockedCount).toBe(0);
+  });
+
+  it('returns full signal checklist for howItStacksUp', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        signal_checklist: [
+          { signal: 'Published hours', met: true, evidence: null },
+          { signal: 'No website', met: false, evidence: null },
+        ],
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getPartialContent('some-slug', 'cust-1');
+
+    expect(result.howItStacksUp.available).toBe(true);
+    expect(result.howItStacksUp.signals).toEqual([
+      { signal: 'Published hours', met: true },
+      { signal: 'No website', met: false },
+    ]);
+  });
+
+  it('renders howItStacksUp available:false when signal_checklist is absent', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: { summary: 'no checklist' },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getPartialContent('some-slug', 'cust-1');
+
+    expect(result.howItStacksUp.available).toBe(false);
+    expect(result.howItStacksUp.signals).toEqual([]);
+  });
+
+  it('renders growthOpportunities available:false when no opportunities and no gaps', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: { summary: 'nothing' },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getPartialContent('some-slug', 'cust-1');
+
+    expect(result.growthOpportunities.available).toBe(false);
+    expect(result.growthOpportunities.items).toEqual([]);
+    expect(result.growthOpportunities.lockedCount).toBe(0);
+  });
+});
+
+// ─── getFullContent (§4.3) ───────────────────────────────────────────────
+
+describe('getFullContent (§4.3)', () => {
+  it('returns hasAudit:false when the resolution chain breaks', async () => {
+    mockListing.mockResolvedValue(null);
+
+    const result = await service.getFullContent('no-such-slug');
+
+    expect(result.hasAudit).toBe(false);
+    expect(result.businessName).toBeNull();
+    expect(result.growthOpportunities.available).toBe(false);
+    expect(result.howItStacksUp.available).toBe(false);
+    expect(result.gapAnalysis).toBeNull();
+    expect(result.marketContext).toBeNull();
+  });
+
+  it('returns all opportunities unlocked with descriptions', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test Biz' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        market_opportunities: [
+          { title: 'No website', description: 'Missing online discovery', impact: 'HIGH' },
+          { title: 'Limited hours', description: 'Closes before 7pm', impact: 'MEDIUM' },
+        ],
+        signal_checklist: [
+          { signal: 'Published hours', met: true, evidence: 'GBP hours current' },
+          { signal: 'No website', met: false, evidence: 'No website found' },
+        ],
+        gap_analysis: { gaps: [{ field: 'website', severity: 'non_negotiable' }] },
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getFullContent('some-slug');
+
+    expect(result.hasAudit).toBe(true);
+    expect(result.businessName).toBe('Test Biz');
+    expect(result.growthOpportunities.available).toBe(true);
+    expect(result.growthOpportunities.items).toHaveLength(2);
+    expect(result.growthOpportunities.items[0]).toEqual({
+      title: 'No website',
+      description: 'Missing online discovery',
+      impact: 'HIGH',
+    });
+    expect(result.howItStacksUp.available).toBe(true);
+    expect(result.howItStacksUp.signals).toHaveLength(2);
+    expect(result.howItStacksUp.signals[0]).toEqual({
+      signal: 'Published hours',
+      met: true,
+      evidence: 'GBP hours current',
+    });
+    expect(result.gapAnalysis).toEqual({ gaps: [{ field: 'website', severity: 'non_negotiable' }] });
+  });
+
+  it('falls back to gap_analysis when market_opportunities is absent', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        gap_analysis: { gaps: [{ field: 'website', severity: 'non_negotiable' }] },
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getFullContent('some-slug');
+
+    expect(result.growthOpportunities.available).toBe(true);
+    expect(result.growthOpportunities.items).toHaveLength(1);
+    expect(result.growthOpportunities.items[0]).toEqual({
+      title: 'website',
+      description: null,
+      impact: 'HIGH',
+    });
+  });
+
+  it('includes market context with category/location intelligence flags', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'African Grocery Store', city: 'Indianapolis', state: 'IN' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: { market_opportunities: [{ title: 'A', impact: 'HIGH' }] },
+      created_at: new Date('2026-09-01'),
+    });
+    mockLoadMarketContext.mockResolvedValue({
+      category: { category_signals: ['Published hours'] },
+      location: { market_gaps: [{ category: 'African Grocery', signal: 'south side demand' }] },
+    });
+    mockHasCategoryIntelligence.mockReturnValue(true);
+    mockHasLocationIntelligence.mockReturnValue(true);
+
+    const result = await service.getFullContent('some-slug');
+
+    expect(result.marketContext).not.toBeNull();
+    expect(result.marketContext!.hasCategoryIntelligence).toBe(true);
+    expect(result.marketContext!.hasLocationIntelligence).toBe(true);
+    expect(result.marketContext!.category).toEqual({ category_signals: ['Published hours'] });
+    expect(result.marketContext!.location).toEqual({ market_gaps: [{ category: 'African Grocery', signal: 'south side demand' }] });
   });
 });

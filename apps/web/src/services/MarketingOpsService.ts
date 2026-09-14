@@ -242,6 +242,11 @@ export interface CampaignLineageEntry {
   created_at?: string;
   category?: string | null;
   city?: string | null;
+  // Number of mkt_audits_list rows on the child. An audit row is the
+  // authoritative "this enrichment campaign has been executed" signal —
+  // enrichment campaigns stay at stage='seek' after a run, so the
+  // proving-ground Sentiment flow keys "done" off audit_count > 0.
+  audit_count?: number;
 }
 
 export interface CampaignDetail extends Campaign {

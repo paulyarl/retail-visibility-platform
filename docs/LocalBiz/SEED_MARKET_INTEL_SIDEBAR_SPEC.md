@@ -648,7 +648,7 @@ The `business_analysis` schema has no opportunities array and no per-signal eval
 CREATE TABLE market_intel_unlocks (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       VARCHAR(255) NOT NULL REFERENCES tenants(id),
-  customer_id     UUID NOT NULL REFERENCES customers(id),
+  customer_id     VARCHAR(255) NOT NULL REFERENCES customers(id),
   surface_type    TEXT NOT NULL CHECK (surface_type IN ('place', 'category', 'city')),
   surface_key     TEXT NOT NULL,
   unlock_type     TEXT NOT NULL CHECK (unlock_type IN ('single_report', 'subscription', 'owner_claim')),

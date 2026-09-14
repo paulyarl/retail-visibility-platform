@@ -93,7 +93,8 @@ export type ConversionSource =
   | 'external'
   | 'portal_checkout'
   | 'diagnostic_gallery'
-  | 'directory_claim';
+  | 'directory_claim'
+  | 'market_intel_unlock';
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
@@ -1387,7 +1388,16 @@ export class MarketingCampaignService extends BaseService {
             // Migration 262 — title/category/city added: proving-ground
             // children are intelligence campaigns whose identity is
             // title + category + city (business_name is null).
-            select: { id: true, business_name: true, title: true, category: true, city: true, scope: true, stage: true, created_at: true },
+            // _count.mkt_audits_list surfaces whether each child has been
+            // executed (an audit row is the authoritative "ran" signal —
+            // enrichment campaigns stay at stage='seek' after a run, and
+            // the directory_category_enrichment row may not exist yet, so
+            // the proving-ground Sentiment flow uses audit_count to mark a
+            // lane green instead of relying on stage or the markets API).
+            select: {
+              id: true, business_name: true, title: true, category: true, city: true, scope: true, stage: true, created_at: true,
+              _count: { select: { mkt_audits_list: true } },
+            },
             orderBy: { created_at: 'desc' },
           },
           mkt_outreach_log: { orderBy: { contact_date: 'desc' }, take: 20 },
@@ -1463,7 +1473,10 @@ export class MarketingCampaignService extends BaseService {
         stage_history: mkt_stage_history_list ?? [],
         outreach_log: mkt_outreach_log ?? [],
         parent_campaign: parent ?? null,
-        children: children ?? [],
+        children: (children ?? []).map((c: any) => {
+          const { _count, ...childRest } = c;
+          return { ...childRest, audit_count: _count?.mkt_audits_list ?? 0 };
+        }),
         service_category_label,
         proving_ground: provingGround,
         // Surface sibling grouping + archetype in camelCase so the detail

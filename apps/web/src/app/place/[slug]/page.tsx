@@ -4,6 +4,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import marketIntelPublicService from '@/services/MarketIntelPublicService';
 import { clientLogger } from '@/lib/client-logger';
 
 import PlacePageClient from './PlacePageClient';
@@ -82,11 +83,13 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   // Sidebar/skill data in parallel. Each failure degrades to null rather than
   // erroring the page — the listing content is the SEO payload that matters.
-  const [businessHours, tenantInfo, dirEntryOpts, resolvedSlug] = await Promise.all([
+  const [businessHours, tenantInfo, dirEntryOpts, resolvedSlug, marketIntelTeaser] = await Promise.all([
     getBusinessHours(listing),
     tenantPublicService.getPublicTenantInfo(listing.tenantId).catch(() => null),
     publicUnifiedCapabilityService.getDirectoryEntryOptionsState(listing.tenantId).catch(() => null),
     publicDirectoryService.resolveBySlug(slug).catch(() => null),
+    // Server-render the teaser so crawlers see it without JS (§11.5).
+    marketIntelPublicService.getTeaserSummary(slug).catch(() => null),
   ]);
 
   return (
@@ -97,6 +100,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
       tenantInfo={tenantInfo}
       dirEntryOpts={dirEntryOpts}
       slugForRelated={resolvedSlug || slug}
+      marketIntelTeaser={marketIntelTeaser}
     />
   );
 }
