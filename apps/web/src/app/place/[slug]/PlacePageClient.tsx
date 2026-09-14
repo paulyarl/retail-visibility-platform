@@ -2,11 +2,13 @@
 
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
+import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
 
 import PlaceEntryEditorialLayout from './layouts/PlaceEntryEditorialLayout';
 import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
 import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
 import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
+import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
 
 interface PlacePageClientProps {
   slug: string;
@@ -15,6 +17,8 @@ interface PlacePageClientProps {
   tenantInfo: any;
   dirEntryOpts: DirectoryEntryOptionsState | null;
   slugForRelated: string;
+  /** Server-rendered teaser (§11.5 — crawlable DOM content). */
+  marketIntelTeaser?: MarketIntelTeaserSummary | null;
 }
 
 export default function PlacePageClient({
@@ -24,6 +28,7 @@ export default function PlacePageClient({
   tenantInfo,
   dirEntryOpts,
   slugForRelated,
+  marketIntelTeaser,
 }: PlacePageClientProps) {
   const tenantId = listing?.tenantId || '';
   const { status: hoursStatus } = useStoreStatus(tenantId, true);
@@ -68,7 +73,19 @@ export default function PlacePageClient({
         fullAddress={fullAddress}
         claimToken={listing.activeClaimToken}
         publicDisclaimer={listing.publicDisclaimer}
+        publicNarrative={marketIntelTeaser?.publicNarrative ?? null}
       />
+      {/* Market Intel sidebar — seed pages only (§2.1). The page already
+          redirects non-seeds server-side; this gate is defensive. */}
+      {listing.listingOrigin === 'directory_seed' && (
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <MarketIntelSidebar
+            slug={slug}
+            initialTeaser={marketIntelTeaser}
+            activeClaimToken={listing.activeClaimToken}
+          />
+        </div>
+      )}
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <GbpReviewsSection slug={slug} />
         <GbpPostsSection slug={slug} />

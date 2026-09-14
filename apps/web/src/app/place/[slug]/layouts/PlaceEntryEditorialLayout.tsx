@@ -59,6 +59,8 @@ export interface PlaceEntryEditorialLayoutProps {
   fullAddress: string;
   claimToken?: string | null;
   publicDisclaimer?: string | null;
+  /** Tier-C-safe audit narrative — preferred About-section source (§1.1). */
+  publicNarrative?: string | null;
 }
 
 export default function PlaceEntryEditorialLayout({
@@ -79,6 +81,7 @@ export default function PlaceEntryEditorialLayout({
   fullAddress,
   claimToken,
   publicDisclaimer,
+  publicNarrative,
 }: PlaceEntryEditorialLayoutProps) {
   useQrScanTracking(tenantId, 'directory');
 
@@ -202,12 +205,17 @@ export default function PlaceEntryEditorialLayout({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               <div className="lg:col-span-2">
                 <h2 className="text-2xl font-bold text-neutral-900 mb-3">About this listing</h2>
-                {listing.description && (
+                {publicNarrative && (
+                  <p className="text-neutral-700 leading-relaxed whitespace-pre-line">
+                    {publicNarrative}
+                  </p>
+                )}
+                {!publicNarrative && listing.description && (
                   <p className="text-neutral-700 leading-relaxed">
                     {listing.description}
                   </p>
                 )}
-                {!listing.description && (
+                {!publicNarrative && !listing.description && (
                   <p className="text-neutral-600 leading-relaxed">
                     {disclaimer}
                   </p>

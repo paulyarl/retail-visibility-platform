@@ -23,6 +23,7 @@
 
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
+import { MarketContextLoader } from './intelligence/MarketContextLoader';
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -44,6 +45,14 @@ export interface ResolvedSeedAudit {
   seedId: string;
   /** directory_listings_list.id the seed belongs to */
   listingId: string;
+  /** directory_listings_list.business_name — for the teaser payload */
+  businessName: string | null;
+  /** directory_presence_seeds.category — drives MarketContextLoader */
+  category: string | null;
+  /** directory_presence_seeds.city — drives MarketContextLoader */
+  city: string | null;
+  /** directory_presence_seeds.state — drives MarketContextLoader */
+  state: string | null;
   /** The parsed audit_data JSONB (may be null if the audit row has no data). */
   auditData: unknown;
   /** When the audit row was created (used to pick the latest on ties). */
@@ -89,17 +98,17 @@ export class MarketIntelService extends BaseService {
   async resolveSeedAuditBySlug(businessSlug: string): Promise<ResolvedSeedAudit | null> {
     if (!businessSlug) return null;
 
-    // 1. listing → listing_id
+    // 1. listing → listing_id + business_name
     const listing = await this.prisma.directory_listings_list.findFirst({
       where: { slug: businessSlug },
-      select: { id: true },
+      select: { id: true, business_name: true },
     });
     if (!listing) return null;
 
-    // 2. listing_id → seed
+    // 2. listing_id → seed (id + category/city/state for MarketContextLoader)
     const seed = await this.prisma.directory_presence_seeds.findUnique({
       where: { listing_id: listing.id },
-      select: { id: true },
+      select: { id: true, category: true, city: true, state: true },
     });
     if (!seed) return null;
 
@@ -132,6 +141,10 @@ export class MarketIntelService extends BaseService {
       campaignId: audit.campaign_id,
       seedId: seed.id,
       listingId: listing.id,
+      businessName: listing.business_name,
+      category: seed.category,
+      city: seed.city,
+      state: seed.state,
       auditData: audit.audit_data,
       createdAt: audit.created_at,
     };
@@ -190,4 +203,416 @@ export class MarketIntelService extends BaseService {
     if (!Array.isArray(checklist)) return null;
     return checklist as Array<{ signal: string; met: boolean | null; evidence: string | null }>;
   }
+
+  /**
+   * Read the Tier-C-safe `public_narrative` from the audit output (§1.1).
+   * Returns `null` when absent — the layout keeps its existing
+   * description/disclaimer fallback chain.
+   */
+  readPublicNarrative(auditData: unknown): string | null {
+    if (!auditData || typeof auditData !== 'object') return null;
+    const data = auditData as Record<string, unknown>;
+    const narrative = data.public_narrative;
+    return typeof narrative === 'string' && narrative.trim().length > 0 ? narrative : null;
+  }
+
+  /**
+   * Read the structured `market_opportunities` array (§8.5).
+   * Returns `[]` when absent — callers fall back to `gap_analysis.gaps`.
+   */
+  readMarketOpportunities(
+    auditData: unknown,
+  ): Array<{ title: string; description: string | null; impact: string | null }> {
+    if (!auditData || typeof auditData !== 'object') return [];
+    const data = auditData as Record<string, unknown>;
+    const opportunities = data.market_opportunities;
+    if (!Array.isArray(opportunities)) return [];
+    return opportunities as Array<{ title: string; description: string | null; impact: string | null }>;
+  }
+
+  /**
+   * Read `gap_analysis.gaps` for the §8.5.4 fallback. Each gap carries a
+   * `field` (the missing capability) and a `severity` (`non_negotiable` |
+   * `recommended`). Returns `[]` when absent.
+   */
+  readGapAnalysisGaps(
+    auditData: unknown,
+  ): Array<{ field: string | null; severity: string | null }> {
+    if (!auditData || typeof auditData !== 'object') return [];
+    const data = auditData as Record<string, unknown>;
+    const gapAnalysis = data.gap_analysis as { gaps?: unknown[] } | undefined;
+    const gaps = gapAnalysis?.gaps;
+    if (!Array.isArray(gaps)) return [];
+    return gaps as Array<{ field: string | null; severity: string | null }>;
+  }
+
+  /**
+   * Read the full `gap_analysis` object (gold-standard benchmark comparison)
+   * for the "How It Stacks Up" full view. Returns `null` when absent.
+   */
+  readGapAnalysis(auditData: unknown): Record<string, unknown> | null {
+    if (!auditData || typeof auditData !== 'object') return null;
+    const data = auditData as Record<string, unknown>;
+    const gapAnalysis = data.gap_analysis;
+    if (!gapAnalysis || typeof gapAnalysis !== 'object') return null;
+    return gapAnalysis as Record<string, unknown>;
+  }
+
+  // ─── Teaser summary (§4.1) ─────────────────────────────────────────────
+
+  /**
+   * Build the public teaser summary payload for the seed page sidebar.
+   *
+   * Resolves the audit via §8.4, loads market context via
+   * `MarketContextLoader`, and derives teaser counts with the §8.5.4
+   * fallback. Returns `hasAudit: false` when the resolution chain breaks
+   * — the sidebar renders a "no intel available" state, not an error.
+   *
+   * @param businessSlug The `directory_listings_list.slug` for the place page.
+   */
+  async getTeaserSummary(businessSlug: string): Promise<MarketIntelTeaserSummary> {
+    const resolved = await this.resolveSeedAuditBySlug(businessSlug);
+
+    // No audit → sidebar still renders, cards show available: false.
+    if (!resolved) {
+      return {
+        businessSlug,
+        businessName: null,
+        hasAudit: false,
+        publicNarrative: null,
+        cards: {
+          growthOpportunities: { available: false, teaser: 'No growth opportunities identified', count: 0 },
+          howItStacksUp: { available: false, teaser: 'Category signal evaluation pending' },
+          fullReport: { available: false, teaser: 'Complete market analysis with recommendations' },
+          claimBusiness: { available: true, teaser: 'Owner? Get the full picture and unlock all intelligence for free.' },
+        },
+      };
+    }
+
+    // Load market context (5-min TTL inside MarketContextLoader).
+    const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
+      resolved.category ?? '',
+      resolved.city,
+      resolved.state,
+    );
+
+    // public_narrative — Tier-C-safe audit field rendered in the About
+    // section (§1.1). Falls back to null when absent; the layout keeps its
+    // existing description/disclaimer fallback chain.
+    const publicNarrative = this.readPublicNarrative(resolved.auditData);
+
+    // Growth Opportunities — §8.5.4 fallback derivation.
+    const oppCount = this.deriveOpportunityCount(resolved.auditData);
+    const growthAvailable = oppCount.count > 0;
+    const growthTeaser = `${oppCount.count} actionable gap${oppCount.count !== 1 ? 's' : ''} identified`;
+
+    // How It Stacks Up — signal checklist (structured array).
+    const checklist = this.readSignalChecklist(resolved.auditData);
+    let stacksAvailable: boolean;
+    let stacksTeaser: string;
+    if (checklist && checklist.length > 0) {
+      const met = checklist.filter((s) => s.met === true).length;
+      stacksAvailable = true;
+      stacksTeaser = `Meets ${met} of ${checklist.length} category signals`;
+    } else {
+      // Fallback: category signals exist in context but no per-business
+      // evaluation yet (re-audits haven't landed). Card renders available:
+      // false with the "pending" teaser copy per §8.5.4.
+      stacksAvailable = false;
+      stacksTeaser = 'Category signal evaluation pending';
+    }
+
+    return {
+      businessSlug,
+      businessName: resolved.businessName,
+      hasAudit: true,
+      publicNarrative,
+      cards: {
+        growthOpportunities: {
+          available: growthAvailable,
+          teaser: growthTeaser,
+          count: oppCount.count,
+        },
+        howItStacksUp: {
+          available: stacksAvailable,
+          teaser: stacksTeaser,
+        },
+        fullReport: {
+          available: true,
+          teaser: 'Complete market analysis with recommendations',
+        },
+        claimBusiness: {
+          available: true,
+          teaser: 'Owner? Get the full picture and unlock all intelligence for free.',
+        },
+      },
+    };
+  }
+
+  // ─── Partial content (§4.2) ───────────────────────────────────────────
+
+  /**
+   * Number of growth-opportunity items shown to a free (logged-in)
+   * shopper before the rest lock. Spec §3.1 partial view shows 2 items
+   * + "1 more opportunity".
+   */
+  static readonly PARTIAL_OPPORTUNITY_LIMIT = 2;
+
+  /**
+   * Build the partial-content payload for a logged-in free shopper.
+   *
+   * Phase 2: any authenticated customer qualifies (spec §4.2 —
+   * `requireCustomerAuth` only, no `requirePlatformContext`). The
+   * `customerId` is accepted for Phase 3 access-tier resolution but
+   * unused here.
+   *
+   * Returns `available: false` cards when the audit or structured fields
+   * are missing — the sidebar degrades to the teaser state, not an error.
+   *
+   * @param businessSlug The `directory_listings_list.slug` for the place page.
+   * @param _customerId   Reserved for Phase 3 access-tier resolution.
+   */
+  async getPartialContent(
+    businessSlug: string,
+    _customerId: string,
+  ): Promise<MarketIntelPartialContent> {
+    const resolved = await this.resolveSeedAuditBySlug(businessSlug);
+
+    if (!resolved) {
+      return {
+        businessSlug,
+        hasAudit: false,
+        growthOpportunities: { items: [], lockedCount: 0, available: false },
+        howItStacksUp: { signals: [], available: false },
+      };
+    }
+
+    // Growth Opportunities — top N items unlocked, rest locked.
+    const opportunities = this.readMarketOpportunities(resolved.auditData);
+    let growthItems: Array<{ title: string; impact: string | null; locked: boolean }>;
+    let lockedCount: number;
+    let growthAvailable: boolean;
+
+    if (opportunities.length > 0) {
+      const limit = MarketIntelService.PARTIAL_OPPORTUNITY_LIMIT;
+      growthItems = opportunities.map((opp, i) => ({
+        title: opp.title,
+        impact: opp.impact,
+        locked: i >= limit,
+      }));
+      lockedCount = Math.max(0, opportunities.length - limit);
+      growthAvailable = true;
+    } else {
+      // Fallback: gap_analysis.gaps (§8.5.4) — title from the gap field,
+      // impact mapped from severity.
+      const gaps = this.readGapAnalysisGaps(resolved.auditData);
+      if (gaps.length > 0) {
+        const limit = MarketIntelService.PARTIAL_OPPORTUNITY_LIMIT;
+        growthItems = gaps.map((gap, i) => ({
+          title: gap.field ?? 'Growth opportunity identified',
+          impact: gap.severity === 'non_negotiable' ? 'HIGH' : 'MEDIUM',
+          locked: i >= limit,
+        }));
+        lockedCount = Math.max(0, gaps.length - limit);
+        growthAvailable = true;
+      } else {
+        growthItems = [];
+        lockedCount = 0;
+        growthAvailable = false;
+      }
+    }
+
+    // How It Stacks Up — full signal checklist (short by design).
+    const checklist = this.readSignalChecklist(resolved.auditData);
+    let signals: Array<{ signal: string; met: boolean | null }>;
+    let stacksAvailable: boolean;
+    if (checklist && checklist.length > 0) {
+      signals = checklist.map((s) => ({ signal: s.signal, met: s.met }));
+      stacksAvailable = true;
+    } else {
+      signals = [];
+      stacksAvailable = false;
+    }
+
+    return {
+      businessSlug,
+      hasAudit: true,
+      growthOpportunities: {
+        items: growthItems,
+        lockedCount,
+        available: growthAvailable,
+      },
+      howItStacksUp: {
+        signals,
+        available: stacksAvailable,
+      },
+    };
+  }
+
+  // ─── Full content (§4.3) ─────────────────────────────────────────────
+
+  /**
+   * Build the full-content payload for a paid tenant or claimed owner.
+   *
+   * Phase 3: the route handler checks access via
+   * `MarketIntelAccessService.canAccessFull` before calling this. This
+   * method assumes access is granted — it does NOT re-check.
+   *
+   * Returns the complete audit-derived intelligence: all growth
+   * opportunities (unlocked), the full signal checklist with evidence,
+   * the gold-standard gap analysis, and the market context summary.
+   *
+   * @param businessSlug The `directory_listings_list.slug` for the place page.
+   */
+  async getFullContent(businessSlug: string): Promise<MarketIntelFullContent> {
+    const resolved = await this.resolveSeedAuditBySlug(businessSlug);
+
+    if (!resolved) {
+      return {
+        businessSlug,
+        businessName: null,
+        hasAudit: false,
+        growthOpportunities: { items: [], available: false },
+        howItStacksUp: { signals: [], available: false },
+        gapAnalysis: null,
+        marketContext: null,
+      };
+    }
+
+    // Growth Opportunities — all items, unlocked.
+    const opportunities = this.readMarketOpportunities(resolved.auditData);
+    let growthItems: Array<{ title: string; description: string | null; impact: string | null }>;
+    let growthAvailable: boolean;
+    if (opportunities.length > 0) {
+      growthItems = opportunities;
+      growthAvailable = true;
+    } else {
+      const gaps = this.readGapAnalysisGaps(resolved.auditData);
+      if (gaps.length > 0) {
+        growthItems = gaps.map((g) => ({
+          title: g.field ?? 'Growth opportunity identified',
+          description: null,
+          impact: g.severity === 'non_negotiable' ? 'HIGH' : 'MEDIUM',
+        }));
+        growthAvailable = true;
+      } else {
+        growthItems = [];
+        growthAvailable = false;
+      }
+    }
+
+    // How It Stacks Up — full signal checklist with evidence.
+    const checklist = this.readSignalChecklist(resolved.auditData);
+    let signals: Array<{ signal: string; met: boolean | null; evidence: string | null }>;
+    let stacksAvailable: boolean;
+    if (checklist && checklist.length > 0) {
+      signals = checklist;
+      stacksAvailable = true;
+    } else {
+      signals = [];
+      stacksAvailable = false;
+    }
+
+    // Gold-standard gap analysis (raw, for the "How It Stacks Up" full view).
+    const gapAnalysis = this.readGapAnalysis(resolved.auditData);
+
+    // Market context summary (category + location intelligence).
+    const marketLoader = MarketContextLoader.getInstance();
+    const marketCtx = await marketLoader.loadMarketContext(
+      resolved.category ?? '',
+      resolved.city,
+      resolved.state,
+    );
+
+    return {
+      businessSlug,
+      businessName: resolved.businessName,
+      hasAudit: true,
+      growthOpportunities: {
+        items: growthItems,
+        available: growthAvailable,
+      },
+      howItStacksUp: {
+        signals,
+        available: stacksAvailable,
+      },
+      gapAnalysis,
+      marketContext: {
+        hasCategoryIntelligence: marketLoader.hasCategoryIntelligence(marketCtx),
+        hasLocationIntelligence: marketLoader.hasLocationIntelligence(marketCtx),
+        category: marketCtx.category ?? null,
+        location: marketCtx.location ?? null,
+      },
+    };
+  }
+}
+
+// ─── Teaser summary types (§4.1) ──────────────────────────────────────────
+
+export interface MarketIntelTeaserSummary {
+  businessSlug: string;
+  businessName: string | null;
+  hasAudit: boolean;
+  /** Tier-C-safe audit narrative for the About section (§1.1). */
+  publicNarrative: string | null;
+  cards: {
+    growthOpportunities: {
+      available: boolean;
+      teaser: string;
+      count: number;
+    };
+    howItStacksUp: {
+      available: boolean;
+      teaser: string;
+    };
+    fullReport: {
+      available: boolean;
+      teaser: string;
+    };
+    claimBusiness: {
+      available: boolean;
+      teaser: string;
+    };
+  };
+}
+
+// ─── Partial content types (§4.2) ─────────────────────────────────────────
+
+export interface MarketIntelPartialContent {
+  businessSlug: string;
+  hasAudit: boolean;
+  growthOpportunities: {
+    items: Array<{ title: string; impact: string | null; locked: boolean }>;
+    lockedCount: number;
+    available: boolean;
+  };
+  howItStacksUp: {
+    signals: Array<{ signal: string; met: boolean | null }>;
+    available: boolean;
+  };
+}
+
+// ─── Full content types (§4.3) ────────────────────────────────────────────
+
+export interface MarketIntelFullContent {
+  businessSlug: string;
+  businessName: string | null;
+  hasAudit: boolean;
+  growthOpportunities: {
+    items: Array<{ title: string; description: string | null; impact: string | null }>;
+    available: boolean;
+  };
+  howItStacksUp: {
+    signals: Array<{ signal: string; met: boolean | null; evidence: string | null }>;
+    available: boolean;
+  };
+  /** Gold-standard gap analysis (raw, for the full "How It Stacks Up" view). */
+  gapAnalysis: Record<string, unknown> | null;
+  /** Category + location intelligence summary. */
+  marketContext: {
+    hasCategoryIntelligence: boolean;
+    hasLocationIntelligence: boolean;
+    category: unknown;
+    location: unknown;
+  } | null;
 }

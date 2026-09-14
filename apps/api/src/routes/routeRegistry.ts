@@ -307,6 +307,8 @@ import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade
 import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-public';
 import directoryClaimQrRoutes from '../routes/directory-claim-qr';
 import growthEngineAdminRoutes from '../routes/growth-engine-admin';
+import marketIntelPublicRoutes from '../routes/market-intel-public';
+import marketIntelCustomerRoutes from '../routes/market-intel-customer';
 
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
@@ -1097,6 +1099,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
     comment: 'GBP Management Suite customer portal routes — authenticated, platform-context-gated (Phase 0 scaffold)',
+  },
+  {
+    path: '/api/customer/place',
+    router: marketIntelCustomerRoutes,
+    domain: 'customer',
+    authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
+    comment: 'Market Intel customer routes — /partial for logged-in shoppers (§4.2, requireCustomerAuth only)',
   },
   {
     path: '/api/customer-addresses',
@@ -2097,6 +2106,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public claim-invite QR redirect (/qr/claim/:token → /place/claim/:token)',
+  },
+  {
+    path: '/api/public/place',
+    router: marketIntelPublicRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public Market Intel teaser summary at /api/public/place/:slug/market-intel/summary (§4.1)',
   },
   {
     path: '/api/tenant',

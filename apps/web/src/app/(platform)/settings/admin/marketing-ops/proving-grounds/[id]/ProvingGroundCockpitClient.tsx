@@ -1619,7 +1619,12 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           {(() => {
             const locCampaigns = children.filter((c) => c.scope === 'city');
             const loc = locCampaigns[0];
-            const locDone = loc && loc.stage !== 'seek';
+            // "Done" = stage advanced OR an audit row exists. Enrichment
+            // campaigns stay at stage='seek' after a run, so audit_count is
+            // the authoritative "executed" signal (the markets API the cockpit
+            // also polls can be empty when the directory row hasn't been
+            // written yet).
+            const locDone = loc && (loc.stage !== 'seek' || (loc.audit_count ?? 0) > 0);
             return (
               <div className={`flex-1 rounded-lg border p-3 ${
                 locDone
@@ -1673,7 +1678,10 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           {(() => {
             const catCampaigns = children.filter((c) => c.scope === 'category');
             const cat = catCampaigns[0];
-            const catDone = (cat && cat.stage !== 'seek') || !!marketStatus?.enrichedAt;
+            // "Done" = stage advanced, an audit row exists, OR the market
+            // enrichment row is present. audit_count is the authoritative
+            // "executed" signal — see Stage 1 note.
+            const catDone = (cat && (cat.stage !== 'seek' || (cat.audit_count ?? 0) > 0)) || !!marketStatus?.enrichedAt;
             return (
               <div className={`flex-1 rounded-lg border p-3 ${
                 catDone
@@ -1729,8 +1737,8 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             const biz = bizCampaigns[0];
             const locCampaigns = children.filter((c) => c.scope === 'city');
             const catCampaigns = children.filter((c) => c.scope === 'category');
-            const locDone = locCampaigns.some((c) => c.stage !== 'seek');
-            const catDone = catCampaigns.some((c) => c.stage !== 'seek') || !!marketStatus?.enrichedAt;
+            const locDone = locCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0);
+            const catDone = catCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0) || !!marketStatus?.enrichedAt;
             const hasContext = locDone && catDone;
             return (
               <div className={`flex-1 rounded-lg border p-3 ${

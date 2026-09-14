@@ -144,6 +144,93 @@ slug resolves to its audit.
 
 ---
 
+## Phase 1.5 — Capability gate (DEFERRED to back-burner)
+
+**Status (updated 2026-09-14):** DEFERRED. Per user direction, every
+surface (seed, category, location) ships visible first so cohesion
+can be confirmed across all surfaces before any gating is applied.
+Gating will be revisited after Phase 6 (category + location surfaces)
+lands and the full surface matrix is reviewable in production.
+
+The original tier-gated toggle design below is preserved for when the
+work is picked back up.
+
+---
+
+### Original design (preserved — not active)
+
+**Goal:** gate the entire Market Intel sidebar behind a tier-gated
+merchant toggle, but ONLY on tenant-owned seed surfaces. Category pages,
+location pages, and unclaimed seeds (no tenant) keep the sidebar ungated
+— the capability is a tenant-merchant feature, not a public-surface
+default.
+
+**Gate model (confirmed 2026-09-14):**
+- **Scope:** entire sidebar (all four cards) — one feature key, not
+  per-card.
+- **Surface:** tenant-owned seed pages only (`directory_presence_seeds`
+  has a `tenant_id` that maps to a real tenant). Unclaimed seeds,
+  category pages, and location pages are NOT gated.
+- **Type:** tier-gated toggle — the tenant's plan tier determines
+  whether the toggle is *available* (free tier can't turn it on; paid
+  tier can toggle on/off). Tier gates the capability; the merchant
+  preference (stored in the tenant prefs table) sets the on/off state.
+- **Default:** OFF for all tenants at launch — they opt in via settings.
+
+**Capability deployment (8-phase flow per
+`.devin/skills/capability-deployment-flow.md`):**
+
+1. **Feature key** — `market_intel_sidebar_enabled` in
+   `canonical-features.ts` + `tier-hierarchies.ts`. Type gate (master
+   enabled/disabled), not a group gate.
+2. **Seed DB** — `features_list` + `capability_features_list` +
+   `tier_features_list` rows. Paid tiers get it; free tier does not.
+3. **Tenant prefs table + Prisma** — new column for the merchant
+   toggle (default false). Migration + `prisma db pull`.
+4. **Resolver** — `MarketIntelSidebarResolver.ts` + types +
+   `EffectiveCapabilityResolver.ts` registration. Resolves
+   `market_intel_sidebar_enabled` from tier + merchant pref.
+5. **Route** — `market-intel-options-settings.ts` (GET + PUT + tier
+   filtering + cache invalidation). Tenant settings UI surface.
+6. **Map** — `UnifiedCapabilityService.ts` +
+   `CapabilityResolutionService.ts` (frontend fallback resolver parity).
+7. **Display** — `PlanSummaryWidget.tsx` (dashboard + options pages) +
+   `PlanSummaryPanel.tsx` (plan-summary page) + `CapabilityShowcase.tsx`
+   + settings page. Sidebar mount in `PlacePageClient` checks the
+   resolved capability before rendering.
+8. **Verify** — TS checks + `verify-capability-deployment.md`.
+
+**Frontend fallback resolver parity (R30):** update
+`apps/web/src/services/CapabilityResolutionService.ts` with the matching
+fallback for `market_intel_sidebar_enabled`.
+
+**API route settings file (R32):** update four places in
+`market-intel-options-settings.ts` — Zod schema, `DEFAULT_SETTINGS`,
+all-false fallback when tier-disabled, tier-filtered GET.
+
+**`buildExpiredCapabilitiesResponse` (R13):** add
+`market_intel_sidebar_enabled: false` to the relevant domain's entry so
+expired tenants don't crash the frontend mapper.
+
+**Sidebar mount change:** `PlacePageClient` currently gates on
+`listing.listingOrigin === 'directory_seed'` (Phase 1). Phase 1.5 adds
+a second gate: the resolved capability must be `enabled` AND the seed
+must be tenant-owned. Unclaimed seeds (no tenant_id) skip the capability
+check entirely — sidebar renders as in Phase 1.
+
+### Exit criteria
+
+- [ ] Free-tier tenant: sidebar toggle not available in settings,
+      sidebar hidden on their seed page
+- [ ] Paid-tier tenant: toggle available; OFF by default; ON shows
+      sidebar on their seed page
+- [ ] Unclaimed seed: sidebar renders regardless (no tenant to gate)
+- [ ] Category + location pages: sidebar renders regardless (Phase 6)
+- [ ] `pnpm checkapi` + `pnpm checkweb` clean
+- [ ] `verify-capability-deployment.md` passes
+
+---
+
 ## Phase 2 — Partial content (spec §4.2; free accounts)
 
 ### Tasks
@@ -435,12 +522,17 @@ card, no `StoreAccessCard.tsx` / `AppStoreClient.tsx` entry. Checklist §4
 items are N/A — confirmed by spec §7 (component tree) and §2.1 (surface
 model).
 
-### 5. No capability-system work
+### 5. No capability-system work (Phase 1–6)
 
 Access is gated by `market_intel_unlocks` rows + `isOwner` (spec §6, §8.2),
 not by the capability/tier system. Checklist §8 (8-phase capability
 deployment) does not apply. No `canonical-features.ts` / `tier-hierarchies.ts`
 / resolver / `capability_features_list` entries.
+
+**Note (updated 2026-09-14):** Phase 1.5 capability gating was DEFERRED
+to the back-burner — every surface ships visible first to confirm
+cohesion across seed/category/location pages before any gating is
+applied. See Phase 1.5 above for the preserved design.
 
 ### 6. Route-order / auth-scope risk to review at Phase 1 & 3
 

@@ -1382,6 +1382,7 @@ model customers {
   customer_tenant_relationships     customer_tenant_relationships[]
   users                             users?                             @relation(fields: [linked_user_id], references: [id], onUpdate: NoAction, map: "fk_customers_linked_user")
   digital_access_grants             digital_access_grants[]
+  market_intel_unlocks              market_intel_unlocks[]
   marketing_revenue                 marketing_revenue[]
   mkt_campaigns_list                mkt_campaigns_list[]
   mkt_customer_branding             mkt_customer_branding?
@@ -7257,6 +7258,7 @@ model tenants {
   location_inventory_pools_location_inventory_pools_location_idTotenants                 location_inventory_pools[]               @relation("location_inventory_pools_location_idTotenants")
   location_inventory_pools_location_inventory_pools_tenant_idTotenants                   location_inventory_pools[]               @relation("location_inventory_pools_tenant_idTotenants")
   location_status_logs                                                                   location_status_logs[]
+  market_intel_unlocks                                                                   market_intel_unlocks[]
   merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]              @relation("merchant_billing_gateways_tenant_idTotenants")
   merchant_paypal_connections                                                            merchant_paypal_connections?
   merchant_stripe_connections                                                            merchant_stripe_connections?
@@ -7863,6 +7865,29 @@ model directory_attribute_definitions {
   is_active               Boolean  @default(true)
   created_at              DateTime @default(now()) @db.Timestamptz(6)
   updated_at              DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model market_intel_unlocks {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String    @db.VarChar(255)
+  customer_id       String    @db.VarChar(255)
+  surface_type      String
+  surface_key       String
+  unlock_type       String
+  payment_intent_id String?
+  unlocked_at       DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at        DateTime? @db.Timestamptz(6)
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+  customers         customers @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([tenant_id, surface_type, surface_key, unlock_type])
+  @@index([customer_id], map: "idx_market_intel_unlocks_customer")
+  @@index([surface_type, surface_key], map: "idx_market_intel_unlocks_surface")
+  @@index([tenant_id], map: "idx_market_intel_unlocks_tenant")
 }
 
 enum action {
