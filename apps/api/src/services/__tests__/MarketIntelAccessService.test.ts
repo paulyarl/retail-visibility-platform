@@ -9,6 +9,7 @@ const {
   mockUserTenant,
   mockUnlockFindMany,
   mockUnlockUpsert,
+  mockUser,
 } = vi.hoisted(() => ({
   mockListing: vi.fn(),
   mockSeed: vi.fn(),
@@ -16,6 +17,7 @@ const {
   mockUserTenant: vi.fn(),
   mockUnlockFindMany: vi.fn(),
   mockUnlockUpsert: vi.fn(),
+  mockUser: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -24,6 +26,7 @@ vi.mock('../../prisma', () => ({
     directory_presence_seeds: { findUnique: mockSeed },
     customers: { findUnique: mockCustomer },
     user_tenants: { findFirst: mockUserTenant },
+    users: { findUnique: mockUser },
     market_intel_unlocks: {
       findMany: mockUnlockFindMany,
       upsert: mockUnlockUpsert,
@@ -48,6 +51,9 @@ describe('MarketIntelAccessService', () => {
     mockUserTenant.mockReset();
     mockUnlockFindMany.mockReset();
     mockUnlockUpsert.mockReset();
+    mockUser.mockReset();
+    // Default: no linked user → not a platform admin.
+    mockUser.mockResolvedValue(null);
   });
 
   // ── getAccessTier ─────────────────────────────────────────────────────
@@ -101,6 +107,34 @@ describe('MarketIntelAccessService', () => {
     mockSeed.mockResolvedValue({ tenant_id: 'tenant-1' });
     mockCustomer.mockResolvedValue({ linked_user_id: 'user-1' });
     mockUserTenant.mockResolvedValue(null); // no owner row anywhere
+
+    const tier = await service.getAccessTier('cust-1', 'place', 'some-slug');
+    expect(tier).toBe(AccessTier.Free);
+  });
+
+  it('returns Owner (tier 3) when the customer is a PLATFORM_ADMIN', async () => {
+    // Admin has a linked user with role PLATFORM_ADMIN.
+    mockCustomer.mockResolvedValue({ linked_user_id: 'user-admin' });
+    mockUser.mockResolvedValue({ role: 'PLATFORM_ADMIN' });
+
+    const tier = await service.getAccessTier('cust-admin', 'place', 'some-slug');
+    expect(tier).toBe(AccessTier.Owner);
+  });
+
+  it('returns Owner (tier 3) for PLATFORM_ADMIN on category surfaces too', async () => {
+    mockCustomer.mockResolvedValue({ linked_user_id: 'user-admin' });
+    mockUser.mockResolvedValue({ role: 'PLATFORM_ADMIN' });
+
+    const tier = await service.getAccessTier('cust-admin', 'category', 'indian-grocery');
+    expect(tier).toBe(AccessTier.Owner);
+  });
+
+  it('does not grant admin access when linked user role is USER', async () => {
+    mockCustomer.mockResolvedValue({ linked_user_id: 'user-1' });
+    mockUser.mockResolvedValue({ role: 'USER' });
+    mockListing.mockResolvedValue({ id: 'listing-1' });
+    mockSeed.mockResolvedValue({ tenant_id: 'tenant-1' });
+    mockUserTenant.mockResolvedValue(null);
 
     const tier = await service.getAccessTier('cust-1', 'place', 'some-slug');
     expect(tier).toBe(AccessTier.Free);

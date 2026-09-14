@@ -51,6 +51,10 @@ class MarketIntelAccessService extends BaseService {
    *
    * Tier 3 (owner) only applies on `place` surfaces — category/city
    * surfaces have no owner claim path.
+   *
+   * PLATFORM_ADMIN bypass: if the customer's linked user has role
+   * PLATFORM_ADMIN, they get Owner-tier access on any surface so they
+   * can test the full flow without purchasing.
    */
   async getAccessTier(
     customerId: string | null,
@@ -59,6 +63,10 @@ class MarketIntelAccessService extends BaseService {
   ): Promise<AccessTier> {
     // Tier 0 — anonymous.
     if (!customerId) return AccessTier.Anonymous;
+
+    // PLATFORM_ADMIN bypass — admin can test the full flow on any surface.
+    const isPlatformAdmin = await this.isPlatformAdmin(customerId);
+    if (isPlatformAdmin) return AccessTier.Owner;
 
     // Tier 3 — owner (place only).
     if (surfaceType === 'place') {
@@ -244,6 +252,33 @@ class MarketIntelAccessService extends BaseService {
         customerId,
       });
       return null;
+    }
+  }
+
+  /**
+   * Check whether the customer's linked user is a PLATFORM_ADMIN.
+   * Used to grant admin full access for testing the flow without
+   * purchasing.
+   */
+  async isPlatformAdmin(customerId: string): Promise<boolean> {
+    try {
+      const customer = await this.prisma.customers.findUnique({
+        where: { id: customerId },
+        select: { linked_user_id: true },
+      });
+      if (!customer?.linked_user_id) return false;
+
+      const user = await this.prisma.users.findUnique({
+        where: { id: customer.linked_user_id },
+        select: { role: true },
+      });
+      return user?.role === 'PLATFORM_ADMIN';
+    } catch (error) {
+      logger.error('[MarketIntelAccessService.isPlatformAdmin] Error', undefined, {
+        error: (error as Error).message,
+        customerId,
+      });
+      return false;
     }
   }
 }
