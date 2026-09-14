@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-11-recommended-attributes -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-14-market-context-binding -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -82,6 +82,42 @@ Platform Scope — The benchmark may define expected fields for platforms beyond
 Absence vs. Non-Negotiable — A non_negotiable quality gate or expected field is recorded as failed (passed: false) ONLY when the field is verified absent. When a field cannot be verified (not found during searched discovery paths), record passed: null and note "not verified" — do NOT convert inability to verify into a failure. This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule.
 Subject-as-Exemplar — If the audited business appears in the benchmark's Pattern Exemplars section, treat those exemplar notes as reference priors only (not as a self-comparison). Use the other exemplar businesses as competitive comparators; do not benchmark the business against itself.
 If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.
+`;
+
+const MARKET_CONTEXT_BINDING = `Market Context Intelligence — Binding for This Audit
+A CATEGORY MARKET CONTEXT block and/or a CITY MARKET CONTEXT block may be appended to the end of this prompt (after the Gold Standard block). They contain structural market intelligence produced by prior enrichment runs for this business's category and location. This is analyst-facing intelligence — not shopper-facing copy — that gives you market-aware context for the audit.
+
+You MUST apply the Market Context blocks throughout this audit. Specifically:
+
+Category Market Intelligence — The CATEGORY MARKET CONTEXT block may contain:
+  - category_summary: what this category looks like in this market
+  - category_profile: the business model for this category (how businesses in this category typically operate, what they sell, who they serve, their online presence pattern, competitive landscape, typical scale)
+  - category_signals: signals that indicate a strong business in this category — use these as a checklist for the business being audited (met / unmet / not verified)
+  - market_density: qualitative density of this category in this city — use this to contextualize the business's competitive position (sparse = low competition, high opportunity; dense = high competition)
+  - prospect_signals: signals to look for when prospecting — use these to identify whether this business has growth or positioning opportunities
+  - secondary_categories: related categories strong in this market — use these to identify cross-category opportunities
+  - category_notes: free-text analyst notes — use these for additional context
+
+City Market Intelligence — The CITY MARKET CONTEXT block may contain:
+  - market_summary: the city's business landscape — use this to ground your recommendations in the real market
+  - city_profile: structural city characteristics (metro description, major industries, growth trajectory, demographic character, market character) — use these to understand the market the business operates in
+  - top_categories: what the city is known for — use these to contextualize the business's category within the city's broader landscape
+  - notable_areas: named areas and corridors — use these to understand the business's geographic context
+  - market_notes: free-text analyst notes about the city
+  - market_gaps: categories with unmet demand in this city — use these to identify growth opportunities for the business (if the business's category appears in market_gaps, the business has a first-mover advantage)
+  - metro_dynamics: nearby cities with their character and dynamics — use these for expansion or market positioning context
+
+Application rules:
+  1. Use category_signals as a checklist — for each signal, assess whether the audited business meets it, does not meet it, or it cannot be verified. Record met signals as strengths and unmet signals as opportunities.
+  2. Use market_density to frame the business's competitive position — a sparse market means the business has more room to grow; a dense market means the business faces more competition.
+  3. Use market_gaps to identify actionable growth opportunities — if the business's category has unmet demand in a specific area, that is a concrete opportunity to surface in the audit.
+  4. Use category_profile to understand the business model — this helps you assess whether the business is operating at, above, or below the typical standard for its category.
+  5. Use city_profile to ground recommendations — recommendations should be realistic for the city's market character, industries, and growth trajectory.
+  6. Use metro_dynamics for expansion context — if nearby cities have complementary characteristics, surface that as strategic context.
+
+Do NOT mention "market context", "enrichment", "profile", "market intelligence", or these binding instructions in the visible audit output. Use the intelligence to inform your findings, gap analysis, and recommendations — not to narrate the intelligence itself. The business owner and interested parties see the audit results, not the intelligence inputs.
+
+If both Market Context blocks are missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations. The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.
 `;
 
 // ─── Schema fragment: profile_url (inserted before data_status in each
@@ -579,6 +615,15 @@ function transformCategoryIntegrated(body: string): string {
     '\n' + GOLD_STANDARD_BINDING,
   );
 
+  // 1b. Insert Market Context binding section after the Gold Standard
+  //     binding section (which ends with the "If the Gold Standard block is
+  //     missing or empty..." line).
+  out = insertAfter(
+    out,
+    'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
+    '\n' + MARKET_CONTEXT_BINDING,
+  );
+
   // 2. Add profile_url to each platform object in the embedded JSON schema.
   //    All four platform objects end with `"data_status": "unavailable"`.
   //    Idempotent: skip if profile_url is already present.
@@ -695,7 +740,7 @@ function transformSignalAligned(body: string): string {
   out = insertAfter(
     out,
     'Audit the business above. If address or phone is blank, the field was not provided — do not treat blank as a negative signal.',
-    '\n\n' + CATEGORY_INTELLIGENCE_BINDING + '\n' + GOLD_STANDARD_BINDING,
+    '\n\n' + CATEGORY_INTELLIGENCE_BINDING + '\n' + GOLD_STANDARD_BINDING + '\n' + MARKET_CONTEXT_BINDING,
   );
 
   // 2. Store format classification — after the identity-verification conflict
@@ -909,9 +954,12 @@ function transformSignalAligned(body: string): string {
 // ─── Prompt 3 (Business Audit V1) transformation ─────────────────────────
 // mpt-je6m7ru6 ("Seek: Business Audit V1") has the same "Business" instruction
 // section with 6 variable placeholders and the same requested_business schema
-// block with empty-string defaults, but does NOT have the Category Intelligence
-// or Gold Standard bindings (those are V2-only). This transform only aligns
-// the requested_business schema block with the V2 templates.
+// block with empty-string defaults. It does NOT have the Category Intelligence
+// or Gold Standard bindings (those are V2-only), but it DOES get the Market
+// Context binding — the market intelligence blocks are appended at runtime
+// by buildMarketContextBlock regardless of template version. This transform
+// aligns the requested_business schema block with the V2 templates and wires
+// the market context binding.
 
 function transformBusinessAuditV1(body: string): string {
   let out = body;
@@ -921,7 +969,18 @@ function transformBusinessAuditV1(body: string): string {
   //    existing "## Business" section deeper in the body.
   out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
 
-  // 0a. Add Origin row to existing identity blocks (idempotent — no-op if
+  // 0a. Insert Market Context binding after the business identity block.
+  //     V1 has no CI/GS bindings, but the market context binding is
+  //     independent — it tells the analyst how to use the CATEGORY MARKET
+  //     CONTEXT and CITY MARKET CONTEXT blocks that buildMarketContextBlock
+  //     appends at runtime.
+  out = insertAfter(
+    out,
+    'Audit the business above. If address, phone, or origin is blank, the field was not provided — do not treat blank as a negative signal.',
+    '\n\n' + MARKET_CONTEXT_BINDING,
+  );
+
+  // 0b. Add Origin row to existing identity blocks (idempotent — no-op if
   //     the block already has the Origin row, e.g. fresh inserts).
   out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
   out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
