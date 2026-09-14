@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-14-market-context-binding-3 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-14-market-context-binding-5 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -313,6 +313,43 @@ const GAP_AND_GATES_SCHEMA = `  "gap_analysis": {
     ],
     "summary": ""
   }`;
+
+// ─── Schema fragment: market_opportunities + signal_checklist (Seed Market
+//     Intel Sidebar — Phase 0). Inserted after quality_gate_results, before
+//     the top-level close. Two SEPARATE replaceFirst calls — never combine
+//     into one (AGENTS.md: independent re-application on partial-wire bodies;
+//     each field must be independently idempotent so a re-run after a partial
+//     failure self-heals instead of silently dropping the second field).
+const MARKET_OPPORTUNITIES_SCHEMA = `  "market_opportunities": [
+    {
+      "title": "",
+      "description": "",
+      "impact": "HIGH"
+    }
+  ]`;
+
+const SIGNAL_CHECKLIST_SCHEMA = `  "signal_checklist": [
+    {
+      "signal": "",
+      "met": null,
+      "evidence": null
+    }
+  ]`;
+
+// ─── Directive: Market Intelligence Output Fields (inserted AFTER the
+//     headingless MARKET_CONTEXT_BINDING — which itself is inserted AFTER all
+//     removeSection calls per AGENTS.md). Has a heading so removeSection can
+//     manage re-runs. Tells the analyst to populate the two new top-level
+//     output fields when Market Context was provided.
+const MARKET_INTEL_OUTPUT_DIRECTIVE = `
+### Market Intelligence Output Fields — REQUIRED when Market Context is present
+
+When a Market Context block was provided above, populate these two top-level output fields in addition to gap_analysis and quality_gate_results:
+
+market_opportunities — an array of business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps, and website.conversion_opportunities. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Omit the field entirely (do not emit an empty array) when no market context was provided.
+
+signal_checklist — an array with one entry per category_signals item from the Category Market Context block, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was provided.
+`;
 
 // ─── Prompt 2 (Signal-Aligned) missing CI instruction sections ───────────
 
@@ -627,6 +664,27 @@ function transformCategoryIntegrated(body: string): string {
   //    comma + new fields + top-level close).
   out = replaceFirst(out, '  ]\n}', '  ],\n' + GAP_AND_GATES_SCHEMA + '\n}');
 
+  // 3a. Add market_opportunities after quality_gate_results (before the
+  //     top-level close). Separate replaceFirst — idempotent (no-op if the
+  //     field is already present, so a re-run after marker bump self-heals
+  //     without duplicating). The anchor is the quality_gate_results
+  //     summary close + top-level close (gap_analysis's summary close has
+  //     a comma, so this pattern is unique to quality_gate_results).
+  out = replaceFirst(
+    out,
+    '    "summary": ""\n  }\n}',
+    '    "summary": ""\n  },\n' + MARKET_OPPORTUNITIES_SCHEMA + '\n}',
+  );
+
+  // 3b. Add signal_checklist after market_opportunities (before the
+  //     top-level close). Separate replaceFirst — idempotent (no-op if the
+  //     field is already present).
+  out = replaceFirst(
+    out,
+    MARKET_OPPORTUNITIES_SCHEMA + '\n}',
+    MARKET_OPPORTUNITIES_SCHEMA + ',\n' + SIGNAL_CHECKLIST_SCHEMA + '\n}',
+  );
+
   // 4. Targeted content update: delivery_model enum now includes 'unknown'.
   out = out.replace(
     'delivery_model: none / marketplace / direct / both\n',
@@ -655,6 +713,13 @@ function transformCategoryIntegrated(body: string): string {
       '\n' + PUBLIC_NARRATIVE_DIRECTIVE,
     );
   }
+
+  // 4c2. Remove any prior version of the Market Intel Output directive
+  //      (seed version bump). Has a heading so removeSection can manage it.
+  //      Runs BEFORE the headingless MARKET_CONTEXT_BINDING insertion (4i)
+  //      per AGENTS.md — headingless bindings go after all removeSection
+  //      calls so each run self-heals.
+  out = removeSection(out, '### Market Intelligence Output Fields');
 
   // 4d. Website Accessibility Verification directive — insert at the end of
   //     the Website Assessment section (after the intrusive-testing line).
@@ -715,6 +780,16 @@ function transformCategoryIntegrated(body: string): string {
     '\n' + MARKET_CONTEXT_BINDING,
   );
 
+  // 4j. Market Intel Output directive — after the headingless
+  //     MARKET_CONTEXT_BINDING (inserted in 4i). Has a heading so the
+  //     removeSection in 4c2 can manage re-runs. Inserted AFTER the binding
+  //     per AGENTS.md (headingless bindings before headed directives).
+  out = insertAfter(
+    out,
+    'The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.',
+    MARKET_INTEL_OUTPUT_DIRECTIVE,
+  );
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -738,6 +813,13 @@ function transformSignalAligned(body: string): string {
   out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
   out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
 
+  // 0c. Remove any prior version of the Market Intel Output directive
+  //     (seed version bump). Runs BEFORE the headingless MARKET_CONTEXT_BINDING
+  //     insertion (step 1) and the directive insertion (step 1b) per
+  //     AGENTS.md — headingless bindings + headed directives go AFTER all
+  //     removeSection calls so each run self-heals.
+  out = removeSection(out, '### Market Intelligence Output Fields');
+
   // 1. Insert the binding sections after the business identity block's
   //    last line (the "do not treat blank as a negative signal" note).
   //    This keeps the bindings AFTER the business identity, not before it.
@@ -754,6 +836,16 @@ function transformSignalAligned(body: string): string {
     out,
     'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
     '\n' + MARKET_CONTEXT_BINDING,
+  );
+
+  // 1b. Market Intel Output directive — after the headingless
+  //     MARKET_CONTEXT_BINDING (inserted in step 1). Has a heading so the
+  //     removeSection in 19c2 can manage re-runs. Inserted AFTER the binding
+  //     per AGENTS.md (headingless bindings before headed directives).
+  out = insertAfter(
+    out,
+    'The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.',
+    MARKET_INTEL_OUTPUT_DIRECTIVE,
   );
 
   // 2. Store format classification — after the identity-verification conflict
@@ -911,6 +1003,22 @@ function transformSignalAligned(body: string): string {
   // 18. gap_analysis + quality_gate_results — after the sources array.
   out = replaceFirst(out, '  ]\n}', '  ],\n' + GAP_AND_GATES_SCHEMA + '\n}');
 
+  // 18a. market_opportunities after quality_gate_results (before top-level
+  //      close). Separate replaceFirst — idempotent.
+  out = replaceFirst(
+    out,
+    '    "summary": ""\n  }\n}',
+    '    "summary": ""\n  },\n' + MARKET_OPPORTUNITIES_SCHEMA + '\n}',
+  );
+
+  // 18b. signal_checklist after market_opportunities (before top-level
+  //      close). Separate replaceFirst — idempotent.
+  out = replaceFirst(
+    out,
+    MARKET_OPPORTUNITIES_SCHEMA + '\n}',
+    MARKET_OPPORTUNITIES_SCHEMA + ',\n' + SIGNAL_CHECKLIST_SCHEMA + '\n}',
+  );
+
   // 19. Targeted content update: delivery_model enum now includes 'unknown'.
   out = out.replace(
     'delivery_model: none / marketplace / direct / both\n',
@@ -927,6 +1035,9 @@ function transformSignalAligned(body: string): string {
   //      instruction section. Remove any prior version first (seed bump).
   out = removeSection(out, '### Public Narrative (required)');
   out = insertAfter(out, '## Summary', PUBLIC_NARRATIVE_DIRECTIVE);
+
+  // (Market Intel Output directive removeSection moved to step 0c —
+  //  must run BEFORE the directive insertion in 1b, not after.)
 
   // 19d. Website Accessibility Verification directive — insert at the end of
   //      the Website Assessment section (after the intrusive-testing line).
@@ -982,6 +1093,12 @@ function transformBusinessAuditV1(body: string): string {
   //    existing "## Business" section deeper in the body.
   out = insertAfter(out, 'Never invent or assume data.', BUSINESS_IDENTITY_BLOCK);
 
+  // 0a. Remove any prior version of the Market Intel Output directive
+  //     (seed version bump). Runs BEFORE the headingless MARKET_CONTEXT_BINDING
+  //     insertion below per AGENTS.md — headingless bindings go after all
+  //     removeSection calls so each run self-heals.
+  out = removeSection(out, '### Market Intelligence Output Fields');
+
   // 0a. Insert Market Context binding after the business identity block.
   //     V1 has no CI/GS bindings, but the market context binding is
   //     independent — it tells the analyst how to use the CATEGORY MARKET
@@ -991,6 +1108,19 @@ function transformBusinessAuditV1(body: string): string {
     out,
     'Audit the business above. If address, phone, or origin is blank, the field was not provided — do not treat blank as a negative signal.',
     '\n\n' + MARKET_CONTEXT_BINDING,
+  );
+
+  // 0a2. Market Intel Output directive — after the headingless
+  //      MARKET_CONTEXT_BINDING. Has a heading so the removeSection in 0a
+  //      can manage re-runs. V1 does NOT get the schema field insertions
+  //      (no GAP_AND_GATES_SCHEMA anchor — V1 has a different embedded JSON
+  //      schema structure and is absent in prd; the directive alone tells
+  //      the analyst to populate the fields, and the validator accepts
+  //      them as optional).
+  out = insertAfter(
+    out,
+    'The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.',
+    MARKET_INTEL_OUTPUT_DIRECTIVE,
   );
 
   // 0b. Add Origin row to existing identity blocks (idempotent — no-op if

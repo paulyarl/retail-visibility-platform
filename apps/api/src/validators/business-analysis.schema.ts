@@ -552,6 +552,39 @@ const qualityGateResultsSchema = z.object({
   summary: z.string().nullable().optional(),
 }).passthrough();
 
+// ---- Market intel sidebar fields (Seed Market Intel Sidebar — Phase 0) ----
+
+/**
+ * A single business-specific growth opportunity synthesized by the audit
+ * from `gap_analysis`, relevant `market_gaps`, and
+ * `website.conversion_opportunities`. Ranked by impact (HIGH first).
+ *
+ * Optional — only present when the audit prompt's market-context binding
+ * ran (category + location intelligence injected). Pre-change audits do
+ * not have it; the sidebar falls back to `gap_analysis.gaps.length`
+ * (§8.5.4) until re-audits land.
+ */
+const marketOpportunityEntrySchema = z.object({
+  title: z.string(),
+  description: z.string().nullable().optional(),
+  impact: z.enum(['HIGH', 'MEDIUM', 'LOW']),
+}).passthrough();
+
+/**
+ * One entry per `category_signals` item, evaluated by the audit for THIS
+ * business. `met` is the audit's verdict against observed evidence; the
+ * frontend never joins signals to evidence itself.
+ *
+ * Optional — only present when the audit prompt's category-context binding
+ * ran. Absent → the "How It Stacks Up" card renders `available: false`
+ * (teaser copy: "Category signal evaluation pending").
+ */
+const signalChecklistEntrySchema = z.object({
+  signal: z.string(),
+  met: z.boolean().nullable().optional(),
+  evidence: z.string().nullable().optional(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const businessAnalysisSchema = z.object({
@@ -595,6 +628,14 @@ export const businessAnalysisSchema = z.object({
   // gates, producing structured gaps and pass/fail results.
   gap_analysis: gapAnalysisSchema.optional(),
   quality_gate_results: qualityGateResultsSchema.optional(),
+  // Seed Market Intel Sidebar — Phase 0: business-specific growth
+  // opportunities + per-signal evaluation. Both optional — populated ONLY
+  // when the market-context (category + location intelligence) binding ran.
+  // Pre-change audits do not have them; the sidebar falls back to
+  // gap_analysis.gaps.length for the opportunity count and renders the
+  // signal checklist card as `available: false` (§8.5.4).
+  market_opportunities: z.array(marketOpportunityEntrySchema).optional(),
+  signal_checklist: z.array(signalChecklistEntrySchema).optional(),
 }).passthrough();
 
 export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
@@ -787,13 +828,23 @@ Return your response as JSON matching this exact schema:
       { "platform": "<string>", "gate": "<string>", "passed": <boolean>, "severity": "non_negotiable|recommended", "notes": "<string>" }
     ],
     "summary": "<string>"
-  }
+  },
+  "market_opportunities": [
+    { "title": "<string>", "description": "<string>", "impact": "HIGH|MEDIUM|LOW" }
+  ],
+  "signal_checklist": [
+    { "signal": "<string>", "met": <boolean|null>, "evidence": "<string|null>" }
+  ]
 }
 
 GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present in the prompt):
 - platforms.{platform}.profile_url: "<string|null>" — the LIVE profile URL on each platform (e.g. "https://www.google.com/maps/place/..."). Always capture this.
 - gap_analysis: compare the business's actual profile against the gold-standard expected fields. For each field where the business's actual value differs from the expected value, produce a gap entry with the platform, field name, expected value, actual value, gap description, and severity (non_negotiable or recommended). The expected and actual values may be a string (e.g. "African grocery store"), a boolean (presence fields like hours_present/website_present — use true/false), a number (count fields like photo_count), an array of strings/numbers/booleans (multi-value fields like additional_categories — use a JSON array such as ["Grocery store", "International grocery store"]), or null when not verifiable.
 - quality_gate_results: for each gold-standard quality gate, record whether the business passed or failed, with the platform, gate name, passed boolean, severity, and notes.
+
+MARKET INTEL SIDEBAR FIELDS (populate ONLY when a MARKET CONTEXT section is present in the prompt — i.e. category + location intelligence was injected):
+- market_opportunities: business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps, and website.conversion_opportunities. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Omit the field entirely (do not emit an empty array) when no market context was injected.
+- signal_checklist: one entry per category_signals item, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was injected.
 
 PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types):
 - website.has_product_browsing: <boolean|null> — can customers browse products or categories on the website? (null when unable to verify or no website)

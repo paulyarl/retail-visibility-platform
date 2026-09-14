@@ -1,0 +1,403 @@
+/**
+ * Unit tests for MarketContext injection into intelligence campaigns.
+ *
+ * Covers the three injection points in MarketingExecutionService.resolvePrompt:
+ *   1. Gold-standard establishment scan → formatEstablishmentMarketContext
+ *   2. Gold-standard discovery scan (degraded + normal) → formatDiscoveryMarketContext
+ *   3. Emerging/competitive discovery scan → formatDiscoveryMarketContext
+ *
+ * Also covers:
+ *   - National campaigns (no city) → no market context injection
+ *   - Business-scope campaigns → no market context injection
+ *   - Market context block appears after gold standard block
+ *   - Graceful degradation when enrichment hasn't run
+ *
+ * Spec: docs/LocalBiz/INTELLIGENCE_CAMPAIGN_MARKET_CONTEXT_SPEC.md
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery } = vi.hoisted(() => {
+  const mockProfileService = {
+    resolve: vi.fn(async () => null),
+    resolveGoldStandard: vi.fn(async () => null),
+    serializeGoldStandard: vi.fn(() => ''),
+    renderBusinessProfileBlock: vi.fn(() => ''),
+  };
+  const mockPromptService = {
+    getTemplate: vi.fn(),
+    createExecution: vi.fn(),
+    updateExecution: vi.fn(),
+  };
+  const mockCampaignService = { getCampaign: vi.fn() };
+  const mockAiProvider = { generateChatCompletion: vi.fn() };
+  const mockHotProspectService = { syncFromExecution: vi.fn() };
+  const mockComposerService = {
+    composeIntelligencePrompt: vi.fn(async (_input: any) => ({
+      body: 'COMPOSED_BODY',
+      resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' as const },
+      focus: _input.focus,
+    })),
+  };
+  const mockMarketContextLoader = {
+    loadMarketContext: vi.fn(async () => ({ category: {}, location: {} })),
+    hasCategoryIntelligence: vi.fn(() => false),
+    hasLocationIntelligence: vi.fn(() => false),
+  };
+  const mockFormatEstablishment = vi.fn(() => '');
+  const mockFormatDiscovery = vi.fn(() => '');
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery };
+});
+
+vi.mock('../intelligence/IntelligenceProfileService', () => ({
+  IntelligenceProfileService: {
+    getInstance: () => mockProfileService,
+  },
+}));
+
+vi.mock('../intelligence/PromptComposerService', () => ({
+  PromptComposerService: {
+    getInstance: () => mockComposerService,
+  },
+}));
+
+vi.mock('../MarketingPromptService', () => ({
+  MarketingPromptService: {
+    getInstance: () => mockPromptService,
+  },
+}));
+
+vi.mock('../MarketingCampaignService', () => ({
+  default: mockCampaignService,
+}));
+
+vi.mock('../ai-providers', () => ({
+  default: mockAiProvider,
+}));
+
+vi.mock('../MarketingHotProspectService', () => ({
+  MarketingHotProspectService: {
+    getInstance: () => mockHotProspectService,
+  },
+}));
+
+vi.mock('../intelligence/MarketContextLoader', () => ({
+  MarketContextLoader: {
+    getInstance: () => mockMarketContextLoader,
+  },
+}));
+
+vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
+  formatEstablishmentMarketContext: mockFormatEstablishment,
+  formatDiscoveryMarketContext: mockFormatDiscovery,
+}));
+
+import { MarketingExecutionService } from '../MarketingExecutionService';
+
+describe('MarketContext injection into intelligence campaigns', () => {
+  let service: MarketingExecutionService;
+
+  beforeEach(() => {
+    service = MarketingExecutionService.getInstance();
+    vi.clearAllMocks();
+    // Reset defaults: no profiles, no gold standard
+    mockProfileService.resolve.mockImplementation(async () => null);
+    mockProfileService.resolveGoldStandard.mockImplementation(async () => null);
+    mockProfileService.serializeGoldStandard.mockImplementation(() => '');
+    mockComposerService.composeIntelligencePrompt.mockImplementation(async (input: any) => ({
+      body: 'COMPOSED_BODY',
+      resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' as const },
+      focus: input.focus,
+    }));
+    // Reset market context to empty by default
+    mockMarketContextLoader.loadMarketContext.mockImplementation(async () => ({ category: {}, location: {} }));
+    mockFormatEstablishment.mockImplementation(() => '');
+    mockFormatDiscovery.mockImplementation(() => '');
+  });
+
+  // ─── Establishment scan ────────────────────────────────────────────────
+
+  describe('establishment scan', () => {
+    const makeEstTemplate = () => ({
+      body: 'Find best-in-class {{category}} in {{city}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'gold_standard_scan' },
+      outputSchema: { name: 'gold_standard_scan' },
+    });
+
+    const makeEstCampaign = (city: string | null = 'Indianapolis', state: string | null = 'IN') => ({
+      id: 'camp-est-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city,
+      state,
+      intelligence_focus: 'gold_standards',
+      intelligence_campaign_kind: 'establishment',
+    });
+
+    it('injects market context when enrichment data exists', async () => {
+      const marketData = {
+        category: { category_profile: { business_model: 'independent' }, category_signals: ['hours'] },
+        location: { city_profile: { metro_description: 'Midwest hub' } },
+      };
+      mockMarketContextLoader.loadMarketContext.mockResolvedValueOnce(marketData);
+      mockFormatEstablishment.mockReturnValueOnce('=== MARKET CONTEXT (from prior enrichment runs) ===\nCATEGORY PROFILE...');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeEstTemplate(),
+        campaign: makeEstCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('MARKET CONTEXT (from prior enrichment runs)');
+      expect(mockMarketContextLoader.loadMarketContext).toHaveBeenCalledWith(
+        'African Grocery Store', 'Indianapolis', 'IN', undefined,
+      );
+      expect(mockFormatEstablishment).toHaveBeenCalledWith(
+        marketData, 'African Grocery Store', 'Indianapolis', 'IN',
+      );
+    });
+
+    it('does not inject market context when enrichment data is empty', async () => {
+      mockMarketContextLoader.loadMarketContext.mockResolvedValueOnce({ category: {}, location: {} });
+      // Formatter returns '' for empty data
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeEstTemplate(),
+        campaign: makeEstCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('MARKET CONTEXT');
+    });
+
+    it('does not inject market context for national campaigns (no city)', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeEstTemplate(),
+        campaign: makeEstCampaign(null, null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('MARKET CONTEXT');
+      expect(mockMarketContextLoader.loadMarketContext).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Gold-standard discovery scan (degraded) ───────────────────────────
+
+  describe('gold-standard discovery scan (degraded — no gold standard)', () => {
+    const makeGsDiscoveryTemplate = () => ({
+      body: 'Discover {{category}} in {{city}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'gold_standard_scan' },
+      outputSchema: { name: 'gold_standard_scan' },
+    });
+
+    const makeGsDiscoveryCampaign = () => ({
+      id: 'camp-gs-disc-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      intelligence_focus: 'gold_standards',
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('injects market context in degraded mode when enrichment data exists', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+      const marketData = {
+        category: { market_density: 'sparse' },
+        location: { market_gaps: [{ category: 'african grocery', signal: 'unmet demand' }] },
+      };
+      mockMarketContextLoader.loadMarketContext.mockResolvedValueOnce(marketData);
+      mockFormatDiscovery.mockReturnValueOnce('=== MARKET CONTEXT (from prior enrichment runs) ===\nMARKET GAPS...');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeGsDiscoveryTemplate(),
+        campaign: makeGsDiscoveryCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('DEGRADED MODE');
+      expect(renderedPrompt).toContain('MARKET CONTEXT');
+      expect(mockFormatDiscovery).toHaveBeenCalled();
+    });
+
+    it('does not inject market context in degraded mode when enrichment is empty', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeGsDiscoveryTemplate(),
+        campaign: makeGsDiscoveryCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('DEGRADED MODE');
+      expect(renderedPrompt).not.toContain('MARKET CONTEXT');
+    });
+  });
+
+  // ─── Gold-standard discovery scan (normal) ────────────────────────────
+
+  describe('gold-standard discovery scan (normal — with gold standard)', () => {
+    const makeGsDiscoveryTemplate = () => ({
+      body: 'Discover {{category}} in {{city}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'gold_standard_scan' },
+      outputSchema: { name: 'gold_standard_scan' },
+    });
+
+    const makeGsDiscoveryCampaign = () => ({
+      id: 'camp-gs-disc-2',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      intelligence_focus: 'gold_standards',
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('injects market context after gold standard block when enrichment data exists', async () => {
+      const goldStandard = { id: 'gs-001', version: 1, reference_platform: 'google' };
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD DISCOVERY ===\nBenchmark...');
+      const marketData = {
+        category: { category_profile: { business_model: 'independent' } },
+        location: { city_profile: { metro_description: 'Midwest hub' } },
+      };
+      mockMarketContextLoader.loadMarketContext.mockResolvedValueOnce(marketData);
+      mockFormatDiscovery.mockReturnValueOnce('=== MARKET CONTEXT (from prior enrichment runs) ===\nCATEGORY PROFILE...');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeGsDiscoveryTemplate(),
+        campaign: makeGsDiscoveryCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('GOLD STANDARD DISCOVERY');
+      expect(renderedPrompt).toContain('MARKET CONTEXT');
+      // Market context appears after gold standard
+      const gsIdx = renderedPrompt.indexOf('GOLD STANDARD DISCOVERY');
+      const mcIdx = renderedPrompt.indexOf('MARKET CONTEXT');
+      expect(mcIdx).toBeGreaterThan(gsIdx);
+    });
+  });
+
+  // ─── Emerging/competitive discovery scan ──────────────────────────────
+
+  describe('emerging/competitive discovery scan', () => {
+    const makeIntelTemplate = () => ({
+      body: 'Discover {{category}} in {{city}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_discovery' },
+      outputSchema: { name: 'intelligence_discovery' },
+    });
+
+    const makeIntelCampaign = (focus: 'emerging' | 'competitive' = 'emerging') => ({
+      id: 'camp-intel-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      intelligence_focus: focus,
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('injects market context for emerging focus when enrichment data exists', async () => {
+      const marketData = {
+        category: { prospect_signals: ['thin online presence'] },
+        location: { market_gaps: [{ category: 'african grocery', signal: 'unmet demand', area: 'south side' }] },
+      };
+      mockMarketContextLoader.loadMarketContext.mockResolvedValueOnce(marketData);
+      mockFormatDiscovery.mockReturnValueOnce('=== MARKET CONTEXT (from prior enrichment runs) ===\nEMERGING focus...');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('MARKET CONTEXT');
+      expect(mockFormatDiscovery).toHaveBeenCalledWith(
+        marketData, 'African Grocery Store', 'Indianapolis', 'IN', 'emerging',
+      );
+    });
+
+    it('injects market context for competitive focus when enrichment data exists', async () => {
+      const marketData = {
+        category: { category_signals: ['published hours'] },
+        location: { city_profile: { metro_description: 'Midwest hub' } },
+      };
+      mockMarketContextLoader.loadMarketContext.mockResolvedValueOnce(marketData);
+      mockFormatDiscovery.mockReturnValueOnce('=== MARKET CONTEXT (from prior enrichment runs) ===\nCOMPETITIVE focus...');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('competitive'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('MARKET CONTEXT');
+      expect(mockFormatDiscovery).toHaveBeenCalledWith(
+        marketData, 'African Grocery Store', 'Indianapolis', 'IN', 'competitive',
+      );
+    });
+
+    it('does not inject market context when enrichment data is empty', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('MARKET CONTEXT');
+    });
+
+    it('does not inject market context for national campaigns (no city)', async () => {
+      const campaign = { ...makeIntelCampaign('emerging'), city: null, state: null };
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign,
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('MARKET CONTEXT');
+      expect(mockMarketContextLoader.loadMarketContext).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Business-scope campaigns (no market context) ─────────────────────
+
+  describe('business-scope campaigns (no market context injection)', () => {
+    const makeBusinessTemplate = () => ({
+      body: 'Audit {{business_name}} in {{category}}',
+      prompt_type: 'seek',
+      scope: 'business',
+    });
+
+    const makeBusinessCampaign = () => ({
+      id: 'camp-biz-1',
+      scope: 'business',
+      category: 'African Grocery Store',
+      business_name: 'Test Business',
+      city: 'Indianapolis',
+      state: 'IN',
+    });
+
+    it('does not inject market context for business-scope campaigns', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeBusinessTemplate(),
+        campaign: makeBusinessCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('MARKET CONTEXT');
+      expect(mockMarketContextLoader.loadMarketContext).not.toHaveBeenCalled();
+    });
+  });
+});

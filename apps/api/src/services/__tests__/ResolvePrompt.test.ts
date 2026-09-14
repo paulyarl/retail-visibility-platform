@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveGoldStandard: vi.fn(async (_category: string, _platform?: string | null) => null),
@@ -40,7 +40,14 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
       focus: _input.focus,
     })),
   };
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService };
+  const mockMarketContextLoader = {
+    loadMarketContext: vi.fn(async () => ({ category: {}, location: {} })),
+    hasCategoryIntelligence: vi.fn(() => false),
+    hasLocationIntelligence: vi.fn(() => false),
+  };
+  const mockFormatEstablishment = vi.fn(() => '');
+  const mockFormatDiscovery = vi.fn(() => '');
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -75,6 +82,17 @@ vi.mock('../MarketingHotProspectService', () => ({
   },
 }));
 
+vi.mock('../intelligence/MarketContextLoader', () => ({
+  MarketContextLoader: {
+    getInstance: () => mockMarketContextLoader,
+  },
+}));
+
+vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
+  formatEstablishmentMarketContext: mockFormatEstablishment,
+  formatDiscoveryMarketContext: mockFormatDiscovery,
+}));
+
 import { MarketingExecutionService } from '../MarketingExecutionService';
 
 describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)', () => {
@@ -93,6 +111,10 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' as const },
       focus: input.focus,
     }));
+    // Reset market context loader + formatters to empty (no market context block)
+    mockMarketContextLoader.loadMarketContext.mockImplementation(async () => ({ category: {}, location: {} }));
+    mockFormatEstablishment.mockImplementation(() => '');
+    mockFormatDiscovery.mockImplementation(() => '');
   });
 
   const makeTemplate = (promptType: string, body = 'Hello {{business_name}} in {{category}}') => ({
@@ -671,8 +693,12 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
   });
 
-  // ─── Enrichment prompt: Gold Standard market reference injection ──────
-  describe('enrichment prompt — gold standard market reference', () => {
+  // ─── Enrichment prompt: Gold Standard removed (V8 reframing) ────────
+  // The V8 reframing decoupled the gold standard from enrichment prompts.
+  // The gold standard is now business-scope only — it is consumed by the
+  // seed/business audit, not by location or category enrichment. These tests
+  // verify that enrichment prompts do NOT inject the gold standard.
+  describe('enrichment prompt — gold standard not injected (V8 reframing)', () => {
     const makeEnrichmentTemplate = (scope: string, body = 'CITY: {{city}} STATE: {{state}}') => ({
       body,
       prompt_type: 'enrichment',
@@ -698,7 +724,9 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       parent_campaign_id: parentCampaignId ?? null,
     });
 
-    it('category enrichment + gold standard → market reference block injected', async () => {
+    it('category enrichment does NOT inject gold standard (business-scope only)', async () => {
+      // Even if a gold standard exists, it should NOT be injected into
+      // enrichment prompts. The gold standard is consumed by the seed audit.
       mockProfileService.resolveGoldStandard.mockResolvedValueOnce({
         id: 'gs-african-grocery',
         version: 2,
@@ -716,27 +744,17 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(renderedPrompt).toContain('GOLD STANDARD MARKET REFERENCE');
-      expect(resolution.profile_id).toBe('gs-african-grocery');
-      expect(resolution.intelligence_mode).toBe('profile');
+      // Gold standard is NOT injected into enrichment prompts
+      expect(renderedPrompt).not.toContain('GOLD STANDARD MARKET REFERENCE');
+      expect(resolution.intelligence_mode).toBe('none');
     });
 
-    it('location enrichment + PG parent → resolves gold standard from parent PG category', async () => {
+    it('location enrichment with PG parent does NOT resolve or inject gold standard', async () => {
       mockCampaignService.getCampaign.mockResolvedValueOnce({
         id: 'mcamp-pg-001',
         category: 'African Grocery Store',
         campaign_category: 'proving_ground',
       });
-      mockProfileService.resolveGoldStandard.mockResolvedValueOnce({
-        id: 'gs-african-grocery',
-        version: 2,
-        category_name: 'African Grocery Store',
-        reference_city: 'Indianapolis',
-        reference_state: 'IN',
-      });
-      mockProfileService.serializeGoldStandard.mockReturnValueOnce(
-        '=== GOLD STANDARD MARKET REFERENCE ===\nCategory: African Grocery Store\nMarket scope: Indianapolis, IN',
-      );
 
       const { renderedPrompt, resolution } = await service.resolvePrompt({
         template: makeEnrichmentTemplate('city'),
@@ -744,12 +762,9 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(mockCampaignService.getCampaign).toHaveBeenCalledWith('mcamp-pg-001', undefined);
-      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith(
-        'African Grocery Store', null, 'Indianapolis', 'IN', undefined,
-      );
-      expect(renderedPrompt).toContain('GOLD STANDARD MARKET REFERENCE');
-      expect(resolution.profile_id).toBe('gs-african-grocery');
+      // Gold standard is NOT resolved or injected for enrichment prompts
+      expect(renderedPrompt).not.toContain('GOLD STANDARD MARKET REFERENCE');
+      expect(resolution.intelligence_mode).toBe('none');
     });
 
     it('enrichment + no gold standard → base render only, intelligence_mode none', async () => {
