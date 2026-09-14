@@ -21,6 +21,7 @@ import { MarketIntelAccessService, AccessTier } from '../services/MarketIntelAcc
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
+import { MarketIntelReportPdfService } from '../services/marketing/MarketIntelReportPdfService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -104,6 +105,48 @@ router.get('/:slug/market-intel/full', requireCustomerAuth, async (req: Request,
     res.json({ success: true, data: full });
   } catch (error) {
     logger.error('[GET /api/customer/place/:slug/market-intel/full] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/customer/place/:slug/market-intel/report.pdf
+ * Downloads the PDF report for paid tenants or claimed owners.
+ *
+ * Access: same as /full — a `market_intel_unlocks` row OR claimed
+ * ownership. Returns 402 JSON when the customer doesn't have access.
+ *
+ * Content-Type: application/pdf
+ * Content-Disposition: inline; filename="market-intel-report-{slug}.pdf"
+ */
+router.get('/:slug/market-intel/report.pdf', requireCustomerAuth, async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const customerId = (req as any).customerId as string;
+    if (!slug) return res.status(400).json({ success: false, error: 'slug_required' });
+
+    const canAccess = await accessService.canAccessFull(customerId, 'place', slug);
+    if (!canAccess) {
+      return res.status(402).json({
+        success: false,
+        error: 'unlock_required',
+        message: 'Unlock the full report to download the PDF.',
+      });
+    }
+
+    const fullContent = await service.getFullContent(slug);
+    const { pdfBuffer, filename } = await MarketIntelReportPdfService.generate({
+      businessSlug: slug,
+      fullContent,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    logger.error('[GET /api/customer/place/:slug/market-intel/report.pdf] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ success: false, error: 'internal_error' });

@@ -255,8 +255,33 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken }: Ma
                 {hasFull && (
                   <button
                     className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                    // PDF download endpoint wired in Phase 4.
-                    onClick={() => window.alert('PDF download coming in Phase 4')}
+                    onClick={async () => {
+                      // Fetch the PDF with auth headers, then trigger download.
+                      try {
+                        const token = typeof window !== 'undefined'
+                          ? localStorage.getItem('customer_auth_token')
+                          : null;
+                        const resp = await fetch(
+                          `/api/customer/place/${encodeURIComponent(slug)}/market-intel/report.pdf`,
+                          token ? { headers: { Authorization: `Bearer ${token}` } } : {},
+                        );
+                        if (!resp.ok) {
+                          window.alert('Failed to download report. Please try again.');
+                          return;
+                        }
+                        const blob = await resp.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `market-intel-report-${slug}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      } catch {
+                        window.alert('Failed to download report. Please try again.');
+                      }
+                    }}
                   >
                     <Download className="w-4 h-4" /> Download PDF Report
                   </button>

@@ -32,13 +32,19 @@ vi.mock('../../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const { mockLoadMarketContext } = vi.hoisted(() => ({
+const { mockLoadMarketContext, mockHasCategoryIntelligence, mockHasLocationIntelligence } = vi.hoisted(() => ({
   mockLoadMarketContext: vi.fn(),
+  mockHasCategoryIntelligence: vi.fn(),
+  mockHasLocationIntelligence: vi.fn(),
 }));
 
 vi.mock('../intelligence/MarketContextLoader', () => ({
   MarketContextLoader: {
-    getInstance: () => ({ loadMarketContext: mockLoadMarketContext }),
+    getInstance: () => ({
+      loadMarketContext: mockLoadMarketContext,
+      hasCategoryIntelligence: mockHasCategoryIntelligence,
+      hasLocationIntelligence: mockHasLocationIntelligence,
+    }),
   },
 }));
 
@@ -53,6 +59,10 @@ beforeEach(() => {
   mockAudit.mockReset();
   mockLoadMarketContext.mockReset();
   mockLoadMarketContext.mockResolvedValue({ category: {}, location: {} });
+  mockHasCategoryIntelligence.mockReset();
+  mockHasCategoryIntelligence.mockReturnValue(false);
+  mockHasLocationIntelligence.mockReset();
+  mockHasLocationIntelligence.mockReturnValue(false);
 });
 
 // ─── Slug → audit resolution (§8.4) ──────────────────────────────────────
@@ -629,6 +639,8 @@ describe('getFullContent (§4.3)', () => {
       category: { category_signals: ['Published hours'] },
       location: { market_gaps: [{ category: 'African Grocery', signal: 'south side demand' }] },
     });
+    mockHasCategoryIntelligence.mockReturnValue(true);
+    mockHasLocationIntelligence.mockReturnValue(true);
 
     const result = await service.getFullContent('some-slug');
 
