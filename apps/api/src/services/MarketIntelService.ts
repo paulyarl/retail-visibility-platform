@@ -538,8 +538,8 @@ export class MarketIntelService extends BaseService {
       },
       gapAnalysis,
       marketContext: {
-        hasCategoryIntelligence: marketLoader.hasCategoryIntelligence(marketCtx),
-        hasLocationIntelligence: marketLoader.hasLocationIntelligence(marketCtx),
+        hasCategoryIntelligence: marketLoader.hasCategoryIntelligence(marketCtx.category),
+        hasLocationIntelligence: marketLoader.hasLocationIntelligence(marketCtx.location),
         category: marketCtx.category ?? null,
         location: marketCtx.location ?? null,
       },

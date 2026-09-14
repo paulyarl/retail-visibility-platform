@@ -532,3 +532,110 @@ describe('getPartialContent (§4.2)', () => {
     expect(result.growthOpportunities.lockedCount).toBe(0);
   });
 });
+
+// ─── getFullContent (§4.3) ───────────────────────────────────────────────
+
+describe('getFullContent (§4.3)', () => {
+  it('returns hasAudit:false when the resolution chain breaks', async () => {
+    mockListing.mockResolvedValue(null);
+
+    const result = await service.getFullContent('no-such-slug');
+
+    expect(result.hasAudit).toBe(false);
+    expect(result.businessName).toBeNull();
+    expect(result.growthOpportunities.available).toBe(false);
+    expect(result.howItStacksUp.available).toBe(false);
+    expect(result.gapAnalysis).toBeNull();
+    expect(result.marketContext).toBeNull();
+  });
+
+  it('returns all opportunities unlocked with descriptions', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test Biz' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        market_opportunities: [
+          { title: 'No website', description: 'Missing online discovery', impact: 'HIGH' },
+          { title: 'Limited hours', description: 'Closes before 7pm', impact: 'MEDIUM' },
+        ],
+        signal_checklist: [
+          { signal: 'Published hours', met: true, evidence: 'GBP hours current' },
+          { signal: 'No website', met: false, evidence: 'No website found' },
+        ],
+        gap_analysis: { gaps: [{ field: 'website', severity: 'non_negotiable' }] },
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getFullContent('some-slug');
+
+    expect(result.hasAudit).toBe(true);
+    expect(result.businessName).toBe('Test Biz');
+    expect(result.growthOpportunities.available).toBe(true);
+    expect(result.growthOpportunities.items).toHaveLength(2);
+    expect(result.growthOpportunities.items[0]).toEqual({
+      title: 'No website',
+      description: 'Missing online discovery',
+      impact: 'HIGH',
+    });
+    expect(result.howItStacksUp.available).toBe(true);
+    expect(result.howItStacksUp.signals).toHaveLength(2);
+    expect(result.howItStacksUp.signals[0]).toEqual({
+      signal: 'Published hours',
+      met: true,
+      evidence: 'GBP hours current',
+    });
+    expect(result.gapAnalysis).toEqual({ gaps: [{ field: 'website', severity: 'non_negotiable' }] });
+  });
+
+  it('falls back to gap_analysis when market_opportunities is absent', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'Cat', city: 'City', state: 'ST' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: {
+        gap_analysis: { gaps: [{ field: 'website', severity: 'non_negotiable' }] },
+      },
+      created_at: new Date('2026-09-01'),
+    });
+
+    const result = await service.getFullContent('some-slug');
+
+    expect(result.growthOpportunities.available).toBe(true);
+    expect(result.growthOpportunities.items).toHaveLength(1);
+    expect(result.growthOpportunities.items[0]).toEqual({
+      title: 'website',
+      description: null,
+      impact: 'HIGH',
+    });
+  });
+
+  it('includes market context with category/location intelligence flags', async () => {
+    mockListing.mockResolvedValue({ id: 'listing-1', business_name: 'Test' });
+    mockSeed.mockResolvedValue({ id: 'seed-1', category: 'African Grocery Store', city: 'Indianapolis', state: 'IN' });
+    mockCampaignLink.mockResolvedValue({ campaign_id: 'camp-1' });
+    mockAudit.mockResolvedValue({
+      id: 'audit-1',
+      campaign_id: 'camp-1',
+      audit_data: { market_opportunities: [{ title: 'A', impact: 'HIGH' }] },
+      created_at: new Date('2026-09-01'),
+    });
+    mockLoadMarketContext.mockResolvedValue({
+      category: { category_signals: ['Published hours'] },
+      location: { market_gaps: [{ category: 'African Grocery', signal: 'south side demand' }] },
+    });
+
+    const result = await service.getFullContent('some-slug');
+
+    expect(result.marketContext).not.toBeNull();
+    expect(result.marketContext!.hasCategoryIntelligence).toBe(true);
+    expect(result.marketContext!.hasLocationIntelligence).toBe(true);
+    expect(result.marketContext!.category).toEqual({ category_signals: ['Published hours'] });
+    expect(result.marketContext!.location).toEqual({ market_gaps: [{ category: 'African Grocery', signal: 'south side demand' }] });
+  });
+});
