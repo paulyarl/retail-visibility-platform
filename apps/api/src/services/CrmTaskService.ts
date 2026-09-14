@@ -2,7 +2,7 @@
  * CrmTaskService — CRUD + status + assignment for crm_tasks
  */
 import { BaseService } from './BaseService';
-import { prisma } from '../prisma';
+import { prisma, basePrisma } from '../prisma';
 import { generateCrmTaskId, generateCrmActivityId } from '../lib/id-generator';
 
 export class CrmTaskService extends BaseService {
@@ -183,13 +183,16 @@ export class CrmTaskService extends BaseService {
    * Accepts an array of { id, sort_order } pairs and batch-updates them
    */
   async reorder(items: { id: string; sort_order: number }[]) {
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as organizations.ts.
     const ops = items.map(item =>
-      prisma.crm_tasks.update({
+      basePrisma.crm_tasks.update({
         where: { id: item.id },
         data: { sort_order: item.sort_order },
       })
     );
-    return prisma.$transaction(ops);
+    return basePrisma.$transaction(ops);
   }
 }
 

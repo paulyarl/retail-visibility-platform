@@ -27,7 +27,7 @@ const router = Router();
 
 // Initialize Stripe (ensure STRIPE_SECRET_KEY is set in environment)
 const stripe = unifiedConfig.stripeSecretKey 
-  ? new Stripe(unifiedConfig.stripeSecretKey, { apiVersion: '2026-06-24.dahlia' })
+  ? new Stripe(unifiedConfig.stripeSecretKey, { apiVersion: '2026-08-26.dahlia' })
   : null;
 
 const STRIPE_WEBHOOK_SECRET = unifiedConfig.stripeWebhookSecret;

@@ -2,7 +2,7 @@
  * CrmTicketService — CRUD + status transitions + assignment for crm_support_tickets
  */
 import { BaseService } from './BaseService';
-import { prisma } from '../prisma';
+import { prisma, basePrisma } from '../prisma';
 import { generateCrmTicketId, generateCrmActivityId, generateCustomerTenantRelationshipId } from '../lib/id-generator';
 
 export class CrmTicketService extends BaseService {
@@ -256,13 +256,16 @@ export class CrmTicketService extends BaseService {
    * Accepts an array of { id, sort_order } pairs and batch-updates them
    */
   async reorder(items: { id: string; sort_order: number }[]) {
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as organizations.ts.
     const ops = items.map(item =>
-      prisma.crm_support_tickets.update({
+      basePrisma.crm_support_tickets.update({
         where: { id: item.id },
         data: { sort_order: item.sort_order },
       })
     );
-    return prisma.$transaction(ops);
+    return basePrisma.$transaction(ops);
   }
 }
 

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
-import { prisma } from "../prisma";
+import { prisma, basePrisma } from "../prisma";
 import { unifiedConfig } from "../config/unifiedConfig";
 // Create service role Supabase client for storage operations (bypasses RLS)
 const serviceRoleKey = unifiedConfig.supabaseServiceRoleKey;
@@ -365,10 +365,13 @@ r.put("/:listingId/photos/reorder", async (req, res) => {
       return res.status(400).json({ error: "some photos not found or don't belong to this listing" });
     }
 
-    // Update positions in transaction
-    await prisma.$transaction(
+    // Update positions in transaction.
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as organizations.ts.
+    await basePrisma.$transaction(
       updates.map(({ id, position }) =>
-        prisma.directory_photos.update({
+        basePrisma.directory_photos.update({
           where: { id },
           data: { position },
         })

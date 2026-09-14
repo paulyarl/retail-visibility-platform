@@ -15,6 +15,7 @@
  */
 
 import { BaseService } from './BaseService';
+import { basePrisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError } from '../middleware/errorHandler';
@@ -208,9 +209,12 @@ export class MarketingPlaybookCatalogService extends BaseService {
     ctx?: RequestCtx,
   ): Promise<PlaybookCatalogRow[]> {
     try {
-      const updated = await this.prisma.$transaction(
+      // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+      // the array form of $transaction rejects ("need to be Prisma Client
+      // promises"). Same convention as organizations.ts.
+      const updated = await basePrisma.$transaction(
         rankings.map((r) =>
-          this.prisma.mkt_playbook_catalog.update({
+          basePrisma.mkt_playbook_catalog.update({
             where: { id: r.id },
             data: { priority_rank: r.priorityRank },
           }),

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { prisma } from "./prisma";
+import { prisma, basePrisma } from "./prisma";
 import { createClient } from "@supabase/supabase-js";
 import { StorageBuckets } from "./storage-config";
 import { generateQuickStart } from "./lib/id-generator";
@@ -565,10 +565,13 @@ r.put('/:id/photos/reorder', async (req, res) => {
       return res.status(400).json({ error: "some photos not found or don't belong to this item" });
     }
 
-    // Update positions in transaction
-    await prisma.$transaction(
+    // Update positions in transaction.
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as organizations.ts.
+    await basePrisma.$transaction(
       updates.map(({ id, position }) =>
-        prisma.photo_assets.update({
+        basePrisma.photo_assets.update({
           where: { id },
           data: { position },
         })

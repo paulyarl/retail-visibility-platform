@@ -12,7 +12,7 @@
  * - Comprehensive validation and error handling
  */
 
-import { prisma } from '../prisma';
+import { prisma, basePrisma } from '../prisma';
 import crypto from 'crypto';
 
 export interface DownloadPage {
@@ -449,10 +449,13 @@ export class DigitalDownloadPageService {
    * Reorder assets on a download page
    */
   async reorderPageAssets(tenantId: string, pageId: string, assetIds: string[]): Promise<void> {
-    // Update display_order for each asset in a transaction
-    await prisma.$transaction(
+    // Update display_order for each asset in a transaction.
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as organizations.ts.
+    await basePrisma.$transaction(
       assetIds.map((assetId, index) =>
-        prisma.digital_downloads.update({
+        basePrisma.digital_downloads.update({
           where: {
             id: assetId,
             tenant_id: tenantId,

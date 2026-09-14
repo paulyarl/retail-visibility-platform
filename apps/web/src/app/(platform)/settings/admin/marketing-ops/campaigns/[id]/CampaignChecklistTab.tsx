@@ -17,6 +17,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   RefreshCw, CheckCircle2, Circle, AlertCircle, X, Lightbulb,
   ExternalLink, ArrowUpRight, MessageSquare,
@@ -105,6 +106,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
   const [proposedActionConfig, setProposedActionConfig] = useState<Record<string, any>>({});
   const [rationale, setRationale] = useState('');
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
+  const [suggestionSubmitted, setSuggestionSubmitted] = useState(false);
 
   const fetchChecklist = useCallback(async () => {
     setLoading(true);
@@ -187,6 +189,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
     setProposedStepType(step?.stepType ?? '');
     setProposedActionConfig(step?.actionConfig ? { ...step.actionConfig } : {});
     setRationale('');
+    setSuggestionSubmitted(false);
     setShowSuggestionForm(true);
   };
 
@@ -223,6 +226,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
         rationale,
       });
       setShowSuggestionForm(false);
+      setSuggestionSubmitted(true);
       await fetchChecklist();
     } catch (err: any) {
       setError(err.message || 'Failed to submit suggestion');
@@ -249,6 +253,38 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
   }
 
   if (!view) return null;
+
+  // Success banner after a suggestion submits. Suggestions go to the
+  // playbook's admin review queue — they never touch this campaign's
+  // checklist directly — so the confirmation points at the review location
+  // (Playbooks → Checklist Builder → Operator Suggestions).
+  const suggestionBanner = suggestionSubmitted ? (
+    <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+          <p className="text-xs text-green-700 dark:text-green-300">
+            Suggestion submitted — pending admin review. This campaign's checklist only changes if it's accepted.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/settings/admin/marketing-ops/playbooks"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-green-800 dark:text-green-200 bg-green-100 dark:bg-green-900/40 rounded hover:bg-green-200 dark:hover:bg-green-900/60"
+          >
+            Review in Playbooks <ArrowUpRight className="w-3 h-3" />
+          </Link>
+          <button
+            onClick={() => setSuggestionSubmitted(false)}
+            className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   // Empty state: no effective playbook AND no permanent steps (no triage
   // decision, campaign not in seek/preview_built). When permanent steps are
@@ -284,6 +320,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
   if (view.steps.length === 0) {
     return (
       <div className="space-y-4">
+        {suggestionBanner}
         <div className="text-center py-12 border border-dashed border-gray-200 dark:border-neutral-700 rounded-lg">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-50 dark:bg-neutral-800 mb-3">
             <CheckCircle2 className="w-6 h-6 text-gray-400" />
@@ -345,6 +382,7 @@ export default function CampaignChecklistTab({ campaignId, currentStage, onGoToT
 
   return (
     <div className="space-y-4">
+      {suggestionBanner}
       {/* No-playbook banner (permanent steps visible, triage not yet run) */}
       {showNoPlaybookBanner && (
         <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3">
