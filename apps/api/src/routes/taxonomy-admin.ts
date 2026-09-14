@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from '../prisma';
+import { prisma, basePrisma } from '../prisma';
 import { GOOGLE_PRODUCT_TAXONOMY, CategoryNode } from '../lib/google/taxonomy';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { logger } from '../logger';
@@ -128,9 +128,12 @@ async function upsertInBatches(items: any[], batchSize = 200) {
     console.log(`[upsertInBatches] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(items.length/batchSize)} with ${batch.length} items`);
     
     try {
-      await prisma.$transaction(
+      // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+      // the array form of $transaction rejects ("need to be Prisma Client
+      // promises"). Same convention as organizations.ts.
+      await basePrisma.$transaction(
         batch.map((it) =>
-          prisma.google_taxonomy_list.upsert({
+          basePrisma.google_taxonomy_list.upsert({
             where: { category_id: it.categoryId },
             create: {
               category_id: it.categoryId,

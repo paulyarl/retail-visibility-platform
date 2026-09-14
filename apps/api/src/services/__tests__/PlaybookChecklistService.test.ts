@@ -48,8 +48,11 @@ const {
   transactionOps: { updates: [] as any[] },
 }));
 
-vi.mock('../../prisma', () => ({
-  prisma: {
+vi.mock('../../prisma', () => {
+  // Same mock client under both export names — services use `prisma` (retry
+  // proxy) for ordinary queries and `basePrisma` (unwrapped) for array-form
+  // $transaction.
+  const client = {
     mkt_playbook_checklist_steps: mockSteps,
     mkt_campaign_checklist_progress: mockProgress,
     mkt_playbook_checklist_suggestions: mockSuggestions,
@@ -67,8 +70,9 @@ vi.mock('../../prisma', () => ({
       // Array form — resolve each operation
       return Promise.all(arg.map((op: any) => op));
     }),
-  },
-}));
+  };
+  return { prisma: client, basePrisma: client };
+});
 
 vi.mock('../../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

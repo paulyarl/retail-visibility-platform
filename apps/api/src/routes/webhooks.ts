@@ -46,7 +46,7 @@ router.post(
 
       // Verify webhook signature
       const stripe = new Stripe(unifiedConfig.stripeSecretKey, {
-        apiVersion: '2026-06-24.dahlia',
+        apiVersion: '2026-08-26.dahlia',
       });
 
       const event = stripe.webhooks.constructEvent(

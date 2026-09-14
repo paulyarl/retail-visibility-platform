@@ -63,7 +63,7 @@ const getStripeClient = async (): Promise<Stripe | null> => {
   const secretKey = config.stripe_platform_secret_key_encrypted;
   
   return new Stripe(secretKey, {
-    apiVersion: '2026-06-24.dahlia',
+    apiVersion: '2026-08-26.dahlia',
   });
 };
 
