@@ -597,6 +597,20 @@ export class MarketingCampaignService extends BaseService {
         state: stateFilter,
         ...activeStageFilter,
       };
+      // directory_enrichment children are per-parent: each proving ground
+      // gets its own location/category enrichment child (preflight step 9 —
+      // "It attaches under this PG automatically"). The enrichment *output*
+      // is still deduplicated by the (category_key, city, state) upsert in
+      // LocationMarketEnrichmentService / CategoryMarketEnrichmentService,
+      // so multiple per-PG children just overwrite the same shared row;
+      // only the campaign rows (lineage/audit) multiply. Scoping the
+      // signature by parent_campaign_id prevents one PG's enrichment child
+      // from globally blocking every other PG in the same market. A null
+      // parent (orphan enrichment campaign) matches null parent only, so
+      // an orphan still collides with another orphan but not with a child.
+      if (campaignCategory === 'directory_enrichment') {
+        where.parent_campaign_id = input.parentCampaignId ?? null;
+      }
     }
 
     try {

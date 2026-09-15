@@ -500,4 +500,83 @@ describe('createCampaign structural-duplicate guardrail', () => {
     expect(result.id).toBeDefined();
     expect(mockCampaignsList.create).toHaveBeenCalled();
   });
+
+  // ── Per-parent scoping for directory_enrichment children ──────────────
+  // Regression (2026-09-15): a directory_enrichment / __location__ child
+  // parented to one proving ground globally blocked every other PG in the
+  // same city from getting its own location-enrichment child, contradicting
+  // preflight step 9 ("It attaches under this PG automatically"). The
+  // signature now includes parent_campaign_id for directory_enrichment
+  // children so each PG gets its own; the shared enrichment *row* is still
+  // deduplicated by the (category_key, city, state) upsert.
+
+  it('scopes directory_enrichment children per-parent: PG-A child does not block PG-B child in the same market', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    const result = await service.createCampaign({
+      scope: 'city',
+      campaignCategory: 'directory_enrichment',
+      category: '__location__',
+      city: 'Fort Wayne',
+      state: 'IN',
+      title: 'Location Enrichment - Fort Wayne, IN',
+      parentCampaignId: 'mcamp-atjg53lm',
+    });
+
+    const where = mockCampaignsList.findFirst.mock.calls[0][0].where;
+    expect(where.parent_campaign_id).toBe('mcamp-atjg53lm');
+    expect(where.campaign_category).toBe('directory_enrichment');
+    expect(result.id).toBeDefined();
+    expect(mockCampaignsList.create).toHaveBeenCalled();
+  });
+
+  it('blocks a second directory_enrichment child under the SAME parent (same-parent duplicate)', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-i2hya5ux',
+      display_id: null,
+      scope: 'city',
+      campaign_category: 'directory_enrichment',
+      category: '__location__',
+      city: 'Fort Wayne',
+      state: 'IN',
+      business_name: null,
+      stage: 'seek',
+      intelligence_campaign_kind: null,
+      intelligence_focus: null,
+      intelligence_platform: null,
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'city',
+        campaignCategory: 'directory_enrichment',
+        category: '__location__',
+        city: 'Fort Wayne',
+        state: 'IN',
+        title: 'Location Enrichment - Fort Wayne, IN',
+        parentCampaignId: 'mcamp-qemsvv6t',
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+
+    // The lookup must have been scoped to the same parent, not global.
+    const where = mockCampaignsList.findFirst.mock.calls[0][0].where;
+    expect(where.parent_campaign_id).toBe('mcamp-qemsvv6t');
+    expect(mockCampaignsList.create).not.toHaveBeenCalled();
+  });
+
+  it('does NOT add parent_campaign_id to the signature for non-enrichment city/category campaigns', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    await service.createCampaign({
+      scope: 'city',
+      campaignCategory: 'proving_ground',
+      category: 'Grocery Store',
+      city: 'Fort Wayne',
+      state: 'IN',
+    });
+
+    const where = mockCampaignsList.findFirst.mock.calls[0][0].where;
+    expect(where).not.toHaveProperty('parent_campaign_id');
+    expect(where.campaign_category).toBe('proving_ground');
+  });
 });
