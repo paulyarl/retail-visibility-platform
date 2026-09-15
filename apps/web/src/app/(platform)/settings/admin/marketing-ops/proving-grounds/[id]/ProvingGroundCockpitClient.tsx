@@ -204,6 +204,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [promoteResult, setPromoteResult] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [priorityBusy, setPriorityBusy] = useState<string | null>(null);
+  const [creatingId, setCreatingId] = useState<string | null>(null);
 
   // Profile readiness (coverage §state-model) — one establishment slot per
   // (domain category × domain geo × focus), sourced from the same coverage
@@ -619,6 +620,25 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setPromoteError(err.message || 'Failed to update priority');
     } finally {
       setPriorityBusy(null);
+    }
+  };
+
+  // Graduate a prospect to a campaign — the same create the queue page
+  // exposes (createCampaignFromQueue replays the discovery snapshot through
+  // deriveBusinessCampaign, idempotent on repeat clicks). Once the row has
+  // a campaign + business audit it becomes promotable. verify_then_outreach
+  // rows are gated server-side (409) — verification must be resolved first,
+  // so those rows link to the queue's verify tab instead of offering create.
+  const handleCreateCampaign = async (entry: ProspectQueueEntry) => {
+    setCreatingId(entry.id);
+    setPromoteError(null);
+    try {
+      await marketingOpsService.createCampaignFromQueue(entry.id);
+      await load();
+    } catch (err: any) {
+      setPromoteError(err.message || 'Failed to create campaign');
+    } finally {
+      setCreatingId(null);
     }
   };
 
@@ -1501,6 +1521,24 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                           ) : (
                             <>
                               <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                              {e.status === 'verify_then_outreach' ? (
+                                <Link
+                                  href="/settings/admin/marketing-ops/queue?status=verify_then_outreach"
+                                  className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
+                                  title="Pending verification — the campaign can only be created after the verification call is resolved on the queue page"
+                                >
+                                  verify →
+                                </Link>
+                              ) : (
+                                <button
+                                  onClick={() => handleCreateCampaign(e)}
+                                  disabled={creatingId === e.id || promoteBusy || dismissBusy}
+                                  className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+                                  title={`Create a ${e.source_scope ?? 'business'}-scope campaign from this prospect`}
+                                >
+                                  {creatingId === e.id ? '…' : 'create →'}
+                                </button>
+                              )}
                               <ProspectArtifactChips processedCampaignId={null} />
                             </>
                           )}
