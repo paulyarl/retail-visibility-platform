@@ -20,7 +20,11 @@
 import { randomUUID } from 'crypto';
 import { BaseService } from '../BaseService';
 import { prisma } from '../../prisma';
-import { generateManualOutreachAnchorId } from '../../lib/id-generator';
+import {
+  generateDirectoryFieldProvenanceId,
+  generateManualOutreachAnchorId,
+  generateOutreachLogId,
+} from '../../lib/id-generator';
 import { audit } from '../../audit';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
@@ -122,7 +126,7 @@ export type AnchorVerificationResultType =
   | 'pain_confirmed'
   | 'pain_not_present'
   | 'pain_discovered'
-  | 'claim_accepted'
+  | 'claim_invitation_accepted'
   | 'claim_declined'
   | 'follow_up_requested'
   | 'other';
@@ -408,7 +412,7 @@ export class ManualOutreachAnchorService extends BaseService {
    *   - fact_confirmed / fact_corrected / fact_disputed → NAP verification
    *   - pain_confirmed / pain_discovered → owner-reported pain (separate
    *     from platform-observed evidence)
-   *   - claim_accepted → claim status update
+   *   - claim_invitation_accepted → claim status update
    */
   async recordContactWithAnchor(params: {
     anchorId: string;
@@ -426,24 +430,40 @@ export class ManualOutreachAnchorService extends BaseService {
     const anchorSnapshot = await this.snapshotAnchor(anchorId, ctx);
     const userId = ctx.userId ?? 'system';
     let touchId: string | null = null;
-    let eventId: string | null = null;
+    const eventId = contactEventId ?? generateOutreachLogId();
 
-    // Write to mkt_outreach_log if campaign-scoped
+    // Write to mkt_outreach_log if campaign-scoped. Use the existing
+    // outreach-log contract; anchor-specific data belongs in call_details
+    // and the three anchor columns added by migration 272.
     if (campaignId) {
-      eventId = contactEventId ?? `evt-${Date.now()}`;
+      const campaignRows = await this.prisma.$queryRaw<any[]>`
+        SELECT stage FROM mkt_campaigns_list WHERE id = ${campaignId} LIMIT 1
+      `;
+      const stageAtTime = campaignRows[0]?.stage ?? 'seek';
+      const normalizedChannel = channel ?? 'phone';
+      const outcome = this.mapCallResultToOutcome(callResult);
       await this.prisma.$executeRaw`
         INSERT INTO mkt_outreach_log (
-          id, campaign_id, anchor_id, anchor_snapshot,
-          call_result, verification_results, notes, created_by, created_at
+          id, campaign_id, stage_at_time, contact_channel, contact_date,
+          outcome, contacted_by, call_details, anchor_id, anchor_snapshot,
+          verification_results, notes, created_at
         ) VALUES (
           ${eventId},
           ${campaignId},
+          ${stageAtTime},
+          ${normalizedChannel},
+          CURRENT_DATE,
+          ${outcome},
+          ${userId},
+          ${JSON.stringify({
+            call_result: callResult,
+            anchor_id: anchorId,
+            verification_results: verificationResults,
+          })}::jsonb,
           ${anchorId},
           ${JSON.stringify(anchorSnapshot)}::jsonb,
-          ${callResult},
           ${JSON.stringify(verificationResults)}::jsonb,
           ${notes ?? null},
-          ${userId},
           now()
         )
         ON CONFLICT (id) DO NOTHING
@@ -459,19 +479,26 @@ export class ManualOutreachAnchorService extends BaseService {
       const tenantId = seedRows[0]?.tenant_id ?? null;
 
       touchId = randomUUID();
+      const touchNote = `Anchor event ${eventId}: ${notes ?? `${anchorSnapshot.title} (${anchorSnapshot.anchor_type})`}`;
       await this.prisma.$executeRaw`
         INSERT INTO directory_seed_outreach_touches (
           id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
-        ) VALUES (
+        )
+        SELECT
           ${touchId}::uuid,
           ${seedId},
           ${tenantId},
           ${channel ?? 'phone'},
           ${callResult},
-          ${notes ?? `Anchor: ${anchorSnapshot.title} (${anchorSnapshot.anchor_type})`},
+          ${touchNote},
           ${userId},
           now(),
           now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM directory_seed_outreach_touches
+          WHERE seed_id = ${seedId}
+            AND notes LIKE ${`Anchor event ${eventId}:%`}
         )
       `;
     }
@@ -484,7 +511,7 @@ export class ManualOutreachAnchorService extends BaseService {
       // a new report version. Best-effort — a refresh failure must not lose
       // the contact record, and the last successful version is preserved (§20.4.11).
       const hasReportVisibleResult = verificationResults.some((r) =>
-        ['identity_confirmed', 'identity_not_confirmed', 'fact_confirmed', 'fact_corrected', 'fact_disputed', 'pain_confirmed', 'pain_not_present', 'pain_discovered', 'claim_accepted'].includes(r.type),
+        ['identity_confirmed', 'identity_not_confirmed', 'fact_confirmed', 'fact_corrected', 'fact_disputed', 'pain_confirmed', 'pain_not_present', 'pain_discovered', 'claim_invitation_accepted'].includes(r.type),
       );
       if (hasReportVisibleResult) {
         try {
@@ -548,19 +575,26 @@ export class ManualOutreachAnchorService extends BaseService {
       `;
       const tenantId = seedRows[0]?.tenant_id ?? null;
 
+      const touchNote = `Anchor event log-${logId}: ${anchorSnapshot.title} (${anchorSnapshot.anchor_type})`;
       await this.prisma.$executeRaw`
         INSERT INTO directory_seed_outreach_touches (
           id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
-        ) VALUES (
+        )
+        SELECT
           ${randomUUID()}::uuid,
           ${seedId},
           ${tenantId},
           ${params.channel ?? 'phone'},
           ${callResult},
-          ${`Anchor: ${anchorSnapshot.title} (${anchorSnapshot.anchor_type})`},
+          ${touchNote},
           ${userId},
           now(),
           now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM directory_seed_outreach_touches
+          WHERE seed_id = ${seedId}
+            AND notes LIKE ${`Anchor event log-${logId}:%`}
         )
       `;
 
@@ -568,7 +602,7 @@ export class ManualOutreachAnchorService extends BaseService {
         await this.processVerificationResults(seedId, verificationResults, callResult, ctx);
 
         const hasReportVisibleResult = verificationResults.some((r) =>
-          ['identity_confirmed', 'identity_not_confirmed', 'fact_confirmed', 'fact_corrected', 'fact_disputed', 'pain_confirmed', 'pain_not_present', 'pain_discovered', 'claim_accepted'].includes(r.type),
+          ['identity_confirmed', 'identity_not_confirmed', 'fact_confirmed', 'fact_corrected', 'fact_disputed', 'pain_confirmed', 'pain_not_present', 'pain_discovered', 'claim_invitation_accepted'].includes(r.type),
         );
         if (hasReportVisibleResult) {
           try {
@@ -592,10 +626,143 @@ export class ManualOutreachAnchorService extends BaseService {
     `;
   }
 
+  private mapCallResultToOutcome(callResult: string): string {
+    switch (callResult) {
+      case 'connected': return 'reached';
+      case 'voicemail': return 'left_message';
+      case 'no_answer': return 'no_answer';
+      case 'wrong_number': return 'wrong_number';
+      case 'disconnected_number': return 'disconnected_number';
+      default: return callResult;
+    }
+  }
+
   /**
    * Process verification results from a contact event (§11.6).
    * Separates platform-observed corrections from owner-reported findings.
    */
+  private async writeOwnerField(
+    seedId: string,
+    listingId: string | null,
+    tenantId: string | null,
+    field: string,
+    value: unknown,
+    userId: string,
+    evidenceState: 'owner_confirmed' | 'owner_corrected',
+  ): Promise<void> {
+    if (!tenantId || value === null || value === undefined) return;
+
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    const provenanceId = generateDirectoryFieldProvenanceId(tenantId);
+    const source = 'anchor_verification';
+
+    if (listingId) {
+      switch (field) {
+        case 'business_name':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET business_name = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'address':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET address = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'city':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET city = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'state':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET state = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'zip_code':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET zip_code = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'phone':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET phone = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'website':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET website = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'email':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET email = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        case 'primary_category':
+          await this.prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET primary_category = ${serialized}, updated_at = now()
+            WHERE id = ${listingId}
+          `;
+          break;
+        default:
+          break;
+      }
+    }
+
+    await this.prisma.$executeRaw`
+      INSERT INTO directory_field_provenance (
+        id, seed_id, tenant_id, field_key, value,
+        source_name, accessed_at, confidence, show_on_public,
+        override_by, override_at, evidence_state, notes,
+        created_at, updated_at
+      ) VALUES (
+        ${provenanceId},
+        ${seedId},
+        ${tenantId},
+        ${field},
+        ${serialized},
+        ${source},
+        CURRENT_DATE,
+        'high',
+        TRUE,
+        ${userId},
+        now(),
+        ${evidenceState},
+        'Owner verification write-back',
+        now(),
+        now()
+      )
+      ON CONFLICT (seed_id, field_key) DO UPDATE SET
+        value = EXCLUDED.value,
+        source_name = EXCLUDED.source_name,
+        accessed_at = EXCLUDED.accessed_at,
+        confidence = EXCLUDED.confidence,
+        show_on_public = EXCLUDED.show_on_public,
+        override_by = EXCLUDED.override_by,
+        override_at = EXCLUDED.override_at,
+        evidence_state = EXCLUDED.evidence_state,
+        notes = EXCLUDED.notes,
+        updated_at = now()
+    `;
+  }
+
   private async processVerificationResults(
     seedId: string,
     results: AnchorVerificationResult[],
@@ -615,9 +782,10 @@ export class ManualOutreachAnchorService extends BaseService {
 
     // Resolve tenant_id
     const seedRows = await this.prisma.$queryRaw<any[]>`
-      SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      SELECT tenant_id, listing_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
     const tenantId = seedRows[0]?.tenant_id ?? null;
+    const listingId = seedRows[0]?.listing_id ?? null;
     const writebacks: Array<{ type: string; field: string }> = [];
 
     for (const result of results) {
@@ -644,6 +812,15 @@ export class ManualOutreachAnchorService extends BaseService {
           SET nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
           WHERE id = ${seedId}
         `;
+        await this.writeOwnerField(
+          seedId,
+          listingId,
+          tenantId,
+          result.field,
+          result.value ?? result.new_value ?? null,
+          userId,
+          'owner_confirmed',
+        );
         writebacks.push({ type: result.type, field: result.field });
       }
 
@@ -671,6 +848,15 @@ export class ManualOutreachAnchorService extends BaseService {
           SET nap_owner_corrected = TRUE, updated_at = now()
           WHERE id = ${seedId}
         `;
+        await this.writeOwnerField(
+          seedId,
+          listingId,
+          tenantId,
+          result.field,
+          result.new_value,
+          userId,
+          'owner_corrected',
+        );
         writebacks.push({ type: result.type, field: result.field });
       }
 
@@ -687,7 +873,7 @@ export class ManualOutreachAnchorService extends BaseService {
       }
 
       // Claim accepted → mark the claim token consumed
-      if (result.type === 'claim_accepted') {
+      if (result.type === 'claim_invitation_accepted') {
         // The claim token consumption is handled by the existing claim flow.
         // This result is recorded for reporting purposes.
       }

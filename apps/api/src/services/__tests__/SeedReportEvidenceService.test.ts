@@ -53,7 +53,9 @@ vi.mock('../triage/signal-taxonomy', () => ({
 }));
 
 vi.mock('../../lib/id-generator', () => ({
+  generateDirectoryFieldProvenanceId: vi.fn(() => 'dfp-test'),
   generateManualOutreachAnchorId: vi.fn(() => 'anchor-test'),
+  generateOutreachLogId: vi.fn(() => 'mol-test'),
 }));
 
 import { SeedReportEvidenceService } from '../intelligence/SeedReportEvidenceService';
@@ -477,5 +479,29 @@ describe('ManualOutreachAnchorService verification write-back (§11.6, §20.4)',
 
     const usedUpdates = sqlCallsMatching(mockExecuteRaw, "SET status = 'used'");
     expect(usedUpdates.length).toBe(1);
+  });
+
+  it('uses the existing campaign outreach-log contract for campaign contacts', async () => {
+    await anchorService.recordContactWithAnchor(
+      {
+        anchorId: 'anchor-1',
+        campaignId: 'campaign-1',
+        channel: 'phone',
+        callResult: 'connected',
+        verificationResults: [],
+      },
+      ctx,
+    );
+
+    const logInserts = sqlCallsMatching(mockExecuteRaw, 'INSERT INTO mkt_outreach_log');
+    expect(logInserts).toHaveLength(1);
+    const sql = sqlText(logInserts[0]);
+    expect(sql).toContain('stage_at_time');
+    expect(sql).toContain('contact_channel');
+    expect(sql).toContain('contact_date');
+    expect(sql).toContain('outcome');
+    expect(sql).toContain('contacted_by');
+    expect(sql).toContain('call_details');
+    expect(sql).not.toContain('call_result, verification_results, notes, created_by');
   });
 });

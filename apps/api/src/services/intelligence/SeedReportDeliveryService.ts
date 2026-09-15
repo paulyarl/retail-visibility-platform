@@ -27,6 +27,7 @@
  */
 
 import QRCode from 'qrcode';
+import { randomUUID } from 'crypto';
 import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
@@ -341,19 +342,28 @@ export class SeedReportDeliveryService extends BaseService {
     };
 
     try {
+      const deliveryNote = `Report v${kit.reportVersion} delivered via ${channel}. QR: ${this.qrUrlForChannel(kit, channel)}`;
       await this.prisma.$executeRaw`
         INSERT INTO directory_seed_outreach_touches (
           id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
-        ) VALUES (
-          ${`sot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`},
+        )
+        SELECT
+          ${randomUUID()}::uuid,
           ${kit.seedId},
           (SELECT tenant_id FROM directory_presence_seeds WHERE id = ${kit.seedId}),
           ${channelLabels[channel]},
           'report_delivered',
-          ${`Report v${kit.reportVersion} delivered via ${channel}. QR: ${this.qrUrlForChannel(kit, channel)}`},
+          ${deliveryNote},
           ${operatorId},
           now(),
           now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM directory_seed_outreach_touches
+          WHERE seed_id = ${kit.seedId}
+            AND channel = ${channelLabels[channel]}
+            AND outcome = 'report_delivered'
+            AND notes = ${deliveryNote}
         )
       `;
 

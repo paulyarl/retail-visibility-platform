@@ -36,6 +36,8 @@ export interface GeneratedSeedReportPdf {
   reportStatus: string;
 }
 
+const PUBLIC_REPORT_STATUSES = new Set(['provisional', 'complete', 'claimed']);
+
 /**
  * Generate a Seed Intelligence Report PDF.
  *
@@ -51,12 +53,15 @@ export async function generateSeedReportPdf(
   const { seedId, version } = input;
 
   const report = await loadReportVersion(seedId, version);
-  if (!report) {
+  if (!report || !PUBLIC_REPORT_STATUSES.has(report.status)) {
     throw new Error('No published report found for this seed');
   }
 
-  // Resolve claim token for the embedded claim QR (pre-claim reports only).
-  const claimToken = await resolveClaimToken(seedId);
+  // Resolve claim token for the embedded claim QR only when the report's
+  // eligibility gate allows a public claim CTA.
+  const claimToken = report.next_actions?.cta_eligible
+    ? await resolveClaimToken(seedId)
+    : null;
   const isClaimed = report.claim_summary?.claim_status === 'claimed';
 
   const branding = await loadPlatformBranding();

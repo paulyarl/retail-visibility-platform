@@ -462,7 +462,7 @@ const verificationResultSchema = z.object({
     'pain_confirmed',
     'pain_not_present',
     'pain_discovered',
-    'claim_accepted',
+    'claim_invitation_accepted',
     'claim_declined',
     'follow_up_requested',
     'other',

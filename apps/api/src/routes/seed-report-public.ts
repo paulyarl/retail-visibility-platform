@@ -24,6 +24,15 @@ import { logger } from '../logger';
 
 const router = Router();
 const reportService = SeedIntelligenceReportService.getInstance();
+const PUBLIC_REPORT_STATUSES = new Set(['provisional', 'complete', 'claimed']);
+
+function isPubliclyEligibleReport(report: { status: string }): boolean {
+  return PUBLIC_REPORT_STATUSES.has(report.status);
+}
+
+function canExposeClaimCta(report: { next_actions?: { cta_eligible?: boolean } }): boolean {
+  return report.next_actions?.cta_eligible === true;
+}
 
 /**
  * Resolve the active claim token + short code for a seed (pre-claim CTA/QR).
@@ -57,11 +66,13 @@ router.get('/marketing/seed/:seedId/report', async (req: Request, res: Response)
 
   try {
     const report = await reportService.getLatestPublishedReport(seedId);
-    if (!report) {
+    if (!report || !isPubliclyEligibleReport(report)) {
       return res.status(404).json({ error: 'no_published_report' });
     }
 
-    const claim = await resolveClaimToken(seedId);
+    const claim = canExposeClaimCta(report)
+      ? await resolveClaimToken(seedId)
+      : { token: null, shortCode: null };
 
     res.json({
       success: true,
@@ -118,12 +129,15 @@ router.get('/marketing/seed/:seedId/report/preview', async (req: Request, res: R
 
   try {
     const report = await reportService.getLatestPublishedReport(seedId);
-    if (!report) {
+    if (!report || !isPubliclyEligibleReport(report)) {
       return res.status(404).json({ error: 'no_published_report' });
     }
 
-    // Resolve the active claim token for the claim QR + CTA.
-    const { token: claimToken, shortCode: claimShortCode } = await resolveClaimToken(seedId);
+    // Resolve the active claim token only when the report's eligibility gate
+    // allows a public claim CTA.
+    const { token: claimToken, shortCode: claimShortCode } = canExposeClaimCta(report)
+      ? await resolveClaimToken(seedId)
+      : { token: null, shortCode: null };
 
     // Preview shape — subset of the full DTO for public consumption.
     // Strips internal fields (source observation IDs, lint findings,
