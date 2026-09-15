@@ -80,8 +80,12 @@ import {
   locationEnrichmentSchema,
   LOCATION_ENRICHMENT_SCHEMA_NAME,
   LOCATION_ENRICHMENT_PROMPT_SUFFIX,
+  categorySetEnrichmentSchema,
+  CATEGORY_SET_ENRICHMENT_SCHEMA_NAME,
+  CATEGORY_SET_ENRICHMENT_PROMPT_SUFFIX,
   type CategoryEnrichmentOutput,
   type LocationEnrichmentOutput,
+  type CategorySetEnrichmentOutput,
 } from './directory-enrichment.schema';
 
 export {
@@ -111,8 +115,12 @@ export {
   locationEnrichmentSchema,
   LOCATION_ENRICHMENT_SCHEMA_NAME,
   LOCATION_ENRICHMENT_PROMPT_SUFFIX,
+  categorySetEnrichmentSchema,
+  CATEGORY_SET_ENRICHMENT_SCHEMA_NAME,
+  CATEGORY_SET_ENRICHMENT_PROMPT_SUFFIX,
   type CategoryEnrichmentOutput,
   type LocationEnrichmentOutput,
+  type CategorySetEnrichmentOutput,
 };
 
 // ============================================================================
@@ -346,6 +354,16 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     // (AI wins when non-empty; deterministic aggregates fill gaps).
     auditPlatform: 'location_enrichment',
     promptSuffix: LOCATION_ENRICHMENT_PROMPT_SUFFIX,
+  },
+  [CATEGORY_SET_ENRICHMENT_SCHEMA_NAME]: {
+    validator: categorySetEnrichmentSchema,
+    // PG shelf sweep: one execution produces a packet per uncovered
+    // (category, city, state) market. The post-run/post-import hooks loop
+    // markets[] and apply each entry under its own market coordinates —
+    // the parent campaign's category/city/state only name the anchor market.
+    // Distinct auditPlatform so the audit card can render per-market packets.
+    auditPlatform: 'category_set_enrichment',
+    promptSuffix: CATEGORY_SET_ENRICHMENT_PROMPT_SUFFIX,
   },
 };
 

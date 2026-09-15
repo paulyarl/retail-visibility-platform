@@ -4932,6 +4932,32 @@ class MarketingOpsService extends AdminApiSingleton {
     return campaign;
   }
 
+  /** POST /:id/enrich-sweep — PG shelf coverage sweep. Fills every uncovered
+   *  (category × market) in the PG's declared + discovered domain via the
+   *  deterministic path, then spawns one directory_enrichment child for the
+   *  residual no-profile set (category_set_enrichment schema). */
+  async enrichShelfSweep(provingGroundId: string, opts?: { createCampaign?: boolean }): Promise<{
+    provingGroundId: string;
+    domain: { categories: string[]; geos: { city: string; state: string | null }[] };
+    categoryMarkets: Array<{ category: string; categoryKey: string; city: string; state: string; status: string; detail?: string; listingsEnriched?: number }>;
+    locationMarkets: Array<{ city: string; state: string; status: string; detail?: string }>;
+    needsAi: Array<{ category: string; categoryKey: string; city: string; state: string }>;
+    sweepCampaign: { id: string; created: boolean; marketCount: number; mergedMarkets?: number } | null;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${provingGroundId}/enrich-sweep`,
+      { method: 'POST', body: JSON.stringify({ create_campaign: opts?.createCampaign ?? true }) },
+      `mkt-ops-pg-sweep-${provingGroundId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Shelf sweep failed');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    await this.invalidateCachePattern(`mkt-ops-campaign-${provingGroundId}`);
+    return result.data?.data ?? result.data;
+  }
+
   /** DELETE /:id/children/:childId — release a child (breadcrumbs-only). */
   async detachProvingGroundChild(parentId: string, childId: string): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(

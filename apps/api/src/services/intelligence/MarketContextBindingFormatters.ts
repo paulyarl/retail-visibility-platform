@@ -305,6 +305,92 @@ export function formatCategoryIdentificationMarketContext(
   return lines.join('\n');
 }
 
+// ─── Known-category vocabulary binding ──────────────────────────────────
+
+/**
+ * Format the operator-selectable category union for a category identification
+ * scan — the same two lists DirectoryCategorySelectorAdapter merges:
+ *   1. directoryLabels    — platform_categories (is_active), the ~414
+ *      directory shelf labels
+ *   2. registeredLabels   — mkt_service_categories_list (is_active) labels
+ *      registered by operators, prior scans, and service packages (not all
+ *      are directory shelves — the copy calls them labels, never categories)
+ *
+ * The two sections partition the union: a registered label matching a
+ * directory name (case-insensitive, trimmed) is excluded — it is already
+ * covered by KNOWN CATEGORIES. Directory casing wins on overlap.
+ *
+ * Returns '' when both lists are empty — the template's KNOWN CATEGORIES
+ * paragraph then falls back to general-knowledge matching.
+ *
+ * Spec: docs/LocalBiz/CATEGORY_IDENTIFICATION_VOCAB_INJECTION_SPEC.md §4.2
+ */
+export function formatKnownCategoryVocabulary(
+  directoryLabels: string[],
+  registeredLabels: string[],
+): string {
+  const dedupe = (labels: string[]): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of labels) {
+      const label = raw.trim();
+      const key = label.toLowerCase();
+      if (!label || seen.has(key)) continue;
+      seen.add(key);
+      out.push(label);
+    }
+    return out.sort((a, b) => a.localeCompare(b));
+  };
+
+  const directory = dedupe(directoryLabels);
+  const directoryKeys = new Set(directory.map((l) => l.toLowerCase()));
+  const registered = dedupe(registeredLabels).filter((l) => !directoryKeys.has(l.toLowerCase()));
+
+  if (directory.length === 0 && registered.length === 0) return '';
+
+  const lines: string[] = [
+    '=== KNOWN CATEGORY VOCABULARY (platform directory shelves) ===',
+    '',
+    `The platform maintains a directory vocabulary of ${directory.length} category labels. These are`,
+    'the shelves that already exist as public directory pages and that operators can',
+    'select on every category-consuming surface.',
+    '',
+    'Judge `is_known_category` against THIS list — not against the market shelves in',
+    'the MARKET CONTEXT block (when that block is present). The two are different:',
+    '',
+    '  - MARKET CONTEXT top/secondary categories = shelves observed to be active in',
+    '    this city by a prior enrichment run. Use them for the population test.',
+    '  - KNOWN CATEGORY VOCABULARY = the platform\'s registered directory labels.',
+    '    Use this list to set `is_known_category`.',
+    '',
+    'If a candidate label appears in either list below, set is_known_category = true;',
+    'otherwise set it to false so the operator is prompted to register it.',
+    '',
+    'PRIMARY vs SECONDARY:',
+    '  - primary_category is the business\'s canonical shelf. Prefer a listed label',
+    '    whenever one fits — if your best-fit label is a close variant of a listed',
+    '    label (singular vs plural, word order, "Shop" vs "Store"), use the listed',
+    '    label. Propose a new primary label only when no listed label fits.',
+    '  - Secondary candidates have more flexibility: freely propose adjacent',
+    '    shelves, broader parent (super) categories, and narrower niche (sub)',
+    '    categories the business legitimately belongs on — including labels not',
+    '    in this list. Near-duplicate spellings of a listed shelf should still',
+    '    resolve to the listed label.',
+  ];
+
+  if (directory.length > 0) {
+    lines.push('', `KNOWN CATEGORIES (${directory.length}):`);
+    lines.push(`  ${directory.join(', ')}`);
+  }
+
+  if (registered.length > 0) {
+    lines.push('', `REGISTERED LABELS (${registered.length}) — operator- and analyst-added, not all are directory shelves:`);
+    lines.push(`  ${registered.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Discovery binding ──────────────────────────────────────────────────
 
 /**

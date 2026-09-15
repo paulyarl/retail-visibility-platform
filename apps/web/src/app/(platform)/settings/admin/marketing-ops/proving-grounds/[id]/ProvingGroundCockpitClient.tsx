@@ -14,7 +14,7 @@ import Link from 'next/link';
 import {
   Loader2, RefreshCw, X, ListChecks, GitBranch, AlertTriangle,
   ExternalLink, CheckCircle2, Circle, Link2, Unlink, Phone, Users, Search, MapPin,
-  Eye, Save, RotateCcw, Trash2,
+  Eye, Save, RotateCcw, Trash2, Layers,
 } from 'lucide-react';
 import marketingOpsService, {
   type Audit,
@@ -165,6 +165,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [enrichCampaignBusy, setEnrichCampaignBusy] = useState<'category' | 'location' | null>(null);
   const [enrichCampaignError, setEnrichCampaignError] = useState<string | null>(null);
   const [enrichCampaignCreated, setEnrichCampaignCreated] = useState<{ id: string; title: string | null } | null>(null);
+  // Shelf sweep — one-click coverage for the PG's full category × market
+  // domain (declared ∪ per-prospect categories incl. secondaries).
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [sweepResult, setSweepResult] = useState<{ summary: string; campaignId?: string; campaignCreated?: boolean } | null>(null);
+  const [sweepError, setSweepError] = useState<string | null>(null);
 
   // Public copy — the market SEO the enrichment feeds the public category×city
   // surfaces (meta title / description / keywords). Viewer + operator override
@@ -495,6 +500,41 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setEnrichCampaignError(err.message || 'Failed to create enrichment campaign');
     } finally {
       setEnrichCampaignBusy(null);
+    }
+  };
+
+  // Shelf sweep — fills every uncovered (category × market) in the PG's
+  // domain: declared categories × declared geos plus each queue prospect's
+  // own categories (incl. secondaries) × its market. Deterministic enrich
+  // runs where a profile exists; the residual goes into one spawned
+  // directory_enrichment child carrying the market set.
+  const handleShelfSweep = async () => {
+    if (!campaign || campaign.campaign_category !== 'proving_ground') return;
+    setSweepBusy(true);
+    setSweepError(null);
+    setSweepResult(null);
+    try {
+      const report = await marketingOpsService.enrichShelfSweep(campaignId);
+      const count = (s: string) => report.categoryMarkets.filter((m) => m.status === s).length;
+      const locEnriched = report.locationMarkets.filter((m) => m.status === 'enriched').length;
+      const parts = [
+        `${report.categoryMarkets.length} category markets`,
+        `${count('covered')} already covered`,
+        `${count('enriched')} enriched now`,
+        `${count('campaign_exists')} already have a campaign`,
+        `${report.needsAi.length} need AI`,
+      ];
+      if (locEnriched) parts.push(`${locEnriched} location${locEnriched === 1 ? '' : 's'} enriched`);
+      setSweepResult({
+        summary: parts.join(' · '),
+        campaignId: report.sweepCampaign?.id,
+        campaignCreated: report.sweepCampaign?.created,
+      });
+      await load();
+    } catch (err: any) {
+      setSweepError(err.message || 'Shelf sweep failed');
+    } finally {
+      setSweepBusy(false);
     }
   };
 
@@ -1198,6 +1238,48 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         )}
         {enrichError && (
           <div className="mt-2 text-xs text-red-600 dark:text-red-400">{enrichError}</div>
+        )}
+
+        {/* Shelf sweep — one click covers the PG's full category × market
+            domain (declared + per-prospect categories incl. secondaries), not
+            just the anchor market. Deterministic where a profile exists; the
+            residual set spawns one directory_enrichment child campaign. */}
+        {campaign.campaign_category === 'proving_ground' && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-neutral-700">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Shelf sweep: enrich every category × market this proving ground covers — including prospect secondary categories and member cities.
+              </div>
+              <button
+                onClick={handleShelfSweep}
+                disabled={sweepBusy}
+                title="Enrich every uncovered market in this proving ground's domain (deterministic where possible; spawns one enrichment campaign for the rest)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {sweepBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
+                Sweep shelf coverage
+              </button>
+            </div>
+            {sweepResult && (
+              <p className="mt-2 text-xs text-green-700 dark:text-green-400">
+                {sweepResult.summary}
+                {sweepResult.campaignId && (
+                  <>
+                    {' — '}
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${sweepResult.campaignId}`}
+                      className="font-medium underline"
+                    >
+                      {sweepResult.campaignCreated ? 'set campaign created' : 'markets merged into existing set campaign'}
+                    </Link>
+                  </>
+                )}
+              </p>
+            )}
+            {sweepError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">{sweepError}</p>
+            )}
+          </div>
         )}
       </div>
 

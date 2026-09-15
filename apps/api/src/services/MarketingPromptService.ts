@@ -15,7 +15,7 @@ import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { normalizeIntelligenceDiscoveryPayload, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
-import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
+import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import MarketingCampaignService from './MarketingCampaignService';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -1116,13 +1116,46 @@ export class MarketingPromptService extends BaseService {
       // failed apply does not fail the import; the response surfaces
       // enrichmentApplied so the operator can see and retry.
       let enrichmentApplied = false;
-      if (schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME || schemaName === LOCATION_ENRICHMENT_SCHEMA_NAME) {
+      if (
+        schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME ||
+        schemaName === LOCATION_ENRICHMENT_SCHEMA_NAME ||
+        schemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME
+      ) {
         try {
           const enrichmentCampaign = await this.prisma.mkt_campaigns_list.findUnique({
             where: { id: input.campaignId },
             select: { id: true, category: true, city: true, state: true },
           });
-          if (schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
+          if (schemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME) {
+            // PG shelf sweep — one packet per market; each entry routes on
+            // its own category_name/city/state (the campaign row only names
+            // the anchor market). Partial success counts as applied.
+            const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
+            let appliedCount = 0;
+            for (const market of (parsedJson as any).markets ?? []) {
+              const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
+                campaign: {
+                  id: input.campaignId,
+                  category: market.category_name ?? market.category_key ?? null,
+                  city: market.city ?? null,
+                  state: market.state ?? null,
+                },
+                packet: market,
+                executionId,
+                enrichedBy: input.executedBy ?? null,
+              }, ctx);
+              if (applied?.categoryEnrichmentId) appliedCount += 1;
+            }
+            enrichmentApplied = appliedCount > 0;
+            if (appliedCount < ((parsedJson as any).markets?.length ?? 0)) {
+              logger.warn('Set enrichment partially applied on import', ctx, {
+                campaignId: input.campaignId,
+                executionId,
+                applied: appliedCount,
+                total: (parsedJson as any).markets?.length,
+              });
+            }
+          } else if (schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
             const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
             const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
               campaign: enrichmentCampaign ?? { id: input.campaignId },

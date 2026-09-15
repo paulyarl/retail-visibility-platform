@@ -113,7 +113,7 @@ class LocationMarketEnrichmentService extends BaseService {
   async enrichLocation(
     city: string,
     state: string,
-    opts: { triggerSource?: 'manual' | 'profile_activated' | 'on_demand' | 'campaign_run'; enrichedBy?: string | null } = {},
+    opts: { triggerSource?: 'manual' | 'profile_activated' | 'on_demand' | 'campaign_run' | 'pg_sweep'; enrichedBy?: string | null } = {},
     ctx?: RequestCtx,
   ): Promise<LocationState | null> {
     const normalizedCity = normalizeReferenceCity(city);

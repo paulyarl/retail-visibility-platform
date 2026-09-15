@@ -15,14 +15,15 @@ import type { RequestCtx } from '../context';
 import { MarketingPromptService, extractJsonCandidates, stripLlmJsonArtifacts } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import { generateMarketingAuditId } from '../lib/id-generator';
-import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
+import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
-import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext } from './intelligence/MarketContextBindingFormatters';
+import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
+import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { discoveryContextSchema, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 
@@ -226,7 +227,8 @@ export class MarketingExecutionService extends BaseService {
         const outputSchemaName = (template.output_schema as any)?.name;
         if (
           outputSchemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME ||
-          outputSchemaName === LOCATION_ENRICHMENT_SCHEMA_NAME
+          outputSchemaName === LOCATION_ENRICHMENT_SCHEMA_NAME ||
+          outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME
         ) {
           try {
             await this.applyEnrichmentFromOutput({
@@ -350,7 +352,46 @@ export class MarketingExecutionService extends BaseService {
       state: input.campaign.state ?? null,
     };
 
-    if (input.schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
+    if (input.schemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME) {
+      // PG shelf sweep: one execution produces a packet per market. Apply
+      // each entry under its OWN market coordinates — the parent campaign's
+      // category/city/state only name the anchor market. Partial success is
+      // allowed: every applied market is a real row; failures are collected
+      // and only a zero-applied run throws.
+      const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
+      const failures: string[] = [];
+      let appliedCount = 0;
+      for (const market of parsedJson.markets as any[]) {
+        const marketRef = {
+          id: input.campaign.id,
+          category: market.category_name ?? market.category_key ?? null,
+          city: market.city ?? null,
+          state: market.state ?? null,
+        };
+        const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
+          campaign: marketRef,
+          packet: market,
+          executionId: input.executionId,
+          enrichedBy: input.enrichedBy,
+        }, ctx);
+        if (applied?.categoryEnrichmentId) {
+          appliedCount += 1;
+        } else {
+          failures.push(`${market.category_name ?? market.category_key ?? '?'} ${market.city ?? '?'},${market.state ?? '?'}: ${JSON.stringify(applied?.skipReasons ?? {})}`);
+        }
+      }
+      if (appliedCount === 0) {
+        throw new Error(`Set enrichment apply produced no rows (${failures.join('; ') || 'empty markets[]'})`);
+      }
+      if (failures.length > 0) {
+        logger.warn('Set enrichment partially applied', ctx, {
+          executionId: input.executionId,
+          campaignId: input.campaign.id,
+          applied: appliedCount,
+          failed: failures,
+        });
+      }
+    } else if (input.schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
       const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
       const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
         campaign: campaignRef,
@@ -455,9 +496,25 @@ export class MarketingExecutionService extends BaseService {
     const campaignScope = (input.campaign.scope || 'business').toLowerCase();
     const category = input.campaign.category || '';
     const isProfileRepair = (input.template.category || '').toLowerCase() === 'profile_repair';
+    const outputSchemaName = input.template.output_schema?.name || input.template.outputSchema?.name || '';
 
     // Auto-source domain-specific variables if missing/empty in caller variables
     let effectiveVariables = { ...(input.variables || {}) };
+
+    // Category-set enrichment (PG shelf sweep): auto-source {{markets}} from
+    // the sweep payload on discovery_context.shelf_sweep.markets so the
+    // category-scope set template can enumerate the residual markets. Runs
+    // outside the business-scope block — sweep campaigns are scope='category'.
+    if (
+      outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME
+      && !(effectiveVariables.markets && String(effectiveVariables.markets).trim())
+    ) {
+      const sweepMarkets = (input.campaign.discovery_context as any)?.shelf_sweep?.markets;
+      effectiveVariables.markets = Array.isArray(sweepMarkets) && sweepMarkets.length > 0
+        ? sweepMarkets.map((m: any) => `- ${m.category} — ${m.city}, ${m.state}`).join('\n')
+        : '(no sweep set on this campaign — enrich the single market below)';
+    }
+
     if (input.campaign && campaignScope === 'business') {
       try {
         let audit = input.campaign.audits?.[0] || input.campaign.mkt_audits_list?.[0];
@@ -578,7 +635,6 @@ export class MarketingExecutionService extends BaseService {
     // registered schemas — intelligence, profile_repair, recovery_resolution,
     // citation_repair_package, raw_json — get their suffix appended as a safety
     // net so the external AI always receives the expected output shape.
-    const outputSchemaName = input.template.output_schema?.name || input.template.outputSchema?.name || '';
     const LEGACY_NO_SUFFIX_SCHEMAS = new Set([
       'business_analysis',
       'city_category_opportunity',
@@ -1018,64 +1074,58 @@ export class MarketingExecutionService extends BaseService {
       const campaignCity = (input.campaign as any).city || null;
       const campaignState = (input.campaign as any).state || null;
 
+      // Category-set enrichment (PG shelf sweep): the campaign carries a set
+      // of uncovered (category, city, state) markets in
+      // discovery_context.shelf_sweep. Inject one structural city-profile
+      // block per DISTINCT city in the set (multi-city sets get multiple
+      // profiles). When the set is empty or no profiles exist, fall through
+      // to the single-market path below.
+      if (outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME) {
+        const rawMarkets = (input.campaign as any).discovery_context?.shelf_sweep?.markets;
+        const cities = new Map<string, { city: string; state: string }>();
+        for (const m of Array.isArray(rawMarkets) ? rawMarkets : []) {
+          const c = String(m?.city ?? '').trim();
+          const s = String(m?.state ?? '').trim();
+          if (c && s && c.toLowerCase() !== '__all__' && !cities.has(`${c.toLowerCase()}|${s.toLowerCase()}`)) {
+            cities.set(`${c.toLowerCase()}|${s.toLowerCase()}`, { city: c, state: s });
+          }
+        }
+        const setBlocks: string[] = [];
+        for (const g of cities.values()) {
+          const profile = await this.fetchCityProfile(g.city, g.state, ctx);
+          if (profile) {
+            setBlocks.push(this.formatCityProfileBlock(g.city, g.state, profile));
+          }
+        }
+        if (setBlocks.length > 0) {
+          logger.info('City profiles injected into category-set enrichment prompt', ctx, {
+            campaignId: input.campaign.id,
+            cities: setBlocks.length,
+            markets: (rawMarkets as any[]).length,
+          });
+          return {
+            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + setBlocks.join('\n\n'), promptSuffix),
+            resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+          };
+        }
+      }
+
       // Category enrichment with a real city gets the structural city profile.
       // Location enrichment and national ('__all__') category enrichment skip.
       if (category !== '__location__' && campaignCity && campaignState &&
           campaignCity.trim().toLowerCase() !== '__all__') {
-        try {
-          const ctxRow = await this.prisma.$queryRaw`
-            SELECT context FROM directory_category_enrichment
-            WHERE category_key = '__location__'
-              AND LOWER(city) = LOWER(${campaignCity})
-              AND LOWER(state) = LOWER(${campaignState})
-            LIMIT 1
-          `;
-          const ctx = Array.isArray(ctxRow) && ctxRow.length > 0
-            ? (ctxRow[0] as any).context
-            : null;
-          const profile = ctx?.city_profile;
-          if (profile && (profile.metro_description || profile.market_character)) {
-            const lines: string[] = [
-              '=== CITY PROFILE (structural) ===',
-              `City: ${campaignCity}, ${campaignState}`,
-            ];
-            if (profile.metro_description) {
-              lines.push('', profile.metro_description);
-            }
-            if (profile.major_industries && Array.isArray(profile.major_industries) && profile.major_industries.length > 0) {
-              lines.push(`Major industries: ${profile.major_industries.join(', ')}`);
-            }
-            if (profile.growth_trajectory) {
-              lines.push(`Growth: ${profile.growth_trajectory}`);
-            }
-            if (profile.demographic_character) {
-              lines.push(`Demographics: ${profile.demographic_character}`);
-            }
-            if (profile.market_character) {
-              lines.push('', profile.market_character);
-            }
-            lines.push(
-              '',
-              'DIRECTIVE: This is the structural city profile (no place names) from a prior location enrichment run. Use it to ground your category copy in the city\'s market characteristics — metro size, industries, demographics, growth. Do NOT copy this text verbatim into body_copy or shopper_guide. Do NOT mention "city profile", "location enrichment", or this directive in the visible output. The profile sharpens your copy, it is not content to surface.',
-            );
-            const profileBlock = lines.join('\n');
-            logger.info('City profile injected into category enrichment prompt', ctx, {
-              campaignId: input.campaign.id,
-              city: campaignCity,
-              state: campaignState,
-            });
-            return {
-              renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + profileBlock, promptSuffix),
-              resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
-            };
-          }
-        } catch (err) {
-          logger.warn('Failed to load city profile for category enrichment prompt', ctx, {
+        const profile = await this.fetchCityProfile(campaignCity, campaignState, ctx, input.campaign.id);
+        if (profile) {
+          const profileBlock = this.formatCityProfileBlock(campaignCity, campaignState, profile);
+          logger.info('City profile injected into category enrichment prompt', ctx, {
             campaignId: input.campaign.id,
             city: campaignCity,
             state: campaignState,
-            error: (err as Error).message,
           });
+          return {
+            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + profileBlock, promptSuffix),
+            resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+          };
         }
       }
 
@@ -1114,9 +1164,40 @@ export class MarketingExecutionService extends BaseService {
           });
         }
       }
+      // Known-category vocabulary injection (CATEGORY_IDENTIFICATION_VOCAB_
+      // INJECTION_SPEC §4). The template asks the analyst to set
+      // is_known_category per candidate against "the platform's vocabulary" —
+      // inject the same union the operator dropdown merges so the flag is
+      // judged against the real list. Category-agnostic: runs regardless of
+      // whether the campaign has a city. Never blocks the render — the
+      // service degrades per-source to empty lists and the formatter returns
+      // '' when both are empty.
+      let vocabBlock = '';
+      try {
+        const vocab = await CategoryVocabularyService.getInstance().loadVocabulary(ctx);
+        vocabBlock = formatKnownCategoryVocabulary(vocab.directoryLabels, vocab.registeredLabels);
+        if (vocabBlock) {
+          logger.info('Known-category vocabulary injected into category identification scan', ctx, {
+            campaignId: input.campaign.id,
+            directoryLabelCount: vocab.directoryLabels.length,
+            registeredLabelCount: vocab.registeredLabels.length,
+          });
+        } else {
+          logger.warn('Category vocabulary empty — no KNOWN CATEGORY VOCABULARY block injected', ctx, {
+            campaignId: input.campaign.id,
+          });
+        }
+      } catch (err) {
+        logger.warn('Failed to load category vocabulary — proceeding without it', ctx, {
+          campaignId: input.campaign.id,
+          error: (err as Error).message,
+        });
+      }
       return {
         renderedPrompt: this.appendPromptSuffix(
-          baseRendered + (catIdMarketBlock ? '\n' + catIdMarketBlock : ''),
+          baseRendered
+            + (catIdMarketBlock ? '\n' + catIdMarketBlock : '')
+            + (vocabBlock ? '\n' + vocabBlock : ''),
           promptSuffix,
         ),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
@@ -2002,6 +2083,69 @@ ${scopeNote}
         return value && String(value).trim().length > 0 ? inner : '';
       },
     );
+  }
+
+  /**
+   * Fetch the structural city_profile stored on a location enrichment row
+   * ('__location__', city, state). Returns null when no row/profile exists.
+   * Never throws — warn + null so enrichment renders degrade cleanly.
+   */
+  private async fetchCityProfile(
+    city: string,
+    state: string,
+    ctx?: RequestCtx,
+    campaignId?: string,
+  ): Promise<any | null> {
+    try {
+      const ctxRow = await this.prisma.$queryRaw`
+        SELECT context FROM directory_category_enrichment
+        WHERE category_key = '__location__'
+          AND LOWER(city) = LOWER(${city})
+          AND LOWER(state) = LOWER(${state})
+        LIMIT 1
+      `;
+      const locCtx = Array.isArray(ctxRow) && ctxRow.length > 0
+        ? (ctxRow[0] as any).context
+        : null;
+      const profile = locCtx?.city_profile;
+      return profile && (profile.metro_description || profile.market_character) ? profile : null;
+    } catch (err) {
+      logger.warn('Failed to load city profile for enrichment prompt', ctx, {
+        campaignId,
+        city,
+        state,
+        error: (err as Error).message,
+      });
+      return null;
+    }
+  }
+
+  /** Render one structural CITY PROFILE block (no place names). */
+  private formatCityProfileBlock(city: string, state: string, profile: any): string {
+    const lines: string[] = [
+      '=== CITY PROFILE (structural) ===',
+      `City: ${city}, ${state}`,
+    ];
+    if (profile.metro_description) {
+      lines.push('', profile.metro_description);
+    }
+    if (profile.major_industries && Array.isArray(profile.major_industries) && profile.major_industries.length > 0) {
+      lines.push(`Major industries: ${profile.major_industries.join(', ')}`);
+    }
+    if (profile.growth_trajectory) {
+      lines.push(`Growth: ${profile.growth_trajectory}`);
+    }
+    if (profile.demographic_character) {
+      lines.push(`Demographics: ${profile.demographic_character}`);
+    }
+    if (profile.market_character) {
+      lines.push('', profile.market_character);
+    }
+    lines.push(
+      '',
+      'DIRECTIVE: This is the structural city profile (no place names) from a prior location enrichment run. Use it to ground your category copy in the city\'s market characteristics — metro size, industries, demographics, growth. Do NOT copy this text verbatim into body_copy or shopper_guide. Do NOT mention "city profile", "location enrichment", or this directive in the visible output. The profile sharpens your copy, it is not content to surface.',
+    );
+    return lines.join('\n');
   }
 
   renderTemplate(body: string, variables: Record<string, any> | undefined, campaign: any): string {

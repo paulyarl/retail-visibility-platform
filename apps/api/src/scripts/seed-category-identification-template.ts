@@ -40,7 +40,9 @@ Research the business using publicly available sources (Google Business Profile,
 The goal is to identify the SINGLE best-fit category label that would be used in a business-scope marketing campaign. This is not a broad industry classification — it is the specific niche label (e.g., "Auto Repair Shop", "Transmission Repair", "African Grocery Store", "Pediatric Dentistry").
 
 === KNOWN CATEGORIES ===
-The platform maintains a vocabulary of known categories. Where possible, match the business to an existing known category label. If no known category fits, propose a new label — the operator can register it with one click.
+Where a KNOWN CATEGORY VOCABULARY block is present in this prompt, match the business against that list and set is_known_category accordingly. Where the block is absent, fall back to general knowledge of common category labels.
+
+Primary vs secondary: primary_category is the business's canonical shelf — prefer a listed label whenever one fits and propose a new label only when no listed label does. Secondary slots have more flexibility: freely propose adjacent shelves, broader parent categories, and narrower sub-niches the business legitimately belongs on, including labels outside the vocabulary — mark those is_known_category = false and the operator can register them with one click.
 
 === DIRECTORY HOSTING CONTEXT ===
 A category label is not a positioning statement — it becomes a public directory page that hosts every similar business in the market. Evaluate every candidate as a directory shelf:
@@ -127,7 +129,9 @@ Rules:
 
 === OUTPUT ===
 Return JSON matching the category_identification schema. The candidate_categories array must contain at least one entry — typically 3-8 entries, maximum 10 (1 primary + 9 secondary slots). The primary_category must match the highest-confidence candidate. business_summary, public_narrative, digital_footprint, and nap are required.`,
-  variables: ['business_name', 'city', 'state'],
+  // known_categories is metadata-only: the render path appends the KNOWN
+  // CATEGORY VOCABULARY block after the body (no {{placeholder}} exists).
+  variables: ['business_name', 'city', 'state', 'known_categories'],
   outputSchema: {
     name: CATEGORY_IDENTIFICATION_SCHEMA_NAME,
     description: 'Business category identification — takes a business name + location (no category input) and returns ranked candidate categories with confidence scores, business type classification, evidence sources, and reasoning. Used when the operator cannot determine the correct niche category for a business.',

@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockFormatCategoryId, mockFormatVocab, mockVocabService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async () => null),
     resolveGoldStandard: vi.fn(async () => null),
@@ -41,12 +41,20 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
   };
   const mockMarketContextLoader = {
     loadMarketContext: vi.fn(async () => ({ category: {}, location: {} })),
+    loadLocationContext: vi.fn(async () => ({})),
     hasCategoryIntelligence: vi.fn(() => false),
     hasLocationIntelligence: vi.fn(() => false),
   };
   const mockFormatEstablishment = vi.fn(() => '');
   const mockFormatDiscovery = vi.fn(() => '');
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery };
+  const mockFormatCategoryId = vi.fn(() => '');
+  const mockFormatVocab = vi.fn(() => '');
+  const mockVocabService = {
+    loadVocabulary: vi.fn(async () => ({ directoryLabels: [], registeredLabels: [] })),
+    isKnownLabel: vi.fn(async () => false),
+    findRegisteredValue: vi.fn(async () => null),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockFormatCategoryId, mockFormatVocab, mockVocabService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -90,6 +98,15 @@ vi.mock('../intelligence/MarketContextLoader', () => ({
 vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
   formatEstablishmentMarketContext: mockFormatEstablishment,
   formatDiscoveryMarketContext: mockFormatDiscovery,
+  formatCategoryIdentificationMarketContext: mockFormatCategoryId,
+  formatKnownCategoryVocabulary: mockFormatVocab,
+}));
+
+vi.mock('../CategoryVocabularyService', () => ({
+  CategoryVocabularyService: {
+    getInstance: () => mockVocabService,
+  },
+  default: mockVocabService,
 }));
 
 import { MarketingExecutionService } from '../MarketingExecutionService';
@@ -111,8 +128,12 @@ describe('MarketContext injection into intelligence campaigns', () => {
     }));
     // Reset market context to empty by default
     mockMarketContextLoader.loadMarketContext.mockImplementation(async () => ({ category: {}, location: {} }));
+    mockMarketContextLoader.loadLocationContext.mockImplementation(async () => ({}));
     mockFormatEstablishment.mockImplementation(() => '');
     mockFormatDiscovery.mockImplementation(() => '');
+    mockFormatCategoryId.mockImplementation(() => '');
+    mockFormatVocab.mockImplementation(() => '');
+    mockVocabService.loadVocabulary.mockImplementation(async () => ({ directoryLabels: [], registeredLabels: [] }));
   });
 
   // ─── Establishment scan ────────────────────────────────────────────────
@@ -368,6 +389,98 @@ describe('MarketContext injection into intelligence campaigns', () => {
 
       expect(renderedPrompt).not.toContain('MARKET CONTEXT');
       expect(mockMarketContextLoader.loadMarketContext).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Category identification seek (location + vocabulary injection) ────
+
+  describe('category identification seek', () => {
+    const makeCatIdTemplate = () => ({
+      body: 'Identify {{business_name}} in {{city}}, {{state}}',
+      prompt_type: 'seek',
+      scope: 'business',
+      output_schema: { name: 'category_identification' },
+      outputSchema: { name: 'category_identification' },
+    });
+
+    const makeCatIdCampaign = (city: string | null = 'Indianapolis', state: string | null = 'IN') => ({
+      id: 'camp-catid-1',
+      scope: 'business',
+      category: '', // the category is what the scan determines
+      business_name: 'Test Business',
+      city,
+      state,
+    });
+
+    it('injects the vocabulary block after the location block', async () => {
+      const locCtx = { city_profile: { metro_description: 'Midwest hub' } };
+      mockMarketContextLoader.loadLocationContext.mockResolvedValueOnce(locCtx);
+      mockFormatCategoryId.mockReturnValueOnce('=== MARKET CONTEXT (from prior location enrichment) ===\nCITY PROFILE...');
+      mockVocabService.loadVocabulary.mockResolvedValueOnce({
+        directoryLabels: ['Grocery Store'],
+        registeredLabels: ['Somali Grocery Store'],
+      });
+      mockFormatVocab.mockReturnValueOnce('=== KNOWN CATEGORY VOCABULARY ===\nGrocery Store');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCatIdTemplate(),
+        campaign: makeCatIdCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('MARKET CONTEXT');
+      expect(renderedPrompt).toContain('KNOWN CATEGORY VOCABULARY');
+      expect(mockMarketContextLoader.loadLocationContext).toHaveBeenCalledWith('Indianapolis', 'IN', undefined);
+      expect(mockFormatCategoryId).toHaveBeenCalledWith(locCtx, 'Indianapolis', 'IN');
+      expect(mockFormatVocab).toHaveBeenCalledWith(['Grocery Store'], ['Somali Grocery Store']);
+      // Vocabulary renders after the location block.
+      expect(renderedPrompt.indexOf('KNOWN CATEGORY VOCABULARY'))
+        .toBeGreaterThan(renderedPrompt.indexOf('MARKET CONTEXT'));
+    });
+
+    it('injects the vocabulary block even when the campaign has no city', async () => {
+      mockVocabService.loadVocabulary.mockResolvedValueOnce({
+        directoryLabels: ['Grocery Store'],
+        registeredLabels: [],
+      });
+      mockFormatVocab.mockReturnValueOnce('=== KNOWN CATEGORY VOCABULARY ===\nGrocery Store');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCatIdTemplate(),
+        campaign: makeCatIdCampaign(null, null),
+        variables: undefined,
+      });
+
+      expect(mockMarketContextLoader.loadLocationContext).not.toHaveBeenCalled();
+      expect(renderedPrompt).toContain('KNOWN CATEGORY VOCABULARY');
+    });
+
+    it('renders cleanly when the vocabulary is empty (no block injected)', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCatIdTemplate(),
+        campaign: makeCatIdCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('KNOWN CATEGORY VOCABULARY');
+      expect(renderedPrompt).toContain('Identify Test Business');
+    });
+
+    it('does not inject the vocabulary block for non-category-identification seeks', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: {
+          body: 'Audit {{business_name}}',
+          prompt_type: 'seek',
+          scope: 'business',
+          output_schema: { name: 'business_analysis' },
+          outputSchema: { name: 'business_analysis' },
+        },
+        campaign: makeCatIdCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('KNOWN CATEGORY VOCABULARY');
+      expect(mockVocabService.loadVocabulary).not.toHaveBeenCalled();
     });
   });
 

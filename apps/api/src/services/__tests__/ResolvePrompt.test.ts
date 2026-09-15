@@ -793,4 +793,76 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(resolution.intelligence_mode).toBe('none');
     });
   });
+
+  // ─── Category-set enrichment (PG shelf sweep) ─────────────────────────
+  // The sweep spawns one scope='category' directory_enrichment child carrying
+  // the residual no-profile markets in discovery_context.shelf_sweep. The
+  // set template's {{markets}} placeholder is auto-sourced from that payload,
+  // and each distinct city gets its own structural CITY PROFILE block.
+  describe('enrichment prompt — category set (PG shelf sweep)', () => {
+    const makeSetTemplate = () => ({
+      body: 'CATEGORY: {{category}}\nMARKETS:\n{{markets}}',
+      prompt_type: 'enrichment',
+      scope: 'category',
+      output_schema: { name: 'category_set_enrichment' },
+    });
+    const makeSetCampaign = (markets: any[] | null) => ({
+      id: 'camp-set-1',
+      scope: 'category',
+      category: 'Halal Market',
+      city: 'Fort Wayne',
+      state: 'IN',
+      discovery_context: markets ? { shelf_sweep: { markets } } : null,
+    });
+    const SET_MARKETS = [
+      { category: 'Halal Market', city: 'Fort Wayne', state: 'IN' },
+      { category: 'Butcher Shop', city: 'Auburn', state: 'IN' },
+      { category: 'Kebab House', city: 'Fort Wayne', state: 'IN' },
+    ];
+
+    it('auto-sources {{markets}} from the sweep payload', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeSetTemplate(),
+        campaign: makeSetCampaign(SET_MARKETS),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('- Halal Market — Fort Wayne, IN');
+      expect(renderedPrompt).toContain('- Butcher Shop — Auburn, IN');
+      expect(renderedPrompt).toContain('- Kebab House — Fort Wayne, IN');
+    });
+
+    it('renders the single-market fallback line when no sweep set exists', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeSetTemplate(),
+        campaign: makeSetCampaign(null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('no sweep set');
+    });
+
+    it('injects one CITY PROFILE block per distinct city when profiles exist', async () => {
+      const realPrisma = (service as any).prisma;
+      (service as any).prisma = {
+        $queryRaw: vi.fn(async () => [
+          { context: { city_profile: { metro_description: 'Mid-size Midwest metro', major_industries: ['logistics'] } } },
+        ]),
+      };
+      try {
+        const { renderedPrompt } = await service.resolvePrompt({
+          template: makeSetTemplate(),
+          campaign: makeSetCampaign(SET_MARKETS),
+          variables: undefined,
+        });
+
+        // Two distinct cities in the set → two profile blocks.
+        expect(renderedPrompt.match(/=== CITY PROFILE \(structural\) ===/g)).toHaveLength(2);
+        expect(renderedPrompt).toContain('City: Fort Wayne, IN');
+        expect(renderedPrompt).toContain('City: Auburn, IN');
+      } finally {
+        (service as any).prisma = realPrisma;
+      }
+    });
+  });
 });

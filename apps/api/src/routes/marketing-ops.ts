@@ -157,6 +157,7 @@ import MarketingDeliverableService from '../services/MarketingDeliverableService
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
+import CategoryVocabularyService from '../services/CategoryVocabularyService';
 import { ReviewResponseService } from '../services/ReviewResponseService';
 import { OutreachOpenerService, resolveCampaignArchetype } from '../services/OutreachOpenerService';
 import { selectArchetype, type BusinessAnalysisAuditData } from '../services/outreach-openers/archetype-selection';
@@ -1234,6 +1235,40 @@ router.get('/:campaignId/stage-distribution', async (req: any, res: Response) =>
   }
 });
 
+// POST /:campaignId/enrich-sweep — PG shelf coverage sweep. Computes the
+// proving ground's full category × market domain (declared category ∪
+// secondary_categories over declared geos, plus each queue prospect's own
+// categories × its market), then for every uncovered market:
+//   1. enrichMarket() — free deterministic path when a profile exists
+//   2. enrichLocation() — deterministic baseline per uncovered city
+//   3. the residual (no profile) goes into ONE spawned directory_enrichment
+//      child campaign whose discovery_context.shelf_sweep carries the set —
+//      the category_set_enrichment output schema turns one execution into a
+//      packet per market.
+// Idempotent: existing enrichment rows and markets already covered by an
+// active enrichment campaign are never touched.
+const enrichSweepSchema = z.object({
+  create_campaign: z.boolean().optional(),
+});
+
+router.post('/:campaignId/enrich-sweep', async (req: any, res: Response) => {
+  try {
+    const parsed = enrichSweepSchema.parse(req.body ?? {});
+    const { default: sweepService } = await import('../services/ProvingGroundShelfSweepService');
+    const report = await sweepService.sweep(
+      req.params.campaignId,
+      { createCampaign: parsed.create_campaign, enrichedBy: (req.user as any)?.id ?? null },
+      getCtx(req),
+    );
+    res.json({ success: true, data: report });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // POST /:id/gap-log — append a mid-run gap entry (Migration 262, spec §4.5).
 // Append-only chronological record; the server stamps timestamp + logged_by.
 const gapLogEntrySchema = z.object({
@@ -1880,15 +1915,45 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
       review_count: null,
     }));
 
-    // Step 1: Register the category in vocab if it's new.
+    // Step 1: Register the category in vocab if it's new. The analyst's
+    // is_known flag is advisory — membership in the operator-selectable union
+    // (platform_categories ∪ mkt_service_categories_list) is a server-side
+    // fact, so a stale audit or a false negative cannot mint a duplicate row
+    // (CATEGORY_IDENTIFICATION_VOCAB_INJECTION_SPEC §4.6). Lookup failure
+    // fails open to the flag-driven behaviour — the backstop can only
+    // prevent writes, never add failure modes to the destination action.
     let categoryAdded = false;
     if (!parsed.is_known) {
-      await MarketingServiceCategoryService.upsertCategory({
-        value: categorySlug || categoryLabel,
-        label: categoryLabel,
-        isActive: true,
-      }, ctx);
-      categoryAdded = true;
+      let alreadyKnown: boolean | null = null;
+      try {
+        alreadyKnown = await CategoryVocabularyService.isKnownLabel(categoryLabel, ctx);
+      } catch {
+        // Vocabulary lookup failed — fall back to trusting the flag.
+      }
+      if (alreadyKnown === true) {
+        logger.info('Skipped vocab registration — label already in category vocabulary', ctx, {
+          campaignId,
+          categoryLabel,
+        });
+      } else {
+        // Warn when the slug collides with an existing vocab value under a
+        // different label — the upsert would overwrite that row's label.
+        const collision = await CategoryVocabularyService.findRegisteredValue(categorySlug, ctx).catch(() => null);
+        if (collision && collision.label.trim().toLowerCase() !== categoryLabel.toLowerCase()) {
+          logger.warn('Vocab value collision — slug exists under a different label', ctx, {
+            campaignId,
+            value: categorySlug,
+            existingLabel: collision.label,
+            newLabel: categoryLabel,
+          });
+        }
+        await MarketingServiceCategoryService.upsertCategory({
+          value: categorySlug || categoryLabel,
+          label: categoryLabel,
+          isActive: true,
+        }, ctx);
+        categoryAdded = true;
+      }
     }
 
     // Step 2: Route to the chosen destination.
@@ -1984,6 +2049,19 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
     // NAP handoff: include flat NAP fields in business_snapshot so the
     // queue→campaign derive path (createCampaignFromQueue) can forward
     // them to the spawned campaign without re-keying.
+    // Secondary handoff: the audit's other candidate categories ride along so
+    // the PG shelf sweep (ProvingGroundShelfSweepService) can enrich every
+    // shelf this business sits on — primary-only enrichment leaves the
+    // secondary public category pages bare.
+    const auditCandidates = (latestCatIdAudit?.audit_data as any)?.candidate_categories;
+    const snapshotSecondaries = (Array.isArray(auditCandidates) ? auditCandidates : [])
+      .map((c: any) => String(c?.category ?? '').trim())
+      .filter((c: string, i: number, arr: string[]) =>
+        c.length > 0
+        && c.toLowerCase() !== categoryLabel.toLowerCase()
+        && arr.findIndex((x) => x.toLowerCase() === c.toLowerCase()) === i,
+      )
+      .slice(0, 9);
     const queueResult = await MarketingProspectQueueService.addToQueue({
       business_name: napBusinessName,
       title: napBusinessName,
@@ -1997,6 +2075,7 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
         identified_category: categoryLabel,
         confidence: parsed.confidence,
         category_added: categoryAdded,
+        secondary_categories: snapshotSecondaries,
         // Flat NAP fields — read by createCampaignFromQueue's derive path
         phone: napPhone,
         website: napWebsite,

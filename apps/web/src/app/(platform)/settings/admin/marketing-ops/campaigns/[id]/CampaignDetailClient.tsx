@@ -1850,6 +1850,21 @@ export default function CampaignDetailClient({
                             </details>
                           )}
                         </div>
+                      ) : audit.platform === 'category_set_enrichment' && Array.isArray(audit.audit_data?.markets) ? (
+                        // PG shelf sweep — one packet card per market entry;
+                        // each renders with its OWN market coordinates (the
+                        // campaign's category/city/state only name the anchor).
+                        <div key={audit.id} className="space-y-3">
+                          {audit.audit_data.markets.map((m: any, i: number) => (
+                            <EnrichmentAuditCard
+                              key={`${audit.id}-${i}`}
+                              audit={{ ...audit, platform: 'category_enrichment', audit_data: m }}
+                              campaignCategory={m.category_name ?? m.category_key}
+                              campaignCity={m.city}
+                              campaignState={m.state}
+                            />
+                          ))}
+                        </div>
                       ) : (audit.platform === 'category_enrichment' || audit.platform === 'location_enrichment') && audit.audit_data ? (
                         <EnrichmentAuditCard
                           key={audit.id}

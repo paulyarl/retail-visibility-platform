@@ -91,7 +91,7 @@ class CategoryMarketEnrichmentService extends BaseService {
     category: string,
     city: string,
     state: string,
-    opts: { triggerSource?: 'manual' | 'profile_activated'; enrichedBy?: string } = {},
+    opts: { triggerSource?: 'manual' | 'profile_activated' | 'pg_sweep'; enrichedBy?: string } = {},
     ctx?: RequestCtx,
   ): Promise<EnrichMarketResult> {
     const categoryKey = normalizeCategoryKey(category);

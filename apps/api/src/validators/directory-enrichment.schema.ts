@@ -26,6 +26,7 @@ import { z } from 'zod';
 
 export const CATEGORY_ENRICHMENT_SCHEMA_NAME = 'category_enrichment';
 export const LOCATION_ENRICHMENT_SCHEMA_NAME = 'location_enrichment';
+export const CATEGORY_SET_ENRICHMENT_SCHEMA_NAME = 'category_set_enrichment';
 
 /**
  * Accept a string[] OR a comma-separated string (LLMs frequently emit
@@ -128,6 +129,28 @@ export const categoryEnrichmentSchema = z.object({
 }).passthrough();
 
 export type CategoryEnrichmentOutput = z.infer<typeof categoryEnrichmentSchema>;
+
+// ─── Category Set Enrichment Packet (PG shelf sweep) ────────────────────
+//
+// One execution produces one packet per market — the PG shelf sweep spawns a
+// single directory_enrichment child campaign carrying the uncovered
+// (category × city,state) set in discovery_context.shelf_sweep, and this
+// schema validates the multi-packet output. Each entry is a full
+// category_enrichment packet PLUS its own market coordinates (required —
+// the applier routes on them; the parent campaign's category/city/state only
+// describe the anchor market).
+
+export const categorySetMarketPacketSchema = categoryEnrichmentSchema.extend({
+  category_name: z.string().min(1),
+  city: z.string().min(1),
+  state: z.string().min(1),
+});
+
+export const categorySetEnrichmentSchema = z.object({
+  markets: z.array(categorySetMarketPacketSchema).min(1),
+}).passthrough();
+
+export type CategorySetEnrichmentOutput = z.infer<typeof categorySetEnrichmentSchema>;
 
 // ─── Location Enrichment Packet ─────────────────────────────────────────
 
@@ -267,6 +290,55 @@ Return your response as JSON matching this exact schema:
 }
 
 Return ONLY the JSON object, no markdown fences, no commentary.`;
+
+export const CATEGORY_SET_ENRICHMENT_PROMPT_SUFFIX = `
+
+Return your response as JSON matching this exact schema — one entry in "markets" per market you were asked to enrich, in the same order:
+{
+  "markets": [
+    {
+      "category_name": "<the market's category label — required>",
+      "category_key": "<normalized key, lowercase, spaces replaced with underscores>",
+      "city": "<the market's city — required>",
+      "state": "<the market's 2-letter state code — required>",
+      "meta_title": "<SEO title, <= 70 chars — category + city + state>",
+      "description": "<meta description, <= 300 chars, browse-oriented local-SEO copy>",
+      "keywords": ["<keyword>", ...],
+      "secondary_categories": ["<closely related category a shopper might also browse>", ...],
+      "schema_type_hint": "<schema.org type hint, e.g. CollectionPage>",
+      "body_copy": "<1-2 short paragraphs of visible on-page copy for the category page top>",
+      "category_overview": "<1-2 paragraphs: what this category IS — what businesses in it do, who they serve, definitional>",
+      "super_categories": ["<containing category>", ...],
+      "sub_categories": ["<specialization within this category>", ...],
+      "adjacent_categories": ["<sibling category at same level>", ...],
+      "shopper_guide": "<1-2 paragraphs of 'what to look for' guidance for shoppers browsing this category>",
+      "faq": [
+        {"question": "<question>", "answer": "<answer>"},
+        ...
+      ],
+      "context": {
+        "category_summary": "<analyst-facing summary of this category in this market>",
+        "keywords": ["<category-level search term>", ...],
+        "secondary_categories": ["<same set as top-level secondary_categories>", ...],
+        "category_notes": "<optional free-text notes for downstream work>",
+        "category_profile": {
+          "business_model": "<qualitative>",
+          "typical_products": "<qualitative>",
+          "customer_base": "<qualitative>",
+          "online_presence_pattern": "<qualitative>",
+          "competitive_landscape": "<qualitative>",
+          "typical_scale": "<qualitative>"
+        },
+        "category_signals": ["<signal that indicates a strong business in this category>", ...],
+        "market_density": "<qualitative density in this market>",
+        "prospect_signals": ["<signal to look for when prospecting businesses in this category>", ...]
+      }
+    },
+    ...
+  ]
+}
+
+Every entry's category_name, city, and state MUST match one of the markets you were given — they route the packet to that market's public page. Return ONLY the JSON object, no markdown fences, no commentary.`;
 
 export const LOCATION_ENRICHMENT_PROMPT_SUFFIX = `
 

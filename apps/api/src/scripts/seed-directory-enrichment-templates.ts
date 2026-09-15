@@ -30,12 +30,13 @@ import { logger } from '../logger';
 import {
   CATEGORY_ENRICHMENT_SCHEMA_NAME,
   LOCATION_ENRICHMENT_SCHEMA_NAME,
+  CATEGORY_SET_ENRICHMENT_SCHEMA_NAME,
 } from '../validators/directory-enrichment.schema';
 
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V10';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V11';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -163,7 +164,83 @@ Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
   isDefault: true,
 };
 
-const TEMPLATES = [CATEGORY_TEMPLATE, LOCATION_TEMPLATE];
+// Category Set Enrichment — the PG shelf sweep lane. A proving-ground
+// "Enrich shelves" sweep fills every uncovered market it can deterministically
+// (enrichMarket when a profile exists) and spawns ONE child campaign carrying
+// the residual no-profile set in discovery_context.shelf_sweep.markets. This
+// template renders that set via {{markets}} (auto-sourced from the sweep
+// payload; falls back to a single-market instruction when absent) and returns
+// one category_enrichment-shaped packet per market — each entry carries its
+// own category_name/city/state, which route the apply loop.
+const CATEGORY_SET_TEMPLATE = {
+  id: 'mpt-category-set-enrichment-default',
+  name: 'Enrichment: Category Set Market SEO',
+  promptType: 'enrichment' as const,
+  scope: 'category' as const,
+  body: `<!-- ${SEED_VERSION_MARKER} -->
+You are a local-SEO copywriter producing directory enrichment packets for business-category pages on VisibleShelf, a public directory of local businesses.
+
+ANCHOR CATEGORY: {{category}}
+ANCHOR MARKET: {{city}}, {{state}}
+
+=== MARKETS TO ENRICH ===
+Produce one packet for EACH market below (same order). Every packet powers the public category page for that category in that city.
+{{markets}}
+
+If the list above says there is no sweep set, produce a single packet for the anchor market (ANCHOR CATEGORY in ANCHOR MARKET).
+
+=== OBJECTIVE ===
+For each market, produce the SEO + content packet that will power the public category page for that category in that market. Each market is independent — copy must be specific to that category in that city, never templated boilerplate repeated across entries.
+
+=== TONE ===
+Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about categories and places from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, category_overview, shopper_guide, faq.
+
+=== WHAT GOOD LOOKS LIKE (per market entry) ===
+- category_name / city / state: echo the market exactly as listed under MARKETS TO ENRICH — these route the packet to that market's public page.
+- meta_title: <= 70 chars. Pattern: "{Category} in {City}, {ST} — VisibleShelf Places". Front-load the category noun.
+- description: <= 300 chars meta description. Browse-oriented: who is listed, that listings come from public information, and 1-2 related terms shoppers search.
+- keywords: 8-15 search terms — the category name, synonyms, "near me" variants, related product/service terms. No keyword stuffing, no competitor brand names.
+- secondary_categories: 3-6 closely related category names relevant in this market that a shopper might also browse (real categories, not invented niches).
+- schema_type_hint: the schema.org type that best fits the page — typically "CollectionPage" for a category listing page.
+- body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what shoppers find on this page and how listings are sourced. Warm and factual, per the TONE section. Definitional "what is this category" content belongs in category_overview, not here.
+- category_overview: 1-2 paragraphs (<= 5000 chars) of definitional content — what this category IS, what businesses in it do, who they serve. Distinct from body_copy (page intro) and shopper_guide (how to choose).
+- super_categories: 2-4 containing categories (e.g. "grocery stores", "food retail", "retail"). Used for breadcrumbs.
+- sub_categories: 2-6 specializations within this category (e.g. "West African grocery", "Afro-Caribbean grocery"). Return an empty array if none are meaningful.
+- adjacent_categories: 2-5 sibling categories at the same taxonomy level. Used for "Related categories".
+- shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this category, what makes a listing worth visiting, what to check (hours, website, product scope, reviews). Distinct from body_copy; this is "how to choose" guidance.
+- faq: 3-6 question/answer pairs shoppers might have about this category. Each answer 1-3 sentences, warm and factual. Used for an FAQ section + FAQ schema.
+
+=== REUSABLE CONTEXT (per market entry, multiple consumers) ===
+Each market entry's context object is consumed by business audit campaigns (the seed) for category-specific market awareness. All context fields → seed only.
+
+- context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context.
+- context.keywords: category-level search terms for downstream use — exclude "near me" variants and page-level phrasing from the SEO keywords.
+- context.secondary_categories: the same set as the packet's secondary_categories, for downstream use.
+- context.category_notes: optional free-text notes useful for downstream work.
+- context.category_profile: STRUCTURAL category characteristics (NO business names, NO city names). Fields: { business_model, typical_products, customer_base, online_presence_pattern, competitive_landscape, typical_scale } — all qualitative descriptors, NOT specific revenue figures or employee counts.
+- context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns (e.g. "published hours with daily coverage", "community presence").
+- context.market_density: qualitative density assessment for this category in this city (e.g. "sparse — few dedicated stores", "dense — competitive market"). Qualitative only.
+- context.prospect_signals: 3-5 signals to look for when prospecting businesses in this category (e.g. "businesses with incomplete online presence — high opportunity").
+
+=== RULES ===
+- Write for shoppers, not operators. No internal jargon, no "campaign", no "enrichment", no "sweep".
+- Do NOT invent business counts, ratings, or specific business names.
+- Do NOT include claims about business quality ("best", "top-rated") — the directory lists from public information.
+- Category name in copy should use natural casing (e.g. "African grocery stores").
+- Every market gets its own copy — do NOT reuse paragraphs across entries. Categories that share a city may reference the same market conditions but with category-specific framing.
+- You may draw on general knowledge about each category and market. Do not fabricate specific business names, counts, or ratings. If you are genuinely uncertain whether a category is strong in a market, describe the category generally rather than guess at local density.
+
+=== OUTPUT REQUIREMENT ===
+Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
+  variables: ['category', 'city', 'state', 'markets'],
+  outputSchema: {
+    name: CATEGORY_SET_ENRICHMENT_SCHEMA_NAME,
+    description: 'Category set enrichment — one category_enrichment-shaped packet per market, each carrying its own category_name/city/state for apply routing.',
+  },
+  isDefault: false,
+};
+
+const TEMPLATES = [CATEGORY_TEMPLATE, LOCATION_TEMPLATE, CATEGORY_SET_TEMPLATE];
 
 async function main() {
   const service = MarketingPromptService.getInstance();
