@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import PlaceCategoryClient from './PlaceCategoryClient';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
+import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,20 @@ export default async function PlaceCategoryPage({ params, searchParams }: PagePr
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
 
+  // Server-render the market intel teaser for SEO (§11.5).
+  const city = resolvedSearchParams.city ?? '__all__';
+  const state = resolvedSearchParams.state ?? null;
+  let marketIntelTeaser = null;
+  try {
+    marketIntelTeaser = await marketIntelSurfaceService.getCategoryTeaser(
+      resolvedParams.categorySlug,
+      city,
+      state,
+    );
+  } catch {
+    // Degrade gracefully — sidebar just won't render.
+  }
+
   return (
     <Suspense
       fallback={
@@ -77,6 +92,7 @@ export default async function PlaceCategoryPage({ params, searchParams }: PagePr
         categorySlug={resolvedParams.categorySlug}
         city={resolvedSearchParams.city}
         state={resolvedSearchParams.state}
+        marketIntelTeaser={marketIntelTeaser}
       />
     </Suspense>
   );

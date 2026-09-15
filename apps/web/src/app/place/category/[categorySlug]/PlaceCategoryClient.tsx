@@ -21,11 +21,14 @@ import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
+import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 
 interface PlaceCategoryClientProps {
   categorySlug: string;
   city?: string;
   state?: string;
+  marketIntelTeaser?: CategoryMarketIntelTeaser | null;
 }
 
 function formatCategoryName(slug: string): string {
@@ -39,6 +42,7 @@ export default function PlaceCategoryClient({
   categorySlug,
   city,
   state,
+  marketIntelTeaser,
 }: PlaceCategoryClientProps) {
   const [places, setPlaces] = useState<PlaceListing[]>([]);
   const [enrichment, setEnrichment] = useState<CategoryEnrichmentResponse | null>(null);
@@ -393,6 +397,15 @@ export default function PlaceCategoryClient({
       )}
 
       <PoweredByFooter />
+
+      {/* Market Intel sidebar (§12.3) — server-rendered teaser for SEO. */}
+      <MarketIntelSurfaceSidebar
+        surfaceType="category"
+        surfaceKey={categorySlug}
+        city={city ?? '__all__'}
+        state={state ?? null}
+        initialTeaser={marketIntelTeaser}
+      />
     </div>
   );
 }

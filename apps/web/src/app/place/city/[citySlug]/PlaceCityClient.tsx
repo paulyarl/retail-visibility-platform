@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
+import type { CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 
 interface PlaceResult {
   id: string;
@@ -60,11 +62,16 @@ class PlacesCityService extends PublicApiSingleton {
 
 const cityService = PlacesCityService.getInstance();
 
-export default function PlaceCityClient() {
+interface PlaceCityClientProps {
+  citySlug: string;
+  marketIntelTeaser?: CityMarketIntelTeaser | null;
+}
+
+export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTeaser }: PlaceCityClientProps) {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const citySlug = (params?.citySlug as string) || '';
+  const citySlug = citySlugProp || (params?.citySlug as string) || '';
 
   const sort = searchParams.get('sort') || 'name';
   const page = parseInt(searchParams.get('page') || '1');
@@ -205,6 +212,13 @@ export default function PlaceCityClient() {
           </div>
         )}
       </div>
+
+      {/* Market Intel sidebar (§12.3) — server-rendered teaser for SEO. */}
+      <MarketIntelSurfaceSidebar
+        surfaceType="city"
+        surfaceKey={citySlug}
+        initialTeaser={marketIntelTeaser}
+      />
     </div>
   );
 }
