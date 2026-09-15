@@ -159,7 +159,13 @@ Record each control attempt in the top-level `render_controls` array (one entry 
 * `access_barrier` — whether an access-blocking page appeared instead of profile content (see enum in §5)
 * `determination` — the resulting outcome: `business_specific_failure` | `platform_available` | `unable_to_verify`
 
-Note: `bbb` has no platform object in the `platforms` block today (the validator's `platformsSchema` defines only google, yelp, facebook). A bbb control-confirmed absence is recorded in `render_controls` only — do not attempt to create a `platforms.bbb` object. The same applies to bing, apple_maps, and any other non-primary platform named in the Gold Standard block.
+When a determination is reached, set the platform object's `data_status` accordingly:
+
+* `business_specific_failure` → set `data_status: "unavailable"` (the profile is verified absent, not merely unrendered). Set `profile_status: "unable_to_verify"` and null out any positive fields (rating, reviews, hours, categories, attribute chips) — they cannot be observed on a profile that does not render.
+* `platform_available` → leave `data_status` to the normal platform audit (complete / partial / unavailable based on what loaded).
+* `unable_to_verify` → set `data_status: "unable_to_verify"` unless the profile partially loaded — in that case use `partial` and note the partial load in `data_quality.limitations`.
+
+For platforms beyond the four primary platforms (google, yelp, facebook, bbb) — e.g. bing, apple_maps — that are named in the Gold Standard block but have no platform object in the `platforms` block, record the control attempt in `render_controls` only. Do not create a platform object for them.
 
 Do not bypass bot defenses, solve access controls, or perform intrusive testing.
 

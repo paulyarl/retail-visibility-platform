@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-availability-control-2 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-availability-control-4 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -329,7 +329,13 @@ Record each control attempt in the top-level \`render_controls\` array (one entr
 * \`access_barrier\` — whether an access-blocking page appeared instead of profile content: none | js_required | bot_defense | captcha | login_wall | rate_limit | timeout | not_attempted
 * \`determination\` — the resulting outcome: business_specific_failure | platform_available | unable_to_verify
 
-Note: \`bbb\` has no platform object in the \`platforms\` block today. A bbb control-confirmed absence is recorded in \`render_controls\` only — do not attempt to create a \`platforms.bbb\` object. The same applies to bing, apple_maps, and any other non-primary platform named in the Gold Standard block.
+When a determination is reached, set the platform object's \`data_status\` accordingly:
+
+* \`business_specific_failure\` → set \`data_status: "unavailable"\` (the profile is verified absent, not merely unrendered). Set \`profile_status: "unable_to_verify"\` and null out any positive fields (rating, reviews, hours, categories, attribute chips) — they cannot be observed on a profile that does not render.
+* \`platform_available\` → leave \`data_status\` to the normal platform audit (complete / partial / unavailable based on what loaded).
+* \`unable_to_verify\` → set \`data_status: "unable_to_verify"\` unless the profile partially loaded — in that case use \`partial\` and note the partial load in \`data_quality.limitations\`.
+
+For platforms beyond the four primary platforms (google, yelp, facebook, bbb) — e.g. bing, apple_maps — that are named in the Gold Standard block but have no platform object in the \`platforms\` block, record the control attempt in \`render_controls\` only. Do not create a platform object for them.
 
 Do not bypass bot defenses, solve access controls, or perform intrusive testing.
 
@@ -337,6 +343,15 @@ Do not record positive platform attributes (rating, reviews, hours, categories, 
 
 Emit \`DS_MISSING_PROFILE\` ONLY when the control rendered on that platform and the business profile did not. Do not emit it when the control also failed, when no control was available, or when the platform was not attempted. Non-primary platforms (bing, apple_maps, etc.) record \`business_specific_failure\` in \`render_controls\` but do NOT emit \`DS_MISSING_PROFILE\` — the signal is restricted to the four primary platforms (google, yelp, facebook, bbb).
 `;
+
+// ─── Targeted content update: fix the buggy "bbb has no platform object" note
+//     from availability-control-1/2 and replace it with the data_status mapping
+//     + corrected non-primary platform guidance. The directive's insertAfter
+//     is idempotent on the heading fingerprint, so a re-run with a new marker
+//     won't re-insert the corrected directive — this replaceFirst updates the
+//     old text in-place. Idempotent (no-op if already updated or not present).
+const PLATFORM_DIRECTIVE_BUG_FROM = 'Note: \`bbb\` has no platform object in the \`platforms\` block today. A bbb control-confirmed absence is recorded in \`render_controls\` only — do not attempt to create a \`platforms.bbb\` object. The same applies to bing, apple_maps, and any other non-primary platform named in the Gold Standard block.';
+const PLATFORM_DIRECTIVE_BUG_TO = 'When a determination is reached, set the platform object\'s \`data_status\` accordingly:\n\n* \`business_specific_failure\` → set \`data_status: "unavailable"\` (the profile is verified absent, not merely unrendered). Set \`profile_status: "unable_to_verify"\` and null out any positive fields (rating, reviews, hours, categories, attribute chips) — they cannot be observed on a profile that does not render.\n* \`platform_available\` → leave \`data_status\` to the normal platform audit (complete / partial / unavailable based on what loaded).\n* \`unable_to_verify\` → set \`data_status: "unable_to_verify"\` unless the profile partially loaded — in that case use \`partial\` and note the partial load in \`data_quality.limitations\`.\n\nFor platforms beyond the four primary platforms (google, yelp, facebook, bbb) — e.g. bing, apple_maps — that are named in the Gold Standard block but have no platform object in the \`platforms\` block, record the control attempt in \`render_controls\` only. Do not create a platform object for them.';
 
 // ─── Schema fragment: render_controls array (inserted after signal_checklist
 //     in the embedded JSON schema, before the top-level close). Idempotent
@@ -864,6 +879,11 @@ function transformCategoryIntegrated(body: string): string {
   //      Idempotent (no-op if already updated).
   out = replaceFirst(out, DS_MISSING_PROFILE_FROM_CATEGORY, DS_MISSING_PROFILE_TO_CATEGORY);
 
+  // 4e4. Fix the buggy "bbb has no platform object" note from earlier seed
+  //      versions and replace it with the data_status mapping + corrected
+  //      non-primary platform guidance. Idempotent (no-op if already updated).
+  out = replaceFirst(out, PLATFORM_DIRECTIVE_BUG_FROM, PLATFORM_DIRECTIVE_BUG_TO);
+
   // 4f. Replace requested_business empty-string defaults with variable
   //     placeholders so the rendered prompt pre-fills the requested business
   //     identity in the JSON schema template. Idempotent (no-op if already
@@ -1227,6 +1247,11 @@ function transformSignalAligned(body: string): string {
   // 19e3. Amend DS_MISSING_PROFILE definition to require a render control.
   //       Idempotent (no-op if already updated).
   out = replaceFirst(out, DS_MISSING_PROFILE_FROM_SIGNAL, DS_MISSING_PROFILE_TO_SIGNAL);
+
+  // 19e4. Fix the buggy "bbb has no platform object" note from earlier seed
+  //       versions and replace it with the data_status mapping + corrected
+  //       non-primary platform guidance. Idempotent (no-op if already updated).
+  out = replaceFirst(out, PLATFORM_DIRECTIVE_BUG_FROM, PLATFORM_DIRECTIVE_BUG_TO);
 
   // 19f. Replace requested_business empty-string defaults with variable
   //      placeholders so the rendered prompt pre-fills the requested business
