@@ -1,7 +1,7 @@
 /**
  * Seed script: PG-01 Proving Ground Preflight Playbook
  *
- * Seeds the `proving_ground`-category playbook + its 9 checklist steps into
+ * Seeds the `proving_ground`-category playbook + its 14 checklist steps into
  * mkt_playbook_catalog / mkt_playbook_checklist_steps (Migration 262).
  *
  * Why a seed script (not migration SQL): the catalog is curated data, and
@@ -42,9 +42,12 @@ const PLAYBOOK = {
   description:
     'City/category proving-ground launch checklist. Attaches directly to the ' +
     'proving-ground campaign (no triage — aggregate campaigns resolve PG-01 ' +
-    'by catalog code). Steps 1–6 are the required launch funnel (attach ' +
-    'discovery sources → load → queue → prioritize → promote → reconcile ' +
-    'duplicates); steps 7–9 are optional market-enrichment lanes.',
+    'by catalog code). Steps 1–8 and 11–13 are the required launch funnel ' +
+    '(attach discovery sources → load → queue → prioritize → verify ' +
+    'operational status → create the business campaign → audit the category ' +
+    'identification → set categories → audit the business → promote → ' +
+    'reconcile duplicates); steps 9–10 (market enrichment campaigns) and ' +
+    'step 14 (listing attribute back-fill) are optional enrichment lanes.',
   matching_rules: {},
   fitd_offer_title: 'Directory Claim Setup',
   retainer_pitch_title: 'Proving Ground Review',
@@ -53,11 +56,22 @@ const PLAYBOOK = {
 };
 
 // Steps follow the cockpit's actual operator flow (attach → load → queue →
-// prioritize → promote → reconcile → enrich). Every instruction leads with
-// its scope so a step is never ambiguous about acting once per PG vs once
-// per prospect. Steps 1–6 required (the launch funnel); 7–9 optional
-// enrichment lanes. All stage_tag=null — the parent never leaves 'seek',
-// so stage tags would hide them forever.
+// prioritize → verify operational status → create the business campaign →
+// audit the category identification → set categories → category + location
+// enrichment → audit the business → promote → reconcile → enrich market
+// listings). Every instruction leads with its scope so a step is never
+// ambiguous about acting once per PG vs once per prospect.
+// Steps 1–8 and 11–13 required (the launch funnel); 9–10 and 14 optional
+// enrichment lanes. All stage_tag=null — the parent never leaves 'seek', so
+// stage tags would hide them forever.
+//
+// Steps 5–11 are the per-prospect funnel between triage and promotion: the
+// operational-status check gates campaign creation so a permanently closed
+// business never becomes a campaign or an audit, and the category-ID →
+// set-categories → business-audit chain must run before promotion because
+// promotion publishes the SEO-enriched listing the business audit produces.
+// The two market-enrichment campaigns (9–10) run once per PG ahead of the
+// per-prospect audits because the business audit consumes their output.
 const STEPS = [
   {
     id: 'pstep-pg01-s1',
@@ -114,8 +128,113 @@ const STEPS = [
     is_required: true,
   },
   {
-    id: 'pstep-pg01-s5',
+    id: 'pstep-pg01-verify-ops',
     step_order: 5,
+    title: 'Verify operational status before working a prospect',
+    instructions:
+      'Per prospect, after queueing and before Create the business campaign: ' +
+      'confirm the business is still operating before any campaign or audit ' +
+      'exists. Check it on Google first, then use Verify on the queue row — ' +
+      'that parks the row in the verification queue and blocks campaign ' +
+      'creation until you resolve it. A "Permanently closed" label is not ' +
+      'always accurate, so do not dismiss on the label alone; call the ' +
+      'business and log the outcome. Confirmed closed → dismiss the row with ' +
+      'reason unverified_closed. Repeat for every row you intend to work.',
+    step_type: 'internal_link',
+    action_config: { target: 'proving_ground_section', params: { section: 'queue' } },
+    is_required: true,
+  },
+  {
+    id: 'pstep-pg01-create-campaign',
+    step_order: 6,
+    title: 'Create the business campaign',
+    instructions:
+      'Per prospect: use Create campaign on the queue row to spawn the ' +
+      'business-scope campaign from the stored snapshot — it carries the ' +
+      'prospect\'s NAP and categories forward and attaches under this PG. ' +
+      'Resolving verification with "create campaign" does this in the same ' +
+      'move, so this step is already satisfied on that path. Idempotent: ' +
+      're-running returns the existing campaign rather than creating a second.',
+    step_type: 'internal_link',
+    action_config: { target: 'proving_ground_section', params: { section: 'queue' } },
+    is_required: true,
+  },
+  {
+    id: 'pstep-pg01-audit-category-id',
+    step_order: 7,
+    title: 'Audit the category identification',
+    instructions:
+      'Per prospect: open the spawned business campaign and run the ' +
+      'category_identification prompt from its Prompts tab — it takes the ' +
+      'business name + location with no category input and imports ranked ' +
+      'candidate categories with their evidence. The identified categories ' +
+      'are what Set primary and secondary categories registers.',
+    step_type: 'manual',
+    action_config: {},
+    is_required: true,
+  },
+  {
+    id: 'pstep-pg01-set-categories',
+    step_order: 8,
+    title: 'Set primary and secondary categories',
+    instructions:
+      'Per prospect: on the category_identification audit card, use ' +
+      '"+ Secondary" to register the identified categories on the campaign — ' +
+      'the first registration fills the primary slot, the rest append to ' +
+      'secondary_categories. Required before Audit the business: the ' +
+      'business_analysis prompt stays hidden until a primary category exists.',
+    step_type: 'manual',
+    action_config: {},
+    is_required: true,
+  },
+  {
+    id: 'pstep-pg01-s8',
+    step_order: 9,
+    title: 'Category enrichment campaign',
+    instructions:
+      'PG-level, once before the per-prospect audits: spawn a ' +
+      'directory_enrichment child campaign for this category market — ' +
+      'deeper per-listing field work beyond the bulk attribute pass. It ' +
+      'attaches under this PG automatically. Run it before Audit the ' +
+      'business: the business audit consumes the category intelligence this ' +
+      'produces.',
+    step_type: 'internal_link',
+    action_config: { target: 'proving_ground_section', params: { section: 'enrich' } },
+    is_required: false,
+  },
+  {
+    id: 'pstep-pg01-s9',
+    step_order: 10,
+    title: 'Location enrichment campaign',
+    instructions:
+      'PG-level, once before the per-prospect audits: spawn a ' +
+      'directory_enrichment child campaign for this city — enriches ' +
+      'listings across categories in the market. It attaches under this PG ' +
+      'automatically. Run it before Audit the business: the business audit ' +
+      'consumes the market context this produces.',
+    step_type: 'internal_link',
+    action_config: { target: 'proving_ground_section', params: { section: 'enrich' } },
+    is_required: false,
+  },
+  {
+    id: 'pstep-pg01-audit-business',
+    step_order: 11,
+    title: 'Audit the business',
+    instructions:
+      'Per prospect: run the business_analysis prompt from the campaign\'s ' +
+      'Prompts tab (unlocked once the primary category is set). It consumes ' +
+      'the category and market enrichment produced by Category enrichment ' +
+      'campaign and Location enrichment campaign, reports the operating ' +
+      'status, produces the seed\'s SEO packet (description, keywords, ' +
+      'same-as), and generates the triage signals the later upgrade pitch ' +
+      'draws on. Promote prospects to listings waits on it.',
+    step_type: 'manual',
+    action_config: {},
+    is_required: true,
+  },
+  {
+    id: 'pstep-pg01-s5',
+    step_order: 12,
     title: 'Promote prospects to listings',
     instructions:
       'Per prospect, repeatable: check the ready rows in "Promote to ' +
@@ -129,7 +248,7 @@ const STEPS = [
   },
   {
     id: 'pstep-pg01-s6',
-    step_order: 6,
+    step_order: 13,
     title: 'Reconcile Seed Funnel',
     instructions:
       'PG-level, one pass after promotions: resolve every duplicate group ' +
@@ -142,37 +261,13 @@ const STEPS = [
   },
   {
     id: 'pstep-pg01-s7',
-    step_order: 7,
+    step_order: 14,
     title: 'Enrich market listings',
     instructions:
-      'PG-level, repeatable: "Enrich Market Listings" back-fills sourced ' +
-      'attributes on every listing in this PG\'s category × city market. ' +
-      'Re-run after promotion batches so new seeds get enriched too. ' +
-      'Requires the campaign\'s category + city + state to be set.',
-    step_type: 'internal_link',
-    action_config: { target: 'proving_ground_section', params: { section: 'enrich' } },
-    is_required: false,
-  },
-  {
-    id: 'pstep-pg01-s8',
-    step_order: 8,
-    title: 'Category enrichment campaign',
-    instructions:
-      'PG-level, optional: spawn a directory_enrichment child campaign for ' +
-      'this category market — deeper per-listing field work beyond the ' +
-      'bulk attribute pass. It attaches under this PG automatically.',
-    step_type: 'internal_link',
-    action_config: { target: 'proving_ground_section', params: { section: 'enrich' } },
-    is_required: false,
-  },
-  {
-    id: 'pstep-pg01-s9',
-    step_order: 9,
-    title: 'Location enrichment campaign',
-    instructions:
-      'PG-level, optional: spawn a directory_enrichment child campaign for ' +
-      'this city — enriches listings across categories in the market. It ' +
-      'attaches under this PG automatically.',
+      'PG-level, repeatable, last: "Enrich Market Listings" back-fills ' +
+      'sourced attributes on every listing in this PG\'s category × city ' +
+      'market. Re-run after promotion batches so new seeds get enriched ' +
+      'too. Requires the campaign\'s category + city + state to be set.',
     step_type: 'internal_link',
     action_config: { target: 'proving_ground_section', params: { section: 'enrich' } },
     is_required: false,
