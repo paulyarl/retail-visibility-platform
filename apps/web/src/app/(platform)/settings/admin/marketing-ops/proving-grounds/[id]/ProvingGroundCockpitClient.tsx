@@ -1678,10 +1678,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           {(() => {
             const catCampaigns = children.filter((c) => c.scope === 'category');
             const cat = catCampaigns[0];
-            // "Done" = stage advanced, an audit row exists, OR the market
-            // enrichment row is present. audit_count is the authoritative
-            // "executed" signal — see Stage 1 note.
-            const catDone = (cat && (cat.stage !== 'seek' || (cat.audit_count ?? 0) > 0)) || !!marketStatus?.enrichedAt;
+            // Green = campaign attached AND executed (audit row exists).
+            // The marketStatus fallback was removed — a market row without
+            // an attached campaign is not "done"; the operator should still
+            // create + run the campaign.
+            const catDone = cat && (cat.stage !== 'seek' || (cat.audit_count ?? 0) > 0);
             return (
               <div className={`flex-1 rounded-lg border p-3 ${
                 catDone
@@ -1738,7 +1739,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             const locCampaigns = children.filter((c) => c.scope === 'city');
             const catCampaigns = children.filter((c) => c.scope === 'category');
             const locDone = locCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0);
-            const catDone = catCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0) || !!marketStatus?.enrichedAt;
+            const catDone = catCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0);
             const hasContext = locDone && catDone;
             return (
               <div className={`flex-1 rounded-lg border p-3 ${

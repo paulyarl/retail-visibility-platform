@@ -264,15 +264,66 @@ RLS enabled with service-role policy.
 
 ---
 
-## 11. Capability Gating (Deferred)
+## 11. Tenant Soft Gating (Deferred — Planned Model)
 
-Per the user's decision, the sidebar is currently **ungated** on all surfaces to confirm cohesion before introducing gating. The planned gating model (deferred to back-burner):
+Per the user's decision, the sidebar is currently **ungated** on all surfaces so cohesion can be confirmed across the full surface matrix before any gating is introduced. The tenant soft-gating model below is **planned but not yet active**. It will be revisited after Phase 6 (category + location surfaces) lands and the full surface matrix is reviewable in production.
 
-- **Scope:** Entire sidebar, but only for tenant-owned seed surfaces (where the seed has a tenant)
-- **Type:** Tier-gated toggle — tier determines whether the toggle is available (free tier can't toggle on; paid tier can toggle on/off)
-- **Unaffected:** Category pages, location pages, and unclaimed seeds remain ungated
+### 11.1 What "tenant soft gating" means
 
-Gating will be revisited after all surfaces are visible and cohesion is confirmed.
+The Market Intel sidebar is a **tenant-merchant capability**, not a public-surface default. The directory entry (seed page) is the only surface where the sidebar can be gated — and only when that seed is **tenant-owned** (the `directory_presence_seeds` row has a `tenant_id` that maps to a real tenant). The tenant's plan tier determines whether the merchant can toggle the sidebar on; the merchant's own preference sets the on/off state.
+
+This is "soft" gating because:
+- It does **not** block content from public viewers — it controls whether the sidebar renders at all on the tenant's seed page.
+- It does **not** apply to category pages, city pages, or unclaimed seeds.
+- The merchant opts in via settings (default OFF at launch).
+
+### 11.2 Gate model
+
+| Attribute | Value |
+|---|---|
+| Feature key | `market_intel_sidebar_enabled` |
+| Capability type | Type gate (master enabled/disabled), not a group gate |
+| Scope | Entire sidebar (all cards) — one feature key, not per-card |
+| Surface | Tenant-owned seed pages only |
+| Tier rule | Paid tiers get the capability; free tier does not |
+| Merchant pref | Stored in tenant prefs table; default OFF at launch |
+| Unaffected surfaces | Category pages, city pages, unclaimed seeds (no tenant to gate) |
+
+### 11.3 Resolution flow (planned)
+
+1. `MarketIntelSidebarResolver` resolves `market_intel_sidebar_enabled` from tier + merchant pref
+2. `PlacePageClient` checks: `listing.listingOrigin === 'directory_seed'` (Phase 1 gate) **AND** resolved capability is `enabled` **AND** seed is tenant-owned
+3. Unclaimed seeds (no `tenant_id`) skip the capability check entirely — sidebar renders as in Phase 1
+4. Free-tier tenants: toggle not available in settings, sidebar hidden on their seed page
+5. Paid-tier tenants: toggle available; OFF by default; turning ON shows the sidebar on their seed page
+
+### 11.4 Capability deployment (8-phase flow)
+
+When the gating work is picked back up, it follows the standard 8-phase capability deployment flow (per `.devin/skills/capability-deployment-flow.md`):
+
+1. **Feature key** — `market_intel_sidebar_enabled` in `canonical-features.ts` + `tier-hierarchies.ts`
+2. **Seed DB** — `features_list` + `capability_features_list` + `tier_features_list` rows (paid tiers get it; free tier does not)
+3. **Tenant prefs table + Prisma** — new column for the merchant toggle (default false); migration + `prisma db pull`
+4. **Resolver** — `MarketIntelSidebarResolver.ts` + types + `EffectiveCapabilityResolver.ts` registration
+5. **Route** — `market-intel-options-settings.ts` (GET + PUT + tier filtering + cache invalidation); tenant settings UI surface
+6. **Map** — `UnifiedCapabilityService.ts` + `CapabilityResolutionService.ts` (frontend fallback resolver parity per R30)
+7. **Display** — `PlanSummaryWidget.tsx` (dashboard + options pages) + `PlanSummaryPanel.tsx` (plan-summary page) + `CapabilityShowcase.tsx` + settings page
+8. **Verify** — TS checks + `verify-capability-deployment.md`
+
+### 11.5 Why it's deferred
+
+Gating is deferred so that every surface (seed, category, city) can be reviewed for cohesion in production before any piece is hidden. Introducing tier-gating prematurely would make it harder to confirm the full surface matrix renders correctly. Once cohesion is confirmed, the 8-phase flow above is the path to activation.
+
+### 11.6 What is NOT gated (current state)
+
+| Surface | Gated? | Notes |
+|---|---|---|
+| Place (tenant-owned seed) | No (planned: yes, tier-gated toggle) | Currently visible; will be gated post-cohesion-review |
+| Place (unclaimed seed) | No | No tenant to gate against — stays ungated |
+| Category page | No | Public surface — never gated by tenant capability |
+| City page | No | Public surface — never gated by tenant capability |
+
+The access tiers in §3 (anonymous → free → paid → owner → admin) operate **independently** of this capability gate. The capability gate controls whether the sidebar renders at all on a tenant-owned seed; the access tiers control what content level a viewer sees once the sidebar is rendered.
 
 ---
 
