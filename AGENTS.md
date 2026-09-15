@@ -17,6 +17,7 @@ Seed scripts in `apps/api/src/scripts/seed-*.ts` are idempotent (update-in-place
 # Intelligence cluster (has package.json script entries)
 doppler run --config local -- pnpm seed:intelligence-fragments
 doppler run --config local -- pnpm seed:intelligence-discovery-templates
+doppler run --config local -- pnpm seed:intelligence-discovery-signals
 doppler run --config local -- pnpm seed:intelligence-profile-establishment-template
 doppler run --config local -- pnpm seed:intelligence-profile-auto-repair
 
@@ -53,6 +54,22 @@ Known constraint ↔ enum pairs (drift history: migrations 256, 264, 270 — thi
 - `chk_prospect_queue_source_scope` ↔ `ProspectCampaignScope` (same file)
 
 When adding an enum value, grep the table name for `chk_` constraints and sync every one the enum touches. Migrations are applied manually: `psql $DATABASE_URL -f database/migrations/<n>_<name>.sql` (Doppler-provided URL), against both `local` and `prd`.
+
+## Seed Intelligence Report — Schema Additions (migrations 271–272)
+
+Spec: `docs/LocalBiz/AUTOMATED_SEED_INTELLIGENCE_REPORT_SPEC.md`
+
+- `271_directory_field_provenance_evidence_state.sql` — adds `evidence_state` (varchar 40, CHECK-constrained to the 9-state taxonomy) + `notes` (text) to `directory_field_provenance`. Backfills existing rows: `owner_confirmed` when `override_by IS NOT NULL`, else `observed`. Run against `local` + `prd`.
+- `272_mkt_outreach_log_anchor_columns.sql` — adds `anchor_id` (varchar 255), `anchor_snapshot` (jsonb), `verification_results` (jsonb) to `mkt_outreach_log`. All nullable; existing rows unaffected. Run against `local` + `prd`.
+- `273_mkt_seed_intelligence_reports.sql` — creates `mkt_seed_intelligence_reports` table for immutable versioned report snapshots (§12.2). `report_data` is the SeedIntelligenceReport DTO; `evidence_refs` references existing provenance/audit/signal/outreach/claim IDs (NOT a duplicate observation store). Run against `local` + `prd`.
+- `seed:intelligence-discovery-signals` — seeds the 11 `INT_*` discovery signal codes into `mkt_signal_registry` as a new `INT` family. Idempotent update-in-place. Run against `local` + `prd`:
+  ```powershell
+  doppler run --config local -- pnpm seed:intelligence-discovery-signals
+  doppler run --config prd --    pnpm seed:intelligence-discovery-signals
+  ```
+  Bump `SEED_VERSION_MARKER` in `src/scripts/seed-intelligence-discovery-signals.ts` to force label/description re-sync on already-registered rows.
+
+After applying migrations 271–272, run `pnpm prisma:generate` (or `doppler run --config local -- pnpm prisma db pull && pnpm prisma generate`) so the Prisma Client picks up the new columns.
 
 ## Architecture
 

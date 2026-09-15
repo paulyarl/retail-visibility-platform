@@ -1706,6 +1706,8 @@ model directory_field_provenance {
   updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
   override_by              String?
   override_at              DateTime?                @db.Timestamptz(6)
+  evidence_state           String?                  @db.VarChar(40)
+  notes                    String?
   directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dfp_seed")
   tenants                  tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dfp_tenant")
 
@@ -1713,6 +1715,7 @@ model directory_field_provenance {
   @@index([field_key], map: "idx_dfp_field_key")
   @@index([seed_id], map: "idx_dfp_seed")
   @@index([tenant_id], map: "idx_dfp_tenant")
+  @@index([evidence_state], map: "idx_dfp_evidence_state")
 }
 
 model directory_listing_categories {
@@ -3991,6 +3994,9 @@ model mkt_outreach_log {
   last_delivery_error    String?
   retry_after            DateTime?          @db.Timestamptz(6)
   call_details           Json?
+  anchor_id              String?            @db.VarChar(255)
+  anchor_snapshot        Json?
+  verification_results   Json?
   mkt_campaigns_list     mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_campaign")
 
   @@index([campaign_id, contact_date(sort: Desc)], map: "idx_mkt_outreach_campaign")
@@ -7888,6 +7894,25 @@ model market_intel_unlocks {
   @@index([customer_id], map: "idx_market_intel_unlocks_customer")
   @@index([surface_type, surface_key], map: "idx_market_intel_unlocks_surface")
   @@index([tenant_id], map: "idx_market_intel_unlocks_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_seed_intelligence_reports {
+  id              String    @id @db.VarChar(255)
+  seed_id         String    @db.VarChar(255)
+  version         Int
+  status          String    @db.VarChar(40)
+  report_mode     String    @db.VarChar(30)
+  report_data     Json
+  source_snapshot Json
+  evidence_refs   Json      @default("[]")
+  lint_findings   Json      @default("[]")
+  generated_at    DateTime  @default(now()) @db.Timestamptz(6)
+  published_at    DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@unique([seed_id, version])
+  @@index([seed_id, version(sort: Desc)], map: "idx_mkt_seed_intel_reports_seed")
 }
 
 enum action {

@@ -2237,3 +2237,12 @@ export function generateIntelligenceRunId(): string {
   return `mir-${nanoid()}`;
 }
 
+/**
+ * Generate seed intelligence report ID
+ * Format: sir-{nanoid} (12 chars)
+ */
+export function generateSeedIntelligenceReportId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sir-${nanoid()}`;
+}
+

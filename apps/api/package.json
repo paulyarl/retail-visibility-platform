@@ -61,6 +61,7 @@
     "seed:intelligence-profile-establishment-template": "tsx src/scripts/seed-intelligence-profile-establishment-template.ts",
     "seed:gold-standard-scan-template": "tsx src/scripts/seed-gold-standard-scan-template.ts",
     "seed:intelligence-discovery-templates": "tsx src/scripts/seed-intelligence-discovery-templates.ts",
+    "seed:intelligence-discovery-signals": "tsx src/scripts/seed-intelligence-discovery-signals.ts",
     "seed:category-identification-template": "tsx src/scripts/seed-category-identification-template.ts",
     "seed:proving-ground-preflight": "tsx src/scripts/seed-proving-ground-preflight.ts",
     "migrate:mkt-data": "tsx src/scripts/migrate-marketing-ops-data.ts",
