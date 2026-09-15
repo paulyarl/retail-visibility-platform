@@ -5,13 +5,20 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
+  AnchorVerificationResult,
+  AnchorVerificationResultType,
+  AssembledSeedCallScript,
   ClaimInviteQrKitMeta,
   DirectoryAttributeDefinition,
   DirectoryAttributeRecommendation,
   DirectoryAttributeSuggestion,
   DirectoryListingAttribute,
   DirectoryPresenceSeedDetail,
+  ManualAnchorType,
+  ManualOutreachAnchor,
   OutreachTouch,
+  ReEngagementSuggestion,
+  ReportDeliveryQrKitMeta,
 } from '@/services/DirectoryPresenceAdminService';
 import { clientLogger } from '@/lib/client-logger';
 import { generateQrDataUrl } from '@/lib/qr-engine';
@@ -42,6 +49,7 @@ import {
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 import ClaimQrDesignerModal from './ClaimQrDesignerModal';
+import ReportQrDesignerModal from './ReportQrDesignerModal';
 import { slugify } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -338,6 +346,59 @@ export default function PresenceSeedDetailPage() {
   const [qrDesignerVariant, setQrDesignerVariant] = useState<
     'mail' | 'walkin' | 'social' | 'email' | null
   >(null);
+  const [reportQrKit, setReportQrKit] = useState<ReportDeliveryQrKitMeta | null>(null);
+  const [reportVersions, setReportVersions] = useState<Array<{
+    version: number;
+    status: string;
+    generated_at: string | null;
+    published_at: string | null;
+    evidence_count: number;
+  }>>([]);
+  const [refreshingReport, setRefreshingReport] = useState(false);
+  const [reengagement, setReengagement] = useState<ReEngagementSuggestion | null>(null);
+  const [anchors, setAnchors] = useState<ManualOutreachAnchor[]>([]);
+  const [showAnchorForm, setShowAnchorForm] = useState(false);
+  const [anchorForm, setAnchorForm] = useState<{
+    anchorType: ManualAnchorType;
+    title: string;
+    operatorThesis: string;
+    verificationQuestion: string;
+    painQuestion: string;
+    recommendedTransition: string;
+  }>({
+    anchorType: 'seed_claim_invitation',
+    title: '',
+    operatorThesis: '',
+    verificationQuestion: '',
+    painQuestion: '',
+    recommendedTransition: '',
+  });
+  const [contactAnchorId, setContactAnchorId] = useState<string | null>(null);
+  const [contactForm, setContactForm] = useState<{
+    callResult: string;
+    channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'visit' | 'other';
+    resultType: '' | AnchorVerificationResultType;
+    field: string;
+    newValue: string;
+    ownerResponse: string;
+    notes: string;
+  }>({
+    callResult: 'connected',
+    channel: 'call',
+    resultType: '',
+    field: '',
+    newValue: '',
+    ownerResponse: '',
+    notes: '',
+  });
+  const [recordingContact, setRecordingContact] = useState(false);
+  const [scriptAnchorId, setScriptAnchorId] = useState<string>('');
+  const [seedScript, setSeedScript] = useState<AssembledSeedCallScript | null>(null);
+  const [scriptLoading, setScriptLoading] = useState(false);
+  const [reportQrDownloading, setReportQrDownloading] = useState<string | null>(null);
+  const [reportQrDesignerChannel, setReportQrDesignerChannel] = useState<
+    'in_person' | 'text' | 'email' | 'social' | 'phone' | null
+  >(null);
   const [touches, setTouches] = useState<OutreachTouch[]>([]);
   const [touchChannel, setTouchChannel] = useState<
     'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'visit' | 'other'
@@ -418,6 +479,24 @@ export default function PresenceSeedDetailPage() {
     }
   }, [seedId]);
 
+  const loadReportQrKit = useCallback(async () => {
+    try {
+      const kit = await directoryPresenceAdminService.getReportQrKit(seedId);
+      setReportQrKit(kit);
+    } catch (err) {
+      clientLogger.error('Failed to load report QR kit:', { detail: err });
+    }
+  }, [seedId]);
+
+  const loadAnchors = useCallback(async () => {
+    try {
+      const list = await directoryPresenceAdminService.listOutreachAnchors(seedId);
+      setAnchors(list);
+    } catch (err) {
+      clientLogger.error('Failed to load outreach anchors:', { detail: err });
+    }
+  }, [seedId]);
+
   const loadTouches = useCallback(async () => {
     try {
       const list = await directoryPresenceAdminService.listOutreachTouches(seedId);
@@ -426,6 +505,71 @@ export default function PresenceSeedDetailPage() {
       clientLogger.error('Failed to load outreach touches:', { detail: err });
     }
   }, [seedId]);
+
+  const loadReportVersions = useCallback(async () => {
+    try {
+      const list = await directoryPresenceAdminService.listReportVersions(seedId);
+      setReportVersions(list);
+    } catch (err) {
+      clientLogger.error('Failed to load report versions:', { detail: err });
+    }
+  }, [seedId]);
+
+  const loadReengagement = useCallback(async () => {
+    try {
+      const suggestion = await directoryPresenceAdminService.getReEngagementSuggestion(seedId);
+      setReengagement(suggestion);
+    } catch (err) {
+      clientLogger.error('Failed to load re-engagement suggestion:', { detail: err });
+    }
+  }, [seedId]);
+
+  const handleRecordContact = async (anchorId: string) => {
+    setActionError(null);
+    setRecordingContact(true);
+    try {
+      const verificationResults: AnchorVerificationResult[] = [];
+      if (contactForm.resultType) {
+        verificationResults.push({
+          type: contactForm.resultType,
+          field: contactForm.field || undefined,
+          new_value:
+            contactForm.resultType === 'fact_corrected'
+              ? contactForm.newValue || undefined
+              : undefined,
+          owner_response: contactForm.ownerResponse || undefined,
+        });
+      }
+      const res = await directoryPresenceAdminService.recordAnchorContact(anchorId, {
+        seedId,
+        callResult: contactForm.callResult,
+        channel: contactForm.channel,
+        verificationResults,
+        notes: contactForm.notes || undefined,
+      });
+      if (!res) {
+        setActionError('Failed to record contact.');
+        return;
+      }
+      setContactAnchorId(null);
+      setContactForm({
+        callResult: 'connected',
+        channel: 'call',
+        resultType: '',
+        field: '',
+        newValue: '',
+        ownerResponse: '',
+        notes: '',
+      });
+      setActionSuccess('Contact recorded.');
+      loadAnchors();
+      loadTouches();
+    } catch {
+      setActionError('Failed to record contact.');
+    } finally {
+      setRecordingContact(false);
+    }
+  };
 
   const loadComposed = useCallback(async () => {
     try {
@@ -442,8 +586,31 @@ export default function PresenceSeedDetailPage() {
   useEffect(() => {
     fetchDetail();
     loadQrKit();
+    loadReportQrKit();
+    loadAnchors();
     loadTouches();
-  }, [fetchDetail, loadQrKit, loadTouches]);
+    loadReportVersions();
+    loadReengagement();
+  }, [fetchDetail, loadQrKit, loadReportQrKit, loadAnchors, loadTouches, loadReportVersions, loadReengagement]);
+
+  // Load the verification call script — refetches when the anchor selection
+  // changes so the script reflects the anchor's questions + transition.
+  useEffect(() => {
+    let cancelled = false;
+    setScriptLoading(true);
+    directoryPresenceAdminService
+      .getSeedCallScript(seedId, scriptAnchorId || undefined)
+      .then((script) => {
+        if (!cancelled) setSeedScript(script);
+      })
+      .catch((err) => {
+        if (!cancelled) clientLogger.error('Failed to load seed call script:', { detail: err });
+      })
+      .finally(() => {
+        if (!cancelled) setScriptLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [seedId, scriptAnchorId]);
 
   useEffect(() => {
     if (seedId) loadComposed();
@@ -481,6 +648,28 @@ export default function PresenceSeedDetailPage() {
       setActionError(
         err instanceof Error ? err.message : 'Failed to generate invite',
       );
+    }
+  };
+
+  const handleReportQrDownload = async (
+    channel: 'in_person' | 'text' | 'email' | 'social' | 'phone',
+    kind: 'png' | 'postcard',
+  ) => {
+    const key = `report-${channel}-${kind}`;
+    setActionError(null);
+    try {
+      setReportQrDownloading(key);
+      if (kind === 'png') {
+        await directoryPresenceAdminService.downloadReportPng(seedId, channel);
+      } else {
+        await directoryPresenceAdminService.downloadReportPostcard(seedId, channel);
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to download QR artifact',
+      );
+    } finally {
+      setReportQrDownloading(null);
     }
   };
 
@@ -735,6 +924,51 @@ export default function PresenceSeedDetailPage() {
     : [];
   const qrDesignerConfig = qrDesignerVariant
     ? qrVariants.find((v) => v.variant === qrDesignerVariant) ?? null
+    : null;
+
+  // Report QR kit channels — one tracked redirect URL per delivery channel.
+  // Mirrors the claim QR kit but for report delivery (spec §13.6).
+  const reportQrChannels = reportQrKit
+    ? [
+        {
+          channel: 'in_person' as const,
+          title: 'In-person leave-behind',
+          desc: 'Printed card QR handed to the owner — scans record as report_delivery_in_person.',
+          url: reportQrKit.qrUrlInPerson,
+          postcard: true,
+        },
+        {
+          channel: 'text' as const,
+          title: 'Text message',
+          desc: 'Text the tracked link — taps record as report_delivery_text.',
+          url: reportQrKit.qrUrlText,
+          postcard: false,
+        },
+        {
+          channel: 'email' as const,
+          title: 'Email link',
+          desc: 'Embed the tracked link in an outreach email — taps record as report_delivery_email.',
+          url: reportQrKit.qrUrlEmail,
+          postcard: false,
+        },
+        {
+          channel: 'social' as const,
+          title: 'Social / DM link',
+          desc: 'Send the tracked link in a DM or post — taps record as report_delivery_social.',
+          url: reportQrKit.qrUrlSocial,
+          postcard: false,
+        },
+        {
+          channel: 'phone' as const,
+          title: 'Phone follow-up',
+          desc: 'Send the tracked link after a call — taps record as report_delivery_phone.',
+          url: reportQrKit.qrUrlPhone,
+          postcard: false,
+        },
+      ]
+    : [];
+  const reportQrDesignerConfig = reportQrDesignerChannel
+    ? reportQrChannels.find((c) => c.channel === reportQrDesignerChannel) ?? null
     : null;
 
   // Public shelf page for a category name. Unclaimed seeds render on
@@ -1987,6 +2221,687 @@ export default function PresenceSeedDetailPage() {
           allowPostcard={qrDesignerConfig.postcard}
         />
       )}
+
+      {/* Report QR Kit — delivery channels for the seed intelligence report */}
+      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Report QR Kit</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Each artifact encodes a tracked redirect for the seed intelligence
+              report, so scans are recorded before the owner lands on the report
+              preview. Print the in-person variant on leave-behind cards, text the
+              tracked link directly, and use email/social/phone variants for
+              remote outreach — all five stay separate in QR analytics.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setActionError(null);
+                setRefreshingReport(true);
+                try {
+                  const res = await directoryPresenceAdminService.refreshReport(seedId);
+                  if (!res) {
+                    setActionError('Report refresh failed.');
+                  } else {
+                    setActionSuccess(
+                      res.reused
+                        ? `Report unchanged — still version ${res.version}.`
+                        : res.lint_passed
+                          ? `Report version ${res.version} published.`
+                          : `Report version ${res.version} created but not published (lint findings).`,
+                    );
+                    if (!res.lint_passed && res.lint_findings.length > 0) {
+                      setActionError(`Lint: ${res.lint_findings[0].message}`);
+                    }
+                    loadReportQrKit();
+                    loadReportVersions();
+                  }
+                } catch {
+                  setActionError('Report refresh failed.');
+                } finally {
+                  setRefreshingReport(false);
+                }
+              }}
+              disabled={refreshingReport}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {refreshingReport ? 'Refreshing…' : 'Refresh report'}
+            </button>
+            {reportQrKit && (
+              <>
+                <a
+                  href={`/seed-report/${seedId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View Report
+                </a>
+                <button
+                  onClick={async () => {
+                    setActionError(null);
+                    try {
+                      const blob = await directoryPresenceAdminService.downloadReportPdf(seedId);
+                      if (blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `seed-report-${seedId}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } else {
+                        setActionError('No published report available for PDF generation.');
+                      }
+                    } catch {
+                      setActionError('Failed to download report PDF.');
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Report PDF
+                </button>
+              </>
+            )}
+            <QrCode className="w-5 h-5 text-gray-400 shrink-0" />
+          </div>
+        </div>
+
+        {status === 'claimed' ? (
+          <p className="text-sm text-gray-500">
+            This seed has been claimed — report delivery QR artifacts are no longer needed.
+          </p>
+        ) : !reportQrKit ? (
+          <p className="text-sm text-gray-500">
+            {status === 'draft' || status === 'suppressed'
+              ? 'No published report — build the intelligence report first, then a claim token will be issued for delivery.'
+              : 'No published report — the report must pass lint before QR artifacts are available.'}
+          </p>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-4">
+            {reportQrChannels.map((c) => (
+              <div
+                key={c.channel}
+                className="border border-gray-200 rounded-lg p-4 space-y-3"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{c.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{c.desc}</p>
+                </div>
+                <div className="flex justify-center">
+                  <ClaimQrPreview url={c.url} />
+                </div>
+                <p className="text-xs font-mono text-gray-600 break-all bg-gray-50 rounded px-2 py-1.5">
+                  {c.url}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(c.channel === 'text' || c.channel === 'social' || c.channel === 'email') && (
+                    <button
+                      onClick={() => {
+                        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                          navigator.clipboard.writeText(c.url);
+                          setCopiedQrLink(`report-${c.channel}`);
+                          setTimeout(() => setCopiedQrLink(null), 2000);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+                    >
+                      {copiedQrLink === `report-${c.channel}` ? 'Copied' : 'Copy link'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setReportQrDesignerChannel(c.channel)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+                    title="Open the styled QR designer — templates, colors, platform logo"
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    Design
+                  </button>
+                  <button
+                    onClick={() => handleReportQrDownload(c.channel, 'png')}
+                    disabled={reportQrDownloading !== null}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {reportQrDownloading === `report-${c.channel}-png` ? 'Downloading…' : 'QR PNG'}
+                  </button>
+                  {c.postcard && (
+                    <button
+                      onClick={() => handleReportQrDownload(c.channel, 'postcard')}
+                      disabled={reportQrDownloading !== null}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {reportQrDownloading === `report-${c.channel}-postcard`
+                        ? 'Downloading…'
+                        : 'Postcard PDF'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Report version history — immutable versions (spec §5.3) */}
+        {reportVersions.length > 0 && (
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+              Report versions
+            </p>
+            <div className="space-y-1">
+              {reportVersions.map((v) => (
+                <div key={v.version} className="flex items-center gap-3 text-xs">
+                  <span className="font-mono text-gray-900">v{v.version}</span>
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                      v.status === 'complete' || v.status === 'claimed'
+                        ? 'bg-green-100 text-green-700'
+                        : v.status === 'provisional'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {v.status}
+                  </span>
+                  <span className="text-gray-500">
+                    {v.generated_at ? formatDate(v.generated_at) : '—'}
+                  </span>
+                  <span className="text-gray-400">{v.evidence_count} obs</span>
+                  {!v.published_at && (
+                    <span className="text-amber-600">unpublished</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Re-engagement suggestion (spec §5.4) — shown when a new version
+            has a meaningful delta and the courtesy window allows contact. */}
+        {reengagement && reengagement.suggested && (
+          <div className="border-t border-gray-100 pt-3">
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-emerald-800">
+                Re-engagement suggested — v{reengagement.currentVersion} has a meaningful delta
+              </p>
+              {reengagement.delta?.changes && reengagement.delta.changes.length > 0 && (
+                <ul className="text-xs text-emerald-700 list-disc pl-4 space-y-0.5">
+                  {reengagement.delta.changes.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[11px] text-emerald-600">
+                Lead with the delta — e.g. "We refreshed the business record we
+                prepared for you and found {reengagement.delta?.changes?.[0]?.toLowerCase() ?? 'new information'}.
+                The updated report is ready if you would like to review and claim it."
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {reportQrDesignerConfig && (
+        <ReportQrDesignerModal
+          open
+          onClose={() => setReportQrDesignerChannel(null)}
+          seedId={seedId}
+          channel={reportQrDesignerConfig.channel}
+          title={reportQrDesignerConfig.title}
+          url={reportQrDesignerConfig.url}
+          allowPostcard={reportQrDesignerConfig.postcard}
+        />
+      )}
+
+      {/* Outreach Anchors — manual outreach thesis layer (spec §11) */}
+      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Outreach Anchors</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Operator-selected outreach theses — focused questions to verify
+              during contact. Anchors affect outreach copy only; they do not
+              change the detected archetype.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAnchorForm(!showAnchorForm)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Anchor
+          </button>
+        </div>
+
+        {/* Create anchor form */}
+        {showAnchorForm && (
+          <div className="border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Anchor Type</label>
+                <select
+                  value={anchorForm.anchorType}
+                  onChange={(e) => setAnchorForm({ ...anchorForm, anchorType: e.target.value as ManualAnchorType })}
+                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                >
+                  <option value="seed_claim_invitation">Seed claim invitation</option>
+                  <option value="identity_verification">Identity verification</option>
+                  <option value="address_verification">Address verification</option>
+                  <option value="hours_verification">Hours verification</option>
+                  <option value="operating_status_verification">Operating status</option>
+                  <option value="website_or_profile_claim">Website/profile claim</option>
+                  <option value="category_verification">Category verification</option>
+                  <option value="service_verification">Service verification</option>
+                  <option value="customer_discovery_problem">Customer discovery problem</option>
+                  <option value="listing_accuracy">Listing accuracy</option>
+                  <option value="owner_reported_pain">Owner reported pain</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Title</label>
+                <input
+                  type="text"
+                  value={anchorForm.title}
+                  onChange={(e) => setAnchorForm({ ...anchorForm, title: e.target.value })}
+                  placeholder="e.g., Verify business address"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Operator Thesis</label>
+              <textarea
+                value={anchorForm.operatorThesis}
+                onChange={(e) => setAnchorForm({ ...anchorForm, operatorThesis: e.target.value })}
+                placeholder="What do you want to verify or accomplish during contact?"
+                rows={2}
+                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Verification Question</label>
+              <input
+                type="text"
+                value={anchorForm.verificationQuestion}
+                onChange={(e) => setAnchorForm({ ...anchorForm, verificationQuestion: e.target.value })}
+                placeholder="e.g., Is this still the correct business information?"
+                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  setActionError(null);
+                  if (!anchorForm.title || !anchorForm.operatorThesis || !anchorForm.verificationQuestion) {
+                    setActionError('Title, operator thesis, and verification question are required.');
+                    return;
+                  }
+                  try {
+                    await directoryPresenceAdminService.createOutreachAnchor(seedId, {
+                      anchorType: anchorForm.anchorType,
+                      title: anchorForm.title,
+                      operatorThesis: anchorForm.operatorThesis,
+                      verificationQuestion: anchorForm.verificationQuestion,
+                      painQuestion: anchorForm.painQuestion || undefined,
+                      recommendedTransition: anchorForm.recommendedTransition || undefined,
+                    });
+                    setActionSuccess('Anchor created.');
+                    setShowAnchorForm(false);
+                    setAnchorForm({
+                      anchorType: 'seed_claim_invitation',
+                      title: '',
+                      operatorThesis: '',
+                      verificationQuestion: '',
+                      painQuestion: '',
+                      recommendedTransition: '',
+                    });
+                    loadAnchors();
+                  } catch {
+                    setActionError('Failed to create anchor.');
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"
+              >
+                Create Anchor
+              </button>
+              <button
+                onClick={() => setShowAnchorForm(false)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {anchors.length === 0 ? (
+          <p className="text-sm text-gray-500">No outreach anchors yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {anchors.map((a) => (
+              <div
+                key={a.id}
+                className={`border rounded-lg p-4 space-y-2 ${
+                  a.status === 'retired' ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-gray-200'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{a.anchor_type.replace(/_/g, ' ')}</p>
+                  </div>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      a.status === 'active'
+                        ? 'bg-green-100 text-green-700'
+                        : a.status === 'used'
+                          ? 'bg-blue-100 text-blue-700'
+                          : a.status === 'retired'
+                            ? 'bg-gray-100 text-gray-500'
+                            : 'bg-yellow-100 text-yellow-700'
+                    }`}
+                  >
+                    {a.status}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600">{a.operator_thesis}</p>
+                <div className="flex flex-wrap gap-2">
+                  {a.status === 'draft' && (
+                    <button
+                      onClick={async () => {
+                        setActionError(null);
+                        try {
+                          await directoryPresenceAdminService.activateOutreachAnchor(a.id);
+                          loadAnchors();
+                          setActionSuccess('Anchor activated.');
+                        } catch {
+                          setActionError('Failed to activate anchor.');
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-gray-300 text-gray-700 rounded text-xs font-medium hover:bg-gray-50"
+                    >
+                      <CheckCircle className="w-3 h-3" />
+                      Activate
+                    </button>
+                  )}
+                  {(a.status === 'draft' || a.status === 'active') && (
+                    <button
+                      onClick={async () => {
+                        setActionError(null);
+                        try {
+                          await directoryPresenceAdminService.retireOutreachAnchor(a.id);
+                          loadAnchors();
+                          setActionSuccess('Anchor retired.');
+                        } catch {
+                          setActionError('Failed to retire anchor.');
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-gray-300 text-gray-500 rounded text-xs font-medium hover:bg-gray-50"
+                    >
+                      <Ban className="w-3 h-3" />
+                      Retire
+                    </button>
+                  )}
+                  {a.status === 'active' && (
+                    <button
+                      onClick={() =>
+                        setContactAnchorId(contactAnchorId === a.id ? null : a.id)
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-blue-300 text-blue-700 rounded text-xs font-medium hover:bg-blue-50"
+                    >
+                      <Phone className="w-3 h-3" />
+                      Record contact
+                    </button>
+                  )}
+                </div>
+                {contactAnchorId === a.id && (
+                  <div className="border-t border-gray-100 pt-3 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Call result</label>
+                        <select
+                          value={contactForm.callResult}
+                          onChange={(e) => setContactForm({ ...contactForm, callResult: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                        >
+                          <option value="connected">connected</option>
+                          <option value="no_answer">no_answer</option>
+                          <option value="voicemail">voicemail</option>
+                          <option value="refused">refused</option>
+                          <option value="wrong_number">wrong_number</option>
+                          <option value="follow_up">follow_up</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Channel</label>
+                        <select
+                          value={contactForm.channel}
+                          onChange={(e) => setContactForm({ ...contactForm, channel: e.target.value as typeof contactForm.channel })}
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                        >
+                          <option value="call">call</option>
+                          <option value="email">email</option>
+                          <option value="sms">sms</option>
+                          <option value="mail">mail</option>
+                          <option value="form">form</option>
+                          <option value="referral">referral</option>
+                          <option value="visit">visit</option>
+                          <option value="other">other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Verification result</label>
+                        <select
+                          value={contactForm.resultType}
+                          onChange={(e) => setContactForm({ ...contactForm, resultType: e.target.value as typeof contactForm.resultType })}
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                        >
+                          <option value="">(none)</option>
+                          <option value="identity_confirmed">identity_confirmed</option>
+                          <option value="identity_not_confirmed">identity_not_confirmed</option>
+                          <option value="fact_confirmed">fact_confirmed</option>
+                          <option value="fact_corrected">fact_corrected</option>
+                          <option value="fact_disputed">fact_disputed</option>
+                          <option value="pain_confirmed">pain_confirmed</option>
+                          <option value="pain_not_present">pain_not_present</option>
+                          <option value="pain_discovered">pain_discovered</option>
+                          <option value="claim_accepted">claim_accepted</option>
+                          <option value="claim_declined">claim_declined</option>
+                          <option value="unreachable">unreachable</option>
+                          <option value="not_attempted">not_attempted</option>
+                          <option value="follow_up_requested">follow_up_requested</option>
+                          <option value="other">other</option>
+                        </select>
+                      </div>
+                    </div>
+                    {contactForm.resultType && contactForm.resultType.startsWith('fact_') && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Field</label>
+                          <input
+                            type="text"
+                            value={contactForm.field}
+                            onChange={(e) => setContactForm({ ...contactForm, field: e.target.value })}
+                            placeholder="e.g. phone, address, hours"
+                            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                          />
+                        </div>
+                        {contactForm.resultType === 'fact_corrected' && (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Corrected value (owner-reported)</label>
+                            <input
+                              type="text"
+                              value={contactForm.newValue}
+                              onChange={(e) => setContactForm({ ...contactForm, newValue: e.target.value })}
+                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {contactForm.resultType && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Owner response</label>
+                        <input
+                          type="text"
+                          value={contactForm.ownerResponse}
+                          onChange={(e) => setContactForm({ ...contactForm, ownerResponse: e.target.value })}
+                          placeholder="What the owner said"
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                      <input
+                        type="text"
+                        value={contactForm.notes}
+                        onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRecordContact(a.id)}
+                        disabled={recordingContact}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        {recordingContact ? 'Recording…' : 'Save contact'}
+                      </button>
+                      <button
+                        onClick={() => setContactAnchorId(null)}
+                        className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-xs font-medium hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Verification Call Script — seed-side script driven by the selected anchor (spec §13.3) */}
+      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Verification Call Script</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Verification-call script for this seed. Selecting an anchor drives the
+              verification question, pain probe, and transition stages.
+            </p>
+          </div>
+          {seedScript?.callContext.phone && (
+            <a
+              href={`tel:${seedScript.callContext.phone}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              {seedScript.callContext.phone}
+            </a>
+          )}
+        </div>
+
+        {/* Anchor picker */}
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-gray-700 whitespace-nowrap">Outreach anchor</label>
+          <select
+            value={scriptAnchorId}
+            onChange={(e) => setScriptAnchorId(e.target.value)}
+            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+          >
+            <option value="">(none — generic verification)</option>
+            {anchors
+              .filter((a) => a.status === 'active' || a.status === 'draft')
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.title} ({a.status})
+                </option>
+              ))}
+          </select>
+          {scriptLoading && <span className="text-xs text-gray-400">Loading…</span>}
+        </div>
+
+        {seedScript && (
+          <div className="space-y-3">
+            {seedScript.anchor && (
+              <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-blue-900">Anchor: {seedScript.anchor.title}</p>
+                <p className="text-xs text-blue-700 mt-0.5">{seedScript.anchor.operator_thesis}</p>
+              </div>
+            )}
+
+            {(
+              [
+                ['1. Verify', seedScript.stages.verify],
+                ['2. Report hook', seedScript.stages.report_hook],
+                ['3. Verification', seedScript.stages.verification],
+                ['4. Pain probe', seedScript.stages.pain_probe],
+                ['5. Transition', seedScript.stages.transition],
+                ['6. Claim ask', seedScript.stages.claim_ask],
+                ['7. Close', seedScript.stages.close],
+              ] as Array<[string, string | null]>
+            ).map(([label, text]) =>
+              text ? (
+                <div key={label} className="border border-gray-100 rounded-lg p-3">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+                  <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{text}</p>
+                </div>
+              ) : null,
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <a
+                href={seedScript.callContext.report_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Report link
+              </a>
+              {seedScript.callContext.claim_url && (
+                <a
+                  href={seedScript.callContext.claim_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Claim link
+                </a>
+              )}
+              {seedScript.callContext.claim_short_url && (
+                <span className="text-gray-400">
+                  short: {seedScript.callContext.claim_short_url}
+                </span>
+              )}
+            </div>
+
+            {seedScript.anchor && (
+              <button
+                onClick={() => {
+                  setContactAnchorId(seedScript.anchor!.id);
+                  setScriptAnchorId(seedScript.anchor!.id);
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-blue-300 text-blue-700 rounded text-xs font-medium hover:bg-blue-50"
+              >
+                <Phone className="w-3 h-3" />
+                Record contact for this anchor
+              </button>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Outreach & Enrichment */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">

@@ -62,12 +62,20 @@ Spec: `docs/LocalBiz/AUTOMATED_SEED_INTELLIGENCE_REPORT_SPEC.md`
 - `271_directory_field_provenance_evidence_state.sql` — adds `evidence_state` (varchar 40, CHECK-constrained to the 9-state taxonomy) + `notes` (text) to `directory_field_provenance`. Backfills existing rows: `owner_confirmed` when `override_by IS NOT NULL`, else `observed`. Run against `local` + `prd`.
 - `272_mkt_outreach_log_anchor_columns.sql` — adds `anchor_id` (varchar 255), `anchor_snapshot` (jsonb), `verification_results` (jsonb) to `mkt_outreach_log`. All nullable; existing rows unaffected. Run against `local` + `prd`.
 - `273_mkt_seed_intelligence_reports.sql` — creates `mkt_seed_intelligence_reports` table for immutable versioned report snapshots (§12.2). `report_data` is the SeedIntelligenceReport DTO; `evidence_refs` references existing provenance/audit/signal/outreach/claim IDs (NOT a duplicate observation store). Run against `local` + `prd`.
+- `274_mkt_outreach_anchors.sql` — creates `mkt_outreach_anchors` (§12.4): operator outreach theses scoped to `seed_id` / `campaign_id` / `business_prospect_id` (at least one required), lifecycle `draft → active → used → retired`. Anchor contact events snapshot the anchor into `mkt_outreach_log.anchor_snapshot` + `verification_results`; `fact_confirmed`/`fact_corrected` results also write `directory_seed_nap_verifications` rows (`owner_corrected` FALSE/TRUE respectively). Run against `local` + `prd`.
 - `seed:intelligence-discovery-signals` — seeds the 11 `INT_*` discovery signal codes into `mkt_signal_registry` as a new `INT` family. Idempotent update-in-place. Run against `local` + `prd`:
   ```powershell
   doppler run --config local -- pnpm seed:intelligence-discovery-signals
   doppler run --config prd --    pnpm seed:intelligence-discovery-signals
   ```
   Bump `SEED_VERSION_MARKER` in `src/scripts/seed-intelligence-discovery-signals.ts` to force label/description re-sync on already-registered rows.
+
+Report pipeline notes:
+- **Shared prompt directives (§6.1, §6.10)** live in `apps/api/src/services/intelligence/report-directives.ts` and are composed ONCE by `PromptComposerService.composeIntelligencePrompt` — never copy them into fragment bodies or seed transforms. Bump `REPORT_DIRECTIVES_VERSION` on text changes.
+- **Report generation:** `SeedIntelligenceReportService.refreshReport(seedId)` builds from `SeedReportEvidenceService.buildSubstrateEvidence` (legacy seeds need no prompt output) and is idempotent via an `evidence_snapshot_hash` in `generated_from`. Triggered best-effort after anchor verification results, claim completion (both claim paths), and owner NAP corrections. Admin: `POST .../presence-seeds/:id/report/refresh`, `GET .../report/versions`, `GET .../report-pdf?version=`.
+- **Public surface:** `GET /api/public/marketing/seed/:seedId/report` (+ `/preview`, `/report/pdf`); claimed-owner: `GET /api/customer/marketing/seed/:seedId/report` (verifies approved `directory_claim_requests` row).
+- **§13.4:** `POST /api/admin/marketing-ops/:id/outreach` accepts `anchor_id` + `verification_results` — validated before the log row is created, then `attachAnchorToOutreachLog` back-fills snapshot + seed touch + NAP write-back + report refresh.
+- **Connected-contact gate (§20.4):** `fact_confirmed`/`fact_corrected` only write NAP verification rows when `callResult` is a connected outcome; no-answer/voicemail/wrong-number cannot produce verified facts.
 
 After applying migrations 271–272, run `pnpm prisma:generate` (or `doppler run --config local -- pnpm prisma db pull && pnpm prisma generate`) so the Prisma Client picks up the new columns.
 

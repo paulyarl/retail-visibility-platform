@@ -2246,3 +2246,8 @@ export function generateSeedIntelligenceReportId(): string {
   return `sir-${nanoid()}`;
 }
 
+export function generateManualOutreachAnchorId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `anchor-${nanoid()}`;
+}
+

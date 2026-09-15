@@ -1136,4 +1136,46 @@ router.post('/checkout/confirm', requireCustomerAuth, requirePlatformContext, as
   }
 });
 
+// ── Claimed-owner seed report (§13.1, §14.3, §23.2) ─────────────────────
+
+/**
+ * GET /api/customer/marketing/seed/:seedId/report
+ *
+ * Returns the latest published seed intelligence report for a seed the
+ * customer has claimed. Ownership is verified via an approved
+ * directory_claim_requests row linking the customer to the seed.
+ * Uses requireCustomerAuth (not requirePlatformContext) — a directory
+ * claim is free and may not involve a purchase.
+ */
+router.get('/seed/:seedId/report', requireCustomerAuth, async (req: Request, res: Response) => {
+  const customerId = (req as any).customerId;
+  const { seedId } = req.params;
+
+  try {
+    const claimRows = await prisma.$queryRaw<any[]>`
+      SELECT id FROM directory_claim_requests
+      WHERE customer_id = ${customerId}
+        AND seed_id = ${seedId}
+        AND status = 'approved'
+      LIMIT 1
+    `;
+    if (!claimRows[0]) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'No claimed seed found for this account' });
+    }
+
+    const { SeedIntelligenceReportService } = await import(
+      '../services/intelligence/SeedIntelligenceReportService.js'
+    );
+    const report = await SeedIntelligenceReportService.getInstance().getLatestPublishedReport(seedId);
+    if (!report) {
+      return res.status(404).json({ success: false, error: 'no_published_report' });
+    }
+
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    logger.error('[marketing-customer] GET /seed/:seedId/report error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
 export default router;

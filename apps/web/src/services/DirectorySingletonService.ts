@@ -141,6 +141,7 @@ export interface DirectoryConsolidated {
     listingOrigin?: string | null;
     publicDisclaimer?: string | null;
     activeClaimToken?: string | null;
+    seedId?: string | null;
   };
   storeTypes: any[];
   categoryCounts: any[];

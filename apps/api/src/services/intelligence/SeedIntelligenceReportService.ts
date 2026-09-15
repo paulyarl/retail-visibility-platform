@@ -21,7 +21,9 @@
  * Pattern: singleton extends BaseService (mirrors SeedReportEvidenceService).
  */
 
+import { createHash } from 'crypto';
 import { BaseService } from '../BaseService';
+import { audit } from '../../audit';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateSeedIntelligenceReportId } from '../../lib/id-generator';
@@ -50,6 +52,7 @@ import {
   type NextActionSection,
   type ReportGenerationMetadata,
   evaluateClaimHookEligibility,
+  computeDeltaSummary,
 } from '../../validators/seed-report-dto.schema';
 import {
   type ReportEvidenceOutput,
@@ -74,6 +77,12 @@ export interface BuildReportInput {
   promptTemplates: Array<{ template_id: string; template_version: number }>;
   /** Source snapshot IDs from the discovery run (§5.5). */
   sourceSnapshotIds: string[];
+  /**
+   * Idempotency hash over report-visible inputs (§22.3). Stored in
+   * generated_from so a refresh retry with unchanged inputs can reuse the
+   * latest version instead of minting a duplicate.
+   */
+  evidenceSnapshotHash?: string;
   /** Optional operator context for logging. */
   ctx?: RequestCtx;
 }
@@ -196,6 +205,7 @@ export class SeedIntelligenceReportService extends BaseService {
         prompt_templates: promptTemplates,
         source_snapshot_ids: sourceSnapshotIds,
         evidence_ids: normalizedEvidence.observations_with_ids.map((o) => o.observation_id!).filter(Boolean),
+        ...(input.evidenceSnapshotHash ? { evidence_snapshot_hash: input.evidenceSnapshotHash } : {}),
       },
       evidence_count: evidence.observations.length,
       unresolved_count: evidence.unresolved_questions.length,
@@ -222,12 +232,60 @@ export class SeedIntelligenceReportService extends BaseService {
       });
     }
 
-    // 11. Determine next version number
+    // 11. Determine next version number + compute the delta vs the prior
+    //     version (§5.4) so re-engagement can lead with what changed.
     const nextVersion = await this.getNextVersion(seedId, ctx);
     report.version = nextVersion;
 
+    try {
+      const priorRows = await this.prisma.$queryRaw<any[]>`
+        SELECT report_data FROM mkt_seed_intelligence_reports
+        WHERE seed_id = ${seedId}
+        ORDER BY version DESC
+        LIMIT 1
+      `;
+      report.delta_summary = computeDeltaSummary(
+        (priorRows?.[0]?.report_data as SeedIntelligenceReport | undefined) ?? null,
+        report,
+      );
+    } catch (err: any) {
+      logger.warn('SeedIntelligenceReportService: delta computation failed (non-blocking)', ctx, {
+        seedId,
+        error: err?.message,
+      });
+    }
+
     // 12. Persist the immutable report version
     const persisted = await this.persistReport(report, normalizedEvidence, lint, ctx);
+
+    // 13. Claim handoff (§13.5): a CTA-eligible unclaimed seed needs a live
+    //     claim token for the report CTA/QR. Mint one when none is active so
+    //     the published report always carries a working claim path. Minting
+    //     flips the seed to 'invited' (claim invited state). Best-effort —
+    //     a mint failure must not fail report generation.
+    if (eligibility.eligible && !seedState.claimed_at) {
+      try {
+        const activeTokens = await this.prisma.$queryRaw<any[]>`
+          SELECT 1 FROM directory_claim_tokens
+          WHERE seed_id = ${seedId}
+            AND consumed_at IS NULL
+            AND (expires_at IS NULL OR expires_at > now())
+          LIMIT 1
+        `;
+        if (!activeTokens[0]) {
+          const { default: seedService } = await import('../DirectoryPresenceSeedService.js');
+          await seedService.inviteSeed(seedId, 90, {
+            actorType: 'system',
+            actorId: ctx?.userId ?? 'system',
+          });
+        }
+      } catch (err: any) {
+        logger.warn('SeedIntelligenceReportService: claim token mint failed (non-blocking)', ctx, {
+          seedId,
+          error: err?.message,
+        });
+      }
+    }
 
     return {
       report,
@@ -235,6 +293,216 @@ export class SeedIntelligenceReportService extends BaseService {
       persisted,
       reportId,
       version: nextVersion,
+    };
+  }
+
+  // ─── Operator refresh (§5.1 trigger, §22.3 idempotency) ───────────────
+
+  /**
+   * Build a report version from the existing substrate only (no prompt
+   * output required). This is the operator-initiated refresh path and the
+   * trigger target for §5.1 events (claim, owner correction, verification
+   * event) — it also lets legacy seeds produce a provisional report.
+   *
+   * Idempotency (§22.3): hashes the report-visible inputs
+   * (seed identity, provenance, NAP verifications, outreach touches) into
+   * an evidence_snapshot_hash. When the latest stored version carries the
+   * same hash, that version is returned instead of creating a duplicate.
+   */
+  async refreshReport(
+    seedId: string,
+    ctx?: RequestCtx,
+  ): Promise<BuildReportResult & { reused: boolean }> {
+    this.logOperation('SeedIntelligenceReportService.refreshReport', { seedId });
+
+    const [seedState, normalizedEvidence, napVerifications, outreachTouches] = await Promise.all([
+      this.evidenceService.getResolvedSeedState(seedId, ctx),
+      this.evidenceService.buildSubstrateEvidence(seedId, ctx),
+      this.evidenceService.getNapVerifications(seedId, ctx),
+      this.evidenceService.getSeedOutreachTouches(seedId, ctx),
+    ]);
+
+    if (!seedState) {
+      throw new Error(`Seed not found: ${seedId}`);
+    }
+
+    const snapshotHash = createHash('sha256')
+      .update(JSON.stringify({
+        seed_state: {
+          identity_confidence: seedState.identity_confidence,
+          category_fit: seedState.category_fit,
+          category: seedState.category,
+          city: seedState.city,
+          state: seedState.state,
+          name_variants: seedState.name_variants,
+          claimed_at: seedState.claimed_at,
+          status: seedState.status,
+          outreach_state: seedState.outreach_state,
+          nap_verified_at: seedState.nap_verified_at,
+        },
+        evidence: normalizedEvidence.evidence,
+        provenance_refs: normalizedEvidence.provenance_refs,
+        nap_verification_ids: napVerifications.map((v) => v.id),
+        outreach_touch_ids: outreachTouches.map((t) => t.id),
+        substrate_template: 'substrate-1',
+      }))
+      .digest('hex');
+
+    // Reuse the latest version when the inputs are unchanged (§22.3).
+    const latestRows = await this.prisma.$queryRaw<any[]>`
+      SELECT version, report_data,
+             source_snapshot->>'evidence_snapshot_hash' AS snapshot_hash
+      FROM mkt_seed_intelligence_reports
+      WHERE seed_id = ${seedId}
+      ORDER BY version DESC
+      LIMIT 1
+    `;
+    const latest = latestRows?.[0];
+    if (latest?.snapshot_hash && latest.snapshot_hash === snapshotHash) {
+      await audit({
+        actorType: ctx?.userId ? 'user' : 'system',
+        actor: ctx?.userId,
+        action: 'seed_intelligence_report.refresh',
+        payload: { seedId, reused: true, version: latest.version },
+      });
+      return {
+        report: latest.report_data as SeedIntelligenceReport,
+        lint: { passed: true, findings: [] },
+        persisted: false,
+        reportId: (latest.report_data as SeedIntelligenceReport).report_id,
+        version: latest.version,
+        reused: true,
+      };
+    }
+
+    const result = await this.buildReport({
+      seedId,
+      normalizedEvidence,
+      promptTemplates: [{ template_id: 'substrate', template_version: 1 }],
+      sourceSnapshotIds: [`substrate-${snapshotHash.slice(0, 12)}`],
+      evidenceSnapshotHash: snapshotHash,
+      ctx,
+    });
+
+    await audit({
+      actorType: ctx?.userId ? 'user' : 'system',
+      actor: ctx?.userId,
+      action: 'seed_intelligence_report.refresh',
+      payload: { seedId, reused: false, version: result.version, reportId: result.reportId },
+    });
+
+    return { ...result, reused: false };
+  }
+
+  // ─── Re-engagement suggestion (§5.4) ───────────────────────────────────
+
+  /**
+   * Evaluate whether a refreshed report justifies re-contacting the seed.
+   * All conditions from §5.4 must hold:
+   *   - the prior report was delivered (report_delivered touch exists)
+   *   - the seed remains unclaimed
+   *   - the prior report was not viewed or produced no response
+   *   - the latest version carries a meaningful delta (delta_summary)
+   *   - the courtesy/follow-up policy allows another contact (no recent
+   *     touch, no declined/opt-out outcome)
+   */
+  async getReEngagementSuggestion(
+    seedId: string,
+    ctx?: RequestCtx,
+  ): Promise<{
+    suggested: boolean;
+    reasons: string[];
+    delta: SeedIntelligenceReport['delta_summary'] | null;
+    priorVersion: number | null;
+    currentVersion: number | null;
+    lastDeliveryAt: string | null;
+    priorViewed: boolean;
+    seedClaimed: boolean;
+  }> {
+    const reasons: string[] = [];
+
+    const [versions, seedRows, deliveryRows, scanRows, responseRows] = await Promise.all([
+      this.prisma.$queryRaw<any[]>`
+        SELECT version, report_data FROM mkt_seed_intelligence_reports
+        WHERE seed_id = ${seedId}
+        ORDER BY version DESC
+        LIMIT 2
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT claimed_at, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT occurred_at FROM directory_seed_outreach_touches
+        WHERE seed_id = ${seedId} AND outcome = 'report_delivered'
+        ORDER BY occurred_at DESC
+        LIMIT 1
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT created_at FROM qr_scan_events
+        WHERE product_id = ${seedId} AND surface LIKE 'report_delivery%'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT outcome, occurred_at FROM directory_seed_outreach_touches
+        WHERE seed_id = ${seedId}
+          AND outcome NOT IN ('report_delivered', 'not_attempted')
+        ORDER BY occurred_at DESC
+        LIMIT 5
+      `,
+    ]);
+
+    const latest = versions?.[0];
+    const prior = versions?.[1];
+    const latestReport = latest?.report_data as SeedIntelligenceReport | undefined;
+    const delta = latestReport?.delta_summary ?? null;
+
+    const seedClaimed = !!seedRows?.[0]?.claimed_at || seedRows?.[0]?.status === 'claimed';
+    const lastDeliveryAt = deliveryRows?.[0]?.occurred_at
+      ? new Date(deliveryRows[0].occurred_at).toISOString()
+      : null;
+    const lastScanAt = scanRows?.[0]?.created_at ? new Date(scanRows[0].created_at) : null;
+    const priorViewed = !!(lastScanAt && lastDeliveryAt && lastScanAt >= new Date(lastDeliveryAt));
+
+    // §5.4 conditions
+    if (!lastDeliveryAt) reasons.push('prior report was never delivered');
+    if (seedClaimed) reasons.push('seed is already claimed');
+    if (!latest) reasons.push('no report versions exist');
+    if (!prior) reasons.push('no prior version to diff — first report is not a re-engagement event');
+    if (latest && !delta?.meaningful) reasons.push('latest version has no meaningful delta');
+
+    // Response check: any non-delivery touch after the last delivery counts
+    // as a response (contact made, claim response, etc.)
+    const responded = (responseRows ?? []).some(
+      (r) => lastDeliveryAt && new Date(r.occurred_at) > new Date(lastDeliveryAt),
+    );
+    if (priorViewed || responded) reasons.push('prior report was viewed or produced a response');
+
+    // Courtesy/follow-up policy: declined/opt-out outcomes block contact;
+    // require a quiet window since the last touch.
+    const RE_ENGAGEMENT_QUIET_DAYS = 7;
+    const lastTouch = responseRows?.[0];
+    if (lastTouch && ['declined', 'opt_out', 'do_not_contact'].includes(lastTouch.outcome)) {
+      reasons.push(`prior outcome "${lastTouch.outcome}" blocks further contact`);
+    }
+    const lastActivity = lastTouch?.occurred_at ?? lastDeliveryAt;
+    if (lastActivity) {
+      const quietUntil = new Date(lastActivity);
+      quietUntil.setDate(quietUntil.getDate() + RE_ENGAGEMENT_QUIET_DAYS);
+      if (new Date() < quietUntil) {
+        reasons.push(`quiet window until ${quietUntil.toISOString().slice(0, 10)}`);
+      }
+    }
+
+    return {
+      suggested: reasons.length === 0,
+      reasons,
+      delta,
+      priorVersion: prior?.version ?? null,
+      currentVersion: latest?.version ?? null,
+      lastDeliveryAt,
+      priorViewed,
+      seedClaimed,
     };
   }
 
@@ -281,6 +549,34 @@ export class SeedIntelligenceReportService extends BaseService {
         version: report.version,
         published: lint.passed,
       });
+
+      // §23.4 auditability — report generation + publication
+      await audit({
+        actorType: ctx?.userId ? 'user' : 'system',
+        actor: ctx?.userId,
+        action: 'seed_intelligence_report.generate',
+        payload: {
+          reportId: report.report_id,
+          seedId: report.seed_id,
+          version: report.version,
+          status: report.status,
+          reportMode: report.report_mode,
+          evidenceCount: report.evidence_count,
+          lintPassed: lint.passed,
+        },
+      });
+      if (lint.passed) {
+        await audit({
+          actorType: ctx?.userId ? 'user' : 'system',
+          actor: ctx?.userId,
+          action: 'seed_intelligence_report.publish',
+          payload: {
+            reportId: report.report_id,
+            seedId: report.seed_id,
+            version: report.version,
+          },
+        });
+      }
 
       return true;
     } catch (err: any) {

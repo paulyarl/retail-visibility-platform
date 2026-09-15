@@ -89,6 +89,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.listing_origin,
           dll.public_disclaimer,
           dll.attributes,
+          dps.id AS seed_id,
           dps.seo_enrichment->>'meta_title' as meta_title,
           dps.seo_enrichment->>'schema_type_hint' as schema_type_hint,
           (SELECT dct.token FROM directory_claim_tokens dct
@@ -360,6 +361,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
     // Transform the listing to match expected response format
     const transformedListing = listing ? {
       id: listing.id,
+      seedId: (listing as any).seed_id || null,
       tenantId: listing.tenant_id,
       businessName: listing.business_name,
       slug: listing.slug,

@@ -39,6 +39,8 @@ import {
   getClaimInviteKitMeta,
   type ClaimInviteQrVariant,
 } from '../services/ClaimInviteQrKitService';
+import SeedReportDeliveryService from '../services/intelligence/SeedReportDeliveryService';
+import type { ReportDeliveryChannel } from '../services/intelligence/SeedReportDeliveryService';
 import { HttpError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 
@@ -1884,6 +1886,424 @@ router.post('/presence-seeds/:id/qr-kit/postcard', requirePlatformStaff, async (
       return res.status(404).json({ error: 'no_active_claim_token' });
     }
     logger.error('[POST /api/admin/directory/presence-seeds/:id/qr-kit/postcard] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/* ====================
+   Report-delivery QR kit (Phase 5 — spec §13.6)
+   ==================== */
+
+/** Parse the report-qr-kit ?channel= query param; anything unrecognized falls
+ *  back to 'in_person' so a bad param can't produce a misattributed artifact. */
+function parseReportChannel(raw: unknown): ReportDeliveryChannel {
+  return raw === 'phone' || raw === 'email' || raw === 'social' || raw === 'text' ? raw : 'in_person';
+}
+
+/** GET /api/admin/directory/presence-seeds/:id/report-qr-kit — report delivery kit metadata */
+router.get('/presence-seeds/:id/report-qr-kit', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const kit = await SeedReportDeliveryService.getReportKitMeta(id);
+    if (!kit) return res.status(404).json({ error: 'no_published_report' });
+    res.json({
+      success: true,
+      seedId: kit.seedId,
+      reportVersion: kit.reportVersion,
+      reportStatus: kit.reportStatus,
+      token: kit.token,
+      shortCode: kit.shortCode,
+      qrUrlPhone: kit.qrUrlPhone,
+      qrUrlEmail: kit.qrUrlEmail,
+      qrUrlSocial: kit.qrUrlSocial,
+      qrUrlInPerson: kit.qrUrlInPerson,
+      reportPreviewUrl: kit.reportPreviewUrl,
+      claimUrl: kit.claimUrl,
+      businessName: kit.businessName,
+      expiresAt: kit.expiresAt,
+    });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report-qr-kit] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/report-qr-kit/png — downloadable report QR PNG.
+ *  ?channel=phone|email|social|in_person encodes that channel's tracked URL. */
+router.get('/presence-seeds/:id/report-qr-kit/png', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const channel = parseReportChannel(req.query.channel);
+    const { pngBuffer, filename } = await SeedReportDeliveryService.generateReportQrPng(id, channel);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pngBuffer.length);
+    return res.send(pngBuffer);
+  } catch (error: any) {
+    if (error?.message === 'no_published_report') {
+      return res.status(404).json({ error: 'no_published_report' });
+    }
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report-qr-kit/png] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/report-qr-kit/postcard — downloadable postcard PDF.
+ *  ?channel=phone|email|social|in_person renders that channel's variant. */
+router.get('/presence-seeds/:id/report-qr-kit/postcard', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const channel = parseReportChannel(req.query.channel);
+    const { pdfBuffer, filename } = await SeedReportDeliveryService.generateReportPostcard(id, channel);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.send(pdfBuffer);
+  } catch (error: any) {
+    if (error?.message === 'no_published_report') {
+      return res.status(404).json({ error: 'no_published_report' });
+    }
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report-qr-kit/postcard] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/report-qr-kit/postcard — styled postcard.
+ *  Body: { channel?, qrDataUrl? }. The admin QR designer (ReportQrDesignerModal)
+ *  posts its client-rendered styled QR so the printed postcard carries the same
+ *  styled code the operator previewed. */
+router.post('/presence-seeds/:id/report-qr-kit/postcard', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const channel = parseReportChannel(req.body?.channel ?? req.query.channel);
+    const qrDataUrl = typeof req.body?.qrDataUrl === 'string' ? req.body.qrDataUrl : undefined;
+    if (
+      qrDataUrl &&
+      (!qrDataUrl.startsWith('data:image/png;base64,') || qrDataUrl.length > 8_000_000)
+    ) {
+      return res.status(400).json({ error: 'invalid_qr_data_url' });
+    }
+    const { pdfBuffer, filename } = await SeedReportDeliveryService.generateReportPostcard(id, channel, qrDataUrl);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.send(pdfBuffer);
+  } catch (error: any) {
+    if (error?.message === 'no_published_report') {
+      return res.status(404).json({ error: 'no_published_report' });
+    }
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/report-qr-kit/postcard] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/report-pdf — downloadable report PDF (spec §14.2). */
+router.get('/presence-seeds/:id/report-pdf', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const version = req.query.version ? parseInt(String(req.query.version), 10) : undefined;
+    const { generateSeedReportPdf } = await import(
+      '../services/intelligence/SeedReportPdfService.js'
+    );
+    const { pdfBuffer, filename } = await generateSeedReportPdf({
+      seedId: id,
+      version: version && !isNaN(version) ? version : undefined,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    if (error?.message === 'No published report found for this seed') {
+      return res.status(404).json({ error: 'no_published_report' });
+    }
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report-pdf] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/report/refresh
+ * Operator-initiated report refresh (spec §5.1, §13.1). Builds a report
+ * version from the existing substrate; idempotent — reuses the latest
+ * version when report-visible inputs are unchanged (§22.3).
+ */
+router.post('/presence-seeds/:id/report/refresh', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { SeedIntelligenceReportService } = await import(
+      '../services/intelligence/SeedIntelligenceReportService.js'
+    );
+    const result = await SeedIntelligenceReportService.getInstance().refreshReport(
+      req.params.id,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.status(result.reused ? 200 : 201).json({
+      success: true,
+      data: {
+        report_id: result.reportId,
+        version: result.version,
+        status: result.report.status,
+        report_mode: result.report.report_mode,
+        published: result.report ? result.persisted : false,
+        lint_passed: result.lint.passed,
+        lint_findings: result.lint.findings,
+        reused: result.reused,
+      },
+    });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError' || /Seed not found/.test(error?.message ?? '')) {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/report/refresh] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/report/versions — operator version history (spec §13.1). */
+router.get('/presence-seeds/:id/report/versions', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { SeedIntelligenceReportService } = await import(
+      '../services/intelligence/SeedIntelligenceReportService.js'
+    );
+    const versions = await SeedIntelligenceReportService.getInstance().listReportVersions(req.params.id);
+    res.json({ success: true, data: versions });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report/versions] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory/presence-seeds/:id/report/reengagement
+ * Re-engagement suggestion (spec §5.4) — evaluates delivery, view,
+ * claim state, delta meaningfulness, and the courtesy/follow-up window.
+ */
+router.get('/presence-seeds/:id/report/reengagement', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { SeedIntelligenceReportService } = await import(
+      '../services/intelligence/SeedIntelligenceReportService.js'
+    );
+    const suggestion = await SeedIntelligenceReportService.getInstance().getReEngagementSuggestion(
+      req.params.id,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.json({ success: true, data: suggestion });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report/reengagement] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ─── Outreach Anchors (spec §11, §12.4) ─────────────────────────────────
+
+/** GET /api/admin/directory-presence/presence-seeds/:id/outreach-anchors — list anchors for a seed. */
+router.get('/presence-seeds/:id/outreach-anchors', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchors = await manualOutreachAnchorService.listAnchorsForSeed(req.params.id);
+    res.json({ success: true, data: anchors });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/outreach-anchors] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory-presence/presence-seeds/:id/outreach-anchors — create a seed-scoped anchor. */
+router.post('/presence-seeds/:id/outreach-anchors', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchor = await manualOutreachAnchorService.createAnchor(
+      { ...req.body, seedId: req.params.id },
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.status(201).json({ success: true, data: anchor });
+  } catch (error: any) {
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/outreach-anchors] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory-presence/outreach-anchors/:anchorId — get a single anchor. */
+router.get('/outreach-anchors/:anchorId', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchor = await manualOutreachAnchorService.getAnchor(req.params.anchorId);
+    res.json({ success: true, data: anchor });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError') {
+      return res.status(404).json({ error: 'anchor_not_found' });
+    }
+    logger.error('[GET /api/admin/directory-presence/outreach-anchors/:anchorId] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** PATCH /api/admin/directory-presence/outreach-anchors/:anchorId — update a draft anchor. */
+router.patch('/outreach-anchors/:anchorId', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchor = await manualOutreachAnchorService.updateAnchor(
+      req.params.anchorId,
+      req.body,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.json({ success: true, data: anchor });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError') {
+      return res.status(404).json({ error: 'anchor_not_found' });
+    }
+    if (error?.name === 'ConflictError' || error?.name === 'ValidationError') {
+      return res.status(409).json({ error: error.message });
+    }
+    logger.error('[PATCH /api/admin/directory-presence/outreach-anchors/:anchorId] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory-presence/outreach-anchors/:anchorId/activate — activate a draft anchor. */
+router.post('/outreach-anchors/:anchorId/activate', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchor = await manualOutreachAnchorService.activateAnchor(
+      req.params.anchorId,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.json({ success: true, data: anchor });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError') {
+      return res.status(404).json({ error: 'anchor_not_found' });
+    }
+    if (error?.name === 'ConflictError') {
+      return res.status(409).json({ error: error.message });
+    }
+    logger.error('[POST /api/admin/directory-presence/outreach-anchors/:anchorId/activate] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** POST /api/admin/directory-presence/outreach-anchors/:anchorId/retire — retire an anchor. */
+router.post('/outreach-anchors/:anchorId/retire', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchor = await manualOutreachAnchorService.retireAnchor(
+      req.params.anchorId,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.json({ success: true, data: anchor });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError') {
+      return res.status(404).json({ error: 'anchor_not_found' });
+    }
+    if (error?.name === 'ConflictError') {
+      return res.status(409).json({ error: error.message });
+    }
+    logger.error('[POST /api/admin/directory-presence/outreach-anchors/:anchorId/retire] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory-presence/outreach-anchors/:anchorId/contact
+ * Record a seed-scoped contact event that used an anchor (§11.6, §12.5).
+ * Writes verification results to directory_seed_outreach_touches +
+ * directory_seed_nap_verifications for corrected facts.
+ */
+router.post('/outreach-anchors/:anchorId/contact', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const { seedId, callResult, verificationResults, contactEventId, notes } = req.body;
+    if (!seedId || !callResult) {
+      return res.status(400).json({ error: 'seedId and callResult are required' });
+    }
+    const result = await manualOutreachAnchorService.recordContactWithAnchor(
+      {
+        anchorId: req.params.anchorId,
+        seedId,
+        callResult,
+        verificationResults: verificationResults ?? [],
+        contactEventId,
+        notes,
+      },
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.status(201).json({ success: true, data: result });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError') {
+      return res.status(404).json({ error: 'anchor_not_found' });
+    }
+    logger.error('[POST /api/admin/directory-presence/outreach-anchors/:anchorId/contact] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/:id/call-script?anchorId=
+ * Assemble the seed-side verification call script (spec §13.3 seed path).
+ * anchorId is optional — the selected anchor's verification question, pain
+ * probe, and recommended transition drive the middle stages.
+ */
+router.get('/presence-seeds/:id/call-script', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: callScriptService } = await import('../services/CallScriptService.js');
+    const script = await callScriptService.assembleForSeed(
+      req.params.id,
+      req.query.anchorId as string | undefined,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.json({ success: true, data: script });
+  } catch (error: any) {
+    if (error?.name === 'NotFoundError') {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/call-script] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

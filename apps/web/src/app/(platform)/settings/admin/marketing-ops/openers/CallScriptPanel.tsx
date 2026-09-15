@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, ArrowRight, ListChecks, Rocket } from 'lucide-react';
 import Link from 'next/link';
-import { marketingOpsService, type AssembledCallScript, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
+import { marketingOpsService, type AssembledCallScript, type CampaignOutreachAnchor, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
 
 interface DeadNumberLog {
   id: string;
@@ -61,18 +61,29 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const [deadNumberAction, setDeadNumberAction] = useState<string | null>(null);
   const [recentLog, setRecentLog] = useState<OutreachLogEntry[]>([]);
   const [showFullLog, setShowFullLog] = useState(false);
+  const [campaignAnchors, setCampaignAnchors] = useState<CampaignOutreachAnchor[]>([]);
+  const [selectedAnchorId, setSelectedAnchorId] = useState<string>('');
 
-  const fetchScript = useCallback(async (angle?: string) => {
+  const fetchScript = useCallback(async (angle?: string, anchorId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await marketingOpsService.getCallScript(campaignId, angle);
+      const result = await marketingOpsService.getCallScript(campaignId, angle, anchorId || undefined);
       setScript(result);
       setSelectedAngle(result.stages.hook.angle);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load call script');
     } finally {
       setLoading(false);
+    }
+  }, [campaignId]);
+
+  const fetchAnchors = useCallback(async () => {
+    try {
+      const list = await marketingOpsService.listCampaignAnchors(campaignId);
+      setCampaignAnchors(list.filter((a) => a.status === 'active' || a.status === 'draft'));
+    } catch {
+      // Non-blocking — the anchor picker just doesn't show
     }
   }, [campaignId]);
 
@@ -103,7 +114,8 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
     fetchScript();
     fetchDeadNumberStatus();
     fetchRecentLog();
-  }, [fetchScript, fetchDeadNumberStatus, fetchRecentLog, campaignPhone]);
+    fetchAnchors();
+  }, [fetchScript, fetchDeadNumberStatus, fetchRecentLog, fetchAnchors, campaignPhone]);
 
   const handleConfirmDead = async (logId: string) => {
     setDeadNumberAction(logId);
@@ -134,7 +146,12 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const handleAngleChange = (angle: HookAngle) => {
     if (angle === selectedAngle) return;
     setSelectedAngle(angle);
-    fetchScript(angle);
+    fetchScript(angle, selectedAnchorId || undefined);
+  };
+
+  const handleAnchorChange = (anchorId: string) => {
+    setSelectedAnchorId(anchorId);
+    fetchScript(selectedAngle ?? undefined, anchorId || undefined);
   };
 
   const handleCopy = async (text: string, stageName: string) => {
@@ -172,7 +189,7 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
       <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
         <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
         <button
-          onClick={() => fetchScript(selectedAngle ?? undefined)}
+          onClick={() => fetchScript(selectedAngle ?? undefined, selectedAnchorId || undefined)}
           className="mt-2 text-xs font-medium text-red-700 underline dark:text-red-400"
         >
           Retry
@@ -183,10 +200,57 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
 
   if (!script) return null;
 
-  const { stages, hookOptions, objections, callContext } = script;
+  const { stages, hookOptions, objections, callContext, anchor } = script;
 
   return (
     <div className="space-y-6">
+      {/* Outreach Anchor picker — operator-selected verification thesis (spec §11).
+          Only shown when the campaign has anchors. Selecting one reloads the
+          script with the anchor's questions attached. */}
+      {campaignAnchors.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center gap-3">
+            <label htmlFor="anchor-select" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Outreach anchor
+            </label>
+            <select
+              id="anchor-select"
+              value={selectedAnchorId}
+              onChange={(e) => handleAnchorChange(e.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            >
+              <option value="">(none)</option>
+              {campaignAnchors.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.title} ({a.anchor_type.replace(/_/g, ' ')}{a.status === 'draft' ? ' — draft' : ''})
+                </option>
+              ))}
+            </select>
+          </div>
+          {anchor && (
+            <div className="mt-3 space-y-2 rounded-md border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/40 dark:bg-blue-900/10">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                {anchor.title} — {anchor.anchor_type.replace(/_/g, ' ')}
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-medium">Verify:</span> {anchor.verification_question}
+              </p>
+              {anchor.pain_question && (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Pain probe:</span> {anchor.pain_question}
+                </p>
+              )}
+              {anchor.recommended_transition && (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Transition:</span> {anchor.recommended_transition}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400">{anchor.operator_thesis}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Dead-Number Review Banner (Sprint 2 — §13.3) */}
       {deadNumberLogs.length > 0 && (
         <div className="rounded-lg border border-orange-300 bg-orange-50 p-4 dark:border-orange-700 dark:bg-orange-900/20">

@@ -93,6 +93,47 @@ export interface AssembledCallScript {
   hookOptions: RankedPhoneHook[];
   objections: ObjectionRow[];
   callContext: CallContext;
+  /** Present when an anchorId was supplied — operator-selected verification thesis. */
+  anchor: {
+    id: string;
+    anchor_type: string;
+    title: string;
+    verification_question: string;
+    pain_question: string | null;
+    recommended_transition: string | null;
+    operator_thesis: string;
+  } | null;
+}
+
+/**
+ * Seed-side verification call script (spec §13.3 seed path).
+ *
+ * A seed call is a verification call, not a cold-call sale — the stages are
+ * verify → report hook → verification → pain probe → transition → claim ask
+ * → close. The anchor supplies the verification question, pain probe, and
+ * transition; without an anchor, generic verification defaults apply.
+ */
+export interface AssembledSeedCallScript {
+  seed_id: string;
+  stages: {
+    verify: string;
+    report_hook: string;
+    verification: string;
+    pain_probe: string | null;
+    transition: string | null;
+    claim_ask: string;
+    close: string;
+  };
+  anchor: AssembledCallScript['anchor'];
+  callContext: {
+    phone: string | null;
+    business_name: string | null;
+    address: string | null;
+    city: string | null;
+    report_url: string;
+    claim_url: string | null;
+    claim_short_url: string | null;
+  };
 }
 
 export interface CallConfirmationInput {
@@ -148,6 +189,7 @@ export class CallScriptService extends BaseService {
     campaignId: string,
     angle?: string,
     ctx?: RequestCtx,
+    anchorId?: string,
   ): Promise<AssembledCallScript> {
     // 1. Load campaign
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
@@ -263,6 +305,31 @@ export class CallScriptService extends BaseService {
     const askStage = this.resolveMerge(CALL_SCRIPT_ASK, mergeContext);
     const closeStage = this.resolveMerge(CALL_SCRIPT_CLOSE, mergeContext);
 
+    // 9. Load optional anchor — affects the verification question and
+    // recommended transition without changing the detected archetype.
+    let anchorBlock: AssembledCallScript['anchor'] = null;
+    if (anchorId) {
+      try {
+        const { default: anchorService } = await import(
+          './intelligence/ManualOutreachAnchorService.js'
+        );
+        const anchor = await anchorService.getAnchor(anchorId, ctx);
+        if (anchor && anchor.status !== 'retired') {
+          anchorBlock = {
+            id: anchor.id,
+            anchor_type: anchor.anchor_type,
+            title: anchor.title,
+            verification_question: anchor.verification_question,
+            pain_question: anchor.pain_question,
+            recommended_transition: anchor.recommended_transition,
+            operator_thesis: anchor.operator_thesis,
+          };
+        }
+      } catch {
+        // Anchor lookup failed — proceed without it
+      }
+    }
+
     return {
       stages: {
         verify: verifyStage,
@@ -286,7 +353,209 @@ export class CallScriptService extends BaseService {
         gallery_short_url: galleryShortUrl,
         channel_hint: channelHint,
       },
+      anchor: anchorBlock,
     };
+  }
+
+  // ─── Seed-side assembly (spec §13.3) ──────────────────────────────────
+
+  /**
+   * Assemble a verification call script for a directory presence seed.
+   *
+   * Unlike assembleForCampaign, this does not require a campaign worksheet
+   * or detected archetype — the script is driven by the seed's resolved
+   * identity (listing + seed row) plus the selected outreach anchor.
+   *
+   * When anchorId is provided, the anchor's verification_question,
+   * pain_question, and recommended_transition drive the middle stages.
+   * The anchor does not change any detected archetype (§11.4 rule 3).
+   */
+  async assembleForSeed(
+    seedId: string,
+    anchorId?: string,
+    ctx?: RequestCtx,
+  ): Promise<AssembledSeedCallScript> {
+    // 1. Load seed + listing identity
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        dps.id,
+        dps.city AS seed_city,
+        dps.state AS seed_state,
+        dps.category AS seed_category,
+        dl.business_name,
+        dl.address,
+        dl.city AS listing_city,
+        dl.state AS listing_state,
+        dl.zip_code,
+        dl.phone,
+        dl.website
+      FROM directory_presence_seeds dps
+      LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+    const seed = rows[0];
+    if (!seed) {
+      throw new NotFoundError(`Seed ${seedId} not found`);
+    }
+
+    // 2. Resolve claim token → claim URL + tracked short URL
+    let claimUrl: string | null = null;
+    let claimShortUrl: string | null = null;
+    try {
+      const tokens = await this.prisma.$queryRaw<any[]>`
+        SELECT token, short_code FROM directory_claim_tokens
+        WHERE seed_id = ${seedId}
+          AND consumed_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || '';
+      if (tokens[0]?.token) {
+        claimUrl = `${baseUrl}/place/claim/${tokens[0].token}`;
+      }
+      if (tokens[0]?.short_code) {
+        claimShortUrl = `${baseUrl}/q/${tokens[0].short_code}`;
+      }
+    } catch {
+      // Claim URL is best-effort — the script still works without it
+    }
+
+    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || '';
+    const reportUrl = `${baseUrl}/seed-report/${seedId}`;
+
+    // 3. Build merge context
+    const business = seed.business_name ?? null;
+    const city = seed.seed_city ?? seed.listing_city ?? null;
+    const state = seed.seed_state ?? seed.listing_state ?? null;
+    const addressParts = [seed.address, city, state].filter(Boolean);
+    const address = addressParts.length > 0 ? addressParts.join(', ') : null;
+    const category = seed.seed_category ?? null;
+    const operatorName = await this.resolveOperatorNameFromCtx(ctx);
+
+    const merge: Record<string, string | null> = {
+      business,
+      address,
+      category,
+      city,
+      operator_name: operatorName,
+      report_url: reportUrl,
+      claim_url: claimShortUrl ?? claimUrl,
+    };
+    const mergeText = (t: string) =>
+      t.replace(/\{\{(\w+)\}\}/g, (m, k) => merge[k] ?? m);
+
+    // 4. Load optional anchor
+    let anchorBlock: AssembledSeedCallScript['anchor'] = null;
+    if (anchorId) {
+      try {
+        const { default: anchorService } = await import(
+          './intelligence/ManualOutreachAnchorService.js'
+        );
+        const anchor = await anchorService.getAnchor(anchorId, ctx);
+        if (anchor && anchor.status !== 'retired') {
+          anchorBlock = {
+            id: anchor.id,
+            anchor_type: anchor.anchor_type,
+            title: anchor.title,
+            verification_question: anchor.verification_question,
+            pain_question: anchor.pain_question,
+            recommended_transition: anchor.recommended_transition,
+            operator_thesis: anchor.operator_thesis,
+          };
+        }
+      } catch {
+        // Anchor lookup failed — proceed with generic verification
+      }
+    }
+
+    // 5. Assemble stages — verification-call structure (not the five-stage
+    //    cold-call arc). Defaults are tone-safe per §6.10: no alarmism, no
+    //    unsupported claims, absence framed as "not found during discovery".
+    const verify = mergeText(
+      'Hi, may I speak with the owner or manager of {{business}}? ' +
+      'My name is {{operator_name}} — I\'m calling on behalf of the local business directory.',
+    );
+
+    const reportHook = mergeText(
+      'We came across {{business}} while reviewing {{category}} businesses in {{city}}, ' +
+      'and we put together a free snapshot of how the business appears across public ' +
+      'sources. Before I send it over, I\'d like to verify a couple of details with you — ' +
+      'it takes about a minute.',
+    );
+
+    const verification = anchorBlock
+      ? mergeText(anchorBlock.verification_question)
+      : mergeText(
+          'I have {{business}} listed at {{address}} — is that still correct? ' +
+          'And is this the best phone number for the business?',
+        );
+
+    const painProbe = anchorBlock?.pain_question
+      ? mergeText(anchorBlock.pain_question)
+      : null;
+
+    const transition = anchorBlock?.recommended_transition
+      ? mergeText(anchorBlock.recommended_transition)
+      : null;
+
+    const claimAsk = mergeText(
+      'The snapshot is free — it\'s at {{report_url}}. If anything looks off, you can ' +
+      'claim the listing and correct it yourself at {{claim_url}} — it takes about two minutes.',
+    );
+
+    const close = mergeText(
+      'Thanks for confirming — I\'ll make sure the record reflects what you told me. ' +
+      'I can text or email you the report link so you can review it when it\'s convenient.',
+    );
+
+    return {
+      seed_id: seedId,
+      stages: {
+        verify,
+        report_hook: reportHook,
+        verification,
+        pain_probe: painProbe,
+        transition,
+        claim_ask: claimAsk,
+        close,
+      },
+      anchor: anchorBlock,
+      callContext: {
+        phone: seed.phone ?? null,
+        business_name: business,
+        address,
+        city,
+        report_url: reportUrl,
+        claim_url: claimUrl,
+        claim_short_url: claimShortUrl,
+      },
+    };
+  }
+
+  /**
+   * Resolve the operator display name from the request context — looks up
+   * the calling user's display name. Falls back to a neutral label.
+   */
+  private async resolveOperatorNameFromCtx(ctx?: RequestCtx): Promise<string> {
+    const userId = ctx?.userId;
+    if (userId && typeof userId === 'string') {
+      try {
+        const user = await this.prisma.users.findUnique({
+          where: { id: userId },
+          select: { first_name: true, last_name: true, email: true },
+        });
+        if (user) {
+          const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+          if (displayName) return displayName;
+          if (user.email) return user.email.split('@')[0];
+        }
+      } catch {
+        // Fall through to default
+      }
+    }
+    return 'the directory team';
   }
 
   // ─── Worksheet write-back ─────────────────────────────────────────────

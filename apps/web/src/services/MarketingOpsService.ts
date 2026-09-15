@@ -507,6 +507,30 @@ export interface AssembledCallScript {
   hookOptions: RankedPhoneHook[];
   objections: ObjectionRow[];
   callContext: CallScriptContext;
+  /** Present when an anchorId was supplied — operator-selected verification thesis (spec §11). */
+  anchor: {
+    id: string;
+    anchor_type: string;
+    title: string;
+    verification_question: string;
+    pain_question: string | null;
+    recommended_transition: string | null;
+    operator_thesis: string;
+  } | null;
+}
+
+export interface CampaignOutreachAnchor {
+  id: string;
+  seed_id: string | null;
+  campaign_id: string | null;
+  business_prospect_id: string | null;
+  anchor_type: string;
+  status: 'draft' | 'active' | 'used' | 'retired';
+  title: string;
+  operator_thesis: string;
+  verification_question: string;
+  pain_question: string | null;
+  recommended_transition: string | null;
 }
 
 export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
@@ -5165,13 +5189,60 @@ class MarketingOpsService extends AdminApiSingleton {
 
   // ─── Cold Call Script (Sprint 1 — Cold Call Channel) ───────────────────
 
-  async getCallScript(campaignId: string, angle?: string): Promise<AssembledCallScript> {
-    const url = angle
-      ? `${BASE_URL}/${campaignId}/call-script?angle=${encodeURIComponent(angle)}`
-      : `${BASE_URL}/${campaignId}/call-script`;
+  async getCallScript(campaignId: string, angle?: string, anchorId?: string): Promise<AssembledCallScript> {
+    const params = new URLSearchParams();
+    if (angle) params.set('angle', angle);
+    if (anchorId) params.set('anchorId', anchorId);
+    const qs = params.toString();
+    const url = `${BASE_URL}/${campaignId}/call-script${qs ? `?${qs}` : ''}`;
     const result = await this.makeDefaultRequest<any>(url, { method: 'GET' });
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch call script');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach Anchors — campaign-scoped (spec §11, §12.4) ────────────
+
+  async listCampaignAnchors(campaignId: string): Promise<CampaignOutreachAnchor[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-anchors`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async recordAnchorContact(
+    campaignId: string,
+    anchorId: string,
+    payload: {
+      callResult: string;
+      channel?: string;
+      seedId?: string;
+      verificationResults?: Array<{
+        type: string;
+        field?: string;
+        value?: unknown;
+        previous_value?: unknown;
+        new_value?: unknown;
+        confidence?: string;
+        owner_response?: string;
+      }>;
+      notes?: string;
+    },
+  ): Promise<{ touchId: string | null; eventId: string | null }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-anchors/${encodeURIComponent(anchorId)}/contact`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to record anchor contact');
     }
     return result.data?.data ?? result.data;
   }

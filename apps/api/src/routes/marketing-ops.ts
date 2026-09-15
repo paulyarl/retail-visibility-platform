@@ -449,6 +449,32 @@ const callDetailsSchema = z.object({
   })).nullable().default(null),
 });
 
+// Structured verification result for manual outreach anchors (§11.6, §13.4)
+const verificationResultSchema = z.object({
+  type: z.enum([
+    'not_attempted',
+    'unreachable',
+    'identity_confirmed',
+    'identity_not_confirmed',
+    'fact_confirmed',
+    'fact_corrected',
+    'fact_disputed',
+    'pain_confirmed',
+    'pain_not_present',
+    'pain_discovered',
+    'claim_accepted',
+    'claim_declined',
+    'follow_up_requested',
+    'other',
+  ]),
+  field: z.string().optional(),
+  value: z.unknown().optional(),
+  previous_value: z.unknown().optional(),
+  new_value: z.unknown().optional(),
+  confidence: z.string().optional(),
+  owner_response: z.string().optional(),
+});
+
 const outreachLogBaseSchema = z.object({
   contact_channel: contactChannelEnum,
   contact_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'contact_date must be YYYY-MM-DD'),
@@ -461,6 +487,10 @@ const outreachLogBaseSchema = z.object({
   // Cold-call channel (Sprint 1)
   call_details: callDetailsSchema.nullable().optional(),
   update_worksheet: z.boolean().optional(),
+  // Manual outreach anchor (§13.4) — snapshot + structured verification
+  // results are recorded on the same outreach-log row.
+  anchor_id: z.string().max(255).optional(),
+  verification_results: z.array(verificationResultSchema).optional(),
 });
 
 const outreachLogSchema = outreachLogBaseSchema.superRefine((data, ctx) => {
@@ -1488,6 +1518,14 @@ const outreachService = MarketingOutreachService.getInstance();
 router.post('/:id/outreach', async (req: any, res: Response) => {
   try {
     const parsed = outreachLogSchema.parse(req.body);
+    // §13.4: when an anchor is attached, validate it BEFORE creating the
+    // log row so a bad anchor_id doesn't leave an orphan contact record.
+    if (parsed.anchor_id) {
+      const { default: manualOutreachAnchorService } = await import(
+        '../services/intelligence/ManualOutreachAnchorService.js'
+      );
+      await manualOutreachAnchorService.getAnchor(parsed.anchor_id, getCtx(req));
+    }
     const log = await outreachService.logContact({
       campaignId: req.params.id,
       contactChannel: parsed.contact_channel,
@@ -1502,6 +1540,30 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
       callDetails: parsed.call_details ?? null,
       updateWorksheet: parsed.update_worksheet ?? false,
     }, getCtx(req));
+    // §13.4: back-fill the anchor snapshot + verification results onto the
+    // created log row, write the canonical seed touch, process NAP
+    // verification write-back, and mark the anchor used. Best-effort —
+    // the contact log itself must not fail if anchor attachment does.
+    if (parsed.anchor_id) {
+      try {
+        const { default: manualOutreachAnchorService } = await import(
+          '../services/intelligence/ManualOutreachAnchorService.js'
+        );
+        await manualOutreachAnchorService.attachAnchorToOutreachLog({
+          logId: log.id,
+          anchorId: parsed.anchor_id,
+          verificationResults: parsed.verification_results,
+          callResult: parsed.call_details?.call_result ?? parsed.outcome,
+          channel: parsed.contact_channel,
+        }, getCtx(req));
+      } catch (anchorErr) {
+        logger.warn('Outreach log anchor attachment failed (swallowed)', getCtx(req), {
+          logId: log.id,
+          anchorId: parsed.anchor_id,
+          error: anchorErr instanceof Error ? anchorErr.message : String(anchorErr),
+        });
+      }
+    }
     // ★ Seed Outreach Courtesy Window: sync seed outreach_state from the
     // logged outcome. Fire-and-forget — errors are logged but do not
     // affect the 201 response.
@@ -2333,13 +2395,16 @@ router.get('/:campaignId/hook-suggestions', async (req: any, res: Response) => {
 // Two-segment /:campaignId/call-script — safe from the GET /:id
 // catch-all (Express only matches /:id against a single segment).
 
-// GET /:campaignId/call-script?angle= — assembled five-stage script
+// GET /:campaignId/call-script?angle=&anchorId= — assembled five-stage script.
+// anchorId is optional — when present, the anchor's verification question
+// and recommended transition are included in the script output (spec §11).
 router.get('/:campaignId/call-script', async (req: any, res: Response) => {
   try {
     const result = await CallScriptService.assembleForCampaign(
       req.params.campaignId,
       req.query.angle as string | undefined,
       getCtx(req),
+      req.query.anchorId as string | undefined,
     );
     res.json({ success: true, data: result });
   } catch (error) {
@@ -7210,6 +7275,84 @@ const handleRepairResolutionRender = async (req: any, res: Response) => {
 };
 router.post('/campaigns/:id/repair-resolution/render', handleRepairResolutionRender);
 router.post('/:id/repair-resolution/render', handleRepairResolutionRender);
+
+// ─── Outreach Anchors — campaign-scoped (spec §11, §12.4) ───────────────
+
+/** GET /api/admin/marketing-ops/:campaignId/outreach-anchors — list anchors for a campaign. */
+router.get('/:campaignId/outreach-anchors', async (req: any, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchors = await manualOutreachAnchorService.listAnchorsForCampaign(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: anchors });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/** POST /api/admin/marketing-ops/:campaignId/outreach-anchors — create a campaign-scoped anchor. */
+router.post('/:campaignId/outreach-anchors', async (req: any, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const anchor = await manualOutreachAnchorService.createAnchor(
+      { ...req.body, campaignId: req.params.campaignId },
+      getCtx(req),
+    );
+    res.status(201).json({ success: true, data: anchor });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+const recordContactSchema = z.object({
+  callResult: z.string().min(1).max(80),
+  channel: z.string().max(40).optional(),
+  verificationResults: z.array(verificationResultSchema).default([]),
+  seedId: z.string().optional(),
+  contactEventId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+/**
+ * POST /api/admin/marketing-ops/:campaignId/outreach-anchors/:anchorId/contact
+ * Record a contact event that used an anchor. Writes the anchor snapshot +
+ * verification results to mkt_outreach_log and, when seedId is provided,
+ * to directory_seed_outreach_touches + directory_seed_nap_verifications
+ * for corrected facts (§11.6, §12.5).
+ */
+router.post('/:campaignId/outreach-anchors/:anchorId/contact', async (req: any, res: Response) => {
+  try {
+    const parsed = recordContactSchema.parse(req.body);
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const result = await manualOutreachAnchorService.recordContactWithAnchor(
+      {
+        anchorId: req.params.anchorId,
+        campaignId: req.params.campaignId,
+        seedId: parsed.seedId,
+        channel: parsed.channel,
+        callResult: parsed.callResult,
+        verificationResults: parsed.verificationResults,
+        contactEventId: parsed.contactEventId,
+        notes: parsed.notes,
+      },
+      getCtx(req),
+    );
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
 
 // ====================
 // CATCH-ALL: GET /:id

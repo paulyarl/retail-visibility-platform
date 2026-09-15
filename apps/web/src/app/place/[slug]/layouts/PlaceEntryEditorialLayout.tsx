@@ -16,6 +16,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
+import SeedReportPreview from '@/components/directory/SeedReportPreview';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
@@ -198,6 +199,14 @@ export default function PlaceEntryEditorialLayout({
             publicDisclaimer={publicDisclaimer}
           />
         </section>
+
+        {/* Seed report preview — the "how we found you" narrative that leads
+            into the claim CTA. Only renders when a published report exists. */}
+        {listing.seedId && (
+          <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20 mb-4">
+            <SeedReportPreview seedId={listing.seedId} claimToken={claimToken} />
+          </div>
+        )}
 
         {/* Full-width provenance callout — the conversion pitch */}
         <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">

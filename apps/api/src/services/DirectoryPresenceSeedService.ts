@@ -1049,6 +1049,22 @@ class DirectoryPresenceSeedService {
         SET nap_owner_corrected = TRUE, nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
         WHERE id = ${seedId}
       `;
+
+      // §5.1: an owner correction is a report-version trigger. Best-effort —
+      // a refresh failure must not fail the field update, and the last
+      // published version is preserved regardless (§20.4.11).
+      try {
+        const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
+        await SeedIntelligenceReportService.getInstance().refreshReport(
+          seedId,
+          ctx ? { region: 'us-east-1', userId: ctx.actorId, ip: ctx.ip, userAgent: ctx.userAgent } : undefined,
+        );
+      } catch (err: any) {
+        logger.warn('DirectoryPresenceSeedService: post-correction report refresh failed', undefined, {
+          seedId,
+          error: err?.message,
+        });
+      }
     }
 
     // Sync seed hours into the canonical business_hours_list so the public

@@ -30,6 +30,8 @@ const {
   mockEnsureShortCode,
   mockAudit,
   mockGetLatestAuditData,
+  mockQueryRaw,
+  mockUsersFindUnique,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockResolveCampaignArchetype: vi.fn(),
@@ -45,6 +47,8 @@ const {
   mockEnsureShortCode: vi.fn(),
   mockAudit: vi.fn(),
   mockGetLatestAuditData: vi.fn(),
+  mockQueryRaw: vi.fn(),
+  mockUsersFindUnique: vi.fn(),
 }));
 
 vi.mock('../MarketingCampaignService', () => ({
@@ -95,6 +99,7 @@ vi.mock('../deliverable/BusinessContextService', () => ({
 
 vi.mock('../../prisma', () => ({
   prisma: {
+    $queryRaw: mockQueryRaw,
     mkt_outreach_intelligence: {
       findUnique: mockOiFindUnique,
       create: mockOiCreate,
@@ -107,6 +112,9 @@ vi.mock('../../prisma', () => ({
     },
     mkt_deliverable_preview_tokens: {
       findMany: mockPreviewTokensFindMany,
+    },
+    users: {
+      findUnique: mockUsersFindUnique,
     },
   },
 }));
@@ -692,5 +700,127 @@ describe('CallScriptService.applyCallConfirmations', () => {
     expect(auditCall[0].action).toBe('update');
     expect(auditCall[0].payload.call_log_id).toBe('log-001');
     expect(auditCall[0].payload.written).toContain('owner_name');
+  });
+});
+
+// ─── assembleForSeed (spec §13.3 seed path) ─────────────────────────────
+
+describe('CallScriptService.assembleForSeed', () => {
+  const seedRow = {
+    id: 'seed-1',
+    seed_city: 'Indianapolis',
+    seed_state: 'IN',
+    seed_category: 'Auto Repair',
+    business_name: 'Acme Auto',
+    address: '123 Main St',
+    listing_city: 'Indianapolis',
+    listing_state: 'IN',
+    zip_code: '46204',
+    phone: '317-555-0100',
+    website: 'https://acme.test',
+  };
+
+  const anchorRow = {
+    id: 'anchor-1',
+    seed_id: 'seed-1',
+    campaign_id: null,
+    business_prospect_id: null,
+    anchor_type: 'address_verification',
+    status: 'active',
+    title: 'Verify address',
+    operator_thesis: 'Confirm the address on file',
+    observed_issue: null,
+    evidence_summary: null,
+    evidence_refs: [],
+    verification_question: 'Is 123 Main St still the correct address for {{business}}?',
+    pain_question: 'How do most customers find you today?',
+    recommended_transition: 'Everything you confirm goes straight into the report.',
+    expected_verification: 'confirm',
+    created_by: 'op-1',
+    activated_by: 'op-1',
+    created_at: '2025-01-01',
+    activated_at: '2025-01-01',
+    retired_at: null,
+  };
+
+  const sqlText = (call: any[]): string =>
+    Array.isArray(call[0]) ? call[0].join('?') : String(call[0]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUsersFindUnique.mockResolvedValue(null);
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const sql = sqlText(args);
+      if (sql.includes('FROM directory_presence_seeds')) return Promise.resolve([seedRow]);
+      if (sql.includes('FROM directory_claim_tokens')) {
+        return Promise.resolve([{ token: 'tok-1', short_code: 'abc123' }]);
+      }
+      if (sql.includes('FROM mkt_outreach_anchors')) return Promise.resolve([anchorRow]);
+      return Promise.resolve([]);
+    });
+  });
+
+  it('throws NotFoundError for a missing seed', async () => {
+    mockQueryRaw.mockResolvedValue([]);
+    await expect(CallScriptService.assembleForSeed('seed-missing')).rejects.toThrow('not found');
+  });
+
+  it('assembles all stages with merged merge fields', async () => {
+    const result = await CallScriptService.assembleForSeed('seed-1');
+
+    expect(result.seed_id).toBe('seed-1');
+    expect(result.stages.verify).toContain('Acme Auto');
+    expect(result.stages.report_hook).toContain('Indianapolis');
+    expect(result.stages.claim_ask).toContain('/seed-report/seed-1');
+    // Short claim URL preferred for verbal handoff
+    expect(result.stages.claim_ask).toContain('/q/abc123');
+    expect(result.callContext.phone).toBe('317-555-0100');
+    expect(result.callContext.claim_url).toContain('/place/claim/tok-1');
+    expect(result.anchor).toBeNull();
+  });
+
+  it('uses the generic verification default when no anchor is selected', async () => {
+    const result = await CallScriptService.assembleForSeed('seed-1');
+    expect(result.stages.verification).toContain('123 Main St');
+    expect(result.stages.pain_probe).toBeNull();
+    expect(result.stages.transition).toBeNull();
+  });
+
+  it('drives verification/pain/transition stages from the anchor', async () => {
+    const result = await CallScriptService.assembleForSeed('seed-1', 'anchor-1');
+
+    expect(result.anchor).not.toBeNull();
+    expect(result.anchor!.title).toBe('Verify address');
+    // Anchor question merge-resolved
+    expect(result.stages.verification).toContain('Acme Auto');
+    expect(result.stages.verification).toContain('123 Main St');
+    expect(result.stages.pain_probe).toBe('How do most customers find you today?');
+    expect(result.stages.transition).toBe('Everything you confirm goes straight into the report.');
+  });
+
+  it('proceeds without an anchor when the anchor lookup fails', async () => {
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const sql = sqlText(args);
+      if (sql.includes('FROM directory_presence_seeds')) return Promise.resolve([seedRow]);
+      if (sql.includes('FROM mkt_outreach_anchors')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+    const result = await CallScriptService.assembleForSeed('seed-1', 'anchor-missing');
+    expect(result.anchor).toBeNull();
+    expect(result.stages.verification).toContain('123 Main St');
+  });
+
+  it('omits claim URLs when no active claim token exists', async () => {
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const sql = sqlText(args);
+      if (sql.includes('FROM directory_presence_seeds')) return Promise.resolve([seedRow]);
+      if (sql.includes('FROM directory_claim_tokens')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+    const result = await CallScriptService.assembleForSeed('seed-1');
+    expect(result.callContext.claim_url).toBeNull();
+    expect(result.callContext.claim_short_url).toBeNull();
+    // {{claim_url}} placeholder stays visible rather than fabricated
+    expect(result.stages.claim_ask).toContain('{{claim_url}}');
   });
 });

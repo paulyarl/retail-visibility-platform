@@ -36,6 +36,7 @@ import {
   type ReportObservation,
   type ReportSignal,
   type EvidenceState,
+  type EvidenceConfidence,
 } from '../../validators/seed-report-evidence.schema';
 import {
   getSignalRegistryCache,
@@ -257,6 +258,116 @@ export class SeedReportEvidenceService extends BaseService {
       provenance_refs: provenanceRefs,
       valid: errors.length === 0,
       errors,
+    };
+  }
+
+  // ─── Substrate-only evidence build (legacy seeds, §18 regression) ──────
+
+  /**
+   * Build a NormalizedEvidence snapshot entirely from the existing
+   * substrate — no prompt output required. This is the path that lets a
+   * legacy seed (created before report_evidence existed) still produce a
+   * provisional report rather than failing (§18 regression requirement).
+   *
+   * Mapping:
+   *   - directory_field_provenance rows → ReportObservation[] with stable
+   *     deterministic IDs (obs-sub-{seed}-{idx}); evidence_state and
+   *     confidence carried straight through (migration 271 backfill).
+   *   - directory_presence_seeds → a single IdentityCandidate built from
+   *     provenance identity fields + the resolved city/state/confidence.
+   *   - Geographic assessment: a seed exists in the directory for its city,
+   *     so a set city maps to 'inside_city' with that basis; unset →
+   *     'outside_market' (which correctly fails claim-hook eligibility).
+   *   - Category assessment: resolved category + category_fit from the seed.
+   *   - No signals, platform observations, or unresolved questions — the
+   *     substrate does not carry them.
+   */
+  async buildSubstrateEvidence(seedId: string, ctx?: RequestCtx): Promise<NormalizedEvidence> {
+    const [seedState, provenanceRows, provenanceRefs] = await Promise.all([
+      this.getResolvedSeedState(seedId, ctx),
+      this.getProvenanceRows(seedId, ctx),
+      this.loadProvenanceRefs(seedId, ctx),
+    ]);
+
+    if (!seedState) {
+      throw new NotFoundError(`Seed not found: ${seedId}`);
+    }
+
+    const safeKey = seedId.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40);
+    const observations: ReportObservation[] = provenanceRows.map((p, idx) => ({
+      observation_id: `obs-sub-${safeKey}-${String(idx).padStart(3, '0')}`,
+      subject: 'seed',
+      field: p.field_key,
+      value: p.value,
+      state: (p.evidence_state as EvidenceState)
+        ?? (p.override_by ? 'owner_confirmed' : 'observed'),
+      confidence: (p.confidence as EvidenceConfidence) ?? 'medium',
+      source_name: p.source_name ?? 'directory',
+      source_type: 'directory',
+      source_url: p.source_url,
+      observed_at: p.accessed_at,
+      notes: p.notes,
+    }));
+
+    const provValue = (key: string) =>
+      provenanceRows.find((p) => p.field_key === key)?.value ?? null;
+    const provObsIds = (keys: string[]) =>
+      observations.filter((o) => keys.includes(o.field)).map((o) => o.observation_id!);
+
+    const identityCandidate = {
+      business_name: provValue('business_name') ?? seedState.name_variants[0] ?? null,
+      address: provValue('address'),
+      phone: provValue('phone'),
+      website: provValue('website'),
+      city: seedState.city,
+      state: seedState.state,
+      identity_confidence: (seedState.identity_confidence as 'high' | 'medium' | 'low') ?? 'low',
+      basis: ['resolved seed record', 'directory_field_provenance'],
+      source_observation_ids: provObsIds(['business_name', 'address', 'phone', 'website', 'city', 'state']),
+    };
+
+    const geographicAssessment = seedState.city
+      ? {
+          location_status: 'inside_city' as const,
+          basis: [`seed is listed in the ${seedState.city} directory surface`],
+          source_observation_ids: provObsIds(['city']),
+        }
+      : {
+          location_status: 'outside_market' as const,
+          basis: ['no resolved city on the seed record'],
+          source_observation_ids: [],
+        };
+
+    const categoryAssessment = seedState.category
+      ? {
+          category: seedState.category,
+          subcategory: null,
+          category_fit: (seedState.category_fit as 'verified' | 'probable' | 'insufficient') ?? 'probable',
+          basis: ['resolved seed category'],
+          source_observation_ids: [],
+        }
+      : null;
+
+    const evidence: ReportEvidenceOutput = {
+      observations,
+      identity_candidates: [identityCandidate],
+      category_assessment: categoryAssessment,
+      geographic_assessment: geographicAssessment,
+      signals: [],
+      unresolved_questions: [],
+      platform_observations: [],
+    };
+
+    return {
+      candidate_key: `substrate-${seedId}`,
+      seed_id: seedId,
+      evidence,
+      observations_with_ids: observations,
+      validated_signals: [],
+      quarantined_signals: [],
+      provenance_refs: provenanceRefs,
+      valid: true,
+      errors: [],
     };
   }
 

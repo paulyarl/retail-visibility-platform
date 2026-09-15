@@ -7915,6 +7915,34 @@ model mkt_seed_intelligence_reports {
   @@index([seed_id, version(sort: Desc)], map: "idx_mkt_seed_intel_reports_seed")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_anchors {
+  id                     String    @id @db.VarChar(255)
+  seed_id                String?   @db.VarChar(255)
+  campaign_id            String?   @db.VarChar(255)
+  business_prospect_id   String?   @db.VarChar(255)
+  anchor_type            String    @db.VarChar(50)
+  status                 String    @default("draft") @db.VarChar(20)
+  title                  String    @db.VarChar(255)
+  operator_thesis        String
+  observed_issue         String?
+  evidence_summary       String?
+  evidence_refs          Json      @default("[]")
+  verification_question  String
+  pain_question          String?
+  recommended_transition String?
+  expected_verification  String    @default("confirm") @db.VarChar(30)
+  created_by             String    @db.VarChar(255)
+  activated_by           String?   @db.VarChar(255)
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  activated_at           DateTime? @db.Timestamptz(6)
+  retired_at             DateTime? @db.Timestamptz(6)
+
+  @@index([status], map: "idx_mkt_outreach_anchors_status")
+  @@index([anchor_type], map: "idx_mkt_outreach_anchors_type")
+}
+
 enum action {
   create
   update

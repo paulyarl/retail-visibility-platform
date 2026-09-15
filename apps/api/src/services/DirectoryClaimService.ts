@@ -1022,6 +1022,22 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       WHERE id = ${r.seed_id}
     `;
 
+    // §5.1: an owner claim is a report-version trigger — regenerate the seed
+    // intelligence report so the claimed variant (report_mode='claimed') is
+    // persisted. Best-effort: a refresh failure must not block the claim,
+    // and the last published version is preserved regardless (§20.4.11).
+    if (r.seed_id) {
+      try {
+        const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
+        await SeedIntelligenceReportService.getInstance().refreshReport(r.seed_id);
+      } catch (err: any) {
+        logger.warn('DirectoryClaimService: post-claim report refresh failed', undefined, {
+          seedId: r.seed_id,
+          error: { name: err?.name || 'Error', message: err?.message || String(err) },
+        });
+      }
+    }
+
     await this.promoteListingToClaimed(r.tenant_id);
 
     // --- Customer-to-user promotion bridge ---
@@ -1286,6 +1302,22 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       SET status = 'claimed', claimed_at = now(), nap_verified_at = now(), updated_at = now()
       WHERE id = ${r.seed_id}
     `;
+
+    // §5.1: an owner claim is a report-version trigger — regenerate the seed
+    // intelligence report so the claimed variant (report_mode='claimed') is
+    // persisted. Best-effort: a refresh failure must not block the claim,
+    // and the last published version is preserved regardless (§20.4.11).
+    if (r.seed_id) {
+      try {
+        const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
+        await SeedIntelligenceReportService.getInstance().refreshReport(r.seed_id);
+      } catch (err: any) {
+        logger.warn('DirectoryClaimService: post-claim report refresh failed', undefined, {
+          seedId: r.seed_id,
+          error: { name: err?.name || 'Error', message: err?.message || String(err) },
+        });
+      }
+    }
 
     await this.promoteListingToClaimed(r.tenant_id);
 

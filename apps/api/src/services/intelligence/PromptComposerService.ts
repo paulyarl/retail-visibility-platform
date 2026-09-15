@@ -36,6 +36,7 @@ import {
   type PromptResolution,
   type IntelligenceFocus,
 } from './IntelligenceProfileService';
+import { composeReportDirectives, REPORT_DIRECTIVES_VERSION } from './report-directives';
 
 // Re-export IntelligenceFocus for backward compatibility — the type now
 // originates in IntelligenceProfileService to avoid a circular import.
@@ -144,8 +145,16 @@ export class PromptComposerService extends BaseService {
       };
     }
 
-    // 4. Assemble: base + extension + profile block + focus
-    const body = [baseFragment, extensionFragment, profileSection, focusFragment]
+    // 4. Assemble: base + extension + profile block + focus + shared
+    //    report directives (§6.1 report_evidence contract + §6.10 tone
+    //    directive — composed once here, not copied into fragment bodies).
+    const body = [
+      baseFragment,
+      extensionFragment,
+      profileSection,
+      focusFragment,
+      composeReportDirectives(),
+    ]
       .filter((s) => s.length > 0)
       .join('\n\n');
 
@@ -159,6 +168,7 @@ export class PromptComposerService extends BaseService {
       profileVersion: resolution.profile_version,
       profileReferenceCity: (profile as any)?.reference_city ?? null,
       profileReferencePlatform: (profile as any)?.reference_platform ?? null,
+      reportDirectivesVersion: REPORT_DIRECTIVES_VERSION,
     });
 
     return { body, resolution, focus: input.focus };

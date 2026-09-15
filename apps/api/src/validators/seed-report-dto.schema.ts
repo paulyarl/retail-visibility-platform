@@ -291,6 +291,27 @@ export const nextActionSectionSchema = z.object({
 
 export type NextActionSection = z.infer<typeof nextActionSectionSchema>;
 
+// ─── Delta summary (§5.4) ────────────────────────────────────────────────
+//
+// Report-visible change between the prior version and this version. Drives
+// re-engagement suggestions — a new version is a re-engagement opportunity
+// only when it contains a meaningful delta. Computed at build time and
+// stored on the report DTO so the reader sees what changed.
+
+export const reportDeltaSummarySchema = z.object({
+  prior_version: z.number().nullable(),
+  meaningful: z.boolean(),
+  changes: z.array(z.string()).default([]),
+  new_sources: z.array(z.string()).default([]),
+  identity_changes: z.array(z.string()).default([]),
+  new_owner_verifications: z.number().default(0),
+  status_changed: z.boolean().default(false),
+  claim_newly_available: z.boolean().default(false),
+  new_signals: z.array(z.string()).default([]),
+}).passthrough();
+
+export type ReportDeltaSummary = z.infer<typeof reportDeltaSummarySchema>;
+
 // ─── Seed intelligence report DTO (§9) ───────────────────────────────────
 //
 // The complete report DTO. HTML, customer portal, operator views, and PDF
@@ -320,6 +341,7 @@ export const seedIntelligenceReportSchema = z.object({
   verification_activity: verificationActivitySectionSchema,
   claim_summary: claimSummarySectionSchema,
   next_actions: nextActionSectionSchema,
+  delta_summary: reportDeltaSummarySchema.nullable().optional(),
 }).passthrough();
 
 export type SeedIntelligenceReport = z.infer<typeof seedIntelligenceReportSchema>;
@@ -380,5 +402,121 @@ export function evaluateClaimHookEligibility(params: {
   return {
     eligible: reasons.length === 0,
     reasons,
+  };
+}
+
+// ─── Report delta computation (§5.4) ─────────────────────────────────────
+//
+// Compares the prior report version with the new version and summarizes
+// report-visible change. A new version is a re-engagement opportunity only
+// when the delta is meaningful — a timer elapsed alone is never a reason
+// to re-contact (§5.4).
+
+const IDENTITY_FIELDS = [
+  'business_name', 'address', 'phone', 'website',
+  'city', 'state', 'owner_name', 'ownership_type',
+] as const;
+
+export function computeDeltaSummary(
+  prior: SeedIntelligenceReport | null | undefined,
+  current: SeedIntelligenceReport,
+): ReportDeltaSummary {
+  if (!prior) {
+    return {
+      prior_version: null,
+      meaningful: false,
+      changes: [],
+      new_sources: [],
+      identity_changes: [],
+      new_owner_verifications: 0,
+      status_changed: false,
+      claim_newly_available: false,
+      new_signals: [],
+    };
+  }
+
+  const changes: string[] = [];
+
+  // New evidence sources
+  const priorSourceNames = new Set(
+    (prior.source_summary?.source_types ?? []).map((s) => s.source_name),
+  );
+  const newSources = (current.source_summary?.source_types ?? [])
+    .filter((s) => !priorSourceNames.has(s.source_name))
+    .map((s) => s.source_name);
+  if (newSources.length > 0) {
+    changes.push(`New source${newSources.length > 1 ? 's' : ''}: ${newSources.join(', ')}`);
+  }
+
+  // Identity field changes (value or evidence state)
+  const identityChanges: string[] = [];
+  for (const field of IDENTITY_FIELDS) {
+    const p = prior.business_identity?.[field];
+    const c = current.business_identity?.[field];
+    if (!p || !c) continue;
+    if (JSON.stringify(p.value) !== JSON.stringify(c.value) || p.state !== c.state) {
+      identityChanges.push(field);
+    }
+  }
+  if (identityChanges.length > 0) {
+    changes.push(`Updated field${identityChanges.length > 1 ? 's' : ''}: ${identityChanges.join(', ')}`);
+  }
+
+  // Owner verifications added since the prior version
+  const newOwnerVerifications = Math.max(
+    0,
+    (current.owner_verification_count ?? 0) - (prior.owner_verification_count ?? 0),
+  );
+  if (newOwnerVerifications > 0) {
+    changes.push(
+      `${newOwnerVerifications} new owner verification${newOwnerVerifications > 1 ? 's' : ''}`,
+    );
+  }
+
+  // Status transition
+  const statusChanged = prior.status !== current.status;
+  if (statusChanged) {
+    changes.push(`Report status: ${prior.status} → ${current.status}`);
+  }
+
+  // Claim path newly available
+  const claimNewlyAvailable = !prior.next_actions?.cta_eligible && !!current.next_actions?.cta_eligible;
+  if (claimNewlyAvailable) {
+    changes.push('Claim path now available');
+  }
+
+  // Newly validated intelligence signals
+  const priorSignalCodes = new Set(
+    (prior.intelligence_signals?.signals ?? []).map((s) => s.code),
+  );
+  const newSignals = (current.intelligence_signals?.signals ?? [])
+    .map((s) => s.code)
+    .filter((code) => code && !priorSignalCodes.has(code));
+  if (newSignals.length > 0) {
+    changes.push(`New finding${newSignals.length > 1 ? 's' : ''}: ${newSignals.join(', ')}`);
+  }
+
+  // Meaningful per §5.4: new source, corrected/changed identity field,
+  // owner-confirmed fact, newly available claim path, or status progression
+  // to complete. Signal additions alone are meaningful when they add a
+  // report-visible finding.
+  const meaningful =
+    newSources.length > 0 ||
+    identityChanges.length > 0 ||
+    newOwnerVerifications > 0 ||
+    claimNewlyAvailable ||
+    newSignals.length > 0 ||
+    (statusChanged && current.status === 'complete');
+
+  return {
+    prior_version: prior.version ?? null,
+    meaningful,
+    changes,
+    new_sources: newSources,
+    identity_changes: identityChanges,
+    new_owner_verifications: newOwnerVerifications,
+    status_changed: statusChanged,
+    claim_newly_available: claimNewlyAvailable,
+    new_signals: newSignals,
   };
 }

@@ -301,6 +301,164 @@ export interface ClaimInviteQrKitMeta {
   expiresAt: string | null;
 }
 
+export interface ReEngagementSuggestion {
+  suggested: boolean;
+  reasons: string[];
+  delta: {
+    prior_version: number | null;
+    meaningful: boolean;
+    changes: string[];
+    new_sources: string[];
+    identity_changes: string[];
+    new_owner_verifications: number;
+    status_changed: boolean;
+    claim_newly_available: boolean;
+    new_signals: string[];
+  } | null;
+  priorVersion: number | null;
+  currentVersion: number | null;
+  lastDeliveryAt: string | null;
+  priorViewed: boolean;
+  seedClaimed: boolean;
+}
+
+export interface ReportDeliveryQrKitMeta {
+  seedId: string;
+  reportVersion: number;
+  reportStatus: string;
+  token: string;
+  shortCode: string | null;
+  qrUrlPhone: string;
+  qrUrlEmail: string;
+  qrUrlSocial: string;
+  qrUrlInPerson: string;
+  qrUrlText: string;
+  reportPreviewUrl: string;
+  claimUrl: string;
+  businessName: string;
+  expiresAt: string | null;
+}
+
+// ── Outreach Anchors ────────────────────────────────────────────────────
+
+export type ManualAnchorType =
+  | 'identity_verification'
+  | 'address_verification'
+  | 'hours_verification'
+  | 'operating_status_verification'
+  | 'website_or_profile_claim'
+  | 'category_verification'
+  | 'service_verification'
+  | 'customer_discovery_problem'
+  | 'listing_accuracy'
+  | 'seed_claim_invitation'
+  | 'owner_reported_pain'
+  | 'custom';
+
+export interface ManualOutreachAnchor {
+  id: string;
+  seed_id: string | null;
+  campaign_id: string | null;
+  business_prospect_id: string | null;
+  anchor_type: ManualAnchorType;
+  status: 'draft' | 'active' | 'used' | 'retired';
+  title: string;
+  operator_thesis: string;
+  observed_issue: string | null;
+  evidence_summary: string | null;
+  evidence_refs: any[];
+  verification_question: string;
+  pain_question: string | null;
+  recommended_transition: string | null;
+  expected_verification: string;
+  created_by: string;
+  activated_by: string | null;
+  created_at: string;
+  activated_at: string | null;
+  retired_at: string | null;
+}
+
+export interface CreateAnchorInput {
+  anchorType: ManualAnchorType;
+  title: string;
+  operatorThesis: string;
+  observedIssue?: string;
+  evidenceSummary?: string;
+  verificationQuestion: string;
+  painQuestion?: string;
+  recommendedTransition?: string;
+  expectedVerification?: string;
+}
+
+export interface UpdateAnchorInput {
+  title?: string;
+  operatorThesis?: string;
+  observedIssue?: string;
+  evidenceSummary?: string;
+  verificationQuestion?: string;
+  painQuestion?: string;
+  recommendedTransition?: string;
+  expectedVerification?: string;
+}
+
+export type AnchorVerificationResultType =
+  | 'not_attempted'
+  | 'unreachable'
+  | 'identity_confirmed'
+  | 'identity_not_confirmed'
+  | 'fact_confirmed'
+  | 'fact_corrected'
+  | 'fact_disputed'
+  | 'pain_confirmed'
+  | 'pain_not_present'
+  | 'pain_discovered'
+  | 'claim_accepted'
+  | 'claim_declined'
+  | 'follow_up_requested'
+  | 'other';
+
+export interface AnchorVerificationResult {
+  type: AnchorVerificationResultType;
+  field?: string;
+  value?: unknown;
+  previous_value?: unknown;
+  new_value?: unknown;
+  confidence?: string;
+  owner_response?: string;
+}
+
+/** Seed-side verification call script (spec §13.3 seed path). */
+export interface AssembledSeedCallScript {
+  seed_id: string;
+  stages: {
+    verify: string;
+    report_hook: string;
+    verification: string;
+    pain_probe: string | null;
+    transition: string | null;
+    claim_ask: string;
+    close: string;
+  };
+  anchor: {
+    id: string;
+    anchor_type: string;
+    title: string;
+    verification_question: string;
+    pain_question: string | null;
+    recommended_transition: string | null;
+    operator_thesis: string;
+  } | null;
+  callContext: {
+    phone: string | null;
+    business_name: string | null;
+    address: string | null;
+    city: string | null;
+    report_url: string;
+    claim_url: string | null;
+    claim_short_url: string | null;
+  };
+}
+
 export class DirectoryPresenceAdminService extends AdminApiSingleton {
   private static instance: DirectoryPresenceAdminService;
 
@@ -648,6 +806,263 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     );
     if (!result.success) return null;
     return (result.data as unknown as Blob) ?? null;
+  }
+
+  // ============================
+  // Report-delivery QR kit (Phase 5)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/report-qr-kit */
+  async getReportQrKit(seedId: string): Promise<ReportDeliveryQrKitMeta | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-qr-kit`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/report-qr-kit/png — returns a Blob.
+   *  channel selects the tracked URL surface. */
+  async downloadReportPng(
+    seedId: string,
+    channel: 'phone' | 'email' | 'social' | 'in_person' | 'text' = 'in_person',
+  ): Promise<Blob | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-qr-kit/png?channel=${channel}`,
+      { method: 'GET' },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/report-qr-kit/postcard — returns a Blob.
+   *  channel selects the tracked URL + printed badge. */
+  async downloadReportPostcard(
+    seedId: string,
+    channel: 'phone' | 'email' | 'social' | 'in_person' | 'text' = 'in_person',
+  ): Promise<Blob | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-qr-kit/postcard?channel=${channel}`,
+      { method: 'GET' },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/report-qr-kit/postcard — styled variant.
+   *  Sends a client-rendered QR data URL so the printed postcard embeds the
+   *  styled code instead of the classic B/W render. */
+  async downloadReportPostcardStyled(
+    seedId: string,
+    channel: 'phone' | 'email' | 'social' | 'in_person' | 'text',
+    qrDataUrl: string,
+  ): Promise<Blob | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-qr-kit/postcard`,
+      { method: 'POST', body: JSON.stringify({ channel, qrDataUrl }) },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/report-pdf — downloadable report PDF (spec §14.2).
+   *  Pass version to render a specific report version; omit for latest published. */
+  async downloadReportPdf(
+    seedId: string,
+    version?: number,
+  ): Promise<Blob | null> {
+    const qs = version !== undefined ? `?version=${version}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-pdf${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+      { responseType: 'blob' as any },
+    );
+    if (!result.success) return null;
+    return (result.data as unknown as Blob) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/report/reengagement — §5.4 suggestion. */
+  async getReEngagementSuggestion(seedId: string): Promise<ReEngagementSuggestion | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report/reengagement`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  // ── Outreach Anchors (spec §11, §12.4) ──────────────────────────────
+
+  async listOutreachAnchors(seedId: string): Promise<ManualOutreachAnchor[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/outreach-anchors`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async createOutreachAnchor(seedId: string, input: CreateAnchorInput): Promise<ManualOutreachAnchor | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/outreach-anchors`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  async getOutreachAnchor(anchorId: string): Promise<ManualOutreachAnchor | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/outreach-anchors/${encodeURIComponent(anchorId)}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  async updateOutreachAnchor(anchorId: string, input: UpdateAnchorInput): Promise<ManualOutreachAnchor | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/outreach-anchors/${encodeURIComponent(anchorId)}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  async activateOutreachAnchor(anchorId: string): Promise<ManualOutreachAnchor | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/outreach-anchors/${encodeURIComponent(anchorId)}/activate`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  async retireOutreachAnchor(anchorId: string): Promise<ManualOutreachAnchor | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/outreach-anchors/${encodeURIComponent(anchorId)}/retire`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  /**
+   * Operator-initiated report refresh (spec §5.1, §13.1). Idempotent —
+   * the API reuses the latest version when inputs are unchanged.
+   */
+  async refreshReport(seedId: string): Promise<{
+    report_id: string;
+    version: number;
+    status: string;
+    report_mode: string;
+    published: boolean;
+    lint_passed: boolean;
+    lint_findings: Array<{ rule: string; severity: string; message: string }>;
+    reused: boolean;
+  } | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report/refresh`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  async listReportVersions(seedId: string): Promise<Array<{
+    version: number;
+    status: string;
+    generated_at: string | null;
+    published_at: string | null;
+    evidence_count: number;
+  }>> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report/versions`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  /**
+   * Assemble the seed-side verification call script (spec §13.3 seed path).
+   * When anchorId is provided, the anchor's verification question, pain
+   * probe, and recommended transition drive the middle stages.
+   */
+  async getSeedCallScript(
+    seedId: string,
+    anchorId?: string,
+  ): Promise<AssembledSeedCallScript | null> {
+    const qs = anchorId ? `?anchorId=${encodeURIComponent(anchorId)}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/call-script${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  /**
+   * Record a seed-scoped contact event that used an anchor (spec §11.6, §12.5).
+   * Verification results are persisted on the outreach log; corrected facts
+   * also write a directory_seed_nap_verifications row (owner_corrected=true).
+   */
+  async recordAnchorContact(
+    anchorId: string,
+    input: {
+      seedId: string;
+      callResult: string;
+      channel?: string;
+      verificationResults?: AnchorVerificationResult[];
+      contactEventId?: string;
+      notes?: string;
+    },
+  ): Promise<{ touchId: string | null; eventId: string | null } | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/outreach-anchors/${encodeURIComponent(anchorId)}/contact`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
   }
 
   async updateFields(

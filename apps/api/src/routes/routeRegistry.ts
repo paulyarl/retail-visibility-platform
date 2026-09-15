@@ -306,6 +306,8 @@ import directoryPresencePublicRoutes from '../routes/directory-presence-public';
 import directoryPresenceUpgradeRoutes from '../routes/directory-presence-upgrade';
 import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-public';
 import directoryClaimQrRoutes from '../routes/directory-claim-qr';
+import seedReportQrRoutes from '../routes/seed-report-qr';
+import seedReportPublicRoutes from '../routes/seed-report-public';
 import growthEngineAdminRoutes from '../routes/growth-engine-admin';
 import marketIntelPublicRoutes from '../routes/market-intel-public';
 import marketIntelCustomerRoutes from '../routes/market-intel-customer';
@@ -2115,6 +2117,20 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public claim-invite QR redirect (/qr/claim/:token → /place/claim/:token)',
+  },
+  {
+    path: '/api/public',
+    router: seedReportQrRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public report-delivery QR redirect (/r/seed/:seedId/:channel → /seed-report/:seedId)',
+  },
+  {
+    path: '/api/public',
+    router: seedReportPublicRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public seed report preview (/marketing/seed/:seedId/report/preview)',
   },
   {
     path: '/api/public/place',
