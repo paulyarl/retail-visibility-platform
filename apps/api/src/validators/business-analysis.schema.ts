@@ -552,6 +552,48 @@ const qualityGateResultsSchema = z.object({
   summary: z.string().nullable().optional(),
 }).passthrough();
 
+// ---- Platform Availability Verification (render controls) ----
+
+/**
+ * Render control entry — records the outcome of attempting to load a
+ * business's profile on a platform relative to a gold-standard control
+ * business on the same platform. Produced by the audit prompt when the
+ * Platform Availability Verification directive is present.
+ *
+ * `determination` is the render-level outcome (attributable to the
+ * business vs. the platform/analyst). `data_status` on the platform
+ * object reflects what content was observed; `determination` reflects
+ * whether the render failure is attributable. See the spec's
+ * determination ↔ data_status mapping rule (§5).
+ */
+const renderControlDeterminationEnum = z.enum([
+  'business_specific_failure',
+  'platform_available',
+  'unable_to_verify',
+]);
+
+const renderControlAccessBarrierEnum = z.enum([
+  'none',
+  'js_required',
+  'bot_defense',
+  'captcha',
+  'login_wall',
+  'rate_limit',
+  'timeout',
+  'not_attempted',
+]);
+
+const renderControlSchema = z.object({
+  platform: z.string(),
+  business_profile_url: z.string().nullable().optional(),
+  business_rendered: z.boolean().nullable().optional(),
+  control_business: z.string().nullable().optional(),
+  control_url: z.string().nullable().optional(),
+  control_rendered: z.boolean().nullable().optional(),
+  access_barrier: renderControlAccessBarrierEnum.nullable().optional(),
+  determination: renderControlDeterminationEnum,
+}).passthrough();
+
 // ---- Market intel sidebar fields (Seed Market Intel Sidebar — Phase 0) ----
 
 /**
@@ -636,6 +678,13 @@ export const businessAnalysisSchema = z.object({
   // signal checklist card as `available: false` (§8.5.4).
   market_opportunities: z.array(marketOpportunityEntrySchema).optional(),
   signal_checklist: z.array(signalChecklistEntrySchema).optional(),
+  // Platform Availability Verification — render control records. Optional;
+  // only present when the Platform Availability Verification directive ran
+  // (i.e. a Gold Standard block was injected). Each entry records the
+  // business profile render outcome relative to a gold-standard control
+  // on that platform. See spec §5 for the determination ↔ data_status
+  // mapping rule.
+  render_controls: z.array(renderControlSchema).optional(),
 }).passthrough();
 
 export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
@@ -834,6 +883,9 @@ Return your response as JSON matching this exact schema:
   ],
   "signal_checklist": [
     { "signal": "<string>", "met": <boolean|null>, "evidence": "<string|null>" }
+  ],
+  "render_controls": [
+    { "platform": "<string>", "business_profile_url": "<string|null>", "business_rendered": <boolean|null>, "control_business": "<string|null>", "control_url": "<string|null>", "control_rendered": <boolean|null>, "access_barrier": "none|js_required|bot_defense|captcha|login_wall|rate_limit|timeout|not_attempted", "determination": "business_specific_failure|platform_available|unable_to_verify" }
   ]
 }
 
@@ -841,6 +893,7 @@ GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present i
 - platforms.{platform}.profile_url: "<string|null>" — the LIVE profile URL on each platform (e.g. "https://www.google.com/maps/place/..."). Always capture this.
 - gap_analysis: compare the business's actual profile against the gold-standard expected fields. For each field where the business's actual value differs from the expected value, produce a gap entry with the platform, field name, expected value, actual value, gap description, and severity (non_negotiable or recommended). The expected and actual values may be a string (e.g. "African grocery store"), a boolean (presence fields like hours_present/website_present — use true/false), a number (count fields like photo_count), an array of strings/numbers/booleans (multi-value fields like additional_categories — use a JSON array such as ["Grocery store", "International grocery store"]), or null when not verifiable.
 - quality_gate_results: for each gold-standard quality gate, record whether the business passed or failed, with the platform, gate name, passed boolean, severity, and notes.
+- render_controls: for each platform in scope where a render control was attempted, record the business profile URL requested and whether it rendered, the control business name and control URL and whether it rendered, the access barrier (none|js_required|bot_defense|captcha|login_wall|rate_limit|timeout|not_attempted), and the determination (business_specific_failure|platform_available|unable_to_verify). Emit DS_MISSING_PROFILE ONLY when determination is business_specific_failure on a primary platform (google, yelp, facebook, bbb). Non-primary platforms (bing, apple_maps, etc.) record the determination but emit no signal.
 
 MARKET INTEL SIDEBAR FIELDS (populate ONLY when a MARKET CONTEXT section is present in the prompt — i.e. category + location intelligence was injected):
 - market_opportunities: business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps, and website.conversion_opportunities. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Omit the field entirely (do not emit an empty array) when no market context was injected.

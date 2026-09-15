@@ -725,6 +725,98 @@ describe('extractSignals — emits SignalCode[] from campaign + audit + BBB', ()
     // No duplicates
     expect(new Set(signals).size).toBe(signals.length);
   });
+
+  // ─── DS_MISSING_PROFILE render-control gating (spec §7.3) ──────────────
+
+  it('DS_MISSING_PROFILE — render_controls business_specific_failure on google fires signal', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: { google: { profile_status: 'unable_to_verify', data_status: 'unable_to_verify' } },
+        render_controls: [
+          { platform: 'google', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — render_controls business_specific_failure on yelp fires signal', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: { google: { profile_status: 'claimed', data_status: 'complete' } },
+        render_controls: [
+          { platform: 'yelp', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — render_controls business_specific_failure on non-primary platform does NOT fire', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: { google: { profile_status: 'claimed', data_status: 'complete' } },
+        render_controls: [
+          { platform: 'bing', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+    }));
+    expect(signals).not.toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — render_controls unable_to_verify does NOT fire (control failed too)', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+        render_controls: [
+          { platform: 'google', determination: 'unable_to_verify', business_rendered: false, control_rendered: false },
+        ],
+      } as any,
+    }));
+    expect(signals).not.toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — render_controls platform_available does NOT fire', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: { google: { profile_status: 'claimed', data_status: 'complete' } },
+        render_controls: [
+          { platform: 'google', determination: 'platform_available', business_rendered: true, control_rendered: true },
+        ],
+      } as any,
+    }));
+    expect(signals).not.toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — render_controls present but no failure + !google does NOT fire (control says not business-specific)', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+        render_controls: [
+          { platform: 'google', determination: 'unable_to_verify', business_rendered: false, control_rendered: false },
+        ],
+      } as any,
+    }));
+    expect(signals).not.toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — legacy fallback: no render_controls + !google fires signal (backward compat)', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+      } as any,
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+  });
+
+  it('DS_MISSING_PROFILE — legacy fallback: no render_controls + google.data_status=missing fires signal', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: { google: { data_status: 'missing' } },
+      } as any,
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+  });
 });
 
 // ─── Extractor helpers ───────────────────────────────────────────────────

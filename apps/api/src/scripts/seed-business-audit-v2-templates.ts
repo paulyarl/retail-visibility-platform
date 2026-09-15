@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-narrative-tone-6 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-availability-control-2 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -79,10 +79,20 @@ Expected Fields — Compare the business's actual profile against the Universal 
 Quality Gates — Evaluate each quality gate (Universal and per-platform). Record pass/fail in quality_gate_results.results with the platform, gate name, passed boolean, severity, and notes.
 Profile URLs — Capture the live profile URL for each platform in platforms.{platform}.profile_url so the benchmark comparison references a concrete destination.
 Platform Scope — The benchmark may define expected fields for platforms beyond the four audited here (google, yelp, facebook, bbb) — e.g., bing, apple_maps. For those platforms, evaluate the expected fields where publicly observable and record any gaps in gap_analysis.gaps with the platform field set accordingly; do not create platform objects for them in the platforms block.
-Absence vs. Non-Negotiable — A non_negotiable quality gate or expected field is recorded as failed (passed: false) ONLY when the field is verified absent. When a field cannot be verified (not found during searched discovery paths), record passed: null and note "not verified" — do NOT convert inability to verify into a failure. This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule.
+Absence vs. Non-Negotiable — A non_negotiable quality gate or expected field is recorded as failed (passed: false) ONLY when the field is verified absent. When a field cannot be verified (not found during searched discovery paths), record passed: null and note "not verified" — do NOT convert inability to verify into a failure. This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly.
 Subject-as-Exemplar — If the audited business appears in the benchmark's Pattern Exemplars section, treat those exemplar notes as reference priors only (not as a self-comparison). Use the other exemplar businesses as competitive comparators; do not benchmark the business against itself.
 If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.
 `;
+
+// ─── Targeted content update: amend the Absence vs. Non-Negotiable paragraph
+//     in the Gold Standard binding to add the business_specific_failure
+//     exception. The GOLD_STANDARD_BINDING const above already has the new
+//     text, but insertAfter skips re-insertion when the binding is already
+//     present (fingerprint match on the first 80 chars). This replaceFirst
+//     updates the paragraph in-place for templates that already have the old
+//     binding. Idempotent (no-op if already updated or not present).
+const ABSENCE_VS_NONNEGOTIABLE_FROM = "This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule.";
+const ABSENCE_VS_NONNEGOTIABLE_TO = "This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly.";
 
 const MARKET_CONTEXT_BINDING = `Market Context Intelligence — Binding for This Audit
 A CATEGORY MARKET CONTEXT block and/or a CITY MARKET CONTEXT block may be appended to the end of this prompt (after the Gold Standard block). They contain structural market intelligence produced by prior enrichment runs for this business's category and location. This is analyst-facing intelligence — not shopper-facing copy — that gives you market-aware context for the audit.
@@ -287,6 +297,72 @@ If the URL redirects to a bot-defense, notification-permission, login, or other 
 //     directive above. Idempotent via replaceFirst (no-op if already updated).
 const WC_BROKEN_WEBSITE_DEFINITION_FROM = '* `WC_BROKEN_WEBSITE`: Website URL returns 404, SSL error, or dead domain.';
 const WC_BROKEN_WEBSITE_DEFINITION_TO = '* `WC_BROKEN_WEBSITE`: Website URL returns 404, SSL error, dead domain, or redirects to a bot-defense / notification-permission / login / access-blocking page that prevents an ordinary visitor from reaching business content (per the Website Accessibility Verification directive).';
+
+// ─── Directive: Platform Availability Verification (inserted at the end of
+//     the Platforms section for Signal-Aligned, or after the Website
+//     Accessibility directive for Category-Integrated which has no Platforms
+//     heading). Requires the analyst to attempt a gold-standard control URL
+//     on the same platform before emitting any missing-profile signal, so
+//     bare render failures (bot defense, JS gating) are not converted into
+//     business findings. Control attempts are recorded in the top-level
+//     render_controls array (Option B per spec §5).
+const PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE = `
+### Platform Availability Verification — REQUIRED
+
+For every platform in scope (google, yelp, facebook, bbb, and any platform named in the Gold Standard block), attempt to load the business's profile URL as an ordinary public visitor before recording any positive platform attribute or emitting any missing-profile signal. A directory entry, search-result snippet, or indexed preview that displays a URL is NOT proof that the profile is reachable.
+
+A render failure is only interpretable relative to a control. The Gold Standard block provides control businesses in the same category with per-platform destination URLs. A control is a profile known to exist on that platform. Attempt at least one control URL on the same platform as the business profile you are testing.
+
+Determine the outcome:
+
+* Control rendered AND the business profile did not render → the failure is specific to this business. Record the platform as unavailable for this business.
+* Control rendered AND the business profile rendered → the platform is available. Proceed with the normal platform audit.
+* Control did not render, or no control exists for this platform → the failure is not attributable to the business. Record the platform as unable_to_verify and emit NO missing-profile signal.
+
+If the Gold Standard block is absent, no control is available. Record every unrendered platform as unable_to_verify and note the absence of a control set in data_quality.limitations.
+
+Record each control attempt in the top-level \`render_controls\` array (one entry per platform attempted):
+
+* \`platform\` — the platform name (google, yelp, facebook, bbb, bing, apple_maps, ...)
+* \`business_profile_url\` — the business profile URL requested, and \`business_rendered\` — whether it rendered
+* \`control_business\` — the control business name, and \`control_url\` — the control URL requested, and \`control_rendered\` — whether it rendered
+* \`access_barrier\` — whether an access-blocking page appeared instead of profile content: none | js_required | bot_defense | captcha | login_wall | rate_limit | timeout | not_attempted
+* \`determination\` — the resulting outcome: business_specific_failure | platform_available | unable_to_verify
+
+Note: \`bbb\` has no platform object in the \`platforms\` block today. A bbb control-confirmed absence is recorded in \`render_controls\` only — do not attempt to create a \`platforms.bbb\` object. The same applies to bing, apple_maps, and any other non-primary platform named in the Gold Standard block.
+
+Do not bypass bot defenses, solve access controls, or perform intrusive testing.
+
+Do not record positive platform attributes (rating, reviews, hours, categories, attribute chips) unless the profile content actually loaded.
+
+Emit \`DS_MISSING_PROFILE\` ONLY when the control rendered on that platform and the business profile did not. Do not emit it when the control also failed, when no control was available, or when the platform was not attempted. Non-primary platforms (bing, apple_maps, etc.) record \`business_specific_failure\` in \`render_controls\` but do NOT emit \`DS_MISSING_PROFILE\` — the signal is restricted to the four primary platforms (google, yelp, facebook, bbb).
+`;
+
+// ─── Schema fragment: render_controls array (inserted after signal_checklist
+//     in the embedded JSON schema, before the top-level close). Idempotent
+//     via replaceFirst — no-op if already present.
+const RENDER_CONTROLS_SCHEMA = `  "render_controls": [
+    {
+      "platform": "",
+      "business_profile_url": null,
+      "business_rendered": null,
+      "control_business": null,
+      "control_url": null,
+      "control_rendered": null,
+      "access_barrier": "none",
+      "determination": "unable_to_verify"
+    }
+  ]`;
+
+// ─── Targeted content update: amend DS_MISSING_PROFILE definition to require
+//     a render control. Two FROM variants — the Category-Integrated template
+//     uses bare text (no bullet/markdown), the Signal-Aligned template uses
+//     markdown bullet + backticks. Idempotent via replaceFirst (no-op if
+//     already updated).
+const DS_MISSING_PROFILE_FROM_CATEGORY = 'DS_MISSING_PROFILE: Business missing entirely on a primary platform (Google, Yelp, Facebook, BBB).';
+const DS_MISSING_PROFILE_TO_CATEGORY = 'DS_MISSING_PROFILE: Business missing entirely on a primary platform (Google, Yelp, Facebook, BBB). Emit ONLY when a render control established business_specific_failure for that platform per the Platform Availability Verification directive.';
+const DS_MISSING_PROFILE_FROM_SIGNAL = '* `DS_MISSING_PROFILE`: Business missing entirely on a primary platform (Google, Yelp, Facebook, BBB).';
+const DS_MISSING_PROFILE_TO_SIGNAL = '* `DS_MISSING_PROFILE`: Business missing entirely on a primary platform (Google, Yelp, Facebook, BBB). Emit ONLY when a render control established business_specific_failure for that platform per the Platform Availability Verification directive.';
 
 // ─── Schema fragment: gap_analysis + quality_gate_results (inserted before
 //     the final closing brace, after the sources array) ───────────────────
@@ -654,6 +730,12 @@ function transformCategoryIntegrated(body: string): string {
     '\n' + GOLD_STANDARD_BINDING,
   );
 
+  // 1a. Amend the Absence vs. Non-Negotiable paragraph in the Gold Standard
+  //     binding to add the business_specific_failure exception. Runs after
+  //     step 1 so it updates both fresh insertions (no-op — new text already
+  //     present) and pre-existing bindings (replaces old text). Idempotent.
+  out = replaceFirst(out, ABSENCE_VS_NONNEGOTIABLE_FROM, ABSENCE_VS_NONNEGOTIABLE_TO);
+
   // 2. Add profile_url to each platform object in the embedded JSON schema.
   //    All four platform objects end with `"data_status": "unavailable"`.
   //    Idempotent: skip if profile_url is already present.
@@ -685,6 +767,16 @@ function transformCategoryIntegrated(body: string): string {
     out,
     MARKET_OPPORTUNITIES_SCHEMA + '\n}',
     MARKET_OPPORTUNITIES_SCHEMA + ',\n' + SIGNAL_CHECKLIST_SCHEMA + '\n}',
+  );
+
+  // 3c. Add render_controls after signal_checklist (before the top-level
+  //     close). Separate replaceFirst — idempotent (no-op if the field is
+  //     already present, so a re-run after marker bump self-heals without
+  //     duplicating).
+  out = replaceFirst(
+    out,
+    SIGNAL_CHECKLIST_SCHEMA + '\n}',
+    SIGNAL_CHECKLIST_SCHEMA + ',\n' + RENDER_CONTROLS_SCHEMA + '\n}',
   );
 
   // 4. Targeted content update: delivery_model enum now includes 'unknown'.
@@ -744,6 +836,33 @@ function transformCategoryIntegrated(body: string): string {
   // 4e. Broaden WC_BROKEN_WEBSITE signal definition to include access-blocking
   //     redirects. Idempotent (no-op if already updated).
   out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
+
+  // 4e2. Platform Availability Verification directive — insert after the
+  //      Website Accessibility Verification directive (Category-Integrated
+  //      has no ## Platforms heading). Idempotent via fingerprint. Fallback
+  //      anchors cover bodies where the website directive's last line may
+  //      be absent (e.g. the website directive wasn't inserted).
+  try {
+    out = insertAfter(
+      out,
+      'record the redirect chain and access barrier in `website.issues` and `gap_analysis.gaps` (when a Gold Standard block is present).',
+      PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE,
+    );
+  } catch {
+    try {
+      out = insertAfter(
+        out,
+        'Do not perform intrusive testing, vulnerability scanning, or security exploitation.',
+        PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE,
+      );
+    } catch {
+      out = insertAfter(out, 'Never invent or assume data.', PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE);
+    }
+  }
+
+  // 4e3. Amend DS_MISSING_PROFILE definition to require a render control.
+  //      Idempotent (no-op if already updated).
+  out = replaceFirst(out, DS_MISSING_PROFILE_FROM_CATEGORY, DS_MISSING_PROFILE_TO_CATEGORY);
 
   // 4f. Replace requested_business empty-string defaults with variable
   //     placeholders so the rendered prompt pre-fills the requested business
@@ -834,6 +953,14 @@ function transformSignalAligned(body: string): string {
     'Audit the business above. If address or phone is blank, the field was not provided — do not treat blank as a negative signal.',
     '\n\n' + CATEGORY_INTELLIGENCE_BINDING + '\n' + GOLD_STANDARD_BINDING,
   );
+
+  // 1a. Amend the Absence vs. Non-Negotiable paragraph in the Gold Standard
+  //     binding to add the business_specific_failure exception. Runs after
+  //     the CI+GS binding insertion so it updates both fresh insertions
+  //     (no-op — new text already present) and pre-existing bindings
+  //     (replaces old text). Idempotent.
+  out = replaceFirst(out, ABSENCE_VS_NONNEGOTIABLE_FROM, ABSENCE_VS_NONNEGOTIABLE_TO);
+
   out = insertAfter(
     out,
     'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
@@ -1021,6 +1148,14 @@ function transformSignalAligned(body: string): string {
     MARKET_OPPORTUNITIES_SCHEMA + ',\n' + SIGNAL_CHECKLIST_SCHEMA + '\n}',
   );
 
+  // 18c. render_controls after signal_checklist (before top-level close).
+  //      Separate replaceFirst — idempotent (no-op if already present).
+  out = replaceFirst(
+    out,
+    SIGNAL_CHECKLIST_SCHEMA + '\n}',
+    SIGNAL_CHECKLIST_SCHEMA + ',\n' + RENDER_CONTROLS_SCHEMA + '\n}',
+  );
+
   // 19. Targeted content update: delivery_model enum now includes 'unknown'.
   out = out.replace(
     'delivery_model: none / marketplace / direct / both\n',
@@ -1062,6 +1197,36 @@ function transformSignalAligned(body: string): string {
   // 19e. Broaden WC_BROKEN_WEBSITE signal definition to include access-blocking
   //      redirects. Idempotent (no-op if already updated).
   out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
+
+  // 19e2. Platform Availability Verification directive — insert at the end
+  //       of the Platforms section. Idempotent via fingerprint. Fallback
+  //       anchors cover bodies where the Platforms section's last line may
+  //       be absent or reworded.
+  try {
+    out = insertAfter(
+      out,
+      'Per the Category Intelligence evidence rules, do not treat absence from a platform as evidence that the business is inactive, nonexistent, or unqualified.',
+      PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE,
+    );
+  } catch {
+    try {
+      out = insertAfter(out, '## Platforms', PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE);
+    } catch {
+      try {
+        out = insertAfter(
+          out,
+          'record the redirect chain and access barrier in `website.issues` and `gap_analysis.gaps` (when a Gold Standard block is present).',
+          PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE,
+        );
+      } catch {
+        out = insertAfter(out, 'Do not perform intrusive testing, vulnerability scanning, or security exploitation.', PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE);
+      }
+    }
+  }
+
+  // 19e3. Amend DS_MISSING_PROFILE definition to require a render control.
+  //       Idempotent (no-op if already updated).
+  out = replaceFirst(out, DS_MISSING_PROFILE_FROM_SIGNAL, DS_MISSING_PROFILE_TO_SIGNAL);
 
   // 19f. Replace requested_business empty-string defaults with variable
   //      placeholders so the rendered prompt pre-fills the requested business

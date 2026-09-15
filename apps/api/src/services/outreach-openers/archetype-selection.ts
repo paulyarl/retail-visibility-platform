@@ -109,6 +109,22 @@ export interface BusinessAnalysisAuditData {
   audit_metadata?: any;
   // Product-visibility fields (Sprint 1 — Universal Recalibration)
   business_type?: 'service' | 'product' | 'hybrid' | 'unable_to_verify' | null;
+  // Platform Availability Verification — render control records. Present
+  // when the Platform Availability Verification directive ran (Gold Standard
+  // block was injected). Used by the signal extractor to gate DS_MISSING_PROFILE
+  // on control-confirmed absence rather than bare render failure.
+  render_controls?: RenderControlEntry[];
+}
+
+export interface RenderControlEntry {
+  platform: string;
+  business_profile_url?: string | null;
+  business_rendered?: boolean | null;
+  control_business?: string | null;
+  control_url?: string | null;
+  control_rendered?: boolean | null;
+  access_barrier?: string | null;
+  determination: 'business_specific_failure' | 'platform_available' | 'unable_to_verify';
 }
 
 export interface ArchetypeSelection {

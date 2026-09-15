@@ -255,12 +255,37 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       }
     }
 
-    // DS_MISSING_PROFILE — business absent from a key platform
+    // DS_MISSING_PROFILE — business absent from a primary platform.
+    //
+    // When render_controls is present (Platform Availability Verification
+    // directive ran), the signal fires ONLY when a control established
+    // business_specific_failure on a primary platform (google, yelp,
+    // facebook, bbb). This prevents bare render failures (bot defense, JS
+    // gating, rate limits) from firing the signal — the control proves the
+    // failure is attributable to the business, not the platform/analyst.
+    //
+    // When render_controls is absent (legacy imports pre-control-mechanism),
+    // fall back to the original heuristic: !google or google.data_status in
+    // ('missing', 'not_found'). This preserves backward compatibility.
     if (!signals.has('DS_MISSING_PROFILE')) {
-      const missingPlatform =
-        !google || google.data_status === 'missing' || google.data_status === 'not_found';
-      if (missingPlatform) {
-        signals.add('DS_MISSING_PROFILE');
+      const renderControls = (auditData as any).render_controls;
+      if (Array.isArray(renderControls) && renderControls.length > 0) {
+        const primaryPlatforms = new Set(['google', 'yelp', 'facebook', 'bbb']);
+        const hasBusinessSpecificFailure = renderControls.some(
+          (rc: any) =>
+            rc.determination === 'business_specific_failure' &&
+            primaryPlatforms.has(rc.platform),
+        );
+        if (hasBusinessSpecificFailure) {
+          signals.add('DS_MISSING_PROFILE');
+        }
+      } else {
+        // Legacy fallback — no render_controls field present.
+        const missingPlatform =
+          !google || google.data_status === 'missing' || google.data_status === 'not_found';
+        if (missingPlatform) {
+          signals.add('DS_MISSING_PROFILE');
+        }
       }
     }
 
