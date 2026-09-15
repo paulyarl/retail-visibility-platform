@@ -1619,26 +1619,21 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           {(() => {
             const locCampaigns = children.filter((c) => c.scope === 'city');
             const loc = locCampaigns[0];
-            // "Done" = stage advanced OR an audit row exists. Enrichment
-            // campaigns stay at stage='seek' after a run, so audit_count is
-            // the authoritative "executed" signal (the markets API the cockpit
-            // also polls can be empty when the directory row hasn't been
-            // written yet).
-            const locDone = loc && (loc.stage !== 'seek' || (loc.audit_count ?? 0) > 0);
+            // "Done" = an audit row exists. Enrichment campaigns stay at
+            // stage='seek' permanently (stage is a setup parking spot for
+            // non-business campaigns, not an execution signal), so
+            // audit_count is the sole "executed" indicator.
+            const locDone = loc && (loc.audit_count ?? 0) > 0;
             return (
               <div className={`flex-1 rounded-lg border p-3 ${
                 locDone
                   ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
-                  : loc
-                    ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
-                    : 'border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-900/30'
+                  : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
               }`}>
                 <div className="flex items-center gap-1.5 mb-1">
                   {locDone
                     ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                    : loc
-                      ? <Circle className="w-3.5 h-3.5 text-amber-500" />
-                      : <Circle className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />}
+                    : <Circle className="w-3.5 h-3.5 text-amber-500" />}
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     1 · Location
                   </span>
@@ -1679,24 +1674,19 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             const catCampaigns = children.filter((c) => c.scope === 'category');
             const cat = catCampaigns[0];
             // Green = campaign attached AND executed (audit row exists).
-            // The marketStatus fallback was removed — a market row without
-            // an attached campaign is not "done"; the operator should still
-            // create + run the campaign.
-            const catDone = cat && (cat.stage !== 'seek' || (cat.audit_count ?? 0) > 0);
+            // Stage is not part of the equation — it's a setup parking spot
+            // for non-business campaigns, not an execution signal.
+            const catDone = cat && (cat.audit_count ?? 0) > 0;
             return (
               <div className={`flex-1 rounded-lg border p-3 ${
                 catDone
                   ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
-                  : cat
-                    ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
-                    : 'border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-900/30'
+                  : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
               }`}>
                 <div className="flex items-center gap-1.5 mb-1">
                   {catDone
                     ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                    : cat
-                      ? <Circle className="w-3.5 h-3.5 text-amber-500" />
-                      : <Circle className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />}
+                    : <Circle className="w-3.5 h-3.5 text-amber-500" />}
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     2 · Category
                   </span>
@@ -1738,8 +1728,8 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             const biz = bizCampaigns[0];
             const locCampaigns = children.filter((c) => c.scope === 'city');
             const catCampaigns = children.filter((c) => c.scope === 'category');
-            const locDone = locCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0);
-            const catDone = catCampaigns.some((c) => c.stage !== 'seek' || (c.audit_count ?? 0) > 0);
+            const locDone = locCampaigns.some((c) => (c.audit_count ?? 0) > 0);
+            const catDone = catCampaigns.some((c) => (c.audit_count ?? 0) > 0);
             const hasContext = locDone && catDone;
             return (
               <div className={`flex-1 rounded-lg border p-3 ${
