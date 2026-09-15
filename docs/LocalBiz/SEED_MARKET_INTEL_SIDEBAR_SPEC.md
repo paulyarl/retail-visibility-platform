@@ -309,7 +309,7 @@ Returns teaser data for the sidebar. No authentication required. May use `option
   "cards": {
     "growthOpportunities": {
       "available": true,
-      "teaser": "3 actionable gaps identified",
+      "teaser": "3 actionable gaps spotted",
       "count": 3
     },
     "howItStacksUp": {
@@ -324,7 +324,7 @@ Returns teaser data for the sidebar. No authentication required. May use `option
     },
     "claimBusiness": {
       "available": true,
-      "teaser": "Owner? Get the full picture and unlock all intelligence for free."
+      "teaser": "Own this business? Claim it to see the full picture — free."
     }
   }
 }
@@ -636,7 +636,7 @@ The `business_analysis` schema has no opportunities array and no per-signal eval
    - `signal_checklist`: `array of { signal, met, evidence }` — one entry per `category_signals` item when category intelligence was injected; `met` is the audit's verdict against observed evidence.
 2. **`BUSINESS_ANALYSIS_PROMPT_SUFFIX`** — document both fields.
 3. **`seed-business-audit-v2-templates.ts`** — add both fields to the embedded JSON schema in each variant + a directive that they are populated ONLY when the category/market context bindings ran. Bump `SEED_VERSION_MARKER` and re-run the seed on `local` AND `prd` (AGENTS.md seed discipline — a stale row silently serves the old body).
-4. **Fallback until re-audits land:** opportunities count = `gap_analysis.gaps.length` with `severity` mapped to impact; the signal checklist renders `available: false` (teaser copy: "Category signal evaluation pending").
+4. **Fallback until re-audits land:** opportunities count = `gap_analysis.gaps.length` with `severity` mapped to impact; the signal checklist renders `available: false` (teaser copy: "Signal check still in progress").
 
 ---
 
@@ -787,9 +787,16 @@ first (current consumers render only the public list above).
 
 ### 12.3 Cards per surface
 
+**Voice:** all card copy uses the platform's uniform public voice —
+warm and professional, like a knowledgeable local speaking to a
+neighbor. Plain-spoken, never casual or promotional: no exclamation
+marks, no superlatives, no hype. CTAs stay short and functional.
+Empty states say "still gathering" (ongoing work), never cold system
+status ("pending", "not yet available").
+
 **Category sidebar** (claim card replaced — no owner exists here):
 - **Category Signals** — "what strong looks like in {category}".
-  Teaser: "{N} benchmark signals tracked". Full: `category_signals`.
+  Teaser: "What strong looks like here — {N} signals tracked". Full: `category_signals`.
 - **Category Profile** — `category_profile`: business model, customer
   base, competitive landscape, typical scale.
 - **Market Density** — `market_density` qualitative read for this city.

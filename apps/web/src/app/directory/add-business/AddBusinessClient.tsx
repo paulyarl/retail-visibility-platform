@@ -103,7 +103,7 @@ export default function AddBusinessClient({
 
     setError(
       result.error === 'already_listed'
-        ? 'This business appears to already be listed.'
+        ? 'Looks like this one is already listed.'
         : result.error === 'invalid_input'
         ? 'Please check the form and try again.'
         : 'Something went wrong. Please try again.'

@@ -127,11 +127,11 @@ export function MarketIntelPaywall({ slug, open, onClose, onUnlocked }: MarketIn
                 <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                    A business account is required
+                    You'll need a business account for this
                   </p>
                   <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                    The Market Intel Report is a business product. Register or link a
-                    business (tenant) account to purchase.
+                    Market Intel reports are a business product — register or link your
+                    business account to purchase.
                   </p>
                 </div>
               </div>

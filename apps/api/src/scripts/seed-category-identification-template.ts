@@ -96,6 +96,8 @@ Exclude (these are internal assessment content — never public):
 * Competitive benchmark comparisons
 * Any language that could embarrass the business owner or signal weakness
 
+Tone: warm and professional — a knowledgeable local describing the business to a neighbor. Welcoming and plain-spoken, never casual or promotional: third person only, no exclamation marks, no superlatives, no hype. The business did not write this text and has not claimed the listing — write about the business, not as or for it.
+
 Length: 2-4 sentences, 300-600 characters. Write in third person. Be specific and vivid. Do not invent details; use only verified public information.
 
 === DIGITAL FOOTPRINT (required) ===

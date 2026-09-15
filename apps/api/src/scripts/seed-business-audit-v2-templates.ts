@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-14-market-context-binding-5 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-narrative-tone-6 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -231,6 +231,8 @@ Exclude (these are internal assessment content — never public):
 * Competitive benchmark comparisons
 * Any language that could embarrass the business owner or signal weakness
 * Health inspection outcomes, license status, closure/suspension reports
+
+Tone: warm and professional — a knowledgeable local describing the business to a neighbor. Welcoming and plain-spoken, never casual or promotional: third person only, no exclamation marks, no superlatives, no hype. The business did not write this text and has not claimed the listing — write about the business, not as or for it.
 
 Length: 2-4 sentences, 300-600 characters. Write in third person. Be specific and vivid — this is the first thing a visitor reads on the listing page and the primary text search engines will index. Do not invent details; use only verified public information. If the business is richly sourced, use the verified specifics to fill the range. If too thinly sourced for a rich narrative, write a shorter factual sentence using what is verified — but never pad with generic filler.
 `;

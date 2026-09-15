@@ -281,10 +281,10 @@ export class MarketIntelService extends BaseService {
         hasAudit: false,
         publicNarrative: null,
         cards: {
-          growthOpportunities: { available: false, teaser: 'No growth opportunities identified', count: 0 },
-          howItStacksUp: { available: false, teaser: 'Category signal evaluation pending' },
+          growthOpportunities: { available: false, teaser: 'No growth opportunities spotted yet', count: 0 },
+          howItStacksUp: { available: false, teaser: 'Signal check still in progress' },
           fullReport: { available: false, teaser: 'Complete market analysis with recommendations' },
-          claimBusiness: { available: true, teaser: 'Owner? Get the full picture and unlock all intelligence for free.' },
+          claimBusiness: { available: true, teaser: 'Own this business? Claim it to see the full picture — free.' },
         },
       };
     }
@@ -304,7 +304,7 @@ export class MarketIntelService extends BaseService {
     // Growth Opportunities — §8.5.4 fallback derivation.
     const oppCount = this.deriveOpportunityCount(resolved.auditData);
     const growthAvailable = oppCount.count > 0;
-    const growthTeaser = `${oppCount.count} actionable gap${oppCount.count !== 1 ? 's' : ''} identified`;
+    const growthTeaser = `${oppCount.count} actionable gap${oppCount.count !== 1 ? 's' : ''} spotted`;
 
     // How It Stacks Up — signal checklist (structured array).
     const checklist = this.readSignalChecklist(resolved.auditData);
@@ -319,7 +319,7 @@ export class MarketIntelService extends BaseService {
       // evaluation yet (re-audits haven't landed). Card renders available:
       // false with the "pending" teaser copy per §8.5.4.
       stacksAvailable = false;
-      stacksTeaser = 'Category signal evaluation pending';
+      stacksTeaser = 'Signal check still in progress';
     }
 
     return {
@@ -343,7 +343,7 @@ export class MarketIntelService extends BaseService {
         },
         claimBusiness: {
           available: true,
-          teaser: 'Owner? Get the full picture and unlock all intelligence for free.',
+          teaser: 'Own this business? Claim it to see the full picture — free.',
         },
       },
     };
@@ -581,21 +581,21 @@ export class MarketIntelService extends BaseService {
         categorySignals: {
           available: signalCount > 0,
           teaser: signalCount > 0
-            ? `${signalCount} benchmark signals tracked`
-            : 'Category signal evaluation pending',
+            ? `What strong looks like here — ${signalCount} signal${signalCount !== 1 ? 's' : ''} tracked`
+            : 'Still gathering signals for this category',
           count: signalCount,
         },
         categoryProfile: {
           available: hasProfile,
           teaser: hasProfile
             ? 'Business model, customer base, competitive landscape'
-            : 'Category profile not yet available',
+            : 'Still building the profile for this category',
         },
         marketDensity: {
           available: hasDensity,
           teaser: hasDensity
             ? cat.market_density!
-            : 'Market density analysis pending',
+            : 'Still sizing up this market',
         },
         addYourBusiness: {
           available: true,
@@ -675,21 +675,21 @@ export class MarketIntelService extends BaseService {
         marketGaps: {
           available: gapCount > 0,
           teaser: gapCount > 0
-            ? `${gapCount} unmet demand ${gapCount === 1 ? 'signal' : 'signals'} in ${city}`
-            : 'Market gap analysis pending',
+            ? `${gapCount} thing${gapCount === 1 ? '' : 's'} ${city} could use more of`
+            : 'Still mapping the gaps in this market',
           count: gapCount,
         },
         metroDynamics: {
           available: hasMetro || hasProfile,
           teaser: hasMetro || hasProfile
-            ? `Metro dynamics for ${city}`
-            : 'Metro dynamics not yet available',
+            ? `How ${city} fits into the wider metro area`
+            : 'Metro context still being gathered',
         },
         marketSummary: {
           available: hasSummary,
           teaser: hasSummary
             ? loc.market_summary!.slice(0, 120) + (loc.market_summary!.length > 120 ? '...' : '')
-            : 'Market summary not yet available',
+            : 'City overview still coming together',
         },
         addYourBusiness: {
           available: true,

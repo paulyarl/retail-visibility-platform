@@ -135,7 +135,7 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken }: Ma
         <div id="market-intel-panel" className="mt-2 space-y-3">
           {!teaser || !teaser.hasAudit ? (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm text-gray-500 dark:text-gray-400">
-              No market intelligence available for this business yet.
+              We haven't gathered intel on this business yet — check back soon.
             </div>
           ) : (
             <>

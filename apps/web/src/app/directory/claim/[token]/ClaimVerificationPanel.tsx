@@ -191,7 +191,7 @@ export default function ClaimVerificationPanel({
                   <Badge color="orange" variant="light" leftSection={<IconClock size={12} />}>
                     {primary} (primary)
                   </Badge>
-                  <Text size="xs" c="dimmed">new category — sent for operator review</Text>
+                  <Text size="xs" c="dimmed">new category — we&apos;ll review it before it goes live</Text>
                 </Group>
               )}
               {proposedSecondary.map((label) => (
@@ -199,7 +199,7 @@ export default function ClaimVerificationPanel({
                   <Badge color="orange" variant="light" leftSection={<IconClock size={12} />}>
                     {label}
                   </Badge>
-                  <Text size="xs" c="dimmed">new category — sent for operator review</Text>
+                  <Text size="xs" c="dimmed">new category — we&apos;ll review it before it goes live</Text>
                 </Group>
               ))}
               {pendingFromServer.map((p) => (
@@ -207,11 +207,11 @@ export default function ClaimVerificationPanel({
                   <Badge color="gray" variant="light" leftSection={<IconClock size={12} />}>
                     {p.label}
                   </Badge>
-                  <Text size="xs" c="dimmed">pending operator review</Text>
+                  <Text size="xs" c="dimmed">pending review</Text>
                 </Group>
               ))}
               <Text size="xs" c="dimmed">
-                New categories aren&apos;t published until our team approves them.
+                New categories go live once our team approves them.
               </Text>
             </Stack>
           )}
@@ -227,7 +227,7 @@ export default function ClaimVerificationPanel({
             turn off anything that doesn&apos;t apply, and add anything we missed.
           </Text>
           {attrs.length === 0 && unselectedSuggestions.length === 0 ? (
-            <Text size="sm" c="dimmed">No attributes on file for this listing.</Text>
+            <Text size="sm" c="dimmed">No attributes on file yet — add anything that applies.</Text>
           ) : (
             <Group gap="xs">
               {attrs.map((a) => (

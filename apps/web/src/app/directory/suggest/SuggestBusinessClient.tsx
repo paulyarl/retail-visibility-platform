@@ -88,9 +88,9 @@ export default function SuggestBusinessClient({
 
     setError(
       result.error === 'already_listed'
-        ? 'This business appears to already be listed.'
+        ? 'Looks like this one is already listed.'
         : result.error === 'rate_limit_exceeded'
-        ? 'Too many suggestions. Please wait an hour and try again.'
+        ? 'Lots of suggestions at once — give it an hour and try again.'
         : result.error === 'suspected_bot'
         ? 'Submission rejected.'
         : 'Something went wrong. Please try again.'

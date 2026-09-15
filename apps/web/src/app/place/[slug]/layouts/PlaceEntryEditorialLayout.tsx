@@ -280,7 +280,7 @@ export default function PlaceEntryEditorialLayout({
                 </h3>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
                   Claim this listing and add up to 5 signature products to your storefront —
-                  free with your Directory Presence tier. Showcase your best offerings and see
+                  free with your claimed listing. Showcase your best offerings and see
                   how the platform works before upgrading.
                 </p>
                 <Link

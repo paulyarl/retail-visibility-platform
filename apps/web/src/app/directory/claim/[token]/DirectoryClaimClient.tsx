@@ -330,8 +330,8 @@ export default function DirectoryClaimClient() {
             </ThemeIcon>
             <Title order={3}>Claim Link Not Found</Title>
             <Text c="dimmed">
-              This claim link is invalid or has been removed. If you believe this is an error, please
-              contact support.
+              This claim link doesn&apos;t look right — it may have been removed. If you think
+              that&apos;s a mistake, reach out and we&apos;ll get you a working link.
             </Text>
             <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
               Back to Directory
@@ -352,8 +352,8 @@ export default function DirectoryClaimClient() {
             </ThemeIcon>
             <Title order={3}>Claim Link Expired</Title>
             <Text c="dimmed">
-              This claim link has expired. Claim links are valid for 90 days. Please request a new
-              invite from the directory operator.
+              This claim link has expired — they&apos;re good for 90 days. Reach out and we&apos;ll
+              send you a fresh one.
             </Text>
             <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
               Back to Directory
@@ -374,8 +374,8 @@ export default function DirectoryClaimClient() {
             </ThemeIcon>
             <Title order={3}>Already Claimed</Title>
             <Text c="dimmed">
-              This listing has already been claimed by its owner. If this is your business and you
-              did not claim it, please contact support.
+              Someone&apos;s already claimed this listing. If this is your business and that
+              wasn&apos;t you, reach out — we&apos;ll get it sorted.
             </Text>
             <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
               Back to Directory
@@ -594,8 +594,8 @@ export default function DirectoryClaimClient() {
               </ThemeIcon>
               <Title order={3}>You own the listing for {summary?.businessName}</Title>
               <Text>
-                Your free directory listing is live. Shoppers can find you, but it&apos;s still a
-                basic listing. Choose a Presence Mode to unlock your full directory entry.
+                Your free directory listing is live and shoppers can already find you. Choose a
+                Presence Mode when you&apos;re ready for the full directory entry.
               </Text>
             </Stack>
 
