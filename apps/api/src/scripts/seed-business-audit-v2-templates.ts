@@ -49,7 +49,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-availability-control-4 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-binding-alignment-1 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -57,7 +57,7 @@ const V1_MARKER = SEED_VERSION_MARKER;
 // ─── Shared binding-section text ─────────────────────────────────────────
 
 const CATEGORY_INTELLIGENCE_BINDING = `Category Intelligence — Binding for This Audit
-A CATEGORY INTELLIGENCE block is appended to the end of this prompt (after the JSON schema). It contains category-specific terminology, specialized sources, evidence rules, prohibited inferences, and category signals for the business category being audited.
+A CATEGORY INTELLIGENCE block is appended to this prompt after the audit instructions and before the JSON schema. It contains category-specific terminology, specialized sources, evidence rules, prohibited inferences, and category signals for the business category being audited.
 
 You MUST apply the Category Intelligence block throughout this audit. Specifically:
 
@@ -65,7 +65,7 @@ Terminology — Use the category-specific terms listed in the block as corrobora
 Specialized Sources — Consult the Specialized Sources listed in the block in addition to the mainstream platforms listed in the Platforms section below. Record every consulted source in specialized_sources_audited and sources.
 Evidence Rules — Obey every rule in the block's Category Evidence Rules section. These rules are binding and override any conflicting default behavior.
 Prohibited Inferences — Do NOT make any inference listed in the block's PROHIBITED INFERENCES section. These are category-specific guardrails that complement (and are stricter than) the general cautions in this template.
-Category Signals — Populate detected_signals with any INT_* codes from the block's Category Signals list when verified public evidence supports them. These are admissible alongside the RA_*, DS_*, WC_*, CP_*, and VP_* signal families defined later in this template.
+Category Signals — Populate detected_signals with any INT_* codes from the block's Category Signals list when verified public evidence supports them. These are admissible alongside the RA_*, DS_*, WC_*, CP_*, and VP_* signal families defined later in this template. These INT_* taxonomy codes are distinct from the free-text category_signals list in the CATEGORY MARKET CONTEXT block — the former are codes you may emit, the latter is a qualitative checklist for your assessment.
 Absence Is Not a Negative — If a website, social profile, delivery option, specialty product, or certification listed in the block is not found, record that it was "not verified." Do not convert absence into a claim that the asset does not exist.
 If the Category Intelligence block is missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations.
 `;
@@ -102,11 +102,13 @@ You MUST apply the Market Context blocks throughout this audit. Specifically:
 Category Market Intelligence — The CATEGORY MARKET CONTEXT block may contain:
   - category_summary: what this category looks like in this market
   - category_profile: the business model for this category (how businesses in this category typically operate, what they sell, who they serve, their online presence pattern, competitive landscape, typical scale)
-  - category_signals: signals that indicate a strong business in this category — use these as a checklist for the business being audited (met / unmet / not verified)
+  - category_signals: free-text qualitative signals that indicate a strong business in this category — use these as a checklist for the business being audited (met / unmet / not verified). These are NOT the INT_* taxonomy codes from the CATEGORY INTELLIGENCE block — do not emit them in detected_signals.
   - market_density: qualitative density of this category in this city — use this to contextualize the business's competitive position (sparse = low competition, high opportunity; dense = high competition)
   - prospect_signals: signals to look for when prospecting — use these to identify whether this business has growth or positioning opportunities
   - secondary_categories: related categories strong in this market — use these to identify cross-category opportunities
   - category_notes: free-text analyst notes — use these for additional context
+  - keywords: category-level search terms for this market — use these to sense-check the business's discoverability
+  - super_categories / sub_categories / adjacent_categories: where this category sits in the taxonomy tree — use these to identify related-category and cross-sell opportunities
 
 City Market Intelligence — The CITY MARKET CONTEXT block may contain:
   - market_summary: the city's business landscape — use this to ground your recommendations in the real market
@@ -129,6 +131,58 @@ Do NOT mention "market context", "enrichment", "profile", "market intelligence",
 
 If both Market Context blocks are missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations. The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.
 `;
+
+// ─── Targeted content updates: align the binding text with the blocks the
+//     runtime actually injects. The runtime appends the Category Intelligence,
+//     Gold Standard, and Market Context blocks AFTER the audit instructions and
+//     BEFORE the JSON schema suffix — not after the schema. The Market Context
+//     binding also documented a city_profile field the renderer never emitted,
+//     omitted four category fields it does emit, and reused the name
+//     "category_signals" for a different concept than the Category Intelligence
+//     binding's INT_* taxonomy codes.
+//
+//     insertAfter skips re-insertion when a binding is already present
+//     (fingerprint match on the first 80 chars), so already-seeded bodies need
+//     replaceFirst to update the text in place. Each FROM below is bounded so it
+//     is NOT a substring of its TO — otherwise a fresh insertion would match its
+//     own update and duplicate the sentence. Idempotent (no-op if already
+//     updated or not present).
+const CI_POSITION_FROM = "A CATEGORY INTELLIGENCE block is appended to the end of this prompt (after the JSON schema).";
+const CI_POSITION_TO = "A CATEGORY INTELLIGENCE block is appended to this prompt after the audit instructions and before the JSON schema.";
+
+const CI_SIGNALS_FROM = "signal families defined later in this template.\nAbsence Is Not a Negative —";
+const CI_SIGNALS_TO = "signal families defined later in this template. These INT_* taxonomy codes are distinct from the free-text category_signals list in the CATEGORY MARKET CONTEXT block — the former are codes you may emit, the latter is a qualitative checklist for your assessment.\nAbsence Is Not a Negative —";
+
+const GS_POSITION_FROM = "A GOLD STANDARD BENCHMARK block is appended to the end of this prompt (after the Category Intelligence block).";
+const GS_POSITION_TO = "A GOLD STANDARD BENCHMARK block is appended to this prompt after the Category Intelligence block and before the JSON schema.";
+
+const MC_POSITION_FROM = "A CATEGORY MARKET CONTEXT block and/or a CITY MARKET CONTEXT block may be appended to the end of this prompt (after the Gold Standard block).";
+const MC_POSITION_TO = "A CATEGORY MARKET CONTEXT block and/or a CITY MARKET CONTEXT block may be appended to this prompt after the Gold Standard block and before the JSON schema.";
+
+const MC_SIGNALS_FROM = "  - category_signals: signals that indicate a strong business in this category — use these as a checklist for the business being audited (met / unmet / not verified)";
+const MC_SIGNALS_TO = "  - category_signals: free-text qualitative signals that indicate a strong business in this category — use these as a checklist for the business being audited (met / unmet / not verified). These are NOT the INT_* taxonomy codes from the CATEGORY INTELLIGENCE block — do not emit them in detected_signals.";
+
+const MC_FIELDS_FROM = "  - category_notes: free-text analyst notes — use these for additional context\n\nCity Market Intelligence — The CITY MARKET CONTEXT block may contain:";
+const MC_FIELDS_TO = "  - category_notes: free-text analyst notes — use these for additional context\n  - keywords: category-level search terms for this market — use these to sense-check the business's discoverability\n  - super_categories / sub_categories / adjacent_categories: where this category sits in the taxonomy tree — use these to identify related-category and cross-sell opportunities\n\nCity Market Intelligence — The CITY MARKET CONTEXT block may contain:";
+
+/**
+ * Apply every binding-alignment replaceFirst to a rendered body. Idempotent.
+ *
+ * `includeProfileBindings` is false for the V1 template (mpt-je6m7ru6) — it has
+ * no Category Intelligence or Gold Standard binding, so only the Market Context
+ * alignment applies.
+ */
+function alignBindingText(out: string, includeProfileBindings: boolean): string {
+  if (includeProfileBindings) {
+    out = replaceFirst(out, CI_POSITION_FROM, CI_POSITION_TO);
+    out = replaceFirst(out, CI_SIGNALS_FROM, CI_SIGNALS_TO);
+    out = replaceFirst(out, GS_POSITION_FROM, GS_POSITION_TO);
+  }
+  out = replaceFirst(out, MC_POSITION_FROM, MC_POSITION_TO);
+  out = replaceFirst(out, MC_SIGNALS_FROM, MC_SIGNALS_TO);
+  out = replaceFirst(out, MC_FIELDS_FROM, MC_FIELDS_TO);
+  return out;
+}
 
 // ─── Schema fragment: profile_url (inserted before data_status in each
 //     platform object) ────────────────────────────────────────────────────
@@ -931,6 +985,11 @@ function transformCategoryIntegrated(body: string): string {
     MARKET_INTEL_OUTPUT_DIRECTIVE,
   );
 
+  // 4k. Align the binding text with the blocks the runtime actually injects —
+  //     position claims, the phantom city_profile field, undocumented category
+  //     fields, and the category_signals name collision. Idempotent.
+  out = alignBindingText(out, true);
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -1259,6 +1318,10 @@ function transformSignalAligned(body: string): string {
   //      replaced — the FROM string won't be found).
   out = replaceFirst(out, REQUESTED_BUSINESS_PLACEHOLDERS_FROM, REQUESTED_BUSINESS_PLACEHOLDERS_TO);
 
+  // 19g. Align the binding text with the blocks the runtime actually injects.
+  //      Idempotent.
+  out = alignBindingText(out, true);
+
   // 20. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -1340,6 +1403,11 @@ function transformBusinessAuditV1(body: string): string {
   // 1. Replace requested_business empty-string defaults with variable
   //    placeholders. Idempotent (no-op if already replaced).
   out = replaceFirst(out, REQUESTED_BUSINESS_PLACEHOLDERS_FROM, REQUESTED_BUSINESS_PLACEHOLDERS_TO);
+
+  // 1a. Align the Market Context binding text. V1 has no Category Intelligence
+  //     or Gold Standard binding, so only the Market Context alignment applies.
+  //     Idempotent.
+  out = alignBindingText(out, false);
 
   // 2. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {

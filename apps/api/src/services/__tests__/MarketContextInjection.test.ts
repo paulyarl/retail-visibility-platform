@@ -8,7 +8,8 @@
  *
  * Also covers:
  *   - National campaigns (no city) → no market context injection
- *   - Business-scope campaigns → no market context injection
+ *   - Business-scope campaigns → market context via buildMarketContextBlock
+ *     (which reads MarketContextLoader, not the intelligence-scope formatters)
  *   - Market context block appears after gold standard block
  *   - Graceful degradation when enrichment hasn't run
  *
@@ -484,9 +485,9 @@ describe('MarketContext injection into intelligence campaigns', () => {
     });
   });
 
-  // ─── Business-scope campaigns (no market context) ─────────────────────
+  // ─── Business-scope campaigns (business-audit market context path) ────
 
-  describe('business-scope campaigns (no market context injection)', () => {
+  describe('business-scope campaigns (market context via the business-audit path)', () => {
     const makeBusinessTemplate = () => ({
       body: 'Audit {{business_name}} in {{category}}',
       prompt_type: 'seek',
@@ -502,15 +503,45 @@ describe('MarketContext injection into intelligence campaigns', () => {
       state: 'IN',
     });
 
-    it('does not inject market context for business-scope campaigns', async () => {
+    it('omits the market context block when enrichment data is empty', async () => {
       const { renderedPrompt } = await service.resolvePrompt({
         template: makeBusinessTemplate(),
         campaign: makeBusinessCampaign(),
         variables: undefined,
       });
 
+      // Business audits read market context through MarketContextLoader
+      // (buildMarketContextBlock) rather than the intelligence-scope formatters —
+      // with no enrichment rows the loader returns empty and no block is emitted.
+      expect(mockMarketContextLoader.loadMarketContext).toHaveBeenCalled();
       expect(renderedPrompt).not.toContain('MARKET CONTEXT');
-      expect(mockMarketContextLoader.loadMarketContext).not.toHaveBeenCalled();
+    });
+
+    it('injects category + city blocks, including city_profile, when enrichment exists', async () => {
+      mockMarketContextLoader.loadMarketContext.mockImplementationOnce(async () => ({
+        category: { category_summary: 'Category market summary.', market_density: 'moderate' },
+        location: {
+          market_summary: 'City market summary.',
+          city_profile: { metro_description: 'Midwest metro' },
+        },
+      }));
+      mockMarketContextLoader.hasCategoryIntelligence.mockReturnValueOnce(true);
+      mockMarketContextLoader.hasLocationIntelligence.mockReturnValueOnce(true);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeBusinessTemplate(),
+        campaign: makeBusinessCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== CATEGORY MARKET CONTEXT ===');
+      expect(renderedPrompt).toContain('Category market summary.');
+      expect(renderedPrompt).toContain('Market density: moderate');
+      expect(renderedPrompt).toContain('=== CITY MARKET CONTEXT ===');
+      expect(renderedPrompt).toContain('City market summary.');
+      // The Market Context binding documents city_profile — it must actually render.
+      expect(renderedPrompt).toContain('City profile (structural):');
+      expect(renderedPrompt).toContain('Midwest metro');
     });
   });
 });

@@ -1479,6 +1479,11 @@ export class MarketingExecutionService extends BaseService {
    *   - Category context: row (category, city, state)
    *   - Location context: row ('__location__', city, state)
    *
+   * Loaded through MarketContextLoader — the shared loader also used by the
+   * intelligence-scope formatters — so the field set stays whitelisted (shopper
+   * copy cannot bleed into an audit prompt) and each block's presence gate
+   * checks the full field set rather than a single field.
+   *
    * Returns '' when neither context exists (byte-identical render —
    * campaigns without prior enrichment runs are unaffected).
    */
@@ -1491,26 +1496,23 @@ export class MarketingExecutionService extends BaseService {
     if (!businessCity || !businessState || !category) return '';
 
     try {
-      const rows = await this.prisma.$queryRaw<Array<{ category_key: string; context: any }>>`
-        SELECT category_key, context FROM directory_category_enrichment
-        WHERE LOWER(city) = LOWER(${businessCity})
-          AND LOWER(state) = LOWER(${businessState})
-          AND category_key IN (${category}, '__location__')
-      `;
-      if (!Array.isArray(rows) || rows.length === 0) return '';
-
-      const categoryCtx = rows.find((r) => r.category_key === category)?.context;
-      const locationCtx = rows.find((r) => r.category_key === '__location__')?.context;
+      const loader = MarketContextLoader.getInstance();
+      const marketCtx = await loader.loadMarketContext(category, businessCity, businessState, ctx);
+      const categoryCtx = marketCtx.category;
+      const locationCtx = marketCtx.location;
+      const hasCategoryContext = loader.hasCategoryIntelligence(categoryCtx);
+      const hasLocationContext = loader.hasLocationIntelligence(locationCtx);
 
       const blocks: string[] = [];
-      if (categoryCtx && categoryCtx.category_summary) {
+      if (hasCategoryContext) {
         const lines: string[] = [
           '=== CATEGORY MARKET CONTEXT ===',
           `Category: ${category}`,
           `City: ${businessCity}, ${businessState}`,
-          '',
-          categoryCtx.category_summary,
         ];
+        if (categoryCtx.category_summary) {
+          lines.push('', categoryCtx.category_summary);
+        }
         if (categoryCtx.keywords && Array.isArray(categoryCtx.keywords) && categoryCtx.keywords.length > 0) {
           lines.push(`Keywords: ${categoryCtx.keywords.join(', ')}`);
         }
@@ -1558,13 +1560,14 @@ export class MarketingExecutionService extends BaseService {
         blocks.push(lines.join('\n'));
       }
 
-      if (locationCtx && locationCtx.market_summary) {
+      if (hasLocationContext) {
         const lines: string[] = [
           '=== CITY MARKET CONTEXT ===',
           `City: ${businessCity}, ${businessState}`,
-          '',
-          locationCtx.market_summary,
         ];
+        if (locationCtx.market_summary) {
+          lines.push('', locationCtx.market_summary);
+        }
         if (locationCtx.top_categories && Array.isArray(locationCtx.top_categories) && locationCtx.top_categories.length > 0) {
           lines.push('', `Top categories: ${locationCtx.top_categories.join(', ')}`);
         }
@@ -1573,6 +1576,17 @@ export class MarketingExecutionService extends BaseService {
         }
         if (locationCtx.market_notes) {
           lines.push('', `Notes: ${locationCtx.market_notes}`);
+        }
+        if (locationCtx.city_profile) {
+          const cp = locationCtx.city_profile;
+          lines.push('', 'City profile (structural):');
+          if (cp.metro_description) lines.push(`  Metro: ${cp.metro_description}`);
+          if (Array.isArray(cp.major_industries) && cp.major_industries.length > 0) {
+            lines.push(`  Major industries: ${cp.major_industries.join(', ')}`);
+          }
+          if (cp.growth_trajectory) lines.push(`  Growth trajectory: ${cp.growth_trajectory}`);
+          if (cp.demographic_character) lines.push(`  Demographic character: ${cp.demographic_character}`);
+          if (cp.market_character) lines.push(`  Market character: ${cp.market_character}`);
         }
         if (locationCtx.market_gaps && Array.isArray(locationCtx.market_gaps) && locationCtx.market_gaps.length > 0) {
           lines.push('', 'Market gaps (prospect opportunities):');
@@ -1595,8 +1609,8 @@ export class MarketingExecutionService extends BaseService {
         category,
         city: businessCity,
         state: businessState,
-        hasCategoryContext: Boolean(categoryCtx?.category_summary),
-        hasLocationContext: Boolean(locationCtx?.market_summary),
+        hasCategoryContext,
+        hasLocationContext,
       });
 
       return blocks.join('\n\n') +
