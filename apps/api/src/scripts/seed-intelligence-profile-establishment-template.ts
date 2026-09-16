@@ -20,6 +20,18 @@ import { MarketingPromptService } from '../services/MarketingPromptService';
 import { logger } from '../logger';
 import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-profile.schema';
 
+/**
+ * Bump on every body change so re-runs are auditable in logs. The body also
+ * carries this marker as a trailing HTML comment (repo convention) so the
+ * rendered prompt records which revision produced a given profile.
+ *
+ * 2026-09-16-diaspora-discovery: endonym synonyms, address-indexed datasets,
+ * hosted storefront platforms as a first-class source class, query-shape family
+ * (incl. site-scoped sweeps), corridor derivation from evidence, and the
+ * required coverage self-test.
+ */
+const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-16-diaspora-discovery';
+
 const ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-intel-profile-establishment-001',
   name: 'Seek: Intelligence Profile Establishment',
@@ -90,11 +102,22 @@ name the actual supplier(s) serving {{city}} and the retailers they list.
 Instead of "community directories", name the actual diaspora organizations
 and international-business networks active in {{city}}.
 
+Derive commercial corridors from EVIDENCE, not assumption. Once you have
+identified two or three businesses in this category in {{city}}, cluster their
+street addresses to find where the category actually concentrates, and name
+those corridors. State which corridor you would have assumed and why the
+evidence corrects it. Do not list the city's well-known retail districts unless
+you can tie category businesses to them — the category's real corridor is often
+an industrial or arterial stretch that no general city guide mentions.
+
 === PROFILE SECTIONS ===
 
 1. TERMINOLOGY — Define the key terms used in this category. What do practitioners call their work? What terms would a customer use? What industry-specific vocabulary matters?
 
-2. SYNONYMS — List alternative names for this category (what people search for when looking for this type of business).
+2. SYNONYMS — List alternative names for this category (what people search for when looking for this type of business). Include BOTH classes:
+   (a) ENGLISH CATEGORY TERMS — the label shoppers and mainstream directories use.
+   (b) ENDONYMS AND DIASPORA-LANGUAGE TOKENS — the words the community itself uses for the category and for itself. These are the highest-yield discovery tokens and are usually absent from English-language directory taxonomies. Examples across categories: "habesha" (Ethiopian/Eritrean), "supermarché" (Francophone West African), "tienda" and "bodega" (Latin American), "desi" and "kirana" (South Asian), "halal market" and "souk" (Middle Eastern), "toko" (Indonesian).
+   Label each synonym as an English term or an endonym. A synonym list containing only English category words is incomplete and will miss businesses whose names are transliterations or personal names.
 
 3. SUBCATEGORIES — Identify the major subcategories within this category. Not all businesses in the category do the same thing — what are the specializations?
 
@@ -108,7 +131,26 @@ and international-business networks active in {{city}}.
 
    CRITICAL: Limitations are as important as capabilities. A source's limitations define what inferences must NOT be made from its data. For example, "CARFAX service history is NOT a review system" is a limitation that prevents conflating service records with customer reviews.
 
-5. DISCOVERY PATTERNS — How should an analyst search for businesses in this category? What vertical directories, professional networks, or niche platforms should be searched? What search strategies surface businesses that are invisible to mainstream search?
+   Also look for DATASETS INDEXED TO THE BUSINESS ADDRESS. These are often the highest-signal sources for categories with import supply chains, regulated goods, or licensed premises, and they surface businesses that appear in no commercial directory at all. Dataset classes to consider:
+   - Import / customs bill-of-lading records (importer of record, supplier country, and the exact product line imported)
+   - State business-entity registries (legal name, formation date, principal office address)
+   - Health department food-establishment licensing and inspection records
+   - Benefit-program retailer authorization lists (e.g. SNAP/EBT authorized retailers)
+   - Licensed-goods permit registries (liquor, tobacco, pharmacy, halal or kosher certification)
+   Name the concrete dataset that exists for this category and market, with its URL, capabilities, AND limitations. A registration is not evidence of trading; an authorization is not a quality signal; a permit is not a review.
+
+   Also treat HOSTED STOREFRONT PLATFORMS as a source class in their own right — not merely as a search trick. Small independent retailers in this category disproportionately adopt low-cost storefront hosts (Square Online, Wix, Shopify, GoDaddy, Weebly, WordPress.com) because they bundle point-of-sale with a simple online catalog, and the resulting subdomains stay publicly indexed even when the business's platform category is generic or wrong. Give this class its own source entry, naming the concrete hosts that matter in this market, and carry these limitations with it:
+   - Presence proves the operator adopted a storefront tool, NOT that the business is trading, licensed, or accepting orders. Hosted pages frequently display "not currently accepting online orders", and a storefront can outlive a closed business or precede an opening.
+   - The sweep surfaces only operators who adopted that host, so it carries selection bias toward slightly more digitized businesses. Absence from the sweep means nothing.
+   - Hosted pages are typically client-side rendered, so a search-index hit proves the URL exists, not that it renders for an ordinary visitor.
+
+5. DISCOVERY PATTERNS — How should an analyst search for businesses in this category? What vertical directories, professional networks, or niche platforms should be searched? What search strategies surface businesses that are invisible to mainstream search? Provide at least one concrete pattern for EACH of these query shapes, with real examples for this category and {{city}}:
+   (a) CATEGORY-TAXONOMY queries — the platform's own category labels, including the wrong or generic labels a mis-categorized business would sit under.
+   (b) NAME-TOKEN queries — business names built from endonyms, transliterations, personal names, or place names. These carry no English category word and are invisible to category-name searches.
+   (c) PRODUCT long-tail queries — the specific goods a customer would type.
+   (d) SITE-SCOPED sweeps — restrict a search engine to a hosting platform or directory domain to enumerate an entire population at once (e.g. site:square.site, site:myshopify.com, site:wixsite.com, site:godaddysites.com, site:weebly.com, site:wordpress.com). These are cheap and high-yield, and they surface businesses whose platform category is generic or wrong. Treat the host list as illustrative and verify a host is still live before sweeping — hosted-site platforms are discontinued and rebranded regularly, so a dead host wastes the whole pattern.
+   (e) GEOGRAPHIC cluster queries — derive corridors from the addresses of already-found businesses rather than assuming them.
+   (f) COMMUNITY / REFERRAL queries — the places the community recommends businesses to each other.
 
 6. CATEGORY EVIDENCE RULES — What evidence indicates that a business is active, qualified, and a good prospect? What evidence is meaningful for this category specifically (as opposed to generic digital-presence signals)?
 
@@ -124,8 +166,18 @@ and international-business networks active in {{city}}.
 === EVIDENCE SAFETY ===
 Do NOT convert unavailable information into a negative signal. "Website not found during discovery" is not the same as "no website exists." Record what you found and what you could not verify as separate observations. The prohibited_inferences section is where you document inferences that must not be made from absence of evidence.
 
+=== COVERAGE SELF-TEST (REQUIRED) ===
+Before finalizing, audit your own pattern set for blind spots. For each class below, confirm that at least one of your discovery patterns would surface it. If a class is uncovered, add or fix a pattern until it is covered.
+  (1) A business whose platform category is generic or wrong (e.g. "Convenience store", "Grocery store", "Restaurant") while its actual specialization appears only in its description, photos, or import records.
+  (2) A business whose name contains no English category word — an endonym, transliteration, personal name, or place name.
+  (3) A business with no website and no claimed profile on any platform.
+  (4) A business whose storefront is not on any corridor you listed.
+  (5) A business that is well known in its community but has no customer reviews.
+Record the result in discovery_patterns under the key "coverage_self_test", stating for each class which pattern covers it — or that it is uncovered. A pattern set that can only find businesses that already look like the category is not finished.
+
 === OUTPUT REQUIREMENT ===
-Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.`,
+Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
+<!-- seed-version: intel-profile-establishment-2026-09-16-diaspora-discovery -->`,
   variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,
@@ -147,7 +199,7 @@ async function main() {
       outputSchema: ESTABLISHMENT_TEMPLATE.outputSchema,
       intelligenceCampaignKind: ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
     });
-    logger.info(`Updated establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id });
+    logger.info(`Updated establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id, seedVersion: SEED_VERSION_MARKER });
   } else {
     await service.createTemplate({
       id: ESTABLISHMENT_TEMPLATE.id,
@@ -160,7 +212,7 @@ async function main() {
       isDefault: ESTABLISHMENT_TEMPLATE.isDefault,
       intelligenceCampaignKind: ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
     });
-    logger.info(`Created establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id });
+    logger.info(`Created establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id, seedVersion: SEED_VERSION_MARKER });
   }
 }
 

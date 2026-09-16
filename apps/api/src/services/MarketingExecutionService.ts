@@ -1785,6 +1785,13 @@ When building the profile, bias toward emerging discovery:
 - DISCOVERY PATTERNS: favor long-tail, vertical, and community search paths that
   go beyond the first page of Google. Name the concrete niche search strategies
   that find businesses mainstream search misses.
+- CATEGORY MISALIGNMENT IS THE NORM, NOT THE EXCEPTION: in diaspora- and
+  immigrant-owned categories the platform's assigned category is frequently
+  generic ("Convenience store", "Grocery store", "Restaurant") while the real
+  specialization appears only in the description, photos, or import records.
+  Every pattern set must include at least one discovery path that does NOT
+  depend on the platform's category label, and at least one that does not
+  depend on the business name containing an English category word.
 - CATEGORY EVIDENCE RULES: include absence-handling rules that distinguish "not
   found during discovery" from "does not exist" — emerging discovery must NEVER
   convert absence of evidence into a negative signal.
@@ -1817,6 +1824,12 @@ When building the profile, bias toward competitive benchmarking:
   THIS category — a high-visibility business only counts as a competitive
   benchmark if it meets the profile's category_fit and specialization criteria,
   not merely "has high reviews."
+- CATEGORY-LABEL TRUST: do not treat the platform's category label as ground
+  truth in either direction — a business labeled with the right category may
+  carry none of the assortment, and a business labeled generically may be a
+  genuine specialist. Verify specialization from assortment evidence, not from
+  the label, so a mis-categorized leader is not silently excluded from the
+  benchmark set.
 - TERMINOLOGY / SYNONYMS: capture the full competitive set, including name
   variants and nationality-specific labels that mainstream search may miss. A
   competitive scan that misses those variants is incomplete.
