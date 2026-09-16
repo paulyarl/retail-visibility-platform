@@ -46,7 +46,12 @@ import marketingOpsService, {
   RankedHook,
   HookSuggestionResult,
   FootprintFocusAttribute,
+  CampaignOutreachAnchor,
 } from '@/services/MarketingOpsService';
+import ConstructionVariablesPanel, {
+  type ConstructionVariable,
+} from './ConstructionVariablesPanel';
+import { useConstructionVariables, resolveVar } from './constructionVariables';
 
 interface PitchConstructionPanelProps {
   campaignId: string;
@@ -429,15 +434,15 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const contactStarters = CONTACT_STARTERS[effectiveArchetype] ?? CONTACT_STARTERS.A1;
   const slotConfig = PREVIEW_SLOT_CONFIGS[effectiveArchetype] ?? PREVIEW_SLOT_CONFIGS.A1;
 
-  // ─── Construction Variables ─────────────────────────────────────────
-  // Operator-entered values for the {{placeholders}} used in the convertable
-  // starters. When a starter is clicked, the placeholders are resolved with
-  // whatever values the operator has entered here; unfilled variables are
-  // left as {{placeholder}} so the operator can see what still needs filling.
-  // The variable set is detected dynamically from the current archetype's
-  // starters so the operator only sees inputs for variables that actually
-  // appear in the offered starters.
-  const [constructionVars, setConstructionVars] = useState<Record<string, string>>({});
+  // ─── Construction Variables (shared store with the Manual tab) ──────
+  // Values live in a per-campaign localStorage store shared with tab 1, so a
+  // value entered on either tab resolves on both. `mergeDefaults` holds the
+  // backend-resolved campaign values (business, city, salutation …) from the
+  // Suggested Hooks resolve — used to pre-populate the inputs and as the
+  // resolution fallback, without persisting campaign data into the store.
+  const { vars: constructionVars, setVar: setConstructionVar } =
+    useConstructionVariables(campaignId);
+  const [mergeDefaults, setMergeDefaults] = useState<Record<string, string>>({});
 
   const usedVars = useMemo(() => {
     const set = new Set<string>();
@@ -450,11 +455,26 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const resolveVariables = useCallback(
     (text: string): string =>
       text.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
-        const value = constructionVars[key];
-        return value && value.trim() ? value : match;
+        return resolveVar(constructionVars, key) ?? mergeDefaults[key] ?? match;
       }),
-    [constructionVars],
+    [constructionVars, mergeDefaults],
   );
+
+  // Panel inputs: operator values win, then backend-resolved campaign
+  // defaults. Editing writes to the shared store (not to the defaults).
+  const constructionValues = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const key of usedVars) {
+      const v = resolveVar(constructionVars, key) ?? mergeDefaults[key];
+      if (v && v.trim()) out[key] = v;
+    }
+    return out;
+  }, [usedVars, constructionVars, mergeDefaults]);
+
+  const constructionPanelVars: ConstructionVariable[] = usedVars.map((key) => ({
+    key,
+    hint: mergeDefaults[key] ?? key,
+  }));
 
   // Stamp the renderer labels onto a review pair. The labels are read from
   // the first pair by the backend renderer, so we only need them on pair[0],
@@ -537,20 +557,26 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const [hookError, setHookError] = useState<string | null>(null);
   const [hookArchetype, setHookArchetype] = useState<string | null>(null);
 
+  // Campaign anchors authored on the Manual tab ("Save as anchor"). Surfaced
+  // as a separate group in Suggested Hooks so they can be loaded as hooks.
+  const [campaignAnchors, setCampaignAnchors] = useState<CampaignOutreachAnchor[]>([]);
+
   // ─── Fetchers ───────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     if (!campaignId) return;
     try {
-      const [hdrs, cls, cts, pchs] = await Promise.all([
+      const [hdrs, cls, cts, pchs, anchors] = await Promise.all([
         marketingOpsService.listHeaders(campaignId),
         marketingOpsService.listClosers(campaignId),
         marketingOpsService.listContacts(campaignId),
         marketingOpsService.listPitches(campaignId),
+        marketingOpsService.listCampaignAnchors(campaignId),
       ]);
       setHeaders(hdrs);
       setClosers(cls);
       setContacts(cts);
       setPitches(pchs);
+      setCampaignAnchors(anchors);
     } catch {
       // ignore — individual list calls will surface errors
     }
@@ -584,6 +610,14 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
       const result = await marketingOpsService.getHookSuggestions(campaignId);
       setHookSuggestions(result.suggestions);
       setHookArchetype(result.archetype);
+      // Seed the Construction Variables defaults from the same backend
+      // resolve that makes the hooks business-name-aware, so the operator
+      // doesn't retype {{business}}/{{name}}.
+      const md: Record<string, string> = { ...(result.mergeContext ?? {}) };
+      if (!md.name && (md.sender_name || md.operator_name)) {
+        md.name = md.sender_name ?? md.operator_name;
+      }
+      setMergeDefaults(md);
     } catch (err: any) {
       setHookError(err.message || 'Failed to load hook suggestions');
       setHookSuggestions([]);
@@ -842,46 +876,17 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   // ─── Render ─────────────────────────────────────────────────────────
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-6">
-      {/* ─── Construction Variables ───────────────────────────────────
-          Operator-entered values for the {{placeholders}} in the convertable
-          starters below. When a starter is clicked, the placeholders are
-          resolved with these values; unfilled variables stay as
-          {{placeholder}} so the operator can fill them in the import field. */}
+      {/* ─── Construction Variables (shared with the Manual tab) ──────
+          Values are shared with tab 1 via a per-campaign store; business/name
+          are pre-filled from the Suggested Hooks resolve. Clicking a starter
+          below substitutes these into the {{placeholders}}. */}
       {usedVars.length > 0 && (
-        <details className="group rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-900/10">
-          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2">
-              Construction Variables
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                {usedVars.length}
-              </span>
-            </span>
-            <span className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 group-open:hidden">
-              Fill to auto-resolve starter placeholders
-            </span>
-          </summary>
-          <div className="px-3 pb-3 pt-1">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-              Enter values once and they'll be substituted into the <code className="font-mono">{'{{placeholders}}'}</code> when you click a convertable starter below. Unfilled variables are left as-is for manual editing.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-              {usedVars.map((varName) => (
-                <label key={varName} className="block">
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{`{{${varName}}}`}</span>
-                  <input
-                    type="text"
-                    value={constructionVars[varName] ?? ''}
-                    onChange={(e) =>
-                      setConstructionVars((prev) => ({ ...prev, [varName]: e.target.value }))
-                    }
-                    placeholder={varName}
-                    className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-        </details>
+        <ConstructionVariablesPanel
+          variables={constructionPanelVars}
+          values={constructionValues}
+          onChange={setConstructionVar}
+          hintText="Shared with the Manual tab"
+        />
       )}
 
       {/* ─── Suggested Hooks (Sprint 2 — Light-Score Hook Library) ──── */}
@@ -912,6 +917,58 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
           <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 mb-2">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
             {hookError}
+          </div>
+        )}
+
+        {/* Campaign anchors (authored on the Manual tab) — a separate group
+            from the ranked library hooks. "Use this hook" loads the anchor's
+            thesis into the same header + opener import surfaces. */}
+        {campaignAnchors.length > 0 && (
+          <div className="mb-3">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 select-none">
+              Campaign anchors — authored on the Manual tab. Click to load into the import field below.
+            </p>
+            <div className="space-y-2">
+              {campaignAnchors.map((anchor) => (
+                <div
+                  key={anchor.id}
+                  className="rounded-md border border-amber-200 dark:border-amber-900/40 bg-white dark:bg-neutral-800 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{anchor.title}</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                        {anchor.anchor_type}
+                      </span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-300">
+                        {anchor.status}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderImportText(anchor.title);
+                        window.dispatchEvent(
+                          new CustomEvent('hook-selected', {
+                            detail: { body: anchor.operator_thesis, angle: anchor.anchor_type },
+                          }),
+                        );
+                      }}
+                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700"
+                    >
+                      <Upload className="w-3 h-3" />
+                      Use this hook
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">
+                    <span className="text-gray-400">Verification:</span> {anchor.verification_question}
+                  </p>
+                  <pre className="text-xs text-gray-600 dark:text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                    {anchor.operator_thesis}
+                  </pre>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1019,7 +1076,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
               <option value="">— None (optional) —</option>
               {headers.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.source} · {h.quality_gate_passed ? '✓' : '✗'} · {h.header_text?.slice(0, 40) ?? '(empty)'} · {new Date(h.executed_at).toLocaleDateString()}
+                  {h.source} · {h.quality_gate_passed ? '✓' : '·'} · {h.header_text?.slice(0, 40) ?? '(empty)'} · {new Date(h.executed_at).toLocaleDateString()}
                 </option>
               ))}
             </select>
@@ -1027,9 +1084,12 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
               <div className="mt-2 p-3 bg-gray-50 dark:bg-neutral-900/50 rounded-lg">
                 <p className="text-sm text-gray-700 dark:text-gray-300 font-mono">{selectedHeader.header_text}</p>
                 {selectedHeader.quality_gate_issues && selectedHeader.quality_gate_issues.length > 0 && (
-                  <ul className="mt-1 text-xs text-amber-600 dark:text-amber-400 list-disc list-inside">
-                    {selectedHeader.quality_gate_issues.map((iss, i) => <li key={i}>{iss}</li>)}
-                  </ul>
+                  <div className="mt-1.5">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Advisory notes — not blocking</p>
+                    <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc list-inside">
+                      {selectedHeader.quality_gate_issues.map((iss, i) => <li key={i}>{iss}</li>)}
+                    </ul>
+                  </div>
                 )}
               </div>
             )}
@@ -1300,7 +1360,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
               <option value="">— None (optional) —</option>
               {closers.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.source} · {c.quality_gate_passed ? '✓' : '✗'} · {c.closer_text?.slice(0, 40) ?? '(empty)'} · {new Date(c.executed_at).toLocaleDateString()}
+                  {c.source} · {c.quality_gate_passed ? '✓' : '·'} · {c.closer_text?.slice(0, 40) ?? '(empty)'} · {new Date(c.executed_at).toLocaleDateString()}
                 </option>
               ))}
             </select>
@@ -1308,9 +1368,12 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
               <div className="mt-2 p-3 bg-gray-50 dark:bg-neutral-900/50 rounded-lg">
                 <p className="text-sm text-gray-700 dark:text-gray-300 font-mono">{selectedCloser.closer_text}</p>
                 {selectedCloser.quality_gate_issues && selectedCloser.quality_gate_issues.length > 0 && (
-                  <ul className="mt-1 text-xs text-amber-600 dark:text-amber-400 list-disc list-inside">
-                    {selectedCloser.quality_gate_issues.map((iss, i) => <li key={i}>{iss}</li>)}
-                  </ul>
+                  <div className="mt-1.5">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Advisory notes — not blocking</p>
+                    <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc list-inside">
+                      {selectedCloser.quality_gate_issues.map((iss, i) => <li key={i}>{iss}</li>)}
+                    </ul>
+                  </div>
                 )}
               </div>
             )}

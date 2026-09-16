@@ -502,6 +502,8 @@ export interface RankedHook {
 export interface HookSuggestionResult {
   archetype: string;
   archetypeSource: 'triage' | 'fallback';
+  /** Merge values used to resolve the hooks (business, city, salutation …). */
+  mergeContext?: Record<string, string>;
   suggestions: RankedHook[];
 }
 
@@ -1875,6 +1877,26 @@ class MarketingOpsService extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<any>(url, {}, 'mkt-ops-campaigns-list', this.cacheTTL);
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch campaigns');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.items ? data : { items: Array.isArray(data) ? data : [], total: data?.length ?? 0 };
+  }
+
+  /**
+   * Campaigns eligible for the Openers workspace — business campaigns that
+   * have a real business_analysis audit (openers resolve an archetype from
+   * it). Backend-filtered so the picker never offers a campaign that would
+   * fail to resolve.
+   */
+  async listOpenerEligibleCampaigns(): Promise<{ items: Campaign[]; total: number }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/eligible-campaigns`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch eligible campaigns');
     }
     const data = result.data?.data ?? result.data;
     return data?.items ? data : { items: Array.isArray(data) ? data : [], total: data?.length ?? 0 };

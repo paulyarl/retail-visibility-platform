@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw, Save, Copy, CheckCircle2, AlertTriangle, ArrowRight, Sparkles, Phone,
-  BookmarkPlus,
+  BookmarkPlus, Upload,
 } from 'lucide-react';
 import {
   marketingOpsService,
@@ -12,6 +12,10 @@ import {
   type ManualFieldRole,
 } from '@/services/MarketingOpsService';
 import SaveAsTemplateModal from './SaveAsTemplateModal';
+import ConstructionVariablesPanel, {
+  type ConstructionVariable,
+} from './ConstructionVariablesPanel';
+import { useConstructionVariables, resolveVar } from './constructionVariables';
 
 /**
  * Manual tab — the operator playground / producer lane.
@@ -61,10 +65,12 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
   const [promoting, setPromoting] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  // Construction Variables panel open state — default-open so operators see
-  // the fill-in inputs, but tracked so a manual collapse survives re-renders
-  // (a bare `open={...}` expression re-opens on every keystroke).
-  const [varsOpen, setVarsOpen] = useState(true);
+
+  // Cross-tab Construction Variables store (localStorage, per campaign).
+  // Shared with the Pitch Construction tab so a value entered on either tab
+  // shows up on the other without retyping.
+  const { vars: sharedVars, setVar: setSharedVar, setVars: setSharedVars } =
+    useConstructionVariables(campaignId);
 
   const template = useMemo(
     () => templates.find((t) => t.key === selectedKey) ?? null,
@@ -252,6 +258,23 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
     }
   };
 
+  // Send the opener straight to the Opener tab's "Import External Opener"
+  // box — same custom-event bridge the Pitch tab's "Use this hook" uses. The
+  // Opener tab loads the text and switches to itself.
+  const sendToImportOpener = () => {
+    const text = fieldValue('opener');
+    if (!text?.trim()) {
+      setPromoteError('Opener slot is empty — nothing to send');
+      return;
+    }
+    setPromoteError(null);
+    window.dispatchEvent(
+      new CustomEvent('hook-selected', {
+        detail: { body: text.trim(), angle: template?.hookAngle ?? null },
+      }),
+    );
+  };
+
   const copyText = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
@@ -304,8 +327,41 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
       else next[key] = value;
       return next;
     });
+    // Mirror into the cross-tab store so the Pitch Construction tab sees it.
+    setSharedVar(key, value);
     setDirty(true);
   };
+
+  // Cross-tab sync with the shared Construction Variables store:
+  //   • doc values the store is missing → push to the store (Pitch sees them)
+  //   • store values the doc is missing → pull into fields (Manual sees Pitch)
+  // Only detected vars sync; the doc's `fields` stays authoritative for the
+  // server-side merge and for promotion.
+  useEffect(() => {
+    if (!template || detectedVars.length === 0) return;
+    const push: Record<string, string> = {};
+    const pull: Record<string, string> = {};
+    for (const v of detectedVars) {
+      const shared = resolveVar(sharedVars, v.key);
+      const docVal = fields[v.key];
+      const hasDoc = !!docVal && !!docVal.trim();
+      if (!shared && hasDoc) push[v.key] = docVal;
+      else if (shared && !hasDoc) pull[v.key] = shared;
+    }
+    if (Object.keys(push).length > 0) setSharedVars(push);
+    if (Object.keys(pull).length > 0) {
+      setFields((prev) => ({ ...prev, ...pull }));
+      setDirty(true);
+    }
+  }, [detectedVars, sharedVars, fields, template, setSharedVars]);
+
+  // Variables for the shared panel — same shape the Pitch tab consumes.
+  const panelVariables: ConstructionVariable[] = detectedVars.map((v) => ({
+    key: v.key,
+    hint: v.mergeValue ?? v.key,
+    kind: v.kind,
+    label: v.kind === 'slot' ? v.slotLabel : undefined,
+  }));
 
   const handleTemplateSaved = useCallback(
     (created: { key: string; label: string }) => {
@@ -348,6 +404,18 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
           becomes an anchor in Call Script. The detected archetype is never changed.
         </p>
       </div>
+
+      {/* Construction Variables — top of the tab so the operator fills the
+          essential values first, then edits the body. Shared store with the
+          Pitch Construction tab (values carry across tabs). */}
+      {template && (
+        <ConstructionVariablesPanel
+          variables={panelVariables}
+          values={fields}
+          onChange={setVarValue}
+          hintText="Fill first — values carry to Pitch Construction"
+        />
+      )}
 
       {/* Template picker */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
@@ -465,63 +533,6 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
             ))}
           </div>
 
-          {/* ─── Construction Variables ─────────────────────────────
-              Every {{placeholder}} detected in the body/field values gets
-              an input — values save with the doc and merge at read, same
-              as field slots. Campaign merge keys show their resolved
-              value as the placeholder; typing overrides it, clearing
-              restores the campaign value. */}
-          <details
-            className="group rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-900/10"
-            open={varsOpen}
-            onToggle={(e) => setVarsOpen((e.currentTarget as HTMLDetailsElement).open)}
-          >
-            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
-                Construction Variables
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                  {detectedVars.length}
-                </span>
-              </span>
-              <span className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 group-open:hidden">
-                Values save with the doc and merge at read
-              </span>
-            </summary>
-            <div className="px-3 pb-3 pt-1">
-              {detectedVars.length === 0 ? (
-                <p className="text-[11px] text-gray-400">No {'{{placeholders}}'} in this play yet.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                  {detectedVars.map((v) => (
-                    <label key={v.key} className="block">
-                      <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                        {`{{${v.key}}}`}
-                        {v.kind === 'slot' && v.slotLabel && (
-                          <span className="ml-1 font-sans text-blue-600 dark:text-blue-400">← {v.slotLabel}</span>
-                        )}
-                      </span>
-                      <input
-                        type="text"
-                        value={fields[v.key] ?? ''}
-                        onChange={(e) => setVarValue(v.key, e.target.value)}
-                        placeholder={v.mergeValue ?? v.key}
-                        className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                      />
-                      {v.kind === 'auto' && fields[v.key] !== undefined && (
-                        <span className="mt-0.5 block text-[10px] text-amber-600 dark:text-amber-400">
-                          overrides campaign value{v.mergeValue ? ` "${v.mergeValue}"` : ''} —{' '}
-                          <button type="button" className="underline" onClick={() => setVarValue(v.key, '')}>
-                            clear
-                          </button>
-                        </span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
-
           {/* Script body + resolved preview */}
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-4">
             <div>
@@ -599,6 +610,17 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
                     done={!!savedDoc?.promoted_opener_id}
                     doneLabel={savedDoc?.promoted_opener_id ?? ''}
                   />
+                )}
+                {hasRole('opener') && (
+                  <button
+                    type="button"
+                    onClick={sendToImportOpener}
+                    title="Load this opener into tab 2's Import External Opener box"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-300 rounded-lg hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-700"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Send to Import Opener
+                  </button>
                 )}
                 {hasRole('header') && (
                   <PromoteButton

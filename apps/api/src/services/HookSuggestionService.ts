@@ -46,6 +46,13 @@ export interface RankedHook extends HookTemplate {
 export interface HookSuggestionResult {
   archetype: ArchetypeCode;
   archetypeSource: 'triage' | 'fallback';
+  /**
+   * The merge values used to resolve the hooks (business, city, category,
+   * salutation, sender_name, claim_url …), nulls omitted. Exposed so the
+   * Pitch Construction tab can pre-populate its Construction Variables from
+   * the same backend resolve that makes the hooks business-name-aware.
+   */
+  mergeContext: Record<string, string>;
   suggestions: RankedHook[];
 }
 
@@ -189,9 +196,16 @@ export class HookSuggestionService extends BaseService {
       },
     }));
 
+    // Nulls omitted so the frontend only pre-populates resolvable values.
+    const exposedMergeContext: Record<string, string> = {};
+    for (const [k, v] of Object.entries(mergeContext)) {
+      if (v !== null && v !== undefined) exposedMergeContext[k] = v;
+    }
+
     return {
       archetype: resolved.archetype,
       archetypeSource: resolved.source,
+      mergeContext: exposedMergeContext,
       suggestions,
     };
   }

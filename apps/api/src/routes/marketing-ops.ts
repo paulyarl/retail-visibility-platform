@@ -201,6 +201,7 @@ import PostalMailerService from '../services/marketing/PostalMailerService';
 import { generatePostcardPdf } from '../services/marketing/PostalMailerPdfService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 
 const router = Router();
@@ -1038,7 +1039,13 @@ function handleServiceError(res: Response, error: unknown, ctx?: RequestCtx): vo
     return;
   }
   const message = error instanceof Error ? error.message : 'Unknown error';
-  if (message.includes('not found') || message.includes('Invalid stage transition')) {
+  if (
+    message.includes('not found') ||
+    message.includes('Invalid stage transition') ||
+    // Campaigns without a business_analysis audit are a client/selection
+    // problem, not an internal failure — return 400, not 500.
+    message.includes('no business_analysis audit')
+  ) {
     res.status(400).json({ success: false, error: message });
   } else {
     res.status(500).json({ success: false, error: 'internal_error', message });
@@ -3515,6 +3522,66 @@ const openerImportSchema = z.object({
   // Hook angle attribution (Sprint 2 — Light-Score Hook Library).
   // Validated against HOOK_LIBRARY keys; unknown → 400.
   hook_angle: z.enum(HOOK_ANGLE_KEYS as any as [string, ...string[]]).optional().nullable(),
+});
+
+// GET /openers/eligible-campaigns — business campaigns that are safe to
+// select in the Openers workspace: they have a real business_analysis audit
+// (openers resolve an archetype from it). Stub audits (queue promotion /
+// derived-from-parent placeholders) don't count. A non-primary sibling with
+// no own audit is eligible when a sibling in the same prospect group has one
+// — mirroring getCampaign's sibling audit inheritance, so the list never
+// offers a campaign that would 500 on resolve.
+//
+// Declared before `GET /openers` and `GET /openers/:id` (Express matches in
+// order; this is a two-segment path so `:id` never shadows it anyway).
+router.get('/openers/eligible-campaigns', async (req: any, res: Response) => {
+  try {
+    const ctx = getCtx(req);
+    const result = await MarketingCampaignService.listCampaigns(
+      { scope: 'business', limit: 500 },
+      ctx,
+    );
+    const candidates: any[] = result.items ?? [];
+    const ids = candidates.map((c) => c.id).filter(Boolean);
+
+    let ownEligible = new Set<string>();
+    if (ids.length > 0) {
+      const auditRows = await prisma.mkt_audits_list.findMany({
+        where: { campaign_id: { in: ids }, platform: 'business_analysis' },
+        select: { campaign_id: true, audit_data: true },
+      });
+      ownEligible = new Set(
+        auditRows
+          .filter((a: any) => !isStubBusinessAnalysisAudit({
+            platform: 'business_analysis',
+            audit_data: a.audit_data,
+          }))
+          .map((a: any) => a.campaign_id),
+      );
+    }
+
+    // Prospect groups where at least one sibling is eligible — a non-primary
+    // sibling inherits the primary's audit at read time.
+    const eligibleProspects = new Set<string>();
+    for (const c of candidates) {
+      if (ownEligible.has(c.id) && c.business_prospect_id) {
+        eligibleProspects.add(c.business_prospect_id);
+      }
+    }
+
+    const items = candidates.filter(
+      (c) =>
+        ownEligible.has(c.id) ||
+        (c.business_prospect_id && eligibleProspects.has(c.business_prospect_id)),
+    );
+
+    res.json({
+      success: true,
+      data: { ...result, items, total: items.length },
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
 });
 
 // List openers (filter: campaignId)

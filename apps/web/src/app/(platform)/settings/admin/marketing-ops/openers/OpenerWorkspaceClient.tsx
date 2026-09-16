@@ -158,7 +158,10 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
     setLoading(true);
     setError(null);
     try {
-      const campResult = await marketingOpsService.listCampaigns({ limit: 200 });
+      // Backend pre-validates eligibility: only campaigns with a real
+      // business_analysis audit are returned, so selecting one can't 500 on
+      // archetype resolve.
+      const campResult = await marketingOpsService.listOpenerEligibleCampaigns();
       setCampaigns(campResult.items);
     } catch (err: any) {
       setError(err.message || 'Failed to load campaigns');
@@ -448,10 +451,11 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                 </option>
               ))}
             </select>
-            {businessCampaigns.length === 0 && campaigns.length > 0 && (
+            {businessCampaigns.length === 0 && (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                No review-management campaigns found. Openers only apply to review-management campaigns with a business_analysis audit.
-                Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
+                No eligible campaigns. Openers only apply to review-management campaigns that have a
+                business_analysis audit (run a seek-stage business analysis first). Recovery campaigns
+                use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
               </p>
             )}
             {checklistBadge && (
