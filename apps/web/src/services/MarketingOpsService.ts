@@ -433,7 +433,9 @@ export type HookAngle =
   | 'nap_normalization'
   | 'hours_sync'
   | 'website_foundation'
+  | 'website_repair'
   | 'product_category_pages'
+  | 'availability_inquiry'
   | 'review_acquisition'
   | 'testimonial_amplification'
   | 'local_seo'
@@ -531,6 +533,53 @@ export interface CampaignOutreachAnchor {
   verification_question: string;
   pain_question: string | null;
   recommended_transition: string | null;
+}
+
+// ─── Manual Outreach Scripts (Manual tab — producer lane) ───────────────
+
+export type ManualFieldRole = 'opener' | 'header' | 'closer' | 'thesis' | 'note';
+
+export interface ManualPlayField {
+  key: string;
+  label: string;
+  role: ManualFieldRole;
+  placeholder: string;
+  defaultValue: string;
+}
+
+export interface ManualPlayTemplate {
+  key: string;
+  label: string;
+  description: string;
+  anchorType: string;
+  hookAngle?: string;
+  suggestedWhenSignal?: string;
+  fields: ManualPlayField[];
+  scriptBody: string;
+}
+
+export interface ManualTemplateListItem extends ManualPlayTemplate {
+  suggested: boolean;
+  saved: boolean;
+}
+
+export interface ManualScript {
+  id: string;
+  campaign_id: string;
+  template_key: string;
+  title: string;
+  fields: Record<string, string>;
+  script_body: string;
+  promoted_opener_id: string | null;
+  promoted_anchor_id: string | null;
+  promoted_header_id: string | null;
+  promoted_closer_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_fields: Record<string, string>;
+  resolved_body: string;
 }
 
 export type CallResult = 'connected' | 'voicemail' | 'no_answer' | 'wrong_number' | 'disconnected_number';
@@ -5243,6 +5292,84 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to record anchor contact');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async createCampaignAnchor(
+    campaignId: string,
+    input: {
+      anchorType: string;
+      title: string;
+      operatorThesis: string;
+      observedIssue?: string;
+      evidenceSummary?: string;
+      verificationQuestion: string;
+      painQuestion?: string;
+      recommendedTransition?: string;
+      expectedVerification?: string;
+      seedId?: string;
+    },
+  ): Promise<CampaignOutreachAnchor> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-anchors`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create anchor');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Manual Outreach Scripts (Manual tab — producer lane) ─────────────
+
+  async listManualScripts(campaignId: string): Promise<ManualScript[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/manual-script`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async listManualScriptTemplates(campaignId: string): Promise<ManualTemplateListItem[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/manual-script-templates`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async saveManualScript(
+    campaignId: string,
+    input: {
+      template_key: string;
+      title?: string;
+      fields?: Record<string, string>;
+      script_body?: string;
+      promoted_opener_id?: string | null;
+      promoted_anchor_id?: string | null;
+      promoted_header_id?: string | null;
+      promoted_closer_id?: string | null;
+    },
+  ): Promise<ManualScript> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/manual-script`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save manual script');
     }
     return result.data?.data ?? result.data;
   }

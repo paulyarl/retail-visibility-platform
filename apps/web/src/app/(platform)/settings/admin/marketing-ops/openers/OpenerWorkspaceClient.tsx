@@ -16,6 +16,7 @@ import LogContactModal from '@/components/marketing-ops/LogContactModal';
 import PitchConstructionPanel from './PitchConstructionPanel';
 import PreviewDeliverablePanel from './PreviewDeliverablePanel';
 import CallScriptPanel from './CallScriptPanel';
+import ManualScriptPanel from './ManualScriptPanel';
 
 const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A1: 'Review Response Gap',
@@ -60,7 +61,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
   // then flip to the preview tab to copy the assembled output, then flip
   // back to the opener tab to execute or import a fresh opener without
   // losing the assembled pitch.
-  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'preview' | 'call'>('opener');
+  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'preview' | 'call' | 'manual'>('opener');
 
   const [resolution, setResolution] = useState<OpenerResolution | null>(null);
   const [resolving, setResolving] = useState(false);
@@ -219,7 +220,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
       const found = campaigns.find((c) => c.id === initialCampaignId);
       if (found) {
         setSelectedCampaignId(initialCampaignId);
-        if (initialTab === 'pitch' || initialTab === 'preview' || initialTab === 'call') {
+        if (initialTab === 'pitch' || initialTab === 'preview' || initialTab === 'call' || initialTab === 'manual') {
           setActiveTab(initialTab);
         }
       }
@@ -411,6 +412,17 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
             } ${!selectedCampaign?.phone ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             Call Script
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('manual')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'manual'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            Manual
           </button>
         </div>
       )}
@@ -794,6 +806,32 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
           onLogCall={(angle) => {
             setLogContactAngle(angle);
             setShowLogContactModal(true);
+          }}
+        />
+      )}
+
+      {/* Manual tab — operator playground / producer lane. Template-driven
+          play authoring persisted per campaign; promotion writes into the
+          shared pipeline rows (openers/headers/closers → Pitch Construction,
+          thesis → Call Script anchors) and auto-switches to the pitch tab
+          so the operator can assemble what they just produced. No phone
+          gate — the manual lane works with zero audit data. */}
+      {selectedCampaignId && activeTab === 'manual' && (
+        <ManualScriptPanel
+          campaignId={selectedCampaignId}
+          onPromoted={async (kind) => {
+            if (kind === 'anchor') {
+              setLogToast('Anchor created — see the anchor picker on the Call Script tab');
+              setTimeout(() => setLogToast(null), 4000);
+              return;
+            }
+            try {
+              const existing = await marketingOpsService.listOpeners(selectedCampaignId);
+              setOpeners(existing);
+            } catch {
+              // Non-blocking — Pitch Construction re-fetches on mount anyway
+            }
+            setActiveTab('pitch');
           }}
         />
       )}

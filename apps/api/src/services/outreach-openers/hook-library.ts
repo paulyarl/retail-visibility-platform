@@ -1,7 +1,7 @@
 /**
  * Hook Library — Server-side starter hook catalog (Light-Score Hooks)
  *
- * Code-defined, typed catalog of 13 proven first-touch hook angles, each
+ * Code-defined, typed catalog of 15 proven first-touch hook angles, each
  * following the same five-beat shape:
  *   diagnostic hook → reassurance → bridge/quantified upside → audit offer → soft CTA
  *
@@ -19,8 +19,10 @@
  * `{{category}}`, `{{city}}`, `{{operator_name}}` (no `{{salutation}}` —
  * Stage 1 speaks the business name, not a greeting).
  *
- * The 13th angle (`zero_footprint`) covers the "no usable footprint found
- * at all" case from the cold-call script's `EF_ZERO_INDEXED_PRESENCE` row.
+ * The `zero_footprint` angle covers the "no usable footprint found at all"
+ * case from the cold-call script's `EF_ZERO_INDEXED_PRESENCE` row; the
+ * `availability_inquiry` angle covers `WC_MISSING_AVAILABILITY_INQUIRY`
+ * (no stock-check channel — the WhatsApp/availability upsell play).
  *
  * No DB access, no async, no side effects — pure data module.
  * Mirrors `GalleryArchetypeDefaults.ts` pattern.
@@ -41,6 +43,7 @@ export type HookAngle =
   | 'website_foundation'
   | 'website_repair'
   | 'product_category_pages'
+  | 'availability_inquiry'
   | 'review_acquisition'
   | 'testimonial_amplification'
   | 'local_seo'
@@ -263,6 +266,34 @@ Want me to show you a sample?
       soft_cta: 'Want me to show you a sample?',
     },
     phone_hook: 'Love what you\'ve got going — but I noticed there\'s nowhere online that actually lists what you carry. A lot of shops don\'t have this yet, so you\'re not behind. But it means you\'re leaving an easy win on the table — those exact product searches are how new customers find a shop like yours in the first place. I can put together simple category pages that capture that search traffic. Want me to show you a sample?',
+  },
+
+  // 5b. availability_inquiry — no stock-check channel (WC_MISSING_AVAILABILITY_INQUIRY)
+  {
+    angle: 'availability_inquiry',
+    label: 'Stock / availability inquiry channel',
+    archetypes: ['A6', 'A4'],
+    signals: ['WC_MISSING_AVAILABILITY_INQUIRY'],
+    subject: 'can customers check if you have it in stock?',
+    body: `{{salutation}} I was looking at {{category}} shops in {{city}} and noticed yours has no way for a customer to check if something's in stock before coming in — no text line, no WhatsApp, no quick form.
+
+That's the norm for local shops, so you're not behind.
+
+But "do you have it?" is the question that decides whether someone drives over or orders from somewhere that answers instantly. For shops like yours, a simple WhatsApp or text line is usually the highest-converting answer — customers ask, you reply, they come in.
+
+I put together a quick Availability Channel audit — it shows where that question goes today and the lowest-friction way to answer it.
+
+Want me to send it over?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'No way for customers to check if something is in stock',
+      reassurance: 'That\'s the norm for local shops, so you\'re not behind.',
+      quantified_upside: '"Do you have it?" decides whether they drive over or order elsewhere',
+      audit_offer: 'Availability Channel audit + WhatsApp inquiry line setup',
+      soft_cta: 'Want me to send it over?',
+    },
+    phone_hook: `I was looking at {{category}} shops in {{city}} and noticed yours has no way for a customer to check if something's in stock before coming in — no text line, no WhatsApp, no quick form. That's the norm for local shops, so you're not behind. But "do you have it?" is the question that decides whether someone drives over or orders from somewhere that answers instantly. For shops like yours, a simple WhatsApp or text line is usually the highest-converting answer. I put together a quick Availability Channel audit — it shows where that question goes today and the lowest-friction way to answer it. Want me to send it over?`,
   },
 
   // 6. review_acquisition

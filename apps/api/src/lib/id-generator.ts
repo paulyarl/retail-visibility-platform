@@ -2145,6 +2145,15 @@ export function generateOutreachIntelligenceId(): string {
 }
 
 /**
+ * Generate manual campaign script ID (outreach openers Manual tab)
+ * Format: mms-{nanoid} (12 chars)
+ */
+export function generateManualScriptId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mms-${nanoid()}`;
+}
+
+/**
  * Generate customer claim token ID (row ID for mkt_customer_claim_tokens)
  * Format: mclm-{nanoid} (13 chars)
  * Global (not tenant-scoped) — claim tokens are keyed by email, not tenant.

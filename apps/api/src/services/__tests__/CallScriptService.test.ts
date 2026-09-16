@@ -207,11 +207,11 @@ describe('CallScriptService.assembleForCampaign', () => {
       .rejects.toThrow('phone_required');
   });
 
-  it('returns all 14 ranked hook options', async () => {
+  it('returns all 15 ranked hook options', async () => {
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    expect(result.hookOptions).toHaveLength(14);
-    for (let i = 0; i < 14; i++) {
+    expect(result.hookOptions).toHaveLength(15);
+    for (let i = 0; i < 15; i++) {
       expect(result.hookOptions[i].rank).toBe(i + 1);
     }
   });
@@ -230,6 +230,26 @@ describe('CallScriptService.assembleForCampaign', () => {
 
     expect(result.hookOptions[0].angle).toBe('gbp_verification');
     expect(result.stages.hook.angle).toBe('gbp_verification');
+  });
+
+  it('availability_inquiry is the default hook when WC_MISSING_AVAILABILITY_INQUIRY fired under A6', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A6',
+      source: 'fallback',
+      reason: 'test',
+    });
+    mockGetTriageResult.mockResolvedValue({
+      detectedSignals: [{ code: 'WC_MISSING_AVAILABILITY_INQUIRY', label: 'Missing Availability Inquiry' }],
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    expect(result.hookOptions[0].angle).toBe('availability_inquiry');
+    expect(result.stages.hook.angle).toBe('availability_inquiry');
+    // Merge-resolved: business/category/city filled, no placeholders left
+    expect(result.stages.hook.line).toContain('african grocery stores');
+    expect(result.stages.hook.line).toContain('Indianapolis');
+    expect(result.stages.hook.line).not.toContain('{{');
   });
 
   it('explicit angle overrides the default', async () => {
@@ -350,12 +370,14 @@ describe('CallScriptService.assembleForCampaign', () => {
     });
 
     const result = await CallScriptService.assembleForCampaign('camp-001');
-    const topAngles = result.hookOptions.slice(0, 4).map((h) => h.angle);
+    const topAngles = result.hookOptions.slice(0, 5).map((h) => h.angle);
 
-    // A4-affinity: gbp_verification, website_foundation, website_repair, click_to_call
+    // A4-affinity: gbp_verification, website_foundation, website_repair,
+    // availability_inquiry, click_to_call
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
     expect(topAngles).toContain('website_repair');
+    expect(topAngles).toContain('availability_inquiry');
     expect(topAngles).toContain('click_to_call');
   });
 

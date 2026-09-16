@@ -286,7 +286,7 @@ export class CallScriptService extends BaseService {
         : 'borderline');
     }
 
-    // 6. Rank + resolve all 14 hooks (with emerging-archetype boost + severity weighting)
+    // 6. Rank + resolve all 15 hooks (with emerging-archetype boost + severity weighting)
     const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles, signalSeverity);
 
     // 7. Select the hook for Stage 2
@@ -798,7 +798,7 @@ export class CallScriptService extends BaseService {
   // ─── Ranking (phone hooks) ────────────────────────────────────────────
 
   /**
-   * Rank all 14 hooks for the phone channel. Same ranking logic as
+   * Rank all 15 hooks for the phone channel. Same ranking logic as
    * HookSuggestionService but resolves phone_hook instead of email body.
    * Emerging-archetype boost applied after archetype affinity, before
    * signal-match tie-break.

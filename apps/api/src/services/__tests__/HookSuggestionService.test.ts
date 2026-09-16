@@ -135,12 +135,12 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('HookSuggestionService.suggestForCampaign', () => {
-  it('returns all 14 hooks ranked', async () => {
+  it('returns all 15 hooks ranked', async () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(14);
-    // Ranks are 1–14, sequential
-    for (let i = 0; i < 14; i++) {
+    expect(result.suggestions).toHaveLength(15);
+    // Ranks are 1–15, sequential
+    for (let i = 0; i < 15; i++) {
       expect(result.suggestions[i].rank).toBe(i + 1);
     }
   });
@@ -195,6 +195,20 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     expect(result.suggestions[0].matchedSignals).toContain('DS_CLAIMED_STATUS');
   });
 
+  it('availability_inquiry tops the ranking when WC_MISSING_AVAILABILITY_INQUIRY fired under A6', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A6',
+      source: 'fallback',
+      reason: 'test',
+    });
+    mockGetTriageResult.mockResolvedValue(makeTriageResult(['WC_MISSING_AVAILABILITY_INQUIRY']));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+
+    expect(result.suggestions[0].angle).toBe('availability_inquiry');
+    expect(result.suggestions[0].matchedSignals).toContain('WC_MISSING_AVAILABILITY_INQUIRY');
+  });
+
   it('non-affinity hooks with signal matches still rank below affinity hooks', async () => {
     mockResolveCampaignArchetype.mockResolvedValue({
       archetype: 'A4',
@@ -206,13 +220,15 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     mockGetTriageResult.mockResolvedValue(makeTriageResult(['RA_LOW_REVIEW_VOLUME']));
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
-    const topAngles = result.suggestions.slice(0, 4).map((s) => s.angle);
+    const topAngles = result.suggestions.slice(0, 5).map((s) => s.angle);
 
-    // A4-affinity hooks (gbp_verification, website_foundation, website_repair, click_to_call)
-    // should still rank above signal-matched non-affinity hooks
+    // A4-affinity hooks (gbp_verification, website_foundation, website_repair,
+    // availability_inquiry, click_to_call) should still rank above
+    // signal-matched non-affinity hooks
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
     expect(topAngles).toContain('website_repair');
+    expect(topAngles).toContain('availability_inquiry');
     expect(topAngles).toContain('click_to_call');
   });
 
@@ -221,7 +237,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(14);
+    expect(result.suggestions).toHaveLength(15);
     // All matchedSignals should be empty
     for (const s of result.suggestions) {
       expect(s.matchedSignals).toEqual([]);
@@ -233,7 +249,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(14);
+    expect(result.suggestions).toHaveLength(15);
   });
 });
 
@@ -426,7 +442,7 @@ describe('Emerging-archetype rank boost', () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
     // Without boost, the ranking should match the Sprint 1 logic
-    expect(result.suggestions).toHaveLength(14);
+    expect(result.suggestions).toHaveLength(15);
     // gbp_verification has A3 archetype affinity — should be #1
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
@@ -436,7 +452,7 @@ describe('Emerging-archetype rank boost', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(14);
+    expect(result.suggestions).toHaveLength(15);
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
 });

@@ -191,6 +191,7 @@ import ProvingGroundCadenceService from '../services/ProvingGroundCadenceService
 import OutreachIntelligenceService, { UpsertInput } from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
+import ManualOutreachScriptService from '../services/ManualOutreachScriptService';
 import { IntelligenceProfileService, type IntelligenceProfile } from '../services/intelligence/IntelligenceProfileService';
 import { IntelligenceRunService } from '../services/intelligence/IntelligenceRunService';
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
@@ -2408,6 +2409,71 @@ router.get('/:campaignId/call-script', async (req: any, res: Response) => {
     );
     res.json({ success: true, data: result });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// MANUAL OUTREACH SCRIPTS (Manual tab — operator playground / producer)
+// ====================
+// Two-segment routes — safe from the GET /:id catch-all.
+
+// GET /:campaignId/manual-script — all saved manual docs for the campaign,
+// merge-resolved (resolved_fields + resolved_body).
+router.get('/:campaignId/manual-script', async (req: any, res: Response) => {
+  try {
+    const result = await ManualOutreachScriptService.listForCampaign(
+      req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /:campaignId/manual-script-templates — template catalog annotated
+// with suggested (detected signal fired) + saved (doc exists) flags.
+router.get('/:campaignId/manual-script-templates', async (req: any, res: Response) => {
+  try {
+    const result = await ManualOutreachScriptService.listTemplatesForCampaign(
+      req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+const manualScriptPutSchema = z.object({
+  template_key: z.string().min(1).max(80),
+  title: z.string().min(1).max(255).optional(),
+  fields: z.record(z.string(), z.string()).optional(),
+  script_body: z.string().min(1).optional(),
+  promoted_opener_id: z.string().max(64).nullable().optional(),
+  promoted_anchor_id: z.string().max(255).nullable().optional(),
+  promoted_header_id: z.string().max(64).nullable().optional(),
+  promoted_closer_id: z.string().max(64).nullable().optional(),
+});
+
+// PUT /:campaignId/manual-script — upsert the doc for (campaign, template).
+// Also stamps promoted_* row ids back after the panel promotes a slot into
+// the shared pipeline (importOpener / importHeader / importCloser /
+// createCampaignAnchor).
+router.put('/:campaignId/manual-script', async (req: any, res: Response) => {
+  try {
+    const parsed = manualScriptPutSchema.parse(req.body);
+    const result = await ManualOutreachScriptService.upsert(
+      req.params.campaignId,
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

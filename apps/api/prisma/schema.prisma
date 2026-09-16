@@ -7962,6 +7962,27 @@ model whatsapp_channels {
   @@index([tenant_id], map: "idx_whatsapp_channels_tenant_id")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_campaign_manual_scripts {
+  id                 String   @id @db.VarChar(40)
+  campaign_id        String   @db.VarChar(255)
+  template_key       String   @db.VarChar(80)
+  title              String   @db.VarChar(255)
+  fields             Json     @default("{}")
+  script_body        String
+  promoted_opener_id String?  @db.VarChar(40)
+  promoted_anchor_id String?  @db.VarChar(255)
+  promoted_header_id String?  @db.VarChar(40)
+  promoted_closer_id String?  @db.VarChar(40)
+  created_by         String?  @db.VarChar(255)
+  updated_by         String?  @db.VarChar(255)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([campaign_id, template_key], map: "uq_manual_script_campaign_template")
+  @@index([campaign_id], map: "idx_mkt_campaign_manual_scripts_campaign")
+}
+
 enum action {
   create
   update
