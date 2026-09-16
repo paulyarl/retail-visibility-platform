@@ -41,12 +41,15 @@ Roles (tabs are numbered in workflow order):
    `{{operator_name}}` `{{sender_name}}` `{{salutation}}` `{{claim_url}}`
    plus any field key (e.g. `{{observed_gap}}`, `{{channel_pitch}}`).
    Unresolvable placeholders stay visible — never fabricated.
-5. **Construction Variables** panel — any `{{placeholder}}` detected in
-   the body or field values is classified: **auto** (global merge, shown
-   resolved), **slot** (a declared field key, click to focus its input),
-   or **free** (everything else — gets an input). Free-var values persist
-   on the doc's `fields` jsonb and merge at read like slot values; clear
-   an input to remove the key and leave the placeholder literal.
+5. **Construction Variables** panel — every `{{placeholder}}` detected in
+   the body or field values gets a fill-in input (same pattern as Pitch
+   Construction). Values persist on the doc's `fields` jsonb and merge at
+   read like slot values. Campaign merge keys (`{{business}}`, `{{city}}`,
+   `{{salutation}}` …) show their resolved value as the input placeholder —
+   typing overrides it for this doc, clearing restores the campaign value.
+   Slot keys (`{{channel_pitch}}` …) edit the same `fields` entry as the
+   Play-fields inputs above; clearing removes the key and leaves the
+   placeholder literal.
 6. The **resolved preview** is live — it merges as you type.
    (Server `resolved_body` remains authoritative for promotion.)
 7. **Save play** — persisted per (campaign × template). Multiple templates

@@ -331,22 +331,25 @@ same as today). Values are the same ones already shown in `resolved_body` — no
 new exposure class. Frontend: `getManualScriptMergeContext(campaignId)` on
 `MarketingOpsService`, fetched alongside templates + docs in `fetchAll`.
 
-### 9.3 Variable classification (data-driven — no duplicated key list)
+### 9.3 Variable detection (data-driven — no duplicated key list)
 
 `useMemo` scans current `scriptBody` + all field values for `{{(\w+)}}` and
-classifies each var:
+emits **one fill-in input per detected variable** — same UX as the Pitch
+Construction panel. Each var carries a kind for labelling/placeholder:
 
 | Class | Test | Rendered as |
 |---|---|---|
-| **auto** | key ∈ `merge_context` | Read-only chip `{{business}} → Patel Brothers`; if absent from context → muted "not resolvable for this campaign — stays literal" |
-| **slot** | key ∈ `template.fields[].key` | Chip `{{observed_gap}} ← slot "Observed gap"`; click focuses the slot input (add `id={`manual-field-${key}`}` to slot wrappers) |
-| **free** | everything else | Text input → `fields[key]` |
+| **slot** | key ∈ `template.fields[].key` | Input editing the same `fields[key]` as the Play-fields slot; label annotated `← <slot label>` |
+| **auto** | key ∈ `merge_context` | Input whose placeholder is the resolved campaign value; typing writes `fields[key]`, which overrides the campaign value at read (fields win in `fieldCtx`); an amber "overrides campaign value — clear" affordance restores it |
+| **free** | everything else | Input → `fields[key]` |
 
-**Guardrail:** free-var inputs never render for `auto` or `slot` keys. `fields`
-wins over `mergeContext` in `fieldCtx` ordering — letting an operator type into
-a `{{business}}` input would silently shadow the campaign value at read. The
-panel must not create that footgun. (A stale `fields` key that later collides
-with a new global merge key is the one residual case — §9.6.)
+Unlike the earlier free-only design, `auto` keys ARE fillable: the input starts
+blank, shows the campaign value as its placeholder, and surfaces an explicit
+override + clear affordance — so shadowing is deliberate and reversible rather
+than accidental. Slot keys edit the same `fields` entry as their Play-fields
+input, so the two controls stay in sync. (A stale `fields` key that later
+collides with a new global merge key remains the one residual shadowing case —
+§9.6.)
 
 ### 9.4 Panel UI (`ManualScriptPanel.tsx`)
 
@@ -354,24 +357,24 @@ with a new global merge key is the one residual case — §9.6.)
   one (violet border/wash, count badge, `group-open:hidden` hint), rendered
   **above the "Script body + resolved preview" card** — adjacent to where the
   vars resolve.
-- Title: `Construction Variables`; badge counts **free** vars; hint text:
-  "Values save with the doc and merge at read — same as field slots."
-- Free-var grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`, same input
-  styling as Pitch Construction; `onChange` → `setFields(p => ({...p, [k]: v}))`
-  + `setDirty(true)`.
+- Title: `Construction Variables`; badge counts **all detected** vars; hint text:
+  "Values save with the doc and merge at read."
+- Var grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`, one input per detected
+  var, same input styling as Pitch Construction; `onChange` →
+  `setFields(p => ({...p, [k]: v}))` + `setDirty(true)`.
 - **Empty input = delete the key** (`delete fields[key]`), not `''` —
   `resolveMerge` maps `''` to an empty substitution; removing the key keeps the
   placeholder visible, matching the "unfilled stays literal" contract.
-- Panel renders whenever a template is selected (auto/slot chips are useful
-  even with zero free vars — operators see at a glance what `{{claim_url}}`
-  etc. will become). Collapsed by default; auto-opens when ≥1 free var exists.
-- Slot chips get `focus:` rings; panel fits 390px without horizontal scroll.
+- Panel renders whenever a template is selected; auto-opens when ≥1 var exists.
+- Slot-var labels annotate `← <slot label>`; `auto` vars with a doc override
+  show the amber "overrides campaign value — clear" hint. Panel fits 390px
+  without horizontal scroll.
 
 ### 9.5 Live preview (replaces "save to refresh merges")
 
 ```ts
 const resolveClientMerge = (text: string) =>
-  text.replace(/\{\{(\w+)\}\}/g, (m, k) => mergeCtx[k] ?? fields[k] ?? m);
+  text.replace(/\{\{(\w+)\}\}/g, (m, k) => fields[k] ?? mergeCtx[k] ?? m);
 // fields win over mergeCtx — mirrors server fieldCtx ordering
 previewBody = resolveClientMerge(scriptBody);            // always live
 ```
@@ -427,8 +430,9 @@ mock pattern from `CallScriptService.test.ts`):
 Frontend: `pnpm checkweb`; manual verify — create → appears in dropdown badged
 custom on a *different* campaign → save doc under it → promote opener → archive
 → disappears on fresh campaign, stays on the one with a doc. Part 2 manual
-verify — panel detects vars, auto chips show resolved values, free-var input →
-live preview substitutes without saving → survives Save play + reload.
+verify — panel lists every detected var as an input, `auto` vars show the
+campaign value as the placeholder, typing → live preview substitutes without
+saving → survives Save play + reload.
 
 Verify: `pnpm checkapi`, `pnpm checkweb`, focused vitest run.
 

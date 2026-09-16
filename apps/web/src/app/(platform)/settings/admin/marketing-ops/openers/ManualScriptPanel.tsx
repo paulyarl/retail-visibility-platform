@@ -61,6 +61,10 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
   const [promoting, setPromoting] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Construction Variables panel open state — default-open so operators see
+  // the fill-in inputs, but tracked so a manual collapse survives re-renders
+  // (a bare `open={...}` expression re-opens on every keystroke).
+  const [varsOpen, setVarsOpen] = useState(true);
 
   const template = useMemo(
     () => templates.find((t) => t.key === selectedKey) ?? null,
@@ -254,15 +258,18 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
     setTimeout(() => setCopied(null), 1500);
   };
 
-  // ─── Construction Variables (Part 2 — spec §9) ──────────────────────
-  // Scan script body + field values for {{var}} and classify:
-  //   auto — a global merge key ({{business}} etc.) resolved server-side
-  //   slot — a declared template field key ({{observed_gap}} ← its slot)
-  //   free — anything else; value persists on the doc's fields jsonb and
-  //          merges at read (fieldCtx = { ...mergeContext, ...fields }).
-  // Guardrail: never render an input for auto/slot keys — fields would
-  // silently shadow the campaign value at read.
-  const classifiedVars = useMemo(() => {
+  // ─── Construction Variables ─────────────────────────────────────────
+  // Scan script body + field values for {{var}} — every detected variable
+  // gets a fill-in input (mirrors the Pitch Construction panel). Values
+  // persist on the doc's fields jsonb and merge at read
+  // (fieldCtx = { ...mergeContext, ...fields } — fields win):
+  //   slot — a declared template field key ({{observed_gap}}); the input
+  //          edits the same fields[key] the Play-fields inputs bind
+  //   auto — a global merge key ({{business}} etc.); the campaign value
+  //          shows as the placeholder — typing overrides it, clearing
+  //          restores the campaign value
+  //   free — anything else; stored as a plain merge value
+  const detectedVars = useMemo(() => {
     const found = new Set<string>();
     const scan = (text: string) => {
       for (const m of text.matchAll(/\{\{(\w+)\}\}/g)) found.add(m[1]);
@@ -270,24 +277,16 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
     scan(scriptBody);
     for (const v of Object.values(fields)) scan(v);
     const slotKeys = new Set((template?.fields ?? []).map((f) => f.key));
-    const auto: { key: string; value: string | undefined }[] = [];
-    const slots: { key: string; label: string }[] = [];
-    const free: string[] = [];
-    for (const key of found) {
-      if (slotKeys.has(key)) {
-        slots.push({ key, label: template!.fields.find((f) => f.key === key)!.label });
-      } else if (key in mergeCtx) {
-        auto.push({ key, value: mergeCtx[key] });
-      } else {
-        free.push(key);
-      }
-    }
-    // Free vars that collide with the merge context can't be reached via
-    // classification (auto wins) — detect via fields keys instead.
-    const shadows = Object.keys(fields).filter(
-      (k) => !slotKeys.has(k) && k in mergeCtx,
-    );
-    return { auto, slots, free, shadows };
+    return Array.from(found).map((key) => ({
+      key,
+      kind: slotKeys.has(key)
+        ? ('slot' as const)
+        : key in mergeCtx
+          ? ('auto' as const)
+          : ('free' as const),
+      slotLabel: template?.fields.find((f) => f.key === key)?.label,
+      mergeValue: mergeCtx[key],
+    }));
   }, [scriptBody, fields, template, mergeCtx]);
 
   // Live preview — mirrors server fieldCtx ordering (fields win over
@@ -298,7 +297,7 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
     [fields, mergeCtx],
   );
 
-  const setFreeVar = (key: string, value: string) => {
+  const setVarValue = (key: string, value: string) => {
     setFields((prev) => {
       const next = { ...prev };
       if (value === '') delete next[key];
@@ -466,82 +465,59 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
             ))}
           </div>
 
-          {/* ─── Construction Variables (spec §9) ─────────────────────
-              {{placeholders}} in the body/fields classified as auto
-              (global merge), slot (declared field), or free (stored on
-              the doc's fields jsonb — merges at read). Values save with
-              the doc; empty = placeholder stays literal. */}
+          {/* ─── Construction Variables ─────────────────────────────
+              Every {{placeholder}} detected in the body/field values gets
+              an input — values save with the doc and merge at read, same
+              as field slots. Campaign merge keys show their resolved
+              value as the placeholder; typing overrides it, clearing
+              restores the campaign value. */}
           <details
             className="group rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-900/10"
-            open={classifiedVars.free.length > 0}
+            open={varsOpen}
+            onToggle={(e) => setVarsOpen((e.currentTarget as HTMLDetailsElement).open)}
           >
             <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
                 Construction Variables
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                  {classifiedVars.free.length}
+                  {detectedVars.length}
                 </span>
               </span>
               <span className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 group-open:hidden">
                 Values save with the doc and merge at read
               </span>
             </summary>
-            <div className="px-3 pb-3 pt-1 space-y-3">
-              {classifiedVars.auto.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {classifiedVars.auto.map((v) => (
-                    <span
-                      key={v.key}
-                      title="Global merge value — resolved from campaign data"
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                    >
-                      {`{{${v.key}}}`} → {v.value ?? '—'}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {classifiedVars.slots.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {classifiedVars.slots.map((v) => (
-                    <button
-                      key={v.key}
-                      type="button"
-                      onClick={() => document.getElementById(`manual-field-${v.key}`)?.focus()}
-                      title={`Filled by the "${v.label}" field slot`}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    >
-                      {`{{${v.key}}}`} ← {v.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {classifiedVars.free.length > 0 && (
+            <div className="px-3 pb-3 pt-1">
+              {detectedVars.length === 0 ? (
+                <p className="text-[11px] text-gray-400">No {'{{placeholders}}'} in this play yet.</p>
+              ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                  {classifiedVars.free.map((varName) => (
-                    <label key={varName} className="block">
-                      <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{`{{${varName}}}`}</span>
+                  {detectedVars.map((v) => (
+                    <label key={v.key} className="block">
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                        {`{{${v.key}}}`}
+                        {v.kind === 'slot' && v.slotLabel && (
+                          <span className="ml-1 font-sans text-blue-600 dark:text-blue-400">← {v.slotLabel}</span>
+                        )}
+                      </span>
                       <input
                         type="text"
-                        value={fields[varName] ?? ''}
-                        onChange={(e) => setFreeVar(varName, e.target.value)}
-                        placeholder={varName}
+                        value={fields[v.key] ?? ''}
+                        onChange={(e) => setVarValue(v.key, e.target.value)}
+                        placeholder={v.mergeValue ?? v.key}
                         className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
                       />
+                      {v.kind === 'auto' && fields[v.key] !== undefined && (
+                        <span className="mt-0.5 block text-[10px] text-amber-600 dark:text-amber-400">
+                          overrides campaign value{v.mergeValue ? ` "${v.mergeValue}"` : ''} —{' '}
+                          <button type="button" className="underline" onClick={() => setVarValue(v.key, '')}>
+                            clear
+                          </button>
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>
-              )}
-              {classifiedVars.shadows.map((k) => (
-                <p key={k} className="text-[11px] text-amber-600 dark:text-amber-400">
-                  <code className="font-mono">{`{{${k}}}`}</code> has a doc value that overrides the campaign merge
-                  value —{' '}
-                  <button type="button" className="underline" onClick={() => setFreeVar(k, '')}>
-                    clear it
-                  </button>
-                </p>
-              ))}
-              {classifiedVars.auto.length === 0 && classifiedVars.slots.length === 0 && classifiedVars.free.length === 0 && (
-                <p className="text-[11px] text-gray-400">No {'{{placeholders}}'} in this play yet.</p>
               )}
             </div>
           </details>
