@@ -7983,6 +7983,28 @@ model mkt_campaign_manual_scripts {
   @@index([campaign_id], map: "idx_mkt_campaign_manual_scripts_campaign")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_manual_play_templates {
+  id                        String   @id @db.VarChar(40)
+  key                       String   @unique(map: "uq_manual_play_template_key") @db.VarChar(80)
+  label                     String   @db.VarChar(255)
+  description               String   @default("")
+  anchor_type               String   @default("custom") @db.VarChar(40)
+  hook_angle                String?  @db.VarChar(80)
+  suggested_when_signal     String?  @db.VarChar(80)
+  fields                    Json
+  script_body               String
+  status                    String   @default("active") @db.VarChar(20)
+  created_from_campaign_id  String?  @db.VarChar(255)
+  created_from_template_key String?  @db.VarChar(80)
+  created_by                String?  @db.VarChar(255)
+  updated_by                String?  @db.VarChar(255)
+  created_at                DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([status], map: "idx_mkt_manual_play_templates_status")
+}
+
 enum action {
   create
   update

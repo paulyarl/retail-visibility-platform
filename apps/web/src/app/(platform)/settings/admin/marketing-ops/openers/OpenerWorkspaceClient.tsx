@@ -61,7 +61,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
   // then flip to the preview tab to copy the assembled output, then flip
   // back to the opener tab to execute or import a fresh opener without
   // losing the assembled pitch.
-  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'preview' | 'call' | 'manual'>('opener');
+  const [activeTab, setActiveTab] = useState<'opener' | 'pitch' | 'preview' | 'call' | 'manual'>('manual');
 
   const [resolution, setResolution] = useState<OpenerResolution | null>(null);
   const [resolving, setResolving] = useState(false);
@@ -360,13 +360,25 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
         </div>
       )}
 
-      {/* Tab bar — only renders once a campaign is selected. Matches the
-          campaign detail page tab styling. "Opener" is the generate/import
-          workspace; "Pitch Construction" is the assembly UI. Switching tabs
-          preserves all in-memory state so the operator can assemble a pitch,
-          then flip back to execute or import a fresh opener. */}
+      {/* Tab bar — only renders once a campaign is selected. Tabs are
+          numbered in workflow order: the Manual lane is the producer
+          (author a play, promote slots), the other tabs consume those
+          rows — Opener generates/imports, Pitch Construction assembles,
+          Preview Deliverable renders, Call Script executes. Switching
+          tabs preserves all in-memory state. */}
       {selectedCampaignId && (
         <div className="flex items-center gap-1 mb-4 border-b border-gray-200 dark:border-neutral-700">
+          <button
+            type="button"
+            onClick={() => setActiveTab('manual')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'manual'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            1. Manual
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab('opener')}
@@ -376,7 +388,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            Opener
+            2. Opener
           </button>
           <button
             type="button"
@@ -387,7 +399,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            Pitch Construction
+            3. Pitch Construction
           </button>
           <button
             type="button"
@@ -398,7 +410,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            Preview Deliverable
+            4. Preview Deliverable
           </button>
           <button
             type="button"
@@ -411,18 +423,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             } ${!selectedCampaign?.phone ? 'cursor-not-allowed opacity-50' : ''}`}
           >
-            Call Script
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('manual')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'manual'
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            Manual
+            5. Call Script
           </button>
         </div>
       )}

@@ -2154,6 +2154,15 @@ export function generateManualScriptId(): string {
 }
 
 /**
+ * Generate manual play template ID (operator-authored "Save as template")
+ * Format: mptpl-{nanoid} (14 chars)
+ */
+export function generateManualPlayTemplateId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mptpl-${nanoid()}`;
+}
+
+/**
  * Generate customer claim token ID (row ID for mkt_customer_claim_tokens)
  * Format: mclm-{nanoid} (13 chars)
  * Global (not tenant-scoped) — claim tokens are keyed by email, not tenant.

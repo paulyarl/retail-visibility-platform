@@ -26,18 +26,25 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import type { RequestCtx } from '../context';
 import { unifiedConfig } from '../config/unifiedConfig';
-import { NotFoundError, ValidationError } from '../middleware/errorHandler';
+import { ConflictError, NotFoundError, ValidationError } from '../middleware/errorHandler';
 import MarketingCampaignService from './MarketingCampaignService';
 import CampaignTriageService from './CampaignTriageService';
 import OutreachIntelligenceService, {
   resolveSalutation,
 } from './OutreachIntelligenceService';
-import { generateManualScriptId } from '../lib/id-generator';
+import {
+  generateManualScriptId,
+  generateManualPlayTemplateId,
+} from '../lib/id-generator';
+import { MANUAL_ANCHOR_TYPES } from './intelligence/ManualOutreachAnchorService';
 import {
   getManualPlayTemplate,
   MANUAL_PLAY_TEMPLATES,
+  type ManualFieldRole,
+  type ManualPlayField,
   type ManualPlayTemplate,
 } from './outreach-openers/manual-play-templates';
+import { HOOK_ANGLE_KEYS } from './outreach-openers/hook-library';
 
 export type { ManualPlayTemplate };
 
@@ -73,10 +80,84 @@ export interface ManualScriptUpsertInput {
   promoted_closer_id?: string | null;
 }
 
+export type ManualTemplateSource = 'catalog' | 'operator';
+export type ManualTemplateStatus = 'active' | 'archived';
+
 export interface ManualTemplateListItem extends ManualPlayTemplate {
   suggested: boolean;
   saved: boolean;
+  source: ManualTemplateSource;
+  status?: ManualTemplateStatus;
 }
+
+/**
+ * Create/update body for operator-authored templates ("Save as template").
+ * `key` is optional on create — server-slugged from label when omitted.
+ */
+export interface ManualPlayTemplateInput {
+  key?: string;
+  label: string;
+  description: string;
+  anchor_type?: string;
+  hook_angle?: string | null;
+  suggested_when_signal?: string | null;
+  fields: ManualPlayField[];
+  script_body: string;
+  /** Update/archive only — 'active' | 'archived'. Ignored on create. */
+  status?: ManualTemplateStatus;
+  created_from_campaign_id?: string | null;
+  created_from_template_key?: string | null;
+}
+
+export interface ManualPlayTemplateRow {
+  id: string;
+  key: string;
+  label: string;
+  description: string;
+  anchor_type: string;
+  hook_angle: string | null;
+  suggested_when_signal: string | null;
+  fields: ManualPlayField[];
+  script_body: string;
+  status: ManualTemplateStatus;
+  created_from_campaign_id: string | null;
+  created_from_template_key: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ManualPlayTemplateDbRow {
+  id: string;
+  key: string;
+  label: string;
+  description: string;
+  anchor_type: string;
+  hook_angle: string | null;
+  suggested_when_signal: string | null;
+  fields: ManualPlayField[] | null;
+  script_body: string;
+  status: string;
+  created_from_campaign_id: string | null;
+  created_from_template_key: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
+const MANUAL_FIELD_ROLES = new Set<ManualFieldRole>([
+  'opener',
+  'header',
+  'closer',
+  'thesis',
+  'note',
+]);
+
+const TEMPLATE_KEY_PATTERN = /^op_[a-z0-9][a-z0-9_]{1,76}$/;
+const FIELD_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
+const HOOK_ANGLE_SET = new Set<string>(HOOK_ANGLE_KEYS);
 
 interface ManualScriptRow {
   id: string;
@@ -138,10 +219,11 @@ export class ManualOutreachScriptService extends BaseService {
     input: ManualScriptUpsertInput,
     ctx?: RequestCtx,
   ): Promise<ManualScriptView> {
-    const template = getManualPlayTemplate(input.template_key);
+    const template = await this.resolveTemplate(input.template_key);
     if (!template) {
+      const valid = await this.validTemplateKeys();
       throw new ValidationError(
-        `Unknown template_key '${input.template_key}'. Valid: ${MANUAL_PLAY_TEMPLATES.map((t) => t.key).join(', ')}`,
+        `Unknown template_key '${input.template_key}'. Valid: ${valid.join(', ')}`,
       );
     }
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
@@ -156,6 +238,14 @@ export class ManualOutreachScriptService extends BaseService {
       campaignId,
       input.template_key,
     );
+
+    // Docs outlive their template: an existing doc under an archived key
+    // still saves, but no NEW doc can be created under one.
+    if (existing.length === 0 && template.source === 'operator' && template.status === 'archived') {
+      throw new ValidationError(
+        `Template '${input.template_key}' is archived — new docs cannot be created under it.`,
+      );
+    }
 
     const title = input.title ?? existing[0]?.title ?? template.label;
     const fields = input.fields ?? existing[0]?.fields ?? {};
@@ -236,14 +326,354 @@ export class ManualOutreachScriptService extends BaseService {
       // No triage result yet — nothing is suggested
     }
 
-    return MANUAL_PLAY_TEMPLATES.map((t) => ({
+    // Catalog first (catalog order), then operator templates (label ASC).
+    // Archived operator templates stay listed when this campaign already
+    // has a doc under that key — docs outlive their template.
+    const savedKeysArr = [...savedKeys];
+    const operatorRows = await this.prisma.$queryRawUnsafe<ManualPlayTemplateDbRow[]>(
+      `SELECT * FROM mkt_manual_play_templates
+       WHERE status = 'active' OR key = ANY($1::varchar[])
+       ORDER BY label ASC`,
+      savedKeysArr,
+    );
+
+    const annotate = (t: ManualPlayTemplate, source: ManualTemplateSource, status?: ManualTemplateStatus): ManualTemplateListItem => ({
       ...t,
       suggested: !!t.suggestedWhenSignal && detected.has(t.suggestedWhenSignal),
       saved: savedKeys.has(t.key),
-    }));
+      source,
+      status,
+    });
+
+    return [
+      ...MANUAL_PLAY_TEMPLATES.map((t) => annotate(t, 'catalog')),
+      ...operatorRows.map((r) => {
+        const status: ManualTemplateStatus = r.status === 'archived' ? 'archived' : 'active';
+        return annotate(this.rowToTemplate(r), 'operator', status);
+      }),
+    ];
+  }
+
+  /**
+   * Catalog-first, DB-fallback template resolution. Returns the
+   * ManualPlayTemplate shape regardless of where the template lives so
+   * callers (upsert, promotion) don't care about provenance.
+   */
+  async resolveTemplate(
+    key: string,
+  ): Promise<(ManualPlayTemplate & { source: ManualTemplateSource; status?: ManualTemplateStatus }) | null> {
+    const catalog = getManualPlayTemplate(key);
+    if (catalog) {
+      return { ...catalog, source: 'catalog' };
+    }
+    const rows = await this.prisma.$queryRawUnsafe<ManualPlayTemplateDbRow[]>(
+      `SELECT * FROM mkt_manual_play_templates WHERE key = $1`,
+      key,
+    );
+    if (rows.length === 0) return null;
+    const status: ManualTemplateStatus = rows[0].status === 'archived' ? 'archived' : 'active';
+    return { ...this.rowToTemplate(rows[0]), source: 'operator', status };
+  }
+
+  /**
+   * All operator-authored template rows (incl. archived) — manage list +
+   * key-availability checks. Catalog templates are NOT included (they are
+   * code-managed).
+   */
+  async listOperatorTemplates(): Promise<ManualPlayTemplateRow[]> {
+    const rows = await this.prisma.$queryRawUnsafe<ManualPlayTemplateDbRow[]>(
+      `SELECT * FROM mkt_manual_play_templates ORDER BY label ASC`,
+    );
+    return rows.map((r) => this.rowToView(r));
+  }
+
+  /**
+   * Create an operator-authored template. Key is optional — server-slugged
+   * `op_<slug>` from the label when omitted.
+   */
+  async createTemplate(
+    input: ManualPlayTemplateInput,
+    ctx?: RequestCtx,
+  ): Promise<ManualPlayTemplateRow> {
+    const fields = this.validateTemplateInput(input);
+    const actor = ctx?.userId ?? 'system';
+
+    let key = input.key?.trim() ?? '';
+    if (key) {
+      if (!TEMPLATE_KEY_PATTERN.test(key)) {
+        throw new ValidationError(
+          `Invalid template key '${key}'. Must match op_<slug> (lowercase letters, digits, underscores; 4-80 chars).`,
+        );
+      }
+    } else {
+      key = this.slugTemplateKey(input.label);
+    }
+
+    if (getManualPlayTemplate(key)) {
+      throw new ConflictError(`Template key '${key}' collides with a code-catalog template.`);
+    }
+    const dupe = await this.prisma.$queryRawUnsafe<{ id: string }[]>(
+      `SELECT id FROM mkt_manual_play_templates WHERE key = $1`,
+      key,
+    );
+    if (dupe.length > 0) {
+      throw new ConflictError(`Template key '${key}' is already in use.`);
+    }
+
+    const id = generateManualPlayTemplateId();
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO mkt_manual_play_templates
+         (id, key, label, description, anchor_type, hook_angle,
+          suggested_when_signal, fields, script_body, status,
+          created_from_campaign_id, created_from_template_key,
+          created_by, updated_by, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,'active',$10,$11,$12,$12,now(),now())`,
+      id,
+      key,
+      input.label.trim(),
+      input.description.trim(),
+      input.anchor_type ?? 'custom',
+      input.hook_angle ?? null,
+      input.suggested_when_signal?.trim() || null,
+      JSON.stringify(fields),
+      input.script_body,
+      input.created_from_campaign_id ?? null,
+      input.created_from_template_key ?? null,
+      actor,
+    );
+    await this.logTemplateAudit(id, key, 'created', ctx, input.created_from_campaign_id ?? null);
+    return this.requireTemplateView(id);
+  }
+
+  /**
+   * Update an operator template (label/description/fields/script_body/
+   * advanced/status). `key` is immutable. Catalog keys are code-managed.
+   */
+  async updateTemplate(
+    key: string,
+    input: Partial<ManualPlayTemplateInput>,
+    ctx?: RequestCtx,
+  ): Promise<ManualPlayTemplateRow> {
+    if (getManualPlayTemplate(key)) {
+      throw new ValidationError(`Template '${key}' is a catalog template — catalog templates are code-managed.`);
+    }
+    const rows = await this.prisma.$queryRawUnsafe<ManualPlayTemplateDbRow[]>(
+      `SELECT * FROM mkt_manual_play_templates WHERE key = $1`,
+      key,
+    );
+    if (rows.length === 0) {
+      throw new NotFoundError(`Manual play template '${key}' not found`);
+    }
+    const row = rows[0];
+
+    const fields = input.fields !== undefined
+      ? this.validateFields(input.fields)
+      : row.fields ?? [];
+    if (input.label !== undefined && input.label.trim().length === 0) {
+      throw new ValidationError('label is required');
+    }
+    if (input.anchor_type !== undefined && !MANUAL_ANCHOR_TYPES.includes(input.anchor_type as any)) {
+      throw new ValidationError(`Invalid anchor_type '${input.anchor_type}'`);
+    }
+    if (input.hook_angle !== undefined && input.hook_angle !== null && !HOOK_ANGLE_SET.has(input.hook_angle)) {
+      throw new ValidationError(`Invalid hook_angle '${input.hook_angle}'. Valid: ${HOOK_ANGLE_KEYS.join(', ')}`);
+    }
+    if (input.status !== undefined && input.status !== 'active' && input.status !== 'archived') {
+      throw new ValidationError(`Invalid status '${input.status}'`);
+    }
+    if (input.script_body !== undefined && (input.script_body.length === 0 || input.script_body.length > 50000)) {
+      throw new ValidationError('script_body must be 1-50000 chars');
+    }
+
+    const actor = ctx?.userId ?? 'system';
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE mkt_manual_play_templates SET
+         label = $2,
+         description = $3,
+         anchor_type = $4,
+         hook_angle = $5,
+         suggested_when_signal = $6,
+         fields = $7::jsonb,
+         script_body = $8,
+         status = $9,
+         updated_by = $10,
+         updated_at = now()
+       WHERE id = $1`,
+      row.id,
+      input.label?.trim() ?? row.label,
+      input.description?.trim() ?? row.description,
+      input.anchor_type ?? row.anchor_type,
+      input.hook_angle !== undefined ? input.hook_angle : row.hook_angle,
+      input.suggested_when_signal !== undefined
+        ? (input.suggested_when_signal?.trim() || null)
+        : row.suggested_when_signal,
+      JSON.stringify(fields),
+      input.script_body ?? row.script_body,
+      input.status ?? row.status,
+      actor,
+    );
+    await this.logTemplateAudit(row.id, key, 'updated', ctx, null);
+    return this.requireTemplateView(row.id);
+  }
+
+  /**
+   * Soft-archive an operator template. Archived keys stay resolvable
+   * (docs reference them) and can be re-activated via updateTemplate
+   * with status='active'.
+   */
+  async archiveTemplate(key: string, ctx?: RequestCtx): Promise<ManualPlayTemplateRow> {
+    return this.updateTemplate(key, { status: 'archived' }, ctx);
+  }
+
+  /**
+   * Global merge context for a campaign — the same values used to resolve
+   * {{business}} / {{claim_url}} / etc. in doc reads. Exposed so the Manual
+   * tab can classify construction variables and live-resolve the preview.
+   */
+  async mergeContextForCampaign(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<Record<string, string>> {
+    return this.buildMergeContext(campaignId, ctx);
   }
 
   // ─── Internals ──────────────────────────────────────────────────────────
+
+  private rowToTemplate(row: ManualPlayTemplateDbRow): ManualPlayTemplate {
+    return {
+      key: row.key,
+      label: row.label,
+      description: row.description,
+      anchorType: row.anchor_type,
+      hookAngle: row.hook_angle ?? undefined,
+      suggestedWhenSignal: row.suggested_when_signal ?? undefined,
+      fields: row.fields ?? [],
+      scriptBody: row.script_body,
+    };
+  }
+
+  private rowToView(row: ManualPlayTemplateDbRow): ManualPlayTemplateRow {
+    return {
+      id: row.id,
+      key: row.key,
+      label: row.label,
+      description: row.description,
+      anchor_type: row.anchor_type,
+      hook_angle: row.hook_angle,
+      suggested_when_signal: row.suggested_when_signal,
+      fields: row.fields ?? [],
+      script_body: row.script_body,
+      status: row.status === 'archived' ? 'archived' : 'active',
+      created_from_campaign_id: row.created_from_campaign_id,
+      created_from_template_key: row.created_from_template_key,
+      created_by: row.created_by,
+      updated_by: row.updated_by,
+      created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+      updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+    };
+  }
+
+  private async requireTemplateView(id: string): Promise<ManualPlayTemplateRow> {
+    const rows = await this.prisma.$queryRawUnsafe<ManualPlayTemplateDbRow[]>(
+      `SELECT * FROM mkt_manual_play_templates WHERE id = $1`,
+      id,
+    );
+    if (rows.length === 0) {
+      throw new NotFoundError(`Manual play template ${id} not found`);
+    }
+    return this.rowToView(rows[0]);
+  }
+
+  /** Catalog keys ++ active operator keys — for the upsert error message. */
+  private async validTemplateKeys(): Promise<string[]> {
+    const rows = await this.prisma.$queryRawUnsafe<{ key: string }[]>(
+      `SELECT key FROM mkt_manual_play_templates WHERE status = 'active'`,
+    );
+    return [...MANUAL_PLAY_TEMPLATES.map((t) => t.key), ...rows.map((r) => r.key)];
+  }
+
+  /** op_<slug> derived from a label; capped at the 80-char key limit. */
+  private slugTemplateKey(label: string): string {
+    const slug = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 77);
+    const base = `op_${slug || 'play'}`;
+    return TEMPLATE_KEY_PATTERN.test(base) ? base : 'op_play';
+  }
+
+  private validateTemplateInput(input: ManualPlayTemplateInput): ManualPlayField[] {
+    if (!input.label || input.label.trim().length === 0 || input.label.length > 255) {
+      throw new ValidationError('label is required (1-255 chars)');
+    }
+    if (input.description === undefined || input.description.length > 2000) {
+      throw new ValidationError('description is required (max 2000 chars)');
+    }
+    if (!input.script_body || input.script_body.length === 0 || input.script_body.length > 50000) {
+      throw new ValidationError('script_body must be 1-50000 chars');
+    }
+    const anchorType = input.anchor_type ?? 'custom';
+    if (!MANUAL_ANCHOR_TYPES.includes(anchorType as any)) {
+      throw new ValidationError(`Invalid anchor_type '${anchorType}'`);
+    }
+    if (input.hook_angle != null && !HOOK_ANGLE_SET.has(input.hook_angle)) {
+      throw new ValidationError(`Invalid hook_angle '${input.hook_angle}'. Valid: ${HOOK_ANGLE_KEYS.join(', ')}`);
+    }
+    if (input.suggested_when_signal != null && input.suggested_when_signal.length > 80) {
+      throw new ValidationError('suggested_when_signal must be ≤ 80 chars');
+    }
+    return this.validateFields(input.fields);
+  }
+
+  private validateFields(fields: ManualPlayField[] | undefined): ManualPlayField[] {
+    if (!Array.isArray(fields) || fields.length < 1 || fields.length > 40) {
+      throw new ValidationError('fields must be an array of 1-40 items');
+    }
+    return fields.map((f, i) => {
+      if (!f || typeof f.key !== 'string' || !FIELD_KEY_PATTERN.test(f.key)) {
+        throw new ValidationError(`fields[${i}].key must match ^[a-z][a-z0-9_]{0,39}$`);
+      }
+      if (typeof f.label !== 'string' || f.label.length === 0 || f.label.length > 120) {
+        throw new ValidationError(`fields[${i}].label is required (1-120 chars)`);
+      }
+      if (!MANUAL_FIELD_ROLES.has(f.role)) {
+        throw new ValidationError(`fields[${i}].role must be one of: ${[...MANUAL_FIELD_ROLES].join(', ')}`);
+      }
+      if (typeof f.placeholder !== 'string' || f.placeholder.length > 500) {
+        throw new ValidationError(`fields[${i}].placeholder must be ≤ 500 chars`);
+      }
+      if (typeof f.defaultValue !== 'string' || f.defaultValue.length > 20000) {
+        throw new ValidationError(`fields[${i}].defaultValue must be ≤ 20000 chars`);
+      }
+      return f;
+    });
+  }
+
+  private async logTemplateAudit(
+    rowId: string,
+    key: string,
+    action: 'created' | 'updated' | 'archived',
+    ctx: RequestCtx | undefined,
+    createdFromCampaignId: string | null,
+  ): Promise<void> {
+    try {
+      await audit({
+        actor: ctx?.userId ?? null,
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: rowId,
+          manual_template_key: key,
+          manual_template_action: action,
+          created_from_campaign_id: createdFromCampaignId,
+        },
+      });
+    } catch {
+      // audit failures must not block
+    }
+  }
 
   private async requireView(
     id: string,

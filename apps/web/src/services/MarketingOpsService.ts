@@ -445,6 +445,41 @@ export type HookAngle =
   | 'reputation_monitoring'
   | 'zero_footprint';
 
+/** Runtime mirror of HookAngle — for selects (e.g. Save-as-template modal). */
+export const HOOK_ANGLES: HookAngle[] = [
+  'gbp_verification',
+  'nap_normalization',
+  'hours_sync',
+  'website_foundation',
+  'website_repair',
+  'product_category_pages',
+  'availability_inquiry',
+  'review_acquisition',
+  'testimonial_amplification',
+  'local_seo',
+  'cross_platform_expansion',
+  'photo_content_setup',
+  'click_to_call',
+  'reputation_monitoring',
+  'zero_footprint',
+];
+
+/** Runtime mirror of the backend MANUAL_ANCHOR_TYPES enum. */
+export const MANUAL_ANCHOR_TYPES = [
+  'identity_verification',
+  'address_verification',
+  'hours_verification',
+  'operating_status_verification',
+  'website_or_profile_claim',
+  'category_verification',
+  'service_verification',
+  'customer_discovery_problem',
+  'listing_accuracy',
+  'seed_claim_invitation',
+  'owner_reported_pain',
+  'custom',
+] as const;
+
 export interface RankedHook {
   angle: HookAngle;
   label: string;
@@ -561,6 +596,43 @@ export interface ManualPlayTemplate {
 export interface ManualTemplateListItem extends ManualPlayTemplate {
   suggested: boolean;
   saved: boolean;
+  source: 'catalog' | 'operator';
+  status?: 'active' | 'archived';
+}
+
+/** Create/update body for operator-authored templates ("Save as template"). */
+export interface ManualPlayTemplateInput {
+  key?: string;
+  label: string;
+  description: string;
+  anchor_type?: string;
+  hook_angle?: string | null;
+  suggested_when_signal?: string | null;
+  fields: ManualPlayField[];
+  script_body: string;
+  status?: 'active' | 'archived';
+  created_from_campaign_id?: string | null;
+  created_from_template_key?: string | null;
+}
+
+/** Management view of an operator-authored template row. */
+export interface ManualPlayTemplateRow {
+  id: string;
+  key: string;
+  label: string;
+  description: string;
+  anchor_type: string;
+  hook_angle: string | null;
+  suggested_when_signal: string | null;
+  fields: ManualPlayField[];
+  script_body: string;
+  status: 'active' | 'archived';
+  created_from_campaign_id: string | null;
+  created_from_template_key: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ManualScript {
@@ -5370,6 +5442,75 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save manual script');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async getManualScriptMergeContext(campaignId: string): Promise<Record<string, string>> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/manual-script-merge-context`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return {};
+    const data = result.data?.data ?? result.data;
+    return data && typeof data === 'object' ? data : {};
+  }
+
+  // ─── Manual Play Templates (operator-authored — "Save as template") ────
+
+  async listOperatorManualTemplates(): Promise<ManualPlayTemplateRow[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/manual-script-templates`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async createManualTemplate(input: ManualPlayTemplateInput): Promise<ManualPlayTemplateRow> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/manual-script-templates`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const msg = err?.details?.[0]?.message ?? (typeof err === 'string' ? err : 'Failed to create template');
+      throw Object.assign(new Error(msg), { code: err?.error, status: (result as any).status });
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async updateManualTemplate(key: string, input: Partial<ManualPlayTemplateInput>): Promise<ManualPlayTemplateRow> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/manual-script-templates/${encodeURIComponent(key)}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const msg = err?.details?.[0]?.message ?? (typeof err === 'string' ? err : 'Failed to update template');
+      throw Object.assign(new Error(msg), { code: err?.error, status: (result as any).status });
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async archiveManualTemplate(key: string): Promise<ManualPlayTemplateRow> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/manual-script-templates/${encodeURIComponent(key)}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to archive template');
     }
     return result.data?.data ?? result.data;
   }

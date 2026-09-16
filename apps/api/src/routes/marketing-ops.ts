@@ -2478,6 +2478,114 @@ router.put('/:campaignId/manual-script', async (req: any, res: Response) => {
   }
 });
 
+// GET /:campaignId/manual-script-merge-context — the global merge values
+// (business/city/claim_url/…) used to resolve {{placeholders}} in doc
+// reads. Powers the Manual tab's Construction Variables panel + live
+// preview without a save round-trip.
+router.get('/:campaignId/manual-script-merge-context', async (req: any, res: Response) => {
+  try {
+    const result = await ManualOutreachScriptService.mergeContextForCampaign(
+      req.params.campaignId,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// MANUAL PLAY TEMPLATES (operator-authored — "Save as template")
+// ====================
+// Single-segment GET — MUST stay before the GET /:id catch-all at the
+// end of this file. Spec: docs/LocalBiz/MANUAL_PLAY_TEMPLATE_AUTHORING_SPEC.md
+
+const manualPlayFieldSchema = z.object({
+  key: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/),
+  label: z.string().min(1).max(120),
+  role: z.enum(['opener', 'header', 'closer', 'thesis', 'note']),
+  placeholder: z.string().max(500),
+  defaultValue: z.string().max(20000),
+});
+
+const manualTemplateCreateSchema = z.object({
+  key: z.string().regex(/^op_[a-z0-9][a-z0-9_]{1,76}$/).optional(),
+  label: z.string().min(1).max(255),
+  description: z.string().max(2000),
+  anchor_type: z.string().max(40).optional(),
+  hook_angle: z.string().max(80).nullable().optional(),
+  suggested_when_signal: z.string().max(80).nullable().optional(),
+  fields: z.array(manualPlayFieldSchema).min(1).max(40),
+  script_body: z.string().min(1).max(50000),
+  created_from_campaign_id: z.string().max(255).nullable().optional(),
+  created_from_template_key: z.string().max(80).nullable().optional(),
+});
+
+const manualTemplateUpdateSchema = manualTemplateCreateSchema
+  .omit({ key: true, created_from_campaign_id: true, created_from_template_key: true })
+  .partial()
+  .extend({ status: z.enum(['active', 'archived']).optional() });
+
+// GET /manual-script-templates — all operator-authored templates (incl.
+// archived) for the manage list + modal key-availability check. Catalog
+// templates are code-managed and not included.
+router.get('/manual-script-templates', async (req: any, res: Response) => {
+  try {
+    const result = await ManualOutreachScriptService.listOperatorTemplates();
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /manual-script-templates — create an operator template from the
+// "Save as template" capture. Key optional (server-slugged op_<slug>).
+router.post('/manual-script-templates', async (req: any, res: Response) => {
+  try {
+    const parsed = manualTemplateCreateSchema.parse(req.body);
+    const result = await ManualOutreachScriptService.createTemplate(parsed, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// PUT /manual-script-templates/:key — update an operator template.
+// Catalog keys → 400 (code-managed). Key is immutable.
+router.put('/manual-script-templates/:key', async (req: any, res: Response) => {
+  try {
+    const parsed = manualTemplateUpdateSchema.parse(req.body);
+    const result = await ManualOutreachScriptService.updateTemplate(
+      req.params.key,
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// DELETE /manual-script-templates/:key — soft archive (status='archived').
+// No hard delete: campaign docs reference the key and must stay resolvable.
+router.delete('/manual-script-templates/:key', async (req: any, res: Response) => {
+  try {
+    const result = await ManualOutreachScriptService.archiveTemplate(
+      req.params.key,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ====================
 // DEAD-NUMBER DATA-QUALITY LOOP (Sprint 2 — §13.3)
 // ====================

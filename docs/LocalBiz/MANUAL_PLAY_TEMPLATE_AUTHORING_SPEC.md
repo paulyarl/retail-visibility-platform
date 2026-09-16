@@ -65,8 +65,12 @@ archetype. `template_key` remains validated in code — **no CHECK constraints**
    - **Key** — auto-slugged `op_<slug>` (editable; validated; immutable after create)
    - **Description** — copied from source template, editable
    - **Advanced** (collapsed): `anchor_type` select (`MANUAL_ANCHOR_TYPES`),
-     `hook_angle` text, `suggested_when_signal` text — all default to the source
-     template's values
+     `hook_angle` select (`HOOK_ANGLE_KEYS`, optional/none), `suggested_when_signal`
+     text — all default to the source template's values. `hook_angle` is a select,
+     not free text: the value is enum-validated downstream at `openers/import`
+     (`marketing-ops.ts` L3409, `z.enum(HOOK_ANGLE_KEYS)`), so a typo'd angle would
+     save fine but 400 at "Use as opener" promote time — the select makes invalid
+     values unrepresentable, and create/update validates too (§5.3).
    - **Capture summary** — "9 field slots · script body 1,412 chars · captured from
      `<source key>` on campaign `<id>`"
    - **Hygiene warning** (when triggered, §6.4) — campaign-specific literals
@@ -161,7 +165,9 @@ existing doc under an archived key is allowed (docs outlive their template).
 const [savedRows, operatorRows] = await Promise.all([...]);
 // savedRows: template_key set for this campaign (unchanged)
 // operatorRows: SELECT * FROM mkt_manual_play_templates
-//   WHERE status = 'active' OR key = ANY(savedKeys)   -- archived stays reachable for existing docs
+//   WHERE status = 'active' OR key = ANY($1::varchar[])   -- archived stays reachable for existing docs
+// Pass savedKeys as a bound array param — handles the empty-set case
+// (ANY('{}') is valid but only with an explicit array type).
 ```
 
 Return `catalog items (catalog order) ++ operator items (label ASC)`, each
@@ -189,7 +195,8 @@ Validation (zod at the route, service double-checks):
 | `fields` | Array, 1–40 items; each `{key: ^[a-z][a-z0-9_]{0,39}$, label ≤120, role ∈ ManualFieldRole, placeholder ≤500, defaultValue ≤20000}`. The composer may append `role: 'note'` slots for free construction vars not in the source schema (§9.6) — no special-casing needed here |
 | `script_body` | 1–50000 |
 | `anchor_type` | ∈ `MANUAL_ANCHOR_TYPES` (default `'custom'`) |
-| `hook_angle`, `suggested_when_signal` | ≤ 80, optional — `suggested_when_signal` is **free-form** (only fires when it matches a detected signal; no hard validation against the registry since the taxonomy grows) |
+| `hook_angle` | Optional, nullable; when present **must ∈ `HOOK_ANGLE_KEYS`** (validated at create/update — code constant, no drift risk). Free text here would defer the failure to promote time: `openerImportSchema.hook_angle` is `z.enum(HOOK_ANGLE_KEYS)` at `marketing-ops.ts` L3409, so an invalid value 400s on "Use as opener". |
+| `suggested_when_signal` | ≤ 80, optional, **free-form** (only fires when it matches a detected signal; no hard validation against the registry since the taxonomy grows) |
 | `status` (update only) | ∈ `active | archived` |
 
 `updateTemplate`/`archiveTemplate` on a code-catalog key → 400 `validation_error`
@@ -221,8 +228,11 @@ its payload just grows `source`/`status` and includes operator rows.
   and out of the promote row's pipeline semantics.
 - **Modal** (`SaveAsTemplateModal.tsx`, same folder): fields per §3. Live key
   slugging (`op_` + slug of label, editable with prefix locked); key availability
-  checked on debounce against `GET /manual-script-templates` (prefetched list is
-  fine — catalog is small). Submit disabled until label + key valid.
+  checked on debounce against `GET /manual-script-templates` **plus the
+  already-loaded `templates` list** — the endpoint returns operator rows only,
+  so catalog keys (`whatsapp_availability_upsell` etc.) must be checked from
+  in-memory state or a collision surfaces only as a 409 on submit. Submit
+  disabled until label + key valid.
 - **On success:** add the returned template to `templates` state with
   `source: 'operator'`; show the confirmation line + **Switch to it** (calls
   `handleSelect(newKey)` — loads the fresh doc defaults, which are exactly what
@@ -402,7 +412,8 @@ mock pattern from `CallScriptService.test.ts`):
 
 - `resolveTemplate`: catalog hit, operator hit, archived hit, miss → null
 - `createTemplate`: valid create, key collision vs catalog + vs row → 409,
-  invalid key/role/anchor_type → 400, auto-slug from label
+  invalid key/role/anchor_type → 400, `hook_angle` not in `HOOK_ANGLE_KEYS` → 400
+  (valid angle accepted, absent/null accepted), auto-slug from label
 - `upsert` doc: new doc under archived key → 400; existing doc under archived
   key saves
 - `listTemplatesForCampaign`: merge order, `source`/`saved`/`suggested` flags,

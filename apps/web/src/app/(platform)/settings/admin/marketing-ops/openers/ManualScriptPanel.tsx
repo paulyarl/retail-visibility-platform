@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw, Save, Copy, CheckCircle2, AlertTriangle, ArrowRight, Sparkles, Phone,
+  BookmarkPlus,
 } from 'lucide-react';
 import {
   marketingOpsService,
@@ -10,6 +11,7 @@ import {
   type ManualTemplateListItem,
   type ManualFieldRole,
 } from '@/services/MarketingOpsService';
+import SaveAsTemplateModal from './SaveAsTemplateModal';
 
 /**
  * Manual tab — the operator playground / producer lane.
@@ -43,8 +45,11 @@ const ROLE_BADGES: Record<ManualFieldRole, { label: string; classes: string }> =
 export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScriptPanelProps) {
   const [templates, setTemplates] = useState<ManualTemplateListItem[]>([]);
   const [scripts, setScripts] = useState<ManualScript[]>([]);
+  const [mergeCtx, setMergeCtx] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateSavedMsg, setTemplateSavedMsg] = useState<{ key: string; label: string } | null>(null);
 
   const [selectedKey, setSelectedKey] = useState('');
   const [title, setTitle] = useState('');
@@ -86,12 +91,14 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
     setLoading(true);
     setError(null);
     try {
-      const [tpls, docs] = await Promise.all([
+      const [tpls, docs, ctxMap] = await Promise.all([
         marketingOpsService.listManualScriptTemplates(campaignId),
         marketingOpsService.listManualScripts(campaignId),
+        marketingOpsService.getManualScriptMergeContext(campaignId),
       ]);
       setTemplates(tpls);
       setScripts(docs);
+      setMergeCtx(ctxMap);
       // Default selection: a suggested template, else the first with a
       // saved doc, else the first in the catalog.
       const suggested = tpls.find((t) => t.suggested);
@@ -247,6 +254,68 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
     setTimeout(() => setCopied(null), 1500);
   };
 
+  // ─── Construction Variables (Part 2 — spec §9) ──────────────────────
+  // Scan script body + field values for {{var}} and classify:
+  //   auto — a global merge key ({{business}} etc.) resolved server-side
+  //   slot — a declared template field key ({{observed_gap}} ← its slot)
+  //   free — anything else; value persists on the doc's fields jsonb and
+  //          merges at read (fieldCtx = { ...mergeContext, ...fields }).
+  // Guardrail: never render an input for auto/slot keys — fields would
+  // silently shadow the campaign value at read.
+  const classifiedVars = useMemo(() => {
+    const found = new Set<string>();
+    const scan = (text: string) => {
+      for (const m of text.matchAll(/\{\{(\w+)\}\}/g)) found.add(m[1]);
+    };
+    scan(scriptBody);
+    for (const v of Object.values(fields)) scan(v);
+    const slotKeys = new Set((template?.fields ?? []).map((f) => f.key));
+    const auto: { key: string; value: string | undefined }[] = [];
+    const slots: { key: string; label: string }[] = [];
+    const free: string[] = [];
+    for (const key of found) {
+      if (slotKeys.has(key)) {
+        slots.push({ key, label: template!.fields.find((f) => f.key === key)!.label });
+      } else if (key in mergeCtx) {
+        auto.push({ key, value: mergeCtx[key] });
+      } else {
+        free.push(key);
+      }
+    }
+    // Free vars that collide with the merge context can't be reached via
+    // classification (auto wins) — detect via fields keys instead.
+    const shadows = Object.keys(fields).filter(
+      (k) => !slotKeys.has(k) && k in mergeCtx,
+    );
+    return { auto, slots, free, shadows };
+  }, [scriptBody, fields, template, mergeCtx]);
+
+  // Live preview — mirrors server fieldCtx ordering (fields win over
+  // mergeCtx). Server resolved_body stays authoritative for promotion.
+  const resolveClientMerge = useCallback(
+    (text: string) =>
+      text.replace(/\{\{(\w+)\}\}/g, (m, k) => fields[k] ?? mergeCtx[k] ?? m),
+    [fields, mergeCtx],
+  );
+
+  const setFreeVar = (key: string, value: string) => {
+    setFields((prev) => {
+      const next = { ...prev };
+      if (value === '') delete next[key];
+      else next[key] = value;
+      return next;
+    });
+    setDirty(true);
+  };
+
+  const handleTemplateSaved = useCallback(
+    (created: { key: string; label: string }) => {
+      setTemplateModalOpen(false);
+      setTemplateSavedMsg({ key: created.key, label: created.label });
+    },
+    [],
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -265,7 +334,9 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
 
   const hasRole = (role: ManualFieldRole) => template?.fields.some((f) => f.role === role);
   const canPromote = !!savedDoc && !dirty;
-  const previewBody = savedDoc && !dirty ? savedDoc.resolved_body : scriptBody;
+  // Live preview — resolves against mergeCtx + fields as the operator
+  // types (spec §9.5). Unresolvable placeholders stay literal.
+  const previewBody = resolveClientMerge(scriptBody);
 
   return (
     <div className="space-y-5">
@@ -281,7 +352,19 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
 
       {/* Template picker */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Play template</h2>
+        <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Play template</h2>
+          <button
+            type="button"
+            onClick={() => setTemplateModalOpen(true)}
+            disabled={!template}
+            title="Snapshot this play (fields + script body) as a reusable template for every campaign"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800"
+          >
+            <BookmarkPlus className="w-3.5 h-3.5" />
+            {template?.source === 'operator' ? 'Update template' : 'Save as template'}
+          </button>
+        </div>
         <select
           value={selectedKey}
           onChange={(e) => handleSelect(e.target.value)}
@@ -290,6 +373,8 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
           {templates.map((t) => (
             <option key={t.key} value={t.key}>
               {t.label}
+              {t.source === 'operator' ? ' — custom' : ''}
+              {t.source === 'operator' && t.status === 'archived' ? ' (archived)' : ''}
               {t.suggested ? ' — suggested (signal detected)' : ''}
               {t.saved ? ' — saved' : ''}
             </option>
@@ -302,7 +387,36 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
                 <Sparkles className="w-3 h-3" /> Suggested — audit signal fired
               </span>
             )}
+            {template.source === 'operator' && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                Custom{template.status === 'archived' ? ' · archived' : ''}
+              </span>
+            )}
             <p className="text-xs text-gray-500 dark:text-gray-400">{template.description}</p>
+          </div>
+        )}
+        {templateSavedMsg && (
+          <div className="mt-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 flex items-center justify-between gap-2">
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+              Template saved — <strong>{templateSavedMsg.label}</strong> is now in the list for every campaign.
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                const saved = templateSavedMsg;
+                const tpls = await marketingOpsService.listManualScriptTemplates(campaignId);
+                setTemplates(tpls);
+                setTemplateSavedMsg(null);
+                const fresh = tpls.find((t) => t.key === saved.key);
+                if (fresh && fresh.key !== selectedKey) {
+                  setSelectedKey(fresh.key);
+                  loadDoc(fresh, scripts.find((d) => d.template_key === fresh.key) ?? null);
+                }
+              }}
+              className="text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline whitespace-nowrap"
+            >
+              Switch to it →
+            </button>
           </div>
         )}
       </div>
@@ -324,13 +438,14 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
             {template.fields.map((f) => (
               <div key={f.key}>
                 <div className="flex items-center gap-2 mb-1">
-                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">{f.label}</label>
+                  <label htmlFor={`manual-field-${f.key}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">{f.label}</label>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${ROLE_BADGES[f.role].classes}`}>
                     {ROLE_BADGES[f.role].label}
                   </span>
                 </div>
                 {f.role === 'opener' || f.role === 'thesis' ? (
                   <textarea
+                    id={`manual-field-${f.key}`}
                     value={fields[f.key] ?? ''}
                     onChange={(e) => { setFields((p) => ({ ...p, [f.key]: e.target.value })); setDirty(true); }}
                     placeholder={f.placeholder}
@@ -339,6 +454,7 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
                   />
                 ) : (
                   <input
+                    id={`manual-field-${f.key}`}
                     type="text"
                     value={fields[f.key] ?? ''}
                     onChange={(e) => { setFields((p) => ({ ...p, [f.key]: e.target.value })); setDirty(true); }}
@@ -349,6 +465,86 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
               </div>
             ))}
           </div>
+
+          {/* ─── Construction Variables (spec §9) ─────────────────────
+              {{placeholders}} in the body/fields classified as auto
+              (global merge), slot (declared field), or free (stored on
+              the doc's fields jsonb — merges at read). Values save with
+              the doc; empty = placeholder stays literal. */}
+          <details
+            className="group rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-900/10"
+            open={classifiedVars.free.length > 0}
+          >
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                Construction Variables
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                  {classifiedVars.free.length}
+                </span>
+              </span>
+              <span className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 group-open:hidden">
+                Values save with the doc and merge at read
+              </span>
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-3">
+              {classifiedVars.auto.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {classifiedVars.auto.map((v) => (
+                    <span
+                      key={v.key}
+                      title="Global merge value — resolved from campaign data"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    >
+                      {`{{${v.key}}}`} → {v.value ?? '—'}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {classifiedVars.slots.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {classifiedVars.slots.map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => document.getElementById(`manual-field-${v.key}`)?.focus()}
+                      title={`Filled by the "${v.label}" field slot`}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    >
+                      {`{{${v.key}}}`} ← {v.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {classifiedVars.free.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  {classifiedVars.free.map((varName) => (
+                    <label key={varName} className="block">
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{`{{${varName}}}`}</span>
+                      <input
+                        type="text"
+                        value={fields[varName] ?? ''}
+                        onChange={(e) => setFreeVar(varName, e.target.value)}
+                        placeholder={varName}
+                        className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+              {classifiedVars.shadows.map((k) => (
+                <p key={k} className="text-[11px] text-amber-600 dark:text-amber-400">
+                  <code className="font-mono">{`{{${k}}}`}</code> has a doc value that overrides the campaign merge
+                  value —{' '}
+                  <button type="button" className="underline" onClick={() => setFreeVar(k, '')}>
+                    clear it
+                  </button>
+                </p>
+              ))}
+              {classifiedVars.auto.length === 0 && classifiedVars.slots.length === 0 && classifiedVars.free.length === 0 && (
+                <p className="text-[11px] text-gray-400">No {'{{placeholders}}'} in this play yet.</p>
+              )}
+            </div>
+          </details>
 
           {/* Script body + resolved preview */}
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-4">
@@ -366,7 +562,7 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Resolved preview {dirty && <span className="text-amber-500">— save to refresh merges</span>}
+                  Resolved preview <span className="font-normal text-gray-400">— live</span>
                 </label>
                 <button
                   type="button"
@@ -474,6 +670,21 @@ export default function ManualScriptPanel({ campaignId, onPromoted }: ManualScri
             </div>
           </div>
         </>
+      )}
+
+      {template && (
+        <SaveAsTemplateModal
+          open={templateModalOpen}
+          onClose={() => setTemplateModalOpen(false)}
+          onSaved={handleTemplateSaved}
+          campaignId={campaignId}
+          sourceTemplate={template}
+          fields={fields}
+          scriptBody={scriptBody}
+          mergeCtx={mergeCtx}
+          dirty={dirty}
+          existingKeys={templates.map((t) => t.key)}
+        />
       )}
     </div>
   );

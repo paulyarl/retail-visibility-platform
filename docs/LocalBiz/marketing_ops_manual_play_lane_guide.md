@@ -6,12 +6,12 @@ a template-driven authoring lane that sits *beside* the automated detected
 archetype. Everything it produces flows into the same pipeline rows the
 other tabs consume — nothing about detection changes.
 
-Roles:
+Roles (tabs are numbered in workflow order):
 
 | Tab | Role |
 |---|---|
-| Opener / Pitch Construction / Preview Deliverable / Call Script | Consumers — unchanged |
-| **Manual** | Producer — author a play, save it per campaign, promote slots |
+| **1. Manual** | Producer — author a play, save it per campaign, promote slots |
+| 2. Opener · 3. Pitch Construction · 4. Preview Deliverable · 5. Call Script | Consumers — unchanged |
 
 ---
 
@@ -41,9 +41,15 @@ Roles:
    `{{operator_name}}` `{{sender_name}}` `{{salutation}}` `{{claim_url}}`
    plus any field key (e.g. `{{observed_gap}}`, `{{channel_pitch}}`).
    Unresolvable placeholders stay visible — never fabricated.
-5. The **resolved preview** shows the merged output. Save to refresh it
-   after edits.
-6. **Save play** — persisted per (campaign × template). Multiple templates
+5. **Construction Variables** panel — any `{{placeholder}}` detected in
+   the body or field values is classified: **auto** (global merge, shown
+   resolved), **slot** (a declared field key, click to focus its input),
+   or **free** (everything else — gets an input). Free-var values persist
+   on the doc's `fields` jsonb and merge at read like slot values; clear
+   an input to remove the key and leave the placeholder literal.
+6. The **resolved preview** is live — it merges as you type.
+   (Server `resolved_body` remains authoritative for promotion.)
+7. **Save play** — persisted per (campaign × template). Multiple templates
    can coexist on one campaign; each keeps its own doc.
 
 ### Promoting into the pipeline
@@ -132,6 +138,16 @@ Field conventions:
   reference, close, signoff) so the imported opener passes green.
 - `suggestedWhenSignal` must be a real detected-signal code
   (`signal-extractor.ts` taxonomy); omit it for always-available plays.
+
+### Operator-authored templates ("Save as template")
+
+Operators can also promote a tuned doc into a dropdown template without a
+code deploy — the **Save as template** button on the picker card
+(`mkt_manual_play_templates`, migration 288). Operator templates are DB
+rows merged into `listTemplatesForCampaign` at read, badged **custom**,
+available on every campaign, and archivable (soft delete — docs under an
+archived key keep loading). The code catalog remains the platform-shipped
+path. Full spec: `docs/LocalBiz/MANUAL_PLAY_TEMPLATE_AUTHORING_SPEC.md`.
 
 ### Step 2 — nothing else
 
