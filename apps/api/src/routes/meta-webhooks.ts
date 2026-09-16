@@ -15,26 +15,37 @@ import crypto from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
+import WhatsAppInboundService from '../services/whatsapp/WhatsAppInboundService';
 
 const router = Router();
+const whatsappInboundService = WhatsAppInboundService.getInstance();
 
 const META_APP_SECRET = unifiedConfig.metaAppSecret;
 
 /**
- * Verify Meta webhook signature using X-Hub-Signature-256 header
+ * Verify Meta webhook signature using X-Hub-Signature-256 header.
+ * Fails closed: a missing META_APP_SECRET or missing raw body is a
+ * configuration/programming error — never accept unsigned or
+ * re-serialized payloads.
  */
 function verifyWebhookSignature(req: Request): boolean {
   if (!META_APP_SECRET) {
-    logger.warn('META_APP_SECRET not set — skipping webhook signature verification');
-    return true;
+    logger.error('META_APP_SECRET not set — rejecting webhook (signature verification cannot run)');
+    return false;
   }
 
   const signature = req.get('X-Hub-Signature-256');
   if (!signature) return false;
 
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  if (!rawBody || rawBody.length === 0) {
+    logger.error('Meta webhook raw body missing — rejecting (mounted without raw-body capture?)');
+    return false;
+  }
+
   const expectedSignature = 'sha256=' + crypto
     .createHmac('sha256', META_APP_SECRET)
-    .update((req as any).rawBody || JSON.stringify(req.body))
+    .update(rawBody)
     .digest('hex');
 
   try {
@@ -81,6 +92,22 @@ router.post('/meta/webhooks', async (req: Request, res: Response) => {
     const { object, entry } = req.body;
 
     if (!entry || !Array.isArray(entry)) {
+      return res.status(200).json({ received: true });
+    }
+
+    // WhatsApp Business Account events — one platform-owned WABA number.
+    // Intake is synchronous per change (dedupe + durable user persist happen
+    // here); a transient failure propagates → 500 → Meta retries safely via
+    // the wa_message_id dedupe claim. Malformed values return 200 after
+    // logging inside the service.
+    if (object === 'whatsapp_business_account') {
+      for (const item of entry) {
+        const changes = item.changes || [];
+        for (const change of changes) {
+          if (change.field !== 'messages') continue;
+          await whatsappInboundService.handleChange(change.value);
+        }
+      }
       return res.status(200).json({ received: true });
     }
 

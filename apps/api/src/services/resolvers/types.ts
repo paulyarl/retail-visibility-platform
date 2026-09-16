@@ -255,6 +255,8 @@ export interface DirectoryEntryMerchantSettings {
   gallery_display_mode?: string | null;
   snap_ebt_display?: boolean | null;
   attributes_display?: boolean | null;
+  whatsapp_display?: boolean | null;
+  whatsapp_number?: string | null;
 }
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
@@ -569,6 +571,12 @@ export interface EffectiveDirectoryEntryOptions {
   // Each attribute carries its own evidence (source platform + URL + as_of date).
   attributes_badge_enabled: boolean;
   attributes_visible: boolean;
+  // WhatsApp CTA — explicit directory_entry_whatsapp_on key ONLY (D5 decision:
+  // directory_entry_flexible does NOT grant it). Merchant pref gates effective state.
+  can_show_whatsapp: boolean;
+  whatsapp_enabled: boolean;
+  /** Resolved CTA destination (E.164 digits, no '+') — attached post-resolution. */
+  whatsapp_cta_number?: string | null;
   merchant_preferences: Record<string, any>;
 }
 

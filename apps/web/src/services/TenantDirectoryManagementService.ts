@@ -25,6 +25,8 @@ export interface DirectoryEntrySettings {
   gallery_display_mode?: 'carousel' | 'magazine';
   snap_ebt_display?: boolean | null;
   attributes_display?: boolean | null;
+  whatsapp_display?: boolean | null;
+  whatsapp_number?: string | null;
 }
 
 export class TenantDirectoryManagementService extends TenantApiSingleton {

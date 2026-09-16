@@ -10,6 +10,7 @@ import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
+import WhatsAppCtaButton from '@/components/directory/WhatsAppCtaButton';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
@@ -44,6 +45,9 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
   const canShowGallery = directoryEntryOptions?.galleryEnabled ?? true;
   const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
   const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
+  const whatsappCtaNumber = (directoryEntryOptions?.canShowWhatsapp ?? false)
+    ? (directoryEntryOptions?.whatsappCtaNumber ?? null)
+    : null;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -292,10 +296,14 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {!showStatusPanel && canShowContact && (
+              {!showStatusPanel && (canShowContact || whatsappCtaNumber) && (
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="text-lg font-semibold mb-4">Contact</h3>
-                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} />
+                  {canShowContact ? (
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                  ) : (
+                    whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
+                  )}
                 </div>
               )}
               {!showStatusPanel && showsHours && businessHours && (

@@ -453,6 +453,8 @@ interface BackendEffectiveDirectoryEntryMerchantPrefs {
   external_link_enabled?: boolean;
   snap_ebt_display?: boolean | null;
   attributes_display?: boolean | null;
+  whatsapp_display?: boolean | null;
+  whatsapp_number?: string | null;
 }
 
 interface BackendEffectiveDirectoryEntry {
@@ -489,6 +491,9 @@ interface BackendEffectiveDirectoryEntry {
   snap_ebt_visible: boolean;
   attributes_badge_enabled: boolean;
   attributes_visible: boolean;
+  can_show_whatsapp?: boolean;
+  whatsapp_enabled?: boolean;
+  whatsapp_cta_number?: string | null;
   merchant_preferences: BackendEffectiveDirectoryEntryMerchantPrefs;
 }
 
@@ -924,12 +929,17 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     snapEbtVisible: b.snap_ebt_visible ?? false,
     attributesBadgeEnabled: b.attributes_badge_enabled ?? false,
     attributesVisible: b.attributes_visible ?? false,
+    canShowWhatsapp: b.can_show_whatsapp ?? false,
+    whatsappEnabled: b.whatsapp_enabled ?? false,
+    whatsappCtaNumber: b.whatsapp_cta_number ?? null,
     merchantPreferences: {
       directory_entry_opt_enabled: b.merchant_preferences.directory_entry_opt_enabled,
       directory_entry_layout: (b.merchant_preferences.directory_entry_layout as DirectoryEntryLayoutKey) || 'classic',
       external_link_enabled: b.merchant_preferences.external_link_enabled,
       snap_ebt_display: b.merchant_preferences.snap_ebt_display,
       attributes_display: b.merchant_preferences.attributes_display,
+      whatsapp_display: b.merchant_preferences.whatsapp_display,
+      whatsapp_number: b.merchant_preferences.whatsapp_number,
     },
     features: {},
   };

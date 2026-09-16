@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Mail, MapPin, Phone } from "lucide-react";
+import WhatsAppCtaButton from "./WhatsAppCtaButton";
 
 
 interface ContactInformationCollapsibleProps {
@@ -16,12 +17,13 @@ interface ContactInformationCollapsibleProps {
   initialExpanded?: boolean;
   isRetailStore?: boolean;
   showMap?: boolean;
+  whatsappCtaNumber?: string | null;
 
 }
 
 
 export default function ContactInformationCollapsible({
-  tenant, fullAddress, initialExpanded = false, isRetailStore = true, showMap = true
+  tenant, fullAddress, initialExpanded = false, isRetailStore = true, showMap = true, whatsappCtaNumber = null
 }: ContactInformationCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   // console.log(`[ContactInformationCollapsible] tenant:`, tenant);
@@ -31,7 +33,8 @@ export default function ContactInformationCollapsible({
     tenant?.phone,
     tenant?.email,
     tenant?.address,
-    fullAddress?.fullAddress
+    fullAddress?.fullAddress,
+    whatsappCtaNumber
   ].filter(Boolean).length;
 
   return (
@@ -88,6 +91,11 @@ export default function ContactInformationCollapsible({
               >
                 {tenant.email}
               </a>
+            </div>
+          )}
+          {whatsappCtaNumber && (
+            <div className="mt-4">
+              <WhatsAppCtaButton number={whatsappCtaNumber} />
             </div>
           )}
 

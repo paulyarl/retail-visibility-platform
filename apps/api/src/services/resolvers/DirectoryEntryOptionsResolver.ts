@@ -59,6 +59,13 @@ export function resolveDirectoryEntryOptions(
   const attributesBadgeEnabled = mainOn && (!!features.directory_visibility_attributes || flexible);
   const attributesVisible = attributesBadgeEnabled && (merchantPrefs?.attributes_display !== false);
 
+  // WhatsApp CTA — EXPLICIT KEY ONLY (spec §15 / decision D5):
+  // directory_entry_flexible does NOT unlock this flag, unlike every other
+  // section — it is a channel-facing action, not a display section.
+  const whatsappTierAllowed = mainOn &&
+    (!!features.directory_entry_whatsapp_on || !!features.directory_entry_whatsapp_enabled);
+  const whatsappVisible = whatsappTierAllowed && (merchantPrefs?.whatsapp_display !== false);
+
   const prefs = {
     directory_entry_opt_enabled: merchantPrefs?.directory_entry_opt_enabled !== false,
     directory_entry_layout: merchantPrefs?.directory_entry_layout || 'classic',
@@ -111,6 +118,9 @@ export function resolveDirectoryEntryOptions(
     // Sourced attributes display — tier-gated availability + merchant-gated effective state
     attributes_badge_enabled: attributesBadgeEnabled,
     attributes_visible: attributesVisible,
+    // WhatsApp CTA — explicit key only; flexible does not grant (D5)
+    can_show_whatsapp: whatsappTierAllowed,
+    whatsapp_enabled: whatsappVisible,
     merchant_preferences: prefs,
   };
 }

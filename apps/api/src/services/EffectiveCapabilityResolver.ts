@@ -264,6 +264,11 @@ export async function resolveEffectiveCapabilities(
     ),
   ]);
 
+  // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
+  // the capability resolves on — needs DB access so it can't live in the pure
+  // resolver. Never derived from NAP phone (spec §15 provenance rules).
+  await attachWhatsAppCtaNumber(effective[13], tenantId, merchantBundle.directoryEntry);
+
   const result: EffectiveCapabilities = {
     tenant_id: tenantId,
     tier: tierInfo,
@@ -767,6 +772,11 @@ export async function resolveEffectiveCapabilitiesFromMV(
     ),
   ]);
 
+  // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
+  // the capability resolves on — needs DB access so it can't live in the pure
+  // resolver. Never derived from NAP phone (spec §15 provenance rules).
+  await attachWhatsAppCtaNumber(effective[13], tenantId, merchantBundle.directoryEntry);
+
   const result: EffectiveCapabilities = {
     tenant_id: tenantId,
     tier: tierInfo,
@@ -1269,6 +1279,44 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     funnelOptions: funnelOptions as any,
     gbpManagement: gbpManagement as any,
   };
+}
+
+/**
+ * Resolve the WhatsApp CTA destination for directory flavor A (spec §15).
+ * Provenance rules: claimed listings use the merchant's explicit
+ * whatsapp_number pref (E.164 digits); otherwise the tenant's active
+ * whatsapp_channels display number (flavor B channel). NEVER derived from
+ * the listing's NAP phone. Returns digits only, no '+'.
+ */
+async function resolveWhatsAppCtaNumber(
+  tenantId: string,
+  merchantPrefs: { whatsapp_number?: string | null } | null
+): Promise<string | null> {
+  const merchant = typeof merchantPrefs?.whatsapp_number === 'string'
+    ? merchantPrefs.whatsapp_number.replace(/\D/g, '')
+    : '';
+  if (merchant.length >= 8 && merchant.length <= 15) return merchant;
+
+  try {
+    const channel = await prisma.whatsapp_channels.findFirst({
+      where: { tenant_id: tenantId, status: 'active' },
+      select: { display_phone_number: true },
+    });
+    const digits = channel?.display_phone_number?.replace(/\D/g, '') ?? '';
+    return digits.length >= 8 && digits.length <= 15 ? digits : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Attach whatsapp_cta_number to a resolved directory_entry state (mutates). */
+async function attachWhatsAppCtaNumber(
+  dirEntry: { whatsapp_enabled?: boolean; whatsapp_cta_number?: string | null } | null | undefined,
+  tenantId: string,
+  merchantPrefs: { whatsapp_number?: string | null } | null
+): Promise<void> {
+  if (!dirEntry?.whatsapp_enabled) return;
+  dirEntry.whatsapp_cta_number = await resolveWhatsAppCtaNumber(tenantId, merchantPrefs);
 }
 
 async function safeQuery<T>(fn: () => Promise<T>): Promise<T | null> {

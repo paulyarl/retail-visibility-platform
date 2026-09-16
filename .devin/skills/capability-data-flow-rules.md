@@ -337,6 +337,8 @@ Feature keys MUST follow this canonical pattern:
 
 **Backward compatibility**: Legacy `_enabled` / `_disabled` group-gate keys MAY be retained as aliases during migration. Resolvers check new `_on` / `_off` keys first, then fall back to legacy `_enabled` / `_disabled` keys. See `docs/ENABLED_DISABLED_NAMING_CONFLICT_MIGRATION_PLAN.md` for the current migration.
 
+**Worked example — seeding an `_on` + `_enabled` pair**: `directory_entry_whatsapp_on` (canonical) + `directory_entry_whatsapp_enabled` (legacy alias) were seeded together in migration `286_directory_entry_whatsapp.sql` — one `features_list` insert (both keys), one `capability_features_list` link (both), and `tier_features_list` grants for the canonical key only (`presence` + `directory_presence`, matching `directory_entry_contact_on`). The resolver evaluates them as an OR: `!!features.directory_entry_whatsapp_on || !!features.directory_entry_whatsapp_enabled`.
+
 ### R16: Group Gates Required for Options Capabilities
 Options capabilities MUST use group gates to organize features into logical clusters. A group gate is a pair of feature keys:
 
@@ -406,6 +408,8 @@ const staticEnabled = !!feat.chatbot_static_enabled;
 **Audit rule**: For every `!!features.<key>` or `!!feat.<key>` check in a resolver, verify that `flexible ||` precedes it. The only exceptions are the master gate checks themselves (`*_enabled`, `*_disabled`, `*_flexible`) which define `enabled`, `disabled`, and `flexible` — these are the inputs, not the consumers, of the flexible logic.
 
 **Common trap**: Standalone flags added outside the group structure (e.g., `featured_expiry_monitor`, `featured_custom_badge_slots`) are the most likely to miss the `flexible ||` prefix because they don't follow the `if (flexible) { push(...all) } else { if (feat.x) push(x) }` array pattern. Always check standalone boolean flags.
+
+**Documented exception — `directory_entry_whatsapp_on` (channel-facing actions)**: The directory WhatsApp CTA is explicitly keyed ONLY by `directory_entry_whatsapp_on` (or legacy alias `directory_entry_whatsapp_enabled`) — `directory_entry_flexible` does NOT grant it (decision D5, WHATSAPP_CHANNEL_INTEGRATION_SPEC §15). Rationale: it is a channel-facing action exposing a contact number, not a display section. Any future outbound-contact CTA added to a display capability should follow the same explicit-key pattern. Do not "fix" the missing `flexible ||` — it is deliberate.
 
 ### R18: Cross-Capability Constraints Are Post-Resolution
 Cross-capability constraints MUST run as a post-resolution pass, never inside individual resolvers. Individual resolvers remain pure functions of `(features, merchantPrefs)`. The Cross-Capability Constraint Layer (CCL) operates on the assembled `effective` manifest after all resolvers complete.

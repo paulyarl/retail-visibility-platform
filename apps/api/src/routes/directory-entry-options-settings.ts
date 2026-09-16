@@ -25,6 +25,8 @@ const directoryEntryOptionsSchema = z.object({
   gallery_display_mode: z.enum(['carousel', 'magazine']).optional(),
   snap_ebt_display: z.boolean().nullable().optional(),
   attributes_display: z.boolean().nullable().optional(),
+  whatsapp_display: z.boolean().nullable().optional(),
+  whatsapp_number: z.string().regex(/^\+?[0-9]{8,15}$/, 'WhatsApp number must be E.164 digits').max(32).nullable().optional(),
 });
 
 // Default settings for directory entry — only directory-entry-relevant fields
@@ -42,6 +44,8 @@ export const DEFAULT_DIRECTORY_ENTRY_SETTINGS = {
   gallery_display_mode: 'carousel',
   snap_ebt_display: null as boolean | null,
   attributes_display: null as boolean | null,
+  whatsapp_display: null as boolean | null,
+  whatsapp_number: null as string | null,
 };
 
 // Get directory entry options settings for a tenant
@@ -76,6 +80,8 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
           gallery_display_mode: (oldSettings as any).gallery_display_mode || 'carousel',
           snap_ebt_display: (oldSettings as any).snap_ebt_display ?? null,
           attributes_display: (oldSettings as any).attributes_display ?? null,
+          whatsapp_display: null,
+          whatsapp_number: null,
           created_at: oldSettings.created_at,
           updated_at: oldSettings.updated_at,
         } as any;
@@ -128,6 +134,8 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
         gallery_display_mode: settings.gallery_display_mode || 'carousel',
         snap_ebt_display: (settings as any).snap_ebt_display ?? null,
         attributes_display: (settings as any).attributes_display ?? null,
+        whatsapp_display: (settings as any).whatsapp_display ?? null,
+        whatsapp_number: (settings as any).whatsapp_number ?? null,
       },
     });
   } catch (error) {
@@ -213,6 +221,8 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
         gallery_display_mode: settings.gallery_display_mode || 'carousel',
         snap_ebt_display: (settings as any).snap_ebt_display ?? null,
         attributes_display: (settings as any).attributes_display ?? null,
+        whatsapp_display: (settings as any).whatsapp_display ?? null,
+        whatsapp_number: (settings as any).whatsapp_number ?? null,
       },
     });
   } catch (error) {

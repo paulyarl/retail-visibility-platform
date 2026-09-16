@@ -138,6 +138,18 @@ constraint has been updated to allow it).
 - `185_mkt_outreach_checklist_bridge_backfill.sql` — backfills `outreach_kind` on existing steps + inserts new `internal_link` steps (depends on 185a)
 - `186_mkt_outreach_state_signal_registry.sql` — seeds `OX_*` signal rows (independent, data-only)
 
+### Partial unique index for idempotent dedupe (provider message ids)
+
+When deduplicating external provider deliveries (webhook redeliveries, retries), store the provider's message id in a nullable column and claim uniqueness only on non-null values:
+
+```sql
+ALTER TABLE bot_messages ADD COLUMN IF NOT EXISTS wa_message_id varchar(255);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_bot_messages_wa_message_id
+  ON bot_messages (wa_message_id) WHERE wa_message_id IS NOT NULL;
+```
+
+The `WHERE ... IS NOT NULL` partial index is required — most rows have no provider id and NULLs must not collide. Application flow: check-then-insert on the read path; a `P2002` from a racing duplicate delivery is treated as "already processed" (acked), not an error. Worked example: migration `275_whatsapp_channels.sql`.
+
 Apply in order: **185a → 185 → 186**.
 
 ### Marketing Ops (`mkt_*`) namespace exception

@@ -130,8 +130,9 @@ router.get('/conversations', authenticateToken, async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const status = req.query.status as string | undefined;
+    const source = req.query.source as string | undefined;
 
-    const result = await conversationService.listConversations(tenantId, { page, limit, status });
+    const result = await conversationService.listConversations(tenantId, { page, limit, status, source });
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error('Error listing conversations:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });

@@ -112,7 +112,6 @@ import oauthRoutes from '../routes/oauth';
 import googleBusinessOAuthRoutes from '../routes/google-business-oauth';
 import googleMerchantOAuthRoutes from '../routes/google-merchant-oauth';
 import metaOAuthRoutes from '../routes/meta-oauth';
-import metaWebhookRoutes from '../routes/meta-webhooks';
 import tiktokOAuthRoutes from '../routes/tiktok-oauth';
 import tiktokWebhookRoutes from '../routes/tiktok-webhooks';
 import cloverRoutes from '../routes/integrations/clover';
@@ -1199,13 +1198,9 @@ export const routeRegistry: RouteEntry[] = [
     authLevel: 'public',
     comment: 'Meta Commerce OAuth at /api/meta/oauth',
   },
-  {
-    path: '/api',
-    router: metaWebhookRoutes,
-    domain: 'integration',
-    authLevel: 'public',
-    comment: 'Meta Commerce webhooks at /api/meta/webhooks',
-  },
+  // NOTE: meta-webhooks is NOT mounted here — it is mounted in bootstrap.ts §6
+  // (pre-middleware) so X-Hub-Signature-256 verification can run over the raw
+  // request body. A registry mount would shadow it behind the global express.json.
   {
     path: '/api',
     router: tiktokOAuthRoutes,

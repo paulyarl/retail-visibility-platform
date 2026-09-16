@@ -40,6 +40,7 @@ export interface BotMessage {
   guardrailResult: string | null;
   skillName: string | null;
   metadata: any;
+  waMessageId: string | null;
   createdAt: Date;
 }
 
@@ -73,6 +74,7 @@ function toMessage(row: any): BotMessage {
     guardrailResult: row.guardrail_result,
     skillName: row.skill_name,
     metadata: row.metadata,
+    waMessageId: row.wa_message_id,
     createdAt: row.created_at,
   };
 }
@@ -114,6 +116,7 @@ export class BotConversationService {
     pageContext?: string;
     contextEntityName?: string;
     source?: string;
+    skipGreeting?: boolean;
   }): Promise<{ conversation: BotConversation; greeting: string }> {
     const sessionId = params.sessionId || generateBotConversationSessionId(params.tenantId);
     const now = new Date();
@@ -138,16 +141,19 @@ export class BotConversationService {
       },
     });
 
-    // Store greeting as first assistant message
-    await prisma.bot_messages.create({
-      data: {
-        conversation_id: conversation.id,
-        role: 'assistant',
-        content: greeting,
-        response_type: 'static',
-        created_at: now,
-      },
-    });
+    // Store greeting as first assistant message (skipped for transports like
+    // WhatsApp where the inbound user message is the first turn)
+    if (!params.skipGreeting) {
+      await prisma.bot_messages.create({
+        data: {
+          conversation_id: conversation.id,
+          role: 'assistant',
+          content: greeting,
+          response_type: 'static',
+          created_at: now,
+        },
+      });
+    }
 
     logger.info('[BotConversationService] Created conversation', undefined, {
       tenantId: params.tenantId,
@@ -163,6 +169,29 @@ export class BotConversationService {
       orderBy: { created_at: 'desc' },
     });
     return conv ? toConversation(conv) : null;
+  }
+
+  /**
+   * WhatsApp session lifecycle (WHATSAPP_CHANNEL_INTEGRATION_SPEC §8.5).
+   * Returns the latest conversation for the deterministic session id only when
+   * it is still reusable: status 'active' AND last activity (updated_at, bumped
+   * by every appended message) within the app session TTL. Otherwise null —
+   * the caller archives the stale row and creates a fresh one. Multiple
+   * historical rows per session_id are intentional; do NOT add a unique index.
+   */
+  async getReusableConversationBySession(sessionId: string): Promise<BotConversation | null> {
+    const conv = await this.getConversationBySession(sessionId);
+    if (!conv || conv.status !== 'active') return null;
+    const age = Date.now() - conv.updatedAt.getTime();
+    return age < SESSION_TTL_MS ? conv : null;
+  }
+
+  /** Dedupe lookup: has this provider message id already been persisted? */
+  async findMessageByWaMessageId(waMessageId: string): Promise<BotMessage | null> {
+    const msg = await prisma.bot_messages.findFirst({
+      where: { wa_message_id: waMessageId },
+    });
+    return msg ? toMessage(msg) : null;
   }
 
   async isSessionValid(sessionId: string): Promise<boolean> {
@@ -185,6 +214,7 @@ export class BotConversationService {
     guardrailResult?: string;
     skillName?: string;
     metadata?: any;
+    waMessageId?: string;
   }): Promise<BotMessage> {
     const msg = await prisma.bot_messages.create({
       data: {
@@ -198,6 +228,7 @@ export class BotConversationService {
         guardrail_result: params.guardrailResult || null,
         skill_name: params.skillName || null,
         metadata: params.metadata || null,
+        wa_message_id: params.waMessageId || null,
       },
     });
 
@@ -269,6 +300,7 @@ export class BotConversationService {
     page?: number;
     limit?: number;
     status?: string;
+    source?: string;
   } = {}): Promise<{ conversations: BotConversation[]; total: number }> {
     const page = options.page || 1;
     const limit = Math.min(options.limit || 20, 100);
@@ -276,6 +308,7 @@ export class BotConversationService {
 
     const where: any = { tenant_id: tenantId };
     if (options.status) where.status = options.status;
+    if (options.source) where.source = options.source;
 
     const [conversations, total] = await Promise.all([
       prisma.bot_conversations.findMany({

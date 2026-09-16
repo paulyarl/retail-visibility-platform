@@ -237,6 +237,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         external_link_enabled: rawSettings.external_link_enabled,
         snap_ebt_display: rawSettings.snap_ebt_display,
         attributes_display: rawSettings.attributes_display,
+        whatsapp_display: rawSettings.whatsapp_display,
+        whatsapp_number: rawSettings.whatsapp_number || null,
       });
 
       // Invalidate frontend capability cache so public endpoints pick up changes
@@ -289,6 +291,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     rawSettings.external_link_enabled,
     rawSettings.snap_ebt_display,
     rawSettings.attributes_display,
+    rawSettings.whatsapp_display !== false && capState?.canShowWhatsapp,
   ].filter(Boolean).length;
 
   return (
@@ -806,6 +809,50 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                           <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                         </label>
                       </div>
+                      {/* WhatsApp CTA */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">WhatsApp Button</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {capState?.canShowWhatsapp
+                              ? 'Show a "Chat on WhatsApp" button on your listing'
+                              : (
+                                <Link href={`/t/${tenantId}/settings/tiers`} className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium">
+                                  Not included in your plan — upgrade to enable →
+                                </Link>
+                              )}
+                          </p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowWhatsapp ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={rawSettings.whatsapp_display !== false}
+                            disabled={!capState?.canShowWhatsapp}
+                            onChange={(e) => toggleRaw('whatsapp_display', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {capState?.canShowWhatsapp && rawSettings.whatsapp_display !== false && (
+                        <div className="pl-1">
+                          <label htmlFor="whatsapp-number-input" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            WhatsApp number (E.164 digits, e.g. 15551234567)
+                          </label>
+                          <input
+                            id="whatsapp-number-input"
+                            type="text"
+                            inputMode="tel"
+                            value={rawSettings.whatsapp_number || ''}
+                            onChange={(e) => setRawSettings((prev: any) => ({ ...prev, whatsapp_number: e.target.value }))}
+                            placeholder="15551234567"
+                            className="mt-1 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                          />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Leave blank to use your registered WhatsApp channel number. This must be a WhatsApp-enabled number — it is never derived from your listing phone.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
                       <button

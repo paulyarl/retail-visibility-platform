@@ -1036,6 +1036,16 @@ export function generateBotConversationSessionId(tenantId: string): string {
 }
 
 /**
+ * Generate WhatsApp channel ID
+ * Format: wac-{tenantKey}-{nanoid} (16 chars)
+ * Tenant-scoped: the channel row maps a WABA phone_number_id to one tenant.
+ */
+export function generateWhatsAppChannelId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `wac-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate bot embed key for external site licensing
  * Format: ek-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

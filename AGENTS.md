@@ -79,6 +79,18 @@ Report pipeline notes:
 
 After applying migrations 271–272, run `pnpm prisma:generate` (or `doppler run --config local -- pnpm prisma db pull && pnpm prisma generate`) so the Prisma Client picks up the new columns.
 
+## WhatsApp Channel Integration
+
+Spec: `docs/LocalBiz/WHATSAPP_CHANNEL_INTEGRATION_SPEC.md`
+
+- `275_whatsapp_channels.sql` — creates `whatsapp_channels` (platform-owned WABA channel registry; `wac-{tenantKey}-{nanoid}` ids, `access_token_encrypted`, CHECK on `status`) + `bot_messages.wa_message_id` with a partial unique dedupe index (`WHERE wa_message_id IS NOT NULL`). Applied to staging + prod.
+- `286_directory_entry_whatsapp.sql` — seeds `directory_entry_whatsapp_on` + `directory_entry_whatsapp_enabled` feature keys (granted to `presence` + `directory_presence` tiers), adds `whatsapp_display`/`whatsapp_number` columns to `tenant_directory_entry_settings`, and syncs `chk_whatsapp_channels_status` to the app enum (`active|inactive|disabled|revoked` — 275 shipped a stale 2-value set). Run against `local` + `prd`, then `prisma db pull && pnpm prisma generate`.
+- Shared pipeline: `services/bot/BotTurnPipeline.ts` (`preprocessTurn`/`completeTurn`/`persistAssistantTurn`) — one engine, widget + WhatsApp transports. Widget contract pinned by `src/tests/bot-public-pipeline.test.ts` (13 tests) — must stay green.
+- Meta webhooks mount in `bootstrap.ts` §6 pre-middleware (path-scoped `express.json({verify})` raw-body capture); `routeRegistry`'s `preMiddleware` flag is NOT a true pre-parser mount. Signature verification fails closed on missing secret/signature/rawBody.
+- WhatsApp session ids are `wa-{phone_number_id}-{wa_id}`; multiple rows per session are intentional (archive + recreate). Do NOT add a unique index on `bot_conversations.session_id`.
+- `OAUTH_ENCRYPTION_KEY` assertion is WhatsApp-scoped (`services/whatsapp/crypto.ts`) — Meta/Google OAuth consumers keep the existing random-fallback behavior. Do not globalize.
+- `directory_entry_whatsapp_on` is an explicit-key exception to flexible-grants: `directory_entry_flexible` does NOT unlock it (decision D5). CTA number provenance: merchant `whatsapp_number` pref → active channel `display_phone_number`; never the NAP phone; never a Meta test number.
+
 ## Architecture
 
 - **Campaign structural-duplicate guardrail:** `MarketingCampaignService.createCampaign` blocks creation of a second *active* campaign with the same structural signature. Re-run the existing campaign to produce a versioned output instead. Inactive stages (`lost`, `dead`, `closed`, `resolved_and_closed`) do NOT block — a fresh campaign can be created after the prior one was killed. The check is keyed on structural attributes (NOT campaign id):

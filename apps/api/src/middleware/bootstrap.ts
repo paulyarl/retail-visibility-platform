@@ -37,6 +37,7 @@ import { performanceMonitoring } from '../services/alerting';
 import clientErrorRoutes from '../routes/client-errors';
 import webhooksRoutes from '../routes/webhooks';
 import stripeConnectWebhooks from '../routes/stripe-connect-webhooks';
+import metaWebhookRoutes from '../routes/meta-webhooks';
 
 export function bootstrapMiddleware(app: Express): void {
   // ── 1. Security headers ──────────────────────────────────────────────
@@ -93,6 +94,10 @@ export function bootstrapMiddleware(app: Express): void {
   }));
 
   // ── 6. Pre-middleware routes (before JSON parsing) ───────────────────
+  // Inventory: client-errors, webhooks (stripe/paypal), stripe-connect, meta-webhooks.
+  // Any route needing the raw request body (HMAC signature verification) must be
+  // mounted here — the registry's preMiddleware flag only reorders within
+  // mountFromRegistry, which still runs after the global express.json below.
   // Client error reporting — mounted BEFORE auth middleware (errors can occur pre-login)
   app.use('/api/client-errors', express.json({ limit: '1mb' }), clientErrorRoutes);
   console.log('✅ Client error reporting mounted at /api/client-errors');
@@ -104,6 +109,23 @@ export function bootstrapMiddleware(app: Express): void {
   // Stripe Connect webhooks - requires raw body for signature verification
   app.use('/api/webhooks/stripe-connect', express.raw({ type: 'application/json' }), stripeConnectWebhooks);
   console.log('Stripe Connect webhooks mounted at /api/webhooks/stripe-connect');
+
+  // Meta webhooks (Commerce + WhatsApp) - requires raw body for X-Hub-Signature-256.
+  // Scope the raw-body parser to the webhook path only. Mounting it at '/api'
+  // unconditionally would apply the 1 MB limit to every /api request (the global
+  // parser allows 50 MB) and capture raw bodies for all traffic. If the guard's
+  // path check ever misses (e.g. a trailing slash), signature verification fails
+  // closed with 401 — it never falls back to re-serialized JSON.
+  const metaWebhookJson = express.json({
+    limit: '1mb',
+    verify: (req, _res, buf) => { (req as any).rawBody = buf; },
+  });
+  app.use(
+    '/api',
+    (req, res, next) => (req.path === '/meta/webhooks' ? metaWebhookJson(req, res, next) : next()),
+    metaWebhookRoutes,
+  );
+  console.log('Meta webhooks mounted at /api/meta/webhooks (raw-body signature verification)');
 
   // ── 7. Body parsers ──────────────────────────────────────────────────
   app.use(cookieParser());

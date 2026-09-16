@@ -10,6 +10,7 @@ import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
+import WhatsAppCtaButton from '@/components/directory/WhatsAppCtaButton';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
@@ -44,6 +45,9 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
   const canShowGallery = directoryEntryOptions?.galleryEnabled ?? true;
   const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
   const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
+  const whatsappCtaNumber = (directoryEntryOptions?.canShowWhatsapp ?? false)
+    ? (directoryEntryOptions?.whatsappCtaNumber ?? null)
+    : null;
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
@@ -292,10 +296,14 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             {/* Sidebar */}
             <div className="lg:col-span-4 space-y-8">
               {/* Contact Card */}
-              {!showStatusPanel && canShowContact && (
+              {!showStatusPanel && (canShowContact || whatsappCtaNumber) && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
-                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} />
+                  {canShowContact ? (
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                  ) : (
+                    whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
+                  )}
                 </div>
               )}
 

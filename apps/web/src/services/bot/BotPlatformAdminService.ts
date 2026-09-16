@@ -126,6 +126,21 @@ export interface PaginatedResult<T> {
   limit: number;
 }
 
+export type WhatsAppChannelStatus = 'active' | 'disabled' | 'revoked';
+
+export interface WhatsAppChannel {
+  id: string;
+  tenantId: string;
+  phoneNumberId: string;
+  displayPhoneNumber: string | null;
+  status: WhatsAppChannelStatus;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Last-4 indicator returned on create/rotate only — never the token. */
+  tokenFingerprint?: string;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 class BotPlatformAdminService extends AdminApiSingleton {
@@ -143,7 +158,7 @@ class BotPlatformAdminService extends AdminApiSingleton {
   }
 
   getServiceCachePatterns(): string[] {
-    return ['bot-dashboard', 'bot-guardrails', 'bot-intents', 'bot-skills', 'bot-knowledge', 'bot-tenants', 'bot-settings', 'bot-sync-estimate'];
+    return ['bot-dashboard', 'bot-guardrails', 'bot-intents', 'bot-skills', 'bot-knowledge', 'bot-tenants', 'bot-settings', 'bot-sync-estimate', 'bot-channels'];
   }
 
   async invalidateServiceCaches(): Promise<void> {
@@ -356,6 +371,53 @@ class BotPlatformAdminService extends AdminApiSingleton {
       2 * 60 * 1000,
     );
     return this.unwrap<PaginatedResult<BotTenantSummary>>(result);
+  }
+
+  // --- WhatsApp Channels ---
+
+  async listChannels(): Promise<WhatsAppChannel[]> {
+    const result = await this.makeDefaultRequest<WhatsAppChannel[]>(
+      '/api/admin/bot/channels',
+      { method: 'GET' },
+      'bot-channels',
+      60 * 1000,
+    );
+    return this.unwrap<WhatsAppChannel[]>(result);
+  }
+
+  async createChannel(data: {
+    tenantId: string;
+    phoneNumberId: string;
+    displayPhoneNumber?: string;
+    accessToken: string;
+  }): Promise<WhatsAppChannel> {
+    const result = await this.makeDefaultRequest<WhatsAppChannel>(
+      '/api/admin/bot/channels',
+      { method: 'POST', body: JSON.stringify(data) },
+    );
+    await this.invalidateCache('bot-channels');
+    return this.unwrap<WhatsAppChannel>(result);
+  }
+
+  async updateChannel(
+    id: string,
+    data: { displayPhoneNumber?: string | null; status?: WhatsAppChannelStatus },
+  ): Promise<WhatsAppChannel> {
+    const result = await this.makeDefaultRequest<WhatsAppChannel>(
+      `/api/admin/bot/channels/${id}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    );
+    await this.invalidateCache('bot-channels');
+    return this.unwrap<WhatsAppChannel>(result);
+  }
+
+  async rotateChannelToken(id: string, accessToken: string): Promise<WhatsAppChannel> {
+    const result = await this.makeDefaultRequest<WhatsAppChannel>(
+      `/api/admin/bot/channels/${id}/rotate-token`,
+      { method: 'POST', body: JSON.stringify({ accessToken }) },
+    );
+    await this.invalidateCache('bot-channels');
+    return this.unwrap<WhatsAppChannel>(result);
   }
 }
 

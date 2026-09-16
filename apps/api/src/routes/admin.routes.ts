@@ -82,6 +82,7 @@ import tierCapabilitiesRoutes from './admin/tier-capabilities';
 import taxonomyAdminRoutes from './taxonomy-admin';
 import crmAdminRoutes from './crm/admin/crm-admin';
 import botPlatformRoutes from './admin/bot-platform';
+import botChannelsRoutes from './admin/bot-channels';
 import featurePurchasesRoutes from './admin/feature-purchases';
 import botEmbedLicensesRoutes from './admin/bot-embed-licenses';
 import bsaasCatalogRoutes from './admin/bsaas-catalog';
@@ -147,6 +148,7 @@ router.use('/tier-capabilities', authenticateToken, requireAdmin, tierCapabiliti
 router.use('/taxonomy', authenticateToken, requireAdmin, taxonomyAdminRoutes);
 router.use('/crm', authenticateToken, requireAdmin, crmAdminRoutes);
 router.use('/bot', authenticateToken, requireAdmin, botPlatformRoutes);
+router.use('/bot', authenticateToken, requireAdmin, botChannelsRoutes);
 router.use('/feature-purchases', authenticateToken, requireAdmin, featurePurchasesRoutes);
 router.use('/bot-embed-licenses', authenticateToken, requireAdmin, botEmbedLicensesRoutes);
 router.use('/bsaas-catalog', authenticateToken, requireAdmin, bsaasCatalogRoutes);

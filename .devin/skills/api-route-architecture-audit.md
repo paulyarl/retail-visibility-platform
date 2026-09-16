@@ -197,6 +197,10 @@ This is **intra-file dynamic param shadowing** — different from catch-all moun
 
 **Fix:** Mount webhook routers with `express.raw({ type: 'application/*' })` before `express.json()`. Move middleware configuration to `middleware/bootstrap.ts`.
 
+**Pre-middleware inventory (bootstrap.ts §6):** routes that must run before the global `express.json` live in `middleware/bootstrap.ts` — currently `client-errors`, `webhooks` (stripe/paypal), `stripe-connect`, and `meta-webhooks`. The `routeRegistry` `preMiddleware` flag does NOT create a true pre-parser mount — it only reorders within `mountFromRegistry`, which still runs after the global parser.
+
+**HMAC + parsed body pattern:** when a route needs both a verified raw body AND a parsed `req.body` (e.g. `X-Hub-Signature-256` over raw bytes), use `express.json({ verify: (req, res, buf) => { req.rawBody = buf } })` instead of `express.raw`. Scope it with a path-guard wrapper (`req.path === '/meta/webhooks' ? parser(req,res,next) : next()`) so the tighter body limit doesn't apply to all `/api` traffic. Signature verification must fail closed: missing app secret, missing signature, or missing `req.rawBody` → reject; never HMAC a re-serialized `JSON.stringify(req.body)`.
+
 ## Quick Wins (Do These First)
 
 1. **Delete commented-out imports and mounts.** They create noise and make grep inventory unreliable.

@@ -398,6 +398,9 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         snap_ebt_visible: false,
         attributes_badge_enabled: false,
         attributes_visible: false,
+        can_show_whatsapp: false,
+        whatsapp_enabled: false,
+        whatsapp_cta_number: null,
         merchant_preferences: {},
       },
       faq: {

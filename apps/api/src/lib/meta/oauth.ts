@@ -291,6 +291,16 @@ export function decryptToken(encryptedToken: string): string {
 }
 
 /**
+ * Whether the effective ENCRYPTION_KEY came from OAUTH_ENCRYPTION_KEY (not the
+ * random module-load fallback) and is a valid 64-hex AES-256 key.
+ * WhatsApp channel credentials require this — see services/whatsapp/crypto.ts.
+ */
+export function isOauthEncryptionKeyConfigured(): boolean {
+  const envKey = process.env.OAUTH_ENCRYPTION_KEY || '';
+  return /^[0-9a-f]{64}$/i.test(envKey) && ENCRYPTION_KEY === envKey;
+}
+
+/**
  * Revoke Meta OAuth token
  */
 export async function revokeToken(token: string): Promise<boolean> {

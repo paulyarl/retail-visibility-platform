@@ -392,12 +392,18 @@ export interface DirectoryEntryOptionsState {
   // Sourced attributes display — tier-gated availability + merchant-gated effective state
   attributesBadgeEnabled: boolean;
   attributesVisible: boolean;
+  // WhatsApp CTA — explicit key only (flexible does not grant); claimed listings only
+  canShowWhatsapp: boolean;
+  whatsappEnabled: boolean;
+  whatsappCtaNumber?: string | null;
   merchantPreferences: {
     directory_entry_opt_enabled: boolean;
     directory_entry_layout: DirectoryEntryLayoutKey;
     external_link_enabled?: boolean;
     snap_ebt_display?: boolean | null;
     attributes_display?: boolean | null;
+    whatsapp_display?: boolean | null;
+    whatsapp_number?: string | null;
   };
   features: Record<string, boolean>;
 }

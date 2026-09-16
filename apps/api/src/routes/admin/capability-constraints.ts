@@ -260,6 +260,8 @@ const CONSTRAINT_METADATA: ConstraintMetadata = {
         { field: 'can_show_qr', label: 'Can Show QR', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'can_show_social', label: 'Can Show Social', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'can_show_seo', label: 'Can Show SEO', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'whatsapp_enabled', label: 'WhatsApp Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_show_whatsapp', label: 'Can Show WhatsApp', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'is_flexible', label: 'Is Flexible', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
       ],
     },

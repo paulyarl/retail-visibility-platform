@@ -19,19 +19,13 @@ import { z } from 'zod';
 import BotConfigurationService from '../services/BotConfigurationService';
 import BotConversationService from '../services/BotConversationService';
 import BotStaticResponseService from '../services/BotStaticResponseService';
-import BotGuardrailService from '../services/BotGuardrailService';
-import BotIntentService from '../services/BotIntentService';
 import BotSkillService from '../services/BotSkillService';
-import BotCrmIntegrationService from '../services/BotCrmIntegrationService';
 import BotBusinessHoursService from '../services/BotBusinessHoursService';
-import BotDynamicResponseService from '../services/BotDynamicResponseService';
-import BotChannelSteeringService from '../services/BotChannelSteeringService';
-import BotBertGuardrailService from '../services/BotBertGuardrailService';
-import BotBertIntentService from '../services/BotBertIntentService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
 import BotCrmAssistantService from '../services/BotCrmAssistantService';
 import { StorefrontPolicyService } from '../services/StorefrontPolicyService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { preprocessTurn, completeTurn, persistUserTurn, persistAssistantTurn } from '../services/bot/BotTurnPipeline';
 import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
 import { logger } from '../logger';
 
@@ -39,16 +33,9 @@ const router = Router();
 const configService = BotConfigurationService.getInstance();
 const conversationService = BotConversationService.getInstance();
 const staticResponseService = BotStaticResponseService.getInstance();
-const guardrailService = BotGuardrailService.getInstance();
-const intentService = BotIntentService.getInstance();
 const skillService = BotSkillService.getInstance();
-const crmIntegrationService = BotCrmIntegrationService.getInstance();
 const businessHoursService = BotBusinessHoursService.getInstance();
-const dynamicResponseService = BotDynamicResponseService.getInstance();
-const channelSteeringService = BotChannelSteeringService.getInstance();
 const crmAssistantService = BotCrmAssistantService.getInstance();
-const bertGuardrailService = BotBertGuardrailService.getInstance();
-const bertIntentService = BotBertIntentService.getInstance();
 const productCatalogService = BotProductCatalogService.getInstance();
 
 // Rate limiting (in-memory, per session)
@@ -66,61 +53,6 @@ function checkRateLimit(sessionId: string): boolean {
   if (entry.count >= RATE_LIMIT_PER_MINUTE) return false;
   entry.count++;
   return true;
-}
-
-// Handshake layer — lightweight conversational responses for greetings, gratitude, farewells
-// Prevents these from falling through to the fallback/steering path unnecessarily.
-const GREETING_PATTERNS = [
-  /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening)|what'?s\s+up)\b/i,
-];
-const GRATITUDE_PATTERNS = [
-  /^(thanks|thank\s+you|thx|ty|appreciate\s+(it|that)|cheers)\b/i,
-];
-const FAREWELL_PATTERNS = [
-  /^(bye|goodbye|see\s+you|cya|later|take\s+care|have\s+a\s+(good|great|nice)\s+(day|one)|peace)\b/i,
-];
-
-function getHandshakeResponse(message: string, config: { botName: string; tone: string; greeting: string }): string | null {
-  const trimmed = message.trim();
-
-  for (const pattern of GREETING_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      const name = config.botName || 'Assistant';
-      if (config.tone === 'playful') {
-        return `Hey there! I'm ${name}. What can I help you with today?`;
-      }
-      if (config.tone === 'professional') {
-        return `Hello. I'm ${name}, your shopping assistant. How may I help you today?`;
-      }
-      return `Hi! I'm ${name}. How can I help you today?`;
-    }
-  }
-
-  for (const pattern of GRATITUDE_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      if (config.tone === 'playful') {
-        return `You're welcome! Anything else I can help with?`;
-      }
-      if (config.tone === 'professional') {
-        return `You're welcome. Is there anything else I can assist you with?`;
-      }
-      return `You're welcome! Is there anything else I can help you with?`;
-    }
-  }
-
-  for (const pattern of FAREWELL_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      if (config.tone === 'playful') {
-        return `Take care! Come back anytime.`;
-      }
-      if (config.tone === 'professional') {
-        return `Goodbye. Feel free to reach out whenever you need assistance.`;
-      }
-      return `Goodbye! Feel free to come back anytime you have questions.`;
-    }
-  }
-
-  return null;
 }
 
 // Validation schemas
@@ -214,6 +146,8 @@ router.post('/conversations', resolveEmbedKey, async (req, res) => {
 });
 
 // POST /api/public/bot/conversations/:sessionId/messages
+// Widget transport — thin HTTP wrapper over the shared BotTurnPipeline
+// (WHATSAPP_CHANNEL_INTEGRATION_SPEC §8.2). One brain, multiple transports.
 router.post('/conversations/:sessionId/messages', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -247,59 +181,44 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
     }
 
     const config = await configService.getOrCreate(tenantId);
-
     const { message } = validation.data;
 
-    // 1. Guardrail check — run BEFORE lazy conversation creation.
-    // If the first message is blocked and no conversation exists yet,
-    // return the block response without persisting anything.
-    // This prevents spam/abuse from creating conversation records.
-    const guardrailResult = await guardrailService.checkMessage(tenantId, message);
+    // Guardrail + user-turn persistence (owns the user message; persists the
+    // blocked turn only when a conversation already exists — spam never
+    // creates records).
+    const pre = await preprocessTurn({
+      tenantId,
+      conversation,
+      rawText: message,
+      fallbackMessage: config.fallbackMessage,
+    });
 
-    if (guardrailResult.action === 'block') {
-      const blockMessage = guardrailService.getBlockResponse(
-        guardrailResult.triggeredRules,
-        config.fallbackMessage
-      );
-
-      // Only persist blocked messages if the conversation already exists
-      // (audit trail for an active conversation). Skip persistence for
-      // first-message blocks to avoid spamming the conversation list.
+    if (pre.blockedReply !== undefined) {
       if (conversation) {
-        await conversationService.appendMessage({
-          conversationId: conversation.id,
-          role: 'user',
-          content: message,
-          guardrailResult: 'blocked',
-        });
-        const botMsg = await conversationService.appendMessage({
-          conversationId: conversation.id,
-          role: 'assistant',
-          content: blockMessage,
+        const botMsg = await persistAssistantTurn(conversation.id, {
           responseType: 'fallback',
           guardrailResult: 'blocked',
-        });
+        }, pre.blockedReply);
 
         return res.json({
           success: true,
-          reply: blockMessage,
+          reply: pre.blockedReply,
           responseType: 'fallback',
           guardrailResult: 'blocked',
           messageId: botMsg.id,
         });
       }
 
-      // No conversation exists — return block response without persisting
       return res.json({
         success: true,
-        reply: blockMessage,
+        reply: pre.blockedReply,
         responseType: 'fallback',
         guardrailResult: 'blocked',
         messageId: null,
       });
     }
 
-    // Message passed guardrails — now create the conversation if it doesn't exist yet
+    // Message passed guardrails — lazy conversation creation on first turn
     if (!conversation) {
       const caps = await resolveEffectiveCapabilities(tenantId);
       if (!caps || !caps.effective.chatbot.enabled) {
@@ -316,232 +235,74 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
         source: 'widget',
       });
       conversation = result.conversation;
+      await persistUserTurn(conversation.id, pre);
     }
 
-    // Store user message (possibly masked)
-    await conversationService.appendMessage({
-      conversationId: conversation.id,
-      role: 'user',
-      content: guardrailResult.modifiedMessage,
-      guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-    });
+    // Decide the turn, then persist the assistant reply
+    const turn = await completeTurn(conversation, pre, config);
+    const botMsg = await persistAssistantTurn(conversation.id, turn, turn.reply);
 
-    // 2. Intent detection
-    const intentResult = await intentService.detectIntent(guardrailResult.modifiedMessage);
-
-    // 3. Try skill execution if intent maps to a skill
-    if (intentResult.mappedSkill && intentResult.intent) {
-      const skillResult = await skillService.executeSkill(
-        conversation.tenantId,
-        intentResult.mappedSkill,
-        { message: guardrailResult.modifiedMessage, pageContext: conversation.pageContext || undefined }
-      );
-
-      if (skillResult.success) {
-        const botMsg = await conversationService.appendMessage({
-          conversationId: conversation.id,
-          role: 'assistant',
-          content: `Here's what I found:`,
-          intent: intentResult.intent,
-          confidence: intentResult.confidence,
-          responseType: 'skill',
-          skillName: intentResult.mappedSkill,
-          metadata: { skillCard: skillResult.cardSchema, skillData: skillResult.data },
-        });
-
+    switch (turn.kind) {
+      case 'skill':
         return res.json({
           success: true,
-          reply: `Here's what I found:`,
+          reply: turn.reply,
           responseType: 'skill',
           matchedFaqId: null,
-          skillCard: skillResult.cardSchema,
-          skillName: intentResult.mappedSkill,
-          guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+          skillCard: turn.skillCard,
+          skillName: turn.skillName,
+          guardrailResult: pre.guardrailPersist,
           messageId: botMsg.id,
         });
-      }
+
+      case 'handshake':
+        return res.json({
+          success: true,
+          reply: turn.reply,
+          responseType: 'handshake',
+          matchedFaqId: null,
+          guardrailResult: pre.guardrailPersist,
+          messageId: botMsg.id,
+        });
+
+      case 'bert_blocked':
+        // Response shape pinned by characterization tests: no messageId
+        return res.json({
+          success: true,
+          reply: turn.reply,
+          responseType: 'fallback',
+          guardrailResult: 'blocked',
+        });
+
+      case 'dynamic':
+        return res.json({
+          success: true,
+          reply: turn.reply,
+          responseType: turn.responseType,
+          matchedFaqId: turn.matchedFaqId ?? null,
+          guardrailResult: pre.guardrailPersist,
+          messageId: botMsg.id,
+          escalated: turn.escalated,
+          channels: turn.channels,
+        });
+
+      case 'capability_disabled':
+        // Unreachable for the widget (enforceChatbotEnabled is not set) —
+        // kept for completeness so the switch is exhaustive.
+        return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
+
+      default: // 'static'
+        return res.json({
+          success: true,
+          reply: turn.reply,
+          responseType: turn.responseType,
+          matchedFaqId: turn.matchedFaqId ?? null,
+          guardrailResult: pre.guardrailPersist,
+          messageId: botMsg.id,
+          escalated: turn.escalated,
+          channels: turn.channels,
+        });
     }
-
-    // 3.5. Handshake layer — catch greetings, gratitude, farewells before fallback
-    const handshakeReply = getHandshakeResponse(guardrailResult.modifiedMessage, config);
-    if (handshakeReply) {
-      const botMsg = await conversationService.appendMessage({
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: handshakeReply,
-        intent: 'handshake',
-        confidence: 1,
-        responseType: 'handshake',
-        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-      });
-
-      return res.json({
-        success: true,
-        reply: handshakeReply,
-        responseType: 'handshake',
-        matchedFaqId: null,
-        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-        messageId: botMsg.id,
-      });
-    }
-
-    // 4. Tier Router: dynamic (GPT + RAG) vs static (FAQ keyword match)
-    const caps = await resolveEffectiveCapabilities(conversation.tenantId);
-    const platformAiEnabled = await dynamicResponseService.isPlatformAiEnabled();
-    const useDynamic = caps?.effective.chatbot.dynamic_enabled && dynamicResponseService.isAvailable() && platformAiEnabled;
-
-    if (useDynamic) {
-      // BERT-enhanced guardrail check (in addition to rule-based)
-      if (bertGuardrailService.isAvailable()) {
-        const bertResult = await bertGuardrailService.isToxic(guardrailResult.modifiedMessage);
-        if (bertResult.toxic) {
-          const blockMessage = config.fallbackMessage;
-          await conversationService.appendMessage({
-            conversationId: conversation.id,
-            role: 'assistant',
-            content: blockMessage,
-            responseType: 'fallback',
-            guardrailResult: 'blocked',
-            metadata: { bert_toxicity_score: bertResult.score },
-          });
-          return res.json({
-            success: true,
-            reply: blockMessage,
-            responseType: 'fallback',
-            guardrailResult: 'blocked',
-          });
-        }
-      }
-
-      // BERT-enhanced intent detection (falls back to keyword if unavailable)
-      let dynamicIntent = intentResult.intent;
-      let dynamicConfidence = intentResult.confidence;
-      if (bertIntentService.isAvailable()) {
-        const bertIntent = await bertIntentService.classify(guardrailResult.modifiedMessage);
-        if (bertIntent.confidence > 0.5) {
-          dynamicIntent = bertIntent.intent;
-          dynamicConfidence = bertIntent.confidence;
-        }
-      }
-
-      const dynamicResult = await dynamicResponseService.generateResponse(
-        conversation.tenantId,
-        conversation.id,
-        guardrailResult.modifiedMessage,
-        config,
-        conversation.pageContext
-      );
-
-      const botMsg = await conversationService.appendMessage({
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: dynamicResult.reply,
-        intent: dynamicIntent || undefined,
-        confidence: dynamicConfidence,
-        matchedFaqId: dynamicResult.matchedFaqId || undefined,
-        responseType: dynamicResult.responseType,
-        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-        metadata: { ragChunksUsed: dynamicResult.ragChunksUsed },
-      });
-
-      // Escalation: if bot couldn't answer (fallback or channel_steering) and escalation enabled
-      let escalated = false;
-      if ((dynamicResult.responseType === 'fallback' || dynamicResult.responseType === 'channel_steering') && config.escalationEnabled) {
-        try {
-          const alreadyEscalated = await crmIntegrationService.isEscalated(conversation.id);
-          if (!alreadyEscalated) {
-            await crmIntegrationService.escalateToTicket({
-              tenantId: conversation.tenantId,
-              conversationId: conversation.id,
-              sessionId: conversation.sessionId,
-              customerEmail: conversation.customerEmail,
-              customerPhone: conversation.customerPhone,
-              reason: 'Bot could not answer customer question',
-              summary: `Customer asked: "${message}" — bot steered the customer to available support channels.`,
-            });
-            escalated = true;
-          }
-        } catch (escalationError) {
-          logger.error('[BotPublic] Escalation failed:', undefined, { error: { name: (escalationError as any)?.name || 'Error', message: (escalationError as any)?.message || String(escalationError), stack: (escalationError as any)?.stack } });
-        }
-      }
-
-      return res.json({
-        success: true,
-        reply: dynamicResult.reply,
-        responseType: dynamicResult.responseType,
-        matchedFaqId: dynamicResult.matchedFaqId,
-        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-        messageId: botMsg.id,
-        escalated,
-        channels: dynamicResult.channels,
-      });
-    }
-
-    // 4b. Static FAQ response (free tier or dynamic unavailable)
-    const staticResult = await staticResponseService.findResponse(
-      conversation.tenantId,
-      guardrailResult.modifiedMessage,
-      conversation.pageContext || undefined
-    );
-
-    let finalReply = staticResult.reply;
-    let finalResponseType: string = staticResult.responseType;
-    let finalChannels: any[] | undefined;
-
-    // If static FAQ has no match, steer to available human channels instead of
-    // repeating a static fallback message.
-    if (staticResult.responseType === 'fallback') {
-      const steering = await channelSteeringService.steer(conversation.tenantId, config.botName);
-      finalReply = steering.reply;
-      finalResponseType = 'channel_steering';
-      finalChannels = steering.channels;
-    }
-
-    const botMsg = await conversationService.appendMessage({
-      conversationId: conversation.id,
-      role: 'assistant',
-      content: finalReply,
-      intent: intentResult.intent || undefined,
-      confidence: intentResult.confidence,
-      matchedFaqId: staticResult.matchedFaqId || undefined,
-      responseType: finalResponseType,
-      guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-      metadata: finalChannels ? { channels: finalChannels } : undefined,
-    });
-
-    // 5. Escalation: if fallback and escalation enabled, create CRM ticket
-    let escalated = false;
-    if (staticResult.responseType === 'fallback' && config.escalationEnabled) {
-      try {
-        const alreadyEscalated = await crmIntegrationService.isEscalated(conversation.id);
-        if (!alreadyEscalated) {
-          await crmIntegrationService.escalateToTicket({
-            tenantId: conversation.tenantId,
-            conversationId: conversation.id,
-            sessionId: conversation.sessionId,
-            customerEmail: conversation.customerEmail,
-            customerPhone: conversation.customerPhone,
-            reason: 'Bot could not answer customer question',
-            summary: `Customer asked: "${message}" — bot steered the customer to available support channels.`,
-          });
-          escalated = true;
-        }
-      } catch (escalationError) {
-        logger.error('[BotPublic] Escalation failed:', undefined, { error: { name: (escalationError as any)?.name || 'Error', message: (escalationError as any)?.message || String(escalationError), stack: (escalationError as any)?.stack } });
-      }
-    }
-
-    res.json({
-      success: true,
-      reply: finalReply,
-      responseType: finalResponseType,
-      matchedFaqId: staticResult.matchedFaqId,
-      guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
-      messageId: botMsg.id,
-      escalated,
-      channels: finalChannels,
-    });
   } catch (error) {
     logger.error('Error processing message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to process message' });

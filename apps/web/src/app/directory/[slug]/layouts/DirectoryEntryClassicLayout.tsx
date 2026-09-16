@@ -12,6 +12,7 @@ import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import AttributeChips from '@/components/directory/AttributeChips';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
+import WhatsAppCtaButton from '@/components/directory/WhatsAppCtaButton';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
@@ -67,6 +68,9 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
   const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
   const canShowSocial = directoryEntryOptions?.socialEnabled ?? true;
   const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
+  const whatsappCtaNumber = (directoryEntryOptions?.canShowWhatsapp ?? false)
+    ? (directoryEntryOptions?.whatsappCtaNumber ?? null)
+    : null;
 
   // Sourced attribute chips — tier-gated + merchant-gated; each attribute carries
   // its own evidence (source platform + URL + as_of date). SNAP/EBT keeps its own
@@ -399,11 +403,15 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
             </div>
 
             {/* Right Column */}
-            {!showStatusPanel && canShowContact && (
+            {!showStatusPanel && (canShowContact || whatsappCtaNumber) && (
               <div className="space-y-6">
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
-                  <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} />
+                  {canShowContact ? (
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                  ) : (
+                    whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
+                  )}
                   <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
                   {/* Social Links */}
                   {canShowSocial && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (

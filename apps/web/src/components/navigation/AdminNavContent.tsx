@@ -311,6 +311,7 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Intents',    href: '/settings/admin/bot/intents' },
       { label: 'Skills',     href: '/settings/admin/bot/skills' },
       { label: 'Knowledge',  href: '/settings/admin/bot/knowledge' },
+      { label: 'Channels',   href: '/settings/admin/bot/channels' },
       { label: 'Tenants',    href: '/settings/admin/bot/tenants' },
     ],
   },

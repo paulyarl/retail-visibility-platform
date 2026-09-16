@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/bot/intents', label: 'Intents', emoji: '🎯' },
   { href: '/settings/admin/bot/skills', label: 'Skills', emoji: '⚡' },
   { href: '/settings/admin/bot/knowledge', label: 'Knowledge', emoji: '📚' },
+  { href: '/settings/admin/bot/channels', label: 'Channels', emoji: '💬' },
   { href: '/settings/admin/bot/tenants', label: 'Tenants', emoji: '🏢' },
 ] as const;
 

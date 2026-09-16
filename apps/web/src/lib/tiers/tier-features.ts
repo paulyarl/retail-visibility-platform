@@ -15,6 +15,7 @@ export const TIER_FEATURES = {
     'directory_entry_map_on',
     'directory_entry_contact_on',
     'directory_entry_qr_on',
+    'directory_entry_whatsapp_on',
     'storefront_enabled',
     'storefront_retail',
     'directory_visibility_snap_ebt',
@@ -34,6 +35,7 @@ export const TIER_FEATURES = {
     'directory_entry_map_on',
     'directory_entry_contact_on',
     'directory_entry_qr_on',
+    'directory_entry_whatsapp_on',
     'storefront_enabled',
     'storefront_retail',
   ],
@@ -358,6 +360,10 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'directory_promotion_level_featured': 'Promotion: Featured',
   'directory_promotion_flexible': 'Directory Promotion Flexible',
   'directory_promotion_enabled': 'Directory Promotion Enabled',
+
+  // Directory Entry WhatsApp CTA
+  'directory_entry_whatsapp_on': 'WhatsApp Chat Button',
+  'directory_entry_whatsapp_enabled': 'WhatsApp Chat Button',
 };
 
 // Tier pricing (monthly)
