@@ -28,7 +28,7 @@ Use this skill when asked to add, edit, deprecate, or reason about catalog entri
 
 `scope_platform` is independent: a platform-bound reason (mechanics that only exist on one platform) carries it; platform-agnostic reasons leave it NULL.
 
-**Default to universal.** Location scope is a deliberate exception (spec §11.1) — scope a reason to a city only when the blind spot is genuinely market-specific. Scope *promotion* (widening a scoped reason to universal) is an SOP judgement call, never automated: it's a one-row `UPDATE` nulling the scope columns, which bumps the revision.
+**Default to universal.** Location scope is a deliberate exception (spec §11.1) — scope a reason to a city only when the blind spot is genuinely market-specific. Scope *promotion* (widening a scoped reason to universal) is an SOP judgement call, never automated. Mechanically it's `PUT /bronze-reasons/:reasonKey` with explicit nulls (`{"scope_city": null, "scope_state": null, "scope_category_key": null}`) — the update schema's scope fields are `.nullable()`, the service normalizes the merged result, and the write bumps `revised_in_revision` + audits like any edit.
 
 ## Ways to add a reason
 
@@ -76,7 +76,7 @@ await BronzeReasonCatalogService.getInstance().createReason('delivery_app_only',
 }, ctx);
 ```
 
-`ctx` is `RequestCtx` from `apps/api/src/context.ts`. `createReason` runs `findUnique` for the 409 check, then INSERT + revision bump + `introduced_in_revision` stamp + `audit()` in one transaction.
+`ctx` is `RequestCtx` from `apps/api/src/context.ts`. `createReason` runs the `findUnique` 409 check + INSERT + revision bump + `introduced_in_revision` stamp inside one `$transaction`; `audit()` is emitted after the transaction commits (`actorType: 'user'`).
 
 ### 3. Raw SQL (migrations / seeds only)
 

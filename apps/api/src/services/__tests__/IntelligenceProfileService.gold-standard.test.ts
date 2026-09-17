@@ -591,9 +591,13 @@ describe('IntelligenceProfileService — Gold Standard methods (Sprint 0)', () =
       expect(block).toContain('per-platform');
       expect(block).toContain('gold_standard_match');
       expect(block).toContain('gold_standard_gate_results');
-      // Relative-top directive: gates are informational, not a filter
+      // Relative-top directive: gates are informational, not a filter. The
+      // pre-c899a74e "TOP candidates per platform" literal was removed when
+      // the directive was rewritten — the rating is now explicitly
+      // informational and the surrounding focus controls selection.
       expect(block).toContain('does NOT filter gold_standard_match');
-      expect(block).toContain('TOP candidates per platform');
+      expect(block).toContain('This evaluation is informational');
+      expect(block).toContain('The surrounding focus controls selection');
     });
 
     it('directive instructs platform_analysis aggregation and outreach recommendation', () => {
