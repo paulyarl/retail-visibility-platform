@@ -82,6 +82,11 @@ export interface StoreCardProps {
   stats?: StoreStats | null;
   statsLoading?: boolean;
   className?: string;
+  /** Shelf→entry attribution — the shelf this card is rendered on
+   *  (e.g. `place/category/indian-grocery`, `directory/location/madison-wi`).
+   *  Appended as `?shelf=` to internal entry links so the entry view can be
+   *  attributed back to its referring shelf. Ignored for external links. */
+  shelfRef?: string;
 }
 
 // ==================== STORE CARD COMPONENT ====================
@@ -95,7 +100,8 @@ export function StoreCard({
   maxCategories = 3,
   stats,
   statsLoading = false,
-  className = ''
+  className = '',
+  shelfRef,
 }: StoreCardProps) {
   // Get business hours status
   const { status: hoursStatus } = useStoreStatus(store.tenantId, true);
@@ -117,6 +123,15 @@ export function StoreCard({
   const linkHref = linkType === LinkType.Storefront
     ? `/shops/${store.slug || store.tenantId}`
     : getDirectoryListingUrl(store);
+
+  // Shelf→entry attribution — stamp the referring shelf onto internal entry
+  // links (Storefront links are a different surface and are left alone).
+  const entryHref = shelfRef && linkType !== LinkType.Storefront
+    ? `${linkHref}${linkHref.includes('?') ? '&' : '?'}shelf=${encodeURIComponent(shelfRef)}`
+    : linkHref;
+
+  const withQuery = (href: string, qs: string) =>
+    `${href}${href.includes('?') ? '&' : '?'}${qs}`;
 
   // console.log(`linkType: ${linkType}`);
   // console.log(`linkHref: ${linkHref}`);
@@ -214,7 +229,7 @@ export function StoreCard({
         <div className="p-6">
           <div className="mb-4">
             <Link
-              href={linkHref}
+              href={entryHref}
               className="text-lg font-semibold text-neutral-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <span>{store.name}</span>
@@ -305,7 +320,7 @@ export function StoreCard({
                 {displayCategories.map((category) => (
                   <Link
                     key={category.id}
-                    href={`${linkHref}?category=${category.slug}`}
+                    href={withQuery(entryHref, `category=${category.slug}`)}
                     className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                   >
                     {category.name}
@@ -316,7 +331,7 @@ export function StoreCard({
                 ))}
                 {remainingCategories > 0 && (
                   <Link
-                    href={`${linkHref}?featured=false`}
+                    href={withQuery(entryHref, 'featured=false')}
                     className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                   >
                     +{remainingCategories} more
@@ -328,7 +343,7 @@ export function StoreCard({
 
           {/* Action Button */}
           <Link
-            href={linkHref}
+            href={entryHref}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
           >
             Visit Store
@@ -342,7 +357,7 @@ export function StoreCard({
   // ==================== LIST VIEW ====================
   if (viewMode === 'list') {
     return (
-      <Link href={linkHref} className={`block ${className}`}>
+      <Link href={entryHref} className={`block ${className}`}>
         <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 hover:shadow-md transition-shadow">
           <div className="flex items-start space-x-4">
             {/* Logo */}
@@ -545,7 +560,7 @@ export function StoreCard({
 
         {/* Action Button */}
         <Link
-          href={linkHref}
+          href={entryHref}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
         >
           Visit Store

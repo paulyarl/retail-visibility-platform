@@ -6,6 +6,12 @@
  *   GET  /api/public/directory/places               — categories with published presence listings
  *   GET  /api/public/directory/places/:categorySlug — published presence listings by category
  *   GET  /api/public/directory/places/:categorySlug/:city — filter by city within category
+ *   POST /api/public/directory/places/:slug/events       — track one engagement event (Layer 3)
+ *   POST /api/public/directory/places/:slug/events/batch — track up to 50 events (Layer 3)
+ *
+ * The Layer 3 event routes serve both entry surfaces (unclaimed seeds at
+ * /place/[slug] and claimed tenants at /directory/[slug]) — the slug is the
+ * trust boundary; only published listings resolve.
  *
  * The GET claim is fully public so a business owner can see what listing they'd be
  * claiming before authenticating. The POST requires authentication (customer
@@ -30,9 +36,146 @@ import { validateAttachment } from '../validators/recovery-intake.schema';
 import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
 import CategoryMarketEnrichmentService from '../services/CategoryMarketEnrichmentService';
 import LocationMarketEnrichmentService from '../services/LocationMarketEnrichmentService';
+import directoryPresenceAnalyticsService, {
+  checkDirectoryPresenceRateLimit,
+} from '../services/DirectoryPresenceAnalyticsService';
 import crypto from 'crypto';
 
 const router = Router();
+
+// ─── Layer 3 — engagement event capture (public, slug-gated) ─────────────
+// Mirrors the gallery public event routes: slug-gated, rate-limited,
+// fire-and-forget. The slug is the trust boundary (only published seed or
+// claimed listings resolve), so no auth is required.
+
+const directoryPresenceEventSchema = z.object({
+  sessionId: z.string().max(100).optional(),
+  eventType: z.enum([
+    'listing_viewed',
+    'claim_clicked',
+    'call_clicked',
+    'directions_clicked',
+    'storefront_clicked',
+    'qr_scanned',
+    'session_heartbeat',
+    'session_end',
+  ]),
+  dwellMs: z.number().int().min(0).max(24 * 60 * 60 * 1000).optional(),
+  referrer: z.string().max(500).optional(),
+});
+
+const directoryPresenceEventBatchSchema = z.object({
+  events: z.array(directoryPresenceEventSchema).min(1).max(50),
+});
+
+/**
+ * Resolve a published directory entry by slug. Accepts BOTH entry surfaces:
+ * unclaimed seeds (`listing_origin='directory_seed'`, served at /place/[slug])
+ * and claimed tenants (`listing_origin='claimed'`, served at /directory/[slug]).
+ * Returns null for unknown / unpublished slugs.
+ */
+async function resolveEntryListingBySlug(slug: string) {
+  if (!slug || typeof slug !== 'string') return null;
+  return prisma.directory_listings_list.findFirst({
+    where: {
+      slug,
+      is_published: true,
+      listing_origin: { in: ['directory_seed', 'claimed'] },
+    },
+    select: { id: true, tenant_id: true, slug: true },
+  });
+}
+
+/**
+ * POST /api/public/directory/places/:slug/events
+ *
+ * Track a single engagement event. Public, slug-gated — no auth required.
+ * Rate limited 60/min per IP. Always returns 200 on a resolved slug
+ * (fire-and-forget) — mirrors the gallery route.
+ */
+router.post('/places/:slug/events', async (req: Request, res: Response) => {
+  try {
+    const parsed = directoryPresenceEventSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
+    }
+
+    const listing = await resolveEntryListingBySlug(req.params.slug);
+    if (!listing) {
+      return res.status(404).json({ success: false, error: 'listing_not_found' });
+    }
+
+    directoryPresenceAnalyticsService.trackEvent({
+      tenantId: listing.tenant_id,
+      listingId: listing.id,
+      slug: listing.slug ?? req.params.slug,
+      sessionId: parsed.data.sessionId,
+      eventType: parsed.data.eventType,
+      dwellMs: parsed.data.dwellMs,
+      referrer: parsed.data.referrer,
+      userAgent: req.headers['user-agent'],
+      ip,
+    }).catch(() => { /* fire-and-forget — errors logged in service */ });
+
+    return res.status(200).json({ success: true, tracked: true });
+  } catch (error: any) {
+    logger.error('[POST /api/public/directory/places/:slug/events] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    return res.status(200).json({ success: true, tracked: false });
+  }
+});
+
+/**
+ * POST /api/public/directory/places/:slug/events/batch
+ *
+ * Track up to 50 engagement events in one call (used by the sendBeacon
+ * session_end path). Public, slug-gated, rate limited, fire-and-forget.
+ */
+router.post('/places/:slug/events/batch', async (req: Request, res: Response) => {
+  try {
+    const parsed = directoryPresenceEventBatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
+    }
+
+    const listing = await resolveEntryListingBySlug(req.params.slug);
+    if (!listing) {
+      return res.status(404).json({ success: false, error: 'listing_not_found' });
+    }
+
+    const inputs = parsed.data.events.map((e) => ({
+      tenantId: listing.tenant_id,
+      listingId: listing.id,
+      slug: listing.slug ?? req.params.slug,
+      sessionId: e.sessionId,
+      eventType: e.eventType,
+      dwellMs: e.dwellMs,
+      referrer: e.referrer,
+      userAgent: req.headers['user-agent'],
+      ip,
+    }));
+
+    directoryPresenceAnalyticsService.trackEvents(inputs).catch(() => { /* fire-and-forget */ });
+
+    return res.status(200).json({ success: true, tracked: inputs.length });
+  } catch (error: any) {
+    logger.error('[POST /api/public/directory/places/:slug/events/batch] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    return res.status(200).json({ success: true, tracked: 0 });
+  }
+});
 
 /** GET /api/public/directory/claim/:token — public token summary */
 router.get('/claim/:token', async (req: Request, res: Response) => {

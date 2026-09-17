@@ -14,6 +14,7 @@ import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   type DirectoryTrafficDashboard,
+  type DirectoryEngagementDashboard,
   type SeedTrafficDetail,
   type SeedTrafficSummary,
 } from '@/services/DirectoryPresenceAdminService';
@@ -31,6 +32,11 @@ import {
   Tablet,
   HelpCircle,
   Link2,
+  MousePointerClick,
+  Phone,
+  Navigation,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +53,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function DirectoryTrafficPage() {
   const [dashboard, setDashboard] = useState<DirectoryTrafficDashboard | null>(null);
+  const [engagement, setEngagement] = useState<DirectoryEngagementDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -56,7 +63,7 @@ export default function DirectoryTrafficPage() {
     state: '',
     status: '',
     seedBatch: '',
-    surface: '' as '' | 'directory_seed' | 'directory_claimed',
+    surface: '' as '' | 'place' | 'directory',
   });
 
   const [selectedSeed, setSelectedSeed] = useState<SeedTrafficSummary | null>(null);
@@ -73,17 +80,22 @@ export default function DirectoryTrafficPage() {
       if (filters.state.trim()) cleanFilters.state = filters.state.trim();
       if (filters.status) cleanFilters.status = filters.status;
       if (filters.seedBatch.trim()) cleanFilters.seedBatch = filters.seedBatch.trim();
-      const data = await directoryPresenceAdminService.getTrafficDashboard({
-        daysBack: filters.daysBack,
-        surface: filters.surface || undefined,
-        ...cleanFilters,
-      });
+      const [data, eng] = await Promise.all([
+        directoryPresenceAdminService.getTrafficDashboard({
+          daysBack: filters.daysBack,
+          surface: filters.surface || undefined,
+          ...cleanFilters,
+        }),
+        directoryPresenceAdminService.getEngagementDashboard(filters.daysBack),
+      ]);
       if (!data) {
         setError('Failed to load directory traffic.');
         setDashboard(null);
+        setEngagement(null);
         return;
       }
       setDashboard(data);
+      setEngagement(eng);
     } catch {
       setError('Failed to load directory traffic.');
     } finally {
@@ -124,6 +136,10 @@ export default function DirectoryTrafficPage() {
     totals && totals.seedsWithTraffic > 0
       ? Math.round((totals.views / totals.seedsWithTraffic) * 10) / 10
       : 0;
+
+  // Layer 3 — claim clicks per seed, for the claim-CTR column.
+  const claimStatsBySeed = new Map<string, { claimClicks: number; views: number }>();
+  engagement?.topSeeds.forEach((s) => claimStatsBySeed.set(s.seedId, { claimClicks: s.claimClicks, views: s.views }));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -202,14 +218,14 @@ export default function DirectoryTrafficPage() {
               onChange={(e) =>
                 setFilters({
                   ...filters,
-                  surface: e.target.value as '' | 'directory_seed' | 'directory_claimed',
+                  surface: e.target.value as '' | 'place' | 'directory',
                 })
               }
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="">All surfaces</option>
-              <option value="directory_seed">Seed (/place)</option>
-              <option value="directory_claimed">Claimed (/directory)</option>
+              <option value="place">Place (/place)</option>
+              <option value="directory">Directory (/directory)</option>
             </select>
           </div>
           <div>
@@ -292,6 +308,42 @@ export default function DirectoryTrafficPage() {
         />
       </div>
 
+      {/* Layer 3 engagement cards */}
+      {engagement && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <StatCard
+            icon={<MousePointerClick className="w-5 h-5 text-purple-600" />}
+            tint="bg-purple-100 dark:bg-purple-900/30"
+            label={`Claim clicks · ${filters.daysBack}d`}
+            value={engagement.totals.claimClicks.toLocaleString()}
+          />
+          <StatCard
+            icon={<ExternalLink className="w-5 h-5 text-indigo-600" />}
+            tint="bg-indigo-100 dark:bg-indigo-900/30"
+            label="Storefront clicks"
+            value={engagement.totals.storefrontClicks.toLocaleString()}
+          />
+          <StatCard
+            icon={<Phone className="w-5 h-5 text-green-600" />}
+            tint="bg-green-100 dark:bg-green-900/30"
+            label="Call clicks"
+            value={engagement.totals.callClicks.toLocaleString()}
+          />
+          <StatCard
+            icon={<Navigation className="w-5 h-5 text-cyan-600" />}
+            tint="bg-cyan-100 dark:bg-cyan-900/30"
+            label="Directions clicks"
+            value={engagement.totals.directionsClicks.toLocaleString()}
+          />
+          <StatCard
+            icon={<Clock className="w-5 h-5 text-amber-600" />}
+            tint="bg-amber-100 dark:bg-amber-900/30"
+            label="Avg session dwell"
+            value={`${(engagement.totals.avgDwellMs / 1000).toFixed(1)}s`}
+          />
+        </div>
+      )}
+
       {/* Top seeds */}
       <section className="mb-8 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -327,12 +379,15 @@ export default function DirectoryTrafficPage() {
                   <th className="py-2 px-4 font-medium text-right">Views</th>
                   <th className="py-2 px-4 font-medium text-right">7d</th>
                   <th className="py-2 px-4 font-medium text-right">Unique</th>
+                  <th className="py-2 px-4 font-medium text-right">Claim CTR</th>
                   <th className="py-2 px-4" />
                 </tr>
               </thead>
               <tbody>
                 {dashboard.topSeeds.map((seed, index) => {
                   const isSelected = selectedSeed?.seedId === seed.seedId;
+                  const cs = claimStatsBySeed.get(seed.seedId);
+                  const ctr = cs && cs.views > 0 ? Math.round((cs.claimClicks / cs.views) * 100) : null;
                   return (
                     <tr
                       key={seed.seedId}
@@ -371,6 +426,9 @@ export default function DirectoryTrafficPage() {
                       </td>
                       <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
                         {seed.uniqueSessions.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                        {ctr != null ? `${ctr}%` : '—'}
                       </td>
                       <td className="py-2 px-4 text-right">
                         <button
@@ -500,6 +558,36 @@ export default function DirectoryTrafficPage() {
         </section>
       )}
 
+      {/* Aggregate claim funnel (Layer 3) */}
+      {engagement && (
+        <section className="mb-8 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Aggregate Claim Funnel</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            All seeds · last {filters.daysBack} days — listing viewed → claim clicked → claim accepted.
+            This is the on-page CTA conversion; for invite/QR-driven cohort conversion see{' '}
+            <Link href="/settings/admin/directory/funnel" className="text-blue-600 hover:underline">
+              Seed Funnel
+            </Link>
+            .
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <FunnelStage label="Views" value={engagement.funnel.views} />
+            <FunnelStage
+              label="Claim clicks"
+              value={engagement.funnel.claimClicks}
+              rate={engagement.funnel.viewToClickRate}
+              rateLabel="of views"
+            />
+            <FunnelStage
+              label="Claims accepted"
+              value={engagement.funnel.claimsAccepted}
+              rate={engagement.funnel.clickToAcceptRate}
+              rateLabel="of clicks"
+            />
+          </div>
+        </section>
+      )}
+
       {/* Category breakdown + surface split + all-seeds trend */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
@@ -531,7 +619,7 @@ export default function DirectoryTrafficPage() {
         <section className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Traffic by Surface</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Seed (/place) vs claimed (/directory). Events recorded before migration 292 appear as untagged.
+            Place (/place) vs Directory (/directory). Events recorded before migration 294 appear as untagged.
           </p>
           {!dashboard || dashboard.surfaceBreakdown.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">No surface data for the current filters.</p>
@@ -568,6 +656,96 @@ export default function DirectoryTrafficPage() {
           )}
         </section>
       </div>
+
+      {/* Shelf surfaces (category / location / home) — browse pages that are not
+          entry pages. Entry filters do not apply (see service note). */}
+      <section className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-indigo-600" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Shelf Traffic</h2>
+          </div>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            category · location · home browse pages · entry filters do not apply
+          </span>
+        </div>
+        {!dashboard || dashboard.shelves.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No shelf browse events in this window. Category and location shelf views are captured
+              by CategoryBrowseTracker / LocationBrowseTracker.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                  <th className="py-2 px-4 font-medium">Shelf</th>
+                  <th className="py-2 px-4 font-medium">Type</th>
+                  <th className="py-2 px-4 font-medium">Surface</th>
+                  <th className="py-2 px-4 font-medium text-right">Views</th>
+                  <th className="py-2 px-4 font-medium text-right">Unique</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.shelves.map((s, i) => (
+                  <tr
+                    key={`${s.pageType}-${s.entityId}-${i}`}
+                    className="border-b border-gray-100 dark:border-gray-700/60 last:border-0"
+                  >
+                    <td className="py-2 px-4 text-gray-900 dark:text-white">{s.label}</td>
+                    <td className="py-2 px-4 text-gray-600 dark:text-gray-300">{shelfTypeLabel(s.pageType)}</td>
+                    <td className="py-2 px-4 text-gray-600 dark:text-gray-300">
+                      {s.surface ? surfaceLabel(s.surface) : '—'}
+                    </td>
+                    <td className="py-2 px-4 text-right font-medium text-gray-900 dark:text-white">
+                      {s.views.toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {s.uniqueSessions.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Shelf→entry attribution */}
+      <section className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Referring Shelves</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Entry views attributed to the shelf the shopper came from, via the{' '}
+          <code className="text-[11px]">?shelf=</code> link parameter. Only shelf→entry navigation
+          captured after this feature shipped is attributed.
+        </p>
+        {!dashboard || dashboard.shelfReferrals.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No attributed entry views in this window yet.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {dashboard.shelfReferrals.map((row) => (
+              <li key={row.shelf}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-gray-700 dark:text-gray-200">{row.shelf}</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-xs">
+                    {row.views.toLocaleString()} views · {row.uniqueSessions.toLocaleString()} sessions
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-violet-500"
+                    style={{ width: `${barWidth(row.views, dashboard.shelfReferrals[0]?.views)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
@@ -592,8 +770,31 @@ function StatCard({
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: number }) {
+function FunnelStage({
+  label,
+  value,
+  rate,
+  rateLabel,
+}: {
+  label: string;
+  value: number;
+  rate?: number | null;
+  rateLabel?: string;
+}) {
   return (
+    <div className="bg-gray-50 dark:bg-neutral-800/60 rounded-lg p-4 text-center">
+      <div className="text-2xl font-bold text-gray-900 dark:text-white">{value.toLocaleString()}</div>
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</div>
+      {rate != null && (
+        <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+          {Math.round(rate * 100)}% {rateLabel}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: number }) {  return (
     <div className="bg-gray-50 dark:bg-neutral-800/60 rounded-lg p-3">
       <div className="text-lg font-semibold text-gray-900 dark:text-white">{value.toLocaleString()}</div>
       <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{label}</div>
@@ -601,8 +802,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function TimeseriesBars({ points }: { points: Array<{ day: string; views: number; uniqueSessions: number }> }) {
-  const max = Math.max(...points.map((p) => p.views), 1);
+function TimeseriesBars({ points }: { points: Array<{ day: string; views: number; uniqueSessions: number }> }) {  const max = Math.max(...points.map((p) => p.views), 1);
   return (
     <div>
       <div className="flex items-end gap-1 h-32 overflow-x-auto pb-1">
@@ -630,9 +830,17 @@ function barWidth(value: number, max?: number): string {
 }
 
 function surfaceLabel(surface: string): string {
-  if (surface === 'directory_seed') return 'Seed (/place)';
-  if (surface === 'directory_claimed') return 'Claimed (/directory)';
+  if (surface === 'place') return 'Place (/place)';
+  if (surface === 'directory') return 'Directory (/directory)';
   return 'Untagged';
+}
+
+function shelfTypeLabel(pageType: string): string {
+  if (pageType === 'directory_category') return 'Category';
+  if (pageType === 'directory_location') return 'Location';
+  if (pageType === 'directory_store_type') return 'Store type';
+  if (pageType === 'directory_home') return 'Home';
+  return pageType;
 }
 
 function deviceIcon(deviceType: string) {

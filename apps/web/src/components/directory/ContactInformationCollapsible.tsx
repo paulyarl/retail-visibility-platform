@@ -18,12 +18,14 @@ interface ContactInformationCollapsibleProps {
   isRetailStore?: boolean;
   showMap?: boolean;
   whatsappCtaNumber?: string | null;
+  /** Optional click hook for engagement tracking (e.g. Layer 3 call_clicked). */
+  onPhoneClick?: () => void;
 
 }
 
 
 export default function ContactInformationCollapsible({
-  tenant, fullAddress, initialExpanded = false, isRetailStore = true, showMap = true, whatsappCtaNumber = null
+  tenant, fullAddress, initialExpanded = false, isRetailStore = true, showMap = true, whatsappCtaNumber = null, onPhoneClick
 }: ContactInformationCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   // console.log(`[ContactInformationCollapsible] tenant:`, tenant);
@@ -76,7 +78,7 @@ export default function ContactInformationCollapsible({
           {tenant?.phone && (
             <div className="flex items-center gap-2 mb-3">
               <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
-              <a href={`tel:${tenant.phone}`} className="text-sm text-blue-600 hover:text-blue-700">
+              <a href={`tel:${tenant.phone}`} onClick={onPhoneClick} className="text-sm text-blue-600 hover:text-blue-700">
                 {tenant.phone}
               </a>
             </div>

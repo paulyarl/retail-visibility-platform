@@ -253,6 +253,7 @@ export default function PlaceCategoryClient({
                 key={place.id}
                 place={place}
                 categoryName={categoryName}
+                shelfRef={`place/category/${categorySlug}`}
               />
             ))}
           </div>
@@ -417,9 +418,11 @@ export default function PlaceCategoryClient({
 function PlaceCard({
   place,
   categoryName,
+  shelfRef,
 }: {
   place: PlaceListing;
   categoryName: string;
+  shelfRef: string;
 }) {
   const fullAddress = [place.address, place.city, place.state, place.zipCode]
     .filter(Boolean)
@@ -448,7 +451,7 @@ function PlaceCard({
       <div className="p-5">
         <div className="flex items-start justify-between gap-2 mb-2">
           <Link
-            href={`/place/${place.slug}`}
+            href={`/place/${place.slug}?shelf=${encodeURIComponent(shelfRef)}`}
             className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 hover:text-blue-600 dark:hover:text-blue-400"
           >
             {place.businessName}
@@ -496,7 +499,7 @@ function PlaceCard({
         {/* Actions */}
         <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-700 flex items-center justify-between">
           <Link
-            href={`/place/${place.slug}`}
+            href={`/place/${place.slug}?shelf=${encodeURIComponent(shelfRef)}`}
             className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 inline-flex items-center"
           >
             View details

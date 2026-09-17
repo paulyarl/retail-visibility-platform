@@ -172,6 +172,7 @@ export default async function LocationPage({ params, searchParams }: LocationPag
           city={city}
           state={state}
           locationName={locationName}
+          surface="directory"
         />
         {/* Header */}
         <div className="bg-white border-b">
@@ -256,6 +257,7 @@ export default async function LocationPage({ params, searchParams }: LocationPag
               pagination={data.pagination}
               baseUrl="/directory/location"
               categorySlug={location}
+              shelfRef={`directory/location/${location}`}
             />
           )}
 

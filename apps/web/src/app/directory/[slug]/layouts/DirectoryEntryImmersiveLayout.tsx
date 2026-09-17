@@ -29,6 +29,7 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 
 export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayoutProps) {
   const {
@@ -52,6 +53,12 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
+  // Layer 3 — engagement events for the claimed entry surface.
+  const { trackCallClick, trackStorefrontClick } = useDirectoryPresenceTracking({
+    slug: listing?.slug || slugForRelated || '',
+    active: !!listing?.slug,
+  });
+
   const coverImage = listing.coverImageUrl || listing.bannerImageUrl || listing.logoUrl;
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 
@@ -71,7 +78,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
         { name: 'Directory', url: `${baseUrl}/directory` },
         { name: listing.businessName, url: currentUrl },
       ]} />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_claimed" surface="directory_claimed" />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="claimed" surface="directory" />
 
       <div className="min-h-screen bg-gray-950 text-white">
         {/* Immersive Full-Bleed Hero */}
@@ -117,6 +124,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
                   <div className="flex flex-wrap items-center gap-4">
                     {isStorefrontEnabled && (
                       <Link href={`/tenant/${slugForRelated || listing.tenantId}`}
+                        onClick={trackStorefrontClick}
                         className="inline-flex items-center gap-2 px-8 py-3 bg-white text-gray-900 rounded-full hover:bg-gray-100 transition-colors font-bold text-lg">
                         <Globe className="w-5 h-5" /> Visit Storefront
                       </Link>
@@ -300,7 +308,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="text-lg font-semibold mb-4">Contact</h3>
                   {canShowContact ? (
-                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} onPhoneClick={trackCallClick} />
                   ) : (
                     whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
                   )}

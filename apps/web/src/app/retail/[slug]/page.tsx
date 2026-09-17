@@ -224,6 +224,7 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
 
       <PlaceEntryEditorialLayout
         tenantId={tenantId}
+        slug={identifier}
         listing={listing}
         businessHours={businessHours}
         hoursStatus={hoursStatus}

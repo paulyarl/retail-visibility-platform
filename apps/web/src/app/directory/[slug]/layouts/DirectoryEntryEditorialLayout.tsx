@@ -29,6 +29,7 @@ import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 
 export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayoutProps) {
   const {
@@ -52,6 +53,12 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
+  // Layer 3 — engagement events for the claimed entry surface.
+  const { trackCallClick, trackStorefrontClick } = useDirectoryPresenceTracking({
+    slug: listing?.slug || slugForRelated || '',
+    active: !!listing?.slug,
+  });
+
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 
   return (
@@ -70,7 +77,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
         { name: 'Directory', url: `${baseUrl}/directory` },
         { name: listing.businessName, url: currentUrl },
       ]} />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_claimed" surface="directory_claimed" />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="claimed" surface="directory" />
 
       <div className="min-h-screen bg-white">
         {/* Editorial Hero */}
@@ -114,6 +121,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                 <div className="flex flex-wrap items-center gap-4">
                   {isStorefrontEnabled && (
                     <Link href={`/tenant/${slugForRelated || listing.tenantId}`}
+                      onClick={trackStorefrontClick}
                       className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold">
                       <Globe className="w-5 h-5" /> Visit Storefront
                     </Link>
@@ -300,7 +308,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
                   {canShowContact ? (
-                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} onPhoneClick={trackCallClick} />
                   ) : (
                     whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
                   )}

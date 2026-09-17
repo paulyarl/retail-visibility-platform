@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
+import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import type { CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 
 interface PlaceResult {
@@ -117,6 +118,15 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Seed city shelf browse event (Layer 2 surface: 'place') — mirrors
+          /directory/location's LocationBrowseTracker. */}
+      <LocationBrowseTracker
+        location={citySlug}
+        city={data.city}
+        state={data.categories.flatMap((c) => c.places)[0]?.state || ''}
+        locationName={data.city}
+        surface="place"
+      />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link href="/place" className="text-sm text-blue-600 hover:underline mb-4 inline-block">
           ← All places
@@ -169,7 +179,7 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
                 {cat.places.map((p) => (
                   <Link
                     key={p.id}
-                    href={`/place/${p.slug}`}
+                    href={`/place/${p.slug}?shelf=place/city/${encodeURIComponent(citySlug)}`}
                     className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                   >
                     <h3 className="font-semibold text-gray-900 truncate">{p.businessName}</h3>

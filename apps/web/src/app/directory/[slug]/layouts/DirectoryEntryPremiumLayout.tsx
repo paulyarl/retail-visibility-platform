@@ -29,6 +29,7 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 
 export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutProps) {
   const {
@@ -52,6 +53,12 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
+  // Layer 3 — engagement events for the claimed entry surface.
+  const { trackCallClick } = useDirectoryPresenceTracking({
+    slug: listing?.slug || slugForRelated || '',
+    active: !!listing?.slug,
+  });
+
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 
   return (
@@ -70,7 +77,7 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
         { name: 'Directory', url: `${baseUrl}/directory` },
         { name: listing.businessName, url: currentUrl },
       ]} />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_claimed" surface="directory_claimed" />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="claimed" surface="directory" />
 
       <div className="min-h-screen bg-stone-50">
         {/* Premium Header Band */}
@@ -299,7 +306,7 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
                 <div className="bg-white rounded-xl p-6 border border-stone-200">
                   <h3 className="text-lg font-semibold text-stone-900 mb-4">Contact</h3>
                   {canShowContact ? (
-                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} onPhoneClick={trackCallClick} />
                   ) : (
                     whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
                   )}

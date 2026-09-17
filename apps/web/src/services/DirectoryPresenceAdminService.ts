@@ -209,6 +209,23 @@ export interface SurfaceBreakdownRow {
   uniqueSessions: number;
 }
 
+/** A category / location / home shelf browse surface (non-entry). */
+export interface ShelfTrafficRow {
+  pageType: string;
+  entityId: string;
+  label: string;
+  surface: string | null;
+  views: number;
+  uniqueSessions: number;
+}
+
+/** Entry views attributed back to the shelf that referred them. */
+export interface ShelfReferralRow {
+  shelf: string;
+  views: number;
+  uniqueSessions: number;
+}
+
 export interface DirectoryTrafficDashboard {
   daysBack: number;
   surface: string | null;
@@ -227,6 +244,11 @@ export interface DirectoryTrafficDashboard {
   }>;
   daily: TrafficTimeseriesPoint[];
   surfaceBreakdown: SurfaceBreakdownRow[];
+  /** Shelf surfaces (category / location / home). Computed with daysBack +
+   *  surface only — entry filters do not apply. */
+  shelves: ShelfTrafficRow[];
+  /** Entry views grouped by referring shelf (respects entry filters). */
+  shelfReferrals: ShelfReferralRow[];
 }
 
 export interface SeedTrafficDetail {
@@ -252,6 +274,72 @@ export interface SeedTrafficDetail {
   topReferrers: Array<{ referrer: string; views: number }>;
   deviceSplit: Array<{ deviceType: string; views: number }>;
   surfaceBreakdown: SurfaceBreakdownRow[];
+}
+
+// ============================
+// Directory Engagement (Layer 3 — directory_presence_events)
+// ============================
+
+export interface DirectoryPresenceRecentEvent {
+  id: string;
+  eventType: string;
+  sessionId: string | null;
+  deviceType: string | null;
+  dwellMs: number | null;
+  referrer: string | null;
+  createdAt: string;
+}
+
+export interface DirectoryEngagementSummary {
+  tenantId: string;
+  daysBack: number;
+  views: number;
+  claimClicks: number;
+  callClicks: number;
+  directionsClicks: number;
+  storefrontClicks: number;
+  qrScans: number;
+  uniqueSessions: number;
+  avgDwellMs: number;
+  eventCounts: Array<{ eventType: string; events: number; sessions: number }>;
+  deviceSplit: Array<{ deviceType: string; events: number }>;
+}
+
+export interface DirectoryClaimFunnel {
+  views: number;
+  viewSessions: number;
+  claimClicks: number;
+  claimsAccepted: number;
+  viewToClickRate: number | null;
+  clickToAcceptRate: number | null;
+  viewToAcceptRate: number | null;
+}
+
+export interface DirectoryEngagementDashboard {
+  daysBack: number;
+  totals: {
+    views: number;
+    claimClicks: number;
+    callClicks: number;
+    directionsClicks: number;
+    storefrontClicks: number;
+    qrScans: number;
+    uniqueSessions: number;
+    avgDwellMs: number;
+  };
+  eventCounts: Array<{ eventType: string; events: number; sessions: number }>;
+  topSeeds: Array<{
+    seedId: string;
+    businessName: string | null;
+    slug: string | null;
+    category: string;
+    city: string;
+    state: string;
+    views: number;
+    claimClicks: number;
+    sessions: number;
+  }>;
+  funnel: DirectoryClaimFunnel;
 }
 
 // ============================
@@ -816,7 +904,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     category?: string;
     city?: string;
     state?: string;
-    surface?: 'directory_seed' | 'directory_claimed';
+    surface?: 'place' | 'directory';
   }): Promise<DirectoryTrafficDashboard | null> {
     const params = new URLSearchParams();
     if (filters?.daysBack) params.set('daysBack', String(filters.daysBack));
@@ -842,7 +930,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   async getSeedTraffic(
     seedId: string,
     daysBack?: number,
-    surface?: 'directory_seed' | 'directory_claimed',
+    surface?: 'place' | 'directory',
   ): Promise<SeedTrafficDetail | null> {
     const params = new URLSearchParams();
     if (daysBack) params.set('daysBack', String(daysBack));
@@ -857,6 +945,55 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (!result.success) return null;
     const data = result.data?.data ?? result.data;
     return (data as any)?.traffic ?? null;
+  }
+
+  // ============================
+  // Directory Engagement (Layer 3)
+  // ============================
+
+  /** GET /api/admin/directory-presence/engagement — cross-seed Layer 3 rollup */
+  async getEngagementDashboard(daysBack?: number): Promise<DirectoryEngagementDashboard | null> {
+    const qs = daysBack ? `?daysBack=${daysBack}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/engagement${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/engagement */
+  async getSeedEngagement(
+    seedId: string,
+    daysBack?: number,
+  ): Promise<(DirectoryEngagementSummary & { recentEvents: DirectoryPresenceRecentEvent[] }) | null> {
+    const qs = daysBack ? `?daysBack=${daysBack}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/engagement${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.engagement ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/funnel */
+  async getSeedFunnel(seedId: string, daysBack?: number): Promise<DirectoryClaimFunnel | null> {
+    const qs = daysBack ? `?daysBack=${daysBack}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/funnel${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.funnel ?? null;
   }
 
   // ============================

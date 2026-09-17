@@ -8039,6 +8039,26 @@ model mkt_bronze_reason_catalog {
   @@index([scope_category_key, scope_city, scope_state], map: "idx_mkt_bronze_reason_catalog_scope")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model directory_presence_events {
+  id          String   @id @db.VarChar(40)
+  tenant_id   String   @db.VarChar(255)
+  listing_id  String   @db.VarChar(255)
+  slug        String   @db.VarChar(255)
+  session_id  String?  @db.VarChar(100)
+  event_type  String   @db.VarChar(40)
+  referrer    String?
+  user_agent  String?
+  ip_hash     String?  @db.VarChar(64)
+  device_type String?  @db.VarChar(20)
+  dwell_ms    Int?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([event_type, created_at(sort: Desc)], map: "idx_dpe_event_type")
+  @@index([slug, created_at(sort: Desc)], map: "idx_dpe_slug_created")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_dpe_tenant_created")
+}
+
 enum action {
   create
   update

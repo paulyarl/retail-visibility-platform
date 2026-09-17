@@ -16,6 +16,8 @@ export interface StoreListProps {
   loading?: boolean;
   className?: string;
   gridClassName?: string;
+  /** Shelf→entry attribution ref forwarded to each StoreCard (see StoreCard). */
+  shelfRef?: string;
 }
 
 // ==================== SKELETON COMPONENTS ====================
@@ -104,7 +106,8 @@ export function StoreList({
   maxCategories = 3,
   loading = false,
   className = '',
-  gridClassName = ''
+  gridClassName = '',
+  shelfRef,
 }: StoreListProps) {
   const [storeStats, setStoreStats] = useState<Record<string, StoreStats>>({});
   const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
@@ -190,6 +193,7 @@ export function StoreList({
             maxCategories={maxCategories}
             stats={storeStats[store.tenantId] || null}
             statsLoading={statsLoading[store.tenantId]}
+            shelfRef={shelfRef}
           />
         ))}
       </div>
@@ -211,6 +215,7 @@ export function StoreList({
             maxCategories={maxCategories}
             stats={storeStats[store.tenantId] || null}
             statsLoading={statsLoading[store.tenantId]}
+            shelfRef={shelfRef}
           />
         ))}
       </div>
@@ -232,6 +237,7 @@ export function StoreList({
             maxCategories={maxCategories}
             stats={storeStats[store.tenantId] || null}
             statsLoading={statsLoading[store.tenantId]}
+            shelfRef={shelfRef}
           />
         ))}
       </div>

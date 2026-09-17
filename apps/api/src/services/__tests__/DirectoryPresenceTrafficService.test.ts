@@ -100,7 +100,7 @@ describe('DirectoryPresenceTrafficService.getSeedTraffic', () => {
       .mockResolvedValueOnce([{ device_type: 'mobile', views: 40n }])
       // surface split
       .mockResolvedValueOnce([
-        { surface: 'directory_seed', views: 30n, unique_sessions: 12n },
+        { surface: 'place', views: 30n, unique_sessions: 12n },
         { surface: 'untagged', views: 12n, unique_sessions: 5n },
       ]);
 
@@ -121,7 +121,7 @@ describe('DirectoryPresenceTrafficService.getSeedTraffic', () => {
     expect(result!.topReferrers).toEqual([{ referrer: 'google', views: 30 }]);
     expect(result!.deviceSplit).toEqual([{ deviceType: 'mobile', views: 40 }]);
     expect(result!.surfaceBreakdown).toEqual([
-      { surface: 'directory_seed', views: 30, uniqueSessions: 12 },
+      { surface: 'place', views: 30, uniqueSessions: 12 },
       { surface: 'untagged', views: 12, uniqueSessions: 5 },
     ]);
     expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
@@ -135,13 +135,13 @@ describe('DirectoryPresenceTrafficService.getSeedTraffic', () => {
     mockFindUnique.mockResolvedValueOnce(seedRow);
     mockQueryRawUnsafe.mockResolvedValue([]);
 
-    await directoryTrafficService.getSeedTraffic('dps-1', 30, 'directory_seed');
+    await directoryTrafficService.getSeedTraffic('dps-1', 30, 'place');
 
     expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
     const calls = mockQueryRawUnsafe.mock.calls;
     // First four queries carry the surface predicate as $2.
     for (const call of calls.slice(0, 4)) {
-      expect(call.slice(1)).toEqual(['tenant-1', 'directory_seed']);
+      expect(call.slice(1)).toEqual(['tenant-1', 'place']);
       expect(String(call[0])).toContain("context->>'surface' = $2");
     }
     // The split query is deliberately unfiltered.
@@ -182,7 +182,20 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
         { category: 'Indian Grocery', views: 60n, unique_sessions: 25n, seeds: 1n },
       ])
       .mockResolvedValueOnce([{ day: '2026-09-01', views: 60n, unique_sessions: 25n }])
-      .mockResolvedValueOnce([{ surface: 'directory_seed', views: 60n, unique_sessions: 25n }]);
+      .mockResolvedValueOnce([{ surface: 'place', views: 60n, unique_sessions: 25n }])
+      .mockResolvedValueOnce([
+        {
+          page_type: 'directory_category',
+          entity_id: 'place/category/indian-grocery',
+          entity_name: 'Indian Grocery',
+          surface: 'place',
+          views: 15n,
+          unique_sessions: 7n,
+        },
+      ])
+      .mockResolvedValueOnce([
+        { shelf: 'place/category/indian-grocery', views: 8n, unique_sessions: 4n },
+      ]);
 
     const result = await directoryTrafficService.getTrafficDashboard(30);
 
@@ -205,13 +218,24 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       { category: 'Indian Grocery', views: 60, uniqueSessions: 25, seeds: 1 },
     ]);
     expect(result.daily).toEqual([{ day: '2026-09-01', views: 60, uniqueSessions: 25 }]);
-    expect(result.surfaceBreakdown).toEqual([
-      { surface: 'directory_seed', views: 60, uniqueSessions: 25 },
+    expect(result.surfaceBreakdown).toEqual([{ surface: 'place', views: 60, uniqueSessions: 25 }]);
+    expect(result.shelves).toEqual([
+      {
+        pageType: 'directory_category',
+        entityId: 'place/category/indian-grocery',
+        label: 'Indian Grocery',
+        surface: 'place',
+        views: 15,
+        uniqueSessions: 7,
+      },
     ]);
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
+    expect(result.shelfReferrals).toEqual([
+      { shelf: 'place/category/indian-grocery', views: 8, uniqueSessions: 4 },
+    ]);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(7);
   });
 
-  it('binds seed filters as positional params on every query', async () => {
+  it('binds seed filters as positional params on the entry queries only', async () => {
     mockQueryRawUnsafe.mockResolvedValue([]);
 
     await directoryTrafficService.getTrafficDashboard(7, {
@@ -222,13 +246,18 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       state: 'IL',
     });
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
-    for (const call of mockQueryRawUnsafe.mock.calls) {
-      const params = call.slice(1);
-      expect(params).toEqual(['batch-9', 'invited', 'Halal Grocery', 'Chicago', 'IL']);
-      expect(String(call[0])).toContain('s.seed_batch = $1');
-      expect(String(call[0])).toContain('s.state = $5');
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(7);
+    const calls = mockQueryRawUnsafe.mock.calls;
+    // Entry queries carry the seed filters: totals → top seeds → categories →
+    // daily → surfaces → shelf referrals (call index 6).
+    for (const idx of [0, 1, 2, 3, 4, 6]) {
+      expect(calls[idx].slice(1)).toEqual(['batch-9', 'invited', 'Halal Grocery', 'Chicago', 'IL']);
+      expect(String(calls[idx][0])).toContain('s.seed_batch = $1');
+      expect(String(calls[idx][0])).toContain('s.state = $5');
     }
+    // The shelf query is not seed-scoped — no seed filters bound.
+    expect(calls[5].slice(1)).toEqual([]);
+    expect(String(calls[5][0])).toContain("page_type IN ('directory_category'");
   });
 
   it('binds the surface filter on the event queries but not the split query', async () => {
@@ -236,18 +265,24 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
 
     await directoryTrafficService.getTrafficDashboard(30, {
       category: 'Halal Grocery',
-      surface: 'directory_seed',
+      surface: 'place',
     });
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(7);
     const calls = mockQueryRawUnsafe.mock.calls;
     // First four queries bind [category, surface] and reference $2.
     for (const call of calls.slice(0, 4)) {
-      expect(call.slice(1)).toEqual(['Halal Grocery', 'directory_seed']);
+      expect(call.slice(1)).toEqual(['Halal Grocery', 'place']);
       expect(String(call[0])).toContain("b.context->>'surface' = $2");
     }
     // The split query drops the surface param (seed filters only).
     expect(calls[4].slice(1)).toEqual(['Halal Grocery']);
     expect(String(calls[4][0])).not.toContain("b.context->>'surface' = $2");
+    // The shelf query takes the surface param alone.
+    expect(calls[5].slice(1)).toEqual(['place']);
+    expect(String(calls[5][0])).toContain("context->>'surface' = $1");
+    // Shelf referrals is entry-scoped — binds [category, surface] like the others.
+    expect(calls[6].slice(1)).toEqual(['Halal Grocery', 'place']);
+    expect(String(calls[6][0])).toContain("b.context->>'referrer_shelf' IS NOT NULL");
   });
 });

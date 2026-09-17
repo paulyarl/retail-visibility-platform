@@ -31,6 +31,7 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 
 export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutProps) {
   const {
@@ -82,6 +83,12 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
+  // Layer 3 — engagement events for the claimed entry surface.
+  const { trackCallClick, trackStorefrontClick } = useDirectoryPresenceTracking({
+    slug: listing?.slug || slugForRelated || '',
+    active: !!listing?.slug,
+  });
+
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 
   return (
@@ -102,7 +109,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           { name: listing.businessName, url: currentUrl },
         ]}
       />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_claimed" surface="directory_claimed" />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="claimed" surface="directory" />
 
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b">
@@ -125,6 +132,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                       Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
                     </p>
                     <Link href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
+                      onClick={trackStorefrontClick}
                       className="inline-flex items-center gap-2 px-8 py-3 text-white rounded-lg transition-colors font-semibold text-lg shadow-md"
                       style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: '#2563eb' }}
                     >
@@ -408,7 +416,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
                   {canShowContact ? (
-                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} />
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} onPhoneClick={trackCallClick} />
                   ) : (
                     whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
                   )}

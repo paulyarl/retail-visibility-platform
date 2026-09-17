@@ -53,6 +53,8 @@ interface UnifiedStoreCardProps {
   linkType?: 'directory' | 'storefront'; // Determines link destination
   showLogo?: boolean; // Whether to display store logos
   className?: string;
+  /** Shelf→entry attribution ref appended as `?shelf=` to internal entry links. */
+  shelfRef?: string;
   enhancedStats?: {
     totalProducts: number;
     categories: Array<{
@@ -91,7 +93,8 @@ export function UnifiedStoreCard({
   linkType = 'directory',
   showLogo = true,
   className = '',
-  enhancedStats
+  enhancedStats,
+  shelfRef
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
@@ -123,6 +126,11 @@ export function UnifiedStoreCard({
   const linkHref = linkType === 'storefront'
     ? `/tenant/${listing.slug || listing.tenantId}`
     : getDirectoryListingUrl(listing);
+
+  // Shelf→entry attribution — stamp the referring shelf onto internal entry links.
+  const entryHref = shelfRef && linkType !== 'storefront'
+    ? `${linkHref}${linkHref.includes('?') ? '&' : '?'}shelf=${encodeURIComponent(shelfRef)}`
+    : linkHref;
 
   // Prioritize category display: enhancedStats → contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
   // const displayCategory = categories.length > 0 
@@ -186,7 +194,7 @@ export function UnifiedStoreCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+                    <Link href={entryHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
                       <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate flex items-center gap-1.5">
                         {listing.businessName}
                         {listing.isDemo && <DemoBadge isDemo={listing.isDemo} demoExpiresAt={listing.demoExpiresAt} size="sm" />}
@@ -313,7 +321,7 @@ export function UnifiedStoreCard({
           <Card.Section>
             <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center relative overflow-hidden">
               {listing.logoUrl ? (
-                <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+                <Link href={entryHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
                 <Image
                   src={listing.logoUrl}
                   alt={listing.businessName}
@@ -352,7 +360,7 @@ export function UnifiedStoreCard({
         <Card.Section className="p-4">
           <Group justify="space-between" mb="xs" align="start">
             <div className="flex-1">
-               <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+               <Link href={entryHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
               <Text 
                 fw={600} 
                 size="lg" 
@@ -472,7 +480,7 @@ export function UnifiedStoreCard({
         {/* Enhanced Action Buttons */}
         <Card.Section className="pt-3">
           <Group gap={8}>
-            <Link href={linkHref} className="flex-1" onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+            <Link href={entryHref} className="flex-1" onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
               <Button 
                 radius="md" 
                 size="sm" 

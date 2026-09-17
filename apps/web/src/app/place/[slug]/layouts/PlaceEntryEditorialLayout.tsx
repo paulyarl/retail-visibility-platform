@@ -22,6 +22,7 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
 /**
@@ -44,6 +45,8 @@ import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolution
  */
 export interface PlaceEntryEditorialLayoutProps {
   tenantId: string;
+  /** Public listing slug — used for Layer 3 engagement tracking. */
+  slug: string;
   listing: any;
   businessHours: any;
   hoursStatus: any;
@@ -66,6 +69,7 @@ export interface PlaceEntryEditorialLayoutProps {
 
 export default function PlaceEntryEditorialLayout({
   tenantId,
+  slug,
   listing,
   businessHours,
   hoursStatus,
@@ -85,6 +89,13 @@ export default function PlaceEntryEditorialLayout({
   publicNarrative,
 }: PlaceEntryEditorialLayoutProps) {
   useQrScanTracking(tenantId, 'directory');
+
+  // Layer 3 — engagement events. Only track genuine seed listings (the /place
+  // surface is seed-only; this gate mirrors the client-side listingOrigin gate).
+  const { trackClaimClick, trackCallClick } = useDirectoryPresenceTracking({
+    slug,
+    active: listing.listingOrigin === 'directory_seed',
+  });
 
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
   const hasClaimToken = !!claimToken;
@@ -108,7 +119,7 @@ export default function PlaceEntryEditorialLayout({
         { name: 'Directory', url: `${baseUrl}/directory` },
         { name: listing.businessName, url: currentUrl },
       ]} />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_seed" surface="directory_seed" />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_seed" surface="place" />
 
       <div className="min-h-screen bg-white">
         {/* Editorial Hero — seed-adapted */}
@@ -167,6 +178,7 @@ export default function PlaceEntryEditorialLayout({
                 {hasClaimToken ? (
                   <Link
                     href={claimHref}
+                    onClick={trackClaimClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold"
                   >
                     <ShieldCheck className="w-5 h-5" /> Claim this listing
@@ -174,6 +186,7 @@ export default function PlaceEntryEditorialLayout({
                 ) : (
                   <a
                     href={claimHref}
+                    onClick={trackClaimClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold"
                   >
                     <Info className="w-5 h-5" /> Are you the owner?
@@ -238,6 +251,7 @@ export default function PlaceEntryEditorialLayout({
                 {hasClaimToken ? (
                   <Link
                     href={claimHref}
+                    onClick={trackClaimClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
                   >
                     <ShieldCheck className="w-5 h-5" /> Claim this listing
@@ -245,6 +259,7 @@ export default function PlaceEntryEditorialLayout({
                 ) : (
                   <a
                     href={claimHref}
+                    onClick={trackClaimClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
                   >
                     <Info className="w-5 h-5" /> Are you the owner?
@@ -335,6 +350,7 @@ export default function PlaceEntryEditorialLayout({
                     fullAddress={showsLocation ? fullAddress : ''}
                     initialExpanded={true}
                     isRetailStore={true}
+                    onPhoneClick={trackCallClick}
                   />
                 </div>
               )}

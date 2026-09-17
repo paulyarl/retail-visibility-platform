@@ -119,7 +119,7 @@ export default function StoreTypeViewClient({
         search_params: searchParams,
         view_mode: viewMode
       },
-      pageType: 'directory_home'
+      pageType: 'directory_store_type'
     });
   }, [storeTypeSlug]); // Only track once when store type changes
 
@@ -135,7 +135,7 @@ export default function StoreTypeViewClient({
           view_mode: viewMode,
           stores_count: data.pagination.totalItems
         },
-        pageType: 'directory_home'
+        pageType: 'directory_store_type'
       });
     }
   }, [viewMode, storeTypeSlug, data]);
@@ -334,6 +334,7 @@ export default function StoreTypeViewClient({
             loading={loading}
             pagination={data?.pagination}
             categorySlug={storeTypeSlug}
+            shelfRef={`directory/store-type/${storeTypeSlug}`}
           />
         )}
 
@@ -341,6 +342,7 @@ export default function StoreTypeViewClient({
           <DirectoryList
             listings={data?.listings || []}
             loading={loading}
+            shelfRef={`directory/store-type/${storeTypeSlug}`}
           />
         )}
 

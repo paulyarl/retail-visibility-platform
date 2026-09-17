@@ -337,6 +337,7 @@ export default function CategoryViewClient({
             pagination={data?.pagination}
             baseUrl="/directory/categories"
             categorySlug={categorySlug}
+            shelfRef={`directory/category/${categorySlug}`}
           />
         )}
 
@@ -344,6 +345,7 @@ export default function CategoryViewClient({
           <DirectoryList
             listings={data?.listings || []}
             loading={loading}
+            shelfRef={`directory/category/${categorySlug}`}
           />
         )}
 

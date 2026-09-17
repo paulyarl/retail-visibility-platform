@@ -51,6 +51,8 @@ interface DirectoryGridProps {
   pagination?: Pagination;
   baseUrl?: string;
   categorySlug?: string;
+  /** Shelf→entry attribution ref forwarded to each card (see StoreCard). */
+  shelfRef?: string;
 }
 
 
@@ -90,7 +92,8 @@ export default function DirectoryGrid({
   viewMode = 'grid', 
   pagination,
   baseUrl = '', 
-  categorySlug = '' 
+  categorySlug = '',
+  shelfRef,
 }: DirectoryGridProps) {
   // Transform listings to store data format
   const stores = listings.map(transformListing);
@@ -109,6 +112,7 @@ export default function DirectoryGrid({
         showCategories={true}
         maxCategories={3}
         loading={showLoading}
+        shelfRef={shelfRef}
       />
 
       {/* Pagination */}

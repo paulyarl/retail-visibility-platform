@@ -57,6 +57,7 @@ export default function PlacePageClient({
     <>
       <PlaceEntryEditorialLayout
         tenantId={tenantId}
+        slug={slug}
         listing={listing}
         businessHours={businessHours}
         hoursStatus={hoursStatus}

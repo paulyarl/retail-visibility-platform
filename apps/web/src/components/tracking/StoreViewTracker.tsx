@@ -7,12 +7,13 @@ interface StoreViewTrackerProps {
   tenantId: string;
   storeName?: string;
   categories?: Array<{ id: string; slug: string; isPrimary?: boolean }>;
-  /** Tags the event context with the listing origin so the traffic readout can
+  /** Mirrors `directory_listings_list.listing_origin` so the traffic readout can
    *  split unclaimed-seed traffic from claimed-tenant traffic (Layer 2).
-   *  'directory_seed' | 'directory_claimed'. */
+   *  'directory_seed' | 'claimed'. */
   listingOrigin?: string;
-  /** Tags the event context with the surface that produced it.
-   *  'directory_seed' (from /place) | 'directory_claimed' (from /directory). */
+  /** Ecosystem surface axis — 'place' (from /place) | 'directory' (from
+   *  /directory). Matches the `surface` vocabulary used by
+   *  CategoryBrowseTracker / LocationBrowseTracker. */
   surface?: string;
 }
 
@@ -24,6 +25,14 @@ export default function StoreViewTracker({
   surface,
 }: StoreViewTrackerProps) {
   useEffect(() => {
+    // Shelf→entry attribution — category / location / store-type shelf pages
+    // append `?shelf=<surface>/<type>/<slug>` to their entry links. Recorded on
+    // the Layer 1 entry view so the readout can rank referring shelves.
+    const referrerShelf =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('shelf')
+        : null;
+
     // Track store view on page load
     trackBehaviorClient({
       entityType: 'store',
@@ -36,6 +45,7 @@ export default function StoreViewTracker({
         page_type: 'directory_detail',
         ...(listingOrigin ? { listing_origin: listingOrigin } : {}),
         ...(surface ? { surface } : {}),
+        ...(referrerShelf ? { referrer_shelf: referrerShelf } : {}),
       },
       pageType: 'directory_detail'
     });

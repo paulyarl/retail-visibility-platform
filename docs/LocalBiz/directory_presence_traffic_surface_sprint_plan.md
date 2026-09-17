@@ -1,5 +1,22 @@
 # Sprint Plan: Directory Presence — Traffic Surface & Engagement Tracking
 
+> **AMENDMENT (implementation):** §8.3's `surface: 'directory_seed' | 'directory_claimed'`
+> was **not** implemented as written — it collides with the pre-existing ecosystem
+> `surface` axis (`'place' | 'directory'`) that `CategoryBrowseTracker` /
+> `LocationBrowseTracker` already write into the same `user_behavior_simple.context`
+> JSON. Shipped vocabulary (see AGENTS.md → "Directory Presence Traffic Surface"):
+> `listing_origin` = `directory_seed | claimed` (mirrors
+> `directory_listings_list.listing_origin`) and `surface` = `place | directory`.
+> Corrective backfill: `294_directory_presence_surface_vocabulary.sql`.
+> Also see the surface-alignment review notes: shelves (category/location) are
+> captured into `user_behavior_simple` but were out of scope for the §6 readout.
+>
+> **Amendment 2 (funnel reconciliation):** §5/§7's `getClaimFunnel` is the
+> **on-page CTA conversion** funnel (view → claim click → accepted). It does NOT
+> replace `SeedFunnelAnalyticsService`'s cohort funnel (invite → claim, per-channel
+> invite/report scan rates, benchmark gates) — the two share only the `claims
+> accepted` terminus. Invite/QR-driven conversion stays with the cohort funnel.
+
 **Document Version:** 1.0
 **Date:** 2026-08-17
 **Status:** Draft — Ready for Review

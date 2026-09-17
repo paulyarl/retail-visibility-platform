@@ -11,11 +11,13 @@ interface DirectoryListProps {
   contextCategory?: string; // Override category display (e.g., for product category pages)
   showLogo?: boolean; // Whether to display store logos
   viewMode?: 'list' | 'grid';
+  /** Shelf→entry attribution ref forwarded to each card (see UnifiedStoreCard). */
+  shelfRef?: string;
 }
 
 
 
-export default function DirectoryList({ listings, loading, contextCategory, showLogo = true, viewMode = 'list' }: DirectoryListProps) {
+export default function DirectoryList({ listings, loading, contextCategory, showLogo = true, viewMode = 'list', shelfRef }: DirectoryListProps) {
   const [storeStats, setStoreStats] = useState<Record<string, any>>({});
   const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
 
@@ -105,6 +107,7 @@ export default function DirectoryList({ listings, loading, contextCategory, show
             linkType="directory"
             contextCategory={contextCategory}
             showLogo={showLogo}
+            shelfRef={shelfRef}
             enhancedStats={stats ? {
               totalProducts: stats.totalProducts || 0,
               categories: stats.categories || [],

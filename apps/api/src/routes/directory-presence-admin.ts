@@ -6,6 +6,9 @@
  *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
  *   GET    /api/admin/directory-presence/traffic                — cross-seed traffic rollup
  *   GET    /api/admin/directory-presence/presence-seeds/:id/traffic — per-seed traffic readout
+ *   GET    /api/admin/directory-presence/engagement             — cross-seed Layer 3 engagement rollup
+ *   GET    /api/admin/directory-presence/presence-seeds/:id/engagement — per-seed Layer 3 engagement
+ *   GET    /api/admin/directory-presence/presence-seeds/:id/funnel — per-seed claim funnel
  *   POST   /api/admin/directory/presence-seeds/:id/touches — log an outreach touch
  *   GET    /api/admin/directory/presence-seeds/:id/touches — list outreach touches
  *   GET    /api/admin/directory/presence-seeds/:id       — seed detail
@@ -34,6 +37,7 @@ import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignL
 import BatchSeekService from '../services/BatchSeekService';
 import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
 import DirectoryPresenceTrafficService from '../services/DirectoryPresenceTrafficService';
+import DirectoryPresenceAnalyticsService from '../services/DirectoryPresenceAnalyticsService';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import {
@@ -204,8 +208,8 @@ const trafficQuerySchema = z.object({
   category: z.string().max(100).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(50).optional(),
-  // Layer 2 — restrict to events tagged with a surface (StoreViewTracker).
-  surface: z.enum(['directory_seed', 'directory_claimed']).optional(),
+  // Layer 2 — restrict to events tagged with an ecosystem surface.
+  surface: z.enum(['place', 'directory']).optional(),
 });
 
 /**
@@ -242,7 +246,7 @@ router.get('/presence-seeds/:id/traffic', requirePlatformStaff, async (req: Requ
   try {
     const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
     const surface =
-      req.query.surface === 'directory_seed' || req.query.surface === 'directory_claimed'
+      req.query.surface === 'place' || req.query.surface === 'directory'
         ? (req.query.surface as string)
         : undefined;
     const traffic = await DirectoryPresenceTrafficService.getSeedTraffic(
@@ -256,6 +260,82 @@ router.get('/presence-seeds/:id/traffic', requirePlatformStaff, async (req: Requ
     res.json({ success: true, traffic });
   } catch (error) {
     logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/traffic] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
+  }
+});
+
+// ====================
+// DIRECTORY ENGAGEMENT READOUT (Layer 3 — directory_presence_events)
+// docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §5, §7
+// ====================
+
+/**
+ * GET /api/admin/directory-presence/engagement
+ *
+ * Cross-seed Layer 3 rollup: per-event-type counts, top seeds by claim
+ * clicks, and the aggregate claim funnel (view → claim click → accepted).
+ */
+router.get('/engagement', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
+    const dashboard = await DirectoryPresenceAnalyticsService.getDashboardEngagement(
+      Number.isFinite(daysBack) ? daysBack : undefined,
+    );
+    res.json({ success: true, ...dashboard });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/engagement] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/:id/engagement
+ *
+ * Per-seed Layer 3 engagement: event-type counts, avg dwell, device split,
+ * and the recent events feed.
+ */
+router.get('/presence-seeds/:id/engagement', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
+    const engagement = await DirectoryPresenceAnalyticsService.getSeedEngagement(
+      req.params.id,
+      Number.isFinite(daysBack) ? daysBack : undefined,
+    );
+    if (!engagement) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+    res.json({ success: true, engagement });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/engagement] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/:id/funnel
+ *
+ * Per-seed claim funnel: listing_viewed → claim_clicked → claim accepted
+ * (directory_claim_tokens.consumed_at).
+ */
+router.get('/presence-seeds/:id/funnel', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
+    const funnel = await DirectoryPresenceAnalyticsService.getSeedClaimFunnel(
+      req.params.id,
+      Number.isFinite(daysBack) ? daysBack : undefined,
+    );
+    if (!funnel) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+    res.json({ success: true, funnel });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/funnel] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });

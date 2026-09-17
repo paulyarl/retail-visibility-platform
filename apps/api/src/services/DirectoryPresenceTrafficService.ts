@@ -13,12 +13,14 @@
  * readout answers "which directory entry is getting traffic" for the full
  * seed lifecycle.
  *
- * Layer 2: events are tagged with `context->>'surface'`
- * (`directory_seed` from /place, `directory_claimed` from /directory) so
- * seed-vs-claimed traffic can be split without a join. The optional `surface`
- * filter applies that predicate; `surfaceBreakdown` always reports the full
- * split (untagged historical rows appear as `untagged` until migration 292
- * backfills them).
+ * Layer 2: events are tagged with `context->>'surface'` (`place` from /place,
+ * `directory` from /directory — the same vocabulary as CategoryBrowseTracker)
+ * so the ecosystem surface can be split without a join, plus
+ * `context->>'listing_origin'` (`directory_seed` | `claimed`, mirroring
+ * `directory_listings_list.listing_origin`). The optional `surface` filter
+ * applies that predicate; `surfaceBreakdown` always reports the full split
+ * (untagged historical rows appear as `untagged` until migration 294
+ * rewrites them).
  *
  * Read-only — no new table. See
  * docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §3, §6.
@@ -78,6 +80,23 @@ export interface TrafficTimeseriesPoint {
   uniqueSessions: number;
 }
 
+/** A category / location / home shelf browse surface (non-entry). */
+export interface ShelfTrafficRow {
+  pageType: string;
+  entityId: string;
+  label: string;
+  surface: string | null;
+  views: number;
+  uniqueSessions: number;
+}
+
+/** Entry views attributed back to the shelf that referred them. */
+export interface ShelfReferralRow {
+  shelf: string;
+  views: number;
+  uniqueSessions: number;
+}
+
 export interface SeedTrafficDetail {
   seedId: string;
   tenantId: string;
@@ -121,6 +140,12 @@ export interface TrafficDashboard {
   }>;
   daily: TrafficTimeseriesPoint[];
   surfaceBreakdown: SurfaceBreakdownRow[];
+  /** Shelf surfaces (category / location / home) — see §6 review note.
+   *  Computed with `daysBack` + `surface` only; seed filters do not apply. */
+  shelves: ShelfTrafficRow[];
+  /** Entry views grouped by the referring shelf (`context->>'referrer_shelf'`,
+   *  stamped from the `?shelf=` link param). Respects seed + surface filters. */
+  shelfReferrals: ShelfReferralRow[];
 }
 
 interface TrafficCountRow {
@@ -502,8 +527,69 @@ class DirectoryPresenceTrafficService extends BaseService {
       this.buildSeedFilters(filters).params,
     );
 
-    const totalsRow = totalsRows[0];
+    // Shelf surfaces — category / location / home browse pages. These are NOT
+    // seed rows (different entity semantics: path-shaped entity_id, no tenant
+    // join), so the seed filters do not apply. Only daysBack + surface do.
+    const shelfParams: string[] = [];
+    let shelfSurfaceClause = '';
+    if (filters.surface) {
+      shelfParams.push(filters.surface);
+      shelfSurfaceClause = `AND context->>'surface' = $${shelfParams.length}`;
+    }
+    const shelfRows = await this.executeQuery<{
+      page_type: string;
+      entity_id: string;
+      entity_name: string | null;
+      surface: string | null;
+      views: number | bigint;
+      unique_sessions: number | bigint;
+    }>(
+      `SELECT
+         page_type,
+         entity_id,
+         entity_name,
+         context->>'surface' AS surface,
+         COUNT(*)::int AS views,
+         COUNT(DISTINCT session_id)::int AS unique_sessions
+       FROM user_behavior_simple
+       WHERE page_type IN ('directory_category', 'directory_location', 'directory_store_type', 'directory_home')
+         AND entity_id IS NOT NULL
+         AND timestamp >= NOW() - INTERVAL '${window} days'
+         ${shelfSurfaceClause}
+       GROUP BY page_type, entity_id, entity_name, context->>'surface'
+       ORDER BY views DESC
+       LIMIT 50`,
+      shelfParams,
+    );
 
+    // Shelf→entry attribution — entry views grouped by the shelf that referred
+    // them (StoreViewTracker stamps `referrer_shelf` from the `?shelf=` param).
+    // Respects the seed filters + surface filter (it is entry-scoped).
+    const shelfReferralRows = await this.executeQuery<{
+      shelf: string;
+      views: number | bigint;
+      unique_sessions: number | bigint;
+    }>(
+      `SELECT
+         b.context->>'referrer_shelf' AS shelf,
+         COUNT(b.id)::int AS views,
+         COUNT(DISTINCT b.session_id)::int AS unique_sessions
+       FROM directory_presence_seeds s
+       LEFT JOIN user_behavior_simple b
+         ON b.entity_id = s.tenant_id
+        AND b.entity_type = 'store'
+        AND b.page_type = 'directory_detail'
+        AND b.timestamp >= NOW() - INTERVAL '${window} days'
+        ${surfaceJoin}
+       WHERE TRUE ${clause}
+         AND b.context->>'referrer_shelf' IS NOT NULL
+       GROUP BY 1
+       ORDER BY views DESC
+       LIMIT 50`,
+      params,
+    );
+
+    const totalsRow = totalsRows[0];
     return {
       daysBack: window,
       surface: filters.surface ?? null,
@@ -542,6 +628,19 @@ class DirectoryPresenceTrafficService extends BaseService {
       })),
       surfaceBreakdown: surfaceRows.map((row) => ({
         surface: row.surface,
+        views: toNumber(row.views),
+        uniqueSessions: toNumber(row.unique_sessions),
+      })),
+      shelves: shelfRows.map((row) => ({
+        pageType: row.page_type,
+        entityId: row.entity_id,
+        label: row.entity_name || row.entity_id,
+        surface: row.surface,
+        views: toNumber(row.views),
+        uniqueSessions: toNumber(row.unique_sessions),
+      })),
+      shelfReferrals: shelfReferralRows.map((row) => ({
+        shelf: row.shelf,
         views: toNumber(row.views),
         uniqueSessions: toNumber(row.unique_sessions),
       })),

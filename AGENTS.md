@@ -93,11 +93,48 @@ Page-view traffic for `/place/[slug]` (unclaimed seeds) and `/directory/[slug]` 
 
 - **Layer 1 readout:** `apps/api/src/services/DirectoryPresenceTrafficService.ts` aggregates those rows, scoped to seeds via join on `directory_presence_seeds.tenant_id`. Admin routes (in `directory-presence-admin.ts`, mount `/api/admin/directory-presence`): `GET /traffic` (cross-seed rollup) and `GET /presence-seeds/:id/traffic` (per-seed). Both require `requirePlatformStaff`.
 - **Admin page:** `/settings/admin/directory/traffic` (`apps/web/src/app/(platform)/settings/admin/directory/traffic/page.tsx`). Card on `/settings/admin` ("Directory Traffic"), plus Directory Panel and admin-nav entries.
-- **Layer 2 tagging:** `StoreViewTracker` accepts `listingOrigin` + `surface` props and stamps them into `context` (`directory_seed` from `/place` layouts, `directory_claimed` from the four `/directory` layouts). The readout exposes an optional `surface` filter (bound param) and always reports a `surfaceBreakdown` (untagged historical rows appear as `untagged`).
-- **Migration `292_backfill_directory_seed_event_context.sql`** — tags historical `directory_detail` rows for seed tenants with `listing_origin`/`surface = 'directory_seed'` (idempotent: only rows where `context->>'surface' IS NULL`) and adds the partial expression index `idx_ubs_directory_detail_surface`. Applied manually to `local` + `prd`; no `schema.prisma` change, so no `prisma generate` needed for it.
-- **Windows `prisma generate` EPERM:** regenerating while a dev watcher (`pnpm dev:local-vercel` / `tsx watch`) is running fails with `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`. Stop the node/dev processes first, then re-run `pnpm prisma generate`.
+- **Layer 2 tagging:** `StoreViewTracker` accepts `listingOrigin` + `surface` props and stamps them into `context`. **Canonical vocabulary:**
+  - `listing_origin` = `directory_seed` (`/place` layouts) | `claimed` (the four `/directory` layouts) — mirrors `directory_listings_list.listing_origin`.
+  - `surface` = `place` (`/place`) | `directory` (`/directory`) — matches the `CategoryBrowseTracker` / `LocationBrowseTracker` vocabulary already in `context`.
 
-**Not yet built (Layer 3):** `directory_presence_events` table, `DirectoryPresenceAnalyticsService`, public `POST /api/public/directory/places/:slug/events`, `useDirectoryPresenceTracking`, and the seed-detail Traffic & Engagement panel.
+  **Do NOT use the sprint spec's `surface: 'directory_seed' | 'directory_claimed'`** — it collides with the pre-existing ecosystem `surface` axis written into the same `user_behavior_simple.context` JSON. The readout exposes an optional `surface` filter (bound param) and always reports a `surfaceBreakdown` (untagged historical rows appear as `untagged`).
+- **Migration `294_directory_presence_surface_vocabulary.sql`** — rewrites any rows written under the old spec vocabulary (`surface` `directory_seed`→`place`, `directory_claimed`→`directory`; `listing_origin` `directory_claimed`→`claimed`). Idempotent. Applied manually to `local` + `prd`.
+
+**Directory surface taxonomy (`user_behavior_simple` — single source of truth):**
+
+| Surface | Route | Tracker | `page_type` | `entity_type` | `entity_id` | `context.surface` |
+|---|---|---|---|---|---|---|
+| Seed entry | `/place/[slug]` | `StoreViewTracker` | `directory_detail` | `store` | `tenantId` | `place` |
+| Claimed entry | `/directory/[slug]` | `StoreViewTracker` | `directory_detail` | `store` | `tenantId` | `directory` |
+| Seed category shelf | `/place/category/[slug]` | `CategoryBrowseTracker` | `directory_category` | `category` | `place/category/<slug>` | `place` |
+| Claimed category shelf | `/directory/categories/[slug]` | `CategoryBrowseTracker` | `directory_category` | `category` | `directory/categories/<slug>` | `directory` |
+| Seed city shelf | `/place/city/[citySlug]` | `LocationBrowseTracker` | `directory_location` | `location` | `place/city/<slug>` | `place` |
+| Claimed location shelf | `/directory/location/[location]` | `LocationBrowseTracker` | `directory_location` | `location` | `directory/location/<slug>` | `directory` |
+| Store-type shelf | `/directory/stores/[storeTypeSlug]` | `StoreTypeViewClient` | `directory_store_type` | `category` | `<storeTypeSlug>` | `directory` |
+| Directory home | `/directory` | `DirectoryClient` | `directory_home` | — | — | — |
+| Directory search | `/directory` | `DirectoryClient` | `search_results` | `search` | — | — |
+
+Rules:
+- `context.surface` is **`place | directory`** (the ecosystem axis). Never `directory_seed` / `directory_claimed`.
+- `context.listing_origin` is **`directory_seed | claimed`** — mirrors `directory_listings_list.listing_origin` (column default `claimed`).
+- `entity_id` is a raw id for entries and a path for shelves — do not assume it is a tenant id.
+- Entry CTA/engagement events live in `directory_presence_events` (Layer 3). **QR scans live in `qr_scan_events`** (redirect tracking is authoritative) — do not emit `qr_scanned` into `directory_presence_events`; that event type is reserved for forward compatibility only.
+- The `Directory Traffic` readout shows entry rows (seed-joined) plus a **Shelf Traffic** table (`directory_category` / `directory_location` / `directory_store_type` / `directory_home`). Shelf rows are not seed-scoped, so the entry filters do not apply to them.
+- **Shelf→entry attribution:** shelf cards append `?shelf=<surface>/<type>/<slug>` (e.g. `place/category/indian-grocery`, `directory/location/madison-wi`) to their entry links. `StoreViewTracker` reads the param and stamps `context.referrer_shelf` on the Layer 1 entry view; the readout exposes it as `shelfReferrals` (the **Referring Shelves** section). The `shelfRef` prop is threaded through `StoreCard` → `StoreList` → `DirectoryGrid`/`DirectoryList` and through `UnifiedStoreCard`; all are optional and default to `undefined` (no behavior change elsewhere). Attribution only applies to shelf→entry navigation captured after this shipped.
+- **Layer 3 serves BOTH entry surfaces.** `POST /api/public/directory/places/:slug/events` resolves published listings of either origin (`directory_seed` **or** `claimed`), so `/directory/[slug]` (claimed) fires events too — `storefront_clicked` (Visit Storefront) and `call_clicked` (phone) in addition to the automatic view/heartbeat/session_end. The four `/directory` layouts call `useDirectoryPresenceTracking` from `@/hooks/useDirectoryPresenceTracking` (shared with `/place`).
+- **Two distinct claim funnels — do not conflate:**
+  - `DirectoryPresenceAnalyticsService.getClaimFunnel` = **on-page CTA conversion** (`listing_viewed` → `claim_clicked` → accepted), per-seed/aggregate. Shown on the Directory Traffic page + seed detail panel.
+  - `SeedFunnelAnalyticsService.getCohortFunnel` = **GTM/cohort funnel** (seeds → contactable → invited → claimed, per-channel invite-scan + report-scan rates, benchmark gates), campaign-scoped. Shown on `/settings/admin/directory/funnel`.
+  - They share only the `claims accepted` terminus. Invite/QR-driven conversion belongs to the cohort funnel; on-page CTA conversion belongs here.
+- **Migration `292_backfill_directory_seed_event_context.sql`** — tags historical `directory_detail` rows for seed tenants with `listing_origin`/`surface = 'directory_seed'` (idempotent: only rows where `context->>'surface' IS NULL`) and adds the partial expression index `idx_ubs_directory_detail_surface`. Applied manually to `local` + `prd`; no `schema.prisma` change, so no `prisma generate` needed for it.
+- **Layer 3 (engagement):** `directory_presence_events` (migration `293_directory_presence_events.sql` — slug-scoped, mirrors `mkt_gallery_events`; idempotent CREATE TABLE/INDEX). `DirectoryPresenceAnalyticsService` tracks `listing_viewed | claim_clicked | call_clicked | directions_clicked | storefront_clicked | qr_scanned | session_heartbeat | session_end` (fire-and-forget; 60/min/IP limiter) and exposes `getListingEngagement`, `getRecentEvents`, `getClaimFunnel`, `getDashboardEngagement`, plus seed-scoped `getSeedEngagement` / `getSeedClaimFunnel`. **Uses raw SQL (`$executeRawUnsafe` / `$queryRawUnsafe`) instead of a Prisma model** — deliberately avoids a `prisma db pull` + client regeneration dependency for the events table.
+  - Public capture: `POST /api/public/directory/places/:slug/events` + `/events/batch` (slug-gated to published listings of either origin — `directory_seed` or `claimed` — rate-limited, always 200 on a resolved slug).
+  - Admin: `GET /api/admin/directory-presence/engagement`, `GET /presence-seeds/:id/engagement`, `GET /presence-seeds/:id/funnel` (all `requirePlatformStaff`).
+  - Web: `DirectoryPresencePublicService` (`ttl: 0`) + `useDirectoryPresenceTracking` (`apps/web/src/hooks/useDirectoryPresenceTracking.ts` — shared by `/place` and `/directory`). Wired into `PlaceEntryEditorialLayout` (seed: `claim_clicked` on both claim CTAs) and all four `/directory` entry layouts (claimed: `storefront_clicked` on Visit Storefront, `call_clicked` via the optional `onPhoneClick` prop on `ContactInformationCollapsible`). `PlaceEntryEditorialLayout` requires a `slug` prop (passed by `PlacePageClient` and the retail preview page).
+  - UI: `TrafficEngagementPanel` mounted on the seed detail page (funnel + counts + recent feed); the Directory Traffic page shows Layer 3 summary cards, an aggregate claim funnel, and a Claim CTR column.
+  - **`qr_scanned` is schema/Zod-only** — QR codes are images with no click target (spec §14.6). `directions_clicked` has no dedicated link yet (no directions CTA exists).
+
+**Windows `prisma generate` EPERM:** regenerating while a dev watcher (`pnpm dev:local-vercel` / `tsx watch`) is running fails with `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`. Stop the node/dev processes first, then re-run `pnpm prisma generate`.
 
 ## WhatsApp Channel Integration
 

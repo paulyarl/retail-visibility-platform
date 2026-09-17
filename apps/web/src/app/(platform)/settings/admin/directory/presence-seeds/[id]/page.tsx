@@ -50,6 +50,7 @@ import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCa
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import ReportQrDesignerModal from './ReportQrDesignerModal';
+import TrafficEngagementPanel from './TrafficEngagementPanel';
 import { slugify } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -2119,6 +2120,9 @@ export default function PresenceSeedDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Traffic & Engagement — Layer 3 events on the public listing */}
+      <TrafficEngagementPanel seedId={seedId} />
 
       {/* Claim QR Kit — tracked-scan artifacts, one variant per delivery channel */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">

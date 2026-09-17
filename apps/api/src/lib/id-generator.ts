@@ -1236,6 +1236,16 @@ export function generateDirectoryClaimTokenString(): string {
 }
 
 /**
+ * Generate a directory_presence_events ID (raw engagement event row).
+ * Global ID (not tenant-keyed) — mirrors generateGalleryEventId.
+ * Format: dpe-{nanoid8} (12 chars)
+ */
+export function generateDirectoryPresenceEventId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dpe-${nanoid()}`;
+}
+
+/**
  * Generate a directory_claim_requests ID.
  * Format: dcr-{tenantKey}-{nanoid12}
  * URL-safe, readable, unique, tenant-traceable
