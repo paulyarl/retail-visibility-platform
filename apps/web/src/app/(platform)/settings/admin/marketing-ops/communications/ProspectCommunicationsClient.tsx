@@ -18,14 +18,18 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw, Search, Phone, Mail, MessageSquare, MapPin, Globe, Share2,
   Calendar, CheckCircle2, ChevronDown, ChevronRight, Clock, AlertTriangle,
-  PlayCircle,
+  PlayCircle, Loader2, ShieldCheck, ClipboardList, PhoneCall, X,
 } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, {
   ProspectSummary,
   ProspectTimeline,
   ProspectCommunicationEvent,
+  Campaign,
 } from '@/services/MarketingOpsService';
+import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
+import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
+import LogContactModal from '@/components/marketing-ops/LogContactModal';
 
 // ─── Labels ──────────────────────────────────────────────────────────────
 
@@ -54,6 +58,9 @@ const CHANNEL_CHIP: Record<string, string> = {
   social: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
   other: 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300',
 };
+
+/** Channel union accepted by the canonical seed-touch log (logProspectTouch). */
+type TouchChannel = 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
 
 const STATUS_LABELS: Record<string, string> = {
   queued: 'Queued',
@@ -131,6 +138,24 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // ─── Card actions — verify / resolve verification / log contact / log touch
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Campaign "Log contact" — the modal needs a full Campaign (contact channels
+  // drive the available-channel list), so it's fetched on demand.
+  const [logCampaign, setLogCampaign] = useState<Campaign | null>(null);
+  const [logCampaignLoading, setLogCampaignLoading] = useState(false);
+
+  // Pre-campaign "Log touch" — canonical seed touch (channel/outcome/notes).
+  const [touchOpen, setTouchOpen] = useState(false);
+  const [touchChannel, setTouchChannel] = useState<TouchChannel>('call');
+  const [touchOutcome, setTouchOutcome] = useState('');
+  const [touchNotes, setTouchNotes] = useState('');
+  const [touchBusy, setTouchBusy] = useState(false);
+
   const fetchProspects = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -175,11 +200,67 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
   useEffect(() => {
     if (selectedId) {
       setExpandedId(null);
+      setActionError(null);
+      setActionNotice(null);
       fetchTimeline(selectedId);
     } else {
       setTimeline(null);
     }
   }, [selectedId, fetchTimeline]);
+
+  // ─── Card actions ─────────────────────────────────────────────────────
+
+  const handleVerify = async () => {
+    if (!selectedId) return;
+    setVerifyBusy(true);
+    setActionError(null);
+    setActionNotice(null);
+    try {
+      await marketingOpsService.requestVerification(selectedId);
+      setActionNotice('Verification requested — the prospect is gated until the call is resolved.');
+      await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to request verification');
+    } finally {
+      setVerifyBusy(false);
+    }
+  };
+
+  const handleLogContactOpen = async () => {
+    const campaignId = timeline?.prospect.campaign_id;
+    if (!campaignId) return;
+    setLogCampaignLoading(true);
+    setActionError(null);
+    try {
+      setLogCampaign(await marketingOpsService.getCampaign(campaignId));
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to load campaign');
+    } finally {
+      setLogCampaignLoading(false);
+    }
+  };
+
+  const handleLogTouch = async () => {
+    if (!selectedId) return;
+    setTouchBusy(true);
+    setActionError(null);
+    try {
+      await marketingOpsService.logProspectTouch(selectedId, {
+        channel: touchChannel,
+        outcome: (touchOutcome || undefined) as any,
+        notes: touchNotes || undefined,
+      });
+      setTouchOpen(false);
+      setTouchOutcome('');
+      setTouchNotes('');
+      setActionNotice('Touch logged.');
+      await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to log touch');
+    } finally {
+      setTouchBusy(false);
+    }
+  };
 
   const filteredProspects = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -297,9 +378,63 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
                   <span className={`rounded px-1.5 py-0.5 font-medium ${STATUS_CHIP[timeline.prospect.status] ?? STATUS_CHIP.queued}`}>
                     {STATUS_LABELS[timeline.prospect.status] ?? timeline.prospect.status}
                   </span>
+                  <VerificationBadge verification={timeline.prospect.verification} />
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                {/* Verify-then-outreach actions — mirrors the PG promote panel.
+                    Queued prospects can be gated behind the verification call;
+                    gated ones open the shared resolve modal (outcome + verified
+                    NAP + call notes). */}
+                {timeline.prospect.status === 'queued' && (
+                  <button
+                    type="button"
+                    onClick={handleVerify}
+                    disabled={verifyBusy}
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50"
+                    title="Gate outreach on a phone call — moves the prospect to Verify, then resolve with the verified NAP"
+                  >
+                    {verifyBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                    Verify
+                  </button>
+                )}
+                {timeline.prospect.status === 'verify_then_outreach' && (
+                  <button
+                    type="button"
+                    onClick={() => setResolveOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                    title="Resolve the verification call — capture the outcome, verified NAP and call notes; they flow into the campaign on promotion"
+                  >
+                    <ShieldCheck className="h-3 w-3" />
+                    Resolve verification
+                  </button>
+                )}
+
+                {/* Log a communication — campaign outreach (full method/message/
+                    outcome capture) once a campaign exists, otherwise the
+                    canonical pre-campaign seed touch (call notes). */}
+                {timeline.prospect.campaign_id ? (
+                  <button
+                    type="button"
+                    onClick={handleLogContactOpen}
+                    disabled={logCampaignLoading}
+                    className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {logCampaignLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardList className="h-3 w-3" />}
+                    Log contact
+                  </button>
+                ) : timeline.prospect.seed_id && !['dismissed', 'campaign_created'].includes(timeline.prospect.status) ? (
+                  <button
+                    type="button"
+                    onClick={() => setTouchOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-md bg-teal-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-teal-700"
+                    title="Log a pre-campaign touch — call, text, mail or walk-in"
+                  >
+                    <PhoneCall className="h-3 w-3" />
+                    Log touch
+                  </button>
+                ) : null}
+
                 {timeline.prospect.campaign_id && (
                   <Link
                     href={`/settings/admin/marketing-ops/campaigns/${timeline.prospect.campaign_id}`}
@@ -318,6 +453,26 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
                 )}
               </div>
             </div>
+
+            {/* Action feedback */}
+            {actionError && (
+              <div className="mt-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-400 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span className="flex-1">{actionError}</span>
+                <button type="button" onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            {actionNotice && (
+              <div className="mt-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400 flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span className="flex-1">{actionNotice}</span>
+                <button type="button" onClick={() => setActionNotice(null)} className="text-emerald-500 hover:text-emerald-700">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Summary stats */}
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
@@ -399,6 +554,119 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
             )}
           </div>
         </>
+      )}
+
+      {/* Verify-then-outreach resolution modal — shared with the queue page
+          and the PG promote panel (outcome + verified NAP + call notes). */}
+      {resolveOpen && timeline && (
+        <ResolveVerificationModal
+          entry={timeline.prospect}
+          onClose={() => setResolveOpen(false)}
+          onResolved={async () => {
+            if (selectedId) await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
+            setActionNotice('Verification resolved.');
+          }}
+        />
+      )}
+
+      {/* Campaign outreach log — full method / message / outcome capture. */}
+      {logCampaign && (
+        <LogContactModal
+          campaign={logCampaign}
+          onClose={() => setLogCampaign(null)}
+          onLogged={async () => {
+            setLogCampaign(null);
+            setActionNotice('Contact logged.');
+            if (selectedId) await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
+          }}
+        />
+      )}
+
+      {/* Pre-campaign seed touch — canonical call-notes capture. */}
+      {touchOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 max-w-md w-full">
+            <div className="flex items-start gap-3 mb-4">
+              <PhoneCall className="w-5 h-5 text-teal-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Log touch</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {timeline?.prospect.business_name ?? timeline?.prospect.title ?? 'Prospect'} · pre-campaign
+                </p>
+              </div>
+              <button onClick={() => setTouchOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Channel</label>
+            <select
+              value={touchChannel}
+              onChange={(e) => setTouchChannel(e.target.value as TouchChannel)}
+              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+            >
+              {(['call', 'email', 'sms', 'mail', 'form', 'referral', 'other'] as TouchChannel[]).map((c) => (
+                <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Outcome</label>
+            <select
+              value={touchOutcome}
+              onChange={(e) => setTouchOutcome(e.target.value)}
+              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+            >
+              <option value="">— logged only (no signal) —</option>
+              <optgroup label="Live contact">
+                <option value="connected">connected (live reply → in thread)</option>
+                <option value="claimed">claimed</option>
+              </optgroup>
+              <optgroup label="Retry / advance">
+                <option value="no_answer">no answer (retry +1d, max 2)</option>
+                <option value="voicemail">voicemail (next rung +3bd)</option>
+                <option value="no_reply">no reply — email (next rung +5bd)</option>
+                <option value="unread">unread — text/DM (abandon +2d)</option>
+                <option value="read_no_reply">read, no reply (next rung +5d)</option>
+                <option value="form_submitted">form submitted (+7d)</option>
+                <option value="referral_asked">referral asked (+14d)</option>
+              </optgroup>
+              <optgroup label="Dead channel">
+                <option value="bad_number">bad number / disconnected</option>
+                <option value="bounce">bounce (email dead)</option>
+              </optgroup>
+              <optgroup label="Terminal">
+                <option value="not_interested">not interested (dismiss)</option>
+              </optgroup>
+            </select>
+
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call notes</label>
+            <textarea
+              value={touchNotes}
+              onChange={(e) => setTouchNotes(e.target.value)}
+              rows={3}
+              placeholder="What happened…"
+              className="w-full mb-4 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setTouchOpen(false)}
+                disabled={touchBusy}
+                className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogTouch}
+                disabled={touchBusy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                {touchBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PhoneCall className="w-3.5 h-3.5" />}
+                Log touch
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

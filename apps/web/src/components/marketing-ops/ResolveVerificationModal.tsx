@@ -13,13 +13,28 @@
 import { useState } from 'react';
 import { Loader2, Phone, Plus, Trash2, X } from 'lucide-react';
 import marketingOpsService, {
-  ProspectQueueEntry,
   VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
   VerifiedSocialProfile, VerifiedDirectoryProfile, verificationClearsCampaign,
 } from '@/services/MarketingOpsService';
 
+/**
+ * Minimal shape the modal needs from the queue row. Deliberately structural
+ * (not ProspectQueueEntry) so surfaces that don't carry the full entry — e.g.
+ * the prospect communications timeline — can still open the shared modal.
+ * ProspectQueueEntry satisfies this.
+ */
+export interface VerificationEntryLike {
+  id: string;
+  business_name: string | null;
+  title?: string | null;
+  category?: string | null;
+  city?: string | null;
+  state?: string | null;
+  business_snapshot?: Record<string, any> | null;
+}
+
 interface ResolveVerificationModalProps {
-  entry: ProspectQueueEntry;
+  entry: VerificationEntryLike;
   onClose: () => void;
   /** Called after a successful resolve — refresh the host surface. */
   onResolved: () => void | Promise<void>;

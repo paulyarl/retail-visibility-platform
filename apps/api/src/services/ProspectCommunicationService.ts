@@ -93,6 +93,10 @@ export interface ProspectSummary {
   business_prospect_id: string | null;
   last_contact_at: string | null;
   contact_count: number;
+  /** Populated on the timeline payload only — the raw queue row's snapshot,
+   *  needed by the shared resolve-verification modal to pre-fill verified NAP. */
+  business_snapshot?: Record<string, any> | null;
+  verification?: Record<string, any> | null;
 }
 
 export interface ProspectTimeline {
@@ -405,6 +409,8 @@ class ProspectCommunicationServiceClass extends BaseService {
         business_prospect_id: businessProspectId,
         last_contact_at: summary.last_contact_at,
         contact_count: summary.total_events,
+        business_snapshot: (entry.business_snapshot ?? null) as Record<string, any> | null,
+        verification: (entry.verification ?? null) as Record<string, any> | null,
       };
 
       return {

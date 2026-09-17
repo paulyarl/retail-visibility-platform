@@ -1358,6 +1358,10 @@ export interface ProspectSummary {
   business_prospect_id: string | null;
   last_contact_at: string | null;
   contact_count: number;
+  /** Timeline payload only — raw queue snapshot + verification, used by the
+   *  shared resolve-verification modal. */
+  business_snapshot?: Record<string, any> | null;
+  verification?: VerificationRecord | null;
 }
 
 export interface ProspectCommunicationEvent {
