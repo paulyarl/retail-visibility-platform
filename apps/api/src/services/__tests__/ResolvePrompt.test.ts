@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveGoldStandard: vi.fn(async (_category: string, _platform?: string | null) => null),
@@ -49,7 +49,12 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
   };
   const mockFormatEstablishment = vi.fn(() => '');
   const mockFormatDiscovery = vi.fn(() => '');
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery };
+  const mockCatalogService = {
+    applicableReasons: vi.fn(async () => []),
+    currentRevision: vi.fn(async () => 1),
+    serializeCatalogBlock: vi.fn(() => ''),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -90,6 +95,12 @@ vi.mock('../intelligence/MarketContextLoader', () => ({
   },
 }));
 
+vi.mock('../intelligence/BronzeReasonCatalogService', () => ({
+  BronzeReasonCatalogService: {
+    getInstance: () => mockCatalogService,
+  },
+}));
+
 vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
   formatEstablishmentMarketContext: mockFormatEstablishment,
   formatDiscoveryMarketContext: mockFormatDiscovery,
@@ -117,6 +128,13 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     mockMarketContextLoader.loadMarketContext.mockImplementation(async () => ({ category: {}, location: {} }));
     mockFormatEstablishment.mockImplementation(() => '');
     mockFormatDiscovery.mockImplementation(() => '');
+    // Reset bronze profile resolution to absent (no folded city scan) and the
+    // catalog service to an empty catalog.
+    mockProfileService.resolveBronzeStandard.mockImplementation(async () => null);
+    mockProfileService.serializeBronzeStandard.mockImplementation(() => '');
+    mockCatalogService.applicableReasons.mockImplementation(async () => []);
+    mockCatalogService.currentRevision.mockImplementation(async () => 1);
+    mockCatalogService.serializeCatalogBlock.mockImplementation(() => '');
   });
 
   const makeTemplate = (promptType: string, body = 'Hello {{business_name}} in {{category}}') => ({
@@ -729,6 +747,103 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
   // The gold standard is now business-scope only — it is consumed by the
   // seed/business audit, not by location or category enrichment. These tests
   // verify that enrichment prompts do NOT inject the gold standard.
+  describe('emerging establishment — folded bronze city scan (spec §6.3 / D4)', () => {
+    const makeEstabTemplate = () => ({
+      body: 'Establish the intelligence profile for {{category}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_profile' },
+      outputSchema: { name: 'intelligence_profile' },
+    });
+
+    const makeEstabCampaign = (overrides: Record<string, any> = {}) => ({
+      id: 'camp-estab-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      intelligence_focus: 'emerging',
+      intelligence_platform: null,
+      intelligence_campaign_kind: 'establishment',
+      ...overrides,
+    });
+
+    it('injects hunt list + dual-payload directive when a bronze profile resolves', async () => {
+      const bronzeProfile = { id: 'bz-african-001', version: 1, reference_city: null, reference_state: null };
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(bronzeProfile);
+      mockProfileService.serializeBronzeStandard.mockReturnValueOnce(
+        '=== BRONZE STANDARD — NATIONAL REFERENCE ===\nhunt list',
+      );
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([{ reason_key: 'trade_manifest_only' }]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(7);
+      mockCatalogService.serializeCatalogBlock.mockReturnValueOnce('=== BRONZE REASON CATALOG ===\nrev 7');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE STANDARD — CITY SCAN (FOLDED)');
+      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL REFERENCE');
+      expect(renderedPrompt).toContain('BRONZE REASON CATALOG');
+      expect(renderedPrompt).toContain('DUAL-PAYLOAD OUTPUT — FOLDED CITY BRONZE SCAN');
+      expect(renderedPrompt).toContain('PAYLOAD 2 — bronze_standard_scan');
+      expect(renderedPrompt).toContain('reference_city = "Indianapolis"');
+      expect(renderedPrompt).toContain('reference_state = "IN"');
+      // The bronze output contract is injected so the second payload validates
+      expect(renderedPrompt).toContain('reason_coverage');
+      expect(mockProfileService.resolveBronzeStandard).toHaveBeenCalledWith(
+        'African Grocery Store', null, 'Indianapolis', 'IN', undefined,
+      );
+      expect(mockProfileService.serializeBronzeStandard).toHaveBeenCalledWith(
+        bronzeProfile, 'establishment_reference', undefined,
+      );
+      expect(mockCatalogService.applicableReasons).toHaveBeenCalledWith(
+        expect.objectContaining({ categoryKey: 'African Grocery Store', city: 'Indianapolis', state: 'IN' }),
+        undefined,
+      );
+      expect(resolution.bronze_standard_profile_id).toBe('bz-african-001');
+      expect(resolution.bronze_standard_profile_version).toBe(1);
+    });
+
+    it('skips the fold when no bronze profile resolves', async () => {
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('CITY SCAN (FOLDED)');
+      expect(renderedPrompt).not.toContain('DUAL-PAYLOAD OUTPUT');
+      expect(mockCatalogService.applicableReasons).not.toHaveBeenCalled();
+      expect(resolution.bronze_standard_profile_id).toBeNull();
+    });
+
+    it('does not fold into competitive or national establishment campaigns', async () => {
+      // Competitive focus — bronze never enters competitive output (§9).
+      const competitive = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign({ intelligence_focus: 'competitive' }),
+        variables: undefined,
+      });
+      expect(competitive.renderedPrompt).not.toContain('CITY SCAN (FOLDED)');
+      expect(mockProfileService.resolveBronzeStandard).not.toHaveBeenCalled();
+
+      // Nationwide campaign — no city/state, so no market to hunt (stage 2 is
+      // city-scoped by construction).
+      const national = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign({ city: null, state: null }),
+        variables: undefined,
+      });
+      expect(national.renderedPrompt).not.toContain('CITY SCAN (FOLDED)');
+      expect(mockProfileService.resolveBronzeStandard).not.toHaveBeenCalled();
+    });
+  });
+
   describe('enrichment prompt — gold standard not injected (V8 reframing)', () => {
     const makeEnrichmentTemplate = (scope: string, body = 'CITY: {{city}} STATE: {{state}}') => ({
       body,

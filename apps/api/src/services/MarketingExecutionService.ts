@@ -1209,7 +1209,66 @@ export class MarketingExecutionService extends BaseService {
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
       const campaignPlatform = (input.campaign as any).intelligence_platform || null;
       const focusBlock = this.renderEstablishmentFocusBlock(focus, campaignPlatform);
-      const withFocus = focusBlock ? baseRendered + '\n' + focusBlock : baseRendered;
+      let rendered = focusBlock ? baseRendered + '\n' + focusBlock : baseRendered;
+
+      // ─── Folded stage-2 bronze city scan (spec §6.3, sprint-plan D4) ────
+      // The stage-2 city scan can run INSIDE the emerging-establishment
+      // campaign instead of as a separate bronze_standards/discovery
+      // campaign — the artifact flow is identical because each payload is
+      // persisted by its own schema-named import hook (§6.1). When this
+      // city-scoped emerging establishment campaign's category has a
+      // resolvable bronze profile, inject the hunt list (profile reference
+      // + this market's location-scoped catalog rows + the bronze output
+      // contract) and instruct the agent to emit a SECOND payload. No
+      // injection when nothing resolves — the standalone bronze discovery
+      // campaign owns the degraded-mode warning.
+      const estCampaignCity = (input.campaign as any).city || null;
+      const estCampaignState = (input.campaign as any).state || null;
+      let bronzeFoldDirective = '';
+      let bronzeFoldProfileId: string | null = null;
+      let bronzeFoldProfileVersion: number | null = null;
+      if (focus === 'emerging' && estCampaignCity && estCampaignState && category) {
+        const profileService = IntelligenceProfileService.getInstance();
+        const bronzeStandard = await profileService.resolveBronzeStandard(
+          category, campaignPlatform, estCampaignCity, estCampaignState, ctx,
+        );
+        if (bronzeStandard) {
+          const catalogService = BronzeReasonCatalogService.getInstance();
+          const [referenceBlock, cityRows, catalogRevision] = await Promise.all([
+            profileService.serializeBronzeStandard(bronzeStandard, 'establishment_reference', ctx),
+            catalogService.applicableReasons({
+              categoryKey: category,
+              city: estCampaignCity,
+              state: estCampaignState,
+              platform: campaignPlatform,
+            }, ctx),
+            catalogService.currentRevision(),
+          ]);
+          const cityCatalogBlock = catalogService.serializeCatalogBlock(cityRows, catalogRevision);
+          const bronzeOutputFormat = resolveOutputSchema('bronze_standard_scan')?.promptSuffix ?? '';
+          rendered = rendered
+            + '\n\n=== BRONZE STANDARD — CITY SCAN (FOLDED) ===\n'
+            + 'This establishment run also produces the city bronze-standard profile for this market. '
+            + 'The sections below are the stage-2 hunt list: cover every applicable reason at THIS market '
+            + 'and emit the second payload described in the DUAL-PAYLOAD OUTPUT directive at the end of this prompt.'
+            + (referenceBlock ? '\n' + referenceBlock : '')
+            + (cityCatalogBlock ? '\n' + cityCatalogBlock : '')
+            + (bronzeOutputFormat ? '\n' + bronzeOutputFormat : '');
+          bronzeFoldDirective = this.renderBronzeFoldDirective(estCampaignCity, estCampaignState, campaignPlatform);
+          bronzeFoldProfileId = bronzeStandard.id;
+          bronzeFoldProfileVersion = bronzeStandard.version;
+          logger.info('Bronze standard city scan folded into emerging establishment prompt', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            city: estCampaignCity,
+            state: estCampaignState,
+            bronzeStandardProfileId: bronzeStandard.id,
+            bronzeStandardProfileVersion: bronzeStandard.version,
+            catalogRevision,
+            catalogReasonCount: cityRows.length,
+          });
+        }
+      }
 
       logger.info('Intelligence Profile Establishment prompt resolved with focus', ctx, {
         campaignId: input.campaign.id,
@@ -1219,8 +1278,14 @@ export class MarketingExecutionService extends BaseService {
       });
 
       return {
-        renderedPrompt: this.appendPromptSuffix(withFocus, promptSuffix),
-        resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        renderedPrompt: this.appendPromptSuffix(rendered, promptSuffix) + bronzeFoldDirective,
+        resolution: {
+          profile_id: null,
+          profile_version: null,
+          intelligence_mode: 'none',
+          bronze_standard_profile_id: bronzeFoldProfileId,
+          bronze_standard_profile_version: bronzeFoldProfileVersion,
+        },
       };
     }
 
@@ -2395,6 +2460,39 @@ SEARCH BOUNDARY:
   They may be noted in empty_slot_note as "seen outside market" context.
 ${scopeNote}
 === END SEARCH SCOPE ===`;
+  }
+
+  /**
+   * Dual-payload directive for the folded stage-2 bronze city scan (spec
+   * §6.3, sprint-plan D4 follow-up). Appended AFTER the primary output
+   * suffix so it is the final word: the establishment template's output
+   * contract demands a single JSON object, and this directive amends it for
+   * the folded run — two labeled payloads, imported separately through their
+   * own schema-named post-import hooks.
+   */
+  private renderBronzeFoldDirective(
+    city: string,
+    state: string,
+    platform: string | null,
+  ): string {
+    const platformValue = platform && platform !== 'all' ? platform : 'null';
+    return `
+=== DUAL-PAYLOAD OUTPUT — FOLDED CITY BRONZE SCAN ===
+This run produces TWO payloads. Emit them in this order, each preceded by its
+payload label on its own line:
+
+PAYLOAD 1 — intelligence_profile
+  The Category Intelligence Profile JSON described by the EXPECTED OUTPUT
+  FORMAT section of this prompt.
+
+PAYLOAD 2 — bronze_standard_scan
+  The city bronze-standard scan JSON described by the BRONZE STANDARD —
+  CITY SCAN (FOLDED) section's output format. Scope it to ${city}, ${state}:
+  reference_city = "${city}", reference_state = "${state}",
+  reference_platform = ${platformValue === 'null' ? 'null' : `"${platformValue}"`}, and catalog_revision echoes the injected
+  catalog block. Produce exactly one reason_coverage entry per applicable
+  reason for THIS market — including location-scoped reasons — and list
+  non-applicable keys in not_applicable_reasons.`;
   }
 
   /**

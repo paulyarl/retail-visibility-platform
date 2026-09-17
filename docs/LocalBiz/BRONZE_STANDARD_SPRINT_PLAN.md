@@ -220,5 +220,5 @@ Following the `/manual-script-templates` precedent (`marketing-ops.ts:2442-2584`
 - Region scope (§3.6.4) — deliberately unsupported; city+state only.
 - Auto-detection of external fills (D2) — operator-initiated this sprint.
 - Internal test-scan execution (D3) — render/validate only.
-- Folding stage 2 into the emerging-establishment campaign (D4) — separate campaign ships first.
+- ~~Folding stage 2 into the emerging-establishment campaign (D4)~~ — **shipped**: a city-scoped `emerging`/`establishment` campaign whose category has a resolvable bronze profile gets the folded stage-2 hunt list + `DUAL-PAYLOAD OUTPUT` directive (`MarketingExecutionService` establishment branch); PAYLOAD 2 imports via `bronze_standard_scan` against the same campaign (the schema-named hook already stamps the campaign's city/state). The bronze city template's campaign picker (`PromptWorkspaceClient.compatibleCampaigns`) surfaces `emerging`/`establishment` campaigns for that import. Separate campaign remains fully supported.
 - Competitive-scan bronze injection — prohibited by §9.

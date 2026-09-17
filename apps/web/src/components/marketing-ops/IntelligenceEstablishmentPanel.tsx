@@ -259,6 +259,14 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
           {' '}{theme.produces}{' '}
           {theme.downstream}
         </p>
+        {focus === 'emerging' && campaign.city && campaign.state && (
+          <p className={`text-xs ${theme.headerBodyClass} leading-relaxed mt-2 pt-2 border-t ${theme.headerBorder}`}>
+            If an active bronze-standard profile exists for this category, this run also emits a
+            folded city bronze payload (<span className="font-medium">PAYLOAD 2 — bronze_standard_scan</span>).
+            Import it separately against this campaign via the Bronze Standard Scan (City Discovery)
+            template — it persists as a draft city bronze profile.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

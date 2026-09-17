@@ -729,6 +729,11 @@ export class MarketingCampaignService extends BaseService {
         const profileService = IntelligenceProfileService.getInstance();
         const hasProfile = input.intelligenceFocus === 'gold_standards'
           ? await profileService.resolveGoldStandard(input.category || '', input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
+          : input.intelligenceFocus === 'bronze_standards'
+          // Bronze cascades city → state → nationwide: a city (stage-2) scan
+          // is backed by the national bronze profile even before a city
+          // profile exists (BRONZE_STANDARD_SPEC §6.1).
+          ? await profileService.resolveBronzeStandard(input.category || '', input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
           : await profileService.resolve(input.category || '', input.intelligenceFocus as any, input.city || null, input.intelligencePlatform || null, ctx);
         if (!hasProfile) {
           const focusLabel = input.intelligenceFocus === 'gold_standards'

@@ -281,10 +281,19 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     //     ones used to bootstrap a profile).
     let filtered: Campaign[];
     if (isIntelligenceDiscovery) {
-      filtered = scopeMatch.filter((c) =>
-        (c.intelligence_campaign_kind ?? 'discovery') === 'discovery' &&
-        (c.intelligence_focus ?? 'emerging') === templateFocus,
-      );
+      filtered = scopeMatch.filter((c) => {
+        const kind = c.intelligence_campaign_kind ?? 'discovery';
+        const campaignFocus = c.intelligence_focus ?? 'emerging';
+        if (kind === 'discovery' && campaignFocus === templateFocus) return true;
+        // Folded stage-2 (BRONZE_STANDARD_SPEC §6.3, sprint plan D4): the
+        // bronze city scan can run inside an EMERGING establishment
+        // campaign — the run emits a second bronze_standard_scan payload
+        // that is imported against that campaign (the schema-named hook
+        // stamps the draft with the campaign's city/state). Surface
+        // emerging establishment campaigns in the bronze city template's
+        // picker so that import is possible.
+        return templateFocus === 'bronze_standards' && kind === 'establishment' && campaignFocus === 'emerging';
+      });
     } else if (isIntelligenceEstablishment) {
       filtered = scopeMatch.filter((c) =>
         (c.intelligence_campaign_kind ?? 'discovery') === 'establishment',
