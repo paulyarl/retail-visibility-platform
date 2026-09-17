@@ -729,11 +729,16 @@ describe('MarketingProspectQueueService', () => {
       expect(passedBusiness.business_phone).toBe('512-555-0100');
       expect(passedBusiness.website).toEqual(expect.objectContaining({ url: 'https://joepizza.example.com' }));
       expect(passedBusiness.category).toBe('restaurant');
-      // Verified city differs from the parent-derived city → patched.
+      // Verified city differs from the parent-derived city → patched onto the
+      // top-level geo columns AND the structured address columns.
       expect(mockCampaigns.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'mcamp-scan-001' },
-          data: { city: 'Dallas' },
+          data: expect.objectContaining({
+            city: 'Dallas',
+            address_city: 'Dallas',
+            address_state: 'TX',
+          }),
         }),
       );
     });
@@ -1308,6 +1313,81 @@ describe('MarketingProspectQueueService', () => {
         }),
       ).rejects.toThrow(/not found/i);
     });
+
+    it('writes verified social + directory profiles into the snapshot and verification record', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedSocialProfiles: [{ platform: 'facebook', url: 'https://facebook.com/daree' }],
+        verifiedDirectoryProfiles: [{ platform: 'google', url: 'https://g.page/daree' }],
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            business_snapshot: expect.objectContaining({
+              social_profiles: [{ platform: 'facebook', url: 'https://facebook.com/daree' }],
+              directory_profiles: [
+                expect.objectContaining({ platform: 'google', url: 'https://g.page/daree', claim_status: 'unknown' }),
+              ],
+            }),
+            verification: expect.objectContaining({
+              verified_social_profiles: [{ platform: 'facebook', url: 'https://facebook.com/daree' }],
+              verified_directory_profiles: [expect.objectContaining({ platform: 'google' })],
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('drops incomplete social/directory rows rather than persisting blanks', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedSocialProfiles: [{ platform: 'facebook', url: '  ' }, { platform: '', url: 'https://x.example.com' }],
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      const updateData = mockQueue.update.mock.calls[0][0].data;
+      expect(updateData.business_snapshot?.social_profiles).toBeUndefined();
+      expect(updateData.verification?.verified_social_profiles).toBeUndefined();
+    });
+
+    it('rejects nextAction=create_campaign for a non-operational outcome (closed temporarily)', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      }));
+
+      await expect(
+        MarketingProspectQueueService.resolveVerification({
+          queueEntryId: 'pque-test-001',
+          outcome: 'closed_temporarily',
+          nextAction: 'create_campaign',
+        }),
+      ).rejects.toThrow(/cannot create a campaign/i);
+    });
   });
 
   // ─── update editability + createCampaign guard (Migration 255) ────────
@@ -1338,6 +1418,41 @@ describe('MarketingProspectQueueService', () => {
       await expect(
         MarketingProspectQueueService.createCampaignFromQueue({ queueEntryId: 'pque-test-001' }),
       ).rejects.toThrow(/pending verification/i);
+    });
+  });
+
+  describe('createCampaignFromQueue — verification filter (non-operational outcomes)', () => {
+    it('blocks a requeued entry whose outcome was temporarily closed', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({
+        status: 'queued',
+        verification: { requested_at: '2026-09-01T00:00:00Z', outcome: 'closed_temporarily' },
+      }));
+
+      await expect(
+        MarketingProspectQueueService.createCampaignFromQueue({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/failed verification/i);
+    });
+
+    it('blocks a requeued entry whose outcome was permanently closed', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({
+        status: 'queued',
+        verification: { requested_at: '2026-09-01T00:00:00Z', outcome: 'closed' },
+      }));
+
+      await expect(
+        MarketingProspectQueueService.createCampaignFromQueue({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/failed verification/i);
+    });
+
+    it('blocks a requeued entry whose outcome was unreachable', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({
+        status: 'queued',
+        verification: { requested_at: '2026-09-01T00:00:00Z', outcome: 'unreachable' },
+      }));
+
+      await expect(
+        MarketingProspectQueueService.createCampaignFromQueue({ queueEntryId: 'pque-test-001' }),
+      ).rejects.toThrow(/failed verification/i);
     });
   });
 });

@@ -7,9 +7,10 @@ import {
   UserPlus, UserX, Calendar, AlertTriangle, Phone,
 } from 'lucide-react';
 import marketingOpsService, {
-  ProspectQueueEntry, ProspectPriority, ProspectDismissReason,
-  VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
+  ProspectQueueEntry, ProspectPriority, ProspectDismissReason, verificationClearsCampaign,
 } from '@/services/MarketingOpsService';
+import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
+import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import {
@@ -77,29 +78,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [checklistError, setChecklistError] = useState<{ campaignId: string; steps: { id: string; title: string; stage_tag?: string | null }[] } | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
-  const [resolveModalEntry, setResolveModalEntry] = useState<ProspectQueueEntry | null>(null);
-  const [resolveForm, setResolveForm] = useState<{
-    outcome: VerificationOutcome;
-    verifiedName: string;
-    verifiedPhone: string;
-    verifiedAddress: string;
-    verifiedCity: string;
-    verifiedState: string;
-    verifiedWebsite: string;
-    verifiedEmail: string;
-    verifiedCategory: string;
-    verifiedOwnerName: string;
-    ownerReceptivity: OwnerReceptivity | '';
-    callNotes: string;
-    nextAction: VerificationNextAction;
-  }>({
-    outcome: 'operational',
-    verifiedName: '', verifiedPhone: '', verifiedAddress: '', verifiedCity: '', verifiedState: '',
-    verifiedWebsite: '', verifiedEmail: '', verifiedCategory: '', verifiedOwnerName: '',
-    ownerReceptivity: '', callNotes: '', nextAction: 'create_campaign',
-  });
-  const [resolving, setResolving] = useState(false);
-  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [resolveEntry, setResolveEntry] = useState<ProspectQueueEntry | null>(null);
 
   const staffUsers = useStaffUsers();
   const currentUserId = staffUsers[0]?.id ?? null;
@@ -258,68 +237,6 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
     }
   };
 
-  const openResolveModal = (entry: ProspectQueueEntry) => {
-    const snap = entry.business_snapshot ?? {};
-    const nap = snap.verified_nap ?? snap.nap ?? {};
-    setResolveForm({
-      outcome: 'operational',
-      verifiedName: nap.name ?? entry.business_name ?? '',
-      verifiedPhone: nap.phone ?? snap.phone ?? '',
-      verifiedAddress: nap.address ?? snap.address ?? '',
-      verifiedCity: nap.city ?? entry.city ?? '',
-      verifiedState: nap.state ?? entry.state ?? '',
-      verifiedWebsite: snap.website ?? '',
-      verifiedEmail: snap.email ?? '',
-      verifiedCategory: entry.category ?? snap.category ?? '',
-      verifiedOwnerName: snap.owner_name ?? (Array.isArray(snap.owner_names) ? snap.owner_names[0] : '') ?? '',
-      ownerReceptivity: '',
-      callNotes: '',
-      nextAction: 'create_campaign',
-    });
-    setResolveError(null);
-    setResolveModalEntry(entry);
-  };
-
-  const handleOutcomeChange = (outcome: VerificationOutcome) => {
-    // Auto-select nextAction based on outcome + receptivity heuristics.
-    let nextAction: VerificationNextAction = 'requeue';
-    if (outcome === 'closed' || outcome === 'wrong_business') nextAction = 'dismiss';
-    else if (outcome === 'unreachable') nextAction = 'dismiss';
-    else if (outcome === 'operational') nextAction = 'create_campaign';
-    else if (outcome === 'relocated') nextAction = 'requeue';
-    setResolveForm((f) => ({ ...f, outcome, nextAction }));
-  };
-
-  const handleResolve = async () => {
-    if (!resolveModalEntry) return;
-    setResolving(true);
-    setResolveError(null);
-    try {
-      const input: VerificationResolutionInput = {
-        outcome: resolveForm.outcome,
-        verifiedName: resolveForm.verifiedName || undefined,
-        verifiedPhone: resolveForm.verifiedPhone || undefined,
-        verifiedAddress: resolveForm.verifiedAddress || undefined,
-        verifiedCity: resolveForm.verifiedCity || undefined,
-        verifiedState: resolveForm.verifiedState || undefined,
-        verifiedWebsite: resolveForm.verifiedWebsite || undefined,
-        verifiedEmail: resolveForm.verifiedEmail || undefined,
-        verifiedCategory: resolveForm.verifiedCategory || undefined,
-        verifiedOwnerName: resolveForm.verifiedOwnerName || undefined,
-        ownerReceptivity: resolveForm.ownerReceptivity || undefined,
-        callNotes: resolveForm.callNotes || undefined,
-        nextAction: resolveForm.nextAction,
-      };
-      await marketingOpsService.resolveVerification(resolveModalEntry.id, input);
-      setResolveModalEntry(null);
-      await onRefresh();
-    } catch (err: any) {
-      setResolveError(err.message || 'Failed to resolve verification');
-    } finally {
-      setResolving(false);
-    }
-  };
-
   // ─── Render ────────────────────────────────────────────────────────────
 
   const allColumns = ['__queued__', '__verify__', ...stageColumns, ...(showClosed ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed') : [])];
@@ -415,7 +332,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       onTransition={(toStage) => entry.processed_campaign_id && handleTransition(entry.processed_campaign_id, toStage)}
                       onOpenDismissReason={() => setDismissReasonOpen(dismissReasonOpen === entry.id ? null : entry.id)}
                       onRequestVerify={() => handleRequestVerification(entry.id)}
-                      onOpenResolve={() => openResolveModal(entry)}
+                      onOpenResolve={() => setResolveEntry(entry)}
                     />
                   ))}
                 </div>
@@ -464,174 +381,13 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
         </div>
       )}
 
-      {/* Verify-then-outreach resolution modal */}
-      {resolveModalEntry && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 max-w-lg w-full max-h-[90vh] overflow-auto">
-            <div className="flex items-start gap-3 mb-4">
-              <Phone className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Resolve verification
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {resolveModalEntry.business_name ?? resolveModalEntry.title} · {resolveModalEntry.city ?? '—'}
-                </p>
-              </div>
-              <button onClick={() => setResolveModalEntry(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {resolveError && (
-              <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-3 py-2 text-xs text-red-800 dark:text-red-300">
-                {resolveError}
-              </div>
-            )}
-
-            {/* Outcome */}
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call outcome</label>
-            <select
-              value={resolveForm.outcome}
-              onChange={(e) => handleOutcomeChange(e.target.value as VerificationOutcome)}
-              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-            >
-              <option value="operational">Operational — open and reachable</option>
-              <option value="closed">Closed — out of business</option>
-              <option value="relocated">Relocated — moved to a new address</option>
-              <option value="unreachable">Unreachable — no answer after attempts</option>
-              <option value="wrong_business">Wrong business — not the target</option>
-            </select>
-
-            {/* Verified NAP — shown for operational + relocated */}
-            {(resolveForm.outcome === 'operational' || resolveForm.outcome === 'relocated') && (
-              <div className="mb-3 space-y-2">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Verified NAP</label>
-                <input
-                  type="text"
-                  placeholder="Business name"
-                  value={resolveForm.verifiedName}
-                  onChange={(e) => setResolveForm((f) => ({ ...f, verifiedName: e.target.value }))}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone"
-                  value={resolveForm.verifiedPhone}
-                  onChange={(e) => setResolveForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Street address"
-                  value={resolveForm.verifiedAddress}
-                  onChange={(e) => setResolveForm((f) => ({ ...f, verifiedAddress: e.target.value }))}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                />
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="City"
-                    value={resolveForm.verifiedCity}
-                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedCity: e.target.value }))}
-                    className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="State"
-                    value={resolveForm.verifiedState}
-                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedState: e.target.value }))}
-                    className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
-                  Enrichment <span className="font-normal text-gray-400">— flows into the campaign record</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    placeholder="Website (https://…)"
-                    value={resolveForm.verifiedWebsite}
-                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedWebsite: e.target.value }))}
-                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={resolveForm.verifiedEmail}
-                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedEmail: e.target.value }))}
-                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Category"
-                    value={resolveForm.verifiedCategory}
-                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedCategory: e.target.value }))}
-                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Owner name"
-                    value={resolveForm.verifiedOwnerName}
-                    onChange={(e) => setResolveForm((f) => ({ ...f, verifiedOwnerName: e.target.value }))}
-                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Owner receptivity */}
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Owner receptivity</label>
-            <select
-              value={resolveForm.ownerReceptivity}
-              onChange={(e) => setResolveForm((f) => ({ ...f, ownerReceptivity: e.target.value as OwnerReceptivity | '' }))}
-              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-            >
-              <option value="">—</option>
-              <option value="interested">Interested</option>
-              <option value="neutral">Neutral</option>
-              <option value="defensive">Defensive</option>
-              <option value="no_answer">No answer</option>
-            </select>
-
-            {/* Call notes */}
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call notes</label>
-            <textarea
-              rows={3}
-              value={resolveForm.callNotes}
-              onChange={(e) => setResolveForm((f) => ({ ...f, callNotes: e.target.value }))}
-              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-            />
-
-            {/* Next action */}
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Next action</label>
-            <select
-              value={resolveForm.nextAction}
-              onChange={(e) => setResolveForm((f) => ({ ...f, nextAction: e.target.value as VerificationNextAction }))}
-              disabled={resolveForm.outcome === 'closed' || resolveForm.outcome === 'wrong_business'}
-              className="w-full mb-4 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white disabled:opacity-60"
-            >
-              <option value="requeue">Re-queue (back to Queued with verified NAP)</option>
-              <option value="create_campaign">Create campaign (graduate immediately)</option>
-              <option value="dismiss">Dismiss (unverified_closed)</option>
-            </select>
-
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setResolveModalEntry(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
-                Cancel
-              </button>
-              <button
-                onClick={handleResolve}
-                disabled={resolving}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
-              >
-                {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Resolve'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Verify-then-outreach resolution modal (shared) */}
+      {resolveEntry && (
+        <ResolveVerificationModal
+          entry={resolveEntry}
+          onClose={() => setResolveEntry(null)}
+          onResolved={onRefresh}
+        />
       )}
     </div>
   );
@@ -675,6 +431,8 @@ function BoardCard({
 }: BoardCardProps) {
   const signals = entry.detected_signals ?? [];
   const crisis = hasCrisis(signals);
+  // Pre-campaign filter: a resolved non-operational verification blocks create.
+  const verificationBlocked = !verificationClearsCampaign(entry.verification?.outcome);
   const assigneeLabel = staffDisplayName(staffUsers, entry.assigned_to);
   const auditDays = daysSince(entry.audit_date);
   const stageDays = daysSince(entry.stage_entered_at);
@@ -751,6 +509,12 @@ function BoardCard({
           <span className="rounded bg-gray-100 dark:bg-neutral-700 px-1 py-0.5 text-[9px]">{entry.source_scope}</span>
         )}
       </div>
+
+      {entry.verification && (
+        <div className="mb-1.5">
+          <VerificationBadge verification={entry.verification} />
+        </div>
+      )}
 
       {/* Stage badge for campaign cards */}
       {!isQueued && !isVerify && entry.campaign_stage && (
@@ -840,8 +604,11 @@ function BoardCard({
         <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-neutral-700">
           <button
             onClick={onCreate}
-            disabled={creating}
+            disabled={creating || verificationBlocked}
             className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-violet-600 rounded hover:bg-violet-700 disabled:opacity-50"
+            title={verificationBlocked
+              ? 'Blocked — this prospect failed verification (closed/unreachable). Re-verify as operational first.'
+              : undefined}
           >
             {creating ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Plus className="w-2.5 h-2.5" />}
             Create

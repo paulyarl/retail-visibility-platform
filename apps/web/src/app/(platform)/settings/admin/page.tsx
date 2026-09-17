@@ -996,6 +996,19 @@ export default function AdminDashboardPage() {
           badge: 'NEW',
         },
         {
+          title: 'Prospect Communications',
+          description: 'Full communication history for a prospect — pre-campaign touches through campaign outreach',
+          href: '/settings/admin/marketing-ops/communications',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.2-3.6A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'Prospect history',
+          badge: 'NEW',
+        },
+        {
           title: 'GBP Monitor',
           description: 'Cross-tenant Google Business Profile health — connections, verification, reviews, posts, job status, and entitlements',
           href: '/settings/admin/marketing-ops/gbp',

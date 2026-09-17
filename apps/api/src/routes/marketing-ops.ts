@@ -189,6 +189,7 @@ import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
+import ProspectCommunicationService from '../services/ProspectCommunicationService';
 import ProvingGroundCadenceService from '../services/ProvingGroundCadenceService';
 import OutreachIntelligenceService, { UpsertInput } from '../services/OutreachIntelligenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
@@ -5051,8 +5052,23 @@ router.post('/prospect-queue/:id/request-verification', async (req: any, res: Re
   }
 });
 
+// Authoritative identity enrichment captured on the verification call —
+// social + directory profile URLs. claim_status/rating default downstream.
+const verifiedSocialProfileSchema = z.object({
+  platform: z.string().min(1).max(100),
+  url: z.string().min(1).max(1000),
+});
+const verifiedDirectoryProfileSchema = z.object({
+  platform: z.string().min(1).max(100),
+  url: z.string().min(1).max(1000),
+  claim_status: z.enum(['claimed', 'unclaimed', 'unknown']).optional(),
+  star_rating: z.number().nullable().optional(),
+  review_count: z.number().nullable().optional(),
+  category: z.string().max(255).optional(),
+});
+
 const verificationResolveSchema = z.object({
-  outcome: z.enum(['operational', 'closed', 'relocated', 'unreachable', 'wrong_business']),
+  outcome: z.enum(['operational', 'closed', 'closed_temporarily', 'relocated', 'unreachable', 'wrong_business']),
   verifiedName: z.string().max(255).optional(),
   verifiedPhone: z.string().max(50).optional(),
   verifiedAddress: z.string().max(500).optional(),
@@ -5062,6 +5078,8 @@ const verificationResolveSchema = z.object({
   verifiedEmail: z.string().max(255).optional(),
   verifiedCategory: z.string().max(255).optional(),
   verifiedOwnerName: z.string().max(255).optional(),
+  verifiedSocialProfiles: z.array(verifiedSocialProfileSchema).max(20).optional(),
+  verifiedDirectoryProfiles: z.array(verifiedDirectoryProfileSchema).max(20).optional(),
   ownerReceptivity: z.enum(['interested', 'neutral', 'defensive', 'no_answer']).optional(),
   callNotes: z.string().max(2000).optional(),
   nextAction: z.enum(['requeue', 'create_campaign', 'dismiss']),
@@ -5085,6 +5103,8 @@ router.post('/prospect-queue/:id/resolve-verification', async (req: any, res: Re
       verifiedEmail: parsed.verifiedEmail,
       verifiedCategory: parsed.verifiedCategory,
       verifiedOwnerName: parsed.verifiedOwnerName,
+      verifiedSocialProfiles: parsed.verifiedSocialProfiles,
+      verifiedDirectoryProfiles: parsed.verifiedDirectoryProfiles,
       ownerReceptivity: parsed.ownerReceptivity,
       callNotes: parsed.callNotes,
       nextAction: parsed.nextAction,
@@ -5095,6 +5115,45 @@ router.post('/prospect-queue/:id/resolve-verification', async (req: any, res: Re
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// PROSPECT COMMUNICATION ROUTES
+// ====================
+// Prospect-scoped communication history (read-only). Anchored on the queue
+// entry — the prospect registry — and folds in pre-campaign seed touches
+// (directory_seed_outreach_touches) plus campaign outreach log rows
+// (mkt_outreach_log) across the processed campaign and its siblings.
+// Declared before the catch-all router.get('/:id', ...) below.
+
+// GET /prospects — list prospects for the communications picker.
+router.get('/prospects', async (req: any, res: Response) => {
+  try {
+    const statusRaw = req.query.status as string | undefined;
+    const status = statusRaw
+      ? statusRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const prospects = await ProspectCommunicationService.listProspects({
+      status,
+      category: req.query.category as string | undefined,
+      city: req.query.city as string | undefined,
+      search: req.query.search as string | undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+    }, getCtx(req));
+    res.json({ success: true, data: prospects });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /prospects/:id/timeline — unified communication timeline for one prospect.
+router.get('/prospects/:id/timeline', async (req: any, res: Response) => {
+  try {
+    const timeline = await ProspectCommunicationService.getTimeline(req.params.id, getCtx(req));
+    res.json({ success: true, data: timeline });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

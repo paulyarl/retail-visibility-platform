@@ -23,7 +23,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError, ConflictError } from '../middleware/errorHandler';
+import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateProspectQueueId } from '../lib/id-generator';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
@@ -54,9 +54,45 @@ export type ProspectPriority = 'high' | 'normal';
 // business to confirm operational status + capture a verified NAP before a
 // campaign is created. See docs spec: verify-then-outreach queue status.
 
-export type VerificationOutcome = 'operational' | 'closed' | 'relocated' | 'unreachable' | 'wrong_business';
+export type VerificationOutcome =
+  | 'operational'
+  | 'closed'
+  | 'closed_temporarily'
+  | 'relocated'
+  | 'unreachable'
+  | 'wrong_business';
 export type OwnerReceptivity = 'interested' | 'neutral' | 'defensive' | 'no_answer';
 export type VerificationNextAction = 'requeue' | 'create_campaign' | 'dismiss';
+
+/** A captured social profile (platform + URL) — mirrors campaign.social_profiles. */
+export interface VerifiedSocialProfile {
+  platform: string;
+  url: string;
+}
+
+/** A captured directory profile (platform + URL) — mirrors campaign.directory_profiles. */
+export interface VerifiedDirectoryProfile {
+  platform: string;
+  url: string;
+  claim_status?: 'claimed' | 'unclaimed' | 'unknown';
+  star_rating?: number | null;
+  review_count?: number | null;
+  category?: string;
+}
+
+// Pre-campaign verification filter (Migration 255 follow-up). The verification
+// modal is an authoritative identity enricher AND a gate: only a
+// verified-operational prospect — or a relocated one, i.e. operational at a
+// new address — may graduate to a campaign. Every other resolved outcome
+// (permanently closed, temporarily closed, unreachable, wrong business) blocks
+// creation until the prospect is re-verified. Rows that were never verified
+// carry no outcome and are unaffected. Extend this set when new blocking
+// statuses are added.
+const CAMPAIGN_CLEARED_OUTCOMES: ReadonlySet<string> = new Set(['operational', 'relocated']);
+
+export function verificationClearsCampaign(outcome: string | null | undefined): boolean {
+  return !outcome || CAMPAIGN_CLEARED_OUTCOMES.has(outcome);
+}
 
 export interface VerificationRequestInput {
   queueEntryId: string;
@@ -78,6 +114,11 @@ export interface VerificationResolutionInput {
   verifiedEmail?: string;
   verifiedCategory?: string;
   verifiedOwnerName?: string;
+  // Identity enrichment captured on the call — social + directory profile
+  // URLs are authoritative: they overwrite the campaign's social_profiles /
+  // directory_profiles on promotion (not fill-null).
+  verifiedSocialProfiles?: VerifiedSocialProfile[];
+  verifiedDirectoryProfiles?: VerifiedDirectoryProfile[];
   ownerReceptivity?: OwnerReceptivity;
   callNotes?: string;
   nextAction: VerificationNextAction;
@@ -99,6 +140,8 @@ export interface VerificationRecord {
   verified_email?: string;
   verified_category?: string;
   verified_owner_name?: string;
+  verified_social_profiles?: VerifiedSocialProfile[];
+  verified_directory_profiles?: VerifiedDirectoryProfile[];
   owner_receptivity?: OwnerReceptivity;
   call_notes?: string;
   next_action?: VerificationNextAction;
@@ -644,12 +687,38 @@ class MarketingProspectQueueServiceClass extends BaseService {
         );
       }
 
+      // Pre-campaign verification filter: a resolved verification whose outcome
+      // is not operational/relocated blocks graduation — permanently closed,
+      // temporarily closed, unreachable, and wrong-business prospects must be
+      // re-verified as operational before a campaign is built. Rows that were
+      // never verified carry no outcome and are unaffected.
+      const resolvedOutcome = (entry.verification as any)?.outcome as string | undefined;
+      if (!verificationClearsCampaign(resolvedOutcome)) {
+        throw new ConflictError(
+          `Queue entry ${input.queueEntryId} failed verification (outcome=${resolvedOutcome}) — re-verify as operational before creating a campaign`,
+        );
+      }
+
       const assignee = entry.assigned_to ?? input.actingUserId ?? null;
       const snapshot = (entry.business_snapshot as any) ?? {};
       // Verified NAP/enrichment (written by resolveVerification) takes
       // precedence over the raw discovery snapshot so a correction captured
       // on the verification call flows into the campaign.
       const verifiedNap = (snapshot.verified_nap as Record<string, string> | undefined) ?? {};
+      // Authoritative identity enrichment — social + directory profile URLs
+      // captured on the verification call. Written to the snapshot by
+      // resolveVerification; overwrite the campaign's profiles on promotion.
+      const verifiedSocialProfiles = Array.isArray(snapshot.social_profiles)
+        ? (snapshot.social_profiles as VerifiedSocialProfile[])
+        : undefined;
+      const verifiedDirectoryProfiles = Array.isArray(snapshot.directory_profiles)
+        ? (snapshot.directory_profiles as VerifiedDirectoryProfile[]).map((p) => ({
+            ...p,
+            // DirectoryProfileEntry requires claim_status; snapshot rows may
+            // predate the field, so default it here.
+            claim_status: p.claim_status ?? ('unknown' as const),
+          }))
+        : undefined;
       const snapshotOwnerNames = Array.isArray(snapshot.owner_names) ? (snapshot.owner_names as string[]) : undefined;
       const ownerNames = verifiedNap.owner_name
         ? [verifiedNap.owner_name]
@@ -677,7 +746,16 @@ class MarketingProspectQueueServiceClass extends BaseService {
           phone: (verifiedNap.phone as string) ?? (snapshot.phone as string) ?? undefined,
           email: (verifiedNap.email as string) ?? (snapshot.email as string) ?? undefined,
           websiteUrl: (verifiedNap.website as string) ?? (snapshot.website as string) ?? undefined,
+          // Verified street address carries too — without this a correction
+          // captured on the verification call was dropped for parentless
+          // entries (city/state rode along via the top-level columns only).
+          addressLine1: (verifiedNap.address as string) ?? (snapshot.address as string) ?? undefined,
+          addressCity: (verifiedNap.city as string) ?? (snapshot.address_city as string) ?? undefined,
+          addressState: (verifiedNap.state as string) ?? (snapshot.address_state as string) ?? undefined,
           ownerNames,
+          // Authoritative identity enrichment captured on the verification call.
+          socialProfiles: verifiedSocialProfiles,
+          directoryProfiles: verifiedDirectoryProfiles,
           notes: [
             `Manually queued prospect (no parent campaign, scope=${campaignScope}).`,
             entry.city ? `City: ${entry.city}` : null,
@@ -756,9 +834,21 @@ class MarketingProspectQueueServiceClass extends BaseService {
         result = r;
         // The scan path derives city/state from the parent campaign — apply
         // the verified location when the operator captured a different one.
+        // The structured address fields are overlaid here too: the scan
+        // business JSON's own address (canonical/google/matched) outranks the
+        // flat `address` key inside syncContactFields, so a verified street
+        // correction must be applied after derive to win.
         const geoPatch: any = {};
         if (verifiedNap.city && r.campaign?.city !== verifiedNap.city) geoPatch.city = verifiedNap.city;
         if (verifiedNap.state && r.campaign?.state !== verifiedNap.state) geoPatch.state = verifiedNap.state;
+        if (verifiedNap.address && r.campaign?.address_line1 !== verifiedNap.address) geoPatch.address_line1 = verifiedNap.address;
+        if (verifiedNap.city && r.campaign?.address_city !== verifiedNap.city) geoPatch.address_city = verifiedNap.city;
+        if (verifiedNap.state && r.campaign?.address_state !== verifiedNap.state) geoPatch.address_state = verifiedNap.state;
+        // Authoritative identity enrichment — the scan path has no native
+        // social/directory profile inputs, so a verified capture is applied as
+        // an overwrite after derive (the scan payload carries no socials).
+        if (verifiedSocialProfiles?.length) geoPatch.social_profiles = verifiedSocialProfiles;
+        if (verifiedDirectoryProfiles?.length) geoPatch.directory_profiles = verifiedDirectoryProfiles;
         if (r.created && r.campaign?.id && Object.keys(geoPatch).length > 0) {
           await this.prisma.mkt_campaigns_list.update({
             where: { id: r.campaign.id },
@@ -851,6 +941,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
           addressZip: (snapshot.address_zip as string) ?? undefined,
           addressCountry: (snapshot.address_country as string) ?? undefined,
           ownerNames,
+          // Authoritative identity enrichment captured on the verification
+          // call — overwrite the child's social/directory profiles.
+          socialProfiles: verifiedSocialProfiles,
+          directoryProfiles: verifiedDirectoryProfiles,
           // Category corrected on the verification call overrides the
           // parent-inherited category (undefined → inherit as before).
           categoryOverride: (verifiedNap.category as string) ?? undefined,
@@ -1097,6 +1191,30 @@ class MarketingProspectQueueServiceClass extends BaseService {
         );
       }
 
+      // A non-operational outcome must never graduate to a campaign. The UI
+      // hides the create option for these outcomes; this is the API-level
+      // safety net against a hand-rolled request.
+      if (input.nextAction === 'create_campaign' && !verificationClearsCampaign(input.outcome)) {
+        throw new ValidationError(
+          `Verification outcome '${input.outcome}' cannot create a campaign — only operational/relocated prospects graduate`,
+        );
+      }
+
+      // Authoritative identity enrichment — social + directory profile URLs
+      // captured on the call. Incomplete rows are dropped; blank values are
+      // treated as "not captured" so we never overwrite with empties.
+      const verifiedSocial = (input.verifiedSocialProfiles ?? [])
+        .filter((p) => p?.platform?.trim() && p?.url?.trim())
+        .map((p) => ({ platform: p.platform.trim(), url: p.url.trim() }));
+      const verifiedDirectory = (input.verifiedDirectoryProfiles ?? [])
+        .filter((p) => p?.platform?.trim() && p?.url?.trim())
+        .map((p) => ({
+          claim_status: 'unknown' as const,
+          ...p,
+          platform: p.platform.trim(),
+          url: p.url.trim(),
+        }));
+
       const prior = (existing.verification as any) ?? {};
       const resolvedVerification: VerificationRecord = {
         ...prior,
@@ -1112,6 +1230,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
         verified_email: input.verifiedEmail,
         verified_category: input.verifiedCategory,
         verified_owner_name: input.verifiedOwnerName,
+        verified_social_profiles: verifiedSocial.length > 0 ? verifiedSocial : undefined,
+        verified_directory_profiles: verifiedDirectory.length > 0 ? verifiedDirectory : undefined,
         owner_receptivity: input.ownerReceptivity,
         call_notes: input.callNotes,
         next_action: input.nextAction,
@@ -1164,10 +1284,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       }
 
       const hasVerified = Object.keys(verifiedNap).length > 0;
-      const updatedSnapshot = hasVerified
+      const hasIdentityEnrichment = hasVerified || verifiedSocial.length > 0 || verifiedDirectory.length > 0;
+      const updatedSnapshot = hasIdentityEnrichment
         ? {
             ...snapshot,
             ...flatEnrichment,
+            ...(verifiedSocial.length > 0 ? { social_profiles: verifiedSocial } : {}),
+            ...(verifiedDirectory.length > 0 ? { directory_profiles: verifiedDirectory } : {}),
             verified_nap: { ...((snapshot.verified_nap as any) ?? {}), ...verifiedNap },
           }
         : snapshot;

@@ -23,6 +23,7 @@ import marketingOpsService, {
   type ProspectDismissReason,
   type ProspectPriority,
   type ProspectQueueEntry,
+  verificationClearsCampaign,
 } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
   type CohortFunnelResponse,
@@ -31,6 +32,8 @@ import directoryPresenceAdminService, {
 import CampaignChecklistTab from '@/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignChecklistTab';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import ProspectArtifactChips from '@/components/marketing-ops/ProspectArtifactChips';
+import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
+import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import { STAGE_LABELS, STAGE_COLORS } from '@/components/marketing-ops/StageBadge';
 
 interface Props {
@@ -210,6 +213,8 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [priorityBusy, setPriorityBusy] = useState<string | null>(null);
   const [creatingId, setCreatingId] = useState<string | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState<string | null>(null);
+  const [resolveEntry, setResolveEntry] = useState<ProspectQueueEntry | null>(null);
 
   // Profile readiness (coverage §state-model) — one establishment slot per
   // (domain category × domain geo × focus), sourced from the same coverage
@@ -679,6 +684,23 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       setPromoteError(err.message || 'Failed to create campaign');
     } finally {
       setCreatingId(null);
+    }
+  };
+
+  // Gate a queued prospect behind the verification call — mirrors the queue
+  // page's Verify action (status → verify_then_outreach). The Resolve action
+  // opens the shared modal so the captured NAP lands on the queue row and
+  // follows the prospect into its campaign on promotion.
+  const handleRequestVerification = async (id: string) => {
+    setVerifyBusy(id);
+    setPromoteError(null);
+    try {
+      await marketingOpsService.requestVerification(id);
+      await load();
+    } catch (err: any) {
+      setPromoteError(err.message || 'Failed to request verification');
+    } finally {
+      setVerifyBusy(null);
     }
   };
 
@@ -1542,6 +1564,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                       <span className={`truncate font-medium ${promoted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}>
                         {e.business_name || e.title || e.id}
                       </span>
+                      {e.verification && <VerificationBadge verification={e.verification} />}
                       {isHold && !promoted && (
                         <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 flex-shrink-0">
                           <AlertTriangle className="w-2.5 h-2.5" /> hold
@@ -1604,22 +1627,36 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                             <>
                               <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
                               {e.status === 'verify_then_outreach' ? (
-                                <Link
-                                  href="/settings/admin/marketing-ops/queue?status=verify_then_outreach"
-                                  className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
-                                  title="Pending verification — the campaign can only be created after the verification call is resolved on the queue page"
-                                >
-                                  verify →
-                                </Link>
-                              ) : (
                                 <button
-                                  onClick={() => handleCreateCampaign(e)}
-                                  disabled={creatingId === e.id || promoteBusy || dismissBusy}
-                                  className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
-                                  title={`Create a ${e.source_scope ?? 'business'}-scope campaign from this prospect`}
+                                  onClick={() => setResolveEntry(e)}
+                                  className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
+                                  title="Resolve the verification call — capture the outcome + verified NAP; it flows into the campaign on promotion"
                                 >
-                                  {creatingId === e.id ? '…' : 'create →'}
+                                  resolve →
                                 </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleCreateCampaign(e)}
+                                    disabled={creatingId === e.id || promoteBusy || dismissBusy || !verificationClearsCampaign(e.verification?.outcome)}
+                                    className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+                                    title={!verificationClearsCampaign(e.verification?.outcome)
+                                      ? 'Blocked — this prospect failed verification (closed/unreachable). Re-verify as operational first.'
+                                      : `Create a ${e.source_scope ?? 'business'}-scope campaign from this prospect`}
+                                  >
+                                    {creatingId === e.id ? '…' : 'create →'}
+                                  </button>
+                                  {e.status === 'queued' && (
+                                    <button
+                                      onClick={() => handleRequestVerification(e.id)}
+                                      disabled={verifyBusy === e.id || promoteBusy || dismissBusy}
+                                      className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline disabled:opacity-50"
+                                      title="Gate outreach on a phone call — moves the prospect to Verify, then resolve with the verified NAP"
+                                    >
+                                      {verifyBusy === e.id ? '…' : 'verify →'}
+                                    </button>
+                                  )}
+                                </>
                               )}
                               <ProspectArtifactChips processedCampaignId={null} />
                             </>
@@ -1724,6 +1761,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Verify-then-outreach resolution modal (shared with the queue page) */}
+      {resolveEntry && (
+        <ResolveVerificationModal
+          entry={resolveEntry}
+          onClose={() => setResolveEntry(null)}
+          onResolved={load}
+        />
       )}
 
       {/* Sentiment flow — the 3-stage PG pipeline */}

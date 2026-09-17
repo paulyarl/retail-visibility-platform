@@ -1118,9 +1118,41 @@ export type ProspectPriority = 'high' | 'normal';
 export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'unverified_closed' | 'other';
 
 // ─── Verify-then-outreach (Migration 255) ───────────────────────────────
-export type VerificationOutcome = 'operational' | 'closed' | 'relocated' | 'unreachable' | 'wrong_business';
+export type VerificationOutcome =
+  | 'operational'
+  | 'closed'
+  | 'closed_temporarily'
+  | 'relocated'
+  | 'unreachable'
+  | 'wrong_business';
 export type OwnerReceptivity = 'interested' | 'neutral' | 'defensive' | 'no_answer';
 export type VerificationNextAction = 'requeue' | 'create_campaign' | 'dismiss';
+
+/** A captured social profile (platform + URL) — mirrors campaign.social_profiles. */
+export interface VerifiedSocialProfile {
+  platform: string;
+  url: string;
+}
+
+/** A captured directory profile (platform + URL) — mirrors campaign.directory_profiles. */
+export interface VerifiedDirectoryProfile {
+  platform: string;
+  url: string;
+  claim_status?: 'claimed' | 'unclaimed' | 'unknown';
+  star_rating?: number | null;
+  review_count?: number | null;
+  category?: string;
+}
+
+/**
+ * Pre-campaign verification filter: only a verified-operational prospect (or a
+ * relocated one — operational at a new address) may graduate to a campaign.
+ * Never-verified rows (no outcome) are unaffected. Mirrors the server-side
+ * gate in MarketingProspectQueueService.createCampaignFromQueue.
+ */
+export function verificationClearsCampaign(outcome: string | null | undefined): boolean {
+  return !outcome || outcome === 'operational' || outcome === 'relocated';
+}
 
 export interface VerificationResolutionInput {
   outcome: VerificationOutcome;
@@ -1136,6 +1168,10 @@ export interface VerificationResolutionInput {
   verifiedEmail?: string;
   verifiedCategory?: string;
   verifiedOwnerName?: string;
+  // Authoritative identity enrichment — overwrite the campaign's social /
+  // directory profiles on promotion (not fill-null).
+  verifiedSocialProfiles?: VerifiedSocialProfile[];
+  verifiedDirectoryProfiles?: VerifiedDirectoryProfile[];
   ownerReceptivity?: OwnerReceptivity;
   callNotes?: string;
   nextAction: VerificationNextAction;
@@ -1156,6 +1192,8 @@ export interface VerificationRecord {
   verified_email?: string;
   verified_category?: string;
   verified_owner_name?: string;
+  verified_social_profiles?: VerifiedSocialProfile[];
+  verified_directory_profiles?: VerifiedDirectoryProfile[];
   owner_receptivity?: OwnerReceptivity;
   call_notes?: string;
   next_action?: VerificationNextAction;
@@ -1297,6 +1335,74 @@ export interface ProspectQueueEntry {
   current_channel_index?: number;
   next_touch_at?: string | null;
   account_family?: string | null;
+}
+
+// ─── Prospect communications (prospect-scoped history) ───────────────────
+// One timeline spanning pre-campaign seed touches + campaign outreach logs.
+
+export interface ProspectSummary {
+  /** Queue entry id — the prospect anchor. */
+  id: string;
+  business_name: string | null;
+  title: string | null;
+  category: string | null;
+  city: string | null;
+  state: string | null;
+  status: ProspectStatus;
+  priority: ProspectPriority;
+  assigned_to: string | null;
+  seed_id: string | null;
+  campaign_id: string | null;
+  campaign_title: string | null;
+  campaign_stage: string | null;
+  business_prospect_id: string | null;
+  last_contact_at: string | null;
+  contact_count: number;
+}
+
+export interface ProspectCommunicationEvent {
+  id: string;
+  source: 'campaign_outreach' | 'seed_touch';
+  occurred_at: string;
+  /** Normalized channel vocabulary (call→phone, visit→in_person). */
+  channel: string;
+  raw_channel: string;
+  outcome: string | null;
+  outcome_label: string;
+  subject: string | null;
+  message: string | null;
+  notes: string | null;
+  contacted_by: string | null;
+  campaign_id: string | null;
+  campaign_title: string | null;
+  stage_at_time: string | null;
+  follow_up_date: string | null;
+  follow_up_completed_at: string | null;
+  delivery_status: string | null;
+  call_details: Record<string, any> | null;
+  recording_url: string | null;
+  anchor_snapshot: Record<string, any> | null;
+  verification_results: Record<string, any>[] | null;
+  system_generated: boolean;
+}
+
+export interface ProspectCommunicationSummary {
+  total_events: number;
+  first_contact_at: string | null;
+  last_contact_at: string | null;
+  days_since_last_contact: number | null;
+  last_outcome: string | null;
+  last_channel: string | null;
+  by_channel: Record<string, number>;
+  by_source: { campaign_outreach: number; seed_touch: number };
+  next_follow_up_at: string | null;
+}
+
+export interface ProspectTimeline {
+  prospect: ProspectSummary;
+  summary: ProspectCommunicationSummary;
+  events: ProspectCommunicationEvent[];
+  campaigns: Array<{ id: string; title: string | null; stage: string | null }>;
 }
 
 export interface LogContactInput {
@@ -4966,6 +5072,37 @@ class MarketingOpsService extends AdminApiSingleton {
       entries: Array.isArray(data) ? data : [],
       queuedCount: result.data?.queuedCount ?? 0,
     };
+  }
+
+  async listProspects(filters?: { status?: string[]; category?: string; city?: string; search?: string; limit?: number }): Promise<ProspectSummary[]> {
+    const params = new URLSearchParams();
+    if (filters?.status?.length) params.set('status', filters.status.join(','));
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.search) params.set('search', filters.search);
+    if (filters?.limit) params.set('limit', String(filters.limit));
+    const query = params.toString();
+    const url = `${BASE_URL}/prospects${query ? `?${query}` : ''}`;
+
+    const result = await this.makeDefaultRequest<any>(url, {}, 'mkt-ops-prospects', this.cacheTTL);
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list prospects');
+    }
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getProspectTimeline(prospectId: string): Promise<ProspectTimeline> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospects/${encodeURIComponent(prospectId)}/timeline`,
+      {},
+      `mkt-ops-prospect-timeline-${prospectId}`,
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load prospect timeline');
+    }
+    return result.data?.data ?? result.data;
   }
 
   async updateProspectQueue(id: string, patch: ProspectQueuePatch): Promise<ProspectQueueEntry> {
