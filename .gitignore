@@ -38,8 +38,14 @@ Thumbs.db
 .windsurf/
 .vercel
 
-# Database dumps and sensitive data
+# Database dumps and ad-hoc SQL
 *.sql
+
+# Source-controlled manual database migrations
+!database/
+!database/migrations/
+!database/migrations/**/*.sql
+
 !CHECK_*.sql
 !CLEANUP_*.sql
 !CREATE_*.sql
