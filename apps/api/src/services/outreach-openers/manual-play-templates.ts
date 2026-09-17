@@ -166,7 +166,7 @@ The report is here if you want to look now: {{report_url}} (or scan the card I l
       'tracked QR, and log the visit. The QR records the scan before the ' +
       'owner lands on the claim page.',
     anchorType: 'customer_discovery_problem',
-    hookAngle: 'footprint_verification',
+    hookAngle: 'nap_normalization',
     fields: [
       {
         key: 'card_line',
@@ -229,7 +229,7 @@ Thanks — I'll leave it with you.
       'owner preferred. The tracked URL records the view so the cadence sees ' +
       'delivered → viewed.',
     anchorType: 'customer_discovery_problem',
-    hookAngle: 'footprint_verification',
+    hookAngle: 'gbp_verification',
     fields: [
       {
         key: 'subject',

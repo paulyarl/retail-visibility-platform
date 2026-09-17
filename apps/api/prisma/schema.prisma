@@ -4106,6 +4106,7 @@ model mkt_playbook_catalog {
   created_at                                                                                            DateTime                             @default(now()) @db.Timestamptz(6)
   updated_at                                                                                            DateTime                             @default(now()) @db.Timestamptz(6)
   priority_rank                                                                                         Int                                  @default(99)
+  delivery_artifacts                                                                                    Json                                 @default("[]")
   mkt_campaign_triage_results_mkt_campaign_triage_results_overridden_playbook_idTomkt_playbook_catalog  mkt_campaign_triage_results[]        @relation("mkt_campaign_triage_results_overridden_playbook_idTomkt_playbook_catalog")
   mkt_campaign_triage_results_mkt_campaign_triage_results_recommended_playbook_idTomkt_playbook_catalog mkt_campaign_triage_results[]        @relation("mkt_campaign_triage_results_recommended_playbook_idTomkt_playbook_catalog")
   mkt_playbook_checklist_steps                                                                          mkt_playbook_checklist_steps[]
