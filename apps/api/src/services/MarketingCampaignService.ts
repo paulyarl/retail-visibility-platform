@@ -327,6 +327,9 @@ export interface CampaignInput {
   // block. See docs/LocalBiz/marketing_ops_discovery_leads_handoff_spec.md.
   discoveryContext?: DiscoveryContext | null;
   intelligenceRunId?: string;
+  /** Seek-batch provenance — set by BatchSeekService.launchBatch so batch
+   *  campaigns remain attributable and relaunch can reuse them. */
+  seekBatchId?: string;
 }
 
 export interface CampaignUpdateInput {
@@ -816,6 +819,7 @@ export class MarketingCampaignService extends BaseService {
           // Migration 253 — GAP-E3 discovery context handoff
           discovery_context: (input.discoveryContext ?? null) as any,
           intelligence_run_id: input.intelligenceRunId || null,
+          seek_batch_id: input.seekBatchId || null,
         },
       });
 

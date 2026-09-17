@@ -15,7 +15,10 @@
  * Funnel stage sources:
  *   seeds        — directory_presence_seeds bonded via directory_seed_campaign_links
  *   contactable  — seeds.contact_status = 'contactable' (derived at ingest, migration 258)
- *   invited      — ≥ 1 directory_claim_tokens row for the seed
+ *   invited      — ≥ 1 directory_claim_tokens row for the seed AND evidence of
+ *                  delivery (outreach touch, invite/report QR scan, or the
+ *                  claim itself). PG preflight mints tokens at seeding for QR
+ *                  kits — token existence alone is not an invite.
  *   claimed      — seeds.claimed_at IS NOT NULL (token consumed via acceptClaim)
  *   claimed_30d  — claimed within 30 days of the token being issued (G2 window)
  *   nap_verified — seeds.nap_verified_at IS NOT NULL (stamped at claim)
@@ -63,9 +66,11 @@ export interface CohortFunnelMetrics {
   inviteScansMail: number;
   inviteScansWalkin: number;
   inviteScansSocial: number;
+  inviteScansEmail: number;
   inviteScanRateMail: number | null;
   inviteScanRateWalkin: number | null;
   inviteScanRateSocial: number | null;
+  inviteScanRateEmail: number | null;
   /** Spec §5.7: seeds with ≥1 report-delivery QR scan / invited seeds.
    *  Mirrors inviteScans for the report_delivery_* surfaces. */
   reportScans: number;
@@ -117,6 +122,9 @@ export interface CohortFunnelReport {
   city?: string | null;
   state?: string | null;
   focus?: string | null;
+  /** 'proving_ground' when the cohort is a PG workspace — lets dashboards
+   *  badge it and link to the cockpit instead of the plain campaign page. */
+  campaignCategory?: string | null;
   metrics: CohortFunnelMetrics;
   gates: GateResult[];
   grade: CohortGrade;
@@ -257,6 +265,7 @@ interface CohortRow {
   city: string | null;
   state: string | null;
   focus: string | null;
+  campaign_category: string | null;
   seeds: bigint | number;
   contactable: bigint | number;
   invited: bigint | number;
@@ -279,6 +288,7 @@ interface CohortRow {
   invite_scans_mail: bigint | number;
   invite_scans_walkin: bigint | number;
   invite_scans_social: bigint | number;
+  invite_scans_email: bigint | number;
   report_scans: bigint | number;
   report_scans_phone: bigint | number;
   report_scans_email: bigint | number;
@@ -425,8 +435,22 @@ const CONVERSION_LATERAL = `
 const METRIC_SELECT = `
   COUNT(DISTINCT dps.id) AS seeds,
   COUNT(DISTINCT dps.id) FILTER (WHERE dps.contact_status = 'contactable') AS contactable,
+  -- invited = token minted AND evidence the invite actually left the building:
+  -- ≥1 outreach touch (QR kit generation logs claim_qr_generated; operator
+  -- outreach logs its own touch), ≥1 invite/report QR scan, or the claim
+  -- itself (claimed ⊆ invited — the owner provably received it). Bare tokens
+  -- minted at PG preflight seeding no longer count.
   COUNT(DISTINCT dps.id) FILTER (
     WHERE EXISTS (SELECT 1 FROM directory_claim_tokens t WHERE t.seed_id = dps.id)
+      AND (
+        dsot.id IS NOT NULL
+        OR dps.claimed_at IS NOT NULL
+        OR EXISTS (
+          SELECT 1 FROM qr_scan_events qse_inv
+          WHERE qse_inv.tenant_id = dps.tenant_id
+            AND (qse_inv.surface LIKE 'claim_invite%' OR qse_inv.surface LIKE 'report_delivery%')
+        )
+      )
   ) AS invited,
   COUNT(DISTINCT dps.id) FILTER (WHERE dps.claimed_at IS NOT NULL) AS claimed,
   COUNT(DISTINCT dps.id) FILTER (
@@ -462,19 +486,23 @@ const METRIC_SELECT = `
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w2, 0) > 0) AS w2_count,
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w3, 0) > 0) AS w3_count,
   COUNT(DISTINCT dps.id) FILTER (WHERE COALESCE(tc.w4, 0) > 0) AS w4_count,
-  COUNT(dsot.id) AS touches,
+  -- DISTINCT: dual-linked seeds (primary intel campaign + sibling PG link)
+  -- would otherwise double-count touches in combined/rollup aggregates.
+  COUNT(DISTINCT dsot.id) AS touches,
   -- v1.2 W10: invite scans = distinct seeds with ≥1 claim-invite QR scan event
   -- (qr_scan_events is keyed by tenant_id; seeds carry the same tenant_id post-claim,
   --  and pre-claim scans are attributed to the seed's tenant_id via the QR redirect)
   -- 'claim_invite' = mailed card, 'claim_invite_walkin' = hand-delivered card,
-  -- 'claim_invite_social' = DM/social link — all count as invite scans.
+  -- 'claim_invite_social' = DM/social link, 'claim_invite_email' = /qe/ email kit —
+  -- all count as invite scans (LIKE matches every claim_invite* surface, same
+  -- convention as ProvingGroundCadenceService / outreach-state-extractor).
   -- Per-channel columns expose the split for channel-effort decisions; a
   -- cross-channel seed counts once in invite_scans and once per channel.
   COUNT(DISTINCT dps.id) FILTER (
     WHERE EXISTS (
       SELECT 1 FROM qr_scan_events qse
       WHERE qse.tenant_id = dps.tenant_id
-        AND qse.surface IN ('claim_invite', 'claim_invite_walkin', 'claim_invite_social')
+        AND qse.surface LIKE 'claim_invite%'
     )
   ) AS invite_scans,
   COUNT(DISTINCT dps.id) FILTER (
@@ -498,6 +526,13 @@ const METRIC_SELECT = `
         AND qse.surface = 'claim_invite_social'
     )
   ) AS invite_scans_social,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'claim_invite_email'
+    )
+  ) AS invite_scans_email,
   -- Spec §5.7: report-delivery QR scans. Same seed-attribution + cross-channel
   -- semantics as invite_scans — the report QR redirect stamps the seed's
   -- tenant_id via the short code / seed-id before landing on the report page.
@@ -562,6 +597,7 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
   const inviteScansMail = Number(row.invite_scans_mail ?? 0);
   const inviteScansWalkin = Number(row.invite_scans_walkin ?? 0);
   const inviteScansSocial = Number(row.invite_scans_social ?? 0);
+  const inviteScansEmail = Number(row.invite_scans_email ?? 0);
   const reportScans = Number(row.report_scans ?? 0);
   const reportScansPhone = Number(row.report_scans_phone ?? 0);
   const reportScansEmail = Number(row.report_scans_email ?? 0);
@@ -590,9 +626,11 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
     inviteScansMail,
     inviteScansWalkin,
     inviteScansSocial,
+    inviteScansEmail,
     inviteScanRateMail: invited > 0 ? Math.round((inviteScansMail / invited) * 10000) / 10000 : null,
     inviteScanRateWalkin: invited > 0 ? Math.round((inviteScansWalkin / invited) * 10000) / 10000 : null,
     inviteScanRateSocial: invited > 0 ? Math.round((inviteScansSocial / invited) * 10000) / 10000 : null,
+    inviteScanRateEmail: invited > 0 ? Math.round((inviteScansEmail / invited) * 10000) / 10000 : null,
     reportScans,
     reportScanRate: scanRate(reportScans),
     reportScansPhone,
@@ -648,9 +686,11 @@ function buildReport(
         inviteScansMail: 0,
         inviteScansWalkin: 0,
         inviteScansSocial: 0,
+        inviteScansEmail: 0,
         inviteScanRateMail: null,
         inviteScanRateWalkin: null,
         inviteScanRateSocial: null,
+        inviteScanRateEmail: null,
         reportScans: 0,
         reportScanRate: null,
         reportScansPhone: 0,
@@ -682,6 +722,7 @@ function buildReport(
     report.city = row.city;
     report.state = row.state;
     report.focus = row.focus;
+    report.campaignCategory = row.campaign_category;
   }
   return report;
 }
@@ -719,10 +760,11 @@ export class SeedFunnelAnalyticsService {
         mc.address_city AS city,
         mc.address_state AS state,
         mc.intelligence_focus AS focus,
+        mc.campaign_category AS campaign_category,
         ${METRIC_SELECT}
       ${FUNNEL_FROM}
       ${whereClause}
-      GROUP BY mc.id, mc.display_id, mc.category, mc.address_city, mc.address_state, mc.intelligence_focus
+      GROUP BY mc.id, mc.display_id, mc.category, mc.address_city, mc.address_state, mc.intelligence_focus, mc.campaign_category
       ORDER BY MAX(mc.created_at) DESC`,
       ...params,
     );
@@ -735,6 +777,7 @@ export class SeedFunnelAnalyticsService {
         NULL::text AS city,
         NULL::text AS state,
         NULL::text AS focus,
+        NULL::text AS campaign_category,
         ${METRIC_SELECT}
       ${FUNNEL_FROM}
       ${whereClause}`,
@@ -746,15 +789,16 @@ export class SeedFunnelAnalyticsService {
       `SELECT
         NULL::text AS campaign_id,
         NULL::text AS display_id,
-        mc.category AS category,
+        dps.category AS category,
         NULL::text AS city,
         NULL::text AS state,
         NULL::text AS focus,
+        NULL::text AS campaign_category,
         ${METRIC_SELECT}
       ${FUNNEL_FROM}
       ${whereClause}
-      GROUP BY mc.category
-      ORDER BY mc.category`,
+      GROUP BY dps.category
+      ORDER BY dps.category`,
       ...params,
     );
 
@@ -769,14 +813,16 @@ export class SeedFunnelAnalyticsService {
       : 'WHERE t2.consumed_at IS NOT NULL';
     const medianRows = await prisma.$queryRawUnsafe<Array<{ median_days: number | null }>>(
       `SELECT
-        PERCENTILE_CONT(0.5) WITHIN GROUP (
-          ORDER BY EXTRACT(EPOCH FROM (t2.consumed_at - t2.created_at)) / 86400.0
-        ) AS median_days
-      FROM directory_claim_tokens t2
-      JOIN directory_presence_seeds dps ON dps.id = t2.seed_id
-      JOIN directory_seed_campaign_links dscl ON dscl.seed_id = dps.id
-      JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
-      ${medianWhere}`,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days) AS median_days
+      FROM (
+        SELECT DISTINCT t2.id,
+          EXTRACT(EPOCH FROM (t2.consumed_at - t2.created_at)) / 86400.0 AS days
+        FROM directory_claim_tokens t2
+        JOIN directory_presence_seeds dps ON dps.id = t2.seed_id
+        JOIN directory_seed_campaign_links dscl ON dscl.seed_id = dps.id
+        JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+        ${medianWhere}
+      ) deduped`,
       ...params,
     );
 

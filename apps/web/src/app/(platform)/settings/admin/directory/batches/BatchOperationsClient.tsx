@@ -701,6 +701,7 @@ export default function BatchOperationsDashboard() {
                 <th className="py-3 px-4 font-medium">Prospects</th>
                 <th className="py-3 px-4 font-medium">Seeds</th>
                 <th className="py-3 px-4 font-medium">Published</th>
+                <th className="py-3 px-4 font-medium">Invited</th>
                 <th className="py-3 px-4 font-medium">Claimed</th>
                 <th className="py-3 px-4 font-medium">Created</th>
               </tr>
@@ -708,7 +709,7 @@ export default function BatchOperationsDashboard() {
             <tbody>
               {seekBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-gray-400">
+                  <td colSpan={11} className="py-8 text-center text-gray-400">
                     No seek batches yet. Click &quot;+ New Seek Batch&quot; to create one.
                   </td>
                 </tr>
@@ -749,6 +750,7 @@ export default function BatchOperationsDashboard() {
                     <td className="py-3 px-4 text-gray-900">{b.metrics?.totalProspects ?? 0}</td>
                     <td className="py-3 px-4 text-gray-900">{b.metrics?.totalSeeds ?? 0}</td>
                     <td className="py-3 px-4 text-gray-900">{b.metrics?.publishedSeeds ?? 0}</td>
+                    <td className="py-3 px-4 text-gray-900">{b.metrics?.invitedSeeds ?? 0}</td>
                     <td className="py-3 px-4 text-gray-900">{b.metrics?.claimedSeeds ?? 0}</td>
                     <td className="py-3 px-4 text-gray-500 text-xs">
                       {new Date(b.createdAt).toLocaleDateString()}
@@ -790,7 +792,19 @@ export default function BatchOperationsDashboard() {
                   const publishedPct = b.totalSeeds > 0 ? Math.round((b.publishedSeeds / b.totalSeeds) * 100) : 0;
                   return (
                     <tr key={b.seedBatch} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono text-xs text-gray-900">{b.seedBatch}</td>
+                      <td className="py-3 px-4">
+                        <span className="font-mono text-xs text-gray-900">{b.seedBatch}</span>
+                        {(b.provingGrounds || []).map((pg: { id: string; displayId: string | null }) => (
+                          <Link
+                            key={pg.id}
+                            href={`/settings/admin/marketing-ops/proving-grounds/${pg.id}`}
+                            className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-100 text-violet-700 hover:bg-violet-200 align-middle"
+                            title={`Proving ground: ${pg.displayId || pg.id}`}
+                          >
+                            PG · {pg.displayId || pg.id}
+                          </Link>
+                        ))}
+                      </td>
                       <td className="py-3 px-4 text-gray-600">{b.cities?.join(', ') || '—'}</td>
                       <td className="py-3 px-4 text-gray-600">{b.categories?.join(', ') || '—'}</td>
                       <td className="py-3 px-4 text-gray-900 font-medium">{b.totalSeeds}</td>

@@ -132,6 +132,11 @@ contactable         = seeds WHERE (owner_phone OR campaign.phone) IS NOT NULL
 contactable_rate    = contactable / seeds
 
 invited             = seeds WITH ≥1 directory_claim_tokens row
+                      AND evidence of delivery (≥1 outreach touch — QR kit
+                      generation logs claim_qr_generated — or ≥1 claim_invite/
+                      report_delivery QR scan, or the claim itself). PG
+                      preflight mints tokens at seeding for QR kits, so token
+                      existence alone is not an invite.
 invite_rate         = invited / contactable
 
 claimed             = seeds WHERE EXISTS token WITH consumed_at NOT NULL

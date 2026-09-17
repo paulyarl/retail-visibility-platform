@@ -20,6 +20,8 @@ export interface FunnelMetrics {
   seedsInvited: number;
   seedsClaimed: number;
   seedsUpgraded: number;
+  /** Of seedsCreated: how many carry ≥1 link to a proving_ground campaign. */
+  seedsPgLinked: number;
 }
 
 export interface FunnelStage {
@@ -81,6 +83,20 @@ export interface DemandSignal {
   description: string;
 }
 
+export interface PgBreakdown {
+  provingGroundId: string;
+  displayId: string | null;
+  category: string | null;
+  city: string | null;
+  state: string | null;
+  seeds: number;
+  published: number;
+  invited: number;
+  claimed: number;
+  upgraded: number;
+  claimRate: number;
+}
+
 export interface NextSeekTarget {
   category: string;
   city: string;
@@ -102,8 +118,15 @@ class GrowthEngineAnalyticsService {
 
     const result = await pool.query(
       `SELECT
-        ((SELECT COUNT(*) FROM mkt_intelligence_runs WHERE created_at >= $1 AND created_at <= $2)
-         + (SELECT COUNT(*) FROM mkt_seek_batches WHERE created_at >= $1 AND created_at <= $2)) AS seeks_run,
+        -- A "seek" = a prompt execution on an intelligence-scope discovery
+        -- campaign. mkt_intelligence_runs has no production writer (only
+        -- IntelligenceRunService.createRun, invoked from tests); counting it
+        -- + mkt_seek_batches double-counted batch campaigns against their runs.
+        (SELECT COUNT(*) FROM mkt_prompt_executions_list pe
+          JOIN mkt_campaigns_list mc ON mc.id = pe.campaign_id
+          WHERE mc.scope = 'intelligence'
+            AND mc.intelligence_campaign_kind = 'discovery'
+            AND pe.executed_at >= $1 AND pe.executed_at <= $2) AS seeks_run,
         (SELECT COUNT(*) FROM mkt_prospect_queue WHERE created_at >= $1 AND created_at <= $2) AS prospects_queued,
         (SELECT COUNT(*) FROM directory_presence_seeds WHERE created_at >= $1 AND created_at <= $2) AS seeds_created,
         (SELECT COUNT(*) FROM directory_presence_seeds WHERE contact_status = 'contactable' AND created_at >= $1 AND created_at <= $2) AS seeds_contactable,
@@ -114,7 +137,12 @@ class GrowthEngineAnalyticsService {
           JOIN tenants tn ON tn.id = dps.tenant_id
           WHERE dps.claimed_at >= $1 AND dps.claimed_at <= $2
             AND tn.org_standing_mode = 'independent'
-            AND tn.subscription_tier <> 'directory_presence') AS seeds_upgraded`,
+            AND tn.subscription_tier <> 'directory_presence') AS seeds_upgraded,
+        (SELECT COUNT(DISTINCT dps.id) FROM directory_presence_seeds dps
+          JOIN directory_seed_campaign_links dscl ON dscl.seed_id = dps.id
+          JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+          WHERE dps.created_at >= $1 AND dps.created_at <= $2
+            AND mc.campaign_category = 'proving_ground') AS seeds_pg_linked`,
       [startDate, endDate],
     );
 
@@ -128,6 +156,7 @@ class GrowthEngineAnalyticsService {
       seedsInvited: parseInt(r.seeds_invited) || 0,
       seedsClaimed: parseInt(r.seeds_claimed) || 0,
       seedsUpgraded: parseInt(r.seeds_upgraded) || 0,
+      seedsPgLinked: parseInt(r.seeds_pg_linked) || 0,
     };
 
     const stages = this.buildStages(raw);
@@ -265,6 +294,56 @@ class GrowthEngineAnalyticsService {
         claimRate: published > 0 ? claimed / published : 0,
         upgradeRate: claimed > 0 ? upgraded / claimed : 0,
         bestNiche: bestNicheByCity.get(r.city)?.bestNiche ?? null,
+      };
+    });
+  }
+
+  /**
+   * Get per-proving-ground breakdown — one row per proving_ground campaign
+   * with ≥1 linked seed. Cumulative (not windowed): PGs are long-lived
+   * cohorts and a window would hide older-but-active ones.
+   */
+  async getByProvingGround(): Promise<PgBreakdown[]> {
+    const pool = getDirectPool();
+
+    const result = await pool.query(
+      `SELECT
+        mc.id AS proving_ground_id,
+        mc.display_id,
+        mc.category,
+        mc.address_city AS city,
+        mc.address_state AS state,
+        COUNT(DISTINCT dps.id) AS seeds,
+        COUNT(DISTINCT CASE WHEN dps.published_at IS NOT NULL THEN dps.id END) AS published,
+        COUNT(DISTINCT CASE WHEN dps.invited_at IS NOT NULL THEN dps.id END) AS invited,
+        COUNT(DISTINCT CASE WHEN dps.status = 'claimed' THEN dps.id END) AS claimed,
+        COUNT(DISTINCT CASE WHEN dps.status = 'claimed'
+          AND tn.org_standing_mode = 'independent'
+          AND tn.subscription_tier <> 'directory_presence' THEN dps.id END) AS upgraded
+      FROM mkt_campaigns_list mc
+      JOIN directory_seed_campaign_links dscl ON dscl.campaign_id = mc.id
+      JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+      LEFT JOIN tenants tn ON tn.id = dps.tenant_id
+      WHERE mc.campaign_category = 'proving_ground'
+      GROUP BY mc.id, mc.display_id, mc.category, mc.address_city, mc.address_state
+      ORDER BY seeds DESC`,
+    );
+
+    return result.rows.map((r: any) => {
+      const published = parseInt(r.published) || 0;
+      const claimed = parseInt(r.claimed) || 0;
+      return {
+        provingGroundId: r.proving_ground_id,
+        displayId: r.display_id,
+        category: r.category,
+        city: r.city,
+        state: r.state,
+        seeds: parseInt(r.seeds) || 0,
+        published,
+        invited: parseInt(r.invited) || 0,
+        claimed,
+        upgraded: parseInt(r.upgraded) || 0,
+        claimRate: published > 0 ? claimed / published : 0,
       };
     });
   }

@@ -11,6 +11,32 @@ export interface FunnelStage {
   conversionFromFirst: number;
 }
 
+export interface FunnelMetrics {
+  seeksRun: number;
+  prospectsQueued: number;
+  seedsCreated: number;
+  seedsContactable: number;
+  seedsPublished: number;
+  seedsInvited: number;
+  seedsClaimed: number;
+  seedsUpgraded: number;
+  seedsPgLinked: number;
+}
+
+export interface PgBreakdown {
+  provingGroundId: string;
+  displayId: string | null;
+  category: string | null;
+  city: string | null;
+  state: string | null;
+  seeds: number;
+  published: number;
+  invited: number;
+  claimed: number;
+  upgraded: number;
+  claimRate: number;
+}
+
 export interface NicheBreakdown {
   category: string;
   prospects: number;
@@ -82,7 +108,7 @@ class GrowthEngineAdminService extends AdminApiSingleton {
     return GrowthEngineAdminService.instance;
   }
 
-  async getFunnel(dateRange?: { startDate?: string; endDate?: string }): Promise<{ stages: FunnelStage[]; raw: any }> {
+  async getFunnel(dateRange?: { startDate?: string; endDate?: string }): Promise<{ stages: FunnelStage[]; raw: FunnelMetrics }> {
     const qs = new URLSearchParams();
     if (dateRange?.startDate) qs.set('startDate', dateRange.startDate);
     if (dateRange?.endDate) qs.set('endDate', dateRange.endDate);
@@ -119,6 +145,16 @@ class GrowthEngineAdminService extends AdminApiSingleton {
     );
     const data = result.data?.data ?? result.data;
     return data?.cities ?? [];
+  }
+
+  async getByProvingGround(): Promise<PgBreakdown[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/growth-engine/by-proving-ground`,
+      { method: 'GET' },
+      undefined, 0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.provingGrounds ?? [];
   }
 
   async getTimeSeries(dateRange?: { startDate?: string; endDate?: string }, granularity?: 'week' | 'month'): Promise<TimeSeriesPoint[]> {

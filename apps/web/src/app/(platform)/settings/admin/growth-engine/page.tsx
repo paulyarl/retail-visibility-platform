@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import growthEngineAdminService, {
   FunnelStage,
+  FunnelMetrics,
   NicheBreakdown,
   CityBreakdown,
+  PgBreakdown,
   TimeSeriesPoint,
   Recommendation,
   DemandSignal,
@@ -14,8 +16,10 @@ import growthEngineAdminService, {
 
 export default function GrowthEngineDashboard() {
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
+  const [funnelRaw, setFunnelRaw] = useState<FunnelMetrics | null>(null);
   const [niches, setNiches] = useState<NicheBreakdown[]>([]);
   const [cities, setCities] = useState<CityBreakdown[]>([]);
+  const [pgs, setPgs] = useState<PgBreakdown[]>([]);
   const [series, setSeries] = useState<TimeSeriesPoint[]>([]);
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [demandSignals, setDemandSignals] = useState<DemandSignal[]>([]);
@@ -27,18 +31,21 @@ export default function GrowthEngineDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [f, n, c, s, r, ds, st] = await Promise.all([
+      const [f, n, c, pg, s, r, ds, st] = await Promise.all([
         growthEngineAdminService.getFunnel(),
         growthEngineAdminService.getByNiche(),
         growthEngineAdminService.getByCity(),
+        growthEngineAdminService.getByProvingGround(),
         growthEngineAdminService.getTimeSeries(),
         growthEngineAdminService.getRecommendations(),
         growthEngineAdminService.getDemandSignals(),
         growthEngineAdminService.getNextSeekTargets(),
       ]);
       setFunnel(f?.stages ?? []);
+      setFunnelRaw(f?.raw ?? null);
       setNiches(n);
       setCities(c);
+      setPgs(pg);
       setSeries(s);
       setRecs(r);
       setDemandSignals(ds);
@@ -75,7 +82,17 @@ export default function GrowthEngineDashboard() {
 
       {/* Funnel */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Funnel (Last 90 Days)</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Funnel (Last 90 Days)</h2>
+          {funnelRaw && funnelRaw.seedsPgLinked > 0 && (
+            <span
+              className="px-2.5 py-1 text-xs font-medium rounded-full bg-violet-100 text-violet-700"
+              title={`${funnelRaw.seedsPgLinked} of ${funnelRaw.seedsCreated} seeds are linked to a proving ground`}
+            >
+              {funnelRaw.seedsPgLinked} PG-linked seeds
+            </span>
+          )}
+        </div>
         <div className="space-y-3">
           {funnel.map((stage, i) => {
             const widthPct = Math.min(100, Math.max(2, (stage.count / maxFunnelCount) * 100));
@@ -107,6 +124,57 @@ export default function GrowthEngineDashboard() {
           })}
         </div>
       </div>
+
+      {/* Proving Grounds — cumulative per-PG seed breakdown */}
+      {pgs.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <h2 className="text-lg font-semibold text-gray-900 p-4 border-b border-gray-200">
+            Proving Grounds <span className="text-sm font-normal text-gray-500">(all time)</span>
+          </h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-600 bg-gray-50">
+                <th className="py-2 px-3 font-medium">Proving Ground</th>
+                <th className="py-2 px-3 font-medium">Seeds</th>
+                <th className="py-2 px-3 font-medium">Pub</th>
+                <th className="py-2 px-3 font-medium">Invited</th>
+                <th className="py-2 px-3 font-medium">Claimed</th>
+                <th className="py-2 px-3 font-medium">Upg</th>
+                <th className="py-2 px-3 font-medium">Claim %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pgs.map((pg) => (
+                <tr key={pg.provingGroundId} className="border-b border-gray-100">
+                  <td className="py-2 px-3">
+                    <Link
+                      href={`/settings/admin/marketing-ops/proving-grounds/${pg.provingGroundId}`}
+                      className="font-medium text-gray-900 hover:underline hover:text-blue-600"
+                    >
+                      {pg.displayId || pg.provingGroundId}
+                    </Link>
+                    {(pg.category || pg.city) && (
+                      <span className="block text-xs text-gray-500">
+                        {pg.category}{pg.city ? ` · ${pg.city}${pg.state ? `, ${pg.state}` : ''}` : ''}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 px-3 text-gray-700">{pg.seeds}</td>
+                  <td className="py-2 px-3 text-gray-700">{pg.published}</td>
+                  <td className="py-2 px-3 text-gray-700">{pg.invited}</td>
+                  <td className="py-2 px-3 text-gray-700">{pg.claimed}</td>
+                  <td className="py-2 px-3 text-gray-700">{pg.upgraded}</td>
+                  <td className="py-2 px-3">
+                    <span className={`font-medium ${pg.claimRate > 0.3 ? 'text-green-600' : pg.claimRate < 0.1 && pg.published > 0 ? 'text-red-600' : 'text-gray-700'}`}>
+                      {(pg.claimRate * 100).toFixed(0)}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Recommendations */}
       {recs.length > 0 && (

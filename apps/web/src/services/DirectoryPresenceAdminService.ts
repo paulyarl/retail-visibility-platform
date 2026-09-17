@@ -197,9 +197,11 @@ export interface CohortFunnelMetrics {
   inviteScansMail: number;
   inviteScansWalkin: number;
   inviteScansSocial: number;
+  inviteScansEmail: number;
   inviteScanRateMail: number | null;
   inviteScanRateWalkin: number | null;
   inviteScanRateSocial: number | null;
+  inviteScanRateEmail: number | null;
   /** Spec §5.7 — report-delivery QR scans (report_delivery_* surfaces). */
   reportScans: number;
   reportScanRate: number | null;
@@ -259,6 +261,8 @@ export interface CohortFunnelReport {
   city?: string | null;
   state?: string | null;
   focus?: string | null;
+  /** 'proving_ground' when the cohort is a PG workspace. */
+  campaignCategory?: string | null;
   metrics: CohortFunnelMetrics;
   gates: GateResult[];
   grade: CohortGrade;
@@ -266,6 +270,18 @@ export interface CohortFunnelReport {
   conversionScoreBreakdown?: ConversionScoreBreakdown;
   medianDaysToClaim?: number | null;
   scalingReadiness?: ScalingReadiness;
+}
+
+export interface SeedBatchSummary {
+  seedBatch: string;
+  totalSeeds: number;
+  publishedSeeds: number;
+  claimedSeeds: number;
+  invitedSeeds: number;
+  cities: string[];
+  categories: string[];
+  /** Proving grounds this batch's seeds are linked to (usually 0 or 1). */
+  provingGrounds: Array<{ id: string; displayId: string | null }>;
 }
 
 export interface CategoryRollup {
@@ -1374,7 +1390,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   }
 
   /** GET /api/admin/directory-presence/seed-batches */
-  async listSeedBatches(seedBatch?: string): Promise<any[]> {
+  async listSeedBatches(seedBatch?: string): Promise<SeedBatchSummary[]> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/seed-batches${seedBatch ? `?seedBatch=${encodeURIComponent(seedBatch)}` : ''}`,
       { method: 'GET' },

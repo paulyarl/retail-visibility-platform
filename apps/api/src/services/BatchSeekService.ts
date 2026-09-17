@@ -74,6 +74,7 @@ export interface BatchMetrics {
   totalProspects: number;
   totalSeeds: number;
   publishedSeeds: number;
+  invitedSeeds: number;
   claimedSeeds: number;
 }
 
@@ -233,72 +234,72 @@ class BatchSeekService {
 
     const campaignIds: string[] = [];
 
+    // Route through MarketingCampaignService.createCampaign so batch-launched
+    // campaigns get the structural-duplicate guardrail, stage-transition log,
+    // and the discovery-profile prerequisite — same as every other campaign.
+    const { default: campaignService } = await import('./MarketingCampaignService.js');
+    const requestCtx = {
+      region: 'us-east-1',
+      userId: ctx?.actorId,
+      ip: ctx?.ip,
+      userAgent: ctx?.userAgent,
+    };
+
+    // Reuse a campaign this batch already created for the same (category, city)
+    // — makes relaunch idempotent instead of minting duplicates.
+    const reuseExisting = async (category: string, city: string): Promise<string | null> => {
+      const existing = await prisma.$queryRaw<any[]>`
+        SELECT id FROM mkt_campaigns_list
+        WHERE seek_batch_id = ${batchId}
+          AND LOWER(category) = LOWER(${category})
+          AND LOWER(city) = LOWER(${city})
+        LIMIT 1
+      `;
+      return existing[0]?.id || null;
+    };
+
+    const launchEntry = async (category: string, city: string, state: string | null, focus: string) => {
+      const reused = await reuseExisting(category, city);
+      if (reused) {
+        campaignIds.push(reused);
+        return;
+      }
+      try {
+        const campaign = await campaignService.createCampaign({
+          scope: 'intelligence',
+          category,
+          city,
+          state: state || undefined,
+          intelligenceFocus: focus as 'emerging' | 'competitive',
+          intelligenceCampaignKind: 'discovery',
+          seekBatchId: batchId,
+        }, requestCtx);
+        campaignIds.push(campaign.id);
+      } catch (err) {
+        // Structural-duplicate conflict: adopt the existing campaign rather
+        // than failing the entry (carries existingCampaignId — Migration 271).
+        const existingId = (err as any)?.existingCampaignId;
+        if (existingId) {
+          campaignIds.push(existingId);
+          return;
+        }
+        logger.error('BatchSeekService.launchBatch — campaign creation failed', undefined, {
+          batchId, city, category, error: (err as Error).message,
+        });
+        // Continue with other entries — partial failure is OK
+      }
+    };
+
     if (entryRows.length > 0) {
       // Queue-based launch: one campaign per entry, each using its own profile/category/focus
       for (const entry of entryRows) {
-        const campaignId = `mkt-${entry.niche_category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${entry.city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
-        const focus = entry.intelligence_focus || 'emerging';
-
-        try {
-          await prisma.$executeRaw`
-            INSERT INTO mkt_campaigns_list (
-              id, category, city, state, scope, intelligence_focus,
-              intelligence_campaign_kind, seek_batch_id, stage,
-              created_at, updated_at
-            ) VALUES (
-              ${campaignId},
-              ${entry.niche_category},
-              ${entry.city},
-              ${entry.state || null},
-              'intelligence',
-              ${focus},
-              'discovery',
-              ${batchId},
-              'seek',
-              now(), now()
-            )
-          `;
-          campaignIds.push(campaignId);
-        } catch (err) {
-          logger.error('BatchSeekService.launchBatch — campaign creation failed (entry)', undefined, {
-            batchId, city: entry.city, category: entry.niche_category, error: (err as Error).message,
-          });
-          // Continue with other entries — partial failure is OK
-        }
+        await launchEntry(entry.niche_category, entry.city, entry.state, entry.intelligence_focus || 'emerging');
       }
     } else {
       // Legacy launch: one campaign per city using batch-level profile/category/focus
       const cities: string[] = batch.cities;
       for (const city of cities) {
-        const campaignId = `mkt-${batch.niche_category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
-        const focus = batch.intelligence_focus || 'emerging';
-
-        try {
-          await prisma.$executeRaw`
-            INSERT INTO mkt_campaigns_list (
-              id, category, city, state, scope, intelligence_focus,
-              intelligence_campaign_kind, seek_batch_id, stage,
-              created_at, updated_at
-            ) VALUES (
-              ${campaignId},
-              ${batch.niche_category},
-              ${city},
-              ${batch.state || null},
-              'intelligence',
-              ${focus},
-              'discovery',
-              ${batchId},
-              'seek',
-              now(), now()
-            )
-          `;
-          campaignIds.push(campaignId);
-        } catch (err) {
-          logger.error('BatchSeekService.launchBatch — campaign creation failed', undefined, {
-            batchId, city, error: (err as Error).message,
-          });
-          // Continue with other cities — partial failure is OK
-        }
+        await launchEntry(batch.niche_category, city, batch.state, batch.intelligence_focus || 'emerging');
       }
     }
 
@@ -359,8 +360,9 @@ class BatchSeekService {
         b.cities, b.campaign_ids, b.status, b.created_at, b.completed_at,
         (SELECT COUNT(*) FROM mkt_prospect_queue pq WHERE pq.seek_batch_id = b.id) AS total_prospects,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id) AS total_seeds,
-        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.status = 'published') AS published_seeds,
-        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.status = 'claimed') AS claimed_seeds
+        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.published_at IS NOT NULL) AS published_seeds,
+        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.invited_at IS NOT NULL) AS invited_seeds,
+        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.claimed_at IS NOT NULL) AS claimed_seeds
       FROM mkt_seek_batches b
       WHERE b.id = ${batchId}
       LIMIT 1
@@ -370,17 +372,32 @@ class BatchSeekService {
     const r = rows[0];
     const cities: string[] = r.cities;
 
-    // Per-city breakdown
+    // Lazy completion: a running batch is complete once every launched
+    // campaign has ≥1 execution recorded. completeBatch has no other caller —
+    // runs never signal back to the batch otherwise.
+    if (r.status === 'running' && Array.isArray(r.campaign_ids) && r.campaign_ids.length > 0) {
+      const done = await this.campaignsAllExecuted(r.campaign_ids);
+      if (done) {
+        await this.completeBatch(batchId);
+        r.status = 'completed';
+        r.completed_at = new Date();
+      }
+    }
+
+    // Per-city breakdown — cumulative timestamps (published/invited/claimed
+    // are lifecycle events, not the current status), NULL-safe + case-insensitive
+    // city join consistent with the rest of the pipeline.
     const perCityRows = await prisma.$queryRaw<any[]>`
       SELECT
         pq.city,
         COUNT(DISTINCT pq.id) AS prospects,
         COUNT(DISTINCT dps.id) AS seeds,
-        COUNT(DISTINCT CASE WHEN dps.status = 'published' THEN dps.id END) AS published,
-        COUNT(DISTINCT CASE WHEN dps.status = 'claimed' THEN dps.id END) AS claimed
+        COUNT(DISTINCT CASE WHEN dps.published_at IS NOT NULL THEN dps.id END) AS published,
+        COUNT(DISTINCT CASE WHEN dps.invited_at IS NOT NULL THEN dps.id END) AS invited,
+        COUNT(DISTINCT CASE WHEN dps.claimed_at IS NOT NULL THEN dps.id END) AS claimed
       FROM mkt_prospect_queue pq
       LEFT JOIN directory_presence_seeds dps ON dps.tenant_id IS NOT NULL
-        AND dps.city = pq.city AND dps.seek_batch_id = pq.seek_batch_id
+        AND LOWER(dps.city) = LOWER(pq.city) AND dps.seek_batch_id = pq.seek_batch_id
       WHERE pq.seek_batch_id = ${batchId}
       GROUP BY pq.city
     `;
@@ -423,6 +440,7 @@ class BatchSeekService {
         totalProspects: parseInt(r.total_prospects) || 0,
         totalSeeds: parseInt(r.total_seeds) || 0,
         publishedSeeds: parseInt(r.published_seeds) || 0,
+        invitedSeeds: parseInt(r.invited_seeds) || 0,
         claimedSeeds: parseInt(r.claimed_seeds) || 0,
       },
       perCity: perCityRows.map((c) => ({
@@ -430,6 +448,7 @@ class BatchSeekService {
         prospects: parseInt(c.prospects) || 0,
         seeds: parseInt(c.seeds) || 0,
         published: parseInt(c.published) || 0,
+        invited: parseInt(c.invited) || 0,
         claimed: parseInt(c.claimed) || 0,
       })),
     };
@@ -451,8 +470,9 @@ class BatchSeekService {
         b.cities, b.campaign_ids, b.status, b.created_at, b.completed_at,
         (SELECT COUNT(*) FROM mkt_prospect_queue pq WHERE pq.seek_batch_id = b.id) AS total_prospects,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id) AS total_seeds,
-        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.status = 'published') AS published_seeds,
-        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.status = 'claimed') AS claimed_seeds
+        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.published_at IS NOT NULL) AS published_seeds,
+        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.invited_at IS NOT NULL) AS invited_seeds,
+        (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.claimed_at IS NOT NULL) AS claimed_seeds
       FROM mkt_seek_batches b
     `;
     const params: any[] = [];
@@ -464,6 +484,23 @@ class BatchSeekService {
     params.push(limit);
 
     const rows = await prisma.$queryRawUnsafe<any[]>(query, ...params);
+
+    // Lazy completion — see getBatchStatus. One aggregate query across all
+    // running batches instead of a per-row check.
+    const running = rows.filter(
+      (r) => r.status === 'running' && Array.isArray(r.campaign_ids) && r.campaign_ids.length > 0,
+    );
+    if (running.length > 0) {
+      const allCampaignIds = running.flatMap((r) => r.campaign_ids);
+      const executed = new Set(await this.executedCampaignIds(allCampaignIds));
+      for (const r of running) {
+        if (r.campaign_ids.every((id: string) => executed.has(id))) {
+          await this.completeBatch(r.id);
+          r.status = 'completed';
+          r.completed_at = new Date();
+        }
+      }
+    }
 
     return rows.map((r) => ({
       id: r.id,
@@ -481,13 +518,35 @@ class BatchSeekService {
         totalProspects: parseInt(r.total_prospects) || 0,
         totalSeeds: parseInt(r.total_seeds) || 0,
         publishedSeeds: parseInt(r.published_seeds) || 0,
+        invitedSeeds: parseInt(r.invited_seeds) || 0,
         claimedSeeds: parseInt(r.claimed_seeds) || 0,
       },
     }));
   }
 
+  /** Campaign ids that have at least one recorded prompt execution. */
+  private async executedCampaignIds(campaignIds: string[]): Promise<string[]> {
+    if (campaignIds.length === 0) return [];
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT DISTINCT campaign_id FROM mkt_prompt_executions_list
+      WHERE campaign_id = ANY(${campaignIds}::text[])
+    `;
+    return rows.map((r) => r.campaign_id);
+  }
+
+  private async campaignsAllExecuted(campaignIds: string[]): Promise<boolean> {
+    const executed = new Set(await this.executedCampaignIds(campaignIds));
+    return campaignIds.every((id) => executed.has(id));
+  }
+
   /**
    * List seed batches (grouped by seed_batch column) with metrics.
+   *
+   * PG awareness: each batch is attributed to proving-ground campaigns via
+   * the seeds' campaign links (proving-ground-seed stamps pg-{id}-{date}
+   * slugs, but attribution comes from the link — not the slug — so renamed
+   * or hand-stamped batches still resolve). A batch can surface multiple
+   * PGs if its seeds were linked to more than one.
    */
   async listSeedBatches(filters?: {
     seedBatch?: string;
@@ -500,6 +559,7 @@ class BatchSeekService {
     invitedSeeds: number;
     cities: string[];
     categories: string[];
+    provingGrounds: Array<{ id: string; displayId: string | null }>;
   }>> {
     const limit = Math.min(filters?.limit || 50, 200);
     const seedBatchFilter = filters?.seedBatch;
@@ -508,22 +568,40 @@ class BatchSeekService {
       SELECT
         seed_batch,
         COUNT(*) AS total_seeds,
-        COUNT(*) FILTER (WHERE status = 'published') AS published_seeds,
-        COUNT(*) FILTER (WHERE status = 'claimed') AS claimed_seeds,
-        COUNT(*) FILTER (WHERE status = 'invited') AS invited_seeds,
+        COUNT(*) FILTER (WHERE published_at IS NOT NULL) AS published_seeds,
+        COUNT(*) FILTER (WHERE claimed_at IS NOT NULL) AS claimed_seeds,
+        COUNT(*) FILTER (WHERE invited_at IS NOT NULL) AS invited_seeds,
         ARRAY_AGG(DISTINCT city) AS cities,
         ARRAY_AGG(DISTINCT category) AS categories
       FROM directory_presence_seeds
     `;
     const params: any[] = [];
+    const conditions = ['seed_batch IS NOT NULL'];
     if (seedBatchFilter) {
-      query += ` WHERE seed_batch = $1`;
+      conditions.push(`seed_batch = $1`);
       params.push(seedBatchFilter);
     }
-    query += ` GROUP BY seed_batch ORDER BY MIN(created_at) DESC LIMIT $${params.length + 1}`;
+    query += ` WHERE ${conditions.join(' AND ')} GROUP BY seed_batch ORDER BY MIN(created_at) DESC LIMIT $${params.length + 1}`;
     params.push(limit);
 
     const rows = await prisma.$queryRawUnsafe<any[]>(query, ...params);
+
+    // Attribute each seed_batch to its proving-ground campaign(s) via the
+    // seed ↔ campaign links.
+    const pgRows = await prisma.$queryRaw<any[]>`
+      SELECT DISTINCT dps.seed_batch, mc.id AS pg_id, mc.display_id AS pg_display_id
+      FROM directory_presence_seeds dps
+      JOIN directory_seed_campaign_links dscl ON dscl.seed_id = dps.id
+      JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+      WHERE dps.seed_batch IS NOT NULL
+        AND mc.campaign_category = 'proving_ground'
+    `;
+    const pgByBatch = new Map<string, Array<{ id: string; displayId: string | null }>>();
+    for (const r of pgRows) {
+      const list = pgByBatch.get(r.seed_batch) || [];
+      list.push({ id: r.pg_id, displayId: r.pg_display_id });
+      pgByBatch.set(r.seed_batch, list);
+    }
 
     return rows.map((r) => ({
       seedBatch: r.seed_batch,
@@ -533,6 +611,7 @@ class BatchSeekService {
       invitedSeeds: parseInt(r.invited_seeds) || 0,
       cities: r.cities || [],
       categories: r.categories || [],
+      provingGrounds: pgByBatch.get(r.seed_batch) || [],
     }));
   }
 }

@@ -4,6 +4,7 @@
  *   GET /api/admin/growth-engine/funnel         — funnel metrics
  *   GET /api/admin/growth-engine/by-niche       — per-niche breakdown
  *   GET /api/admin/growth-engine/by-city        — per-city breakdown
+ *   GET /api/admin/growth-engine/by-proving-ground — per-proving-ground breakdown
  *   GET /api/admin/growth-engine/time-series    — time series chart data
  *   GET /api/admin/growth-engine/recommendations — expansion recommendations
  *   POST /api/admin/growth-engine/aggregate     — trigger daily aggregation
@@ -62,6 +63,19 @@ router.get('/by-city', requirePlatformAdmin, async (req: Request, res: Response)
     res.json({ success: true, cities: result });
   } catch (error: any) {
     logger.error('[GET /api/admin/growth-engine/by-city] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/growth-engine/by-proving-ground — per-PG seed breakdown */
+router.get('/by-proving-ground', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await GrowthEngineAnalyticsService.getByProvingGround();
+    res.json({ success: true, provingGrounds: result });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/growth-engine/by-proving-ground] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

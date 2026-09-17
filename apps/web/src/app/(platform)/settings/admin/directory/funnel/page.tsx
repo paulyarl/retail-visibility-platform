@@ -374,7 +374,7 @@ function FunnelSummaryCard({ report, title }: { report: CohortFunnelReport; titl
 
       {/* Per-channel invite-scan split — drives channel-effort decisions.
           A seed scanned via two channels counts once in each. */}
-      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
         <StatCell
           label="Scans · Mail"
           value={m.inviteScansMail}
@@ -389,6 +389,11 @@ function FunnelSummaryCard({ report, title }: { report: CohortFunnelReport; titl
           label="Scans · Social"
           value={m.inviteScansSocial}
           sub={m.inviteScanRateSocial !== null ? `${(m.inviteScanRateSocial * 100).toFixed(1)}% of invited` : '—'}
+        />
+        <StatCell
+          label="Scans · Email"
+          value={m.inviteScansEmail}
+          sub={m.inviteScanRateEmail !== null ? `${(m.inviteScanRateEmail * 100).toFixed(1)}% of invited` : '—'}
         />
       </div>
 
@@ -546,14 +551,22 @@ function CohortCard({ cohort }: { cohort: CohortFunnelReport }) {
           <h3 className="font-semibold text-gray-900 dark:text-white">
             {cohort.campaignId ? (
               <Link
-                href={`/settings/admin/marketing-ops/campaigns/${cohort.campaignId}`}
+                href={cohort.campaignCategory === 'proving_ground'
+                  ? `/settings/admin/marketing-ops/proving-grounds/${cohort.campaignId}`
+                  : `/settings/admin/marketing-ops/campaigns/${cohort.campaignId}`}
                 className="hover:underline hover:text-blue-600 dark:hover:text-blue-400"
-                title="Open campaign"
+                title={cohort.campaignCategory === 'proving_ground' ? 'Open proving ground cockpit' : 'Open campaign'}
               >
                 {cohort.displayId || cohort.cohortKey}
               </Link>
             ) : (
               cohort.displayId || cohort.cohortKey
+            )}
+            {cohort.campaignCategory === 'proving_ground' && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 align-middle">
+                <FlaskConical className="w-3 h-3" />
+                PG
+              </span>
             )}
           </h3>
           {cohort.category && (
