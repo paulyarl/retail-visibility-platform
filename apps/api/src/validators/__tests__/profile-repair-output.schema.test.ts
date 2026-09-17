@@ -37,6 +37,16 @@ describe('profileRepairTriageSchema', () => {
           marketplace_positioning: 'Underexposed on the primary discovery platform.',
         },
         risks: ['Appeal may take 2-3 weeks', 'Hard suspension may require video verification'],
+        outreach_problems: [
+          {
+            problem: 'Customers searching for the business on Google find nothing — the profile is suspended.',
+            regular: 'Your Google Business Profile is suspended, so customers looking for you on Google Maps hit a dead end.',
+            hook: 'Quick check — Google your own business name right now. Nothing comes up, and that\'s what every customer sees too.',
+            solution: 'Claim the listing and run the reinstatement appeal with the required evidence.',
+            evidence: 'audit_results: Google profile_status=suspended',
+            outreach_use: 'Cold-call opener',
+          },
+        ],
         rationale: 'Profile is suspended on Google Maps, blocking phone calls and visits.',
         escalation_signals: ['suspension'],
         standard_signals: [],
@@ -84,6 +94,59 @@ describe('profileRepairTriageSchema', () => {
 
     expect(() => profileRepairTriageSchema.parse(invalid)).toThrow();
   });
+
+  // outreach_problems boundary tests — required .min(1), no .max()
+  // (the ≤3 cap is a prompt-level ranking rule, not a validator rule).
+  const triageBase = () => ({
+    profile_repair_triage: {
+      severity_score: 6,
+      recommended_track: 'standard',
+      issue_type_confirmed: 'nap_drift',
+      scope: { summary: 'test', broken_platforms: [], drift_details: '', missing_assets: [] },
+      viability: { pursuit_recommendation: 'pursue', rationale: 'test' },
+      pitch: { primary_angle: 'test', opener_hook: 'test', pain_points: [], marketplace_positioning: 'test' },
+      risks: [],
+      rationale: 'test',
+    },
+  });
+  const entry = () => ({
+    problem: 'p', regular: 'r', hook: 'h',
+    solution: 's', evidence: 'e', outreach_use: 'u',
+  });
+
+  it('rejects a triage briefing with no outreach_problems field', () => {
+    expect(() => profileRepairTriageSchema.parse(triageBase())).toThrow();
+  });
+
+  it('rejects a triage briefing with an empty outreach_problems array', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [];
+    expect(() => profileRepairTriageSchema.parse(v)).toThrow();
+  });
+
+  it('accepts a triage briefing with 1 outreach_problems entry', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [entry()];
+    expect(() => profileRepairTriageSchema.parse(v)).not.toThrow();
+  });
+
+  it('accepts a triage briefing with 3 outreach_problems entries', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [entry(), entry(), entry()];
+    expect(() => profileRepairTriageSchema.parse(v)).not.toThrow();
+  });
+
+  it('accepts a triage briefing with 4 outreach_problems entries (cap is prompt-level)', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [entry(), entry(), entry(), entry()];
+    expect(() => profileRepairTriageSchema.parse(v)).not.toThrow();
+  });
+
+  it('rejects an outreach_problems entry missing a required key', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [{ problem: 'p', regular: 'r' }];
+    expect(() => profileRepairTriageSchema.parse(v)).toThrow();
+  });
 });
 
 describe('profileRepairAuditSchema', () => {
@@ -108,6 +171,16 @@ describe('profileRepairAuditSchema', () => {
           value_preview: 'We\'ll correct your phone across Google and Yelp so customers reach you every time.',
         },
         risks: ['Owner may have intentionally changed the number'],
+        outreach_problems: [
+          {
+            problem: 'Customers who call the listed number reach a disconnected line.',
+            regular: 'The phone number on your Google and Yelp listings is an old one, so calls aren\'t reaching you.',
+            hook: 'When\'s the last time you dialed the number shown on your own Google listing? That\'s the number your customers are dialing.',
+            solution: 'Claim the listing and correct the phone across Google and Yelp.',
+            evidence: 'audit_results: Google displayed_phone (816) 555-1234 vs canonical (816) 555-9999',
+            outreach_use: 'Cold-call opener',
+          },
+        ],
       },
     };
 
@@ -141,6 +214,43 @@ describe('profileRepairAuditSchema', () => {
     };
 
     expect(() => profileRepairAuditSchema.parse(missingStructured)).toThrow();
+  });
+
+  // outreach_problems boundary tests — required .min(1) on the dedicated
+  // schema; a repair briefing with zero problems is a failed run.
+  const auditBase = () => ({
+    profile_repair_audit: {
+      severityScore: 4,
+      issueType: 'nap_drift',
+      scope: { summary: 'test', affected_platforms: [], specifics: '' },
+      impact: { primary_consequence: 'test' },
+      pitch: { opener_hook: 'test', pain_points: [], value_preview: 'test' },
+      risks: [],
+    },
+  });
+  const entry = () => ({
+    problem: 'p', regular: 'r', hook: 'h',
+    solution: 's', evidence: 'e', outreach_use: 'u',
+  });
+
+  it('rejects a per-issue briefing with no outreach_problems field', () => {
+    expect(() => profileRepairAuditSchema.parse(auditBase())).toThrow();
+  });
+
+  it('rejects a per-issue briefing with an empty outreach_problems array', () => {
+    const v = auditBase();
+    (v.profile_repair_audit as any).outreach_problems = [];
+    expect(() => profileRepairAuditSchema.parse(v)).toThrow();
+  });
+
+  it('accepts 1 and 4 entries (min 1, no validator-level max)', () => {
+    const one = auditBase();
+    (one.profile_repair_audit as any).outreach_problems = [entry()];
+    expect(() => profileRepairAuditSchema.parse(one)).not.toThrow();
+
+    const four = auditBase();
+    (four.profile_repair_audit as any).outreach_problems = [entry(), entry(), entry(), entry()];
+    expect(() => profileRepairAuditSchema.parse(four)).not.toThrow();
   });
 });
 

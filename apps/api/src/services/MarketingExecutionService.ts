@@ -1277,9 +1277,51 @@ export class MarketingExecutionService extends BaseService {
 
       const profile = await profileService.resolve(category, undefined, businessCity, undefined, ctx);
       if (!profile) {
+        // No active intelligence profile — but there may still be a gold
+        // standard benchmark to inject (Triage & Repair Outreach Problems
+        // spec §4.5). Mirrors the goldStandardOnly fallback in the
+        // category_audit path: repair prompts must be gold-standard aware
+        // whenever a benchmark exists for the category, not only when a CI
+        // profile also resolves.
+        const triagePlatform = (input.campaign as any).intelligence_platform || null;
+        const goldStandardOnly = await profileService.resolveGoldStandard(category, triagePlatform, businessCity, businessState, ctx);
+        if (goldStandardOnly) {
+          const gsBlock = profileService.serializeGoldStandard(goldStandardOnly, 'benchmark');
+          if (gsBlock) {
+            // Discovery leads stay suppressed for signal_triage (T5b) —
+            // repair signals are the sole hypothesis input for triage.
+            let gsAmplified = baseRendered + '\n' + gsBlock;
+            const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
+            if (marketCtxBlock) {
+              gsAmplified = gsAmplified + '\n' + marketCtxBlock;
+            }
+            logger.info('Gold standard benchmark injected into signal triage (no intelligence profile)', ctx, {
+              campaignId: input.campaign.id,
+              category,
+              goldStandardProfileId: goldStandardOnly.id,
+            });
+            return {
+              renderedPrompt: this.appendPromptSuffix(gsAmplified, promptSuffix),
+              resolution: {
+                profile_id: goldStandardOnly.id,
+                profile_version: goldStandardOnly.version,
+                intelligence_mode: 'profile',
+              },
+            };
+          }
+        }
+        let noProfileAmplified = baseRendered;
+        const marketCtxNoProfile = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
+        if (marketCtxNoProfile) {
+          noProfileAmplified = noProfileAmplified + '\n' + marketCtxNoProfile;
+        }
         return {
-          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
-          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+          renderedPrompt: this.appendPromptSuffix(noProfileAmplified, promptSuffix),
+          resolution: {
+            profile_id: null,
+            profile_version: null,
+            intelligence_mode: 'none',
+          },
         };
       }
 

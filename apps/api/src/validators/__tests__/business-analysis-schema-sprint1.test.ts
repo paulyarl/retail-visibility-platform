@@ -345,3 +345,48 @@ describe('identity_corroboration_sources — string vs object elements', () => {
     expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
   });
 });
+
+describe('outreach_problems — optional shared-schema field (Triage & Repair Outreach Problems spec)', () => {
+  const entry = () => ({
+    problem: 'p', regular: 'r', hook: 'h',
+    solution: 's', evidence: 'e', outreach_use: 'u',
+  });
+
+  it('accepts audit without outreach_problems (absent — shared schema)', () => {
+    expect(businessAnalysisSchema.safeParse(baseAudit()).success).toBe(true);
+  });
+
+  it('accepts audit with 1-3 well-formed entries', () => {
+    const a1 = baseAudit();
+    a1.outreach_problems = [entry()];
+    expect(businessAnalysisSchema.safeParse(a1).success).toBe(true);
+
+    const a3 = baseAudit();
+    a3.outreach_problems = [entry(), entry(), entry()];
+    expect(businessAnalysisSchema.safeParse(a3).success).toBe(true);
+  });
+
+  it('accepts 4 entries (the <=3 cap is prompt-level, not validator-level)', () => {
+    const audit = baseAudit();
+    audit.outreach_problems = [entry(), entry(), entry(), entry()];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+
+  it('rejects an empty outreach_problems array (.min(1) when present)', () => {
+    const audit = baseAudit();
+    audit.outreach_problems = [];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+
+  it('rejects an entry missing required keys', () => {
+    const audit = baseAudit();
+    audit.outreach_problems = [{ problem: 'p', regular: 'r' }];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+
+  it('accepts entries with extra keys (passthrough)', () => {
+    const audit = baseAudit();
+    audit.outreach_problems = [{ ...entry(), severity: 'high' }];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+});

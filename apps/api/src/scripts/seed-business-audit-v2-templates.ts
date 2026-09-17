@@ -34,6 +34,7 @@ import { logger } from '../logger';
 const CATEGORY_INTEGRATED_ID = 'mpt-j9bbem3l';
 const SIGNAL_ALIGNED_ID = 'mpt-6oeuiizo';
 const BUSINESS_AUDIT_V1_ID = 'mpt-je6m7ru6';
+const SEED_BUSINESS_AUDIT_ID = 'mpt-seed-seek-001';
 
 // ─── Output schema declaration ───────────────────────────────────────────
 // All three business-audit templates emit business_analysis-shaped output.
@@ -49,7 +50,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-15-binding-alignment-1 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-16-outreach-problems-1 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -498,6 +499,44 @@ market_opportunities — an array of business-specific growth opportunities synt
 signal_checklist — an array with one entry per category_signals item from the Category Market Context block, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was provided.
 `;
 
+// ─── Directive: Operator Outreach Problems & Solutions (Triage & Repair
+//     Outreach Problems spec §2.2/§4.3). Audit-context variant: the input is
+//     this audit's own findings (gap_analysis, detected_signals, website,
+//     platforms); solutions stay high-level (the analyst doesn't know the
+//     package catalog — recommended_services is a hint, not a lookup table);
+//     playbook alignment means deliverability in kind. The Gold Standard
+//     clause carries real weight in the V2 templates (benchmark block is
+//     injected at render time); V1 + mpt-seed-seek-001 fall back to audit
+//     results + category intelligence alone. Has a heading so removeSection
+//     manages re-runs — the removeSection must precede this insertion in
+//     each transform, and the insertion must come AFTER all removeSection
+//     calls in the transform (AGENTS.md).
+const OUTREACH_PROBLEMS_DIRECTIVE = `
+### Operator Outreach Problems & Solutions — REQUIRED
+
+Produce \`outreach_problems\` — an array of ONE to THREE (1–3) problem-and-solution pairs the operator can use directly in outreach to the prospect (the business owner). Return only the most painful problems, ranked by severity: when the audit surfaces a single real issue, return just that one — never pad the count. Each entry ships two spoken lines — a plain professional statement and a hook alternative — followed by the solution. Shape:
+
+{ "problem": "<the problem as the prospect experiences it — the business consequence>",
+  "regular": "<the plain professional line that raises this problem>",
+  "hook": "<the alternative line — same fact, earns attention>",
+  "solution": "<high-level summary of the fix — what gets done, not a named package>",
+  "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
+  "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>" }
+
+Rules:
+* 1–3 entries — the most painful problems only, ranked by severity. One well-grounded pair beats three thin ones: if the audit surfaces a single real issue (e.g. no website, everything else clean), return just that one. Never pad the count with duplicated, weak, or invented problems; never exceed three — when pains are numerous, the three most painful win. Each entry addresses a distinct customer-facing consequence — do not restate the same defect once per platform.
+* Playbook alignment — deliverability in kind. Every pair must be the KIND of fix the operator's packages deliver (repair packages, claim service, listing cleanup, website/visibility work) — the entries converge on the pitch this audit is already making rather than scattering across every observed weakness. \`recommended_services\` is a hint at the kinds of fixes in scope, not a lookup table — you summarize the fix; you do not name the product. Off-scope pains belong in the other audit fields, never in \`outreach_problems\`. Rank by severity *within* the deliverable set.
+* Ground every \`problem\` in THIS audit's findings — \`gap_analysis\`, \`detected_signals\`, \`website\`, \`platforms\`. Do not invent drift, missing platforms, or missed assets that are not present in the audit results. You MAY visit the business's live profile or website as an ordinary public visitor to confirm what is observable today before writing the pair (same access rules as the verification directives: no bypassing bot defenses, no logins, no intrusive testing). \`evidence\` cites what was actually observed — platform + observed fact.
+* When a Gold Standard block is present, it is your primary evidence source for pairs — a verified gap in \`gap_analysis\` / \`quality_gate_results\` against an expected field or quality gate IS the problem, and "close the gap to benchmark" frames the solution. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
+* Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.
+* Frame problems as business consequences ("customers asking Siri for your category are sent to a competitor"), never as technical labels ("NAP inconsistency").
+* Every entry carries two spoken lines: \`regular\` — the plain professional way to raise the problem — and \`hook\` — the alternative that earns attention with the same fact (a curiosity gap, a "try being your own customer" moment, a specific number). The hook must stay 100% true to the evidence: no clickbait, no invented stakes, no fear-mongering.
+* Solutions must be deliverable by the operator — never promise platform-side behavior the operator cannot control. Stay high-level: you do not know the platform's package catalog, so articulate the solution summary or high-level steps (e.g. "claim the listing and correct the phone across Google and Yelp") rather than naming a specific product — the operator maps your summary to the actual offer.
+* Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion).
+* \`outreach_use\` must be concrete enough to act on without rework.
+* Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
+`;
+
 // ─── Prompt 2 (Signal-Aligned) missing CI instruction sections ───────────
 
 const STORE_FORMAT_SECTION_MD = `
@@ -884,6 +923,11 @@ function transformCategoryIntegrated(body: string): string {
   //      calls so each run self-heals.
   out = removeSection(out, '### Market Intelligence Output Fields');
 
+  // 4c3. Remove any prior version of the Operator Outreach Problems
+  //      directive (seed version bump). Has a heading; the re-insertion at
+  //      4j2 runs after ALL removeSection calls so each run self-heals.
+  out = removeSection(out, '### Operator Outreach Problems');
+
   // 4d. Website Accessibility Verification directive — insert at the end of
   //     the Website Assessment section (after the intrusive-testing line).
   //     Idempotent via fingerprint. Fallback anchors cover variant bodies
@@ -985,6 +1029,15 @@ function transformCategoryIntegrated(body: string): string {
     MARKET_INTEL_OUTPUT_DIRECTIVE,
   );
 
+  // 4j2. Operator Outreach Problems directive — anchored on the Market Intel
+  //      Output directive's final line (guaranteed present by step 4j). Runs
+  //      after ALL removeSection calls (4c, 4c2, 4c3) so each run self-heals.
+  out = insertAfter(
+    out,
+    'Omit the field entirely when no category context was provided.',
+    OUTREACH_PROBLEMS_DIRECTIVE,
+  );
+
   // 4k. Align the binding text with the blocks the runtime actually injects —
   //     position claims, the phantom city_profile field, undocumented category
   //     fields, and the category_signals name collision. Idempotent.
@@ -1019,6 +1072,11 @@ function transformSignalAligned(body: string): string {
   //     AGENTS.md — headingless bindings + headed directives go AFTER all
   //     removeSection calls so each run self-heals.
   out = removeSection(out, '### Market Intelligence Output Fields');
+
+  // 0c2. Remove any prior version of the Operator Outreach Problems
+  //     directive (seed version bump). The re-insertion at step 19h runs
+  //     after ALL removeSection calls (0c, 0c2, 19c) so each run self-heals.
+  out = removeSection(out, '### Operator Outreach Problems');
 
   // 1. Insert the binding sections after the business identity block's
   //    last line (the "do not treat blank as a negative signal" note).
@@ -1322,6 +1380,16 @@ function transformSignalAligned(body: string): string {
   //      Idempotent.
   out = alignBindingText(out, true);
 
+  // 19h. Operator Outreach Problems directive — anchored on the Market Intel
+  //      Output directive's final line (guaranteed present by step 1b).
+  //      Placed here — after ALL removeSection calls in this transform
+  //      (0c, 0c2, 19c) — so each run self-heals per AGENTS.md.
+  out = insertAfter(
+    out,
+    'Omit the field entirely when no category context was provided.',
+    OUTREACH_PROBLEMS_DIRECTIVE,
+  );
+
   // 20. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -1353,6 +1421,7 @@ function transformBusinessAuditV1(body: string): string {
   //     insertion below per AGENTS.md — headingless bindings go after all
   //     removeSection calls so each run self-heals.
   out = removeSection(out, '### Market Intelligence Output Fields');
+  out = removeSection(out, '### Operator Outreach Problems');
 
   // 0a. Insert Market Context binding after the business identity block.
   //     V1 has no CI/GS bindings, but the market context binding is
@@ -1376,6 +1445,16 @@ function transformBusinessAuditV1(body: string): string {
     out,
     'The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.',
     MARKET_INTEL_OUTPUT_DIRECTIVE,
+  );
+
+  // 0a3. Operator Outreach Problems directive — after the Market Intel
+  //      Output directive's final line. V1 gets the directive (the validator
+  //      accepts outreach_problems as optional); no embedded-schema insertion
+  //      here — same rationale as the market intel fields (0a2).
+  out = insertAfter(
+    out,
+    'Omit the field entirely when no category context was provided.',
+    OUTREACH_PROBLEMS_DIRECTIVE,
   );
 
   // 0b. Add Origin row to existing identity blocks (idempotent — no-op if
@@ -1417,6 +1496,33 @@ function transformBusinessAuditV1(body: string): string {
   return out;
 }
 
+// ─── Prompt 4 (Seed Business Audit — mpt-seed-seek-001) transformation ────
+// The minimal legacy "Seek: Business Audit" template (~1.9k chars): no
+// embedded JSON schema, no Category/Gold/Market-Context bindings — it relies
+// entirely on BUSINESS_ANALYSIS_PROMPT_SUFFIX for its output shape. Folded
+// into the outreach-problems contract per spec §4.4.1: it gets the directive
+// (audit-context variant — the input is its own audit findings) and nothing
+// else. Its output_schema.name is already 'business_analysis'.
+
+function transformSeedBusinessAudit(body: string): string {
+  let out = body;
+
+  // Self-heal on re-run: drop any prior version of the directive (and the
+  // trailing marker, which removeSection swallows as headingless tail
+  // content — step 2 re-appends it).
+  out = removeSection(out, '### Operator Outreach Problems');
+
+  // Anchor on the body's closing line — the directive lands at the end.
+  out = insertAfter(out, 'Format as structured JSON.', OUTREACH_PROBLEMS_DIRECTIVE);
+
+  // Append seed version marker for idempotency tracking.
+  if (!out.includes(SEED_VERSION_MARKER)) {
+    out = out + '\n' + SEED_VERSION_MARKER;
+  }
+
+  return out;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1428,24 +1534,38 @@ async function main() {
     label: string;
     marker: string;
     transform: (body: string) => string;
+    /** Declared variables written on transform. Omit to leave the column
+     *  untouched (mpt-seed-seek-001 keeps its own 3-var declaration). */
+    variables?: string[];
   }> = [
     {
       id: CATEGORY_INTEGRATED_ID,
       label: 'Business Digital Audit - Cohesive (Category-Integrated)',
       marker: GOLD_STANDARD_MARKER,
       transform: transformCategoryIntegrated,
+      variables: FULL_BUSINESS_VARIABLES,
     },
     {
       id: SIGNAL_ALIGNED_ID,
       label: 'Business Digital Audit - Alignment Scoring (Signal-Aligned)',
       marker: CATEGORY_INTELLIGENCE_MARKER,
       transform: transformSignalAligned,
+      variables: FULL_BUSINESS_VARIABLES,
     },
     {
       id: BUSINESS_AUDIT_V1_ID,
       label: 'Seek: Business Audit V1',
       marker: V1_MARKER,
       transform: transformBusinessAuditV1,
+      variables: FULL_BUSINESS_VARIABLES,
+    },
+    {
+      id: SEED_BUSINESS_AUDIT_ID,
+      label: 'Seek: Business Audit (mpt-seed-seek-001)',
+      marker: SEED_VERSION_MARKER,
+      transform: transformSeedBusinessAudit,
+      // variables intentionally omitted — the minimal legacy body only uses
+      // business_name/city/category; do not widen its declaration.
     },
   ];
 
@@ -1500,7 +1620,7 @@ async function main() {
         where: { id: task.id },
         data: {
           body: newBody,
-          variables: FULL_BUSINESS_VARIABLES,
+          ...(task.variables ? { variables: task.variables } : {}),
           output_schema: BUSINESS_ANALYSIS_OUTPUT_SCHEMA,
           updated_at: new Date(),
         },

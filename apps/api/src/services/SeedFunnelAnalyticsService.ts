@@ -66,6 +66,22 @@ export interface CohortFunnelMetrics {
   inviteScanRateMail: number | null;
   inviteScanRateWalkin: number | null;
   inviteScanRateSocial: number | null;
+  /** Spec §5.7: seeds with ≥1 report-delivery QR scan / invited seeds.
+   *  Mirrors inviteScans for the report_delivery_* surfaces. */
+  reportScans: number;
+  reportScanRate: number | null;
+  /** Per-channel split of reportScans by QR surface (same cross-channel
+   *  semantics as the invite split). */
+  reportScansPhone: number;
+  reportScansEmail: number;
+  reportScansSocial: number;
+  reportScansInPerson: number;
+  reportScansText: number;
+  reportScanRatePhone: number | null;
+  reportScanRateEmail: number | null;
+  reportScanRateSocial: number | null;
+  reportScanRateInPerson: number | null;
+  reportScanRateText: number | null;
 }
 
 export interface ConversionScoreBreakdown {
@@ -263,6 +279,12 @@ interface CohortRow {
   invite_scans_mail: bigint | number;
   invite_scans_walkin: bigint | number;
   invite_scans_social: bigint | number;
+  report_scans: bigint | number;
+  report_scans_phone: bigint | number;
+  report_scans_email: bigint | number;
+  report_scans_social: bigint | number;
+  report_scans_in_person: bigint | number;
+  report_scans_text: bigint | number;
 }
 
 function buildFilterClauses(filters: CohortFilters, params: any[]): string {
@@ -475,7 +497,54 @@ const METRIC_SELECT = `
       WHERE qse.tenant_id = dps.tenant_id
         AND qse.surface = 'claim_invite_social'
     )
-  ) AS invite_scans_social
+  ) AS invite_scans_social,
+  -- Spec §5.7: report-delivery QR scans. Same seed-attribution + cross-channel
+  -- semantics as invite_scans — the report QR redirect stamps the seed's
+  -- tenant_id via the short code / seed-id before landing on the report page.
+  -- 'report_delivery_in_person' = printed report card, '_text' = SMS handoff,
+  -- '_email'/'_social'/'_phone' = the remaining delivery channels.
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface LIKE 'report_delivery_%'
+    )
+  ) AS report_scans,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'report_delivery_phone'
+    )
+  ) AS report_scans_phone,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'report_delivery_email'
+    )
+  ) AS report_scans_email,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'report_delivery_social'
+    )
+  ) AS report_scans_social,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'report_delivery_in_person'
+    )
+  ) AS report_scans_in_person,
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'report_delivery_text'
+    )
+  ) AS report_scans_text
 `;
 
 const FUNNEL_FROM = `
@@ -493,7 +562,15 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
   const inviteScansMail = Number(row.invite_scans_mail ?? 0);
   const inviteScansWalkin = Number(row.invite_scans_walkin ?? 0);
   const inviteScansSocial = Number(row.invite_scans_social ?? 0);
+  const reportScans = Number(row.report_scans ?? 0);
+  const reportScansPhone = Number(row.report_scans_phone ?? 0);
+  const reportScansEmail = Number(row.report_scans_email ?? 0);
+  const reportScansSocial = Number(row.report_scans_social ?? 0);
+  const reportScansInPerson = Number(row.report_scans_in_person ?? 0);
+  const reportScansText = Number(row.report_scans_text ?? 0);
   const invited = Number(row.invited ?? 0);
+  const scanRate = (count: number) =>
+    invited > 0 ? Math.round((count / invited) * 10000) / 10000 : null;
   return {
     seeds: Number(row.seeds ?? 0),
     contactable: Number(row.contactable ?? 0),
@@ -516,6 +593,18 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
     inviteScanRateMail: invited > 0 ? Math.round((inviteScansMail / invited) * 10000) / 10000 : null,
     inviteScanRateWalkin: invited > 0 ? Math.round((inviteScansWalkin / invited) * 10000) / 10000 : null,
     inviteScanRateSocial: invited > 0 ? Math.round((inviteScansSocial / invited) * 10000) / 10000 : null,
+    reportScans,
+    reportScanRate: scanRate(reportScans),
+    reportScansPhone,
+    reportScansEmail,
+    reportScansSocial,
+    reportScansInPerson,
+    reportScansText,
+    reportScanRatePhone: scanRate(reportScansPhone),
+    reportScanRateEmail: scanRate(reportScansEmail),
+    reportScanRateSocial: scanRate(reportScansSocial),
+    reportScanRateInPerson: scanRate(reportScansInPerson),
+    reportScanRateText: scanRate(reportScansText),
   };
 }
 

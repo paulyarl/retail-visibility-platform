@@ -3663,7 +3663,7 @@ const openerFromBriefingSchema = z.object({
   opener_text: z.string().min(10, 'opener_text must be at least 10 characters'),
   primary_angle: z.string().max(500).optional(),
   operator_name: z.string().max(120).optional(),
-  source_briefing: z.enum(['triage', 'issue_audit']),
+  source_briefing: z.enum(['triage', 'issue_audit', 'business_audit']),
   execution_id: z.string().optional(),
 });
 

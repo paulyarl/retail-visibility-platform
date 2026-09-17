@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Target, TrendingDown, MessageSquare, ShieldAlert, Loader2, Sparkles, CheckCircle, Wrench, ArrowRight } from 'lucide-react';
-import marketingOpsService, { PromptExecution } from '@/services/MarketingOpsService';
+import marketingOpsService, { OutreachProblem, PromptExecution } from '@/services/MarketingOpsService';
+import OutreachProblemsSection from './OutreachProblemsSection';
 
 interface RepairBriefingCardProps {
   execution: PromptExecution;
@@ -30,6 +31,9 @@ interface RepairAuditOutput {
       value_preview: string;
     };
     risks: string[];
+    // Optional — absent on executions produced before the outreach_problems
+    // contract landed (Triage & Repair Outreach Problems spec §5.1).
+    outreach_problems?: OutreachProblem[];
   };
 }
 
@@ -205,6 +209,28 @@ export default function RepairBriefingCard({ execution, campaignId }: RepairBrie
             <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-5">
               {briefing.risks.map((r, i) => <li key={i}>{r}</li>)}
             </ul>
+          </div>
+        )}
+
+        {/* Outreach problems — problem → solution pairs deployable in
+            outreach. Per-line "Use as opener" seeds an opener with the
+            entry's problem as primary_angle. */}
+        {briefing.outreach_problems && briefing.outreach_problems.length > 0 && (
+          <div className="text-xs text-gray-700 dark:text-gray-300">
+            <OutreachProblemsSection
+              problems={briefing.outreach_problems}
+              onUseAsOpener={async (line, problem) => {
+                const result = await marketingOpsService.createOpenerFromBriefing({
+                  campaign_id: campaignId,
+                  opener_text: line,
+                  primary_angle: problem,
+                  source_briefing: 'issue_audit',
+                  execution_id: execution.id,
+                });
+                const issues = (result as any)?.qualityGate?.issues ?? (result as any)?.quality_gate_issues;
+                return { warnings: Array.isArray(issues) && issues.length > 0 ? issues : undefined };
+              }}
+            />
           </div>
         )}
 

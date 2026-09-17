@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb, Copy, ClipboardPaste, FileText } from 'lucide-react';
 import marketingOpsService, { Campaign, RepairTrack, TriageRecommendation } from '@/services/MarketingOpsService';
+import OutreachProblemsSection from './OutreachProblemsSection';
 
 interface RepairTrackPanelProps {
   campaign: Campaign;
@@ -603,6 +604,28 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                     <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-5">
                       {recommendation.risks.map((r, i) => <li key={i}>{r}</li>)}
                     </ul>
+                  </div>
+                )}
+
+                {/* Outreach problems — 1–3 problem → solution pairs for the
+                    pitch-construction workflow. Per-line "Use as opener" seeds
+                    an opener with the entry's problem as primary_angle. */}
+                {recommendation.outreach_problems && recommendation.outreach_problems.length > 0 && (
+                  <div className="text-xs text-gray-700 dark:text-gray-300">
+                    <OutreachProblemsSection
+                      problems={recommendation.outreach_problems}
+                      onUseAsOpener={async (line, problem) => {
+                        const result = await marketingOpsService.createOpenerFromBriefing({
+                          campaign_id: campaign.id,
+                          opener_text: line,
+                          primary_angle: problem,
+                          source_briefing: 'triage',
+                          execution_id: recommendation._execution_id,
+                        });
+                        const issues = (result as any)?.qualityGate?.issues ?? (result as any)?.quality_gate_issues;
+                        return { warnings: Array.isArray(issues) && issues.length > 0 ? issues : undefined };
+                      }}
+                    />
                   </div>
                 )}
 

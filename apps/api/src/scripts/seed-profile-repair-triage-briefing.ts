@@ -23,7 +23,7 @@ import { logger } from '../logger';
 
 const TEMPLATE_ID = 'mpt-profile-repair-triage-default';
 
-const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT';
+const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v2: outreach-problems -->';
 
 const NEW_BODY = `You are a local business profile repair analyst producing an operator briefing.
 
@@ -50,7 +50,7 @@ Your job is NOT to classify signals — the signal→track mapping is determinis
 
 ## Instructions
 
-Produce an operator briefing with five sections. Each section must be grounded in the audit data above — do not invent platform names, drift details, or missing assets that are not present in the audit results.
+Produce an operator briefing with six sections. Each section must be grounded in the audit data above — do not invent platform names, drift details, or missing assets that are not present in the audit results.
 
 ### 1. Scope
 
@@ -97,6 +97,30 @@ Also provide:
 - **rationale**: overall reasoning for the track recommendation (kept for stage history)
 - **escalation_signals**: signals that pushed toward escalated (if any)
 - **standard_signals**: signals that kept it on standard (if any)
+
+### 6. Operator Outreach Problems & Solutions
+
+Produce \`outreach_problems\` — an array of ONE to THREE (1–3) problem-and-solution pairs the operator can use directly in outreach to the prospect (the business owner). Return only the most painful problems, ranked by severity: when the audit surfaces a single real issue, return just that one — never pad the count. Each entry ships two spoken lines — a plain professional statement and a hook alternative — followed by the solution. Shape:
+
+{ "problem": "<the problem as the prospect experiences it — the business consequence>",
+  "regular": "<the plain professional line that raises this problem>",
+  "hook": "<the alternative line — same fact, earns attention>",
+  "solution": "<high-level summary of the fix — what gets done, not a named package>",
+  "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
+  "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>" }
+
+Rules:
+* 1–3 entries — the most painful problems only, ranked by severity. One well-grounded pair beats three thin ones: if the audit surfaces a single real issue (e.g. no website, everything else clean), return just that one. Never pad the count with duplicated, weak, or invented problems; never exceed three — when pains are numerous, the three most painful win. Each entry addresses a distinct customer-facing consequence — do not restate the same defect once per platform.
+* Playbook alignment — every entry must serve the confirmed issue (\`issue_type_confirmed\`) the operator is about to pitch, not just the audit's pain list. Most painful AND on-issue is the bar. Off-issue pains belong in the other briefing fields (risks, pitch), never in \`outreach_problems\`. Rank by severity *within* the aligned set.
+* Ground every \`problem\` in the audit data above — do not invent drift, missing platforms, or missed assets that are not present in the audit results. You MAY visit the business's live profile or website as an ordinary public visitor to confirm what is observable today before writing the pair (same access rules as the verification directives: no bypassing bot defenses, no logins, no intrusive testing). \`evidence\` cites what was actually observed — platform + observed fact.
+* When a Gold Standard block is present, treat it as the "what good looks like" reference for every signal in the analysis — a problem is strongest when it names the expected field or quality gate the business fails, and \`gap_analysis\` / \`quality_gate_results\` are your first evidence source. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
+* Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.
+* Frame problems as business consequences ("customers asking Siri for your category are sent to a competitor"), never as technical labels ("NAP inconsistency").
+* Every entry carries two spoken lines: \`regular\` — the plain professional way to raise the problem — and \`hook\` — the alternative that earns attention with the same fact (a curiosity gap, a "try being your own customer" moment, a specific number). The hook must stay 100% true to the evidence: no clickbait, no invented stakes, no fear-mongering.
+* Solutions must be deliverable by the operator — never promise platform-side behavior the operator cannot control. Stay high-level: you do not know the platform's package catalog, so articulate the solution summary or high-level steps (e.g. "claim the listing and correct the phone across Google and Yelp") rather than naming a specific product — the operator maps your summary to the actual offer.
+* Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion).
+* \`outreach_use\` must be concrete enough to act on without rework.
+* Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
 
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`;
 

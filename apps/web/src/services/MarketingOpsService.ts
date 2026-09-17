@@ -91,6 +91,20 @@ export interface DirectoryProfileEntry {
   category?: string;
 }
 
+/**
+ * One problem → solution pair from the outreach_problems contract (Triage &
+ * Repair Outreach Problems spec). Shared by triage briefings, per-issue repair
+ * briefings, and business audits — one card component renders all three.
+ */
+export interface OutreachProblem {
+  problem: string;
+  regular: string;
+  hook: string;
+  solution: string;
+  evidence: string;
+  outreach_use: string;
+}
+
 export interface TriageRecommendation {
   severity_score: number;
   recommended_track: 'standard' | 'escalated';
@@ -115,6 +129,9 @@ export interface TriageRecommendation {
     marketplace_positioning: string;
   };
   risks?: string[];
+  // Operator outreach ammunition — 1–3 problem → solution pairs (§5).
+  // Optional: absent on briefings persisted before the contract landed.
+  outreach_problems?: OutreachProblem[];
   // Provenance metadata (persisted alongside the briefing)
   _execution_id?: string;
   _validated?: boolean;
@@ -3567,7 +3584,7 @@ class MarketingOpsService extends AdminApiSingleton {
     opener_text: string;
     primary_angle?: string;
     operator_name?: string;
-    source_briefing: 'triage' | 'issue_audit';
+    source_briefing: 'triage' | 'issue_audit' | 'business_audit';
     execution_id?: string;
   }): Promise<OpenerResult> {
     const body: Record<string, any> = {

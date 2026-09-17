@@ -25,7 +25,6 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import type { RequestCtx } from '../context';
-import { unifiedConfig } from '../config/unifiedConfig';
 import { ConflictError, NotFoundError, ValidationError } from '../middleware/errorHandler';
 import MarketingCampaignService from './MarketingCampaignService';
 import CampaignTriageService from './CampaignTriageService';
@@ -45,6 +44,10 @@ import {
   type ManualPlayTemplate,
 } from './outreach-openers/manual-play-templates';
 import { HOOK_ANGLE_KEYS } from './outreach-openers/hook-library';
+import {
+  buildOutreachLinkVars,
+  resolveCampaignSeedId,
+} from './outreach-openers/outreach-link-vars';
 
 export type { ManualPlayTemplate };
 
@@ -738,7 +741,12 @@ export class ManualOutreachScriptService extends BaseService {
 
     const rawCategory = campaign.service_category ?? campaign.category ?? null;
     const operatorName = await this.resolveOperatorName(campaign);
-    const claimUrl = await this.resolveClaimUrl(campaignId);
+
+    // Tracked link + QR variables (§5.1) — report_url, claim_url,
+    // claim_short_url, qr_url_* — resolved from the seed's claim/report kits.
+    // Absent keys keep their {{placeholder}} visible in the script.
+    const seedId = await resolveCampaignSeedId(campaignId);
+    const linkVars = await buildOutreachLinkVars(seedId);
 
     const merge: Record<string, string | null> = {
       business: campaign.business_name ?? null,
@@ -748,7 +756,8 @@ export class ManualOutreachScriptService extends BaseService {
       operator_name: operatorName,
       sender_name: operatorName,
       salutation: '{{salutation}}',
-      claim_url: claimUrl,
+      claim_url: null,
+      ...linkVars,
     };
 
     // Salutation: worksheet's stored recommendation → resolveSalutation
@@ -813,38 +822,6 @@ export class ManualOutreachScriptService extends BaseService {
       return `${city}, ${state}`;
     }
     return parts.map((p: any) => String(p).trim()).join(', ');
-  }
-
-  /**
-   * Resolve the directory claim URL for a campaign — mirrors
-   * CallScriptService.resolveClaimUrl. Best-effort: null on any failure.
-   */
-  private async resolveClaimUrl(campaignId: string): Promise<string | null> {
-    try {
-      const links = await this.prisma.$queryRaw<any[]>`
-        SELECT seed_id FROM directory_seed_campaign_links
-        WHERE campaign_id = ${campaignId}
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      if (!links[0]?.seed_id) return null;
-      const seedId = links[0].seed_id;
-
-      const tokens = await this.prisma.$queryRaw<any[]>`
-        SELECT token FROM directory_claim_tokens
-        WHERE seed_id = ${seedId}
-          AND consumed_at IS NULL
-          AND (expires_at IS NULL OR expires_at > now())
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      if (!tokens[0]?.token) return null;
-
-      const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || '';
-      return `${baseUrl}/directory/claim/${tokens[0].token}`;
-    } catch {
-      return null;
-    }
   }
 
   /**

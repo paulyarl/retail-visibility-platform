@@ -63,6 +63,12 @@ const perCampaignRow = {
   invite_scans_mail: 3n,
   invite_scans_walkin: 1n,
   invite_scans_social: 1n,
+  report_scans: 4n,
+  report_scans_phone: 0n,
+  report_scans_email: 1n,
+  report_scans_social: 0n,
+  report_scans_in_person: 2n,
+  report_scans_text: 1n,
 };
 
 const combinedRow = {
@@ -255,6 +261,14 @@ describe('getCohortFunnel — SQL path', () => {
     expect(cohort.metrics.inviteScanRateMail).toBeCloseTo(0.1667, 4);
     expect(cohort.metrics.inviteScanRateWalkin).toBeCloseTo(0.0556, 4);
     expect(cohort.metrics.inviteScanRateSocial).toBeCloseTo(0.0556, 4);
+
+    // Spec §5.7 — report-delivery scans mirror the invite split
+    expect(cohort.metrics.reportScans).toBe(4);
+    expect(cohort.metrics.reportScanRate).toBeCloseTo(0.2222, 4);
+    expect(cohort.metrics.reportScansInPerson).toBe(2);
+    expect(cohort.metrics.reportScansText).toBe(1);
+    expect(cohort.metrics.reportScansEmail).toBe(1);
+    expect(cohort.metrics.reportScanRateInPerson).toBeCloseTo(0.1111, 4);
 
     // Combined: 8 scans / 30 invited
     expect(report.combined.metrics.inviteScans).toBe(8);

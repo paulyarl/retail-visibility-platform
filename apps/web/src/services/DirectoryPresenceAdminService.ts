@@ -200,6 +200,19 @@ export interface CohortFunnelMetrics {
   inviteScanRateMail: number | null;
   inviteScanRateWalkin: number | null;
   inviteScanRateSocial: number | null;
+  /** Spec §5.7 — report-delivery QR scans (report_delivery_* surfaces). */
+  reportScans: number;
+  reportScanRate: number | null;
+  reportScansPhone: number;
+  reportScansEmail: number;
+  reportScansSocial: number;
+  reportScansInPerson: number;
+  reportScansText: number;
+  reportScanRatePhone: number | null;
+  reportScanRateEmail: number | null;
+  reportScanRateSocial: number | null;
+  reportScanRateInPerson: number | null;
+  reportScanRateText: number | null;
 }
 
 export interface ConversionScoreBreakdown {

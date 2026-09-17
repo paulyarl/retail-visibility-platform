@@ -391,6 +391,31 @@ function FunnelSummaryCard({ report, title }: { report: CohortFunnelReport; titl
           sub={m.inviteScanRateSocial !== null ? `${(m.inviteScanRateSocial * 100).toFixed(1)}% of invited` : '—'}
         />
       </div>
+
+      {/* Report-delivery QR scans (spec §5.7) — the report hook's scan signal.
+          Same cross-channel counting as the invite split above. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <StatCell
+          label="Report Scan Rate"
+          value={m.reportScanRate !== null ? `${(m.reportScanRate * 100).toFixed(1)}%` : '—'}
+          sub={`${m.reportScans} scans / ${m.invited} invited`}
+        />
+        <StatCell
+          label="Report · In Person"
+          value={m.reportScansInPerson}
+          sub={m.reportScanRateInPerson !== null ? `${(m.reportScanRateInPerson * 100).toFixed(1)}% of invited` : '—'}
+        />
+        <StatCell
+          label="Report · Text"
+          value={m.reportScansText}
+          sub={m.reportScanRateText !== null ? `${(m.reportScanRateText * 100).toFixed(1)}% of invited` : '—'}
+        />
+        <StatCell
+          label="Report · Email"
+          value={m.reportScansEmail}
+          sub={m.reportScanRateEmail !== null ? `${(m.reportScanRateEmail * 100).toFixed(1)}% of invited` : '—'}
+        />
+      </div>
     </div>
   );
 }

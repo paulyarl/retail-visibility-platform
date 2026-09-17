@@ -7,6 +7,7 @@ import marketingOpsService from '@/services/MarketingOpsService';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import recoveryOpsService from '@/services/RecoveryOpsService';
 import AuditImportMetadataBadge from './AuditImportMetadataBadge';
+import OutreachProblemsSection from './OutreachProblemsSection';
 
 // ─── Helpers (shared with CityAnalysisAuditCard — duplicated for isolation) ───
 
@@ -755,6 +756,30 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             </div>
           )}
         </Section>
+
+        {/* 12b. Outreach ammunition — problem → solution pairs from the audit.
+             Present on audits produced under the outreach_problems contract
+             (Triage & Repair Outreach Problems spec §5.2). Per-line "Use as
+             opener" seeds the Openers workspace with the problem as
+             primary_angle. */}
+        {Array.isArray(d.outreach_problems) && d.outreach_problems.length > 0 && (
+          <Section title="Outreach Ammunition">
+            <OutreachProblemsSection
+              problems={d.outreach_problems}
+              onUseAsOpener={async (line, problem) => {
+                const result = await marketingOpsService.createOpenerFromBriefing({
+                  campaign_id: campaignId,
+                  opener_text: line,
+                  primary_angle: problem,
+                  source_briefing: 'business_audit',
+                  execution_id: (audit as any).execution_id ?? undefined,
+                });
+                const issues = (result as any)?.qualityGate?.issues ?? (result as any)?.quality_gate_issues;
+                return { warnings: Array.isArray(issues) && issues.length > 0 ? issues : undefined };
+              }}
+            />
+          </Section>
+        )}
 
         {/* 13. Data quality */}
         <Section title="Data Quality">

@@ -627,6 +627,28 @@ const signalChecklistEntrySchema = z.object({
   evidence: z.string().nullable().optional(),
 }).passthrough();
 
+/**
+ * One problem → solution pair the operator can deploy verbatim in outreach
+ * (Triage & Repair Outreach Problems spec). `problem` is the consequence-first
+ * statement; `regular`/`hook` are the two spoken lines; `solution` is a
+ * high-level fix summary (not a named package); `evidence` is the audit
+ * observation grounding the pair; `outreach_use` is the deployment guidance.
+ *
+ * Optional — business_analysis is a SHARED schema (audit templates,
+ * mpt-seed-seek-001, the review-response template). Only templates whose body
+ * carries an "Operator Outreach Problems & Solutions" directive emit it.
+ * .min(1) applies when present — emit the field or omit it entirely; an empty
+ * array is invalid (matches market_opportunities / signal_checklist).
+ */
+const outreachProblemEntrySchema = z.object({
+  problem: z.string(),
+  regular: z.string(),
+  hook: z.string(),
+  solution: z.string(),
+  evidence: z.string(),
+  outreach_use: z.string(),
+}).passthrough();
+
 // ---- Top-level schema ----
 
 export const businessAnalysisSchema = z.object({
@@ -685,6 +707,11 @@ export const businessAnalysisSchema = z.object({
   // on that platform. See spec §5 for the determination ↔ data_status
   // mapping rule.
   render_controls: z.array(renderControlSchema).optional(),
+  // Operator Outreach Problems & Solutions — 1–3 problem → solution pairs the
+  // operator deploys verbatim in outreach. Optional on this shared schema
+  // (prompt-level contract: only templates carrying the directive emit it).
+  // When present, .min(1) — never an empty array.
+  outreach_problems: z.array(outreachProblemEntrySchema).min(1).optional(),
 }).passthrough();
 
 export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
@@ -886,6 +913,14 @@ Return your response as JSON matching this exact schema:
   ],
   "render_controls": [
     { "platform": "<string>", "business_profile_url": "<string|null>", "business_rendered": <boolean|null>, "control_business": "<string|null>", "control_url": "<string|null>", "control_rendered": <boolean|null>, "access_barrier": "none|js_required|bot_defense|captcha|login_wall|rate_limit|timeout|not_attempted", "determination": "business_specific_failure|platform_available|unable_to_verify" }
+  ],
+  "outreach_problems": [
+    { "problem": "<the problem as the prospect experiences it — the business consequence>",
+      "regular": "<the plain professional line that raises this problem>",
+      "hook": "<the alternative line — same fact, earns attention>",
+      "solution": "<high-level summary of the fix — what gets done, not a named package>",
+      "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
+      "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>" }
   ]
 }
 
@@ -898,6 +933,9 @@ GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present i
 MARKET INTEL SIDEBAR FIELDS (populate ONLY when a MARKET CONTEXT section is present in the prompt — i.e. category + location intelligence was injected):
 - market_opportunities: business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps, and website.conversion_opportunities. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Omit the field entirely (do not emit an empty array) when no market context was injected.
 - signal_checklist: one entry per category_signals item, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was injected.
+
+OUTREACH PROBLEMS FIELD (conditional — populate ONLY when the prompt body contains an Operator Outreach Problems & Solutions directive):
+- outreach_problems: 1–3 problem → solution pairs the operator can use directly in outreach to the prospect — the most painful problems, ranked by severity. Each entry: { "problem": the problem as the prospect experiences it (business consequence, not a technical label), "regular": the plain professional line that raises it, "hook": the alternative line — same fact, pattern-interrupt delivery, "solution": high-level summary of the fix (not a named package), "evidence": the audit-data observation grounding the problem (platform + observed fact), "outreach_use": how the operator deploys the pair (cold-call opener, email hook, objection response) }. Omit the field entirely when the prompt body carries no such directive — do not emit an empty array.
 
 PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types):
 - website.has_product_browsing: <boolean|null> — can customers browse products or categories on the website? (null when unable to verify or no website)

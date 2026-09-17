@@ -116,6 +116,16 @@ describe('ProfileRepairPromptService — briefing persistence (§2)', () => {
         risks: ['Postcard verification may be required.'],
         escalation_signals: [],
         standard_signals: ['nap_drift'],
+        outreach_problems: [
+          {
+            problem: 'Customers calling the wrong number from Apple Maps',
+            regular: 'I noticed your phone number on Apple Maps does not match the one on your website.',
+            hook: 'How many customers called a dead number this week? Apple Maps shows a different number.',
+            solution: 'Fix the listing NAP so every platform shows the same phone and address.',
+            evidence: 'Phone differs on Apple Maps; address differs on Yelp.',
+            outreach_use: 'cold call opener',
+          },
+        ],
       },
     });
 

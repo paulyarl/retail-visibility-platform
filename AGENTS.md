@@ -52,6 +52,10 @@ Known constraint ↔ enum pairs (drift history: migrations 256, 264, 270 — thi
 - `chk_prospect_queue_source_kind` ↔ `ProspectSourceKind` in `MarketingProspectQueueService.ts` + `prospectQueueAddSchema` in `marketing-ops.ts`
 - `chk_prospect_queue_status` ↔ `ProspectStatus` (same file)
 - `chk_prospect_queue_source_scope` ↔ `ProspectCampaignScope` (same file)
+- `directory_seed_outreach_touches_channel_check` ↔ seed-touch channels (`TouchChannel` in `ProvingGroundCadenceService.ts`, `DirectoryPresenceSeedService.ts`, `touchLogSchema` in `directory-presence-admin.ts`). Current set (migration 273): `call, email, sms, mail, form, referral, visit, other`.
+- `directory_seed_outreach_touches_outcome_check` ↔ seed-touch outcomes (`TouchOutcome` in `ProvingGroundCadenceService.ts` + report-delivery outcomes in `SeedReportDeliveryService.ts`). Current set (migration 289): 262's set + `report_delivered, report_viewed, report_claimed, report_declined, claim_qr_generated`.
+
+**Silent-drop hazard:** a writer whose value is not in the CHECK fails with `23514`, and if the insert sits inside a best-effort `try/catch` (e.g. `SeedReportDeliveryService.recordDeliveryEvent`), the row is silently dropped with only a `logger.error` — no test failure if the test only asserts SQL *text*. Migrations 259/262/273/289 fixed one such case. When touching a CHECK-guarded table, add a **constraint-parity test** that parses the effective CHECK value set from `database/migrations/*.sql` and asserts the writer's emitted values are members (pattern: `apps/api/src/services/__tests__/SeedReportDeliveryService.test.ts`). Note there is a decoy `apps/api/database/migrations` (13 unrelated legacy files) — resolve the real migrations dir by walking ancestors and picking the candidate with the most numbered files.
 
 When adding an enum value, grep the table name for `chk_` constraints and sync every one the enum touches. Migrations are applied manually: `psql $DATABASE_URL -f database/migrations/<n>_<name>.sql` (Doppler-provided URL), against both `local` and `prd`.
 
@@ -126,6 +130,7 @@ Spec: `docs/LocalBiz/WHATSAPP_CHANNEL_INTEGRATION_SPEC.md`
 - Double-wrap response contract: unwrap with `result.data?.data ?? result.data`
 - Mantine UI is used on marketing public pages (`@mantine/core`); customer account pages use Tailwind + `@/components/ui/*`
 - Tabler icons: use `IconLogin` (not `IconLogIn`)
+- **Tracked link + QR variables:** never hand-build a claim/report URL in a script, pitch, or merge context. Resolve `{{report_url}}` / `{{claim_url}}` / `{{claim_short_url}}` / `{{qr_url_*}}` through `apps/api/src/services/outreach-openers/outreach-link-vars.ts` (`buildOutreachLinkVars`, `resolveClaimUrlForCampaign`). Canonical claim path is `/place/claim/{token}` (`/directory/claim/{token}` is a legacy web redirect only). The kit services are imported lazily there because `ClaimInviteQrKitService` evaluates `unifiedConfig.get()` at module load.
 
 ## Marketing Ops Customer Portal (Phase 1)
 

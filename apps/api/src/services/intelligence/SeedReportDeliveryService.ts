@@ -333,12 +333,17 @@ export class SeedReportDeliveryService extends BaseService {
     operatorId: string | null,
     ctx?: RequestCtx,
   ): Promise<void> {
-    const channelLabels: Record<ReportDeliveryChannel, string> = {
-      phone: 'phone',
+    // Report-delivery channel → canonical directory_seed_outreach_touches.channel.
+    // The channel CHECK (migrations 259/262/273) allows only
+    // call|email|sms|mail|form|referral|visit|other — the report channels map
+    // onto that set rather than extending the constraint (spec §5.3.1). The
+    // human-readable channel name is preserved in the delivery note.
+    const TOUCH_CHANNELS: Record<ReportDeliveryChannel, string> = {
+      phone: 'call',
+      text: 'sms',
+      social: 'other',
+      in_person: 'visit',
       email: 'email',
-      social: 'social',
-      in_person: 'in_person',
-      text: 'text',
     };
 
     try {
@@ -351,7 +356,7 @@ export class SeedReportDeliveryService extends BaseService {
           ${randomUUID()}::uuid,
           ${kit.seedId},
           (SELECT tenant_id FROM directory_presence_seeds WHERE id = ${kit.seedId}),
-          ${channelLabels[channel]},
+          ${TOUCH_CHANNELS[channel]},
           'report_delivered',
           ${deliveryNote},
           ${operatorId},
@@ -361,7 +366,7 @@ export class SeedReportDeliveryService extends BaseService {
           SELECT 1
           FROM directory_seed_outreach_touches
           WHERE seed_id = ${kit.seedId}
-            AND channel = ${channelLabels[channel]}
+            AND channel = ${TOUCH_CHANNELS[channel]}
             AND outcome = 'report_delivered'
             AND notes = ${deliveryNote}
         )

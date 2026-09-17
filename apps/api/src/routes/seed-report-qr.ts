@@ -27,7 +27,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { trackQrScanEvent } from '../services/QrAnalyticsService';
+import { trackQrScanEvent, type QrSurfaceType } from '../services/QrAnalyticsService';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
 
@@ -44,7 +44,7 @@ type ReportDeliveryChannel = 'phone' | 'email' | 'social' | 'in_person' | 'text'
 
 const VALID_CHANNELS = new Set<ReportDeliveryChannel>(['phone', 'email', 'social', 'in_person', 'text']);
 
-const SURFACE_MAP: Record<ReportDeliveryChannel, string> = {
+const SURFACE_MAP: Record<ReportDeliveryChannel, QrSurfaceType> = {
   phone: 'report_delivery_phone',
   email: 'report_delivery_email',
   social: 'report_delivery_social',
@@ -58,7 +58,7 @@ const SURFACE_MAP: Record<ReportDeliveryChannel, string> = {
  * seed is invalid — the scan itself is the analytics signal.
  */
 async function recordReportScanAndRedirect(
-  surface: string,
+  surface: QrSurfaceType,
   seedId: string,
   channel: string,
   req: Request,
@@ -78,7 +78,7 @@ async function recordReportScanAndRedirect(
   try {
     await trackQrScanEvent({
       tenantId,
-      surface: surface as any,
+      surface,
       consumer: 'merchant',
       productId: seedId, // §5.4 — seed attribution for report viewed/unviewed tracking
       source: `qr_code_${channel || 'unknown'}`,
@@ -131,7 +131,7 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
   const { surface } = req.query;
 
   // Validate surface — fall back to in_person for unrecognized values
-  const validSurfaces: Record<string, string> = {
+  const validSurfaces: Record<string, QrSurfaceType> = {
     in_person: 'report_delivery_in_person',
     text: 'report_delivery_text',
     email: 'report_delivery_email',
@@ -165,7 +165,7 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
   try {
     await trackQrScanEvent({
       tenantId,
-      surface: resolvedSurface as any,
+      surface: resolvedSurface,
       consumer: 'merchant',
       productId: seedId ?? undefined, // §5.4 — seed attribution for view tracking
       source: `qr_code_${surface || 'unknown'}`,

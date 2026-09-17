@@ -22,7 +22,42 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
-const BRIEFING_MARKER = 'ISSUE-SPECIFIC REPAIR BRIEFING — PRIMARY OUTPUT';
+const BRIEFING_MARKER = 'ISSUE-SPECIFIC REPAIR BRIEFING — PRIMARY OUTPUT\n<!-- issue-briefing-v2: outreach-problems -->';
+
+/**
+ * §6. Operator Outreach Problems & Solutions — shared directive appended to
+ * each per-issue body (Triage & Repair Outreach Problems spec §2.2/§4.2).
+ * `playbookBinding` binds the alignment rule to the template's issueType:
+ * a NAP Drift briefing's pairs are all NAP pairs even when the audit data
+ * contains a more painful off-issue signal.
+ */
+function outreachProblemsSection(playbookBinding: string): string {
+  return `### 6. Operator Outreach Problems & Solutions
+
+Produce \`outreach_problems\` — an array of ONE to THREE (1–3) problem-and-solution pairs the operator can use directly in outreach to the prospect (the business owner). Return only the most painful problems, ranked by severity: when the audit surfaces a single real issue, return just that one — never pad the count. Each entry ships two spoken lines — a plain professional statement and a hook alternative — followed by the solution. Shape:
+
+{ "problem": "<the problem as the prospect experiences it — the business consequence>",
+  "regular": "<the plain professional line that raises this problem>",
+  "hook": "<the alternative line — same fact, earns attention>",
+  "solution": "<high-level summary of the fix — what gets done, not a named package>",
+  "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
+  "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>" }
+
+Rules:
+* 1–3 entries — the most painful problems only, ranked by severity. One well-grounded pair beats three thin ones: if the audit surfaces a single real issue, return just that one. Never pad the count with duplicated, weak, or invented problems; never exceed three — when pains are numerous, the three most painful win. Each entry addresses a distinct customer-facing consequence — do not restate the same defect once per platform.
+* Playbook alignment — ${playbookBinding} Most painful AND on-issue is the bar. Off-issue pains belong in the other briefing fields (risks, pitch), never in \`outreach_problems\`. Rank by severity *within* the aligned set.
+* Ground every \`problem\` in the audit data above — do not invent drift, missing platforms, or missed assets that are not present in the audit results. You MAY visit the business's live profile or website as an ordinary public visitor to confirm what is observable today before writing the pair (same access rules as the verification directives: no bypassing bot defenses, no logins, no intrusive testing). \`evidence\` cites what was actually observed — platform + observed fact.
+* When a Gold Standard block is present, treat it as the "what good looks like" reference for every signal in the analysis — a problem is strongest when it names the expected field or quality gate the business fails. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
+* Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.
+* Frame problems as business consequences ("customers asking Siri for your category are sent to a competitor"), never as technical labels ("NAP inconsistency").
+* Every entry carries two spoken lines: \`regular\` — the plain professional way to raise the problem — and \`hook\` — the alternative that earns attention with the same fact (a curiosity gap, a "try being your own customer" moment, a specific number). The hook must stay 100% true to the evidence: no clickbait, no invented stakes, no fear-mongering.
+* Solutions must be deliverable by the operator — never promise platform-side behavior the operator cannot control. Stay high-level: you do not know the platform's package catalog, so articulate the solution summary or high-level steps (e.g. "claim the listing and correct the phone across Google and Yelp") rather than naming a specific product — the operator maps your summary to the actual offer.
+* Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion).
+* \`outreach_use\` must be concrete enough to act on without rework.
+* Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
+
+`;
+}
 
 interface IssueTemplate {
   id: string;
@@ -93,6 +128,7 @@ List anything that makes this repair harder than it looks:
 - **severityScore** (1-10): how damaging is this NAP drift to local search visibility and customer acquisition
 - **issueType**: "nap_drift"
 
+${outreachProblemsSection('every entry must be a NAP drift pair (name/address/phone consistency) — even when the audit data contains a more painful off-issue signal.')}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
   {
@@ -157,6 +193,7 @@ List anything that makes this repair harder than it looks:
 - **severityScore** (1-10): how damaging is the unclaimed profile to local search visibility and customer acquisition
 - **issueType**: "unclaimed_profile"
 
+${outreachProblemsSection('every entry must be a claim-state pair (unclaimed/unmanaged profile consequences) — even when the audit data contains a more painful off-issue signal.')}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
   {
@@ -221,6 +258,7 @@ List anything that makes this repair harder than it looks:
 - **severityScore** (1-10): how damaging are the platform gaps to local search visibility and customer acquisition
 - **issueType**: "platform_gap"
 
+${outreachProblemsSection('every entry must be a coverage-gap pair (missing platform presence) — even when the audit data contains a more painful off-issue signal.')}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
 ];

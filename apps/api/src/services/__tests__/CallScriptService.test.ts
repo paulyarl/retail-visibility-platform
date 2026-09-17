@@ -32,6 +32,8 @@ const {
   mockGetLatestAuditData,
   mockQueryRaw,
   mockUsersFindUnique,
+  mockGetClaimKitMeta,
+  mockGetReportKitMeta,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockResolveCampaignArchetype: vi.fn(),
@@ -49,6 +51,18 @@ const {
   mockGetLatestAuditData: vi.fn(),
   mockQueryRaw: vi.fn(),
   mockUsersFindUnique: vi.fn(),
+  mockGetClaimKitMeta: vi.fn(),
+  mockGetReportKitMeta: vi.fn(),
+}));
+
+// The shared outreach-link resolver (§5.1) resolves claim/report QR URLs
+// through these two kit services.
+vi.mock('../ClaimInviteQrKitService', () => ({
+  getClaimInviteKitMeta: mockGetClaimKitMeta,
+}));
+
+vi.mock('../intelligence/SeedReportDeliveryService', () => ({
+  default: { getReportKitMeta: mockGetReportKitMeta },
 }));
 
 vi.mock('../MarketingCampaignService', () => ({
@@ -183,6 +197,8 @@ beforeEach(() => {
   mockEnsureShortCode.mockResolvedValue(null);
   mockAudit.mockResolvedValue({});
   mockGetLatestAuditData.mockResolvedValue(null);
+  mockGetClaimKitMeta.mockResolvedValue(null);
+  mockGetReportKitMeta.mockResolvedValue(null);
 });
 
 // ─── Assembly tests ──────────────────────────────────────────────────────
@@ -844,5 +860,31 @@ describe('CallScriptService.assembleForSeed', () => {
     expect(result.callContext.claim_short_url).toBeNull();
     // {{claim_url}} placeholder stays visible rather than fabricated
     expect(result.stages.claim_ask).toContain('{{claim_url}}');
+  });
+
+  it('exposes the tracked QR short URLs from the claim kit (§5.1)', async () => {
+    mockGetClaimKitMeta.mockResolvedValue({
+      claimUrl: 'https://app.example.com/place/claim/tok-1',
+      shortClaimUrl: 'https://app.example.com/c/abc123',
+      qrUrl: 'https://app.example.com/q/abc123',
+      qrUrlWalkin: 'https://app.example.com/qw/abc123',
+      qrUrlSocial: 'https://app.example.com/qs/abc123',
+      qrUrlEmail: 'https://app.example.com/qe/abc123',
+    });
+    mockGetReportKitMeta.mockResolvedValue({
+      qrUrlInPerson: 'https://app.example.com/r/abc123',
+      qrUrlText: 'https://app.example.com/rt/abc123',
+      qrUrlEmail: 'https://app.example.com/re/abc123',
+      qrUrlSocial: 'https://app.example.com/rs/abc123',
+      qrUrlPhone: 'https://app.example.com/rp/abc123',
+    });
+
+    const result = await CallScriptService.assembleForSeed('seed-1');
+
+    expect(result.callContext.qr_url_walkin).toBe('https://app.example.com/qw/abc123');
+    expect(result.callContext.qr_url_report_in_person).toBe('https://app.example.com/r/abc123');
+    expect(result.callContext.qr_url_report_text).toBe('https://app.example.com/rt/abc123');
+    // Canonical claim path — never the legacy /directory/claim form.
+    expect(result.callContext.claim_url).not.toContain('/directory/claim/');
   });
 });

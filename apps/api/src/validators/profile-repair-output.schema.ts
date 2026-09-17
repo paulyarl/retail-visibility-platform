@@ -53,6 +53,20 @@ export const profileRepairTriageSchema = z.object({
     }),
     risks: z.array(z.string()).default([]),
 
+    // Operator outreach ammunition (Triage & Repair Outreach Problems spec).
+    // 1–3 problem → solution pairs sized for the pitch-construction workflow.
+    // .min(1): a repair triage with zero problems is a failed run. No .max() —
+    // the ≤3 cap is a prompt-level ranking rule, so a fourth well-formed entry
+    // must not hard-fail an otherwise good import.
+    outreach_problems: z.array(z.object({
+      problem: z.string(),
+      regular: z.string(),
+      hook: z.string(),
+      solution: z.string(),
+      evidence: z.string(),
+      outreach_use: z.string(),
+    })).min(1),
+
     // Backward-compat fields (still rendered in stage history + signal chips)
     rationale: z.string(),
     escalation_signals: z.array(z.string()).optional().default([]),
@@ -87,6 +101,16 @@ Return valid JSON only matching this shape:
       "marketplace_positioning": "<how this business is positioned in its market>"
     },
     "risks": ["<anything that makes this campaign harder than it looks>", ...],
+    "outreach_problems": [
+      {
+        "problem": "<the problem as the prospect experiences it — the business consequence>",
+        "regular": "<the plain professional line that raises this problem>",
+        "hook": "<the alternative line — same fact, earns attention>",
+        "solution": "<high-level summary of the fix — what gets done, not a named package>",
+        "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
+        "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>"
+      }
+    ],
     "rationale": "<overall reasoning for the track recommendation>",
     "escalation_signals": ["<signal>", ...],
     "standard_signals": ["<signal>", ...]
@@ -140,6 +164,18 @@ export const profileRepairAuditSchema = z.object({
     }),
 
     risks: z.array(z.string()).default([]),
+
+    // Operator outreach ammunition (Triage & Repair Outreach Problems spec).
+    // Same contract as profile_repair_triage — required, .min(1), prompt-level
+    // ≤3 cap. Entries are playbook-aligned to the template's issueType.
+    outreach_problems: z.array(z.object({
+      problem: z.string(),
+      regular: z.string(),
+      hook: z.string(),
+      solution: z.string(),
+      evidence: z.string(),
+      outreach_use: z.string(),
+    })).min(1),
   }).passthrough(),
 });
 
@@ -167,7 +203,17 @@ Return valid JSON only matching this shape:
       "pain_points": ["<category-aware pain point>", ...],
       "value_preview": "<what the repair package will fix — the value proposition>"
     },
-    "risks": ["<anything that makes this repair harder than it looks>", ...]
+    "risks": ["<anything that makes this repair harder than it looks>", ...],
+    "outreach_problems": [
+      {
+        "problem": "<the problem as the prospect experiences it — the business consequence>",
+        "regular": "<the plain professional line that raises this problem>",
+        "hook": "<the alternative line — same fact, earns attention>",
+        "solution": "<high-level summary of the fix — what gets done, not a named package>",
+        "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
+        "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>"
+      }
+    ]
   }
 }
 

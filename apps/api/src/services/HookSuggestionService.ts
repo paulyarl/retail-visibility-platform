@@ -19,7 +19,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { unifiedConfig } from '../config/unifiedConfig';
+import { resolveClaimUrlForCampaign } from './outreach-openers/outreach-link-vars';
 import { resolveCampaignArchetype } from './OutreachOpenerService';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCampaignService from './MarketingCampaignService';
@@ -349,44 +349,13 @@ export class HookSuggestionService extends BaseService {
   }
 
   /**
-   * Resolve the directory claim URL for a campaign. Looks up the directory
-   * seed linked to this campaign via directory_seed_campaign_links, then
-   * finds an active (unconsumed) claim token for that seed. Returns the
-   * public claim URL or null if no seed/token exists.
-   *
-   * Best-effort: any failure returns null, which renders as the visible
-   * {{claim_url}} placeholder so the operator sees what's unresolved.
+   * Resolve the directory claim URL for a campaign. Delegates to the shared
+   * outreach-link resolver so every surface emits the canonical
+   * /place/claim/{token} path (spec §5.1/§5.2). Best-effort: any failure
+   * returns null, which renders as the visible {{claim_url}} placeholder.
    */
-  async resolveClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
-    try {
-      // 1. Find the seed linked to this campaign
-      const links = await this.prisma.$queryRaw<any[]>`
-        SELECT seed_id FROM directory_seed_campaign_links
-        WHERE campaign_id = ${campaignId}
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      if (!links[0]?.seed_id) return null;
-      const seedId = links[0].seed_id;
-
-      // 2. Find an active claim token for that seed
-      const tokens = await this.prisma.$queryRaw<any[]>`
-        SELECT token FROM directory_claim_tokens
-        WHERE seed_id = ${seedId}
-          AND consumed_at IS NULL
-          AND (expires_at IS NULL OR expires_at > now())
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      if (!tokens[0]?.token) return null;
-
-      // 3. Build the public claim URL
-      const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || '';
-      return `${baseUrl}/directory/claim/${tokens[0].token}`;
-    } catch {
-      // Any failure — return null, placeholder stays visible
-      return null;
-    }
+  async resolveClaimUrl(campaignId: string, _ctx?: RequestCtx): Promise<string | null> {
+    return resolveClaimUrlForCampaign(campaignId);
   }
 }
 

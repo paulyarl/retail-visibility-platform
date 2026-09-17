@@ -27,6 +27,9 @@ const {
   mockExecuteRawUnsafe,
   mockUsersFindUnique,
   mockAudit,
+  mockQueryRaw,
+  mockGetClaimKitMeta,
+  mockGetReportKitMeta,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockGetTriageResult: vi.fn(),
@@ -35,6 +38,9 @@ const {
   mockExecuteRawUnsafe: vi.fn(),
   mockUsersFindUnique: vi.fn(),
   mockAudit: vi.fn(),
+  mockQueryRaw: vi.fn(),
+  mockGetClaimKitMeta: vi.fn(),
+  mockGetReportKitMeta: vi.fn(),
 }));
 
 vi.mock('../MarketingCampaignService', () => ({
@@ -54,9 +60,19 @@ vi.mock('../../prisma', () => ({
   prisma: {
     $queryRawUnsafe: mockQueryRawUnsafe,
     $executeRawUnsafe: mockExecuteRawUnsafe,
-    $queryRaw: vi.fn(async () => []),
+    $queryRaw: mockQueryRaw,
     users: { findUnique: mockUsersFindUnique },
   },
+}));
+
+// The shared outreach-link resolver (§5.1) resolves claim/report QR URLs
+// through these two kit services.
+vi.mock('../ClaimInviteQrKitService', () => ({
+  getClaimInviteKitMeta: mockGetClaimKitMeta,
+}));
+
+vi.mock('../intelligence/SeedReportDeliveryService', () => ({
+  default: { getReportKitMeta: mockGetReportKitMeta },
 }));
 
 vi.mock('../../logger', () => ({
@@ -163,6 +179,9 @@ beforeEach(() => {
   mockGetForCampaign.mockRejectedValue(new Error('no worksheet'));
   mockUsersFindUnique.mockResolvedValue(null);
   mockExecuteRawUnsafe.mockResolvedValue(0);
+  mockQueryRaw.mockResolvedValue([]);
+  mockGetClaimKitMeta.mockResolvedValue(null);
+  mockGetReportKitMeta.mockResolvedValue(null);
 });
 
 // ─── resolveTemplate ─────────────────────────────────────────────────────
@@ -386,6 +405,34 @@ describe('mergeContextForCampaign', () => {
     expect(ctx.category).toBe('indian grocery stores');
     expect(ctx.salutation).toBe('Hi there,');
     expect(ctx.operator_name).toBe('Alex Operator');
+  });
+
+  it('resolves tracked link + QR variables from the seed kits (§5.1)', async () => {
+    mockQueryRaw.mockResolvedValueOnce([{ seed_id: 'seed-1' }]);
+    mockGetClaimKitMeta.mockResolvedValue({
+      claimUrl: 'https://app.test/place/claim/tok-1',
+      shortClaimUrl: 'https://app.test/c/abc123',
+      qrUrl: 'https://app.test/q/abc123',
+      qrUrlWalkin: 'https://app.test/qw/abc123',
+      qrUrlSocial: 'https://app.test/qs/abc123',
+      qrUrlEmail: 'https://app.test/qe/abc123',
+    });
+    mockGetReportKitMeta.mockResolvedValue({
+      qrUrlInPerson: 'https://app.test/r/abc123',
+      qrUrlText: 'https://app.test/rt/abc123',
+      qrUrlEmail: 'https://app.test/re/abc123',
+      qrUrlSocial: 'https://app.test/rs/abc123',
+      qrUrlPhone: 'https://app.test/rp/abc123',
+    });
+
+    const ctx = await ManualOutreachScriptService.mergeContextForCampaign('mcamp-test01');
+
+    expect(ctx.report_url).toBe('https://app.test/seed-report/seed-1');
+    expect(ctx.claim_url).toBe('https://app.test/place/claim/tok-1');
+    expect(ctx.claim_short_url).toBe('https://app.test/c/abc123');
+    expect(ctx.qr_url_walkin).toBe('https://app.test/qw/abc123');
+    expect(ctx.qr_url_report_in_person).toBe('https://app.test/r/abc123');
+    expect(ctx.claim_url).not.toContain('/directory/claim/');
   });
 });
 

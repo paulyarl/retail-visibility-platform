@@ -348,8 +348,9 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(resolution.profile_id).toBe('auto_repair_us');
     });
 
-    it('signal_triage + populated audit_signals + no active profile → base render only', async () => {
+    it('signal_triage + populated audit_signals + no profile + no gold standard → base render only', async () => {
       mockProfileService.resolve.mockResolvedValueOnce(null);
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
 
       const template = makeRepairTemplate();
       const campaign = makeCampaign('business', 'Unknown Niche');
@@ -362,7 +363,35 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
 
       expect(renderedPrompt).not.toContain('PROFILE_BLOCK');
       expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
+      expect(renderedPrompt).not.toContain('GOLD STANDARD');
       expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('signal_triage + populated audit_signals + no profile + gold standard → injects benchmark (§4.5 decoupling)', async () => {
+      mockProfileService.resolve.mockResolvedValueOnce(null);
+      const goldStandard = { id: 'gs-auto-repair-001', version: 3, reference_platform: 'google' };
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD BENCHMARK ===\nExpected fields...');
+
+      const template = makeRepairTemplate();
+      const campaign = makeCampaign('business', 'Auto Repair');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'nap_drift' },
+      });
+
+      // GS benchmark injected even though no CI profile resolved
+      expect(renderedPrompt).toContain('GOLD STANDARD BENCHMARK');
+      expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
+      expect(resolution.intelligence_mode).toBe('profile');
+      expect(resolution.profile_id).toBe('gs-auto-repair-001');
+      expect(resolution.profile_version).toBe(3);
+      // Benchmark role (not discovery/target); no platform on a plain
+      // business-scope repair campaign → null passthrough
+      expect(mockProfileService.serializeGoldStandard).toHaveBeenCalledWith(goldStandard, 'benchmark');
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('Auto Repair', null, 'Test City', 'TS', undefined);
     });
   });
 
