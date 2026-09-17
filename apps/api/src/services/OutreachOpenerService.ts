@@ -878,7 +878,7 @@ export class OutreachOpenerService extends BaseService {
         select: {
           campaign_id: true,
           outcome: true,
-          channel: true,
+          contact_channel: true,
           contact_date: true,
         },
       });
@@ -1067,7 +1067,7 @@ export class OutreachOpenerService extends BaseService {
       }>();
 
       for (const log of logs) {
-        const ch = log.channel ?? 'unknown';
+        const ch = log.contact_channel ?? 'unknown';
         const entry = channelMap.get(ch) ?? {
           channel: ch,
           contacts: 0,
@@ -1111,7 +1111,7 @@ export class OutreachOpenerService extends BaseService {
       for (const log of logs) {
         const angle = campaignAngleMap.get(log.campaign_id);
         if (!angle) continue;
-        const ch = log.channel ?? 'unknown';
+        const ch = log.contact_channel ?? 'unknown';
         const key = `${angle}|${ch}`;
         const entry = angleChannelMap.get(key) ?? {
           angle,
