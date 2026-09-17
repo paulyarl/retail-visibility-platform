@@ -2525,13 +2525,13 @@ export class IntelligenceProfileService extends BaseService {
               AND (scope_category_key IS NULL OR scope_category_key = $2)
               AND (scope_city         IS NULL OR scope_city         = $3)
               AND (scope_state        IS NULL OR scope_state        = $4)
-              AND (scope_platform     IS NULL OR scope_platform     = $5)
+              AND (scope_platform     IS NULL OR $5::text IS NULL OR scope_platform = $5)
             ORDER BY priority, reason_key`,
             catalogRevision,
             profile.category_key,
             profile.reference_city,
             profile.reference_state,
-            profile.reference_platform ?? '',
+            profile.reference_platform,
           );
           for (const u of uncovered) {
             lines.push(`  [${u.reason_key}] ${u.label} — ${u.gap_kind}`);

@@ -425,7 +425,7 @@ export default function BronzeCatalogClient() {
           <Textarea label="Definition" description="The blind spot this reason names — why a real, operating, category-qualified business is invisible." value={form.definition} onChange={(e) => setForm({ ...form, definition: e.currentTarget.value })} minRows={3} required />
           <Textarea label="Signals (one per line)" description="Observable vocabulary the scan matches — missing fields, generic categories, absent listings…" value={form.signals} onChange={(e) => setForm({ ...form, signals: e.currentTarget.value })} minRows={3} />
           <Textarea label="Expected vectors (one per line)" description="The discovery surfaces that reach this blind spot — community directories, customs records, word-of-mouth…" value={form.expected_vectors} onChange={(e) => setForm({ ...form, expected_vectors: e.currentTarget.value })} minRows={3} />
-          <NumberInput label="Priority (1 = highest)" value={form.priority} onChange={(v) => setForm({ ...form, priority: typeof v === 'number' ? v : 3 })} min={1} max={9} />
+          <NumberInput label="Priority (1 = highest)" value={form.priority} onChange={(v) => setForm({ ...form, priority: typeof v === 'number' ? v : 3 })} min={1} max={5} />
           <Divider label="Scope (blank = universal)" labelPosition="center" />
           <TextInput label="Category key" placeholder="e.g. african grocery store" value={form.scope_category_key} onChange={(e) => setForm({ ...form, scope_category_key: e.currentTarget.value })} />
           <Group grow>

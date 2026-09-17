@@ -294,7 +294,9 @@ const campaignBaseSchema = z.object({
   business_origin_region: z.string().max(100).optional(),
 });
 
-const campaignCreateSchema = campaignBaseSchema
+// Exported for unit tests (bronze-standard refine semantics — sprint plan
+// Phase 10). Not part of the route's public API.
+export const campaignCreateSchema = campaignBaseSchema
   .refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
     message: 'business_name is required for business-scoped campaigns',
     path: ['business_name'],
@@ -7094,7 +7096,7 @@ const bronzeReasonBaseSchema = z.object({
   definition: z.string().min(1),
   signals: z.array(z.string().min(1)).optional(),
   expected_vectors: z.array(z.string().min(1)).optional(),
-  priority: z.number().int().min(1).max(9).optional(),
+  priority: z.number().int().min(1).max(5).optional(),
   scope_category_key: z.string().max(255).nullable().optional(),
   scope_city: z.string().max(100).nullable().optional(),
   scope_state: z.string().max(50).nullable().optional(),

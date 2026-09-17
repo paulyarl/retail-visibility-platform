@@ -844,6 +844,71 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
   });
 
+  // ── Bronze-standard scans never enter the composer (sprint plan 6.2/10) ──
+  // composeIntelligencePrompt's focus ternary loads the COMPETITIVE fragment
+  // for any non-emerging focus — a bronze campaign reaching the composer would
+  // silently get competitive framing. The isBronzeStandardFocus gate must
+  // divert every bronze scan to its dedicated branch.
+  describe('bronze_standards scans bypass the composer path', () => {
+    const makeBronzeTemplate = (kind: 'establishment' | 'discovery') => ({
+      body: 'Bronze scan for {{category}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'bronze_standard_scan' },
+      outputSchema: { name: 'bronze_standard_scan' },
+      intelligence_campaign_kind: kind,
+    });
+
+    const makeBronzeCampaign = (overrides: Record<string, any> = {}) => ({
+      id: 'camp-bronze-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      intelligence_focus: 'bronze_standards',
+      intelligence_platform: null,
+      intelligence_campaign_kind: 'discovery',
+      ...overrides,
+    });
+
+    it('stage-1 national establishment injects the catalog block and never composes', async () => {
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([{ reason_key: 'trade_manifest_only' }]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(7);
+      mockCatalogService.serializeCatalogBlock.mockReturnValueOnce('=== BRONZE REASON CATALOG ===\nrev 7');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeBronzeTemplate('establishment'),
+        campaign: makeBronzeCampaign({
+          city: null, state: null, intelligence_campaign_kind: 'establishment',
+        }),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE REASON CATALOG');
+      expect(mockComposerService.composeIntelligencePrompt).not.toHaveBeenCalled();
+    });
+
+    it('stage-2 city discovery injects the national reference block and never composes', async () => {
+      const bronzeProfile = { id: 'bz-1', version: 1, reference_city: null, reference_state: null };
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(bronzeProfile);
+      mockProfileService.serializeBronzeStandard.mockReturnValueOnce(
+        '=== BRONZE STANDARD — NATIONAL REFERENCE ===\nhunt list',
+      );
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(1);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeBronzeTemplate('discovery'),
+        campaign: makeBronzeCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL REFERENCE');
+      expect(mockComposerService.composeIntelligencePrompt).not.toHaveBeenCalled();
+      expect(resolution.bronze_standard_profile_id).toBe('bz-1');
+    });
+  });
+
   describe('enrichment prompt — gold standard not injected (V8 reframing)', () => {
     const makeEnrichmentTemplate = (scope: string, body = 'CITY: {{city}} STATE: {{state}}') => ({
       body,

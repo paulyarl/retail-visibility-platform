@@ -188,20 +188,23 @@ export class BronzeReasonCatalogService extends BaseService {
     const state = normalizeReferenceState(scope.state);
     const platform = normalizePlatformScope(scope.platform);
     try {
+      // §3.6.1 platform clause: (scope_platform IS NULL OR :platform IS NULL
+      // OR scope_platform = :platform). A cross-platform scan (:platform IS
+      // NULL) covers every platform, so it evaluates ALL platform-bound
+      // reasons — the clause is omitted entirely rather than narrowed to
+      // scope_platform IS NULL.
+      const and: any[] = [
+        { OR: [{ scope_category_key: null }, { scope_category_key: categoryKey ?? '' }] },
+        { OR: [{ scope_city: null }, { scope_city: city ?? '' }] },
+        { OR: [{ scope_state: null }, { scope_state: state ?? '' }] },
+      ];
+      if (platform) {
+        and.push({ OR: [{ scope_platform: null }, { scope_platform: platform }] });
+      }
       const rows = await this.prisma.mkt_bronze_reason_catalog.findMany({
         where: {
           deprecated_in_revision: null,
-          AND: [
-            { OR: [{ scope_category_key: null }, { scope_category_key: categoryKey ?? '' }] },
-            { OR: [{ scope_city: null }, { scope_city: city ?? '' }] },
-            { OR: [{ scope_state: null }, { scope_state: state ?? '' }] },
-            {
-              OR: [
-                { scope_platform: null },
-                ...(platform ? [{ scope_platform: platform }] : []),
-              ],
-            },
-          ],
+          AND: and,
         },
         orderBy: [{ priority: 'asc' }, { reason_key: 'asc' }],
       });
@@ -261,13 +264,13 @@ export class BronzeReasonCatalogService extends BaseService {
           AND (scope_category_key IS NULL OR scope_category_key = $2)
           AND (scope_city         IS NULL OR scope_city         = $3)
           AND (scope_state        IS NULL OR scope_state        = $4)
-          AND (scope_platform     IS NULL OR scope_platform     = $5)
+          AND (scope_platform     IS NULL OR $5::text IS NULL OR scope_platform = $5)
         ORDER BY priority, reason_key`,
         input.profileCatalogRevision,
         categoryKey,
         city,
         state,
-        platform ?? '',
+        platform,
       );
       return rows;
     } catch (error) {

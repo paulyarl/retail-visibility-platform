@@ -265,9 +265,20 @@ describe('BronzeReasonCatalogService', () => {
         'african grocery store',
         'Kansas City',
         'MO',
-        '',
+        null,
       );
       expect(rows[0].gap_kind).toBe('never_covered');
+    });
+
+    it('passes NULL platform so a cross-platform profile flags platform-bound reasons too (§3.6.1)', async () => {
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+      await service.uncoveredReasons({
+        categoryKey: 'african grocery store',
+        profileCatalogRevision: 3,
+      }, CTX);
+      const [sql, ...params] = mockPrisma.$queryRawUnsafe.mock.calls.at(-1) as any[];
+      expect(sql).toContain('$5::text IS NULL');
+      expect(params.at(-1)).toBeNull();
     });
   });
 
@@ -286,6 +297,16 @@ describe('BronzeReasonCatalogService', () => {
         }),
         orderBy: [{ priority: 'asc' }, { reason_key: 'asc' }],
       });
+    });
+
+    it('omits the platform clause for a cross-platform scan so platform-bound reasons apply (§3.6.1)', async () => {
+      mockPrisma.mkt_bronze_reason_catalog.findMany.mockResolvedValue([]);
+      await service.applicableReasons({ categoryKey: 'african grocery store' }, CTX);
+      const call = mockPrisma.mkt_bronze_reason_catalog.findMany.mock.calls.at(-1)?.[0] as any;
+      const platformClause = call.where.AND.find((c: any) =>
+        (c?.OR ?? []).some((o: any) => 'scope_platform' in o),
+      );
+      expect(platformClause).toBeUndefined();
     });
   });
 

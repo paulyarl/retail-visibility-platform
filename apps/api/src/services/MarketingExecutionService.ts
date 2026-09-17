@@ -1006,6 +1006,10 @@ export class MarketingExecutionService extends BaseService {
           profile_id: bronzeStandard.id,
           profile_version: bronzeStandard.version,
           intelligence_mode: 'profile',
+          // The injected block IS the bronze standard (establishment_reference
+          // role) — stamp it so provenance is explicit, per PromptResolution.
+          bronze_standard_profile_id: bronzeStandard.id,
+          bronze_standard_profile_version: bronzeStandard.version,
         },
       };
     }

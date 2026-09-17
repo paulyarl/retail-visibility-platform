@@ -346,4 +346,32 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       expect(block).toBe('');
     });
   });
+
+  // §10.2 regression — the whole reason bronze uses its own intelligence_focus
+  // (Option A). activateDraft's retire query is focus-scoped, so activating a
+  // bronze draft must NOT retire the active gold_standards profile for the
+  // same (category, city, state, platform) tuple.
+  describe('activateDraft — bronze does not retire gold (§10.2)', () => {
+    it('retires only the bronze scope tuple (focus is part of the retire where)', async () => {
+      const draft = PROFILE({ status: 'draft', version: 2 });
+      mockPrisma.mkt_intelligence_profiles.findUnique.mockResolvedValueOnce(draft);
+      mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockPrisma.mkt_intelligence_profiles.update.mockResolvedValueOnce({ ...draft, status: 'active' });
+
+      const activated = await service.activateDraft('mip-bronze-1', 2);
+
+      expect(activated.status).toBe('active');
+      expect(mockPrisma.mkt_intelligence_profiles.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          intelligence_focus: 'bronze_standards',
+          status: 'active',
+          category_key: 'african grocery store',
+          reference_city: null,
+          reference_state: null,
+          reference_platform: null,
+        }),
+        data: expect.objectContaining({ status: 'retired' }),
+      });
+    });
+  });
 });

@@ -501,6 +501,65 @@ describe('createCampaign structural-duplicate guardrail', () => {
     expect(mockCampaignsList.create).toHaveBeenCalled();
   });
 
+  // ── Bronze Standard (Option A — distinct focus signature) ─────────────
+  // A bronze_standards campaign must never collide with an active
+  // gold_standards/discovery or emerging/establishment campaign at the same
+  // scope: intelligence_focus participates in the signature, so the
+  // duplicate-check query cannot match a non-bronze row
+  // (BRONZE_STANDARD_SPEC §10.2, sprint plan Phase 10).
+
+  it('keys the signature on intelligence_focus so bronze_standards does not collide with gold_standards', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce(null);
+
+    const result = await service.createCampaign({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      intelligenceCampaignKind: 'establishment',
+      intelligenceFocus: 'bronze_standards',
+      intelligencePlatform: null,
+    });
+
+    expect(result.id).toBeDefined();
+    const where = mockCampaignsList.findFirst.mock.calls[0][0].where;
+    expect(where.scope).toBe('intelligence');
+    expect(where.intelligence_focus).toBe('bronze_standards');
+    expect(where.intelligence_campaign_kind).toBe('establishment');
+  });
+
+  it('blocks a duplicate bronze_standards discovery campaign at the same scope', async () => {
+    mockCampaignsList.findFirst.mockResolvedValueOnce({
+      id: 'mcamp-existing-bronze-001',
+      display_id: null,
+      scope: 'intelligence',
+      campaign_category: 'review_management',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      business_name: null,
+      stage: 'seek',
+      intelligence_campaign_kind: 'discovery',
+      intelligence_focus: 'bronze_standards',
+      intelligence_platform: null,
+    });
+
+    await expect(
+      service.createCampaign({
+        scope: 'intelligence',
+        category: 'African Grocery Store',
+        city: 'Indianapolis',
+        state: 'IN',
+        intelligenceCampaignKind: 'discovery',
+        intelligenceFocus: 'bronze_standards',
+        intelligencePlatform: null,
+      }),
+    ).rejects.toThrow(/same structural signature already exists/);
+
+    const where = mockCampaignsList.findFirst.mock.calls[0][0].where;
+    expect(where.intelligence_focus).toBe('bronze_standards');
+    expect(where.intelligence_campaign_kind).toBe('discovery');
+    expect(mockCampaignsList.create).not.toHaveBeenCalled();
+  });
+
   // ── Per-parent scoping for directory_enrichment children ──────────────
   // Regression (2026-09-15): a directory_enrichment / __location__ child
   // parented to one proving ground globally blocked every other PG in the
