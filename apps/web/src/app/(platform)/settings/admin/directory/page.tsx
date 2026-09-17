@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb, Funnel, Tag, BarChart3 } from 'lucide-react';
+import { List, Star, Palette, Building2, CheckCircle, FileEdit, TrendingUp, Lightbulb, Funnel, Tag, BarChart3, Activity } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +92,13 @@ export default function DirectoryPanelPage() {
       description: 'Cohort analytics, G1–G4 gate grading, conversion scores, scaling readiness, and duplicate detection.',
       icon: Funnel,
       gradient: 'from-emerald-500 to-teal-500',
+    },
+    {
+      href: '/settings/admin/directory/traffic',
+      title: 'Directory Traffic',
+      description: 'Which directory entries are getting traffic — page views, unique sessions, referrers, and device split across unclaimed seeds and claimed listings.',
+      icon: Activity,
+      gradient: 'from-blue-600 to-cyan-600',
     },
     {
       href: '/settings/admin/directory/category-emergence',

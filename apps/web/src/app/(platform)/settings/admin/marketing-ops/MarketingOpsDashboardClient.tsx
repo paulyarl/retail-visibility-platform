@@ -10,6 +10,7 @@ import HotProspectsWidget from '@/components/marketing-ops/HotProspectsWidget';
 import ProspectQueueWidget from '@/components/marketing-ops/ProspectQueueWidget';
 import MotionsOverview from '@/components/marketing-ops/MotionsOverview';
 import OutreachHealthWidget from '@/components/marketing-ops/OutreachHealthWidget';
+import DailyDigestWidget from '@/components/marketing-ops/DailyDigestWidget';
 import { NAV_ITEMS } from '@/components/marketing-ops/MarketingOpsNavPanel';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
@@ -108,6 +109,7 @@ export default function MarketingOpsDashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [digestDate, setDigestDate] = useState(() => new Date().toISOString().split('T')[0]);
   const fetchRef = useRef<(() => Promise<void>) | null>(null);
 
   const fetchDashboard = useCallback(async () => {
@@ -174,6 +176,13 @@ export default function MarketingOpsDashboardClient() {
           )}
         </p>
         <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Activity date</label>
+          <input
+            type="date"
+            value={digestDate}
+            onChange={(e) => setDigestDate(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <button
             onClick={handleExport}
             disabled={exporting}
@@ -201,6 +210,9 @@ export default function MarketingOpsDashboardClient() {
 
       {/* Motions — the three non-prospect motions the module now runs */}
       <MotionsOverview />
+
+      {/* Today's derived module activity */}
+      <DailyDigestWidget date={digestDate} />
 
       {loading ? (
         <div className="flex items-center justify-center py-20">

@@ -605,6 +605,19 @@ export default function AdminDashboardPage() {
           badge: 'NEW',
         },
         {
+          title: 'Directory Traffic',
+          description: 'Which directory entries are getting traffic — page views across unclaimed seeds and claimed listings',
+          href: '/settings/admin/directory/traffic',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          ),
+          color: 'bg-teal-600',
+          stats: 'Seed & listing views',
+          badge: 'NEW',
+        },
+        {
           title: 'Directory Featured',
           description: 'Manage featured stores and promoted placements in the directory',
           href: '/settings/admin/directory/featured',

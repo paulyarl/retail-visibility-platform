@@ -153,6 +153,7 @@ import MarketingPromptService, { extractJsonCandidates, normalizeExternalJsonTex
 import { bronzeStandardScanSchema } from '../validators/bronze-standard-scan.schema';
 import MarketingExecutionService from '../services/MarketingExecutionService';
 import MarketingScorecardService from '../services/MarketingScorecardService';
+import MarketingDailyDigestService from '../services/MarketingDailyDigestService';
 import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
@@ -3091,6 +3092,19 @@ router.get('/scorecards', async (req: any, res: Response) => {
       stageFocus: req.query.stage,
     }, getCtx(req));
     res.json({ success: true, data: scorecards });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Derived module-wide activity for a single day — the scorecard's automated
+// half. Composed from the existing motion sources (funnel, batches, outreach,
+// report delivery, queue, revenue); nothing is written. Registered before the
+// scorecard CRUD routes so the path stays unambiguous.
+router.get('/scorecards/daily-summary', async (req: any, res: Response) => {
+  try {
+    const digest = await MarketingDailyDigestService.getDailyDigest(req.query.date, getCtx(req));
+    res.json({ success: true, data: digest });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -176,6 +176,75 @@ export interface DirectoryAttributeDefinitionRow extends DirectoryAttributeDefin
 }
 
 // ============================
+// Directory Traffic (Layer 1 readout — user_behavior_simple)
+// docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §3, §8
+// ============================
+
+export interface SeedTrafficSummary {
+  seedId: string;
+  tenantId: string;
+  listingId: string;
+  businessName: string | null;
+  slug: string | null;
+  category: string;
+  city: string;
+  state: string;
+  status: string;
+  seedBatch: string;
+  views: number;
+  uniqueSessions: number;
+  views7d: number;
+  views30d: number;
+}
+
+export interface TrafficTimeseriesPoint {
+  day: string;
+  views: number;
+  uniqueSessions: number;
+}
+
+export interface DirectoryTrafficDashboard {
+  daysBack: number;
+  totals: {
+    views: number;
+    uniqueSessions: number;
+    seedsWithTraffic: number;
+    totalSeeds: number;
+  };
+  topSeeds: SeedTrafficSummary[];
+  categoryBreakdown: Array<{
+    category: string;
+    views: number;
+    uniqueSessions: number;
+    seeds: number;
+  }>;
+  daily: TrafficTimeseriesPoint[];
+}
+
+export interface SeedTrafficDetail {
+  seedId: string;
+  tenantId: string;
+  listingId: string;
+  businessName: string | null;
+  slug: string | null;
+  category: string;
+  city: string;
+  state: string;
+  status: string;
+  seedBatch: string;
+  daysBack: number;
+  views: number;
+  uniqueSessions: number;
+  views7d: number;
+  views30d: number;
+  views90d: number;
+  avgDurationSeconds: number;
+  daily: TrafficTimeseriesPoint[];
+  topReferrers: Array<{ referrer: string; views: number }>;
+  deviceSplit: Array<{ deviceType: string; views: number }>;
+}
+
+// ============================
 // Seed Funnel Analytics (W3 UI — spec §6, §10)
 // ============================
 
@@ -723,6 +792,52 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const data = result.data?.data ?? result.data;
     // The endpoint spreads the report at the top level: { success, cohorts, combined, ... }
     return (data as any) ?? null;
+  }
+
+  // ============================
+  // Directory Traffic (Layer 1 readout)
+  // ============================
+
+  /** GET /api/admin/directory-presence/traffic — cross-seed traffic rollup */
+  async getTrafficDashboard(filters?: {
+    daysBack?: number;
+    seedBatch?: string;
+    status?: string;
+    category?: string;
+    city?: string;
+    state?: string;
+  }): Promise<DirectoryTrafficDashboard | null> {
+    const params = new URLSearchParams();
+    if (filters?.daysBack) params.set('daysBack', String(filters.daysBack));
+    if (filters?.seedBatch) params.set('seedBatch', filters.seedBatch);
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.state) params.set('state', filters.state);
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/traffic${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/traffic — per-seed traffic */
+  async getSeedTraffic(seedId: string, daysBack?: number): Promise<SeedTrafficDetail | null> {
+    const qs = daysBack ? `?daysBack=${daysBack}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/traffic${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.traffic ?? null;
   }
 
   // ============================

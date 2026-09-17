@@ -1447,6 +1447,54 @@ export interface Scorecard {
   updated_at: string;
 }
 
+/**
+ * Module-wide activity for a single day, composed server-side from the
+ * automated motions (see MarketingDailyDigestService). Read-only.
+ */
+export interface DailyDigestStage {
+  label: string;
+  count: number;
+  conversionFromPrevious: number | null;
+  conversionFromFirst: number;
+}
+
+export interface DailyDigestPgRow {
+  provingGroundId: string;
+  displayId: string | null;
+  category: string | null;
+  city: string | null;
+  state: string | null;
+  seeds: number;
+  published: number;
+  claimed: number;
+}
+
+export interface DailyDigest {
+  date: string;
+  seeks: { runs: number };
+  queue: { created: number; byStatus: Record<string, number> };
+  seeds: {
+    created: number;
+    contactable: number;
+    published: number;
+    invited: number;
+    claimed: number;
+    upgraded: number;
+    pgLinked: number;
+  };
+  provingGrounds: { workspaces: number; linkedSeeds: number; byWorkspace: DailyDigestPgRow[] };
+  batches: { launched: number; completed: number; running: number };
+  outreach: {
+    seedTouches: number;
+    byChannel: Record<string, number>;
+    campaignTouches: number;
+    byOutcome: Record<string, number>;
+  };
+  reports: { delivered: number; viewed: number; claimed: number; declined: number };
+  funnel: DailyDigestStage[];
+  revenue: { canonicalCents: number; loggedCents: number; varianceCents: number; count: number };
+}
+
 export interface DeliverableTemplate {
   id: string;
   name: string;
@@ -2971,6 +3019,16 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete scorecard');
     }
     await this.invalidateCachePattern('mkt-ops-scorecards');
+  }
+
+  /** Derived module-wide activity for a day (YYYY-MM-DD). Read-only. */
+  async getDailyDigest(date?: string): Promise<DailyDigest> {
+    const url = `${BASE_URL}/scorecards/daily-summary${date ? `?date=${encodeURIComponent(date)}` : ''}`;
+    const result = await this.makeDefaultRequest<any>(url, {}, 'mkt-ops-daily-digest', 0);
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch daily digest');
+    }
+    return result.data?.data ?? result.data;
   }
 
   // ─── Deliverable Templates ──────────────────────────────────

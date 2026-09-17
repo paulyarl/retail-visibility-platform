@@ -270,6 +270,7 @@ const buildAdminNavItems = (): NavItem[] => [
     prefetch: false,
     children: [
       { label: 'Listings',             href: '/settings/admin/directory/listings' },
+      { label: 'Traffic',              href: '/settings/admin/directory/traffic' },
       { label: 'Featured',             href: '/settings/admin/directory/featured' },
       { label: 'Directory Appearance', href: '/settings/admin/directory/appearance' },
       { label: 'Market Enrichment',    href: '/settings/admin/directory/category-enrichment/markets' },

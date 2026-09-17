@@ -6,6 +6,7 @@ import marketingOpsService, { Scorecard, CampaignStage, CampaignScope } from '@/
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import DailyDigestPanel from '@/components/marketing-ops/DailyDigestPanel';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
@@ -17,25 +18,24 @@ const SCOPE_LABELS: Record<CampaignScope, string> = {
   intelligence: 'Intelligence',
 };
 
-const emptyForm = () => {
-  const today = new Date().toISOString().split('T')[0];
-  return {
-    user_id: '',
-    date: today,
-    category_focus: '',
-    neighborhood_focus: '',
-    scope_focus: '' as CampaignScope | '',
-    stage_focus: '' as CampaignStage | '',
-    previews_built: 0,
-    previews_shown: 0,
-    packages_paid: 0,
-    packages_delivered: 0,
-    revenue_collected_cents: 0,
-    retainers_pitched: 0,
-    retainers_won: 0,
-    notes: '',
-  };
-};
+const todayStr = () => new Date().toISOString().split('T')[0];
+
+const emptyForm = () => ({
+  user_id: '',
+  date: todayStr(),
+  category_focus: '',
+  neighborhood_focus: '',
+  scope_focus: '' as CampaignScope | '',
+  stage_focus: '' as CampaignStage | '',
+  previews_built: 0,
+  previews_shown: 0,
+  packages_delivered: 0,
+  retainers_pitched: 0,
+  retainers_won: 0,
+  notes: '',
+});
+
+const formatCurrency = (cents: number) => `$${(cents / 100).toLocaleString()}`;
 
 export default function ScorecardClient() {
   const [scorecards, setScorecards] = useState<Scorecard[]>([]);
@@ -103,9 +103,7 @@ export default function ScorecardClient() {
       stage_focus: (s.stage_focus as CampaignStage | '') ?? '',
       previews_built: s.previews_built,
       previews_shown: s.previews_shown,
-      packages_paid: s.packages_paid,
       packages_delivered: s.packages_delivered,
-      revenue_collected_cents: s.revenue_collected_cents,
       retainers_pitched: s.retainers_pitched,
       retainers_won: s.retainers_won,
       notes: s.notes ?? '',
@@ -117,6 +115,9 @@ export default function ScorecardClient() {
     setSaving(true);
     setError(null);
     try {
+      // Only fields without an automated writer are operator-editable.
+      // packages_paid / revenue_collected_cents are written by the payment
+      // path (MarketingCampaignService.markCampaignPaid) and left untouched.
       const payload = {
         user_id: form.user_id,
         date: new Date(form.date).toISOString(),
@@ -126,9 +127,7 @@ export default function ScorecardClient() {
         stage_focus: (form.stage_focus as string) || undefined,
         previews_built: form.previews_built || undefined,
         previews_shown: form.previews_shown || undefined,
-        packages_paid: form.packages_paid || undefined,
         packages_delivered: form.packages_delivered || undefined,
-        revenue_collected_cents: form.revenue_collected_cents || undefined,
         retainers_pitched: form.retainers_pitched || undefined,
         retainers_won: form.retainers_won || undefined,
         notes: form.notes || undefined,
@@ -159,7 +158,6 @@ export default function ScorecardClient() {
     }
   };
 
-  const formatCurrency = (cents: number) => `$${(cents / 100).toLocaleString()}`;
   const numChange = (field: keyof typeof form, value: string) => setForm((p) => ({ ...p, [field]: value === '' ? 0 : parseInt(value) }));
   const hasActiveFilters = scopeFilter !== '' || stageFilter !== '';
 
@@ -181,7 +179,7 @@ export default function ScorecardClient() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Daily Scorecards</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Track daily outreach activity and revenue by scope and stage
+              Module activity (derived) alongside operator-logged work
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -202,6 +200,21 @@ export default function ScorecardClient() {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
+          </div>
+        </div>
+
+        {/* ─── Module Activity (derived, read-only) ─────────────────── */}
+        <div className="mb-8">
+          <DailyDigestPanel />
+        </div>
+
+        {/* ─── Operator Entries (manual) ────────────────────────────── */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Operator Entries</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Fields without an automated writer. Paid and revenue are written automatically when a campaign is marked paid.
+            </p>
           </div>
         </div>
 
@@ -273,18 +286,8 @@ export default function ScorecardClient() {
                   className={inputClass} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Packages Paid</label>
-                <input type="number" value={form.packages_paid} onChange={(e) => numChange('packages_paid', e.target.value)}
-                  className={inputClass} />
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Packages Delivered</label>
                 <input type="number" value={form.packages_delivered} onChange={(e) => numChange('packages_delivered', e.target.value)}
-                  className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Revenue (cents)</label>
-                <input type="number" value={form.revenue_collected_cents} onChange={(e) => numChange('revenue_collected_cents', e.target.value)}
                   className={inputClass} />
               </div>
               <div>
@@ -367,9 +370,9 @@ export default function ScorecardClient() {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Stage</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Built</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Shown</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Paid</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400" title="Automated — written when a campaign is marked paid">Paid</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Delivered</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Revenue</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400" title="Automated — written when a campaign is marked paid">Revenue</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Retainers</th>
                     <th className="px-4 py-3"></th>
                   </tr>

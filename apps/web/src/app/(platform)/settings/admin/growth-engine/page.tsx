@@ -13,6 +13,7 @@ import growthEngineAdminService, {
   DemandSignal,
   NextSeekTarget,
 } from '@/services/GrowthEngineAdminService';
+import DailyDigestPanel from '@/components/marketing-ops/DailyDigestPanel';
 
 export default function GrowthEngineDashboard() {
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
@@ -79,6 +80,12 @@ export default function GrowthEngineDashboard() {
           Batch Operations →
         </Link>
       </div>
+
+      {/* Daily activity — day-scoped motion digest + per-PG cockpit + revenue reconciliation */}
+      <DailyDigestPanel
+        title="Daily Activity"
+        subtitle="Day-scoped activity across proving grounds, batches, seeds, outreach, reports, and queues"
+      />
 
       {/* Funnel */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">

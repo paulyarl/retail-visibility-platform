@@ -4,6 +4,8 @@
  *   GET    /api/admin/directory/presence-seeds           — list seeds
  *   GET    /api/admin/directory/presence-seeds/seo-preview — compose a campaign's SEO packet (form prefill)
  *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
+ *   GET    /api/admin/directory-presence/traffic                — cross-seed traffic rollup
+ *   GET    /api/admin/directory-presence/presence-seeds/:id/traffic — per-seed traffic readout
  *   POST   /api/admin/directory/presence-seeds/:id/touches — log an outreach touch
  *   GET    /api/admin/directory/presence-seeds/:id/touches — list outreach touches
  *   GET    /api/admin/directory/presence-seeds/:id       — seed detail
@@ -31,6 +33,7 @@ import DirectorySuggestionService from '../services/DirectorySuggestionService';
 import DirectorySeedCampaignLinkService from '../services/DirectorySeedCampaignLinkService';
 import BatchSeekService from '../services/BatchSeekService';
 import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
+import DirectoryPresenceTrafficService from '../services/DirectoryPresenceTrafficService';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import {
@@ -180,6 +183,72 @@ router.get('/presence-seeds/funnel/cohorts', requirePlatformStaff, async (req: R
     res.json({ success: true, ...report });
   } catch (error) {
     logger.error('[GET /api/admin/directory/presence-seeds/funnel/cohorts] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
+  }
+});
+
+// ====================
+// DIRECTORY TRAFFIC READOUT (Layer 1 — user_behavior_simple)
+// docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §3, §7
+// ====================
+
+const trafficQuerySchema = z.object({
+  daysBack: z.preprocess(
+    (v) => (v === undefined || v === '' ? undefined : Number(v)),
+    z.number().int().optional(),
+  ),
+  seedBatch: z.string().max(100).optional(),
+  status: z.string().max(20).optional(),
+  category: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(50).optional(),
+});
+
+/**
+ * GET /api/admin/directory-presence/traffic
+ *
+ * Cross-seed traffic rollup: totals, top seeds by views, category breakdown,
+ * and an all-seeds daily trend. Read-only — aggregates the page-view events
+ * already captured by StoreViewTracker on /place and /directory.
+ */
+router.get('/traffic', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const validation = trafficQuerySchema.safeParse(req.query);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: validation.error.issues });
+    }
+    const { daysBack, ...filters } = validation.data;
+    const dashboard = await DirectoryPresenceTrafficService.getTrafficDashboard(daysBack, filters);
+    res.json({ success: true, ...dashboard });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/traffic] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/:id/traffic
+ *
+ * Per-seed traffic: views, unique sessions, fixed-window counts, daily
+ * timeseries, top referrers, and device split.
+ */
+router.get('/presence-seeds/:id/traffic', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
+    const traffic = await DirectoryPresenceTrafficService.getSeedTraffic(
+      req.params.id,
+      Number.isFinite(daysBack) ? daysBack : undefined,
+    );
+    if (!traffic) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+    res.json({ success: true, traffic });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/traffic] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
