@@ -530,6 +530,128 @@ router.get('/places', async (req: Request, res: Response) => {
   }
 });
 
+/** GET /api/public/directory/places/search — full-text search across presence listings
+ *  NOTE: registered BEFORE /places/:categorySlug — a static sibling must precede a
+ *  param route or the param route shadows it (route-lint catchall ordering). */
+router.get('/places/search', async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || '').trim();
+    const category = req.query.category as string | undefined;
+    const city = req.query.city as string | undefined;
+    const snapEbt = req.query.snapEbt === 'true';
+    const sort = (req.query.sort as string) || 'name';
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const perPage = Math.min(48, Math.max(1, parseInt(req.query.perPage as string) || 24));
+    const offset = (page - 1) * perPage;
+
+    const pool = getDirectPool();
+
+    // Build query with optional full-text search
+    let whereClause = `WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true AND dll.listing_origin = 'directory_seed'`;
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (q) {
+      whereClause += ` AND (
+        to_tsvector('english', coalesce(dll.business_name,'') || ' ' || coalesce(dll.city,'') || ' ' || coalesce(dll.state,'') || ' ' || coalesce(dll.slug,'')) @@ plainto_tsquery('english', $${paramIdx})
+        OR dll.business_name ILIKE '%' || $${paramIdx} || '%'
+        OR similarity(dll.business_name, $${paramIdx}) > 0.3
+      )`;
+      params.push(q);
+      paramIdx++;
+    }
+    if (category) {
+      whereClause += ` AND (
+        LOWER(dps.category) = LOWER($${paramIdx})
+        OR EXISTS (
+          SELECT 1 FROM unnest(dll.secondary_categories) sec
+          WHERE LOWER(TRIM(sec)) = LOWER($${paramIdx})
+        )
+      )`;
+      params.push(category);
+      paramIdx++;
+    }
+    if (city) {
+      whereClause += ` AND LOWER(dps.city) = LOWER($${paramIdx})`;
+      params.push(city);
+      paramIdx++;
+    }
+    if (snapEbt) {
+      whereClause += ` AND dll.snap_ebt_reported = true`;
+    }
+
+    let orderBy = 'dll.business_name ASC';
+    if (sort === 'city') orderBy = 'dll.city ASC, dll.business_name ASC';
+    if (sort === 'recent') orderBy = 'dps.published_at DESC';
+    if (sort === 'snap') orderBy = 'dll.snap_ebt_reported DESC, dll.business_name ASC';
+
+    // Count total
+    const countQuery = `SELECT COUNT(*) as total
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dll ON dll.id = dps.listing_id
+      ${whereClause}`;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total) || 0;
+
+    // Fetch page
+    const dataQuery = `SELECT
+        dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
+        dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
+        dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
+        dll.attributes, dll.public_disclaimer,
+        dps.category, dps.city as seed_city, dps.state as seed_state,
+        pc.slug AS category_slug, pc.icon_emoji
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dll ON dll.id = dps.listing_id
+      LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
+      ${whereClause}
+      ORDER BY ${orderBy}
+      LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    params.push(perPage, offset);
+
+    const result = await pool.query(dataQuery, params);
+
+    const places = result.rows.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      businessName: row.business_name,
+      slug: row.slug,
+      address: row.address,
+      city: row.city || row.seed_city,
+      state: row.state || row.seed_state,
+      zipCode: row.zip_code,
+      phone: row.phone,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      logoUrl: row.logo_url,
+      description: row.description,
+      snapEbtReported: row.snap_ebt_reported,
+      snapEbtSource: row.snap_ebt_source,
+      attributes: Array.isArray(row.attributes) ? row.attributes : [],
+      publicDisclaimer: row.public_disclaimer,
+      category: row.category,
+      categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
+      iconEmoji: row.icon_emoji || null,
+    }));
+
+    res.json({
+      success: true,
+      query: q,
+      places,
+      count: places.length,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/places/search] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/public/directory/places/:categorySlug — published presence listings by category */
 router.get('/places/:categorySlug', async (req: Request, res: Response) => {
   try {
@@ -709,128 +831,8 @@ router.get('/attribute-definitions', async (req: Request, res: Response) => {
 });
 
 // ====================
-// Search, city pages, map data, sitemap (Sprint 5)
+// City pages, map data, sitemap (Sprint 5)
 // ====================
-
-/** GET /api/public/directory/places/search — full-text search across presence listings */
-router.get('/places/search', async (req: Request, res: Response) => {
-  try {
-    const q = (req.query.q as string || '').trim();
-    const category = req.query.category as string | undefined;
-    const city = req.query.city as string | undefined;
-    const snapEbt = req.query.snapEbt === 'true';
-    const sort = (req.query.sort as string) || 'name';
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const perPage = Math.min(48, Math.max(1, parseInt(req.query.perPage as string) || 24));
-    const offset = (page - 1) * perPage;
-
-    const pool = getDirectPool();
-
-    // Build query with optional full-text search
-    let whereClause = `WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true AND dll.listing_origin = 'directory_seed'`;
-    const params: any[] = [];
-    let paramIdx = 1;
-
-    if (q) {
-      whereClause += ` AND (
-        to_tsvector('english', coalesce(dll.business_name,'') || ' ' || coalesce(dll.city,'') || ' ' || coalesce(dll.state,'') || ' ' || coalesce(dll.slug,'')) @@ plainto_tsquery('english', $${paramIdx})
-        OR dll.business_name ILIKE '%' || $${paramIdx} || '%'
-        OR similarity(dll.business_name, $${paramIdx}) > 0.3
-      )`;
-      params.push(q);
-      paramIdx++;
-    }
-    if (category) {
-      whereClause += ` AND (
-        LOWER(dps.category) = LOWER($${paramIdx})
-        OR EXISTS (
-          SELECT 1 FROM unnest(dll.secondary_categories) sec
-          WHERE LOWER(TRIM(sec)) = LOWER($${paramIdx})
-        )
-      )`;
-      params.push(category);
-      paramIdx++;
-    }
-    if (city) {
-      whereClause += ` AND LOWER(dps.city) = LOWER($${paramIdx})`;
-      params.push(city);
-      paramIdx++;
-    }
-    if (snapEbt) {
-      whereClause += ` AND dll.snap_ebt_reported = true`;
-    }
-
-    let orderBy = 'dll.business_name ASC';
-    if (sort === 'city') orderBy = 'dll.city ASC, dll.business_name ASC';
-    if (sort === 'recent') orderBy = 'dps.published_at DESC';
-    if (sort === 'snap') orderBy = 'dll.snap_ebt_reported DESC, dll.business_name ASC';
-
-    // Count total
-    const countQuery = `SELECT COUNT(*) as total
-      FROM directory_presence_seeds dps
-      JOIN directory_listings_list dll ON dll.id = dps.listing_id
-      ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].total) || 0;
-
-    // Fetch page
-    const dataQuery = `SELECT
-        dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
-        dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
-        dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
-        dll.attributes, dll.public_disclaimer,
-        dps.category, dps.city as seed_city, dps.state as seed_state,
-        pc.slug AS category_slug, pc.icon_emoji
-      FROM directory_presence_seeds dps
-      JOIN directory_listings_list dll ON dll.id = dps.listing_id
-      LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
-      ${whereClause}
-      ORDER BY ${orderBy}
-      LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
-    params.push(perPage, offset);
-
-    const result = await pool.query(dataQuery, params);
-
-    const places = result.rows.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
-      slug: row.slug,
-      address: row.address,
-      city: row.city || row.seed_city,
-      state: row.state || row.seed_state,
-      zipCode: row.zip_code,
-      phone: row.phone,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      logoUrl: row.logo_url,
-      description: row.description,
-      snapEbtReported: row.snap_ebt_reported,
-      snapEbtSource: row.snap_ebt_source,
-      attributes: Array.isArray(row.attributes) ? row.attributes : [],
-      publicDisclaimer: row.public_disclaimer,
-      category: row.category,
-      categorySlug: row.category_slug || (row.category || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-'),
-      iconEmoji: row.icon_emoji || null,
-    }));
-
-    res.json({
-      success: true,
-      query: q,
-      places,
-      count: places.length,
-      total,
-      page,
-      perPage,
-      totalPages: Math.ceil(total / perPage),
-    });
-  } catch (error) {
-    logger.error('[GET /api/public/directory/places/search] Error:', undefined, {
-      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
-    });
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
 
 /** GET /api/public/directory/places/city/:citySlug — all presence listings in a city, grouped by category */
 router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
