@@ -311,7 +311,7 @@ export interface CampaignInput {
   /** Tenant that this campaign belongs to (e.g. a directory-listed tenant). */
   tenantId?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards';
+  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
   intelligenceZipCodes?: string;
   intelligenceSearchRadiusMiles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -380,7 +380,7 @@ export interface CampaignUpdateInput {
   couponCode?: string;
   serviceCategory?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards';
+  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
   intelligenceZipCodes?: string;
   intelligenceSearchRadiusMiles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns

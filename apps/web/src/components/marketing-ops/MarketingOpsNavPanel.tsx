@@ -22,6 +22,7 @@ import {
   IconBrain,
   IconBuildingStore,
   IconMap2,
+  IconMedal,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops/playbooks', label: 'Playbooks', icon: IconBook, emoji: '📚' },
   { href: '/settings/admin/marketing-ops/prompts', label: 'Prompts', icon: IconMessage, emoji: '💬' },
   { href: '/settings/admin/marketing-ops/intelligence-profiles', label: 'Intelligence Profiles', icon: IconBrain, emoji: '🧠' },
+  { href: '/settings/admin/marketing-ops/bronze-catalog', label: 'Bronze Catalog', icon: IconMedal, emoji: '🥉' },
   { href: '/settings/admin/marketing-ops/openers', label: 'Openers', icon: IconMail, emoji: '✉️' },
   { href: '/settings/admin/marketing-ops/follow-ups', label: 'Follow-Ups', icon: IconMail, emoji: '📨' },
   { href: '/settings/admin/marketing-ops/split-tests', label: 'Split Tests', icon: IconFlask, emoji: '🧪' },

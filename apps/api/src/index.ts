@@ -252,6 +252,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start coupon analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start growth engine daily aggregation (daily) — populates growth_engine_daily_metrics
+      try {
+        const { startGrowthEngineAggregation } = await import('./jobs/growth-engine-aggregation');
+        await startGrowthEngineAggregation();
+        logger.info('Growth engine aggregation job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start growth engine aggregation job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start log purge job (daily at 2 AM UTC)
       try {
         const { startLogPurgeJob } = await import('./jobs/log-purge');

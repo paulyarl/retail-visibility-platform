@@ -21,6 +21,7 @@ import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './sc
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
+import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
 import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
 import { CategoryVocabularyService } from './CategoryVocabularyService';
@@ -665,6 +666,12 @@ export class MarketingExecutionService extends BaseService {
     // is excluded from the composer path; the template body is rendered
     // as-is (like the intelligence_profile establishment template).
     const isGoldStandardFocus = (input.campaign.intelligence_focus || '') === 'gold_standards';
+    // Bronze-standard scans have their own template bodies + a dedicated
+    // render path below (catalog hunt list for stage-1 establishment,
+    // national-profile reference for stage-2 discovery). Excluded from the
+    // composer like gold — the composer assembles emerging/competitive
+    // discovery framing, which would miscast a reason-axis calibration scan.
+    const isBronzeStandardFocus = (input.campaign.intelligence_focus || '') === 'bronze_standards';
 
     // ─── Gold-standard discovery scan: inject the activated profile ──────
     // Discovery scans consume the already-established gold-standard profile
@@ -874,7 +881,136 @@ export class MarketingExecutionService extends BaseService {
       };
     }
 
-    if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment && !isGoldStandardFocus) {
+    // ─── Bronze-standard scans (BRONZE_STANDARD_SPEC §10.3) ──────────────
+    // Two stages share this path, keyed on intelligence_campaign_kind:
+    //   establishment (stage 1, national): inject the scope-applicable REASON
+    //     CATALOG as the hunt list (sprint plan D6 — the spec's §10.3 never
+    //     injected the catalog into stage 1; the national profile cannot
+    //     snapshot a catalog it never saw).
+    //   discovery (stage 2, city): inject the resolved bronze-standard
+    //     profile (city → state → nationwide cascade) as the ESTABLISHMENT
+    //     REFERENCE — the established reason map the city scan must cover,
+    //     plus location-scoped catalog rows the national profile never saw
+    //     (§6.3 — a city-scoped reason lands in the catalog after the
+    //     national profile was authored).
+    if (isBronzeStandardFocus && isSeek && campaignScope === 'intelligence' && hasCategory) {
+      const campaignKind = (input.campaign.intelligence_campaign_kind || 'discovery') as 'discovery' | 'establishment';
+      const profileService = IntelligenceProfileService.getInstance();
+      const catalogService = BronzeReasonCatalogService.getInstance();
+      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      const campaignCity = (input.campaign as any).city || null;
+      const campaignState = (input.campaign as any).state || null;
+
+      if (campaignKind === 'establishment') {
+        // Stage 1 — inject the applicable catalog rows + the revision the
+        // output must stamp (§3.5.2). Location-scoped rows never match a
+        // nationwide establishment scan by construction (they require a
+        // city), so a national campaign receives universal + category rows;
+        // a region-scoped establishment campaign additionally receives the
+        // market's location-scoped rows.
+        const [catalogRows, catalogRevision] = await Promise.all([
+          catalogService.applicableReasons({
+            categoryKey: category,
+            city: campaignCity,
+            state: campaignState,
+            platform: campaignPlatform,
+          }, ctx),
+          catalogService.currentRevision(),
+        ]);
+        const catalogBlock = catalogService.serializeCatalogBlock(catalogRows, catalogRevision);
+        if (!catalogBlock) {
+          logger.warn('Bronze establishment scan resolved an EMPTY reason catalog', ctx, {
+            campaignId: input.campaign.id,
+            category,
+          });
+        }
+        const estRegionDirective = this.renderBronzeRegionDirective(campaignCity, campaignState, null);
+        logger.info('Bronze standard establishment scan catalog injected', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          catalogRevision,
+          reasonCount: catalogRows.length,
+          regionScope: campaignCity || campaignState
+            ? `${campaignCity || ''}${campaignCity && campaignState ? ', ' : ''}${campaignState || ''}`
+            : 'nationwide',
+        });
+        return {
+          renderedPrompt: this.appendPromptSuffix(
+            baseRendered + (catalogBlock ? '\n' + catalogBlock : ''),
+            promptSuffix,
+          ) + '\n' + estRegionDirective,
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+
+      // Stage 2 — city discovery scan consumes the resolved bronze profile
+      // as its hunt list.
+      const bronzeStandard = await profileService.resolveBronzeStandard(
+        category, campaignPlatform, campaignCity, campaignState, ctx,
+      );
+      if (!bronzeStandard) {
+        const warning = '\n\n=== DEGRADED MODE — NO ACTIVE BRONZE STANDARD PROFILE ===\n'
+          + `No active bronze-standard profile exists for category "${category}". `
+          + 'Run a Bronze Standard national Establishment campaign first to create the profile. '
+          + 'This city scan will run in degraded mode — hunt for hard-to-find businesses '
+          + 'using your own blind-spot judgment and report each reason you covered.\n';
+        logger.warn('Bronze standard city scan resolved without active profile (degraded)', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          campaignKind,
+        });
+        const degradedDirective = this.renderBronzeRegionDirective(campaignCity, campaignState, null);
+        return {
+          renderedPrompt: this.appendPromptSuffix(
+            baseRendered + warning,
+            promptSuffix,
+          ) + '\n' + degradedDirective,
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+      const referenceBlock = await profileService.serializeBronzeStandard(bronzeStandard, 'establishment_reference', ctx);
+      // §6.3 — location-scoped catalog rows are injected alongside the
+      // profile: a city-scoped reason authored after the national profile
+      // is still coverage the city scan must produce.
+      const [cityRows, catalogRevision] = await Promise.all([
+        catalogService.applicableReasons({
+          categoryKey: category,
+          city: campaignCity,
+          state: campaignState,
+          platform: campaignPlatform,
+        }, ctx),
+        catalogService.currentRevision(),
+      ]);
+      const cityCatalogBlock = catalogService.serializeCatalogBlock(cityRows, catalogRevision);
+      const regionDirective = this.renderBronzeRegionDirective(
+        campaignCity,
+        campaignState,
+        { reference_city: bronzeStandard.reference_city, reference_state: bronzeStandard.reference_state },
+      );
+      logger.info('Bronze standard discovery profile injected', ctx, {
+        campaignId: input.campaign.id,
+        category,
+        bronzeStandardProfileId: bronzeStandard.id,
+        bronzeStandardProfileVersion: bronzeStandard.version,
+        catalogRevision,
+        catalogReasonCount: cityRows.length,
+      });
+      return {
+        renderedPrompt: this.appendPromptSuffix(
+          baseRendered
+            + (referenceBlock ? '\n' + referenceBlock : '')
+            + (cityCatalogBlock ? '\n' + cityCatalogBlock : ''),
+          promptSuffix,
+        ) + '\n' + regionDirective,
+        resolution: {
+          profile_id: bronzeStandard.id,
+          profile_version: bronzeStandard.version,
+          intelligence_mode: 'profile',
+        },
+      };
+    }
+
+    if (isSeek && campaignScope === 'intelligence' && hasCategory && !isProfileEstablishment && !isGoldStandardFocus && !isBronzeStandardFocus) {
       const composer = PromptComposerService.getInstance();
       const profileService = IntelligenceProfileService.getInstance();
       const focus = (input.campaign.intelligence_focus || 'emerging') as IntelligenceFocus;
@@ -971,6 +1107,50 @@ export class MarketingExecutionService extends BaseService {
         });
       }
 
+      // ─── Bronze standard calibration injection (emerging only) ─────────
+      // Stage 3 (spec §7.1): the city bronze-standard profile is injected
+      // into EMERGING discovery as CALIBRATION framing — exemplars + the
+      // empty-slot report + the vector execution log tell the analyst what a
+      // hard-to-find business looks like here and which vectors reach it.
+      // Bronze NEVER enters competitive output (§1 — it is not a benchmark).
+      // Resolves city → state → nationwide so a market without a city scan
+      // still gets national calibration.
+      let bronzeStandardProfileId: string | null = null;
+      let bronzeStandardProfileVersion: number | null = null;
+      if (focus === 'emerging') {
+        const bronzeStandard = await profileService.resolveBronzeStandard(
+          category, campaignPlatform, campaignCity, campaignState, ctx,
+        );
+        if (bronzeStandard) {
+          const bronzeBlock = await profileService.serializeBronzeStandard(bronzeStandard, 'discovery', ctx);
+          if (bronzeBlock) {
+            rendered = rendered + '\n' + bronzeBlock;
+            bronzeStandardProfileId = bronzeStandard.id;
+            bronzeStandardProfileVersion = bronzeStandard.version;
+            logger.info('Bronze standard calibration injected into emerging scan', ctx, {
+              campaignId: input.campaign.id,
+              category,
+              bronzeStandardProfileId: bronzeStandard.id,
+              bronzeStandardProfileVersion: bronzeStandard.version,
+            });
+          }
+        } else {
+          // Soft degraded note — absence of calibration is informational,
+          // not a scan blocker (unlike gold, bronze coverage is additive).
+          rendered = rendered + '\n\n=== NO BRONZE STANDARD PROFILE — BLIND-SPOT CALIBRATION ABSENT ===\n'
+            + `No active bronze-standard profile exists for category "${category}"`
+            + (campaignCity && campaignState ? ` in ${campaignCity}, ${campaignState}` : '')
+            + '. This emerging scan runs without blind-spot calibration — hard-to-find '
+            + 'businesses that evade mainstream discovery may be missed. '
+            + 'To enable calibration, run the Bronze Standard national + city scans first.';
+          logger.info('Bronze standard absent for emerging scan — degraded mode', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            platform: campaignPlatform ?? 'none',
+          });
+        }
+      }
+
       // ─── Market context injection (emerging/competitive discovery) ─────
       // Discovery prospects businesses in a category + city. It benefits
       // from category_profile (WHAT to look for), city_profile (WHERE),
@@ -1012,6 +1192,8 @@ export class MarketingExecutionService extends BaseService {
           ...composed.resolution,
           gold_standard_profile_id: goldStandardProfileId,
           gold_standard_profile_version: goldStandardProfileVersion,
+          bronze_standard_profile_id: bronzeStandardProfileId,
+          bronze_standard_profile_version: bronzeStandardProfileVersion,
         },
       };
     }
@@ -1890,6 +2072,40 @@ emerging discovery, thin-footprint, or hidden-trust work — those are
 emerging-focus work.`;
     }
 
+    if (focus === 'bronze_standards') {
+      return `=== INTELLIGENCE FOCUS: BRONZE STANDARDS ===
+This profile is a BRONZE STANDARD for this category — a calibration map of what
+INVISIBLE looks like: the lowest digital quality at which a real, operating,
+category-qualified business can exist, typed by WHY it is invisible (each reason
+is a discovery blind spot and a discovery vector).
+
+When building the profile, bias toward blind-spot coverage:
+- REASON SLOTS, NOT RANKINGS: bronze slots are floors, not leaderboards. A slot
+  qualifies only when the business is category-qualified (assortment evidence,
+  not the platform's category label), operationally verified (active or
+  likely_active — unable_to_verify does NOT qualify), and low digital quality
+  in a way the reason explains.
+- EMPTY IS A FINDING: a reason with no exemplar in this market is reported with
+  its status (empty_unproven vs empty_proven_elsewhere) and the vector execution
+  outcome — "executed, returned 0" is materially different from "not executed."
+  An unexecuted vector is an admitted blind spot, never a silent gap. Reasons
+  that do not apply at this scope go in not_applicable_reasons, never in
+  reason_coverage.
+- PROVENANCE IS LOAD-BEARING: every slot records discovered_by. Slots filled by
+  operator_self_discovery or business_audit are ground truth; scan-derived
+  fills are confirmatory. Do not blur the distinction.
+- PROHIBITED INFERENCE: low digital quality describes observable online fields
+  only — never infer low revenue, low customer volume, poor products, poor
+  service, or sales readiness. A bronze slot is NOT a prospect verdict, a
+  competitive benchmark, or a claim that no such business exists when a slot
+  is empty. A filled absent_from_platform or field-gap slot is a per-platform
+  finding, never a whole-business verdict.
+
+The profile's reason_coverage, vector_execution_log, and empty-slot reporting
+are the PRIMARY mechanism set — the emerging discovery scan consumes them as
+calibration, not as a candidate filter.`;
+    }
+
     return '';
   }
 
@@ -2121,6 +2337,62 @@ CANDIDATE SEARCH BOUNDARY:
 - Candidates found outside ${scopeLabel} may be included only as overflow when
   the regional pool is exhausted, and must be flagged in scan_metadata with
   out_of_scope: true and a rationale.
+${scopeNote}
+=== END SEARCH SCOPE ===`;
+  }
+
+  /**
+   * Search-scope directive for bronze-standard scans — same boundary
+   * mechanics as the gold directive but worded for reason coverage: the
+   * scan is a blind-spot hunt, not a benchmark derivation. National
+   * establishment scans aim for coverage across markets; city scans hunt
+   * each reason within the market.
+   */
+  private renderBronzeRegionDirective(
+    city: string | null,
+    state: string | null,
+    profile: { reference_city: string | null; reference_state: string | null } | null,
+  ): string {
+    const isEstablishment = profile === null;
+
+    if (!city && !state) {
+      return `=== SEARCH SCOPE — NATIONWIDE ===
+This bronze-standard ${isEstablishment ? 'establishment' : 'discovery'} scan searches NATIONWIDE. Cover
+each applicable reason with the best available exemplar from ANY US market —
+the national profile proves the reason is findable somewhere. Aim for
+geographic diversity across the fills.
+=== END SEARCH SCOPE ===`;
+    }
+
+    const scopeLabel = city && state
+      ? `${city}, ${state}`
+      : state
+      ? state
+      : city as string;
+
+    const profileCity = profile?.reference_city ?? null;
+    const profileState = profile?.reference_state ?? null;
+    const profileIsNationwide = !isEstablishment && !profileCity && !profileState;
+
+    const scopeNote = isEstablishment
+      ? '\nThis is an ESTABLISHMENT scan — you are DERIVING the bronze-standard\nprofile for this region. Report each applicable reason with its fills or\nits empty status + execution outcome.'
+      : profileIsNationwide
+      ? `\nNOTE: The bronze-standard profile above was resolved from the NATIONAL\nprofile (no ${city ? 'city' : 'state'}-scoped bronze profile exists yet for this\ncategory). It is your hunt list — re-cover every applicable reason at THIS\nmarket. A reason proven nationally but empty here is reported\nempty_proven_elsewhere; a reason with no exemplar at any scope is\nempty_unproven — but you still hunt it.`
+      : '';
+
+    return `=== SEARCH SCOPE — REGION-NARROWED ===
+This bronze-standard ${isEstablishment ? 'establishment' : 'discovery'} scan is REGION-NARROWED to ${scopeLabel}.
+
+SEARCH BOUNDARY:
+- Hunt each applicable reason PRIMARILY within ${scopeLabel}. A bronze slot is
+  a floor, not a ranking — one qualifying exemplar per reason is enough;
+  two is the cap.
+- If the market is thin for a reason, record it as empty with the correct
+  status and the vector execution outcome — do NOT pad the slot with a
+  business that fails the three-part gate (category-qualified, operationally
+  verified, low digital quality the reason explains).
+- ${scopeLabel} is the coverage boundary; out-of-market finds are not fills.
+  They may be noted in empty_slot_note as "seen outside market" context.
 ${scopeNote}
 === END SEARCH SCOPE ===`;
   }

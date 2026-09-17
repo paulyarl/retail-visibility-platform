@@ -149,7 +149,8 @@ import { MarketingOutreachService } from '../services/MarketingOutreachService';
 import { SeedOutreachStateSync } from '../services/SeedOutreachStateSync';
 import { MarketingHotProspectService } from '../services/MarketingHotProspectService';
 import MarketingAuditService from '../services/MarketingAuditService';
-import MarketingPromptService from '../services/MarketingPromptService';
+import MarketingPromptService, { extractJsonCandidates, normalizeExternalJsonText, stripLlmJsonArtifacts } from '../services/MarketingPromptService';
+import { bronzeStandardScanSchema } from '../validators/bronze-standard-scan.schema';
 import MarketingExecutionService from '../services/MarketingExecutionService';
 import MarketingScorecardService from '../services/MarketingScorecardService';
 import MarketingFileService from '../services/MarketingFileService';
@@ -193,6 +194,7 @@ import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
 import ManualOutreachScriptService from '../services/ManualOutreachScriptService';
 import { IntelligenceProfileService, type IntelligenceProfile } from '../services/intelligence/IntelligenceProfileService';
+import { BronzeReasonCatalogService } from '../services/intelligence/BronzeReasonCatalogService';
 import { IntelligenceRunService } from '../services/intelligence/IntelligenceRunService';
 import { HOOK_ANGLE_KEYS, isValidHookAngle } from '../services/outreach-openers/hook-library';
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
@@ -280,7 +282,7 @@ const campaignBaseSchema = z.object({
   assigned_to: z.string().optional(),
   notes: z.string().optional(),
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligence_focus: z.enum(['emerging', 'competitive', 'gold_standards']).optional(),
+  intelligence_focus: z.enum(['emerging', 'competitive', 'gold_standards', 'bronze_standards']).optional(),
   intelligence_zip_codes: z.string().max(500).optional(),
   intelligence_search_radius_miles: z.number().min(0).max(500).optional(),
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -301,12 +303,26 @@ const campaignCreateSchema = campaignBaseSchema
     message: 'category is required for non-business-scoped campaigns',
     path: ['category'],
   })
-  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus === 'gold_standards' || (data.state && data.state.trim().length > 0), {
-    message: 'state is required for intelligence-scoped campaigns (except gold_standards)',
+  // Geo-exempt focuses: gold_standards campaigns are nationwide-only, and a
+  // bronze_standards ESTABLISHMENT campaign is the national stage-1 run
+  // (BRONZE_STANDARD_SPEC §6.1). Bronze DISCOVERY campaigns are the city-scoped
+  // stage-2 run and require city/state like emerging/competitive.
+  .refine((data) => {
+    if (data.scope !== 'intelligence') return true;
+    if (data.intelligence_focus === 'gold_standards') return true;
+    if (data.intelligence_focus === 'bronze_standards' && (data.intelligence_campaign_kind ?? 'discovery') === 'establishment') return true;
+    return !!(data.state && data.state.trim().length > 0);
+  }, {
+    message: 'state is required for intelligence-scoped campaigns (except gold_standards and national bronze establishment)',
     path: ['state'],
   })
-  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus === 'gold_standards' || (data.city && data.city.trim().length > 0), {
-    message: 'city is required for intelligence-scoped campaigns (except gold_standards)',
+  .refine((data) => {
+    if (data.scope !== 'intelligence') return true;
+    if (data.intelligence_focus === 'gold_standards') return true;
+    if (data.intelligence_focus === 'bronze_standards' && (data.intelligence_campaign_kind ?? 'discovery') === 'establishment') return true;
+    return !!(data.city && data.city.trim().length > 0);
+  }, {
+    message: 'city is required for intelligence-scoped campaigns (except gold_standards and national bronze establishment)',
     path: ['city'],
   })
   .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || (data.intelligence_platform && data.intelligence_platform.trim().length > 0), {
@@ -693,7 +709,7 @@ const promptTemplateCreateSchema = z.object({
   variables: z.any().optional(),
   output_schema: z.any().optional(),
   is_default: z.boolean().optional(),
-  intelligence_focus: z.enum(['emerging', 'competitive', 'gold_standards']).nullable().optional(),
+  intelligence_focus: z.enum(['emerging', 'competitive', 'gold_standards', 'bronze_standards']).nullable().optional(),
   intelligence_campaign_kind: z.enum(['discovery', 'establishment']).nullable().optional(),
 });
 
@@ -2785,7 +2801,7 @@ router.get('/prompts/templates', async (req: any, res: Response) => {
       scope: req.query.scope,
       category: req.query.category,
       isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
-      intelligenceFocus: (intelligenceFocus === 'emerging' || intelligenceFocus === 'competitive' || intelligenceFocus === 'gold_standards') ? intelligenceFocus : undefined,
+      intelligenceFocus: (intelligenceFocus === 'emerging' || intelligenceFocus === 'competitive' || intelligenceFocus === 'gold_standards' || intelligenceFocus === 'bronze_standards') ? intelligenceFocus : undefined,
       intelligenceCampaignKind: (intelligenceCampaignKind === 'discovery' || intelligenceCampaignKind === 'establishment') ? intelligenceCampaignKind : undefined,
       includeNullFocusKind: req.query.include_null_focus_kind === 'true',
     }, getCtx(req));
@@ -7017,7 +7033,7 @@ const intelligenceProfileCreateSchema = z.object({
   categoryName: z.string().min(1).max(100),
   configurationJson: z.record(z.string(), z.any()),
   status: z.enum(['draft', 'active', 'retired']).optional(),
-  intelligenceFocus: z.enum(['emerging', 'competitive', 'gold_standards']).default('emerging'),
+  intelligenceFocus: z.enum(['emerging', 'competitive', 'gold_standards', 'bronze_standards']).default('emerging'),
   referenceCity: z.string().max(100).nullable().optional(),
   referenceState: z.string().max(50).nullable().optional(),
   referencePlatform: z.string().max(20).nullable().optional(),
@@ -7067,10 +7083,69 @@ const intelligenceProfileAddCandidateSchema = z.object({
   }).optional(),
 });
 
+// ====================
+// BRONZE REASON CATALOG (Bronze Standard System — spec §3.5)
+// ====================
+
+const BRONZE_REASON_KEY_PATTERN = /^[a-z][a-z0-9_]{1,79}$/;
+
+const bronzeReasonBaseSchema = z.object({
+  label: z.string().min(1).max(255),
+  definition: z.string().min(1),
+  signals: z.array(z.string().min(1)).optional(),
+  expected_vectors: z.array(z.string().min(1)).optional(),
+  priority: z.number().int().min(1).max(9).optional(),
+  scope_category_key: z.string().max(255).nullable().optional(),
+  scope_city: z.string().max(100).nullable().optional(),
+  scope_state: z.string().max(50).nullable().optional(),
+  scope_platform: z.enum(['google', 'yelp', 'facebook', 'bbb', 'apple_maps', 'bing']).nullable().optional(),
+});
+
+const bronzeReasonCreateSchema = bronzeReasonBaseSchema.extend({
+  reason_key: z.string().regex(
+    BRONZE_REASON_KEY_PATTERN,
+    'reason_key must be snake_case (lowercase letters, digits, underscores; 2-80 chars, starting with a letter)',
+  ),
+});
+
+const bronzeReasonUpdateSchema = bronzeReasonBaseSchema.partial();
+
+const bronzeReasonDeprecateSchema = z.object({
+  deprecated_reason: z.string().max(2000).nullable().optional(),
+  superseded_by: z.string().regex(BRONZE_REASON_KEY_PATTERN).nullable().optional(),
+});
+
+// §7.3 — record an out-of-loop fill (business audit / operator self-discovery)
+// as a new DRAFT version of a bronze profile's reason_coverage.
+const bronzeExternalFillSchema = z.object({
+  reason_key: z.string().regex(BRONZE_REASON_KEY_PATTERN),
+  slot: z.object({
+    business_name: z.string().min(1).max(200),
+    address: z.string().max(300).nullable().optional(),
+    observed_platform: z.enum(['google', 'yelp', 'facebook', 'bbb', 'apple_maps', 'bing']).nullable().optional(),
+    category_fit_evidence: z.string().optional(),
+    operational_evidence: z.string().optional(),
+    operational_status: z.enum(['active', 'likely_active', 'unable_to_verify']).nullable().optional(),
+    discovered_by: z.enum(['operator_self_discovery', 'business_audit']),
+    discovered_via: z.string().max(500).nullable().optional(),
+    evidence_urls: z.array(z.string()).optional(),
+    digital_quality: z.enum(['low', 'very_low']).optional(),
+    platform_presence: z.record(z.string(), z.string()).optional(),
+  }).passthrough(),
+});
+
+// Single-reason test scan (sprint plan D3) — two modes, NEITHER persists a
+// profile. 'render' returns the single-reason prompt for an external agent;
+// 'validate' checks pasted output against the bronze scan schema.
+const bronzeTestScanSchema = z.object({
+  mode: z.enum(['render', 'validate']),
+  rawOutput: z.string().optional(),
+});
+
 // GET /intelligence-profiles — list active profiles (optional ?focus= filter)
 router.get('/intelligence-profiles', async (req, res) => {
   try {
-    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
+    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | undefined;
     const profiles = await IntelligenceProfileService.getInstance().listActive(focus, getCtx(req));
     res.json({ success: true, data: profiles });
   } catch (error) {
@@ -7081,7 +7156,7 @@ router.get('/intelligence-profiles', async (req, res) => {
 // GET /intelligence-profiles/drafts — list draft profiles awaiting activation (optional ?focus= filter)
 router.get('/intelligence-profiles/drafts', async (req, res) => {
   try {
-    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
+    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | undefined;
     const profiles = await IntelligenceProfileService.getInstance().listDrafts(focus, getCtx(req));
     res.json({ success: true, data: profiles });
   } catch (error) {
@@ -7109,13 +7184,21 @@ router.get('/intelligence-profiles/coverage', async (req, res) => {
 // When focus=gold_standards, delegates to resolveGoldStandard (city→state→nationwide cascade).
 router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
-    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | undefined;
+    const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | undefined;
     const city = typeof req.query.city === 'string' ? req.query.city : undefined;
     const state = typeof req.query.state === 'string' ? req.query.state : undefined;
     const platform = typeof req.query.platform === 'string' ? req.query.platform : undefined;
     let profile: IntelligenceProfile | null;
     if (focus === 'gold_standards') {
       profile = await IntelligenceProfileService.getInstance().resolveGoldStandard(
+        req.params.category,
+        platform ?? null,
+        city ?? null,
+        state ?? null,
+        getCtx(req),
+      );
+    } else if (focus === 'bronze_standards') {
+      profile = await IntelligenceProfileService.getInstance().resolveBronzeStandard(
         req.params.category,
         platform ?? null,
         city ?? null,
@@ -7354,6 +7437,210 @@ router.delete('/intelligence-profiles/:id/:version', async (req, res) => {
       logger.error('[marketing-ops] intelligence-profile draft delete audit failed', getCtx(req), { error: (e as Error).message });
     }
     res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// BRONZE REASON CATALOG (Bronze Standard System — spec §3.5/§7.3)
+// ====================
+//
+// Operator authoring surface for the discovery-blind-spot reason catalog.
+// The catalog is additive: writes bump mkt_bronze_catalog_meta.catalog_revision
+// in the same transaction (inside BronzeReasonCatalogService), reason keys are
+// immutable, and retirement is deprecate-only — never delete.
+
+// GET /bronze-reasons?categoryKey=&city=&state=&platform=&includeDeprecated=
+router.get('/bronze-reasons', async (req, res) => {
+  try {
+    const service = BronzeReasonCatalogService.getInstance();
+    const [reasons, catalogRevision] = await Promise.all([
+      service.listReasons({
+        categoryKey: typeof req.query.categoryKey === 'string' ? req.query.categoryKey : undefined,
+        city: typeof req.query.city === 'string' ? req.query.city : undefined,
+        state: typeof req.query.state === 'string' ? req.query.state : undefined,
+        platform: typeof req.query.platform === 'string' ? req.query.platform : undefined,
+        includeDeprecated: req.query.includeDeprecated === 'true',
+      }, getCtx(req)),
+      service.currentRevision(),
+    ]);
+    res.json({ success: true, data: { reasons, catalog_revision: catalogRevision } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /bronze-reasons/uncovered?categoryKey=&city=&state=&platform=&profileId=|catalogRevision=
+// §3.5.3 staleness query — reasons a profile stamped at an older
+// catalog_revision has never covered (or covers against a stale definition).
+// NOTE: registered BEFORE /bronze-reasons/:reasonKey so 'uncovered' is not
+// captured as a reason key.
+router.get('/bronze-reasons/uncovered', async (req, res) => {
+  try {
+    const categoryKey = z.string().min(1).parse(req.query.categoryKey);
+    let profileCatalogRevision: number;
+    if (typeof req.query.catalogRevision === 'string' && req.query.catalogRevision.trim() !== '') {
+      profileCatalogRevision = parseInt(req.query.catalogRevision, 10);
+      if (isNaN(profileCatalogRevision)) {
+        return res.status(400).json({ success: false, error: 'Invalid catalogRevision' });
+      }
+    } else if (typeof req.query.profileId === 'string' && req.query.profileId.trim() !== '') {
+      const profiles = await IntelligenceProfileService.getInstance()
+        .getProfileWithVersions(req.query.profileId, getCtx(req));
+      const active = profiles.find((p: any) => p.status === 'active') ?? profiles[0];
+      const stamped = (active?.configuration_json as any)?.catalog_revision;
+      if (typeof stamped !== 'number') {
+        return res.status(400).json({
+          success: false,
+          error: `Profile ${req.query.profileId} does not stamp catalog_revision — pass catalogRevision explicitly`,
+        });
+      }
+      profileCatalogRevision = stamped;
+    } else {
+      return res.status(400).json({ success: false, error: 'Pass profileId or catalogRevision' });
+    }
+    const uncovered = await BronzeReasonCatalogService.getInstance().uncoveredReasons({
+      categoryKey,
+      city: typeof req.query.city === 'string' ? req.query.city : undefined,
+      state: typeof req.query.state === 'string' ? req.query.state : undefined,
+      platform: typeof req.query.platform === 'string' ? req.query.platform : undefined,
+      profileCatalogRevision,
+    }, getCtx(req));
+    res.json({ success: true, data: { uncovered, profile_catalog_revision: profileCatalogRevision } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /bronze-reasons — author a new reason (live immediately; bumps revision)
+router.post('/bronze-reasons', async (req, res) => {
+  try {
+    const parsed = bronzeReasonCreateSchema.parse(req.body);
+    const { reason_key, ...input } = parsed;
+    const reason = await BronzeReasonCatalogService.getInstance().createReason(reason_key, input, getCtx(req));
+    res.status(201).json({ success: true, data: reason });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// PUT /bronze-reasons/:reasonKey — edit content/scope (key is immutable;
+// every write stamps revised_in_revision)
+router.put('/bronze-reasons/:reasonKey', async (req, res) => {
+  try {
+    const parsed = bronzeReasonUpdateSchema.parse(req.body);
+    const reason = await BronzeReasonCatalogService.getInstance().updateReason(
+      req.params.reasonKey, parsed, getCtx(req),
+    );
+    res.json({ success: true, data: reason });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /bronze-reasons/:reasonKey/deprecate — retire a reason (additive
+// catalog: never delete). Optional superseded_by for duplicate retirement.
+router.post('/bronze-reasons/:reasonKey/deprecate', async (req, res) => {
+  try {
+    const parsed = bronzeReasonDeprecateSchema.parse(req.body);
+    const reason = await BronzeReasonCatalogService.getInstance().deprecateReason(
+      req.params.reasonKey,
+      { deprecatedReason: parsed.deprecated_reason, supersededBy: parsed.superseded_by },
+      getCtx(req),
+    );
+    res.json({ success: true, data: reason });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /bronze-reasons/:reasonKey/test-scan — single-reason probe (D3).
+// mode 'render':   return the single-reason prompt text for an external agent.
+// mode 'validate': validate pasted agent output against bronze_standard_scan
+//                  and report the coverage entry for this reason.
+// NEITHER mode writes a profile — test scans never persist (spec §10.3).
+router.post('/bronze-reasons/:reasonKey/test-scan', async (req, res) => {
+  try {
+    const parsed = bronzeTestScanSchema.parse(req.body);
+    const service = BronzeReasonCatalogService.getInstance();
+    const reason = await service.getReason(req.params.reasonKey, getCtx(req));
+    if (!reason) {
+      return res.status(404).json({ success: false, error: `bronze reason "${req.params.reasonKey}" not found` });
+    }
+
+    if (parsed.mode === 'render') {
+      const revision = await service.currentRevision();
+      const catalogBlock = service.serializeCatalogBlock([reason], revision);
+      const prompt = catalogBlock
+        + '\n=== TEST SCAN INSTRUCTIONS ===\n'
+        + 'This is a SINGLE-REASON test scan. Hunt ONLY the reason above: execute its\n'
+        + 'expected vectors in your target market and report the result as a\n'
+        + 'bronze_standard_scan payload with exactly one reason_coverage entry for\n'
+        + `"${reason.reason_key}". Fill up to 2 slots, or report the correct empty\n`
+        + 'status with the vector execution outcome. Do NOT write profiles — this\n'
+        + 'is a catalog-coverage probe.\n';
+      return res.json({ success: true, data: { mode: 'render', prompt, catalog_revision: revision } });
+    }
+
+    // mode === 'validate'
+    const raw = parsed.rawOutput ?? '';
+    if (!raw.trim()) {
+      return res.status(400).json({ success: false, error: 'rawOutput is required for mode=validate' });
+    }
+    let candidateJson: any = null;
+    for (const candidate of extractJsonCandidates(normalizeExternalJsonText(raw))) {
+      try {
+        candidateJson = JSON.parse(stripLlmJsonArtifacts(candidate));
+        break;
+      } catch { /* try next candidate */ }
+    }
+    if (!candidateJson) {
+      return res.status(400).json({ success: false, error: 'No valid JSON found in rawOutput' });
+    }
+    const result = bronzeStandardScanSchema.safeParse(candidateJson);
+    if (!result.success) {
+      return res.status(422).json({
+        success: false,
+        error: 'Output does not match the bronze_standard_scan schema',
+        issues: result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      });
+    }
+    const coverage = (result.data.reason_coverage ?? []).find((e: any) => e.reason_key === reason.reason_key) ?? null;
+    res.json({
+      success: true,
+      data: {
+        mode: 'validate',
+        reason_key: reason.reason_key,
+        covered: !!coverage,
+        coverage,
+        catalog_revision: result.data.catalog_revision,
+        profiles_written: 0,
+      },
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /intelligence-profiles/:id/bronze-fill — §7.3 external fill
+// (operator self-discovery / business audit). Appends the slot under the
+// given reason as a NEW DRAFT version of the bronze profile — never mutates
+// the active version. Returns 404 when the profile id has no active
+// bronze_standard version.
+router.post('/intelligence-profiles/:id/bronze-fill', async (req, res) => {
+  try {
+    const parsed = bronzeExternalFillSchema.parse(req.body);
+    const draft = await IntelligenceProfileService.getInstance().recordBronzeExternalFill(
+      req.params.id, parsed.reason_key, parsed.slot, getCtx(req),
+    );
+    if (!draft) {
+      return res.status(404).json({
+        success: false,
+        error: `No active bronze-standard profile at id ${req.params.id} — a bronze exemplar without a bronze profile is noted, not written`,
+      });
+    }
+    res.status(201).json({ success: true, data: draft });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -15,7 +15,9 @@ export interface FunnelMetrics {
   seeksRun: number;
   prospectsQueued: number;
   seedsCreated: number;
+  seedsContactable: number;
   seedsPublished: number;
+  seedsInvited: number;
   seedsClaimed: number;
   seedsUpgraded: number;
 }
@@ -100,12 +102,19 @@ class GrowthEngineAnalyticsService {
 
     const result = await pool.query(
       `SELECT
-        (SELECT COUNT(*) FROM mkt_intelligence_runs WHERE created_at >= $1 AND created_at <= $2) AS seeks_run,
+        ((SELECT COUNT(*) FROM mkt_intelligence_runs WHERE created_at >= $1 AND created_at <= $2)
+         + (SELECT COUNT(*) FROM mkt_seek_batches WHERE created_at >= $1 AND created_at <= $2)) AS seeks_run,
         (SELECT COUNT(*) FROM mkt_prospect_queue WHERE created_at >= $1 AND created_at <= $2) AS prospects_queued,
         (SELECT COUNT(*) FROM directory_presence_seeds WHERE created_at >= $1 AND created_at <= $2) AS seeds_created,
-        (SELECT COUNT(*) FROM directory_presence_seeds WHERE status IN ('published','invited','claimed') AND created_at >= $1 AND created_at <= $2) AS seeds_published,
-        (SELECT COUNT(*) FROM directory_presence_seeds WHERE status = 'claimed' AND claimed_at >= $1 AND claimed_at <= $2) AS seeds_claimed,
-        (SELECT COUNT(*) FROM tenants WHERE org_standing_mode = 'independent' AND subscription_tier != 'directory_presence' AND updated_at >= $1 AND updated_at <= $2) AS seeds_upgraded`,
+        (SELECT COUNT(*) FROM directory_presence_seeds WHERE contact_status = 'contactable' AND created_at >= $1 AND created_at <= $2) AS seeds_contactable,
+        (SELECT COUNT(*) FROM directory_presence_seeds WHERE published_at >= $1 AND published_at <= $2) AS seeds_published,
+        (SELECT COUNT(*) FROM directory_presence_seeds WHERE invited_at >= $1 AND invited_at <= $2) AS seeds_invited,
+        (SELECT COUNT(*) FROM directory_presence_seeds WHERE claimed_at >= $1 AND claimed_at <= $2) AS seeds_claimed,
+        (SELECT COUNT(*) FROM directory_presence_seeds dps
+          JOIN tenants tn ON tn.id = dps.tenant_id
+          WHERE dps.claimed_at >= $1 AND dps.claimed_at <= $2
+            AND tn.org_standing_mode = 'independent'
+            AND tn.subscription_tier <> 'directory_presence') AS seeds_upgraded`,
       [startDate, endDate],
     );
 
@@ -114,7 +123,9 @@ class GrowthEngineAnalyticsService {
       seeksRun: parseInt(r.seeks_run) || 0,
       prospectsQueued: parseInt(r.prospects_queued) || 0,
       seedsCreated: parseInt(r.seeds_created) || 0,
+      seedsContactable: parseInt(r.seeds_contactable) || 0,
       seedsPublished: parseInt(r.seeds_published) || 0,
+      seedsInvited: parseInt(r.seeds_invited) || 0,
       seedsClaimed: parseInt(r.seeds_claimed) || 0,
       seedsUpgraded: parseInt(r.seeds_upgraded) || 0,
     };
@@ -135,10 +146,13 @@ class GrowthEngineAnalyticsService {
         dps.category,
         COUNT(DISTINCT pq.id) AS prospects,
         COUNT(DISTINCT dps.id) AS seeds,
-        COUNT(DISTINCT CASE WHEN dps.status IN ('published','invited','claimed') THEN dps.id END) AS published,
+        COUNT(DISTINCT CASE WHEN dps.published_at IS NOT NULL THEN dps.id END) AS published,
         COUNT(DISTINCT CASE WHEN dps.status = 'claimed' THEN dps.id END) AS claimed,
-        0 AS upgraded
+        COUNT(DISTINCT CASE WHEN dps.status = 'claimed'
+          AND tn.org_standing_mode = 'independent'
+          AND tn.subscription_tier <> 'directory_presence' THEN dps.id END) AS upgraded
       FROM directory_presence_seeds dps
+      LEFT JOIN tenants tn ON tn.id = dps.tenant_id
       LEFT JOIN mkt_prospect_queue pq ON LOWER(pq.category) = LOWER(dps.category)
         AND pq.created_at >= $1 AND pq.created_at <= $2
       WHERE dps.created_at >= $1 AND dps.created_at <= $2
@@ -147,10 +161,32 @@ class GrowthEngineAnalyticsService {
       [startDate, endDate],
     );
 
+    // Per-category claim rate by city → bestCity / worstCity
+    const cityRates = await pool.query(
+      `SELECT category, city,
+        COUNT(*) FILTER (WHERE published_at IS NOT NULL) AS published,
+        COUNT(*) FILTER (WHERE status = 'claimed') AS claimed
+      FROM directory_presence_seeds
+      WHERE created_at >= $1 AND created_at <= $2
+      GROUP BY category, city`,
+      [startDate, endDate],
+    );
+    const bestWorst = new Map<string, { bestCity: string | null; bestRate: number; worstCity: string | null; worstRate: number }>();
+    for (const row of cityRates.rows) {
+      const published = parseInt(row.published) || 0;
+      if (published === 0) continue;
+      const rate = (parseInt(row.claimed) || 0) / published;
+      const cur = bestWorst.get(row.category) || { bestCity: null, bestRate: -1, worstCity: null, worstRate: 2 };
+      if (rate > cur.bestRate) { cur.bestRate = rate; cur.bestCity = row.city; }
+      if (rate < cur.worstRate) { cur.worstRate = rate; cur.worstCity = row.city; }
+      bestWorst.set(row.category, cur);
+    }
+
     return result.rows.map((r: any) => {
       const published = parseInt(r.published) || 0;
       const claimed = parseInt(r.claimed) || 0;
       const upgraded = parseInt(r.upgraded) || 0;
+      const bw = bestWorst.get(r.category);
       return {
         category: r.category,
         prospects: parseInt(r.prospects) || 0,
@@ -160,8 +196,8 @@ class GrowthEngineAnalyticsService {
         upgraded,
         claimRate: published > 0 ? claimed / published : 0,
         upgradeRate: claimed > 0 ? upgraded / claimed : 0,
-        bestCity: null,
-        worstCity: null,
+        bestCity: bw?.bestCity ?? null,
+        worstCity: bw?.worstCity ?? null,
       };
     });
   }
@@ -177,16 +213,42 @@ class GrowthEngineAnalyticsService {
       `SELECT
         dps.city,
         COUNT(DISTINCT dps.category) AS niches,
+        COUNT(DISTINCT pq.id) AS prospects,
         COUNT(DISTINCT dps.id) AS seeds,
-        COUNT(DISTINCT CASE WHEN dps.status IN ('published','invited','claimed') THEN dps.id END) AS published,
+        COUNT(DISTINCT CASE WHEN dps.published_at IS NOT NULL THEN dps.id END) AS published,
         COUNT(DISTINCT CASE WHEN dps.status = 'claimed' THEN dps.id END) AS claimed,
-        0 AS upgraded
+        COUNT(DISTINCT CASE WHEN dps.status = 'claimed'
+          AND tn.org_standing_mode = 'independent'
+          AND tn.subscription_tier <> 'directory_presence' THEN dps.id END) AS upgraded
       FROM directory_presence_seeds dps
+      LEFT JOIN tenants tn ON tn.id = dps.tenant_id
+      LEFT JOIN mkt_prospect_queue pq ON LOWER(pq.city) = LOWER(dps.city)
+        AND pq.created_at >= $1 AND pq.created_at <= $2
       WHERE dps.created_at >= $1 AND dps.created_at <= $2
       GROUP BY dps.city
       ORDER BY seeds DESC`,
       [startDate, endDate],
     );
+
+    // Per-city claim rate by category → bestNiche
+    const nicheRates = await pool.query(
+      `SELECT city, category,
+        COUNT(*) FILTER (WHERE published_at IS NOT NULL) AS published,
+        COUNT(*) FILTER (WHERE status = 'claimed') AS claimed
+      FROM directory_presence_seeds
+      WHERE created_at >= $1 AND created_at <= $2
+      GROUP BY city, category`,
+      [startDate, endDate],
+    );
+    const bestNicheByCity = new Map<string, { bestNiche: string | null; bestRate: number }>();
+    for (const row of nicheRates.rows) {
+      const published = parseInt(row.published) || 0;
+      if (published === 0) continue;
+      const rate = (parseInt(row.claimed) || 0) / published;
+      const cur = bestNicheByCity.get(row.city) || { bestNiche: null, bestRate: -1 };
+      if (rate > cur.bestRate) { cur.bestRate = rate; cur.bestNiche = row.category; }
+      bestNicheByCity.set(row.city, cur);
+    }
 
     return result.rows.map((r: any) => {
       const published = parseInt(r.published) || 0;
@@ -195,14 +257,14 @@ class GrowthEngineAnalyticsService {
       return {
         city: r.city,
         niches: parseInt(r.niches) || 0,
-        prospects: 0,
+        prospects: parseInt(r.prospects) || 0,
         seeds: parseInt(r.seeds) || 0,
         published,
         claimed,
         upgraded,
         claimRate: published > 0 ? claimed / published : 0,
         upgradeRate: claimed > 0 ? upgraded / claimed : 0,
-        bestNiche: null,
+        bestNiche: bestNicheByCity.get(r.city)?.bestNiche ?? null,
       };
     });
   }
@@ -218,15 +280,35 @@ class GrowthEngineAnalyticsService {
     const { startDate, endDate } = this.resolveDateRange(dateRange);
 
     const truncFn = granularity === 'week' ? 'date_trunc(\'week\'' : 'date_trunc(\'month\'';
+    // Each metric buckets by its own event timestamp (created/published/claimed/
+    // upgraded), not by the seed's creation week.
     const result = await pool.query(
-      `SELECT
-        ${truncFn}, dps.created_at) AS period,
-        COUNT(DISTINCT dps.id) AS seeds_created,
-        COUNT(DISTINCT CASE WHEN dps.status IN ('published','invited','claimed') AND dps.published_at IS NOT NULL THEN dps.id END) AS seeds_published,
-        COUNT(DISTINCT CASE WHEN dps.status = 'claimed' AND dps.claimed_at IS NOT NULL THEN dps.id END) AS seeds_claimed,
-        0 AS seeds_upgraded
-      FROM directory_presence_seeds dps
-      WHERE dps.created_at >= $1 AND dps.created_at <= $2
+      `SELECT period,
+        SUM(created) AS seeds_created,
+        SUM(published) AS seeds_published,
+        SUM(claimed) AS seeds_claimed,
+        SUM(upgraded) AS seeds_upgraded
+      FROM (
+        SELECT ${truncFn}, created_at) AS period, COUNT(*) AS created, 0 AS published, 0 AS claimed, 0 AS upgraded
+          FROM directory_presence_seeds
+          WHERE created_at >= $1 AND created_at <= $2 GROUP BY 1
+        UNION ALL
+        SELECT ${truncFn}, published_at), 0, COUNT(*), 0, 0
+          FROM directory_presence_seeds
+          WHERE published_at >= $1 AND published_at <= $2 GROUP BY 1
+        UNION ALL
+        SELECT ${truncFn}, claimed_at), 0, 0, COUNT(*), 0
+          FROM directory_presence_seeds
+          WHERE claimed_at >= $1 AND claimed_at <= $2 GROUP BY 1
+        UNION ALL
+        SELECT ${truncFn}, dps.claimed_at), 0, 0, 0, COUNT(*)
+          FROM directory_presence_seeds dps
+          JOIN tenants tn ON tn.id = dps.tenant_id
+          WHERE dps.claimed_at >= $1 AND dps.claimed_at <= $2
+            AND tn.org_standing_mode = 'independent'
+            AND tn.subscription_tier <> 'directory_presence'
+          GROUP BY 1
+      ) x
       GROUP BY period
       ORDER BY period ASC`,
       [startDate, endDate],
@@ -364,7 +446,7 @@ class GrowthEngineAnalyticsService {
       [startDate, endDate],
     );
 
-    // Underserved searches (< 5 listings but > 10 searches)
+    // Underserved searches (< 5 listings but > 5 searches)
     const underserved = await pool.query(
       `SELECT
          d.resolved_category, d.resolved_city,
@@ -386,12 +468,12 @@ class GrowthEngineAnalyticsService {
       [startDate, endDate],
     );
 
-    // Lead gen demand (directory_lead_gen prospects grouped by category+city)
+    // Lead gen demand (get-listed + public suggestion submissions, grouped by category+city)
     const leadGen = await pool.query(
       `SELECT
          category, city, COUNT(*) AS submission_count
        FROM mkt_prospect_queue
-       WHERE source_kind = 'directory_lead_gen'
+       WHERE source_kind IN ('directory_lead_gen', 'public_suggestion')
          AND created_at >= $1 AND created_at <= $2
        GROUP BY category, city
        ORDER BY submission_count DESC
@@ -430,7 +512,7 @@ class GrowthEngineAnalyticsService {
         city: r.city,
         searchCount: parseInt(r.submission_count) || 0,
         listingCount: 0,
-        description: `${r.submission_count} "Get listed" submissions for ${r.category || 'unknown'} in ${r.city || 'unknown city'}`,
+        description: `${r.submission_count} demand submissions (get-listed + suggestions) for ${r.category || 'unknown'} in ${r.city || 'unknown city'}`,
       });
     }
 
@@ -466,7 +548,7 @@ class GrowthEngineAnalyticsService {
        lead_gen AS (
          SELECT category, city, COUNT(*) AS lead_gen_submissions
          FROM mkt_prospect_queue
-         WHERE source_kind = 'directory_lead_gen'
+         WHERE source_kind IN ('directory_lead_gen', 'public_suggestion')
            AND created_at >= $1 AND created_at <= $2
          GROUP BY category, city
        ),
@@ -486,11 +568,12 @@ class GrowthEngineAnalyticsService {
           COALESCE(l.lead_gen_submissions, 0) * 5 +
           COALESCE(u.underserved_searches, 0) * 2) AS score
        FROM zero_results z
-       FULL OUTER JOIN underserved u ON LOWER(z.category) = LOWER(u.category) AND LOWER(z.city) = LOWER(u.city)
+       FULL OUTER JOIN underserved u ON LOWER(z.category) = LOWER(u.category)
+         AND COALESCE(LOWER(z.city), '') = COALESCE(LOWER(u.city), '')
        FULL OUTER JOIN lead_gen l ON LOWER(COALESCE(z.category, u.category)) = LOWER(l.category)
-         AND LOWER(COALESCE(z.city, u.city)) = LOWER(l.city)
+         AND COALESCE(LOWER(COALESCE(z.city, u.city)), '') = COALESCE(LOWER(l.city), '')
        LEFT JOIN listings li ON LOWER(COALESCE(z.category, u.category, l.category)) = LOWER(li.category)
-         AND LOWER(COALESCE(z.city, u.city, l.city)) = LOWER(li.city)
+         AND COALESCE(LOWER(COALESCE(z.city, u.city, l.city)), '') = COALESCE(LOWER(li.city), '')
        WHERE COALESCE(z.zero_result_searches, 0) + COALESCE(u.underserved_searches, 0) + COALESCE(l.lead_gen_submissions, 0) > 0
        ORDER BY score DESC
        LIMIT 10`,
@@ -505,7 +588,7 @@ class GrowthEngineAnalyticsService {
       leadGenSubmissions: parseInt(r.lead_gen_submissions) || 0,
       underservedSearches: parseInt(r.underserved_searches) || 0,
       currentListings: parseInt(r.current_listings) || 0,
-      reason: `${parseInt(r.zero_result_searches) || 0} zero-result searches, ${parseInt(r.lead_gen_submissions) || 0} lead gen submissions, ${parseInt(r.current_listings) || 0} existing listings`,
+      reason: `${parseInt(r.zero_result_searches) || 0} zero-result searches, ${parseInt(r.lead_gen_submissions) || 0} demand submissions, ${parseInt(r.current_listings) || 0} existing listings`,
     }));
   }
 
@@ -526,9 +609,13 @@ class GrowthEngineAnalyticsService {
         dps.category,
         dps.city,
         COUNT(DISTINCT dps.id) AS seeds_created,
-        COUNT(DISTINCT CASE WHEN dps.status IN ('published','invited','claimed') THEN dps.id END) AS published,
-        COUNT(DISTINCT CASE WHEN dps.status = 'claimed' THEN dps.id END) AS claimed
+        COUNT(DISTINCT CASE WHEN dps.published_at IS NOT NULL THEN dps.id END) AS published,
+        COUNT(DISTINCT CASE WHEN dps.status = 'claimed' THEN dps.id END) AS claimed,
+        COUNT(DISTINCT CASE WHEN dps.status = 'claimed'
+          AND tn.org_standing_mode = 'independent'
+          AND tn.subscription_tier <> 'directory_presence' THEN dps.id END) AS upgraded
       FROM directory_presence_seeds dps
+      LEFT JOIN tenants tn ON tn.id = dps.tenant_id
       WHERE dps.created_at >= $1 AND dps.created_at <= $2
       GROUP BY dps.category, dps.city`,
       [dayStart, dayEnd],
@@ -538,15 +625,16 @@ class GrowthEngineAnalyticsService {
     for (const row of result.rows) {
       await pool.query(
         `INSERT INTO growth_engine_daily_metrics
-          (metric_date, category, city, seeds_created, seeds_published, seeds_claimed, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, now())
+          (metric_date, category, city, seeds_created, seeds_published, seeds_claimed, seeds_upgraded, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now())
          ON CONFLICT (metric_date, category, city)
          DO UPDATE SET
            seeds_created = EXCLUDED.seeds_created,
            seeds_published = EXCLUDED.seeds_published,
            seeds_claimed = EXCLUDED.seeds_claimed,
+           seeds_upgraded = EXCLUDED.seeds_upgraded,
            updated_at = now()`,
-        [dateStr, row.category, row.city, parseInt(row.seeds_created) || 0, parseInt(row.published) || 0, parseInt(row.claimed) || 0],
+        [dateStr, row.category, row.city, parseInt(row.seeds_created) || 0, parseInt(row.published) || 0, parseInt(row.claimed) || 0, parseInt(row.upgraded) || 0],
       );
       rowsUpdated++;
     }
@@ -569,9 +657,11 @@ class GrowthEngineAnalyticsService {
       { label: 'Seeks Run', count: raw.seeksRun },
       { label: 'Prospects Queued', count: raw.prospectsQueued },
       { label: 'Seeds Created', count: raw.seedsCreated },
+      { label: 'Contactable', count: raw.seedsContactable },
       { label: 'Seeds Published', count: raw.seedsPublished },
+      { label: 'Seeds Invited', count: raw.seedsInvited },
       { label: 'Seeds Claimed', count: raw.seedsClaimed },
-      { label: 'Seeds Upgraded', count: raw.seedsUpgraded },
+      { label: 'Upgraded (Paid)', count: raw.seedsUpgraded },
     ];
 
     const firstCount = stages[0].count || 1;

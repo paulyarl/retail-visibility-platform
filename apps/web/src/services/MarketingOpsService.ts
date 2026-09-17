@@ -238,7 +238,7 @@ export interface Campaign {
   archetype?: string | null;
   archetypeLabel?: string | null;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards' | null;
+  intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | null;
   intelligence_zip_codes?: string | null;
   intelligence_search_radius_miles?: number | null;
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -1610,7 +1610,7 @@ export interface CampaignCreateInput {
   notes?: string;
   service_category?: string;
   // Intelligence scope fields (Sprint 3 — Migration 200)
-  intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards';
+  intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
   intelligence_zip_codes?: string;
   intelligence_search_radius_miles?: number;
   // Migration 201 — discriminator for intelligence-scope campaigns
@@ -5855,8 +5855,79 @@ export interface GalleryDashboard {
 // INTELLIGENCE PROFILE + RUN TYPES (Sprint 2 — Seek Intelligence Scope)
 // ====================
 
-export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'proving_ground';
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | 'proving_ground';
 export type IntelligenceCampaignKind = 'discovery' | 'establishment';
+
+// ─── Bronze Reason Catalog (Bronze Standard System — spec §3.5) ──────────
+
+export interface BronzeReason {
+  reason_key: string;
+  label: string;
+  definition: string;
+  signals: string[];
+  expected_vectors: string[];
+  priority: number;
+  scope_category_key: string | null;
+  scope_city: string | null;
+  scope_state: string | null;
+  scope_platform: string | null;
+  provenance: 'derived' | 'operator_authored';
+  introduced_in_revision: number;
+  revised_in_revision: number | null;
+  deprecated_in_revision: number | null;
+  deprecated_reason: string | null;
+  superseded_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BronzeReasonInput {
+  label: string;
+  definition: string;
+  signals?: string[];
+  expected_vectors?: string[];
+  priority?: number;
+  scope_category_key?: string | null;
+  scope_city?: string | null;
+  scope_state?: string | null;
+  scope_platform?: 'google' | 'yelp' | 'facebook' | 'bbb' | 'apple_maps' | 'bing' | null;
+}
+
+export interface BronzeReasonListResponse {
+  reasons: BronzeReason[];
+  catalog_revision: number;
+}
+
+export interface BronzeUncoveredReason {
+  reason_key: string;
+  label: string;
+  gap_kind: 'never_covered' | 'revised_since_authored';
+}
+
+export interface BronzeTestScanResult {
+  mode: 'render' | 'validate';
+  prompt?: string;
+  catalog_revision?: number;
+  reason_key?: string;
+  covered?: boolean;
+  coverage?: Record<string, any> | null;
+  profiles_written?: number;
+}
+
+export interface BronzeExternalFillSlot {
+  business_name: string;
+  address?: string | null;
+  observed_platform?: 'google' | 'yelp' | 'facebook' | 'bbb' | 'apple_maps' | 'bing' | null;
+  category_fit_evidence?: string;
+  operational_evidence?: string;
+  operational_status?: 'active' | 'likely_active' | 'unable_to_verify' | null;
+  discovered_by: 'operator_self_discovery' | 'business_audit';
+  discovered_via?: string | null;
+  evidence_urls?: string[];
+  digital_quality?: 'low' | 'very_low';
+  platform_presence?: Record<string, string>;
+}
 export type IntelligenceMode = 'profile' | 'none';
 export type ProfileStatus = 'draft' | 'active' | 'retired';
 
@@ -5982,6 +6053,36 @@ interface MarketingOpsService {
   }): Promise<IntelligenceProfile>;
   listIntelligenceRuns(campaignId: string): Promise<IntelligenceRun[]>;
   getIntelligenceRun(runId: string): Promise<IntelligenceRun | null>;
+  // Bronze Reason Catalog (Bronze Standard System)
+  listBronzeReasons(filters?: {
+    categoryKey?: string;
+    city?: string;
+    state?: string;
+    platform?: string;
+    includeDeprecated?: boolean;
+  }): Promise<BronzeReasonListResponse>;
+  listUncoveredBronzeReasons(input: {
+    categoryKey: string;
+    city?: string;
+    state?: string;
+    platform?: string;
+    profileId?: string;
+    catalogRevision?: number;
+  }): Promise<{ uncovered: BronzeUncoveredReason[]; profile_catalog_revision: number }>;
+  createBronzeReason(reasonKey: string, input: BronzeReasonInput): Promise<BronzeReason>;
+  updateBronzeReason(reasonKey: string, input: Partial<BronzeReasonInput>): Promise<BronzeReason>;
+  deprecateBronzeReason(reasonKey: string, input: {
+    deprecated_reason?: string | null;
+    superseded_by?: string | null;
+  }): Promise<BronzeReason>;
+  testScanBronzeReason(reasonKey: string, input: {
+    mode: 'render' | 'validate';
+    rawOutput?: string;
+  }): Promise<BronzeTestScanResult>;
+  recordBronzeExternalFill(profileId: string, input: {
+    reason_key: string;
+    slot: BronzeExternalFillSlot;
+  }): Promise<IntelligenceProfile>;
 }
 
 MarketingOpsService.prototype.generateGalleryToken = async function (
@@ -6343,6 +6444,160 @@ MarketingOpsService.prototype.getIntelligenceRun = async function (runId: string
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch intelligence run');
   }
+  return result.data?.data ?? result.data;
+};
+
+// ─── Bronze Reason Catalog Methods (Bronze Standard System) ──────────────
+
+MarketingOpsService.prototype.listBronzeReasons = async function (
+  this: MarketingOpsService,
+  filters: {
+    categoryKey?: string;
+    city?: string;
+    state?: string;
+    platform?: string;
+    includeDeprecated?: boolean;
+  } = {},
+): Promise<BronzeReasonListResponse> {
+  const params = new URLSearchParams();
+  if (filters.categoryKey) params.set('categoryKey', filters.categoryKey);
+  if (filters.city) params.set('city', filters.city);
+  if (filters.state) params.set('state', filters.state);
+  if (filters.platform) params.set('platform', filters.platform);
+  if (filters.includeDeprecated) params.set('includeDeprecated', 'true');
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/bronze-reasons${query}`,
+    {},
+    `mkt-ops-bronze-reasons-${params.toString()}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list bronze reasons');
+  }
+  const data = result.data?.data ?? result.data;
+  return { reasons: data?.reasons ?? [], catalog_revision: data?.catalog_revision ?? 0 };
+};
+
+MarketingOpsService.prototype.listUncoveredBronzeReasons = async function (
+  this: MarketingOpsService,
+  input: {
+    categoryKey: string;
+    city?: string;
+    state?: string;
+    platform?: string;
+    profileId?: string;
+    catalogRevision?: number;
+  },
+): Promise<{ uncovered: BronzeUncoveredReason[]; profile_catalog_revision: number }> {
+  const params = new URLSearchParams({ categoryKey: input.categoryKey });
+  if (input.city) params.set('city', input.city);
+  if (input.state) params.set('state', input.state);
+  if (input.platform) params.set('platform', input.platform);
+  if (input.profileId) params.set('profileId', input.profileId);
+  if (input.catalogRevision !== undefined) params.set('catalogRevision', String(input.catalogRevision));
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/bronze-reasons/uncovered?${params.toString()}`,
+    {},
+    `mkt-ops-bronze-uncovered-${params.toString()}`,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list uncovered bronze reasons');
+  }
+  const data = result.data?.data ?? result.data;
+  return { uncovered: data?.uncovered ?? [], profile_catalog_revision: data?.profile_catalog_revision ?? 0 };
+};
+
+MarketingOpsService.prototype.createBronzeReason = async function (
+  this: MarketingOpsService,
+  reasonKey: string,
+  input: BronzeReasonInput,
+): Promise<BronzeReason> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/bronze-reasons`,
+    { method: 'POST', body: JSON.stringify({ reason_key: reasonKey, ...input }) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create bronze reason');
+  }
+  await this.invalidateCachePattern('mkt-ops-bronze-reasons');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.updateBronzeReason = async function (
+  this: MarketingOpsService,
+  reasonKey: string,
+  input: Partial<BronzeReasonInput>,
+): Promise<BronzeReason> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/bronze-reasons/${encodeURIComponent(reasonKey)}`,
+    { method: 'PUT', body: JSON.stringify(input) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update bronze reason');
+  }
+  await this.invalidateCachePattern('mkt-ops-bronze-reasons');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.deprecateBronzeReason = async function (
+  this: MarketingOpsService,
+  reasonKey: string,
+  input: { deprecated_reason?: string | null; superseded_by?: string | null },
+): Promise<BronzeReason> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/bronze-reasons/${encodeURIComponent(reasonKey)}/deprecate`,
+    { method: 'POST', body: JSON.stringify(input) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to deprecate bronze reason');
+  }
+  await this.invalidateCachePattern('mkt-ops-bronze-reasons');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.testScanBronzeReason = async function (
+  this: MarketingOpsService,
+  reasonKey: string,
+  input: { mode: 'render' | 'validate'; rawOutput?: string },
+): Promise<BronzeTestScanResult> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/bronze-reasons/${encodeURIComponent(reasonKey)}/test-scan`,
+    { method: 'POST', body: JSON.stringify(input) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    const errMsg = typeof result.error === 'string' ? result.error : 'Bronze test scan failed';
+    const err = new Error(errMsg) as any;
+    err.issues = (result.data as any)?.issues ?? (result as any).issues;
+    throw err;
+  }
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.recordBronzeExternalFill = async function (
+  this: MarketingOpsService,
+  profileId: string,
+  input: { reason_key: string; slot: BronzeExternalFillSlot },
+): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${encodeURIComponent(profileId)}/bronze-fill`,
+    { method: 'POST', body: JSON.stringify(input) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to record bronze external fill');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profiles');
   return result.data?.data ?? result.data;
 };
 

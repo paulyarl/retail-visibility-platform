@@ -8006,6 +8006,39 @@ model mkt_manual_play_templates {
   @@index([status], map: "idx_mkt_manual_play_templates_status")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_bronze_catalog_meta {
+  id               String   @id
+  catalog_revision Int
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_bronze_reason_catalog {
+  reason_key             String   @id @db.VarChar(80)
+  label                  String   @db.VarChar(255)
+  definition             String
+  signals                Json     @default("[]")
+  expected_vectors       Json     @default("[]")
+  priority               Int      @default(3)
+  scope_category_key     String?  @db.VarChar(255)
+  scope_city             String?  @db.VarChar(100)
+  scope_state            String?  @db.VarChar(50)
+  scope_platform         String?  @db.VarChar(20)
+  provenance             String   @default("operator_authored") @db.VarChar(30)
+  introduced_in_revision Int
+  revised_in_revision    Int?
+  deprecated_in_revision Int?
+  deprecated_reason      String?
+  superseded_by          String?  @db.VarChar(80)
+  created_by             String?  @db.VarChar(255)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([deprecated_in_revision], map: "idx_mkt_bronze_reason_catalog_deprecated")
+  @@index([scope_category_key, scope_city, scope_state], map: "idx_mkt_bronze_reason_catalog_scope")
+}
+
 enum action {
   create
   update

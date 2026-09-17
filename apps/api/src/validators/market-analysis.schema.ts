@@ -68,6 +68,12 @@ import {
   type GoldStandardScanOutput,
 } from './gold-standard-scan.schema';
 import {
+  bronzeStandardScanSchema,
+  BRONZE_STANDARD_SCAN_SCHEMA_NAME,
+  BRONZE_STANDARD_SCAN_PROMPT_SUFFIX,
+  type BronzeStandardScanOutput,
+} from './bronze-standard-scan.schema';
+import {
   categoryIdentificationSchema,
   CATEGORY_IDENTIFICATION_SCHEMA_NAME,
   CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
@@ -105,6 +111,10 @@ export {
   GOLD_STANDARD_SCAN_SCHEMA_NAME,
   GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
   type GoldStandardScanOutput,
+  bronzeStandardScanSchema,
+  BRONZE_STANDARD_SCAN_SCHEMA_NAME,
+  BRONZE_STANDARD_SCAN_PROMPT_SUFFIX,
+  type BronzeStandardScanOutput,
   categoryIdentificationSchema,
   CATEGORY_IDENTIFICATION_SCHEMA_NAME,
   CATEGORY_IDENTIFICATION_PROMPT_SUFFIX,
@@ -307,6 +317,17 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     // profile via IntelligenceProfileService.importAsDraft().
     auditPlatform: 'gold_standard_scan',
     promptSuffix: GOLD_STANDARD_SCAN_PROMPT_SUFFIX,
+  },
+  [BRONZE_STANDARD_SCAN_SCHEMA_NAME]: {
+    validator: bronzeStandardScanSchema,
+    // Bronze scans produce PROFILES, not audits — the post-import hook in
+    // importExternalResult() persists a DRAFT bronze-standard profile via
+    // IntelligenceProfileService.importAsDraft() for BOTH campaign kinds
+    // (stage-1 national establishment + stage-2 city discovery are both
+    // profile producers, spec §6.1/§10.3). Deliberately unlike gold, whose
+    // discovery imports land in mkt_audits_list.
+    auditPlatform: null,
+    promptSuffix: BRONZE_STANDARD_SCAN_PROMPT_SUFFIX,
   },
   [PROFILE_REPAIR_TRIAGE_SCHEMA_NAME]: {
     validator: profileRepairTriageSchema,

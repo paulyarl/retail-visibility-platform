@@ -54,7 +54,11 @@ export type IntelligenceProfileStatus = 'draft' | 'active' | 'retired';
 // ground is a city-scope operator workspace (not an intelligence profile), but
 // the coverage UI treats gold_standards / emerging / competitive / proving_ground
 // as parallel slot dimensions. It is never written to mkt_intelligence_profiles.
-export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'proving_ground';
+// 'bronze_standards' — Bronze Standard system (docs/LocalBiz/BRONZE_STANDARD_SPEC.md):
+// slots typed by discovery-blind-spot reason rather than platform. Participates in
+// the profile identity tuple like the other focuses, so bronze and gold profiles
+// coexist without retiring each other (spec §10.2, Option A).
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'proving_ground' | 'bronze_standards';
 
 /**
  * Role for gold-standard injection into prompts.
@@ -74,6 +78,17 @@ export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 
 export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery_benchmark' | 'market_reference';
 
 /**
+ * Role for bronze-standard injection into prompts (BRONZE_STANDARD_SPEC §10.3).
+ *   - 'establishment_reference' → stage-2 city bronze scan: the national
+ *     bronze profile injected as the hunt list (full catalog snapshot +
+ *     national proof state) the city scan must cover.
+ *   - 'discovery' → stage-3 emerging discovery scan: the city bronze profile
+ *     injected as CALIBRATION framing (§7.1) — exemplars + empty-slot report +
+ *     vector execution log. Framing, not a candidate filter.
+ */
+export type BronzeStandardRole = 'establishment_reference' | 'discovery';
+
+/**
  * Maximum number of pattern exemplars emitted PER PLATFORM when injecting a
  * gold-standard profile into benchmark/discovery prompts.
  *
@@ -90,6 +105,16 @@ export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery
  * rather than by the candidate count of a discovery scan.
  */
 const MAX_EXEMPLARS_PER_PLATFORM = 2;
+
+/**
+ * Maximum exemplar slots emitted PER REASON when injecting a bronze-standard
+ * profile (spec §5.3 — mirrors MAX_EXEMPLARS_PER_PLATFORM). Two exemplars per
+ * reason calibrate; more is token cost without marginal signal.
+ */
+const MAX_SLOTS_PER_REASON = 2;
+
+/** Provenance values that survive a re-scan (§7.3 merge rule). */
+const BRONZE_EXTERNAL_PROVENANCE = new Set(['operator_self_discovery', 'business_audit']);
 
 export interface IntelligenceProfile {
   id: string;
@@ -136,6 +161,12 @@ export interface PromptResolution {
   // discovery scans). Null when no gold standard was resolved.
   gold_standard_profile_id?: string | null;
   gold_standard_profile_version?: number | null;
+  // Bronze standard reference when a bronze-standard calibration block was
+  // injected into the rendered prompt (discovery role on emerging scans,
+  // establishment_reference role on bronze city scans). Null when no bronze
+  // standard was resolved.
+  bronze_standard_profile_id?: string | null;
+  bronze_standard_profile_version?: number | null;
   // Migration 253 — GAP-E3: true only when a "Discovery leads" block was
   // appended to the rendered prompt. Additive/optional — existing consumers
   // of resolution ignore unknown keys.
@@ -2191,6 +2222,489 @@ export class IntelligenceProfileService extends BaseService {
     return lines.join('\n');
   }
 
+  // ─── Bronze Standard (BRONZE_STANDARD_SPEC) ───────────────────────────
+
+  /**
+   * Resolve the active bronze-standard profile for a category, cascading
+   * city+state → state → nationwide with platform-exact → cross-platform at
+   * each layer (mirrors resolveGoldStandard; spec §4/§3.6.5). A null platform
+   * matches the cross-platform row only — a platform-scoped bronze profile
+   * and the cross-platform profile for the same market are distinct rows.
+   */
+  async resolveBronzeStandard(
+    category: string,
+    platform?: string | null,
+    city?: string | null,
+    state?: string | null,
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile | null> {
+    const key = normalizeCategoryKey(category);
+    const normalizedCity = normalizeReferenceCity(city);
+    const normalizedState = normalizeReferenceState(state);
+    const normalizedPlatform = platform ? platform.trim().toLowerCase() || null : null;
+
+    try {
+      const buildWhere = (cityVal: string | null, stateVal: string | null, platformVal: string | null) => {
+        const w: any = {
+          category_key: key,
+          intelligence_focus: 'bronze_standards' as const,
+          reference_city: cityVal,
+          reference_state: stateVal,
+          status: 'active',
+        };
+        if (platformVal) {
+          w.reference_platform = platformVal;
+        } else {
+          w.reference_platform = null;
+        }
+        return w;
+      };
+
+      const tryFind = async (cityVal: string | null, stateVal: string | null, platformVal: string | null): Promise<IntelligenceProfile | null> => {
+        const found = await this.prisma.mkt_intelligence_profiles.findFirst({
+          where: buildWhere(cityVal, stateVal, platformVal),
+          orderBy: { version: 'desc' },
+        });
+        return found as IntelligenceProfile | null;
+      };
+
+      // ── Layer 1: City-specific ──
+      if (normalizedCity && normalizedState) {
+        if (normalizedPlatform) {
+          const s1 = await tryFind(normalizedCity, normalizedState, normalizedPlatform);
+          if (s1) return s1;
+        }
+        const s2 = await tryFind(normalizedCity, normalizedState, null);
+        if (s2) {
+          if (normalizedPlatform) {
+            logger.warn('Bronze standard profile resolved via city+cross-platform fallback', ctx, {
+              categoryKey: key, requestedCity: normalizedCity, requestedState: normalizedState,
+              requestedPlatform: normalizedPlatform, profileId: (s2 as any).id,
+            });
+          }
+          return s2;
+        }
+      }
+
+      // ── Layer 2: State-specific ──
+      if (normalizedState) {
+        if (normalizedPlatform) {
+          const s3 = await tryFind(null, normalizedState, normalizedPlatform);
+          if (s3) {
+            logger.info('Bronze standard profile resolved via state-specific match', ctx, {
+              categoryKey: key, requestedState: normalizedState,
+              requestedPlatform: normalizedPlatform, profileId: (s3 as any).id,
+            });
+            return s3;
+          }
+        }
+        const s4 = await tryFind(null, normalizedState, null);
+        if (s4) {
+          logger.info('Bronze standard profile resolved via state-specific cross-platform fallback', ctx, {
+            categoryKey: key, requestedState: normalizedState, profileId: (s4 as any).id,
+          });
+          return s4;
+        }
+      }
+
+      // ── Layer 3: Nationwide (the stage-1 profile) ──
+      if (normalizedPlatform) {
+        const s5 = await tryFind(null, null, normalizedPlatform);
+        if (s5) {
+          if (normalizedCity || normalizedState) {
+            logger.info('Bronze standard profile resolved via nationwide fallback (no scoped profile)', ctx, {
+              categoryKey: key, requestedCity: normalizedCity, requestedState: normalizedState,
+              requestedPlatform: normalizedPlatform, profileId: (s5 as any).id,
+            });
+          }
+          return s5;
+        }
+      }
+      const s6 = await tryFind(null, null, null);
+      if (s6) {
+        if (normalizedCity || normalizedState || normalizedPlatform) {
+          logger.info('Bronze standard profile resolved via nationwide cross-platform fallback', ctx, {
+            categoryKey: key, requestedCity: normalizedCity, requestedState: normalizedState,
+            requestedPlatform: normalizedPlatform, profileId: (s6 as any).id,
+          });
+        }
+        return s6;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.resolveBronzeStandard failed', ctx, {
+        error: (error as Error).message,
+        categoryKey: key,
+        requestedCity: normalizedCity,
+        requestedState: normalizedState,
+        requestedPlatform: normalizedPlatform,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Serialize a bronze-standard profile for prompt injection.
+   *
+   *   establishment_reference (stage-2 city scan): the national profile as
+   *   the hunt list — full reason set (catalog snapshot when present,
+   *   reason_coverage otherwise) + national proof state.
+   *
+   *   discovery (stage-3 emerging scan): the city profile as CALIBRATION
+   *   framing (§7.1) — filled slots as exemplars, the empty-slot report, and
+   *   the vector execution log. Explicitly framing, not a candidate filter.
+   *
+   * Emission per §5.3: filled slots capped at MAX_SLOTS_PER_REASON per
+   * reason, a compact empty-slot report, not_applicable_reasons, scope_mix,
+   * catalog_revision. When the profile's catalog_revision is behind the
+   * current catalog revision, a BRONZE CATALOG DRIFT note + the uncovered
+   * reason list is appended (warn-in-prompt, sprint plan D5).
+   */
+  async serializeBronzeStandard(
+    profile: IntelligenceProfile,
+    role: BronzeStandardRole,
+    ctx?: RequestCtx,
+  ): Promise<string> {
+    const config = profile.configuration_json as any;
+    if (!config) return '';
+
+    const coverage: any[] = Array.isArray(config.reason_coverage) ? config.reason_coverage : [];
+    const catalogSnapshot: any[] = Array.isArray(config.catalog_snapshot) ? config.catalog_snapshot : [];
+    const notApplicable: string[] = Array.isArray(config.not_applicable_reasons) ? config.not_applicable_reasons : [];
+    const vectorLog: any[] = Array.isArray(config.vector_execution_log) ? config.vector_execution_log : [];
+    const scopeMix = config.scope_mix ?? null;
+    const catalogRevision: number | null = typeof config.catalog_revision === 'number' ? config.catalog_revision : null;
+
+    const lines: string[] = [];
+    const scopeLabel = profile.reference_city || profile.reference_state
+      ? `${profile.reference_city || ''}${profile.reference_city && profile.reference_state ? ', ' : ''}${profile.reference_state || ''}`
+      : 'nationwide';
+    const platformLabel = profile.reference_platform ?? 'cross-platform (all platforms)';
+
+    if (role === 'establishment_reference') {
+      lines.push('');
+      lines.push('=== BRONZE STANDARD — NATIONAL REFERENCE ===');
+      lines.push(`Category: ${profile.category_name}`);
+      lines.push(`Profile: ${profile.id} v${profile.version}`);
+      lines.push(`Profile scope: ${scopeLabel}`);
+      lines.push(`Platform scope: ${platformLabel}`);
+      if (catalogRevision !== null) lines.push(`Catalog revision: ${catalogRevision}`);
+      lines.push('');
+      lines.push(
+        'DIRECTIVE: This is the national bronze standard for this category — the established map of what INVISIBLE looks like, typed by discovery-blind-spot reason. Your city scan MUST produce exactly one reason_coverage entry for each applicable reason below. Each reason is a discovery vector: execute its expected_vectors against the reference market, evaluate candidates against the three-part gate (category-qualified by assortment evidence, operationally verified — unable_to_verify never qualifies, low digital quality the reason explains), and record filled slots or the correct empty status with the execution outcome. Reasons marked proven at national scope but empty here are reported empty_proven_elsewhere; reasons with no exemplar at any evaluable scope are empty_unproven — but you still hunt them (the hunt is how they become proven).',
+      );
+      lines.push('');
+
+      // The catalog snapshot is the authoritative reason list when present;
+      // otherwise derive it from reason_coverage keys.
+      if (catalogSnapshot.length > 0) {
+        lines.push('--- Reason Catalog (snapshot) ---');
+        for (const r of catalogSnapshot) {
+          lines.push(`  [${r.reason_key}]${r.priority ? ` (priority ${r.priority})` : ''} ${r.label ?? ''}`);
+          if (r.definition) lines.push(`    ${r.definition}`);
+          if (Array.isArray(r.signals) && r.signals.length) {
+            lines.push('    Signals:');
+            for (const s of r.signals) lines.push(`      - ${s}`);
+          }
+          if (Array.isArray(r.expected_vectors) && r.expected_vectors.length) {
+            lines.push(`    Expected vectors: ${r.expected_vectors.join('; ')}`);
+          }
+          if (r.provenance === 'operator_authored') {
+            lines.push('    (operator-authored — unproven until an exemplar is found; hunt it, report distinctly)');
+          }
+        }
+        lines.push('');
+      } else if (coverage.length > 0) {
+        lines.push('--- Reasons Covered Nationally ---');
+        for (const e of coverage) {
+          lines.push(`  [${e.reason_key}] status: ${e.status}`);
+        }
+        lines.push('');
+      }
+    } else {
+      // discovery — calibration framing for the emerging scan (§7.1).
+      lines.push('');
+      lines.push('=== BRONZE STANDARD — MARKET CALIBRATION ===');
+      lines.push(`Category: ${profile.category_name}`);
+      lines.push(`Profile: ${profile.id} v${profile.version}`);
+      lines.push(`Profile scope: ${scopeLabel}`);
+      lines.push(`Platform scope: ${platformLabel}`);
+      if (catalogRevision !== null) lines.push(`Catalog revision: ${catalogRevision}`);
+      lines.push('');
+      lines.push(
+        'DIRECTIVE: This is the bronze standard for this market — what a hard-to-find business looks like here, and which vectors reach it. Use it to FRAME your research, not to filter candidates: filled slots are concrete calibration exemplars (a hidden business in this market looks like this, and this vector reveals it); empty slots state what is not yet covered; the vector log shows which vectors are proven here and which have not been executed. Low digital quality describes observable online fields only — never infer low revenue, low customer volume, poor products, or sales readiness.',
+      );
+      lines.push('');
+    }
+
+    // ── Filled slots (capped per reason) + empty-slot report ──────────
+    const filledEntries = coverage.filter((e: any) => e.status === 'filled' && Array.isArray(e.slots) && e.slots.length > 0);
+    const emptyEntries = coverage.filter((e: any) => e.status !== 'filled');
+
+    if (filledEntries.length > 0) {
+      lines.push(role === 'discovery' ? '--- Calibration Exemplars ---' : '--- National Proof Slots ---');
+      for (const entry of filledEntries) {
+        const slots = (entry.slots as any[]).slice(0, MAX_SLOTS_PER_REASON);
+        for (const s of slots) {
+          lines.push(`  [${entry.reason_key}] ${s.business_name}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}`);
+          if (s.digital_quality) lines.push(`    Digital quality: ${s.digital_quality}`);
+          if (s.category_fit_evidence) lines.push(`    Category fit: ${s.category_fit_evidence}`);
+          if (s.operational_evidence) lines.push(`    Operational: ${s.operational_evidence}`);
+          if (s.discovered_by) {
+            lines.push(`    Discovered by: ${s.discovered_by}${s.discovered_via ? ` via ${s.discovered_via}` : ''}${BRONZE_EXTERNAL_PROVENANCE.has(s.discovered_by) ? ' (out-of-loop ground truth)' : ' (confirmatory)'}`);
+          }
+          if (Array.isArray(s.evidence_urls) && s.evidence_urls.length) {
+            lines.push(`    Evidence: ${s.evidence_urls.slice(0, 3).join(', ')}`);
+          }
+          if (s.platform_presence && typeof s.platform_presence === 'object') {
+            const pp = Object.entries(s.platform_presence)
+              .map(([p, v]) => `${p}: ${v}`)
+              .join('; ');
+            lines.push(`    Platform presence: ${pp}`);
+          }
+        }
+        if ((entry.slots as any[]).length > MAX_SLOTS_PER_REASON) {
+          lines.push(`  [${entry.reason_key}] ... +${(entry.slots as any[]).length - MAX_SLOTS_PER_REASON} more slot(s) withheld (cap ${MAX_SLOTS_PER_REASON}/reason)`);
+        }
+      }
+      lines.push('');
+    }
+
+    if (emptyEntries.length > 0) {
+      lines.push('--- Empty-Slot Report ---');
+      for (const e of emptyEntries) {
+        lines.push(`  [${e.reason_key}] ${e.status}${e.empty_slot_note ? ` — ${e.empty_slot_note}` : ''}`);
+      }
+      lines.push('');
+    }
+
+    if (notApplicable.length > 0) {
+      lines.push(`--- Not Applicable Here ---`);
+      lines.push(`  ${notApplicable.join(', ')}`);
+      lines.push('');
+    }
+
+    if (vectorLog.length > 0) {
+      lines.push('--- Vector Execution Log ---');
+      for (const v of vectorLog) {
+        lines.push(`  ${v.vector}: ${v.executed ? `executed, returned ${v.returned ?? '?'}` : 'NOT executed'}`);
+      }
+      lines.push('');
+    }
+
+    if (scopeMix) {
+      lines.push(`Scope mix: universal=${scopeMix.universal ?? 0}, category=${scopeMix.category ?? 0}, location=${scopeMix.location ?? 0}, category+location=${scopeMix.category_location ?? 0}, platform-bound=${scopeMix.platform_bound ?? 0}`);
+      lines.push('');
+    }
+
+    // ── Catalog drift note (sprint plan D5 — warn-in-prompt) ──────────
+    if (catalogRevision !== null) {
+      try {
+        const meta = await this.prisma.mkt_bronze_catalog_meta.findUnique({
+          where: { id: 'catalog' },
+          select: { catalog_revision: true },
+        });
+        const current = meta?.catalog_revision ?? null;
+        if (current !== null && catalogRevision < current) {
+          lines.push('=== BRONZE CATALOG DRIFT ===');
+          lines.push(
+            `This profile was authored against catalog revision ${catalogRevision}; the catalog is now at revision ${current}. Reasons added or revised since are listed below — they are coverage this profile has never been asked for, or coverage authored against a stale definition. Treat them as known gaps, not as absence of such businesses.`,
+          );
+          // Inline the uncovered-reason list (§3.5.3 predicate, raw SQL to
+          // avoid the service<->service import).
+          const uncovered = await this.prisma.$queryRawUnsafe<Array<{ reason_key: string; label: string; gap_kind: string }>>(`
+            SELECT reason_key, label,
+                   CASE WHEN introduced_in_revision > $1
+                        THEN 'never_covered'
+                        ELSE 'revised_since_authored' END AS gap_kind
+            FROM mkt_bronze_reason_catalog
+            WHERE GREATEST(introduced_in_revision,
+                           COALESCE(revised_in_revision, 0)) > $1
+              AND deprecated_in_revision IS NULL
+              AND (scope_category_key IS NULL OR scope_category_key = $2)
+              AND (scope_city         IS NULL OR scope_city         = $3)
+              AND (scope_state        IS NULL OR scope_state        = $4)
+              AND (scope_platform     IS NULL OR scope_platform     = $5)
+            ORDER BY priority, reason_key`,
+            catalogRevision,
+            profile.category_key,
+            profile.reference_city,
+            profile.reference_state,
+            profile.reference_platform ?? '',
+          );
+          for (const u of uncovered) {
+            lines.push(`  [${u.reason_key}] ${u.label} — ${u.gap_kind}`);
+          }
+          lines.push('');
+        }
+      } catch (driftErr) {
+        // Best-effort — never fail a render on the drift check.
+        logger.warn('Bronze catalog drift check failed (non-fatal)', ctx, {
+          error: (driftErr as Error).message,
+          profileId: profile.id,
+        });
+      }
+    }
+
+    lines.push('=== END BRONZE STANDARD ===');
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * §7.3 — record an out-of-loop bronze fill (business audit / operator
+   * self-discovery). Writes a NEW DRAFT VERSION carrying the prior version's
+   * reason_coverage forward with the slot appended under reasonKey — never
+   * mutates the active profile. Dedupes on business_name + address within
+   * the reason. Returns the created draft, or null when no ACTIVE profile
+   * exists at profileId (a bronze exemplar without a bronze profile is
+   * noted by the caller, not written — a single fill must not fabricate
+   * coverage the scan never ran).
+   */
+  async recordBronzeExternalFill(
+    profileId: string,
+    reasonKey: string,
+    slot: {
+      business_name: string;
+      address?: string | null;
+      observed_platform?: string | null;
+      category_fit_evidence?: string;
+      operational_evidence?: string;
+      operational_status?: string | null;
+      discovered_by: 'operator_self_discovery' | 'business_audit';
+      discovered_via?: string | null;
+      evidence_urls?: string[];
+      digital_quality?: 'low' | 'very_low';
+      platform_presence?: Record<string, string>;
+    },
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile | null> {
+    try {
+      // Load the active version for this profile id.
+      const active = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId, status: 'active' },
+        orderBy: { version: 'desc' },
+      });
+      if (!active || active.intelligence_focus !== 'bronze_standards') {
+        logger.info('recordBronzeExternalFill: no active bronze profile — fill not recorded', ctx, {
+          profileId,
+          reasonKey,
+        });
+        return null;
+      }
+
+      const priorConfig = (active.configuration_json as any) ?? {};
+      const priorCoverage: any[] = Array.isArray(priorConfig.reason_coverage)
+        ? priorConfig.reason_coverage.map((e: any) => ({ ...e, slots: Array.isArray(e.slots) ? [...e.slots] : [] }))
+        : [];
+
+      const dedupeKey = (s: any) =>
+        `${(s.business_name || '').trim().toLowerCase()}|${(s.address || '').trim().toLowerCase()}`;
+      const newKey = dedupeKey(slot);
+
+      let entry = priorCoverage.find((e: any) => e.reason_key === reasonKey);
+      if (!entry) {
+        entry = { reason_key: reasonKey, status: 'filled', slots: [], empty_slot_note: null };
+        priorCoverage.push(entry);
+      }
+      const existingIdx = (entry.slots as any[]).findIndex((s: any) => dedupeKey(s) === newKey);
+      if (existingIdx >= 0) {
+        // Re-audit of the same business — update the slot in place.
+        entry.slots[existingIdx] = { ...entry.slots[existingIdx], ...slot };
+      } else {
+        entry.slots.push(slot);
+      }
+      entry.status = 'filled';
+      entry.empty_slot_note = null;
+
+      const newConfig = { ...priorConfig, reason_coverage: priorCoverage };
+      const maxVersion = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+      const draft = await this.prisma.mkt_intelligence_profiles.create({
+        data: {
+          id: profileId,
+          category_key: active.category_key,
+          category_name: active.category_name,
+          version: (maxVersion?.version ?? active.version) + 1,
+          intelligence_focus: 'bronze_standards',
+          reference_city: active.reference_city,
+          reference_state: active.reference_state,
+          reference_platform: active.reference_platform,
+          configuration_json: newConfig as any,
+          status: 'draft',
+        },
+      });
+      logger.info('Bronze external fill recorded as draft version', ctx, {
+        profileId,
+        reasonKey,
+        businessName: slot.business_name,
+        discoveredBy: slot.discovered_by,
+        newVersion: draft.version,
+      });
+      return draft as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.recordBronzeExternalFill failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        reasonKey,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * §7.3 merge rule — carries external-provenance slots
+   * (operator_self_discovery, business_audit) forward from the previously
+   * active version's reason_coverage into a new scan import's coverage.
+   * Scan-provenance slots are NOT carried: the scan found them again or
+   * they drop. Pure function — unit-testable without DB.
+   */
+  mergeBronzeCoverage(priorCoverage: any[] | null | undefined, incomingCoverage: any[] | null | undefined): any[] {
+    const dedupeKey = (s: any) =>
+      `${(s.business_name || '').trim().toLowerCase()}|${(s.address || '').trim().toLowerCase()}`;
+
+    const out = (incomingCoverage ?? []).map((e: any) => ({
+      ...e,
+      slots: Array.isArray(e.slots) ? [...e.slots] : [],
+    }));
+    const byReason = new Map<string, any>(out.map((e: any) => [e.reason_key, e]));
+
+    for (const priorEntry of priorCoverage ?? []) {
+      const keepSlots = (priorEntry.slots ?? []).filter((s: any) => BRONZE_EXTERNAL_PROVENANCE.has(s.discovered_by));
+      if (keepSlots.length === 0) continue;
+      const existing = byReason.get(priorEntry.reason_key);
+      if (existing) {
+        const have = new Set(existing.slots.map(dedupeKey));
+        for (const s of keepSlots) {
+          const k = dedupeKey(s);
+          if (!have.has(k)) {
+            existing.slots.push(s);
+            have.add(k);
+          }
+        }
+        // Carried external slots keep the entry filled — they persist until
+        // an operator removes them.
+        if (existing.slots.length > 0) {
+          existing.status = 'filled';
+          existing.empty_slot_note = null;
+        }
+      } else {
+        out.push({
+          ...priorEntry,
+          status: 'filled',
+          slots: [...keepSlots],
+          empty_slot_note: null,
+        });
+      }
+    }
+    return out;
+  }
+
   // ─── Coverage aggregation ─────────────────────────────────────────────
   // Returns a coverage map grouped by category with TWO orthogonal state
   // dimensions per slot position:
@@ -2513,7 +3027,7 @@ export class IntelligenceProfileService extends BaseService {
           slots: slots.sort((a, b) => {
             // Sort: gold_standards first, then emerging, then competitive,
             // then proving_ground; within each focus, by city/platform name.
-            const focusOrder = { gold_standards: 0, emerging: 1, competitive: 2, proving_ground: 3 };
+            const focusOrder = { gold_standards: 0, emerging: 1, competitive: 2, proving_ground: 3, bronze_standards: 4 };
             const fo = focusOrder[a.focus as keyof typeof focusOrder] ?? 3;
             const fob = focusOrder[b.focus as keyof typeof focusOrder] ?? 3;
             if (fo !== fob) return fo - fob;

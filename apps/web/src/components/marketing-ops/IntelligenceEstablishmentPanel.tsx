@@ -41,6 +41,18 @@ const FOCUS_THEME: Record<
     downstream:
       'The resulting profile is imported as a draft and must be reviewed and activated by an operator before downstream campaigns (discovery, audit, fulfill) can consume it.',
   },
+  bronze_standards: {
+    label: 'Bronze Standard',
+    headerBg: 'bg-orange-50 dark:bg-orange-900/10',
+    headerBorder: 'border-orange-200 dark:border-orange-700',
+    headerTitleClass: 'text-orange-900 dark:text-orange-300',
+    headerBodyClass: 'text-orange-800 dark:text-orange-400',
+    establishmentNoun: 'bronze-standard calibration profile',
+    produces:
+      'The establishment scan maps the invisible businesses of this category by discovery-blind-spot reason — coverage, vectors, exemplars, and empty-proven outcomes per catalog reason.',
+    downstream:
+      'The resulting profile is imported as a draft and must be reviewed and activated by an operator before bronze city scans and emerging discovery campaigns can consume it as their calibration baseline.',
+  },
   emerging: {
     label: 'Emerging',
     headerBg: 'bg-blue-50 dark:bg-blue-900/10',

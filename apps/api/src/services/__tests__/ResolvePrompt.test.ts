@@ -20,6 +20,8 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveGoldStandard: vi.fn(async (_category: string, _platform?: string | null) => null),
     serializeGoldStandard: vi.fn((_profile: any, _role: string) => ''),
+    resolveBronzeStandard: vi.fn(async () => null),
+    serializeBronzeStandard: vi.fn((_profile: any, _role: string) => ''),
     renderBusinessProfileBlock: vi.fn(
       (profile: any, _city?: string | null, headerTitle?: string) =>
         `\n${headerTitle ? `=== ${headerTitle} ===\n` : ''}PROFILE_BLOCK:${profile.id}:v${profile.version}`,

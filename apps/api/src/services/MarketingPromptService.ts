@@ -34,7 +34,7 @@ export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_
 
 export type PromptScope = 'business' | 'category' | 'city' | 'intelligence';
 
-export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards';
+export type IntelligenceFocus = 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
 export type IntelligenceCampaignKind = 'discovery' | 'establishment';
 
 export interface PromptTemplateInput {
@@ -83,7 +83,7 @@ export interface PromptExecutionInput {
  * fails or the input is unchanged, the original is returned so JSON.parse can
  * surface the original parse error.
  */
-function normalizeExternalJsonText(raw: string): string {
+export function normalizeExternalJsonText(raw: string): string {
   let text = raw.trim();
 
   // Some callers JSON.stringify the model output before JSON.stringify-ing the
@@ -680,7 +680,7 @@ export class MarketingPromptService extends BaseService {
       intelligence_mode: 'profile' | 'none';
     };
     /** Intelligence focus for intelligence-scope imports (§41 run record). */
-    focus?: 'emerging' | 'competitive' | 'gold_standards';
+    focus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
   }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null; enrichmentApplied: boolean }> {
     try {
       // 1. Load template + campaign
@@ -1038,6 +1038,101 @@ export class MarketingPromptService extends BaseService {
         // (unlike the intelligence_profile hook). The campaign kind is set
         // at creation time by the campaign form. Discovery campaigns stay
         // as discovery; establishment campaigns stay as establishment.
+      }
+
+      // Bronze Standard System — post-import hook for bronze_standard_scan
+      // schema (BRONZE_STANDARD_SPEC §6.1). Deliberately keyed on the SCHEMA
+      // NAME, not the campaign kind: the stage-2 city scan is a
+      // discovery-kind campaign but still produces a bronze profile, so BOTH
+      // establishment and discovery imports persist a DRAFT profile. Bronze
+      // imports never create an audit row (auditPlatform is null in
+      // OUTPUT_SCHEMA_REGISTRY) — a bronze scan is a calibration artifact,
+      // not a candidate audit. Best-effort — failure does not fail the
+      // import (the execution row is already persisted).
+      if (schemaName === 'bronze_standard_scan') {
+        try {
+          const {
+            IntelligenceProfileService,
+            normalizeCategoryKey,
+            normalizeReferenceCity,
+            normalizeReferenceState,
+            normalizePlatformScope,
+          } = await import('./intelligence/IntelligenceProfileService.js');
+          const profileService = IntelligenceProfileService.getInstance();
+          const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+            where: { id: input.campaignId },
+            select: {
+              intelligence_focus: true,
+              intelligence_campaign_kind: true,
+              city: true,
+              state: true,
+            },
+          });
+          const referenceCity = campaign?.city || null;
+          const referenceState = campaign?.state || null;
+          // Platform scoping mirrors gold's platform_focus handling
+          // (spec §10.3): a specific reference_platform produces a
+          // platform-scoped profile; null stays cross-platform.
+          const scanPlatform = parsedJson.reference_platform
+            ? normalizePlatformScope(parsedJson.reference_platform)
+            : null;
+
+          // §7.3 merge rule: when a prior ACTIVE bronze profile exists at
+          // the exact same scope, external-provenance slots
+          // (operator_self_discovery, business_audit) carry forward into the
+          // new draft's reason_coverage. Scan-provenance slots are not
+          // carried — the scan found them again or they drop.
+          const priorActive = await this.prisma.mkt_intelligence_profiles.findFirst({
+            where: {
+              category_key: normalizeCategoryKey(parsedJson.category_key),
+              intelligence_focus: 'bronze_standards',
+              reference_city: normalizeReferenceCity(referenceCity),
+              reference_state: normalizeReferenceState(referenceState),
+              reference_platform: scanPlatform,
+              status: 'active',
+            },
+            orderBy: { version: 'desc' },
+          });
+          let configurationJson = parsedJson;
+          if (priorActive?.configuration_json) {
+            const priorCoverage = (priorActive.configuration_json as any)?.reason_coverage;
+            const mergedCoverage = profileService.mergeBronzeCoverage(
+              Array.isArray(priorCoverage) ? priorCoverage : [],
+              Array.isArray(parsedJson.reason_coverage) ? parsedJson.reason_coverage : [],
+            );
+            configurationJson = { ...parsedJson, reason_coverage: mergedCoverage };
+            logger.info('Bronze external fills carried into new draft', ctx, {
+              campaignId: input.campaignId,
+              priorProfileId: priorActive.id,
+              priorVersion: priorActive.version,
+            });
+          }
+
+          const profile = await profileService.importAsDraft({
+            categoryKey: parsedJson.category_key,
+            categoryName: parsedJson.category_name,
+            configurationJson,
+            intelligenceFocus: 'bronze_standards',
+            referenceCity,
+            referenceState,
+            referencePlatform: scanPlatform,
+          }, ctx);
+          logger.info('Bronze standard profile imported as draft', ctx, {
+            profileId: profile.id,
+            version: profile.version,
+            categoryKey: profile.category_key,
+            campaignKind: campaign?.intelligence_campaign_kind ?? 'unknown',
+            referenceCity,
+            referenceState,
+            referencePlatform: scanPlatform,
+            campaignId: input.campaignId,
+          });
+        } catch (profileErr) {
+          logger.error('Bronze standard profile draft persistence failed (best-effort)', ctx, {
+            error: (profileErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
       }
 
       // Post-import hook for profile_repair_triage schema: persist the

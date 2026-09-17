@@ -31,6 +31,7 @@ const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
   emerging: 'Emerging',
   competitive: 'Competitive',
   gold_standards: 'Gold Standards',
+  bronze_standards: 'Bronze Standards',
   proving_ground: 'Proving Ground',
 };
 
@@ -38,6 +39,7 @@ const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
   emerging: 'blue',
   competitive: 'violet',
   gold_standards: 'gold',
+  bronze_standards: 'orange',
   proving_ground: 'teal',
 };
 

@@ -23,6 +23,8 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     resolve: vi.fn(async () => null),
     resolveGoldStandard: vi.fn(async () => null),
     serializeGoldStandard: vi.fn(() => ''),
+    resolveBronzeStandard: vi.fn(async () => null),
+    serializeBronzeStandard: vi.fn(() => ''),
     renderBusinessProfileBlock: vi.fn(() => ''),
   };
   const mockPromptService = {

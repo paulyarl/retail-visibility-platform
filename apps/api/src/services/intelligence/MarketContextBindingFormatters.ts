@@ -410,7 +410,7 @@ export function formatDiscoveryMarketContext(
   category: string,
   city: string,
   state: string,
-  focus: 'emerging' | 'competitive' | 'gold_standards',
+  focus: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards',
 ): string {
   const { category: catCtx, location: locCtx } = marketCtx;
   const hasCat = loader.hasCategoryIntelligence(catCtx);

@@ -59,14 +59,14 @@ export default function GrowthEngineDashboard() {
     return <div className="py-12 text-center"><p className="text-red-600">{error}</p></div>;
   }
 
-  const maxFunnelCount = funnel.length > 0 ? funnel[0].count : 1;
+  const maxFunnelCount = Math.max(...funnel.map((s) => s.count), 1);
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Growth Engine</h1>
-          <p className="text-sm text-gray-500 mt-1">End-to-end funnel: seeks → prospects → seeds → published → claimed → upgraded</p>
+          <p className="text-sm text-gray-500 mt-1">End-to-end funnel: seeks → prospects → seeds → contactable → published → invited → claimed → upgraded</p>
         </div>
         <Link href="/settings/admin/directory/batches" className="text-sm text-blue-600 hover:underline">
           Batch Operations →
@@ -78,7 +78,7 @@ export default function GrowthEngineDashboard() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Funnel (Last 90 Days)</h2>
         <div className="space-y-3">
           {funnel.map((stage, i) => {
-            const widthPct = maxFunnelCount > 0 ? Math.max(2, (stage.count / maxFunnelCount) * 100) : 0;
+            const widthPct = Math.min(100, Math.max(2, (stage.count / maxFunnelCount) * 100));
             return (
               <div key={stage.label}>
                 <div className="flex items-center justify-between mb-1">
@@ -95,7 +95,7 @@ export default function GrowthEngineDashboard() {
                 <div className="w-full bg-gray-100 rounded-full h-6">
                   <div
                     className={`h-6 rounded-full flex items-center justify-end px-2 text-xs text-white font-medium ${
-                      i < 2 ? 'bg-blue-500' : i < 4 ? 'bg-green-500' : 'bg-purple-500'
+                      i < 2 ? 'bg-blue-500' : i < 6 ? 'bg-green-500' : 'bg-purple-500'
                     }`}
                     style={{ width: `${widthPct}%` }}
                   >
@@ -201,14 +201,37 @@ export default function GrowthEngineDashboard() {
       {/* Time series */}
       {series.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Seeds Over Time</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Seeds Over Time</h2>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-blue-300 inline-block" /> Created</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-green-400 inline-block" /> Published</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-purple-400 inline-block" /> Claimed</span>
+            </div>
+          </div>
           <div className="flex items-end gap-2 h-40">
             {series.map((point) => {
-              const maxVal = Math.max(...series.map((s) => s.seedsCreated), 1);
-              const height = (point.seedsCreated / maxVal) * 100;
+              const maxVal = Math.max(
+                ...series.map((s) => Math.max(s.seedsCreated, s.seedsPublished, s.seedsClaimed)),
+                1,
+              );
+              const bars = [
+                { value: point.seedsCreated, cls: 'bg-blue-300', label: 'created' },
+                { value: point.seedsPublished, cls: 'bg-green-400', label: 'published' },
+                { value: point.seedsClaimed, cls: 'bg-purple-400', label: 'claimed' },
+              ];
               return (
                 <div key={point.date} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full bg-blue-200 rounded-t" style={{ height: `${height}%` }} title={`${point.seedsCreated} seeds`} />
+                  <div className="w-full h-full flex items-end justify-center gap-0.5">
+                    {bars.map((b) => (
+                      <div
+                        key={b.label}
+                        className={`flex-1 rounded-t ${b.cls}`}
+                        style={{ height: `${Math.max(b.value > 0 ? 2 : 0, (b.value / maxVal) * 100)}%` }}
+                        title={`${b.value} ${b.label}`}
+                      />
+                    ))}
+                  </div>
                   <span className="text-xs text-gray-400 rotate-45 origin-left">{point.date}</span>
                 </div>
               );
@@ -229,12 +252,13 @@ export default function GrowthEngineDashboard() {
                 <th className="py-2 px-3 font-medium">Seeds</th>
                 <th className="py-2 px-3 font-medium">Pub</th>
                 <th className="py-2 px-3 font-medium">Claimed</th>
+                <th className="py-2 px-3 font-medium">Upg</th>
                 <th className="py-2 px-3 font-medium">Claim %</th>
               </tr>
             </thead>
             <tbody>
               {niches.length === 0 ? (
-                <tr><td colSpan={5} className="py-6 text-center text-gray-400">No data yet</td></tr>
+                <tr><td colSpan={6} className="py-6 text-center text-gray-400">No data yet</td></tr>
               ) : (
                 niches.map((n) => (
                   <tr key={n.category} className="border-b border-gray-100">
@@ -242,6 +266,7 @@ export default function GrowthEngineDashboard() {
                     <td className="py-2 px-3 text-gray-700">{n.seeds}</td>
                     <td className="py-2 px-3 text-gray-700">{n.published}</td>
                     <td className="py-2 px-3 text-gray-700">{n.claimed}</td>
+                    <td className="py-2 px-3 text-gray-700">{n.upgraded}</td>
                     <td className="py-2 px-3">
                       <span className={`font-medium ${n.claimRate > 0.3 ? 'text-green-600' : n.claimRate < 0.1 ? 'text-red-600' : 'text-gray-700'}`}>
                         {(n.claimRate * 100).toFixed(0)}%
@@ -264,12 +289,13 @@ export default function GrowthEngineDashboard() {
                 <th className="py-2 px-3 font-medium">Niches</th>
                 <th className="py-2 px-3 font-medium">Seeds</th>
                 <th className="py-2 px-3 font-medium">Claimed</th>
+                <th className="py-2 px-3 font-medium">Upg</th>
                 <th className="py-2 px-3 font-medium">Claim %</th>
               </tr>
             </thead>
             <tbody>
               {cities.length === 0 ? (
-                <tr><td colSpan={5} className="py-6 text-center text-gray-400">No data yet</td></tr>
+                <tr><td colSpan={6} className="py-6 text-center text-gray-400">No data yet</td></tr>
               ) : (
                 cities.map((c) => (
                   <tr key={c.city} className="border-b border-gray-100">
@@ -277,6 +303,7 @@ export default function GrowthEngineDashboard() {
                     <td className="py-2 px-3 text-gray-700">{c.niches}</td>
                     <td className="py-2 px-3 text-gray-700">{c.seeds}</td>
                     <td className="py-2 px-3 text-gray-700">{c.claimed}</td>
+                    <td className="py-2 px-3 text-gray-700">{c.upgraded}</td>
                     <td className="py-2 px-3">
                       <span className={`font-medium ${c.claimRate > 0.3 ? 'text-green-600' : c.claimRate < 0.1 ? 'text-red-600' : 'text-gray-700'}`}>
                         {(c.claimRate * 100).toFixed(0)}%

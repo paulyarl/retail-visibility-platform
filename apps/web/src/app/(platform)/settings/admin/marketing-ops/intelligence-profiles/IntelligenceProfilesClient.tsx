@@ -61,6 +61,7 @@ const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
   emerging: 'blue',
   competitive: 'violet',
   gold_standards: 'amber',
+  bronze_standards: 'orange',
   proving_ground: 'teal',
 };
 
@@ -68,6 +69,7 @@ const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
   emerging: 'Emerging',
   competitive: 'Competitive',
   gold_standards: 'Gold Standards',
+  bronze_standards: 'Bronze Standards',
   proving_ground: 'Proving Ground',
 };
 
@@ -546,7 +548,7 @@ export default function IntelligenceProfilesClient() {
       {/* Focus filter — filter profiles by intelligence focus */}
       <Group gap="xs">
         <Text size="xs" c="dimmed">Focus:</Text>
-        {(['all', 'emerging', 'competitive', 'gold_standards'] as const).map((f) => (
+        {(['all', 'emerging', 'competitive', 'gold_standards', 'bronze_standards'] as const).map((f) => (
           <Badge
             key={f}
             size="sm"
@@ -555,7 +557,7 @@ export default function IntelligenceProfilesClient() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFocusFilter(f)}
           >
-            {f === 'all' ? 'All' : f === 'gold_standards' ? 'Gold Standards' : f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === 'all' ? 'All' : f === 'gold_standards' ? 'Gold Standards' : f === 'bronze_standards' ? 'Bronze Standards' : f.charAt(0).toUpperCase() + f.slice(1)}
           </Badge>
         ))}
       </Group>
