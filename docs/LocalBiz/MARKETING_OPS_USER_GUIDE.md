@@ -1486,6 +1486,25 @@ Inline actions are conveniences, not requirements — every step can be complete
 
 **Outreach kind** connects an outreach step to a specific artifact type. When the bridge service detects the artifact (e.g. an opener exists for the campaign), the step shows a blue "detected" indicator. If **auto-complete** is enabled, the step is checked off automatically when the artifact is created — no manual check-off needed.
 
+#### QR Artifact Steps (Permanent)
+
+Business-scope campaigns automatically carry two code-defined QR steps (no playbook required), and the outreach bridge tracks their satisfaction:
+
+| Step | Stage | Satisfied by |
+|------|-------|--------------|
+| **Generate the claim QR kit** | `seed` (after *Mint the claim token*) | A `claim_qr_generated` touch — written when any claim-kit PNG/postcard is downloaded |
+| **Deliver the report (QR / tracked link)** | `preview_built` | A `report_delivered` / `report_viewed` / `report_claimed` touch on the campaign's linked seed |
+
+The proving-ground preflight playbook (**PG-01**) carries the equivalent per-prospect step: *Generate claim-invite QR kits*.
+
+#### Tracked Link / QR Merge Variables
+
+Scripts, pitches, and manual play templates resolve tracked links server-side. Unresolvable placeholders stay visible (`{{report_url}}`) rather than being fabricated:
+
+`{{report_url}}` · `{{claim_url}}` · `{{claim_short_url}}` · `{{qr_url_mail}}` · `{{qr_url_walkin}}` · `{{qr_url_claim_social}}` · `{{qr_url_claim_email}}` · `{{qr_url_report_in_person}}` · `{{qr_url_report_text}}` · `{{qr_url_report_email}}` · `{{qr_url_report_social}}` · `{{qr_url_report_phone}}`
+
+Two starter plays ship in the Manual tab: **Walk-in card handoff** and **Report link follow-up (text / email)**. See `docs/DIRECTORY_PRESENCE_OPERATOR_GUIDE.md` → *Where QR Shows Up in the Campaign Pipeline* for the full operator workflow.
+
 ### Building a Checklist (Playbooks Page → Operator Checklist Tab)
 
 1. Select a playbook from the dropdown. Its **operations overview** appears: code, name, category, archetype, FITD offer, retainer pitch, and description — full playbook context without leaving the tab.

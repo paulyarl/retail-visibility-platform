@@ -204,7 +204,7 @@ Once a seed is published, you can invite the owner to claim it:
 
 ### What the Owner Receives
 
-The owner receives an email with a link to `/directory/claim/[token]`. The claim page shows:
+The owner receives an email with a link to `/place/claim/[token]`. The claim page shows:
 
 - The business name and listing information.
 - A "Claim This Business" call-to-action.
@@ -260,6 +260,71 @@ The funnel signal `invite_scan_rate` (seeds with ≥1 scan / invited seeds) slot
 #### Backward Compatibility
 
 Seeds minted before the short-URL feature carry long-token QR URLs (`/api/public/qr/claim/{token}/...`). Those URLs still work — already-printed QRs redirect to the same claim page and record scans with the same surfaces. New tokens get the short URLs automatically. You don't need to re-print existing artifacts.
+
+### Report-Delivery QR Kit
+
+The seed intelligence report is the hook that makes the claim invite land — so it has its own QR kit, delivered **after** the claim invite and channel-specific. It lives on the same seed detail page (the **Report QR Kit** panel) and requires a **published report** (not just a token).
+
+Each artifact encodes a **tracked redirect** that records the scan before the owner lands on the report page, exactly like the claim kit. The QR never encodes the report URL directly.
+
+| Channel | Short URL | Scan surface | Use when |
+|---------|-----------|--------------|----------|
+| **In person** | `/r/{shortCode}` | `report_delivery_in_person` | Printed report card handed over on a visit |
+| **Text / SMS** | `/rt/{shortCode}` | `report_delivery_text` | Texting the report link after a call |
+| **Email** | `/re/{shortCode}` | `report_delivery_email` | Emailing the report link |
+| **Social / DM** | `/rs/{shortCode}` | `report_delivery_social` | DM or post |
+| **Phone** | `/rp/{shortCode}` | `report_delivery_phone` | Operator sends the link after a call |
+
+**Operator workflow:**
+
+1. Publish the seed's intelligence report (the report panel must show a published version).
+2. Pick the channel that matches how you're reaching the owner.
+3. Download the **PNG** or **postcard PDF**, or copy the tracked short link.
+4. Design (optional) — same styled-QR designer as the claim kit.
+5. Deliver it, then **log the touch** in the seed's outreach log so the cadence and funnel see it.
+
+### Where QR Shows Up in the Campaign Pipeline
+
+Once a seed is linked to a campaign, the QR workflow is surfaced in the campaign checklist and in every script:
+
+**Checklist steps** (business-scope campaigns, no playbook required):
+
+- **Generate the claim QR kit** — appears in the `seed` stage right after *Mint the claim token*. It auto-satisfies once any claim-kit artifact is downloaded (generation logs a `claim_qr_generated` touch).
+- **Deliver the report (QR / tracked link)** — appears in the `preview_built` stage. It auto-satisfies once a `report_delivered` touch is logged.
+
+The proving-ground preflight playbook (**PG-01**) has the matching step: *Generate claim-invite QR kits*, per prospect, right after promotion.
+
+**Merge variables** — every script, pitch, and manual play template can reference the tracked links. They resolve server-side; if a link can't be resolved the `{{placeholder}}` stays visible rather than being fabricated:
+
+| Variable | Points at |
+|----------|-----------|
+| `{{report_url}}` | The report preview page |
+| `{{claim_url}}` | The claim page (`/place/claim/{token}`) |
+| `{{claim_short_url}}` | The compact claim short link (`/c/{shortCode}`) |
+| `{{qr_url_mail}}` / `{{qr_url_walkin}}` / `{{qr_url_claim_social}}` / `{{qr_url_claim_email}}` | Claim-kit tracked links |
+| `{{qr_url_report_in_person}}` / `{{qr_url_report_text}}` / `{{qr_url_report_email}}` / `{{qr_url_report_social}}` / `{{qr_url_report_phone}}` | Report-kit tracked links |
+
+Two starter plays ship with the Manual tab (**Openers → Manual**):
+
+- **Walk-in card handoff** — the in-person leave-behind script, using `{{qr_url_walkin}}`.
+- **Report link follow-up (text / email)** — the post-call report delivery, using `{{qr_url_report_text}}` / `{{claim_short_url}}`.
+
+The assembled **pitch** also renders an optional tracked CTA block under the closer when a report link resolves.
+
+### Delivery Lifecycle & Signals
+
+A delivered report now has a lifecycle on the seed's outreach touches, so you can see whether the hook landed:
+
+```text
+report_delivered  →  report_viewed  →  report_claimed
+   (you sent it)      (they scanned)    (they claimed)
+```
+
+- **Report scans in the funnel** — the directory funnel (**Settings → Admin → Directory → Funnel**) now shows a **Report Scan Rate** plus per-channel report scan counts, alongside the invite-scan split. Filter QR analytics by the `report_delivery_*` surfaces to see them individually.
+- **Cadence signals** — the campaign's outreach state surfaces `OX_QR_SCANNED` (the seed has a claim or report scan) and `OX_QR_NO_SCAN_AFTER_MAIL` (a mail touch is ≥10 days old with no scan). The cadence exposes `getMailScanOutcome` so the worklist can branch automatically:
+  - **scanned, not claimed** → second postcard or move to `in_thread` — they engaged.
+  - **no scan** → unproven; advance the rung or hold.
+- **Rule of thumb:** a scan with no claim is the strongest warm-lead signal you have. Follow up by phone rather than sending another mailer.
 
 ---
 

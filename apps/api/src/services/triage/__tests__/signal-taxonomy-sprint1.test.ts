@@ -38,7 +38,7 @@ describe('Sprint 1 — signal taxonomy: 7 new product-visibility codes', () => {
       expect(KNOWN_SIGNAL_CODES).toContain(code);
     }
     // 24 original + 7 sprint-1 product-visibility + 6 OX outreach-state = 37
-    expect(KNOWN_SIGNAL_CODES.length).toBe(37);
+    expect(KNOWN_SIGNAL_CODES.length).toBe(39);
   });
 
   it('every new code has a human-readable label in SIGNAL_LABELS', () => {

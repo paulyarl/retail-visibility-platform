@@ -28,11 +28,11 @@ export const FAMILY_LABELS: Record<SignalFamily, string> = {
   OX: 'Outreach Execution',
 };
 
-// ─── Canonical 31 signal codes (TS fallback / validation set) ────────────
+// ─── Canonical 39 signal codes (TS fallback / validation set) ────────────
 //
 // The DB registry (`mkt_signal_registry`) is the runtime source of truth.
 // This union exists so the extractor, engine, and tests have compile-time
-// safety for the 24 known codes. Unknown codes (registered by admins at
+// safety for the known codes. Unknown codes (registered by admins at
 // runtime) are valid `SignalCode` strings too — the engine ignores unknown
 // codes in rules with a warning log (forward-compatible).
 
@@ -80,6 +80,10 @@ export const KNOWN_SIGNAL_CODES = [
   'OX_NO_REPLY_AFTER_OPENER',
   'OX_NO_REPLY_AFTER_FOLLOWUP_N',
   'OX_CONTACT_LOGGED',
+  // QR delivery lifecycle (spec §5.8) — display-only, derived from
+  // qr_scan_events + directory_seed_outreach_touches
+  'OX_QR_SCANNED',
+  'OX_QR_NO_SCAN_AFTER_MAIL',
 ] as const;
 
 /**

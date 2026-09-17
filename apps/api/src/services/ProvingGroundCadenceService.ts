@@ -276,8 +276,52 @@ class ProvingGroundCadenceServiceClass extends BaseService {
 
   // ─── Internals ─────────────────────────────────────────────────────────
 
+  /**
+   * Spec §5.8 — derived mail-rung outcome. The mail rung waits 10 days, then
+   * the decision (previously a manual `qr_scan_events` check) is:
+   *   scanned   → owner engaged without claiming → second postcard / in_thread
+   *   no_scan   → unproven → advance the rung (or hold)
+   *   not_mailed→ no mail touch, or not yet due
+   * Exposed as data so the worklist can drive it instead of the operator.
+   */
+  async getMailScanOutcome(
+    seedId: string,
+    ctx?: RequestCtx,
+  ): Promise<'scanned' | 'no_scan' | 'not_mailed'> {
+    try {
+      const mailTouch = await this.prisma.directory_seed_outreach_touches.findFirst({
+        where: { seed_id: seedId, channel: 'mail' },
+        orderBy: { occurred_at: 'asc' },
+        select: { occurred_at: true },
+      });
+      if (!mailTouch?.occurred_at) return 'not_mailed';
+
+      const ageDays = Math.floor(
+        (Date.now() - new Date(mailTouch.occurred_at).getTime()) / 86_400_000,
+      );
+      if (ageDays < 10) return 'not_mailed';
+
+      const seed = await this.prisma.directory_presence_seeds.findUnique({
+        where: { id: seedId },
+        select: { tenant_id: true },
+      });
+      if (!seed?.tenant_id) return 'no_scan';
+
+      const scans = await this.prisma.$queryRaw<any[]>`
+        SELECT 1 FROM qr_scan_events
+        WHERE tenant_id = ${seed.tenant_id}
+          AND (surface LIKE 'claim_invite%' OR surface LIKE 'report_delivery%')
+        LIMIT 1
+      `;
+      return scans.length > 0 ? 'scanned' : 'no_scan';
+    } catch {
+      return 'not_mailed';
+    }
+  }
+
   private resolveRule(channel: TouchChannel, outcome?: TouchOutcome): CadenceRule {
-    // Mail touches key on the channel, not the outcome (spec §4.7).
+    // Mail touches key on the channel, not the outcome (spec §4.7). The
+    // at-due scan check is derived — see getMailScanOutcome (§5.8).
     if (channel === 'mail') return { waitDays: 10, consumesSlot: true };
     if (!outcome) return { waitDays: 2, consumesSlot: true };
     return CADENCE[outcome] ?? { waitDays: 2, consumesSlot: true };

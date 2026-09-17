@@ -52,6 +52,12 @@ export interface OutreachState {
   noReplyAfterOpener: boolean;
   /** True if 2+ follow-ups sent with no reply */
   noReplyAfterFollowupN: boolean;
+  /** Spec §5.8 — the seed has ≥1 claim-invite or report-delivery QR scan */
+  hasQrScan: boolean;
+  /** Spec §5.8 — the seed has ≥1 report-delivery QR scan */
+  hasReportScan: boolean;
+  /** Spec §5.8 — a mail touch was logged ≥10 days ago with no QR scan */
+  noScanAfterMail: boolean;
   /** The derived OX_* signal codes */
   signals: SignalCode[];
 }
@@ -60,6 +66,8 @@ export interface OutreachState {
 
 const NO_REPLY_OPENER_DAYS = 3;
 const NO_REPLY_FOLLOWUP_THRESHOLD = 2;
+/** Spec §5.8 — days after a mail touch before "no scan" becomes a signal. */
+const MAIL_SCAN_WINDOW_DAYS = 10;
 
 // ─── Service ────────────────────────────────────────────────────────────
 
@@ -137,6 +145,52 @@ export class OutreachStateSignalExtractor extends BaseService {
       // No reply after N follow-ups: 2+ follow-ups sent
       const noReplyAfterFollowupN = followupCount >= NO_REPLY_FOLLOWUP_THRESHOLD;
 
+      // ─── QR delivery lifecycle (spec §5.8) — display-only ─────────────
+      // Resolve the campaign's linked seed → its tenant, then look for
+      // claim-invite / report-delivery scans. Best-effort: any failure
+      // leaves the QR flags false rather than throwing.
+      let hasQrScan = false;
+      let hasReportScan = false;
+      let noScanAfterMail = false;
+      try {
+        const link = await this.prisma.$queryRaw<any[]>`
+          SELECT dscl.seed_id AS seed_id, dps.tenant_id AS tenant_id
+          FROM directory_seed_campaign_links dscl
+          JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+          WHERE dscl.campaign_id = ${campaignId}
+          ORDER BY dscl.created_at DESC
+          LIMIT 1
+        `;
+        const seedId = link[0]?.seed_id ?? null;
+        const tenantId = link[0]?.tenant_id ?? null;
+
+        if (tenantId) {
+          const scans = await this.prisma.$queryRaw<any[]>`
+            SELECT surface FROM qr_scan_events
+            WHERE tenant_id = ${tenantId}
+              AND (surface LIKE 'claim_invite%' OR surface LIKE 'report_delivery%')
+          `;
+          hasQrScan = scans.length > 0;
+          hasReportScan = scans.some((s) => String(s.surface ?? '').startsWith('report_delivery'));
+        }
+
+        if (seedId) {
+          const earliestMail = await this.prisma.directory_seed_outreach_touches.findFirst({
+            where: { seed_id: seedId, channel: 'mail' },
+            orderBy: { occurred_at: 'asc' },
+            select: { occurred_at: true },
+          });
+          if (earliestMail?.occurred_at) {
+            const ageDays = Math.floor(
+              (Date.now() - new Date(earliestMail.occurred_at).getTime()) / 86_400_000,
+            );
+            noScanAfterMail = ageDays >= MAIL_SCAN_WINDOW_DAYS && !hasQrScan;
+          }
+        }
+      } catch {
+        // QR-state lookup failed — leave the flags false
+      }
+
       // Derive signals
       const signals: SignalCode[] = [];
       if (hasOpener) signals.push('OX_OPENER_SENT');
@@ -145,6 +199,8 @@ export class OutreachStateSignalExtractor extends BaseService {
       if (noReplyAfterOpener) signals.push('OX_NO_REPLY_AFTER_OPENER');
       if (noReplyAfterFollowupN) signals.push('OX_NO_REPLY_AFTER_FOLLOWUP_N');
       if (hasContactLog) signals.push('OX_CONTACT_LOGGED');
+      if (hasQrScan) signals.push('OX_QR_SCANNED');
+      if (noScanAfterMail) signals.push('OX_QR_NO_SCAN_AFTER_MAIL');
 
       return {
         openerCount,
@@ -160,6 +216,9 @@ export class OutreachStateSignalExtractor extends BaseService {
         hasContactLog,
         noReplyAfterOpener,
         noReplyAfterFollowupN,
+        hasQrScan,
+        hasReportScan,
+        noScanAfterMail,
         signals,
       };
     } catch (error) {

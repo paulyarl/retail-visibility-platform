@@ -223,11 +223,12 @@ Reuse the existing `proving_ground_section` target for PG-scoped steps.
 - ✅ Added `reportScans` + `reportScanRate` + per-channel (phone/email/social/in_person/text) to `SeedFunnelAnalyticsService`, mirroring the `invite_scans*` block with `surface LIKE 'report_delivery_%'`; zero-state and web mirror (`DirectoryPresenceAdminService.ts`) updated; funnel admin page renders a report-scan panel.
 - ✅ No DB migration required (no CHECK on `surface`).
 
-### 5.8 Cadence automation (G11)
+### 5.8 Cadence automation (G11) — PARTIALLY SHIPPED
 
-- Derive a QR outcome from the delivery lifecycle: `report_viewed` → scan-without-claim branch; no scan at due → advance rung or `hold`.
-- Replace the manual mail-rung note in `ProvingGroundCadenceService` with the derived rule; add `OX_QR_SCANNED` / `OX_QR_NO_SCAN_AFTER_MAIL` to `outreach-state-extractor` for the triage/overview display.
-- Keep the operator override (the rung may still be manually advanced).
+- ✅ `outreach-state-extractor` gained `hasQrScan` / `hasReportScan` / `noScanAfterMail` and the display signals `OX_QR_SCANNED` + `OX_QR_NO_SCAN_AFTER_MAIL` (derived from `qr_scan_events` + a mail touch ≥10 days old). Both are `OX_*`, so the triage engine already excludes them from playbook rule evaluation.
+- ✅ `ProvingGroundCadenceService.getMailScanOutcome(seedId)` returns `'scanned' | 'no_scan' | 'not_mailed'` — the previously-manual `qr_scan_events` check, now data the worklist can drive (scanned → second postcard / `in_thread`; no scan → advance rung or hold).
+- ⬜ The worklist UI does not yet consume `getMailScanOutcome` / the new signals (display + API only). Operator override remains.
+- Note: `KNOWN_SIGNAL_CODES` grew 37 → 39; the two taxonomy tests were updated.
 
 ---
 
