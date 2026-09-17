@@ -1,16 +1,18 @@
 /**
  * DirectoryPresenceTrafficService — SQL-path tests
  *
- * Verifies the Layer 1 readout (docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §3, §6):
+ * Verifies the Layer 1 + Layer 2 readout
+ * (docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §3, §6):
  * - bigint → Number conversion across count rows
- * - per-seed mapping (counts, daily, referrers, device split)
+ * - per-seed mapping (counts, daily, referrers, device split, surface split)
  * - getSeedTraffic returns null when the seed does not exist
- * - dashboard mapping (totals, top seeds, category breakdown, daily)
+ * - dashboard mapping (totals, top seeds, category breakdown, daily, surfaces)
  * - seed filters propagate as bound params ($1..$n) — never interpolated
+ * - surface filter binds on the behavior table; the surface split is unfiltered
  * - window is clamped to the allowed 7/30/90 set
  *
- * Query order (asserted): per-seed = counts → daily → referrers → device.
- *                         dashboard = totals → top seeds → categories → daily.
+ * Query order (asserted): per-seed = counts → daily → referrers → device → surfaces.
+ *                         dashboard = totals → top seeds → categories → daily → surfaces.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -73,7 +75,7 @@ describe('DirectoryPresenceTrafficService.getSeedTraffic', () => {
     expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
   });
 
-  it('maps counts, daily, referrers, and device split', async () => {
+  it('maps counts, daily, referrers, device split, and surface split', async () => {
     mockFindUnique.mockResolvedValueOnce(seedRow);
     mockQueryRawUnsafe
       // counts
@@ -95,13 +97,19 @@ describe('DirectoryPresenceTrafficService.getSeedTraffic', () => {
       // referrers
       .mockResolvedValueOnce([{ referrer: 'google', views: 30n }])
       // device split
-      .mockResolvedValueOnce([{ device_type: 'mobile', views: 40n }]);
+      .mockResolvedValueOnce([{ device_type: 'mobile', views: 40n }])
+      // surface split
+      .mockResolvedValueOnce([
+        { surface: 'directory_seed', views: 30n, unique_sessions: 12n },
+        { surface: 'untagged', views: 12n, unique_sessions: 5n },
+      ]);
 
     const result = await directoryTrafficService.getSeedTraffic('dps-1', 30);
 
     expect(result).not.toBeNull();
     expect(result!.businessName).toBe('Madison Spice');
     expect(result!.slug).toBe('madison-spice');
+    expect(result!.surface).toBeNull();
     expect(result!.views).toBe(42);
     expect(result!.uniqueSessions).toBe(17);
     expect(result!.views7d).toBe(9);
@@ -112,11 +120,33 @@ describe('DirectoryPresenceTrafficService.getSeedTraffic', () => {
     ]);
     expect(result!.topReferrers).toEqual([{ referrer: 'google', views: 30 }]);
     expect(result!.deviceSplit).toEqual([{ deviceType: 'mobile', views: 40 }]);
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+    expect(result!.surfaceBreakdown).toEqual([
+      { surface: 'directory_seed', views: 30, uniqueSessions: 12 },
+      { surface: 'untagged', views: 12, uniqueSessions: 5 },
+    ]);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
     // Tenant id is always bound, never interpolated.
     for (const call of mockQueryRawUnsafe.mock.calls) {
       expect(call[1]).toBe('tenant-1');
     }
+  });
+
+  it('binds the surface filter on the event queries but not the split query', async () => {
+    mockFindUnique.mockResolvedValueOnce(seedRow);
+    mockQueryRawUnsafe.mockResolvedValue([]);
+
+    await directoryTrafficService.getSeedTraffic('dps-1', 30, 'directory_seed');
+
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
+    const calls = mockQueryRawUnsafe.mock.calls;
+    // First four queries carry the surface predicate as $2.
+    for (const call of calls.slice(0, 4)) {
+      expect(call.slice(1)).toEqual(['tenant-1', 'directory_seed']);
+      expect(String(call[0])).toContain("context->>'surface' = $2");
+    }
+    // The split query is deliberately unfiltered.
+    expect(calls[4].slice(1)).toEqual(['tenant-1']);
+    expect(String(calls[4][0])).not.toContain("context->>'surface' = $2");
   });
 });
 
@@ -125,7 +155,7 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
     mockQueryRawUnsafe.mockReset();
   });
 
-  it('maps totals, top seeds, category breakdown, and daily trend', async () => {
+  it('maps totals, top seeds, category breakdown, daily trend, and surfaces', async () => {
     mockQueryRawUnsafe
       .mockResolvedValueOnce([
         { views: 100n, unique_sessions: 40n, seeds_with_traffic: 3n, total_seeds: 10n },
@@ -151,11 +181,13 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       .mockResolvedValueOnce([
         { category: 'Indian Grocery', views: 60n, unique_sessions: 25n, seeds: 1n },
       ])
-      .mockResolvedValueOnce([{ day: '2026-09-01', views: 60n, unique_sessions: 25n }]);
+      .mockResolvedValueOnce([{ day: '2026-09-01', views: 60n, unique_sessions: 25n }])
+      .mockResolvedValueOnce([{ surface: 'directory_seed', views: 60n, unique_sessions: 25n }]);
 
     const result = await directoryTrafficService.getTrafficDashboard(30);
 
     expect(result.daysBack).toBe(30);
+    expect(result.surface).toBeNull();
     expect(result.totals).toEqual({
       views: 100,
       uniqueSessions: 40,
@@ -173,7 +205,10 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       { category: 'Indian Grocery', views: 60, uniqueSessions: 25, seeds: 1 },
     ]);
     expect(result.daily).toEqual([{ day: '2026-09-01', views: 60, uniqueSessions: 25 }]);
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+    expect(result.surfaceBreakdown).toEqual([
+      { surface: 'directory_seed', views: 60, uniqueSessions: 25 },
+    ]);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
   });
 
   it('binds seed filters as positional params on every query', async () => {
@@ -187,12 +222,32 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       state: 'IL',
     });
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
     for (const call of mockQueryRawUnsafe.mock.calls) {
       const params = call.slice(1);
       expect(params).toEqual(['batch-9', 'invited', 'Halal Grocery', 'Chicago', 'IL']);
       expect(String(call[0])).toContain('s.seed_batch = $1');
       expect(String(call[0])).toContain('s.state = $5');
     }
+  });
+
+  it('binds the surface filter on the event queries but not the split query', async () => {
+    mockQueryRawUnsafe.mockResolvedValue([]);
+
+    await directoryTrafficService.getTrafficDashboard(30, {
+      category: 'Halal Grocery',
+      surface: 'directory_seed',
+    });
+
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
+    const calls = mockQueryRawUnsafe.mock.calls;
+    // First four queries bind [category, surface] and reference $2.
+    for (const call of calls.slice(0, 4)) {
+      expect(call.slice(1)).toEqual(['Halal Grocery', 'directory_seed']);
+      expect(String(call[0])).toContain("b.context->>'surface' = $2");
+    }
+    // The split query drops the surface param (seed filters only).
+    expect(calls[4].slice(1)).toEqual(['Halal Grocery']);
+    expect(String(calls[4][0])).not.toContain("b.context->>'surface' = $2");
   });
 });

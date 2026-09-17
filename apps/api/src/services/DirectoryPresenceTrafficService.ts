@@ -1,6 +1,6 @@
 /**
- * DirectoryPresenceTrafficService — Layer 1 readout for the directory
- * presence traffic surface.
+ * DirectoryPresenceTrafficService — Layer 1 + Layer 2 readout for the
+ * directory presence traffic surface.
  *
  * Aggregates page-view events already captured by `StoreViewTracker` on
  * `/place/[slug]` (unclaimed seeds) and `/directory/[slug]` (claimed
@@ -13,7 +13,14 @@
  * readout answers "which directory entry is getting traffic" for the full
  * seed lifecycle.
  *
- * Read-only — no schema change, no new table. See
+ * Layer 2: events are tagged with `context->>'surface'`
+ * (`directory_seed` from /place, `directory_claimed` from /directory) so
+ * seed-vs-claimed traffic can be split without a join. The optional `surface`
+ * filter applies that predicate; `surfaceBreakdown` always reports the full
+ * split (untagged historical rows appear as `untagged` until migration 292
+ * backfills them).
+ *
+ * Read-only — no new table. See
  * docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md §3, §6.
  */
 
@@ -38,6 +45,14 @@ export interface DirectoryTrafficFilters {
   category?: string;
   city?: string;
   state?: string;
+  /** Layer 2 — restrict to events tagged with this `context->>'surface'`. */
+  surface?: string;
+}
+
+export interface SurfaceBreakdownRow {
+  surface: string;
+  views: number;
+  uniqueSessions: number;
 }
 
 export interface SeedTrafficSummary {
@@ -75,6 +90,7 @@ export interface SeedTrafficDetail {
   status: string;
   seedBatch: string;
   daysBack: TrafficWindow;
+  surface: string | null;
   views: number;
   uniqueSessions: number;
   views7d: number;
@@ -84,10 +100,12 @@ export interface SeedTrafficDetail {
   daily: TrafficTimeseriesPoint[];
   topReferrers: Array<{ referrer: string; views: number }>;
   deviceSplit: Array<{ deviceType: string; views: number }>;
+  surfaceBreakdown: SurfaceBreakdownRow[];
 }
 
 export interface TrafficDashboard {
   daysBack: TrafficWindow;
+  surface: string | null;
   totals: {
     views: number;
     uniqueSessions: number;
@@ -102,6 +120,7 @@ export interface TrafficDashboard {
     seeds: number;
   }>;
   daily: TrafficTimeseriesPoint[];
+  surfaceBreakdown: SurfaceBreakdownRow[];
 }
 
 interface TrafficCountRow {
@@ -165,11 +184,12 @@ class DirectoryPresenceTrafficService extends BaseService {
 
   /**
    * Per-seed traffic: views, unique sessions, fixed-window counts, daily
-   * timeseries, top referrers, and device split.
+   * timeseries, top referrers, device split, and the surface split.
    */
   async getSeedTraffic(
     seedId: string,
     daysBack?: number,
+    surface?: string,
   ): Promise<SeedTrafficDetail | null> {
     const seed = await this.prisma.directory_presence_seeds.findUnique({
       where: { id: seedId },
@@ -179,6 +199,14 @@ class DirectoryPresenceTrafficService extends BaseService {
 
     const window = clampTrafficWindow(daysBack);
     const tenantId = seed.tenant_id;
+
+    // Layer 2 — optional surface predicate on the behavior table.
+    const params: string[] = [tenantId];
+    let surfaceClause = '';
+    if (surface) {
+      params.push(surface);
+      surfaceClause = `AND context->>'surface' = $${params.length}`;
+    }
 
     const counts = await this.executeQuery<TrafficCountRow>(
       `SELECT
@@ -192,8 +220,9 @@ class DirectoryPresenceTrafficService extends BaseService {
        WHERE entity_type = 'store'
          AND page_type = 'directory_detail'
          AND entity_id = $1
+         ${surfaceClause}
          AND timestamp >= NOW() - INTERVAL '90 days'`,
-      [tenantId],
+      params,
     );
 
     const daily = await this.executeQuery<{
@@ -209,10 +238,11 @@ class DirectoryPresenceTrafficService extends BaseService {
        WHERE entity_type = 'store'
          AND page_type = 'directory_detail'
          AND entity_id = $1
+         ${surfaceClause}
          AND timestamp >= NOW() - INTERVAL '${window} days'
        GROUP BY 1
        ORDER BY 1 ASC`,
-      [tenantId],
+      params,
     );
 
     const topReferrers = await this.executeQuery<{
@@ -226,11 +256,12 @@ class DirectoryPresenceTrafficService extends BaseService {
        WHERE entity_type = 'store'
          AND page_type = 'directory_detail'
          AND entity_id = $1
+         ${surfaceClause}
          AND timestamp >= NOW() - INTERVAL '${window} days'
        GROUP BY 1
        ORDER BY views DESC
        LIMIT 5`,
-      [tenantId],
+      params,
     );
 
     const deviceSplit = await this.executeQuery<{
@@ -245,6 +276,28 @@ class DirectoryPresenceTrafficService extends BaseService {
            ELSE 'desktop'
          END AS device_type,
          COUNT(*)::int AS views
+       FROM user_behavior_simple
+       WHERE entity_type = 'store'
+         AND page_type = 'directory_detail'
+         AND entity_id = $1
+         ${surfaceClause}
+         AND timestamp >= NOW() - INTERVAL '${window} days'
+       GROUP BY 1
+       ORDER BY views DESC`,
+      params,
+    );
+
+    // Surface split is always over the full (unfiltered) event set so the
+    // seed-vs-claimed breakdown stays visible even when a surface filter is on.
+    const surfaceRows = await this.executeQuery<{
+      surface: string;
+      views: number | bigint;
+      unique_sessions: number | bigint;
+    }>(
+      `SELECT
+         COALESCE(context->>'surface', 'untagged') AS surface,
+         COUNT(*)::int AS views,
+         COUNT(DISTINCT session_id)::int AS unique_sessions
        FROM user_behavior_simple
        WHERE entity_type = 'store'
          AND page_type = 'directory_detail'
@@ -270,6 +323,7 @@ class DirectoryPresenceTrafficService extends BaseService {
       status: seed.status,
       seedBatch: seed.seed_batch,
       daysBack: window,
+      surface: surface ?? null,
       views: toNumber(countRow?.views),
       uniqueSessions: toNumber(countRow?.unique_sessions),
       views7d: toNumber(countRow?.views_7d),
@@ -289,13 +343,18 @@ class DirectoryPresenceTrafficService extends BaseService {
         deviceType: row.device_type,
         views: toNumber(row.views),
       })),
+      surfaceBreakdown: surfaceRows.map((row) => ({
+        surface: row.surface,
+        views: toNumber(row.views),
+        uniqueSessions: toNumber(row.unique_sessions),
+      })),
     };
   }
 
   /**
-   * Cross-seed rollup: totals, top seeds by views, category breakdown, and
-   * an all-seeds daily trend. Seeds with zero traffic are included in the
-   * seed count but not in `seedsWithTraffic`.
+   * Cross-seed rollup: totals, top seeds by views, category breakdown, an
+   * all-seeds daily trend, and the seed-vs-claimed surface split. Seeds with
+   * zero traffic are included in the seed count but not in `seedsWithTraffic`.
    */
   async getTrafficDashboard(
     daysBack?: number,
@@ -303,6 +362,14 @@ class DirectoryPresenceTrafficService extends BaseService {
   ): Promise<TrafficDashboard> {
     const window = clampTrafficWindow(daysBack);
     const { clause, params } = this.buildSeedFilters(filters);
+
+    // Layer 2 — surface predicate lives in the behavior JOIN so seeds with no
+    // matching traffic still appear (with zero views).
+    let surfaceJoin = '';
+    if (filters.surface) {
+      params.push(filters.surface);
+      surfaceJoin = `AND b.context->>'surface' = $${params.length}`;
+    }
 
     const totalsRows = await this.executeQuery<DashboardTotalsRow>(
       `SELECT
@@ -316,6 +383,7 @@ class DirectoryPresenceTrafficService extends BaseService {
         AND b.entity_type = 'store'
         AND b.page_type = 'directory_detail'
         AND b.timestamp >= NOW() - INTERVAL '${window} days'
+        ${surfaceJoin}
        WHERE TRUE ${clause}`,
       params,
     );
@@ -358,6 +426,7 @@ class DirectoryPresenceTrafficService extends BaseService {
         AND b.entity_type = 'store'
         AND b.page_type = 'directory_detail'
         AND b.timestamp >= NOW() - INTERVAL '${window} days'
+        ${surfaceJoin}
        WHERE TRUE ${clause}
        GROUP BY s.id, l.business_name, l.slug
        ORDER BY views DESC, s.created_at DESC
@@ -382,6 +451,7 @@ class DirectoryPresenceTrafficService extends BaseService {
         AND b.entity_type = 'store'
         AND b.page_type = 'directory_detail'
         AND b.timestamp >= NOW() - INTERVAL '${window} days'
+        ${surfaceJoin}
        WHERE TRUE ${clause}
        GROUP BY s.category
        ORDER BY views DESC`,
@@ -403,16 +473,40 @@ class DirectoryPresenceTrafficService extends BaseService {
         AND b.entity_type = 'store'
         AND b.page_type = 'directory_detail'
         AND b.timestamp >= NOW() - INTERVAL '${window} days'
+        ${surfaceJoin}
        WHERE TRUE ${clause}
        GROUP BY 1
        ORDER BY 1 ASC`,
       params,
     );
 
+    // Full split — deliberately excludes the surface predicate.
+    const surfaceRows = await this.executeQuery<{
+      surface: string;
+      views: number | bigint;
+      unique_sessions: number | bigint;
+    }>(
+      `SELECT
+         COALESCE(b.context->>'surface', 'untagged') AS surface,
+         COUNT(b.id)::int AS views,
+         COUNT(DISTINCT b.session_id)::int AS unique_sessions
+       FROM directory_presence_seeds s
+       LEFT JOIN user_behavior_simple b
+         ON b.entity_id = s.tenant_id
+        AND b.entity_type = 'store'
+        AND b.page_type = 'directory_detail'
+        AND b.timestamp >= NOW() - INTERVAL '${window} days'
+       WHERE TRUE ${clause}
+       GROUP BY 1
+       ORDER BY views DESC`,
+      this.buildSeedFilters(filters).params,
+    );
+
     const totalsRow = totalsRows[0];
 
     return {
       daysBack: window,
+      surface: filters.surface ?? null,
       totals: {
         views: toNumber(totalsRow?.views),
         uniqueSessions: toNumber(totalsRow?.unique_sessions),
@@ -443,6 +537,11 @@ class DirectoryPresenceTrafficService extends BaseService {
       })),
       daily: dailyRows.map((row) => ({
         day: row.day,
+        views: toNumber(row.views),
+        uniqueSessions: toNumber(row.unique_sessions),
+      })),
+      surfaceBreakdown: surfaceRows.map((row) => ({
+        surface: row.surface,
         views: toNumber(row.views),
         uniqueSessions: toNumber(row.unique_sessions),
       })),

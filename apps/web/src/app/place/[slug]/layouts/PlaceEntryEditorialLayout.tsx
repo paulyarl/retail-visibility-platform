@@ -108,7 +108,7 @@ export default function PlaceEntryEditorialLayout({
         { name: 'Directory', url: `${baseUrl}/directory` },
         { name: listing.businessName, url: currentUrl },
       ]} />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_seed" surface="directory_seed" />
 
       <div className="min-h-screen bg-white">
         {/* Editorial Hero — seed-adapted */}

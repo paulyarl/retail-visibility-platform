@@ -56,6 +56,7 @@ export default function DirectoryTrafficPage() {
     state: '',
     status: '',
     seedBatch: '',
+    surface: '' as '' | 'directory_seed' | 'directory_claimed',
   });
 
   const [selectedSeed, setSelectedSeed] = useState<SeedTrafficSummary | null>(null);
@@ -74,6 +75,7 @@ export default function DirectoryTrafficPage() {
       if (filters.seedBatch.trim()) cleanFilters.seedBatch = filters.seedBatch.trim();
       const data = await directoryPresenceAdminService.getTrafficDashboard({
         daysBack: filters.daysBack,
+        surface: filters.surface || undefined,
         ...cleanFilters,
       });
       if (!data) {
@@ -103,7 +105,11 @@ export default function DirectoryTrafficPage() {
     setSeedTraffic(null);
     setSeedLoading(true);
     try {
-      const detail = await directoryPresenceAdminService.getSeedTraffic(seed.seedId, filters.daysBack);
+      const detail = await directoryPresenceAdminService.getSeedTraffic(
+        seed.seedId,
+        filters.daysBack,
+        filters.surface || undefined,
+      );
       setSeedTraffic(detail);
     } finally {
       setSeedLoading(false);
@@ -111,7 +117,7 @@ export default function DirectoryTrafficPage() {
   };
 
   const resetFilters = () =>
-    setFilters({ daysBack: 30, category: '', city: '', state: '', status: '', seedBatch: '' });
+    setFilters({ daysBack: 30, category: '', city: '', state: '', status: '', seedBatch: '', surface: '' });
 
   const totals = dashboard?.totals;
   const avgViewsPerSeed =
@@ -142,7 +148,7 @@ export default function DirectoryTrafficPage() {
 
       {/* Filters */}
       <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-4">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Window</label>
             <select
@@ -188,6 +194,23 @@ export default function DirectoryTrafficPage() {
               placeholder="e.g. WI"
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Surface</label>
+            <select
+              value={filters.surface}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  surface: e.target.value as '' | 'directory_seed' | 'directory_claimed',
+                })
+              }
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="">All surfaces</option>
+              <option value="directory_seed">Seed (/place)</option>
+              <option value="directory_claimed">Claimed (/directory)</option>
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Status</label>
@@ -455,14 +478,30 @@ export default function DirectoryTrafficPage() {
                     </ul>
                   )}
                 </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Surface split</h3>
+                  {seedTraffic.surfaceBreakdown.length === 0 ? (
+                    <p className="text-xs text-gray-400">No surface data.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {seedTraffic.surfaceBreakdown.map((s) => (
+                        <li key={s.surface} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-300">{surfaceLabel(s.surface)}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">{s.views}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
           )}
         </section>
       )}
 
-      {/* Category breakdown + all-seeds trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Category breakdown + surface split + all-seeds trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Views by Category</h2>
           {!dashboard || dashboard.categoryBreakdown.length === 0 ? (
@@ -481,6 +520,35 @@ export default function DirectoryTrafficPage() {
                     <div
                       className="h-full rounded-full bg-blue-500"
                       style={{ width: `${barWidth(row.views, dashboard.categoryBreakdown[0]?.views)}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Traffic by Surface</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Seed (/place) vs claimed (/directory). Events recorded before migration 292 appear as untagged.
+          </p>
+          {!dashboard || dashboard.surfaceBreakdown.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No surface data for the current filters.</p>
+          ) : (
+            <ul className="space-y-3">
+              {dashboard.surfaceBreakdown.map((row) => (
+                <li key={row.surface}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-gray-700 dark:text-gray-200">{surfaceLabel(row.surface)}</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-xs">
+                      {row.views.toLocaleString()} views · {row.uniqueSessions.toLocaleString()} sessions
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-teal-500"
+                      style={{ width: `${barWidth(row.views, dashboard.surfaceBreakdown[0]?.views)}%` }}
                     />
                   </div>
                 </li>
@@ -559,6 +627,12 @@ function TimeseriesBars({ points }: { points: Array<{ day: string; views: number
 function barWidth(value: number, max?: number): string {
   const denom = Math.max(max ?? 0, 1);
   return `${Math.max((value / denom) * 100, 2)}%`;
+}
+
+function surfaceLabel(surface: string): string {
+  if (surface === 'directory_seed') return 'Seed (/place)';
+  if (surface === 'directory_claimed') return 'Claimed (/directory)';
+  return 'Untagged';
 }
 
 function deviceIcon(deviceType: string) {

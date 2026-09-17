@@ -85,6 +85,20 @@ Report pipeline notes:
 
 After applying migrations 271–272, run `pnpm prisma:generate` (or `doppler run --config local -- pnpm prisma db pull && pnpm prisma generate`) so the Prisma Client picks up the new columns.
 
+## Directory Presence Traffic Surface (Layer 1 + 2)
+
+Spec: `docs/LocalBiz/directory_presence_traffic_surface_sprint_plan.md`
+
+Page-view traffic for `/place/[slug]` (unclaimed seeds) and `/directory/[slug]` (claimed tenants) is captured by `StoreViewTracker` into `user_behavior_simple` (`entity_type='store'`, `page_type='directory_detail'`, `entity_id=<tenantId>`).
+
+- **Layer 1 readout:** `apps/api/src/services/DirectoryPresenceTrafficService.ts` aggregates those rows, scoped to seeds via join on `directory_presence_seeds.tenant_id`. Admin routes (in `directory-presence-admin.ts`, mount `/api/admin/directory-presence`): `GET /traffic` (cross-seed rollup) and `GET /presence-seeds/:id/traffic` (per-seed). Both require `requirePlatformStaff`.
+- **Admin page:** `/settings/admin/directory/traffic` (`apps/web/src/app/(platform)/settings/admin/directory/traffic/page.tsx`). Card on `/settings/admin` ("Directory Traffic"), plus Directory Panel and admin-nav entries.
+- **Layer 2 tagging:** `StoreViewTracker` accepts `listingOrigin` + `surface` props and stamps them into `context` (`directory_seed` from `/place` layouts, `directory_claimed` from the four `/directory` layouts). The readout exposes an optional `surface` filter (bound param) and always reports a `surfaceBreakdown` (untagged historical rows appear as `untagged`).
+- **Migration `292_backfill_directory_seed_event_context.sql`** — tags historical `directory_detail` rows for seed tenants with `listing_origin`/`surface = 'directory_seed'` (idempotent: only rows where `context->>'surface' IS NULL`) and adds the partial expression index `idx_ubs_directory_detail_surface`. Applied manually to `local` + `prd`; no `schema.prisma` change, so no `prisma generate` needed for it.
+- **Windows `prisma generate` EPERM:** regenerating while a dev watcher (`pnpm dev:local-vercel` / `tsx watch`) is running fails with `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`. Stop the node/dev processes first, then re-run `pnpm prisma generate`.
+
+**Not yet built (Layer 3):** `directory_presence_events` table, `DirectoryPresenceAnalyticsService`, public `POST /api/public/directory/places/:slug/events`, `useDirectoryPresenceTracking`, and the seed-detail Traffic & Engagement panel.
+
 ## WhatsApp Channel Integration
 
 Spec: `docs/LocalBiz/WHATSAPP_CHANNEL_INTEGRATION_SPEC.md`

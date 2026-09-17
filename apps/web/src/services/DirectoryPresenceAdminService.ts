@@ -203,8 +203,15 @@ export interface TrafficTimeseriesPoint {
   uniqueSessions: number;
 }
 
+export interface SurfaceBreakdownRow {
+  surface: string;
+  views: number;
+  uniqueSessions: number;
+}
+
 export interface DirectoryTrafficDashboard {
   daysBack: number;
+  surface: string | null;
   totals: {
     views: number;
     uniqueSessions: number;
@@ -219,6 +226,7 @@ export interface DirectoryTrafficDashboard {
     seeds: number;
   }>;
   daily: TrafficTimeseriesPoint[];
+  surfaceBreakdown: SurfaceBreakdownRow[];
 }
 
 export interface SeedTrafficDetail {
@@ -233,6 +241,7 @@ export interface SeedTrafficDetail {
   status: string;
   seedBatch: string;
   daysBack: number;
+  surface: string | null;
   views: number;
   uniqueSessions: number;
   views7d: number;
@@ -242,6 +251,7 @@ export interface SeedTrafficDetail {
   daily: TrafficTimeseriesPoint[];
   topReferrers: Array<{ referrer: string; views: number }>;
   deviceSplit: Array<{ deviceType: string; views: number }>;
+  surfaceBreakdown: SurfaceBreakdownRow[];
 }
 
 // ============================
@@ -806,6 +816,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     category?: string;
     city?: string;
     state?: string;
+    surface?: 'directory_seed' | 'directory_claimed';
   }): Promise<DirectoryTrafficDashboard | null> {
     const params = new URLSearchParams();
     if (filters?.daysBack) params.set('daysBack', String(filters.daysBack));
@@ -814,6 +825,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (filters?.category) params.set('category', filters.category);
     if (filters?.city) params.set('city', filters.city);
     if (filters?.state) params.set('state', filters.state);
+    if (filters?.surface) params.set('surface', filters.surface);
     const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/traffic${qs ? `?${qs}` : ''}`,
@@ -827,10 +839,17 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/:id/traffic — per-seed traffic */
-  async getSeedTraffic(seedId: string, daysBack?: number): Promise<SeedTrafficDetail | null> {
-    const qs = daysBack ? `?daysBack=${daysBack}` : '';
+  async getSeedTraffic(
+    seedId: string,
+    daysBack?: number,
+    surface?: 'directory_seed' | 'directory_claimed',
+  ): Promise<SeedTrafficDetail | null> {
+    const params = new URLSearchParams();
+    if (daysBack) params.set('daysBack', String(daysBack));
+    if (surface) params.set('surface', surface);
+    const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/traffic${qs}`,
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/traffic${qs ? `?${qs}` : ''}`,
       { method: 'GET' },
       undefined,
       0,

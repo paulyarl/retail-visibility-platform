@@ -204,6 +204,8 @@ const trafficQuerySchema = z.object({
   category: z.string().max(100).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(50).optional(),
+  // Layer 2 — restrict to events tagged with a surface (StoreViewTracker).
+  surface: z.enum(['directory_seed', 'directory_claimed']).optional(),
 });
 
 /**
@@ -239,9 +241,14 @@ router.get('/traffic', requirePlatformStaff, async (req: Request, res: Response)
 router.get('/presence-seeds/:id/traffic', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
+    const surface =
+      req.query.surface === 'directory_seed' || req.query.surface === 'directory_claimed'
+        ? (req.query.surface as string)
+        : undefined;
     const traffic = await DirectoryPresenceTrafficService.getSeedTraffic(
       req.params.id,
       Number.isFinite(daysBack) ? daysBack : undefined,
+      surface,
     );
     if (!traffic) {
       return res.status(404).json({ success: false, error: 'not_found' });

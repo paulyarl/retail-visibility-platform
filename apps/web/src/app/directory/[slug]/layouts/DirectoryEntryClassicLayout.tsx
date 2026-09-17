@@ -102,7 +102,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           { name: listing.businessName, url: currentUrl },
         ]}
       />
-      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} />
+      <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_claimed" surface="directory_claimed" />
 
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b">
