@@ -1,7 +1,7 @@
 /**
  * Seed script: PG-01 Proving Ground Preflight Playbook
  *
- * Seeds the `proving_ground`-category playbook + its 14 checklist steps into
+ * Seeds the `proving_ground`-category playbook + its 15 checklist steps into
  * mkt_playbook_catalog / mkt_playbook_checklist_steps (Migration 262).
  *
  * Why a seed script (not migration SQL): the catalog is curated data, and
@@ -42,12 +42,13 @@ const PLAYBOOK = {
   description:
     'City/category proving-ground launch checklist. Attaches directly to the ' +
     'proving-ground campaign (no triage — aggregate campaigns resolve PG-01 ' +
-    'by catalog code). Steps 1–8 and 11–13 are the required launch funnel ' +
+    'by catalog code). Steps 1–8 and 11–14 are the required launch funnel ' +
     '(attach discovery sources → load → queue → prioritize → verify ' +
     'operational status → create the business campaign → audit the category ' +
     'identification → set categories → audit the business → promote → ' +
-    'reconcile duplicates); steps 9–10 (market enrichment campaigns) and ' +
-    'step 14 (listing attribute back-fill) are optional enrichment lanes.',
+    'generate claim QR kits → reconcile duplicates); steps 9–10 (market ' +
+    'enrichment campaigns) and step 15 (listing attribute back-fill) are ' +
+    'optional enrichment lanes.',
   matching_rules: {},
   fitd_offer_title: 'Directory Claim Setup',
   retainer_pitch_title: 'Proving Ground Review',
@@ -58,10 +59,10 @@ const PLAYBOOK = {
 // Steps follow the cockpit's actual operator flow (attach → load → queue →
 // prioritize → verify operational status → create the business campaign →
 // audit the category identification → set categories → category + location
-// enrichment → audit the business → promote → reconcile → enrich market
-// listings). Every instruction leads with its scope so a step is never
-// ambiguous about acting once per PG vs once per prospect.
-// Steps 1–8 and 11–13 required (the launch funnel); 9–10 and 14 optional
+// enrichment → audit the business → promote → generate claim QR kits →
+// reconcile → enrich market listings). Every instruction leads with its scope
+// so a step is never ambiguous about acting once per PG vs once per prospect.
+// Steps 1–8 and 11–14 required (the launch funnel); 9–10 and 15 optional
 // enrichment lanes. All stage_tag=null — the parent never leaves 'seek', so
 // stage tags would hide them forever.
 //
@@ -247,8 +248,24 @@ const STEPS = [
     is_required: true,
   },
   {
-    id: 'pstep-pg01-s6',
+    id: 'pstep-pg01-generate-qr-kits',
     step_order: 13,
+    title: 'Generate claim-invite QR kits',
+    instructions:
+      'Per prospect, after promotion: on the seed detail page open the Claim ' +
+      'QR Kit and download the artifact for the delivery channel — mail ' +
+      'postcard, walk-in card (4x6 leave-behind), or the tracked social/email ' +
+      'link. The QR encodes a tracked redirect, so the scan is recorded before ' +
+      'the owner lands on the claim page. Generation logs a ' +
+      '"claim_qr_generated" touch, so the campaign checklist\'s "Generate the ' +
+      'claim QR kit" step auto-satisfies. Spec §4.10 preflight step 3.',
+    step_type: 'internal_link',
+    action_config: { target: 'proving_ground_section', params: { section: 'queue' } },
+    is_required: true,
+  },
+  {
+    id: 'pstep-pg01-s6',
+    step_order: 14,
     title: 'Reconcile Seed Funnel',
     instructions:
       'PG-level, one pass after promotions: resolve every duplicate group ' +
@@ -261,7 +278,7 @@ const STEPS = [
   },
   {
     id: 'pstep-pg01-s7',
-    step_order: 14,
+    step_order: 15,
     title: 'Enrich market listings',
     instructions:
       'PG-level, repeatable, last: "Enrich Market Listings" back-fills ' +

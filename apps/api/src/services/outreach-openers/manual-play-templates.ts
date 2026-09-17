@@ -154,6 +154,126 @@ Quick question — when someone wants to know if you have something in stock, ho
 For shops like yours, {{channel_pitch}} is the highest-converting answer — customers ask, you reply on your phone, they come in. We can build that straight into your listing page.
 
 I can send you the report first — it shows exactly where that question goes today. What's the best email — or I can text you the link?
+The report is here if you want to look now: {{report_url}} (or scan the card I left — {{qr_url_report_in_person}}).
+
+— {{operator_name}}`,
+  },
+  {
+    key: 'walkin_card_handoff',
+    label: 'Walk-in card handoff',
+    description:
+      'In-person leave-behind: hand over the 4x6 claim card, point at the ' +
+      'tracked QR, and log the visit. The QR records the scan before the ' +
+      'owner lands on the claim page.',
+    anchorType: 'customer_discovery_problem',
+    hookAngle: 'footprint_verification',
+    fields: [
+      {
+        key: 'card_line',
+        label: 'Card line (spoken)',
+        role: 'opener',
+        placeholder: 'What you say as you hand over the card',
+        defaultValue: `{{salutation}} I stopped by because I put together a free listing for {{business}} on the local {{category}} directory — address, phone, and hours from public sources. Nothing to sign up for.
+If anything's off, this code goes straight to the listing so you can fix it yourself: {{qr_url_walkin}}
+I'll leave the card — scan it whenever, or I can email you the report at {{report_url}}.`,
+      },
+      {
+        key: 'leave_behind_note',
+        label: 'Leave-behind note',
+        role: 'note',
+        placeholder: 'Note logged with the visit touch',
+        defaultValue: 'Left the claim card; pointed at the tracked QR.',
+      },
+      {
+        key: 'operator_thesis',
+        label: 'Operator thesis',
+        role: 'thesis',
+        placeholder: 'What this play is trying to accomplish',
+        defaultValue:
+          'Same-town walk-in. Hand over the claim card, get the scan, log a visit touch so the cadence advances.',
+      },
+      {
+        key: 'verification_question',
+        label: 'Verification question',
+        role: 'thesis',
+        placeholder: 'Question that confirms the listing details',
+        defaultValue: 'I have {{business}} at {{address}} — is that still the right address and phone?',
+      },
+      {
+        key: 'recommended_transition',
+        label: 'Recommended transition',
+        role: 'thesis',
+        placeholder: 'Pivot from verification into the report',
+        defaultValue:
+          'The full report shows where {{business}} appears across public sources — it is free, and the card has the code.',
+      },
+    ],
+    scriptBody: `Hi, are you the owner of {{business}}? — I won't take your time.
+
+I put together a free listing for {{business}} on the local {{category}} directory in {{city}} — pulled from public sources. No signup, nothing owed.
+
+I have {{business}} at {{address}} — is that still right? And is this the best number?
+
+[Hand over the card]
+This card has a code that goes straight to the listing — scan it whenever and fix anything that's off, or view the free report at {{report_url}}.
+
+Thanks — I'll leave it with you.
+
+— {{operator_name}}`,
+  },
+  {
+    key: 'report_qr_followup',
+    label: 'Report link follow-up (text / email)',
+    description:
+      'Post-call follow-up: send the tracked report link on the channel the ' +
+      'owner preferred. The tracked URL records the view so the cadence sees ' +
+      'delivered → viewed.',
+    anchorType: 'customer_discovery_problem',
+    hookAngle: 'footprint_verification',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject / header',
+        role: 'header',
+        placeholder: 'Email subject or first line',
+        defaultValue: 'the free report for {{business}}',
+      },
+      {
+        key: 'followup_text',
+        label: 'Follow-up (text)',
+        role: 'opener',
+        placeholder: 'Short text message body',
+        defaultValue: `{{salutation}} as promised — here's the free report for {{business}}: {{qr_url_report_text}}
+It shows where {{business}} appears across public sources. If anything looks off you can claim the listing and fix it yourself: {{claim_short_url}}`,
+      },
+      {
+        key: 'email_text',
+        label: 'Follow-up (email)',
+        role: 'closer',
+        placeholder: 'Longer email body',
+        defaultValue: `Hi — thanks for the call.
+
+Here is the free report we put together for {{business}}: {{report_url}}
+It documents what public sources show for your address, phone, and category — and what was missing.
+
+If anything is wrong, you can claim the listing and correct it yourself here: {{claim_url}} — it takes about two minutes and there is no cost.
+
+— {{sender_name}}`,
+      },
+      {
+        key: 'operator_thesis',
+        label: 'Operator thesis',
+        role: 'thesis',
+        placeholder: 'What this play is trying to accomplish',
+        defaultValue:
+          'Deliver the report on the owner\'s preferred channel using the tracked link; the scan/view drives the next cadence move.',
+      },
+    ],
+    scriptBody: `{{salutation}} — following up from our call.
+
+Here's the free report for {{business}}: {{qr_url_report_text}}
+
+It shows how {{business}} appears across public sources and what was missing. If anything looks off, claim the listing and fix it yourself — {{claim_short_url}} (about two minutes, no cost).
 
 — {{operator_name}}`,
   },

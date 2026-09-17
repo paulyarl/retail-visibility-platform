@@ -410,11 +410,12 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
       expect(result.playbook).toBeNull();
-      expect(result.steps).toHaveLength(3);
+      expect(result.steps).toHaveLength(4);
       expect(result.steps[0].title).toBe('Open Pitch Construction');
       expect(result.steps[1].title).toBe('Open Preview Deliverable / Approach Kit');
       expect(result.steps[2].title).toBe('Open Call Script');
-      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3]);
+      expect(result.steps[3].title).toBe('Deliver the report (QR / tracked link)');
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4]);
       expect(result.requiredTotal).toBe(0);
     });
 
@@ -426,13 +427,14 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
       expect(result.playbook).toBeNull();
-      // 9 seed-first wedge steps + 3 outreach-access steps.
-      expect(result.steps).toHaveLength(12);
+      // 10 seed-first wedge steps + 4 outreach-access steps.
+      expect(result.steps).toHaveLength(14);
       expect(result.steps[0].title).toBe('Run category identification');
       expect(result.steps[3].title).toBe('Call to verify operational status');
       expect(result.steps[4].title).toBe('Create the seed ("Add to Place Listing")');
-      expect(result.steps[8].title).toBe('Invite the owner to claim (free, no obligation)');
-      expect(result.steps[9].title).toBe('Open Pitch Construction');
+      expect(result.steps[8].title).toBe('Generate the claim QR kit');
+      expect(result.steps[9].title).toBe('Invite the owner to claim (free, no obligation)');
+      expect(result.steps[10].title).toBe('Open Pitch Construction');
       // Seed-first steps are guidance, not gates — never required.
       expect(result.steps.every((s) => s.isRequired === false)).toBe(true);
       expect(result.requiredTotal).toBe(0);
@@ -445,10 +447,11 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
 
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
-      // 9 seed-wedge + 3 outreach-access steps still render at seed stage.
-      expect(result.steps).toHaveLength(12);
+      // 10 seed-wedge + 4 outreach-access steps still render at seed stage.
+      expect(result.steps).toHaveLength(14);
       expect(result.steps[4].id).toBe('_permanent_seed_place_listing');
-      expect(result.steps[8].id).toBe('_permanent_pitch_free_claim');
+      expect(result.steps[8].id).toBe('_permanent_generate_claim_qr_kit');
+      expect(result.steps[9].id).toBe('_permanent_pitch_free_claim');
     });
   });
 
@@ -516,15 +519,16 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
 
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
-      // 9 seed steps + 3 outreach steps lead; 2 DB steps follow.
-      expect(result.steps).toHaveLength(14);
-      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+      // 10 seed steps + 4 outreach steps lead; 2 DB steps follow.
+      expect(result.steps).toHaveLength(16);
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
       expect(result.steps[0].id).toBe('_permanent_identify_category');
       expect(result.steps[3].id).toBe('_permanent_verify_operational');
       expect(result.steps[4].id).toBe('_permanent_seed_place_listing');
-      expect(result.steps[8].id).toBe('_permanent_pitch_free_claim');
-      expect(result.steps[9].title).toBe('Open Pitch Construction');
-      expect(result.steps[12].id).toBe(STEP_ID);
+      expect(result.steps[8].id).toBe('_permanent_generate_claim_qr_kit');
+      expect(result.steps[9].id).toBe('_permanent_pitch_free_claim');
+      expect(result.steps[10].title).toBe('Open Pitch Construction');
+      expect(result.steps[14].id).toBe(STEP_ID);
       // Only the required DB step counts toward the gate.
       expect(result.requiredTotal).toBe(1);
     });
@@ -552,13 +556,15 @@ describe('PlaybookChecklistService — campaign checklist resolution', () => {
       const result = await PlaybookChecklistService.getCampaignChecklist(CAMPAIGN_ID);
 
       expect(result.playbook).toMatchObject({ id: PLAYBOOK_ID, isOverride: false });
-      // 2 DB steps + 3 permanent steps injected after the first DB step
-      // (seek stage). Display order: Review(1), Pitch(2), Preview(3), Call(4), step2(5).
-      expect(result.steps).toHaveLength(5);
-      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5]);
+      // 2 DB steps + 4 permanent steps injected after the first DB step
+      // (seek stage). Display order: Review(1), Pitch(2), Preview(3), Call(4),
+      // DeliverReport(5), step2(6).
+      expect(result.steps).toHaveLength(6);
+      expect(result.steps.map((s) => s.stepOrder)).toEqual([1, 2, 3, 4, 5, 6]);
       expect(result.steps[1].title).toBe('Open Pitch Construction');
       expect(result.steps[2].title).toBe('Open Preview Deliverable / Approach Kit');
       expect(result.steps[3].title).toBe('Open Call Script');
+      expect(result.steps[4].title).toBe('Deliver the report (QR / tracked link)');
       expect(result.completedCount).toBe(1);
       expect(result.requiredTotal).toBe(1);
       expect(result.requiredCompleted).toBe(1);

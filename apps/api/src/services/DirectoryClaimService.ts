@@ -1036,6 +1036,18 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
           error: { name: err?.name || 'Error', message: err?.message || String(err) },
         });
       }
+
+      // Spec §5.3.2 — terminal delivery lifecycle outcome (report_claimed).
+      // Best-effort: never blocks the claim.
+      try {
+        const { default: reportDelivery } = await import('./intelligence/SeedReportDeliveryService.js');
+        await reportDelivery.recordClaimed(r.seed_id);
+      } catch (err: any) {
+        logger.warn('DirectoryClaimService: post-claim report_claimed touch failed', undefined, {
+          seedId: r.seed_id,
+          error: { name: err?.name || 'Error', message: err?.message || String(err) },
+        });
+      }
     }
 
     await this.promoteListingToClaimed(r.tenant_id);
@@ -1313,6 +1325,17 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         await SeedIntelligenceReportService.getInstance().refreshReport(r.seed_id);
       } catch (err: any) {
         logger.warn('DirectoryClaimService: post-claim report refresh failed', undefined, {
+          seedId: r.seed_id,
+          error: { name: err?.name || 'Error', message: err?.message || String(err) },
+        });
+      }
+
+      // Spec §5.3.2 — terminal delivery lifecycle outcome (report_claimed).
+      try {
+        const { default: reportDelivery } = await import('./intelligence/SeedReportDeliveryService.js');
+        await reportDelivery.recordClaimed(r.seed_id);
+      } catch (err: any) {
+        logger.warn('DirectoryClaimService: post-claim report_claimed touch failed', undefined, {
           seedId: r.seed_id,
           error: { name: err?.name || 'Error', message: err?.message || String(err) },
         });

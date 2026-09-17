@@ -31,7 +31,7 @@ import type { CampaignChecklistStepView } from './PlaybookChecklistService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-export type OutreachArtifactKind = 'opener' | 'follow_up' | 'pitch' | 'contact_log';
+export type OutreachArtifactKind = 'opener' | 'follow_up' | 'pitch' | 'contact_log' | 'qr_kit' | 'report_delivery';
 
 export interface StepSatisfaction {
   satisfied: boolean;
@@ -181,6 +181,26 @@ export class OutreachChecklistBridgeService extends BaseService {
             ? { satisfied: true, artifactId: row.id, artifactDate: new Date(row.created_at) }
             : { satisfied: false, artifactId: null, artifactDate: null };
         }
+        // Spec §5.4 — QR artifact kinds are satisfied by a seed-outreach touch
+        // on the campaign's linked seed (claim_qr_generated / report_delivered+).
+        case 'qr_kit':
+        case 'report_delivery': {
+          const seedId = await this.resolveCampaignSeedId(campaignId);
+          if (!seedId) return { satisfied: false, artifactId: null, artifactDate: null };
+          const outcomes = kind === 'qr_kit'
+            ? ['claim_qr_generated']
+            : ['report_delivered', 'report_viewed', 'report_claimed'];
+          const rows = await this.prisma.$queryRaw<any[]>`
+            SELECT id, occurred_at FROM directory_seed_outreach_touches
+            WHERE seed_id = ${seedId}
+              AND outcome = ANY(${outcomes}::text[])
+            ORDER BY occurred_at DESC
+            LIMIT 1
+          `;
+          return rows[0]
+            ? { satisfied: true, artifactId: rows[0].id, artifactDate: new Date(rows[0].occurred_at) }
+            : { satisfied: false, artifactId: null, artifactDate: null };
+        }
         default:
           return { satisfied: false, artifactId: null, artifactDate: null };
       }
@@ -218,11 +238,32 @@ export class OutreachChecklistBridgeService extends BaseService {
           return `${BASE}/openers?campaign=${campaignId}&tab=pitch`;
         case 'contact_log':
           return `${BASE}/campaigns/${campaignId}?tab=overview`;
+        case 'qr_kit':
+        case 'report_delivery':
+          // QR artifacts live on the seed detail page (Overview → Spawned
+          // Place Listings). The campaign overview is the sync-safe landing
+          // spot — the seed link is one click away.
+          return `${BASE}/campaigns/${campaignId}?tab=overview`;
         default:
           return null;
       }
     }
     return null;
+  }
+
+  /** Latest seed linked to a campaign, or null. */
+  private async resolveCampaignSeedId(campaignId: string): Promise<string | null> {
+    try {
+      const rows = await this.prisma.$queryRaw<any[]>`
+        SELECT seed_id FROM directory_seed_campaign_links
+        WHERE campaign_id = ${campaignId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      return rows[0]?.seed_id ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /**

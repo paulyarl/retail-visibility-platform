@@ -189,6 +189,41 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
   };
 }
 
+/**
+ * Record that a claim QR kit artifact was generated for a seed (spec §5.4).
+ * Idempotent per seed; best-effort (never blocks the download). The touch
+ * satisfies the "Generate the claim QR kit" checklist step via the outreach
+ * bridge's `qr_kit` artifact kind.
+ */
+export async function recordClaimQrKitGenerated(seedId: string): Promise<void> {
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO directory_seed_outreach_touches (
+        id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+      )
+      SELECT
+        gen_random_uuid(),
+        ${seedId},
+        (SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId}),
+        'other',
+        'claim_qr_generated',
+        'Claim QR kit generated',
+        NULL,
+        now(),
+        now()
+      WHERE NOT EXISTS (
+        SELECT 1 FROM directory_seed_outreach_touches
+        WHERE seed_id = ${seedId} AND outcome = 'claim_qr_generated'
+      )
+    `;
+  } catch (err: any) {
+    logger.warn('ClaimInviteQrKitService.recordClaimQrKitGenerated failed', undefined, {
+      seedId,
+      error: { name: err?.name || 'Error', message: err?.message || String(err) },
+    });
+  }
+}
+
 /** Pick the tracked URL for a delivery variant. */
 function kitUrlForVariant(kit: ClaimInviteQrKit, variant: ClaimInviteQrVariant): string {
   if (variant === 'walkin') return kit.qrUrlWalkin;
@@ -227,6 +262,7 @@ export async function generateClaimInvitePng(
   const filename = `claim-qr-${safeName}${variant === 'mail' ? '' : `-${variant}`}.png`;
 
   logger.info('ClaimInviteQrKitService.generateClaimInvitePng', undefined, { seedId, qrUrl, variant });
+  await recordClaimQrKitGenerated(seedId);
   return { pngBuffer, filename };
 }
 
@@ -352,6 +388,7 @@ export async function generateClaimInvitePostcard(
   const filename = `claim-postcard-${safeName}${variant === 'mail' ? '' : `-${variant}`}.pdf`;
 
   logger.info('ClaimInviteQrKitService.generateClaimInvitePostcard', undefined, { seedId, qrUrl, variant });
+  await recordClaimQrKitGenerated(seedId);
   return { pdfBuffer, filename };
 }
 

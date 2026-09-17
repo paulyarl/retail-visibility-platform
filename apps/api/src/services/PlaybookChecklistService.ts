@@ -130,10 +130,12 @@ const PERMANENT_STEP_IDS = {
   qcSeed: '_permanent_qc_seed',
   mintClaimToken: '_permanent_mint_claim_token',
   publishSeed: '_permanent_publish_seed',
+  generateClaimQrKit: '_permanent_generate_claim_qr_kit',
   pitchFreeClaim: '_permanent_pitch_free_claim',
   pitchConstruction: '_permanent_pitch_construction',
   previewDeliverable: '_permanent_preview_deliverable',
   callScript: '_permanent_call_script',
+  deliverReportQr: '_permanent_deliver_report_qr',
 } as const;
 
 // ─── Seed-first wedge steps ───────────────────────────────────────────────
@@ -144,10 +146,11 @@ const PERMANENT_STEP_IDS = {
 // preview_built, framed as the upgrade that eases the pain the audit
 // surfaced (migration 276 retags the "Review triage signals" steps).
 //
-// The wedge is a fixed 9-step sub-flow so every business campaign runs the
+// The wedge is a fixed 10-step sub-flow so every business campaign runs the
 // same seed pipeline: identify the category → set categories → business
 // audit → verify operational status by phone (optional) → create the seed
-// → QC → mint the claim token → verify live → invite the owner to claim.
+// → QC → publish → mint the claim token → generate the claim QR kit →
+// invite the owner to claim.
 //
 // These steps are code-defined (not DB template rows) because they must be
 // visible BEFORE a playbook is assigned — the seed precedes triage. They
@@ -277,9 +280,24 @@ const PERMANENT_SEED_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outrea
     updatedAt: new Date(0),
   },
   {
-    id: PERMANENT_STEP_IDS.pitchFreeClaim,
+    id: PERMANENT_STEP_IDS.generateClaimQrKit,
     playbookId: '_permanent',
     stepOrder: 9,
+    title: 'Generate the claim QR kit',
+    instructions:
+      'On the seed detail page, open the Claim QR Kit and download the artifact for the delivery channel — mail postcard, walk-in card (4x6 leave-behind), or the tracked social/email link. The QR encodes a tracked redirect, so the scan is recorded before the owner lands on the claim page. Recorded as a "claim_qr_generated" touch, so this step auto-satisfies once the kit is generated.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'seed',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.pitchFreeClaim,
+    playbookId: '_permanent',
+    stepOrder: 10,
     title: 'Invite the owner to claim (free, no obligation)',
     instructions:
       'Share the claim link with the owner — claiming is free and lets them fix hours, phone, and photos. Contact the owner on the best channel and log the outcome. The demonstrated goodwill becomes the wedge: the paid pitch lands at preview_built as the upgrade that eases the pain the audit surfaced.',
@@ -330,6 +348,21 @@ const PERMANENT_STEPS: Omit<CampaignChecklistStepView, 'progress' | 'outreachSta
     instructions: 'Use the five-stage cold-call workspace to place a phone outreach call.',
     stepType: 'internal_link',
     actionConfig: { target: 'openers_workspace', params: { tab: 'call' } },
+    isRequired: false,
+    isActive: true,
+    stageTag: 'preview_built',
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  },
+  {
+    id: PERMANENT_STEP_IDS.deliverReportQr,
+    playbookId: '_permanent',
+    stepOrder: 5,
+    title: 'Deliver the report (QR / tracked link)',
+    instructions:
+      'Deliver the seed intelligence report with the channel\'s tracked QR or short link — in-person card, text, email, or social — so the scan is recorded before the owner reads it. The tracked URLs are available as {{qr_url_report_*}} / {{report_url}} merge variables in the pitch, call script, and manual play templates. Auto-satisfies once a "report_delivered" touch is logged.',
+    stepType: 'internal_link',
+    actionConfig: { target: 'campaign_tab', params: { tab: 'overview' } },
     isRequired: false,
     isActive: true,
     stageTag: 'preview_built',

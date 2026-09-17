@@ -22,6 +22,10 @@ import type { RequestCtx } from '../../context';
 import { NotFoundError } from '../../middleware/errorHandler';
 import { generateOutreachPitchId } from '../../lib/id-generator';
 import { renderPitchText, type ReviewPair, type AssemblePitchInput, type FootprintFocusAttribute, FOOTPRINT_FOCUS_LABELS } from './pitch-renderer';
+import {
+  buildOutreachLinkVars,
+  resolveCampaignSeedId,
+} from '../outreach-openers/outreach-link-vars';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -132,12 +136,25 @@ export class PitchService extends BaseService {
     }
 
     // ── Render the assembled pitch text ──
+    // Spec §5.6 — optional tracked CTA/QR block. Prefer the tracked report
+    // link (records a scan), fall back to the claim short URL. Best-effort.
+    let ctaUrl: string | null = null;
+    try {
+      const seedId = await resolveCampaignSeedId(input.campaignId);
+      const linkVars = await buildOutreachLinkVars(seedId);
+      ctaUrl = linkVars.qr_url_report_in_person ?? linkVars.report_url ?? linkVars.claim_short_url ?? null;
+    } catch {
+      ctaUrl = null;
+    }
+
     const assembledText = renderPitchText({
       openerText: opener.opener_text,
       headerText: header?.header_text ?? null,
       reviewPairs: input.reviewPairs,
       closerText: closer?.closer_text ?? null,
       contactText: contact?.contact_text ?? null,
+      ctaUrl,
+      ctaLabel: ctaUrl ? 'Scan or tap to view your report:' : null,
     });
 
     // ── Persist ──

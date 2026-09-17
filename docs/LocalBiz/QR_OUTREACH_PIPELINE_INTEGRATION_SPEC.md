@@ -160,7 +160,9 @@ Shipped as `database/migrations/289_seed_outreach_touch_report_outcomes.sql`:
 
 Remaining for §5.3.2: the lifecycle write-back that emits `report_viewed` / `report_claimed` / `report_declined`.
 
-**5.3.2 Add the lifecycle.** Give a delivered artifact a state machine on `directory_seed_outreach_touches.outcome`:
+**5.3.2 Add the lifecycle. — SHIPPED**
+
+State machine on `directory_seed_outreach_touches.outcome`:
 
 ```text
 report_delivered  (send side — exists)
@@ -170,21 +172,22 @@ report_viewed     (qr_scan_events row mapped back)
 report_claimed    (claim token consumed)  |  report_declined (explicit not_interested)
 ```
 
-- Add the new outcomes to the seed-touch taxonomy **and the outcome CHECK** (§5.3.1).
-- Add a small reconciliation helper (e.g. `SeedReportDeliveryService.recordViewFromScan(seedId, channel)`) invoked best-effort from `seed-report-qr.ts` after `trackQrScanEvent`, and/or a job that sweeps `qr_scan_events.product_id = seedId` into `report_viewed` touches.
-- Idempotency: mirror `recordDeliveryEvent`'s `WHERE NOT EXISTS` guard so repeated scans do not duplicate touches.
+- ✅ Outcomes added to the seed-touch taxonomy **and the outcome CHECK** (§5.3.1).
+- ✅ `SeedReportDeliveryService.recordViewFromScan(seedId, channel)` — idempotent per (seed, canonical channel) `report_viewed` touch; called best-effort from both `seed-report-qr.ts` routes (seed-id + short-code) after the scan is recorded.
+- ✅ `SeedReportDeliveryService.recordClaimed(seedId)` — idempotent `report_claimed` touch; called best-effort from both claim paths (`DirectoryClaimService.acceptClaim`, `approveClaimRequest`) next to the existing report refresh.
+- ⬜ `report_declined` — the outcome is permitted by the CHECK but no producer writes it yet (would hook the explicit `not_interested` outcome).
 
-### 5.4 Outreach artifact kind + checklist steps (G3, G4)
+### 5.4 Outreach artifact kind + checklist steps (G3, G4) — SHIPPED
 
-- Extend `OutreachArtifactKind` with `qr_kit` and `report_delivery`.
-- `checkStepSatisfaction`:
-  - `qr_kit` — satisfied when a claim kit has been generated for the seed (a `claim_qr_generated` touch — add it to the outcome CHECK — or a dedicated generation stamp). Prefer a touch outcome over a new table so the cadence sees it.
-  - `report_delivery` — satisfied when a `report_delivered` (or later) touch exists.
-- Add permanent steps in `PlaybookChecklistService`:
-  - `_permanent_generate_claim_qr_kit` — stage `seed`, order after `mintClaimToken`; instructions: download the claim kit (PNG/postcard), pick the variant for the channel.
-  - `_permanent_deliver_report_qr` — stage `preview_built`; instructions: deliver the report via the channel's tracked QR/link and log the outcome.
-- Add the missing PG-01 preflight step(s) to `seed-proving-ground-preflight.ts` ("Generate claim-invite QR kits", and optionally "Generate report-delivery QR kit" once a report exists), with `step_type` + `action_config` deep-linking to the seed QR section (see §5.4.1).
-- Add a `qr_kit` case to `resolveStepDeepLink` and an `internal_link` target that opens the seed-detail QR section.
+- ✅ `OutreachArtifactKind` extended with `qr_kit` and `report_delivery`.
+- ✅ `checkStepSatisfaction`:
+  - `qr_kit` — satisfied by a `claim_qr_generated` touch on the campaign's linked seed (`resolveCampaignSeedId` helper).
+  - `report_delivery` — satisfied by any of `report_delivered` / `report_viewed` / `report_claimed`.
+- ✅ New permanent steps in `PlaybookChecklistService`: `_permanent_generate_claim_qr_kit` (stage `seed`, order 9) and `_permanent_deliver_report_qr` (stage `preview_built`, order 5). Seed wedge is now 10 steps; outreach-access is 4.
+- ✅ `ClaimInviteQrKitService.recordClaimQrKitGenerated(seedId)` writes the idempotent `claim_qr_generated` touch from both artifact producers (PNG + postcard) — the satisfaction signal.
+- ✅ `resolveStepDeepLink` returns the campaign overview for both QR kinds. **Deviation from §5.4.1:** the deep link resolver is synchronous, so the seed-detail `seed_qr_kit` target is not wired — both QR steps land on the campaign overview (seed link is one click away). Deferred.
+- ⬜ Auto-complete: `onOutreachArtifactCreated` is not called for QR kinds (the steps are `isRequired: false` guidance); satisfaction still renders via `enrichStepViews`.
+- ⬜ PG-01 preflight QR step — covered by §5.5.
 
 #### 5.4.1 Deep-link targets
 
@@ -194,20 +197,15 @@ Add a target in `OutreachChecklistBridgeService.resolveInternalLinkUrl`:
 
 Reuse the existing `proving_ground_section` target for PG-scoped steps.
 
-### 5.5 Playbook delivery artifacts (G1, G2)
+### 5.5 Playbook delivery artifacts (G1, G2) — PARTIALLY SHIPPED
 
-Add a `delivery_artifacts` jsonb to `mkt_playbook_catalog` (nullable; default `[]`) describing the kits a play ships, e.g.:
-
-```json
-[
-  { "kind": "claim_qr", "variants": ["mail", "walkin"] },
-  { "kind": "report_qr", "channels": ["in_person", "text"] }
-]
-```
-
-Then the checklist builder materializes the matching QR steps per playbook (instead of a fixed permanent list), and PG-01 declares `claim_qr` + `report_qr`. Seeding follows the marker-presence idempotency rule (AGENTS.md) and requires a migration for the column + a re-run of `seed-proving-ground-preflight.ts` against `local` and `prd`.
-
-> Alternative: reuse `preview_deliverable_type` as a string tag (`profile_repair_preview+claim_qr`). Rejected — it conflates the preview deliverable with delivery artifacts and forces string parsing.
+- ✅ Migration `290_mkt_playbook_delivery_artifacts.sql` adds `mkt_playbook_catalog.delivery_artifacts` jsonb NOT NULL DEFAULT `'[]'` and seeds PG-01's declaration inline (the PG-01 seed script does not set the column, so a re-run will not clobber it):
+  ```json
+  [{"kind":"claim_qr","variants":["mail","walkin"]},{"kind":"report_qr","channels":["in_person","text"]}]
+  ```
+- ✅ PG-01 preflight gained step 13 "Generate claim-invite QR kits" (`seed-proving-ground-preflight.ts`), matching `PROVING_GROUND_CAMPAIGN_SPEC.md` §4.10 step 3; reconcile/enrich shifted to 14/15.
+- ⬜ **Deferred:** the checklist builder does not yet materialize QR steps *from* `delivery_artifacts` — the QR steps are the fixed permanent steps from §5.4. The column is declarative until that lands.
+- Apply: `psql $DATABASE_URL -f database/migrations/290_mkt_playbook_delivery_artifacts.sql` against `local` + `prd`, then `prisma db pull && pnpm prisma generate`, then re-run `seed-proving-ground-preflight.ts` against `local` + `prd`.
 
 ### 5.6 Content (G5, G8)
 
@@ -218,12 +216,12 @@ Then the checklist builder materializes the matching QR steps per playbook (inst
   - Update `whatsapp_availability_upsell`'s script to offer the report link/card as the delivery step.
 - **Call scripts:** add walk-in-card language to `assembleForSeed`'s `claim_ask`/`close` ("I can leave a card with a code, or text you the link") and expose the QR URLs on `callContext` so the UI can render a copy button.
 
-### 5.7 Analytics + funnel (G9)
+### 5.7 Analytics + funnel (G9) — SHIPPED
 
-- Add `report_delivery_phone|email|social|in_person|text` to `QrSurfaceType` and `SURFACE_LABELS` in **both** `apps/api/src/services/QrAnalyticsService.ts` and the `apps/web` mirror.
-- Replace the `surface as any` cast in `seed-report-qr.ts` with the typed surface.
-- Add `report_scans` + `report_scan_rate` (+ per-channel) to `SeedFunnelAnalyticsService`, mirroring the `invite_scans*` block, filtering `surface LIKE 'report_delivery_%'`.
-- No DB migration required (no CHECK on `surface`). Optionally add a comment-only migration updating `COMMENT ON COLUMN qr_scan_events.surface` for documentation parity.
+- ✅ Added `report_delivery_phone|email|social|in_person|text` to `QrSurfaceType` + `SURFACE_LABELS` in both `apps/api/src/services/QrAnalyticsService.ts` and `apps/web/src/services/QrAnalyticsService.ts` (the web mirror also gained the previously-missing `claim_invite_email`).
+- ✅ Removed the `surface as any` casts in `seed-report-qr.ts` — `SURFACE_MAP` / `validSurfaces` are now typed `QrSurfaceType`.
+- ✅ Added `reportScans` + `reportScanRate` + per-channel (phone/email/social/in_person/text) to `SeedFunnelAnalyticsService`, mirroring the `invite_scans*` block with `surface LIKE 'report_delivery_%'`; zero-state and web mirror (`DirectoryPresenceAdminService.ts`) updated; funnel admin page renders a report-scan panel.
+- ✅ No DB migration required (no CHECK on `surface`).
 
 ### 5.8 Cadence automation (G11)
 

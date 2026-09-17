@@ -535,7 +535,8 @@ export class CallScriptService extends BaseService {
 
     const close = mergeText(
       'Thanks for confirming — I\'ll make sure the record reflects what you told me. ' +
-      'I can text or email you the report link so you can review it when it\'s convenient.',
+      'I can text or email you the report link so you can review it when it\'s convenient — ' +
+      'or leave a card with a code you can scan on the go.',
     );
 
     return {

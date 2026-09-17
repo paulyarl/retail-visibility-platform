@@ -651,6 +651,18 @@ function buildReport(
         inviteScanRateMail: null,
         inviteScanRateWalkin: null,
         inviteScanRateSocial: null,
+        reportScans: 0,
+        reportScanRate: null,
+        reportScansPhone: 0,
+        reportScansEmail: 0,
+        reportScansSocial: 0,
+        reportScansInPerson: 0,
+        reportScansText: 0,
+        reportScanRatePhone: null,
+        reportScanRateEmail: null,
+        reportScanRateSocial: null,
+        reportScanRateInPerson: null,
+        reportScanRateText: null,
       };
   const { gates, grade } = gradeGates(metrics);
   const report: CohortFunnelReport = {

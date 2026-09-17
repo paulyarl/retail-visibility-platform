@@ -185,6 +185,36 @@ describe('SeedReportDeliveryService', () => {
     expect(note).toContain('delivered via in_person');
   });
 
+  describe('delivery lifecycle write-back (§5.3.2)', () => {
+    it('records an idempotent report_viewed touch with the canonical channel', async () => {
+      await SeedReportDeliveryService.recordViewFromScan('seed-1', 'in_person');
+
+      expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
+      const [strings] = mockExecuteRaw.mock.calls[0];
+      const sql = strings.join('?');
+      expect(sql).toContain('INSERT INTO directory_seed_outreach_touches');
+      expect(sql).toContain('WHERE NOT EXISTS');
+      expect(sql).toContain("'report_viewed'");
+      expect(emittedValues()).toContain('visit');
+    });
+
+    it('records an idempotent report_claimed touch', async () => {
+      await SeedReportDeliveryService.recordClaimed('seed-1');
+
+      const [strings] = mockExecuteRaw.mock.calls[0];
+      const sql = strings.join('?');
+      expect(sql).toContain('WHERE NOT EXISTS');
+      expect(sql).toContain("'report_claimed'");
+    });
+
+    it('never throws when the write fails (best-effort)', async () => {
+      mockExecuteRaw.mockRejectedValueOnce(new Error('db down'));
+      await expect(
+        SeedReportDeliveryService.recordViewFromScan('seed-1', 'text'),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe('CHECK-constraint parity (G12 regression)', () => {
     it.skipIf(!migrationsDir)(
       'emitted channels are all permitted by the effective channel CHECK',
@@ -209,7 +239,7 @@ describe('SeedReportDeliveryService', () => {
     );
 
     it.skipIf(!migrationsDir)(
-      "the 'report_delivered' outcome is permitted by the effective outcome CHECK",
+      "the report lifecycle outcomes are permitted by the effective outcome CHECK",
       () => {
         const allowed = effectiveAllowedValues(
           migrationsDir as string,
@@ -217,10 +247,18 @@ describe('SeedReportDeliveryService', () => {
           'outcome',
         );
         expect(allowed.size).toBeGreaterThan(0);
-        expect(
-          allowed.has('report_delivered'),
-          `'report_delivered' is not in the CHECK set: ${[...allowed].join(', ')}`,
-        ).toBe(true);
+        for (const outcome of [
+          'report_delivered',
+          'report_viewed',
+          'report_claimed',
+          'report_declined',
+          'claim_qr_generated',
+        ]) {
+          expect(
+            allowed.has(outcome),
+            `'${outcome}' is not in the CHECK set: ${[...allowed].join(', ')}`,
+          ).toBe(true);
+        }
       },
     );
   });

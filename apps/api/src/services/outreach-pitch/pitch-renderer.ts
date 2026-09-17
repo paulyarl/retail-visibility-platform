@@ -97,6 +97,13 @@ export interface PitchRenderInput {
   reviewPairs: ReviewPair[];
   closerText: string | null;
   contactText: string | null;
+  /**
+   * Optional tracked CTA/QR block (spec §5.6) — the report/claim tracked short
+   * URL the operator can paste or encode as a QR. Omitted on legacy pitches so
+   * they render unchanged.
+   */
+  ctaUrl?: string | null;
+  ctaLabel?: string | null;
 }
 
 export interface AssemblePitchInput {
@@ -168,7 +175,7 @@ function renderStructuredFootprintSlot(pair: ReviewPair, slotName: string, evide
  * the operator ordered them in the input.
  */
 export function renderPitchText(input: PitchRenderInput): string {
-  const { openerText, headerText, reviewPairs, closerText, contactText } = input;
+  const { openerText, headerText, reviewPairs, closerText, contactText, ctaUrl, ctaLabel } = input;
 
   // Order: negative-first slot first, then the rest in original order.
   const negativeFirst = reviewPairs.find((p) => p.is_negative_first);
@@ -220,6 +227,14 @@ export function renderPitchText(input: PitchRenderInput): string {
   lines.push('');
   lines.push(closerText ? closerText.trim() : '(closer not set)');
   lines.push('');
+
+  // Optional tracked CTA/QR block (spec §5.6) — omitted when no tracked link
+  // resolves, so legacy pitches are unchanged.
+  if (ctaUrl && ctaUrl.trim()) {
+    lines.push(ctaLabel && ctaLabel.trim() ? ctaLabel.trim() : 'Scan or tap to view your report:');
+    lines.push(ctaUrl.trim());
+    lines.push('');
+  }
 
   if (contactText && contactText.trim()) {
     lines.push(`My Contact:  ${contactText.trim()}`);

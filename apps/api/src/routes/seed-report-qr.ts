@@ -91,6 +91,19 @@ async function recordReportScanAndRedirect(
     // Scan tracking failure — don't block the redirect
   }
 
+  // §5.3.2 lifecycle: write the *view* side of the delivery so the funnel and
+  // cadence see delivered → viewed. Best-effort, never blocks the redirect.
+  if (seedId && VALID_CHANNELS.has(channel as ReportDeliveryChannel)) {
+    try {
+      const { default: reportDelivery } = await import(
+        '../services/intelligence/SeedReportDeliveryService'
+      );
+      await reportDelivery.recordViewFromScan(seedId, channel as ReportDeliveryChannel);
+    } catch {
+      // View write-back failure — the scan row is still recorded
+    }
+  }
+
   res.redirect(302, `${WEB_URL}/seed-report/${seedId}`);
 }
 
@@ -180,6 +193,21 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
 
   if (!seedId) {
     return res.status(404).json({ error: 'not_found' });
+  }
+
+  // §5.3.2 lifecycle: write the view side of the delivery (best-effort).
+  try {
+    const channel = (Object.keys(validSurfaces) as ReportDeliveryChannel[]).find(
+      (c) => validSurfaces[c] === resolvedSurface,
+    );
+    if (channel) {
+      const { default: reportDelivery } = await import(
+        '../services/intelligence/SeedReportDeliveryService'
+      );
+      await reportDelivery.recordViewFromScan(seedId, channel);
+    }
+  } catch {
+    // View write-back failure — the scan row is still recorded
   }
 
   res.json({ success: true, seedId });

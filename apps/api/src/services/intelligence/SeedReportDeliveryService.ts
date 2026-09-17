@@ -59,6 +59,19 @@ const WEB_BASE_URL = (
 
 const DEFAULT_QR_SIZE = 512;
 
+// Report-delivery channel → canonical directory_seed_outreach_touches.channel.
+// The channel CHECK (migrations 259/262/273) allows only
+// call|email|sms|mail|form|referral|visit|other — the report channels map
+// onto that set rather than extending the constraint (spec §5.3.1). The
+// human-readable channel name is preserved in the delivery note.
+const TOUCH_CHANNELS: Record<ReportDeliveryChannel, string> = {
+  phone: 'call',
+  text: 'sms',
+  social: 'other',
+  in_person: 'visit',
+  email: 'email',
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type ReportDeliveryChannel = 'phone' | 'email' | 'social' | 'in_person' | 'text';
@@ -333,19 +346,6 @@ export class SeedReportDeliveryService extends BaseService {
     operatorId: string | null,
     ctx?: RequestCtx,
   ): Promise<void> {
-    // Report-delivery channel → canonical directory_seed_outreach_touches.channel.
-    // The channel CHECK (migrations 259/262/273) allows only
-    // call|email|sms|mail|form|referral|visit|other — the report channels map
-    // onto that set rather than extending the constraint (spec §5.3.1). The
-    // human-readable channel name is preserved in the delivery note.
-    const TOUCH_CHANNELS: Record<ReportDeliveryChannel, string> = {
-      phone: 'call',
-      text: 'sms',
-      social: 'other',
-      in_person: 'visit',
-      email: 'email',
-    };
-
     try {
       const deliveryNote = `Report v${kit.reportVersion} delivered via ${channel}. QR: ${this.qrUrlForChannel(kit, channel)}`;
       await this.prisma.$executeRaw`
@@ -384,6 +384,94 @@ export class SeedReportDeliveryService extends BaseService {
         channel,
       });
       // Best-effort — don't fail the delivery if the touch log fails
+    }
+  }
+
+  // ─── Delivery lifecycle write-back (spec §13.6 / §5.3.2) ──────────────
+
+  /**
+   * Record the *view* side of a report delivery. Called best-effort when the
+   * tracked report QR redirect records a scan, so the funnel/cadence see
+   * "delivered → viewed" instead of only the send side.
+   *
+   * Idempotent per (seed, canonical channel): at most one `report_viewed`
+   * touch per delivery channel. Never throws.
+   */
+  async recordViewFromScan(
+    seedId: string,
+    channel: ReportDeliveryChannel = 'in_person',
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const touchChannel = TOUCH_CHANNELS[channel];
+    const note = `Report viewed via ${channel} QR`;
+    try {
+      await this.prisma.$executeRaw`
+        INSERT INTO directory_seed_outreach_touches (
+          id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+        )
+        SELECT
+          ${randomUUID()}::uuid,
+          ${seedId},
+          (SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId}),
+          ${touchChannel},
+          'report_viewed',
+          ${note},
+          NULL,
+          now(),
+          now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM directory_seed_outreach_touches
+          WHERE seed_id = ${seedId}
+            AND channel = ${touchChannel}
+            AND outcome = 'report_viewed'
+        )
+      `;
+      this.logOperation('SeedReportDeliveryService.recordViewFromScan', { seedId, channel });
+    } catch (err: any) {
+      logger.error('SeedReportDeliveryService: recordViewFromScan failed', ctx, {
+        error: err.message,
+        seedId,
+        channel,
+      });
+    }
+  }
+
+  /**
+   * Record that the owner claimed the seed after a report delivery — the
+   * terminal lifecycle outcome (spec §13.6). Idempotent: at most one
+   * `report_claimed` touch per seed. Never throws.
+   */
+  async recordClaimed(seedId: string, ctx?: RequestCtx): Promise<void> {
+    const note = 'Report claim completed';
+    try {
+      await this.prisma.$executeRaw`
+        INSERT INTO directory_seed_outreach_touches (
+          id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+        )
+        SELECT
+          ${randomUUID()}::uuid,
+          ${seedId},
+          (SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId}),
+          'other',
+          'report_claimed',
+          ${note},
+          NULL,
+          now(),
+          now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM directory_seed_outreach_touches
+          WHERE seed_id = ${seedId}
+            AND outcome = 'report_claimed'
+        )
+      `;
+      this.logOperation('SeedReportDeliveryService.recordClaimed', { seedId });
+    } catch (err: any) {
+      logger.error('SeedReportDeliveryService: recordClaimed failed', ctx, {
+        error: err.message,
+        seedId,
+      });
     }
   }
 
