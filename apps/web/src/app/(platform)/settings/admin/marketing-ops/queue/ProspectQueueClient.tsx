@@ -694,17 +694,14 @@ export default function ProspectQueueClient() {
   // ─── Render ────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div>
+      <div className="space-y-4">
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Prospect Queue</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {queuedCount} queued prospect{queuedCount !== 1 ? 's' : ''} awaiting action
-            </p>
-          </div>
+        {/* Header — the shell owns the page title; this is the queue toolbar */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {queuedCount} queued prospect{queuedCount !== 1 ? 's' : ''} awaiting action
+          </p>
           <div className="flex items-center gap-2">
             {/* List / Board view toggle */}
             <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">

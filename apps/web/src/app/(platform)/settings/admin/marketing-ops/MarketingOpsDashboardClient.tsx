@@ -8,6 +8,9 @@ import FollowUpsDueWidget from '@/components/marketing-ops/FollowUpsDueWidget';
 import ReviewFollowUpsDueWidget from '@/components/marketing-ops/ReviewFollowUpsDueWidget';
 import HotProspectsWidget from '@/components/marketing-ops/HotProspectsWidget';
 import ProspectQueueWidget from '@/components/marketing-ops/ProspectQueueWidget';
+import MotionsOverview from '@/components/marketing-ops/MotionsOverview';
+import OutreachHealthWidget from '@/components/marketing-ops/OutreachHealthWidget';
+import { NAV_ITEMS } from '@/components/marketing-ops/MarketingOpsNavPanel';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
   seek: 'Seek',
@@ -39,6 +42,23 @@ const STAGE_COLORS: Record<CampaignStage, string> = {
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'tenant_onboarded'];
 
+const SCOPE_LABELS: Record<string, string> = {
+  business: 'Business prospects',
+  category: 'Category',
+  city: 'City',
+  intelligence: 'Intelligence',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  prospect: 'Prospect',
+  review_management: 'Review Management',
+  recovery_management: 'Recovery',
+  profile_repair: 'Profile Repair',
+  triage_management: 'Triage',
+  proving_ground: 'Proving Ground',
+  directory_enrichment: 'Directory Enrichment',
+};
+
 function SourceBreakdown({ title, data }: { title: string; data: Record<string, number> }) {
   const entries = Object.entries(data || {});
   return (
@@ -51,6 +71,27 @@ function SourceBreakdown({ title, data }: { title: string; data: Record<string, 
           {entries.map(([source, count]) => (
             <div key={source} className="flex items-center justify-between text-sm">
               <span className="text-gray-700 dark:text-gray-300 capitalize">{source.replace(/_/g, ' ')}</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MixBreakdown({ title, data, labels }: { title: string; data?: Record<string, number>; labels: Record<string, string> }) {
+  const entries = Object.entries(data || {}).sort((a, b) => b[1] - a[1]);
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{title}</p>
+      {entries.length === 0 ? (
+        <p className="text-xs text-gray-400 dark:text-gray-500">No campaigns yet</p>
+      ) : (
+        <div className="space-y-1">
+          {entries.map(([key, count]) => (
+            <div key={key} className="flex items-center justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300">{labels[key] ?? key.replace(/_/g, ' ')}</span>
               <span className="font-semibold text-gray-900 dark:text-white">{count}</span>
             </div>
           ))}
@@ -117,209 +158,207 @@ export default function MarketingOpsDashboardClient() {
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toLocaleString()}`;
 
+  const quickActions = NAV_ITEMS.filter((item) => item.href !== '/settings/admin/marketing-ops');
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-6">
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Marketing Ops Dashboard</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Campaign pipeline health, conversion metrics, and revenue tracking
-              {lastUpdated && (
-                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                  · Updated {lastUpdated.toLocaleTimeString()}
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
-            >
-              <Download className="w-4 h-4" />
-              {exporting ? 'Exporting...' : 'Export CSV'}
-            </button>
-            <button
-              onClick={fetchDashboard}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-          </div>
-        )}
-
-        {/* Tab switcher — Dashboard is the current page; Recovery links to its own route */}
-        <div className="mb-6 border-b border-gray-200 dark:border-neutral-700">
-          <nav className="flex gap-4">
-            <span className="px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400">
-              Dashboard
+      {/* Toolbar — the shell owns the title/breadcrumbs */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Campaign pipeline health, conversion metrics, and revenue tracking
+          {lastUpdated && (
+            <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+              · Updated {lastUpdated.toLocaleTimeString()}
             </span>
-            <Link
-              href="/settings/admin/marketing-ops/recovery"
-              className="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-            >
-              Recovery
-            </Link>
-          </nav>
+          )}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <button
+            onClick={fetchDashboard}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
+      </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+      {error && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Motions — the three non-prospect motions the module now runs */}
+      <MotionsOverview />
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      ) : stats ? (
+        <>
+          {/* Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Campaigns</span>
+                <Target className="w-5 h-5 text-blue-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCampaigns}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{stats.activeCampaigns} active</p>
+              {stats.prospectCampaigns != null && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                  {stats.prospectCampaigns} prospect · {stats.intelligenceCampaigns ?? 0} intelligence · {stats.provingGroundCampaigns ?? 0} proving ground
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</span>
+                <DollarSign className="w-5 h-5 text-green-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.totalRevenueCents)}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.weeklyRevenueCents)} this week</p>
+              {stats.marketingRevenueCents != null && stats.marketingRevenueCents > 0 && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                  {formatCurrency(stats.marketingRevenueCents)} from {stats.marketingRevenueCount ?? 0} payment{stats.marketingRevenueCount === 1 ? '' : 's'}
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Retainers Won</span>
+                <Trophy className="w-5 h-5 text-purple-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalRetainersWon}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.totalRetainerRevenueCents)} retainer revenue</p>
+            </div>
+
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</span>
+                <TrendingUp className="w-5 h-5 text-amber-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{(stats.conversionRate * 100).toFixed(1)}%</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">shown → paid</p>
+            </div>
           </div>
-        ) : stats ? (
-          <>
-            {/* Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Campaigns</span>
-                  <Target className="w-5 h-5 text-blue-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCampaigns}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{stats.activeCampaigns} active</p>
-              </div>
 
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</span>
-                  <DollarSign className="w-5 h-5 text-green-500" />
+          {/* Follow-ups due widget + Hot prospects widget + Prospect queue widget */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <FollowUpsDueWidget />
+            <HotProspectsWidget />
+            <ProspectQueueWidget />
+          </div>
+
+          {/* Outreach health */}
+          <OutreachHealthWidget />
+
+          {/* Review follow-ups due widget */}
+          <ReviewFollowUpsDueWidget />
+
+          {/* Weekly Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Previews</span>
+                <Eye className="w-5 h-5 text-indigo-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.weeklyPreviews}</p>
+            </div>
+
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Delivered</span>
+                <Package className="w-5 h-5 text-emerald-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.weeklyDelivered}</p>
+            </div>
+
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Revenue</span>
+                <Activity className="w-5 h-5 text-green-500" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.weeklyRevenueCents)}</p>
+              {stats.weeklyMarketingRevenueCents != null && stats.weeklyMarketingRevenueCents > 0 && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  {formatCurrency(stats.weeklyMarketingRevenueCents)} from online payments
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Tenant Conversion */}
+          {convStats && (
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Conversion</h2>
+                <span className="text-xs text-gray-400 dark:text-gray-500">Prospecting channel performance</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-5">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Conversions</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{convStats.totalConversions}</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.totalRevenueCents)}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.weeklyRevenueCents)} this week</p>
-                {stats.marketingRevenueCents != null && stats.marketingRevenueCents > 0 && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
-                    {formatCurrency(stats.marketingRevenueCents)} from {stats.marketingRevenueCount ?? 0} payment{stats.marketingRevenueCount === 1 ? '' : 's'}
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{(convStats.conversionRate * 100).toFixed(1)}%</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Resurrected</p>
+                  <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{convStats.resurrectedConversions}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">QR View → Conv.</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {(convStats.qrViewRate * 100).toFixed(0)}% → {(convStats.qrConversionRate * 100).toFixed(0)}%
                   </p>
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Retainers Won</span>
-                  <Trophy className="w-5 h-5 text-purple-500" />
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{convStats.tokensViewed}/{convStats.tokensIssued} tokens viewed</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalRetainersWon}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.totalRetainerRevenueCents)} retainer revenue</p>
-              </div>
-
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</span>
-                  <TrendingUp className="w-5 h-5 text-amber-500" />
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Demo Claim Rate</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{(convStats.demoClaimRate * 100).toFixed(0)}%</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{convStats.demoTokensIssued} demos issued</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{(stats.conversionRate * 100).toFixed(1)}%</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">shown → paid</p>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg Days to Convert</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{convStats.avgDaysToConvert}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 border-t border-gray-100 dark:border-neutral-700 pt-4">
+                <SourceBreakdown title="Closed by (last touch)" data={convStats.byLastTouchSource} />
+                <SourceBreakdown title="Opened by (first touch)" data={convStats.byFirstTouchSource} />
+                <SourceBreakdown title="Prospect vs. Upsell" data={convStats.byOrigin} />
               </div>
             </div>
+          )}
 
-            {/* Follow-ups due widget (Sprint 2) + Hot prospects widget (Sprint 3) + Prospect queue widget (Queue sprint) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-              <FollowUpsDueWidget />
-              <HotProspectsWidget />
-              <ProspectQueueWidget />
-            </div>
-
-            {/* Review follow-ups due widget (Sprint 4) */}
-            <div className="mb-8">
-              <ReviewFollowUpsDueWidget />
-            </div>
-
-            {/* Weekly Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Previews</span>
-                  <Eye className="w-5 h-5 text-indigo-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.weeklyPreviews}</p>
+          {/* Prospect pipeline + campaign mix */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Prospect Pipeline by Stage</h2>
+                <span className="text-xs text-gray-400 dark:text-gray-500">business-scope campaigns only</span>
               </div>
-
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Delivered</span>
-                  <Package className="w-5 h-5 text-emerald-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.weeklyDelivered}</p>
-              </div>
-
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Revenue</span>
-                  <Activity className="w-5 h-5 text-green-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.weeklyRevenueCents)}</p>
-                {stats.weeklyMarketingRevenueCents != null && stats.weeklyMarketingRevenueCents > 0 && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    {formatCurrency(stats.weeklyMarketingRevenueCents)} from online payments
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Tenant Conversion */}
-            {convStats && (
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Conversion</h2>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">Prospecting channel performance</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-5">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Conversions</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{convStats.totalConversions}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{(convStats.conversionRate * 100).toFixed(1)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Resurrected</p>
-                    <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{convStats.resurrectedConversions}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">QR View → Conv.</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">
-                      {(convStats.qrViewRate * 100).toFixed(0)}% → {(convStats.qrConversionRate * 100).toFixed(0)}%
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{convStats.tokensViewed}/{convStats.tokensIssued} tokens viewed</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Demo Claim Rate</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{(convStats.demoClaimRate * 100).toFixed(0)}%</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{convStats.demoTokensIssued} demos issued</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg Days to Convert</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{convStats.avgDaysToConvert}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 border-t border-gray-100 dark:border-neutral-700 pt-4">
-                  <SourceBreakdown title="Closed by (last touch)" data={convStats.byLastTouchSource} />
-                  <SourceBreakdown title="Opened by (first touch)" data={convStats.byFirstTouchSource} />
-                  <SourceBreakdown title="Prospect vs. Upsell" data={convStats.byOrigin} />
-                </div>
-              </div>
-            )}
-
-            {/* Pipeline Breakdown */}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pipeline by Stage</h2>
               <div className="space-y-3">
                 {PIPELINE_STAGES.map((stage) => {
-                  const count = stats.stageCounts?.[stage] ?? stats.byStage?.[stage] ?? 0;
-                  const maxCount = Math.max(...PIPELINE_STAGES.map((s) => stats.stageCounts?.[s] ?? stats.byStage?.[s] ?? 0), 1);
+                  const counts = stats.prospectStageCounts ?? stats.stageCounts ?? {};
+                  const count = counts[stage] ?? stats.byStage?.[stage] ?? 0;
+                  const maxCount = Math.max(...PIPELINE_STAGES.map((s) => counts[s] ?? stats.byStage?.[s] ?? 0), 1);
                   const widthPct = (count / maxCount) * 100;
                   return (
                     <div key={stage} className="flex items-center gap-3">
@@ -339,47 +378,35 @@ export default function MarketingOpsDashboardClient() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Link
-                href="/settings/admin/marketing-ops/campaigns"
-                className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Campaign Tracker</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">View and manage prospect campaigns</p>
-              </Link>
-              <Link
-                href="/settings/admin/marketing-ops/campaigns/new"
-                className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-green-400 dark:hover:border-green-600 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">New Campaign</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Add a new prospect to the pipeline</p>
-              </Link>
-              <Link
-                href="/settings/admin/marketing-ops/prompts"
-                className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-purple-400 dark:hover:border-purple-600 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Prompt Library</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Manage prompt templates</p>
-              </Link>
-              <Link
-                href="/settings/admin/marketing-ops/scorecards"
-                className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-amber-400 dark:hover:border-amber-600 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Scorecards</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Daily activity tracking</p>
-              </Link>
-              <Link
-                href="/settings/admin/marketing-ops/gallery-dashboard"
-                className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-cyan-400 dark:hover:border-cyan-600 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Gallery Dashboard</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Diagnostic gallery engagement analytics</p>
-              </Link>
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Campaign Mix</h2>
+              <div className="space-y-5">
+                <MixBreakdown title="By scope" data={stats.byScope} labels={SCOPE_LABELS} />
+                <MixBreakdown title="By category" data={stats.byCategory} labels={CATEGORY_LABELS} />
+              </div>
             </div>
-          </>
-        ) : null}
-      </div>
+          </div>
+
+          {/* Quick Actions — driven by the module nav catalog */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Quick Actions</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {quickActions.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-violet-400 dark:hover:border-violet-600 transition-colors"
+                >
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                    <span aria-hidden>{item.emoji}</span>
+                    {item.label}
+                  </h3>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

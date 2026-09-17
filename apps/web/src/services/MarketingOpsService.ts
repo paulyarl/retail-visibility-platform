@@ -1500,6 +1500,16 @@ export interface DashboardStats {
   totalCampaigns: number;
   activeCampaigns: number;
   stageCounts: Record<string, number>;
+  /** Motion mix — campaign count keyed by campaign_category ('prospect' when null). */
+  byCategory?: Record<string, number>;
+  /** Motion mix — campaign count keyed by scope (business | category | city | intelligence). */
+  byScope?: Record<string, number>;
+  /** Stage counts scoped to the prospect motion (scope='business') so the
+   *  pipeline bars aren't diluted by intelligence / proving-ground / enrichment runs. */
+  prospectStageCounts?: Record<string, number>;
+  prospectCampaigns?: number;
+  intelligenceCampaigns?: number;
+  provingGroundCampaigns?: number;
   byStage?: Record<CampaignStage, number>;
   totalRevenueCents: number;
   marketingRevenueCents?: number;

@@ -146,23 +146,23 @@ Profile Repair is a **third vector** that reuses both existing pipelines via a t
 
 ### What You See
 
+- **Motions row** (three cards, each deep-links to its surface):
+  - **Proving Grounds** — workspace count + distinct markets.
+  - **Seed Funnel** — seeds / claimed / converted, benchmark-gate pass count, and whether the national-scaling rule is met. Links to `/settings/admin/directory/funnel`.
+  - **Intelligence** — category count, active profiles, discovery runs executed, and pending discovery gaps. Links to Coverage.
 - **Metric cards:**
-  - Total campaigns
+  - Total campaigns (with a sub-line splitting prospect / intelligence / proving-ground counts)
   - Total revenue (with sub-line showing marketing revenue from online payments and payment count)
   - Retainers won
   - Conversion rate (shown → paid)
-- **Weekly summary:**
-  - Previews built
-  - Packages delivered
-  - Weekly revenue (with sub-line showing online payment revenue when available)
-- **Tenant Conversion widget** (if the Tenant Prospecting Channel is enabled): total conversions, conversion rate, resurrected conversions, QR view-to-conversion rate, demo claim rate, and average days to convert.
-- **Pipeline by Stage:** horizontal bars showing campaign count per stage.
 - **Widget grid:** Follow-ups Due, Hot Prospects, and Prospect Queue widgets — each shows a count + top entries + a link to the full list. The Prospect Queue widget (§33) shows the queued-prospect count and top 3 entries with a "Work the queue →" link.
-- **Quick action cards:**
-  - Campaign Tracker
-  - New Campaign
-  - Prompt Library
-  - Scorecards
+- **Outreach Health widget:** opener volume, sends, reply rate, and the openers quality-gate pass rate (from the split-test aggregate). Links to the Openers workspace.
+- **Review Follow-Ups Due widget** (Sprint 4).
+- **Weekly summary:** previews built, packages delivered, weekly revenue (with sub-line showing online payment revenue when available).
+- **Tenant Conversion widget** (if the Tenant Prospecting Channel is enabled): total conversions, conversion rate, resurrected conversions, QR view-to-conversion rate, demo claim rate, and average days to convert.
+- **Prospect Pipeline by Stage:** horizontal bars showing business-scope campaign counts per stage (scoped to the prospect motion so intelligence / proving-ground / directory-enrichment runs don't distort the bars).
+- **Campaign Mix:** counts by scope (business / category / city / intelligence) and by campaign category (prospect / review management / recovery / profile repair / triage / proving ground / directory enrichment).
+- **Quick Actions:** a grid of every module destination, driven by the same nav catalog as the sidebar — so new pages appear here automatically.
 
 ### Actions
 
@@ -170,12 +170,9 @@ Profile Repair is a **third vector** that reuses both existing pipelines via a t
 - Click **Export CSV** to download a CSV of campaigns.
 - The dashboard auto-refreshes every 30 seconds.
 
-### Dashboard Tabs
+### Navigation
 
-The dashboard has two tabs at the top:
-
-- **Dashboard** — the default metric cards, pipeline overview, and quick actions described above.
-- **Recovery** — links to the standalone Recovery list page at `/settings/admin/marketing-ops/recovery`. See §25 for details.
+The dashboard renders inside the shared Marketing Ops shell, so the module nav panel (left) is always available. There are no in-page tabs — **Recovery** (§25), **Seed Funnel**, and **Growth Engine** are all reachable from the nav panel.
 
 ---
 

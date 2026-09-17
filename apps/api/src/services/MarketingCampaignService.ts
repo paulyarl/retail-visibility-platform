@@ -3047,10 +3047,42 @@ export class MarketingCampaignService extends BaseService {
       const stageMap: Record<string, number> = {};
       stageCounts.forEach((s: any) => { stageMap[s.stage] = s._count.id; });
 
+      // Motion segmentation — the pipeline/revenue cards are prospect-campaign
+      // metrics, but mkt_campaigns_list also holds intelligence, proving-ground,
+      // and directory-enrichment campaigns that never traverse shown → paid.
+      // Expose the mix so the dashboard can keep the top-line cards honest
+      // (and scope the stage bars to the prospect motion).
+      const categoryCounts = await this.prisma.mkt_campaigns_list.groupBy({
+        by: ['campaign_category'],
+        _count: { id: true },
+      });
+      const scopeCounts = await this.prisma.mkt_campaigns_list.groupBy({
+        by: ['scope'],
+        _count: { id: true },
+      });
+      const prospectStageCounts = await this.prisma.mkt_campaigns_list.groupBy({
+        by: ['stage'],
+        _count: { id: true },
+        where: { scope: 'business' },
+      });
+
+      const categoryMap: Record<string, number> = {};
+      categoryCounts.forEach((s: any) => { categoryMap[s.campaign_category ?? 'prospect'] = s._count.id; });
+      const scopeMap: Record<string, number> = {};
+      scopeCounts.forEach((s: any) => { scopeMap[s.scope] = s._count.id; });
+      const prospectStageMap: Record<string, number> = {};
+      prospectStageCounts.forEach((s: any) => { prospectStageMap[s.stage] = s._count.id; });
+
       return {
         totalCampaigns,
         activeCampaigns,
         stageCounts: stageMap,
+        byCategory: categoryMap,
+        byScope: scopeMap,
+        prospectStageCounts: prospectStageMap,
+        prospectCampaigns: scopeMap.business ?? 0,
+        intelligenceCampaigns: scopeMap.intelligence ?? 0,
+        provingGroundCampaigns: categoryMap.proving_ground ?? 0,
         totalRevenueCents: totalRevenue._sum.amount_paid_cents || 0,
         marketingRevenueCents: marketingRevenueAgg._sum.amount_cents || 0,
         marketingRevenueCount: marketingRevenueAgg._count.id || 0,

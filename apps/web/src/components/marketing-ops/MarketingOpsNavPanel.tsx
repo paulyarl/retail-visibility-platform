@@ -23,9 +23,16 @@ import {
   IconBuildingStore,
   IconMap2,
   IconMedal,
+  IconChartFunnel,
+  IconTrendingUp,
 } from '@tabler/icons-react';
 
-const NAV_ITEMS = [
+/**
+ * Single source of truth for the module's destinations. The dashboard's
+ * Quick Actions grid reuses this list, so adding a page here also surfaces
+ * it on the landing page.
+ */
+export const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops', label: 'Dashboard', icon: IconLayoutDashboard, emoji: '📊' },
   { href: '/settings/admin/marketing-ops/coverage', label: 'Coverage', icon: IconMap2, emoji: '🗺️' },
   { href: '/settings/admin/marketing-ops/queue', label: 'Queue', icon: IconListCheck, emoji: '📥' },
@@ -44,6 +51,11 @@ const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops/filter-review', label: 'Filter Review', icon: IconFilter, emoji: '🔍' },
   { href: '/settings/admin/marketing-ops/scorecards', label: 'Scorecards', icon: IconChartBar, emoji: '🏆' },
   { href: '/settings/admin/marketing-ops/gbp', label: 'GBP Monitor', icon: IconBuildingStore, emoji: '🏪' },
+  // Seed GTM analytics live under the Directory panel but belong to this
+  // motion (PG → seeds → claim funnel); surface them here so the funnel and
+  // growth engine aren't orphaned from Marketing Ops.
+  { href: '/settings/admin/directory/funnel', label: 'Seed Funnel', icon: IconChartFunnel, emoji: '🫗' },
+  { href: '/settings/admin/growth-engine', label: 'Growth Engine', icon: IconTrendingUp, emoji: '📈' },
 ] as const;
 
 interface MarketingOpsNavPanelProps {
