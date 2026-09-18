@@ -3415,6 +3415,7 @@ model mkt_campaigns_list {
   secondary_categories                                                            String[]                             @default([])
   date_seed                                                                       DateTime?                            @db.Timestamptz(6)
   member_geos                                                                     Json?
+  business_hours                                                                  Json?
   directory_seed_campaign_links                                                   directory_seed_campaign_links[]
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
@@ -7785,16 +7786,21 @@ model directory_seed_nap_verifications {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_seed_outreach_touches {
-  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  seed_id                  String
-  tenant_id                String
-  channel                  String
-  outcome                  String?
-  notes                    String?
-  operator_id              String?
-  occurred_at              DateTime                 @default(now()) @db.Timestamptz(6)
-  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
-  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                         String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seed_id                    String
+  tenant_id                  String
+  channel                    String
+  outcome                    String?
+  notes                      String?
+  operator_id                String?
+  occurred_at                DateTime                 @default(now()) @db.Timestamptz(6)
+  created_at                 DateTime                 @default(now()) @db.Timestamptz(6)
+  recording_url              String?
+  recording_duration_seconds Int?
+  recording_provider         String?                  @db.VarChar(40)
+  recording_attached_at      DateTime?                @db.Timestamptz(6)
+  recording_attached_by      String?
+  directory_presence_seeds   directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([seed_id, occurred_at(sort: Desc)], map: "idx_dsot_seed_occurred")
   @@index([tenant_id], map: "idx_dsot_tenant")

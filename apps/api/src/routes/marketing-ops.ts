@@ -218,6 +218,25 @@ router.use(requirePlatformAdmin);
 // ZOD SCHEMAS
 // ====================
 
+// Migration 296 — opening hours shape, shared by the campaign create/update
+// body, the queue patch, and the verify-then-outreach resolve body. Mirrors
+// directory_listings_list.business_hours.
+const dayHoursSchema = z.object({
+  open: z.string().max(5),
+  close: z.string().max(5),
+  closed: z.boolean(),
+});
+const businessHoursSchema = z.object({
+  monday: dayHoursSchema.optional(),
+  tuesday: dayHoursSchema.optional(),
+  wednesday: dayHoursSchema.optional(),
+  thursday: dayHoursSchema.optional(),
+  friday: dayHoursSchema.optional(),
+  saturday: dayHoursSchema.optional(),
+  sunday: dayHoursSchema.optional(),
+  timezone: z.string().max(64).optional(),
+});
+
 const campaignBaseSchema = z.object({
   scope: z.enum(['business', 'category', 'city', 'intelligence']).optional(),
   // Migration 262 — 'proving_ground' allows direct creation of the
@@ -261,6 +280,9 @@ const campaignBaseSchema = z.object({
   address_state: z.string().max(50).optional(),
   address_zip: z.string().max(20).optional(),
   address_country: z.string().max(2).optional(),
+  // Migration 296 — opening hours (verified on the call / edited by the
+  // operator). Flows onto the seed listing at "Add to place listing".
+  business_hours: businessHoursSchema.nullable().optional(),
   directory_profiles: z.array(z.object({
     platform: z.string().max(50),
     url: z.string().max(500),
@@ -1172,6 +1194,7 @@ router.post('/', async (req: any, res: Response) => {
       addressState: parsed.address_state,
       addressZip: parsed.address_zip,
       addressCountry: parsed.address_country,
+      businessHours: parsed.business_hours ?? undefined,
       directoryProfiles: parsed.directory_profiles,
       displayId: parsed.display_id,
       gbpClaimed: parsed.gbp_claimed,
@@ -1375,6 +1398,7 @@ router.put('/:id', async (req: any, res: Response) => {
       addressState: parsed.address_state,
       addressZip: parsed.address_zip,
       addressCountry: parsed.address_country,
+      businessHours: parsed.business_hours ?? undefined,
       directoryProfiles: parsed.directory_profiles,
       gbpClaimed: parsed.gbp_claimed,
       unaddressedReviews: parsed.unaddressed_reviews,
@@ -4935,6 +4959,9 @@ const prospectQueuePatchSchema = z.object({
   priority: z.enum(['high', 'normal']).optional(),
   note: z.string().max(2000).nullable().optional(),
   assigned_to: z.string().min(1).nullable().optional(),
+  // Migration 296 — opening hours captured/edited on the queue entry
+  // (business_snapshot.hours). Null clears them.
+  hours: businessHoursSchema.nullable().optional(),
   // Migration 262 — account-family grouping (one owner → one operator/thread).
   account_family: z.string().max(120).nullable().optional(),
 });
@@ -4949,6 +4976,7 @@ router.patch('/prospect-queue/:id', async (req: any, res: Response) => {
       note: parsed.note,
       assigned_to: parsed.assigned_to,
       account_family: parsed.account_family,
+      hours: parsed.hours,
     }, getCtx(req));
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -4973,6 +5001,10 @@ const logTouchSchema = z.object({
     'referral_asked', 'claimed', 'not_interested',
   ]).optional(),
   notes: z.string().max(2000).optional(),
+  // Migration 295 — optional call recording captured with the touch.
+  recording_url: z.string().max(2000).optional(),
+  recording_duration_seconds: z.number().int().nonnegative().optional(),
+  recording_provider: z.string().max(40).optional(),
 });
 
 router.post('/prospect-queue/:id/log-touch', async (req: any, res: Response) => {
@@ -4982,6 +5014,9 @@ router.post('/prospect-queue/:id/log-touch', async (req: any, res: Response) => 
       channel: parsed.channel,
       outcome: parsed.outcome,
       notes: parsed.notes,
+      recordingUrl: parsed.recording_url,
+      recordingDurationSeconds: parsed.recording_duration_seconds,
+      recordingProvider: parsed.recording_provider,
     }, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
@@ -5067,6 +5102,8 @@ const verifiedDirectoryProfileSchema = z.object({
   category: z.string().max(255).optional(),
 });
 
+// Migration 296 — opening hours pasted from the GBP listing on the call.
+// Shape mirrors directory_listings_list.business_hours (shared schema).
 const verificationResolveSchema = z.object({
   outcome: z.enum(['operational', 'closed', 'closed_temporarily', 'relocated', 'unreachable', 'wrong_business']),
   verifiedName: z.string().max(255).optional(),
@@ -5078,6 +5115,7 @@ const verificationResolveSchema = z.object({
   verifiedEmail: z.string().max(255).optional(),
   verifiedCategory: z.string().max(255).optional(),
   verifiedOwnerName: z.string().max(255).optional(),
+  verifiedHours: businessHoursSchema.optional(),
   verifiedSocialProfiles: z.array(verifiedSocialProfileSchema).max(20).optional(),
   verifiedDirectoryProfiles: z.array(verifiedDirectoryProfileSchema).max(20).optional(),
   ownerReceptivity: z.enum(['interested', 'neutral', 'defensive', 'no_answer']).optional(),
@@ -5103,6 +5141,7 @@ router.post('/prospect-queue/:id/resolve-verification', async (req: any, res: Re
       verifiedEmail: parsed.verifiedEmail,
       verifiedCategory: parsed.verifiedCategory,
       verifiedOwnerName: parsed.verifiedOwnerName,
+      verifiedHours: parsed.verifiedHours,
       verifiedSocialProfiles: parsed.verifiedSocialProfiles,
       verifiedDirectoryProfiles: parsed.verifiedDirectoryProfiles,
       ownerReceptivity: parsed.ownerReceptivity,

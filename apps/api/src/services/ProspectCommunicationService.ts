@@ -55,8 +55,10 @@ export interface ProspectCommunicationEvent {
   follow_up_completed_at: string | null;
   delivery_status: string | null;
   call_details: Record<string, any> | null;
-  /** Recording URL when the call details carry one (nullable until recordings ship). */
+  /** Recording URL when the call carries one (migration 295 for seed touches;
+   *  call_details.recording_url for campaign calls). */
   recording_url: string | null;
+  recording_duration_seconds: number | null;
   anchor_snapshot: Record<string, any> | null;
   verification_results: Record<string, any>[] | null;
   /** True for machine-generated rows (auto follow-ups, report delivery). */
@@ -463,6 +465,10 @@ class ProspectCommunicationServiceClass extends BaseService {
       delivery_status: log.delivery_status ?? null,
       call_details: callDetails,
       recording_url: (callDetails?.recording_url as string) ?? null,
+      recording_duration_seconds:
+        callDetails?.recording_duration_seconds != null
+          ? Number(callDetails.recording_duration_seconds)
+          : null,
       anchor_snapshot: (log.anchor_snapshot ?? null) as Record<string, any> | null,
       verification_results: (log.verification_results ?? null) as Record<string, any>[] | null,
       system_generated: SYSTEM_OUTCOMES.has(log.outcome ?? ''),
@@ -490,7 +496,9 @@ class ProspectCommunicationServiceClass extends BaseService {
       follow_up_completed_at: null,
       delivery_status: null,
       call_details: null,
-      recording_url: null,
+      recording_url: touch.recording_url ?? null,
+      recording_duration_seconds:
+        touch.recording_duration_seconds != null ? Number(touch.recording_duration_seconds) : null,
       anchor_snapshot: null,
       verification_results: null,
       system_generated: SYSTEM_OUTCOMES.has(touch.outcome ?? ''),

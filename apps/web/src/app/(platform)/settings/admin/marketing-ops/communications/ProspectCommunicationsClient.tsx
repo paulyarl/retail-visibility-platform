@@ -30,6 +30,14 @@ import marketingOpsService, {
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
 import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import LogContactModal from '@/components/marketing-ops/LogContactModal';
+import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
+import {
+  DAYS,
+  type DayHours,
+  EMPTY_HOURS,
+  parseHours,
+  formatHoursForDisplay,
+} from '@/lib/business-hours';
 
 // ─── Labels ──────────────────────────────────────────────────────────────
 
@@ -113,6 +121,14 @@ function formatDate(s: string | null | undefined): string {
   }
 }
 
+/** mm:ss for a recording duration in seconds. */
+function formatDuration(seconds: number | null | undefined): string | null {
+  if (seconds == null || Number.isNaN(seconds)) return null;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function prospectLabel(p: ProspectSummary): string {
   const name = p.business_name || p.title || 'Untitled prospect';
   const loc = [p.city, p.state].filter(Boolean).join(', ');
@@ -154,7 +170,16 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
   const [touchChannel, setTouchChannel] = useState<TouchChannel>('call');
   const [touchOutcome, setTouchOutcome] = useState('');
   const [touchNotes, setTouchNotes] = useState('');
+  const [touchRecordingUrl, setTouchRecordingUrl] = useState('');
+  const [touchRecordingDuration, setTouchRecordingDuration] = useState('');
   const [touchBusy, setTouchBusy] = useState(false);
+
+  // Opening hours (migration 296) — the queue leg of the journey. Editable
+  // while the row is open/enrichable; once it graduates, the campaign owns them.
+  const [hoursOpen, setHoursOpen] = useState(false);
+  const [editHours, setEditHours] = useState<Record<string, DayHours>>({ ...EMPTY_HOURS });
+  const [editTimezone, setEditTimezone] = useState('America/New_York');
+  const [savingHours, setSavingHours] = useState(false);
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -210,6 +235,36 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
 
   // ─── Card actions ─────────────────────────────────────────────────────
 
+  // Sync the hours editor from the loaded timeline (snapshot.hours, falling
+  // back to the verified_nap provenance block).
+  useEffect(() => {
+    if (!timeline) return;
+    const snapshot = timeline.prospect.business_snapshot ?? {};
+    const raw = snapshot.hours ?? snapshot.verified_nap?.hours;
+    setEditHours(raw && typeof raw === 'object' ? parseHours(raw) : { ...EMPTY_HOURS });
+    setEditTimezone((raw && typeof raw === 'object' && raw.timezone) || 'America/New_York');
+  }, [timeline]);
+
+  const handleSaveHours = async () => {
+    if (!selectedId) return;
+    setSavingHours(true);
+    setActionError(null);
+    setActionNotice(null);
+    try {
+      const hasOpen = DAYS.some((d) => !editHours[d].closed);
+      await marketingOpsService.updateProspectQueue(selectedId, {
+        hours: hasOpen ? { ...editHours, timezone: editTimezone } : null,
+      });
+      setActionNotice(hasOpen ? 'Opening hours saved.' : 'Opening hours cleared.');
+      setHoursOpen(false);
+      await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to save opening hours');
+    } finally {
+      setSavingHours(false);
+    }
+  };
+
   const handleVerify = async () => {
     if (!selectedId) return;
     setVerifyBusy(true);
@@ -249,10 +304,16 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
         channel: touchChannel,
         outcome: (touchOutcome || undefined) as any,
         notes: touchNotes || undefined,
+        recording_url: touchRecordingUrl.trim() || undefined,
+        recording_duration_seconds: touchRecordingDuration.trim()
+          ? Number(touchRecordingDuration.trim())
+          : undefined,
       });
       setTouchOpen(false);
       setTouchOutcome('');
       setTouchNotes('');
+      setTouchRecordingUrl('');
+      setTouchRecordingDuration('');
       setActionNotice('Touch logged.');
       await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
     } catch (err: any) {
@@ -528,6 +589,73 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
                 {timeline.campaigns.map((c) => c.title ?? c.id).join(', ')}
               </p>
             )}
+
+            {/* Opening hours — queue leg. Editable while the prospect is open;
+                after graduation the campaign owns them (edit there). */}
+            {(() => {
+              const hasHours = DAYS.some((d) => !editHours[d].closed);
+              const editable = ['queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(
+                timeline.prospect.status,
+              );
+              return (
+                <div className="mt-4 border-t border-gray-100 dark:border-neutral-700 pt-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        Opening hours
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                        {hasHours ? formatHoursForDisplay(editHours) : 'Not captured'}
+                      </div>
+                    </div>
+                    {editable ? (
+                      <button
+                        type="button"
+                        onClick={() => setHoursOpen((v) => !v)}
+                        className="flex-shrink-0 rounded-md border border-gray-300 dark:border-neutral-600 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-700"
+                      >
+                        {hoursOpen ? 'Cancel' : hasHours ? 'Edit hours' : 'Add hours'}
+                      </button>
+                    ) : (
+                      <span className="flex-shrink-0 text-[10px] text-gray-400">
+                        {timeline.prospect.campaign_id ? 'Edit on the campaign' : 'Read-only'}
+                      </span>
+                    )}
+                  </div>
+
+                  {hoursOpen && editable && (
+                    <div className="mt-3 rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
+                      <BusinessHoursEditor
+                        compact
+                        hours={editHours}
+                        timezone={editTimezone}
+                        onHoursChange={setEditHours}
+                        onTimezoneChange={setEditTimezone}
+                      />
+                      <div className="mt-3 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setHoursOpen(false)}
+                          disabled={savingHours}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveHours}
+                          disabled={savingHours}
+                          className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                        >
+                          {savingHours ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                          Save hours
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Event list */}
@@ -648,6 +776,27 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
               className="w-full mb-4 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
             />
 
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Recording <span className="font-normal text-gray-400 dark:text-gray-500">— optional link</span>
+            </label>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="url"
+                placeholder="https://… (recording URL)"
+                value={touchRecordingUrl}
+                onChange={(e) => setTouchRecordingUrl(e.target.value)}
+                className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              />
+              <input
+                type="number"
+                min={0}
+                placeholder="sec"
+                value={touchRecordingDuration}
+                onChange={(e) => setTouchRecordingDuration(e.target.value)}
+                className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              />
+            </div>
+
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setTouchOpen(false)}
@@ -718,7 +867,12 @@ function EventRow({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {event.recording_url && <PlayCircle className="h-3.5 w-3.5 text-violet-500" />}
+          {event.recording_url && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-violet-600 dark:text-violet-400">
+              <PlayCircle className="h-3.5 w-3.5" />
+              {formatDuration(event.recording_duration_seconds)}
+            </span>
+          )}
           {event.follow_up_date && !event.follow_up_completed_at && (
             <span className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
               <Calendar className="h-2.5 w-2.5" /> FU {formatDate(event.follow_up_date)}
@@ -795,6 +949,9 @@ function EventRow({
               className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400 hover:underline"
             >
               <PlayCircle className="h-3.5 w-3.5" /> Play call recording
+              {formatDuration(event.recording_duration_seconds) && (
+                <span className="text-gray-400">({formatDuration(event.recording_duration_seconds)})</span>
+              )}
             </a>
           ) : (
             event.channel === 'phone' && (

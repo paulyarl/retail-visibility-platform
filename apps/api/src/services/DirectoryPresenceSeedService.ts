@@ -1581,6 +1581,9 @@ class DirectoryPresenceSeedService {
           identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
           categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
           notes: entry.note || null,
+          // Migration 296 — opening hours captured on the verification call
+          // (snapshot.hours) or the verified_nap provenance block.
+          businessHours: snapshot.hours || snapshot.verified_nap?.hours || undefined,
           provenance: entry.discovery_provenance || [],
         };
 
@@ -1708,6 +1711,9 @@ class DirectoryPresenceSeedService {
           identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
           categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
           notes: entry.note || null,
+          // Migration 296 — opening hours captured on the verification call
+          // (snapshot.hours) or the verified_nap provenance block.
+          businessHours: snapshot.hours || snapshot.verified_nap?.hours || undefined,
           provenance: entry.discovery_provenance || [],
         };
 
@@ -2285,7 +2291,7 @@ class DirectoryPresenceSeedService {
       identityConfidence,
       categoryFit,
       notes: typeof d.summary === 'string' ? d.summary.substring(0, 1000) : undefined,
-      businessHours: d.business_hours || undefined,
+      businessHours: campaign.business_hours || d.business_hours || undefined,
       description: seoPacket.description,
       keywords: seoPacket.keywords,
       sameAs: seoPacket.sameAs,
@@ -2529,6 +2535,11 @@ class DirectoryPresenceSeedService {
         | 'referral_asked' | 'claimed' | 'not_interested';
       notes?: string;
       occurredAt?: Date;
+      // Migration 295 — optional call recording captured at log time. Usually
+      // attached after the fact via attachTouchRecording.
+      recordingUrl?: string;
+      recordingDurationSeconds?: number;
+      recordingProvider?: string;
     },
     ctx?: SeedAuditCtx,
   ): Promise<{ id: string }> {
@@ -2539,10 +2550,13 @@ class DirectoryPresenceSeedService {
 
     const touchId = randomUUID();
     const occurredAt = input.occurredAt ?? new Date();
+    const hasRecording = !!input.recordingUrl;
 
     await prisma.$executeRaw`
       INSERT INTO directory_seed_outreach_touches (
-        id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+        id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at,
+        recording_url, recording_duration_seconds, recording_provider,
+        recording_attached_at, recording_attached_by
       ) VALUES (
         ${touchId}::uuid,
         ${seedId},
@@ -2552,7 +2566,12 @@ class DirectoryPresenceSeedService {
         ${input.notes || null},
         ${ctx?.actorId || null},
         ${occurredAt},
-        now()
+        now(),
+        ${input.recordingUrl || null},
+        ${input.recordingDurationSeconds ?? null},
+        ${input.recordingProvider || null},
+        ${hasRecording ? new Date() : null},
+        ${hasRecording ? (ctx?.actorId || null) : null}
       )
     `;
 
@@ -2567,6 +2586,7 @@ class DirectoryPresenceSeedService {
           touchId,
           channel: input.channel,
           outcome: input.outcome || null,
+          hasRecording,
         },
       });
     }
@@ -2580,9 +2600,57 @@ class DirectoryPresenceSeedService {
     return { id: touchId };
   }
 
+  /**
+   * Attach (or replace) a call recording on an existing touch. Recordings
+   * typically land after the touch is logged, so this is a separate write
+   * (migration 295). Scoped by seed_id so a touch cannot be edited across
+   * seeds.
+   */
+  async attachTouchRecording(
+    seedId: string,
+    touchId: string,
+    input: {
+      recordingUrl: string;
+      recordingDurationSeconds?: number;
+      recordingProvider?: string;
+    },
+    ctx?: SeedAuditCtx,
+  ): Promise<{ id: string }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      UPDATE directory_seed_outreach_touches
+      SET recording_url              = ${input.recordingUrl},
+          recording_duration_seconds = ${input.recordingDurationSeconds ?? null},
+          recording_provider         = ${input.recordingProvider || null},
+          recording_attached_at      = now(),
+          recording_attached_by      = ${ctx?.actorId || null}
+      WHERE id = ${touchId}::uuid AND seed_id = ${seedId}
+      RETURNING id
+    `;
+    if (!rows[0]) throw new Error('touch_not_found');
+
+    if (ctx) {
+      await audit({
+        actor: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'directory_presence_seed.touch_recording_attached',
+        payload: {
+          seedId,
+          touchId,
+          provider: input.recordingProvider || null,
+          durationSeconds: input.recordingDurationSeconds ?? null,
+        },
+      });
+    }
+
+    logger.info('DirectoryPresenceSeedService.attachTouchRecording', undefined, { seedId, touchId });
+    return { id: rows[0].id };
+  }
+
   async listOutreachTouches(seedId: string): Promise<any[]> {
     return prisma.$queryRaw<any[]>`
-      SELECT id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at
+      SELECT id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at,
+             recording_url, recording_duration_seconds, recording_provider,
+             recording_attached_at, recording_attached_by
       FROM directory_seed_outreach_touches
       WHERE seed_id = ${seedId}
       ORDER BY occurred_at DESC

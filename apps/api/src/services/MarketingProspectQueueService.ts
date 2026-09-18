@@ -114,6 +114,10 @@ export interface VerificationResolutionInput {
   verifiedEmail?: string;
   verifiedCategory?: string;
   verifiedOwnerName?: string;
+  // Migration 296 — opening hours pasted from the GBP listing on the call.
+  // Stored on the snapshot (verified_nap.hours + flat `hours`) and carried
+  // onto the campaign, then the seed listing.
+  verifiedHours?: Record<string, any>;
   // Identity enrichment captured on the call — social + directory profile
   // URLs are authoritative: they overwrite the campaign's social_profiles /
   // directory_profiles on promotion (not fill-null).
@@ -230,6 +234,10 @@ export interface UpdateQueueInput {
   // (e.g. the Tairov storefronts): one operator, one thread. Editable on
   // hold/in_thread too — family assignment is identity, not cadence state.
   account_family?: string | null;
+  // Migration 296 — opening hours (business_snapshot.hours). Identity
+  // enrichment, so editable on the same statuses as account_family. `null`
+  // clears them.
+  hours?: Record<string, any> | null;
 }
 
 export interface CreateCampaignInput {
@@ -607,14 +615,15 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (!existing) {
         throw new NotFoundError(`Queue entry ${id} not found`);
       }
-      // account_family is identity metadata — editable on hold/in_thread too.
-      // Cadence fields (priority/note/assigned_to) stay gated to open statuses.
-      const onlyFamilyPatch =
-        patch.account_family !== undefined &&
+      // account_family + hours are identity enrichment — editable on
+      // hold/in_thread too. Cadence fields (priority/note/assigned_to) stay
+      // gated to open statuses.
+      const onlyEnrichmentPatch =
+        (patch.account_family !== undefined || patch.hours !== undefined) &&
         patch.priority === undefined && patch.note === undefined && patch.assigned_to === undefined;
-      const familyEditable = ['queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(existing.status);
+      const enrichmentEditable = ['queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(existing.status);
       const open = existing.status === 'queued' || existing.status === 'verify_then_outreach';
-      if (!open && !(onlyFamilyPatch && familyEditable)) {
+      if (!open && !(onlyEnrichmentPatch && enrichmentEditable)) {
         throw new ConflictError(`Queue entry ${id} is not editable (status=${existing.status})`);
       }
 
@@ -622,6 +631,21 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (patch.priority !== undefined) data.priority = patch.priority;
       if (patch.note !== undefined) data.note = patch.note;
       if (patch.account_family !== undefined) data.account_family = patch.account_family;
+      // Migration 296 — hours live on the snapshot. Keep the flat `hours` key
+      // and the verified_nap provenance block in sync (createCampaignFromQueue
+      // reads verified_nap.hours first, then the flat key).
+      if (patch.hours !== undefined) {
+        const snapshot = { ...((existing.business_snapshot as any) ?? {}) };
+        if (patch.hours === null) delete snapshot.hours;
+        else snapshot.hours = patch.hours;
+        if (snapshot.verified_nap && typeof snapshot.verified_nap === 'object') {
+          const nap = { ...snapshot.verified_nap };
+          if (patch.hours === null) delete nap.hours;
+          else nap.hours = patch.hours;
+          snapshot.verified_nap = nap;
+        }
+        data.business_snapshot = snapshot;
+      }
       if (patch.assigned_to !== undefined) {
         if (patch.assigned_to === null) {
           data.assigned_to = null;
@@ -704,7 +728,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // Verified NAP/enrichment (written by resolveVerification) takes
       // precedence over the raw discovery snapshot so a correction captured
       // on the verification call flows into the campaign.
-      const verifiedNap = (snapshot.verified_nap as Record<string, string> | undefined) ?? {};
+      const verifiedNap = (snapshot.verified_nap as Record<string, any> | undefined) ?? {};
+      // Migration 296 — opening hours captured on the verification call. They
+      // ride onto the campaign (business_hours) and from there onto the seed
+      // listing at "Add to place listing" time.
+      const verifiedHours = (verifiedNap.hours as Record<string, any> | undefined)
+        ?? (snapshot.hours as Record<string, any> | undefined)
+        ?? undefined;
       // Authoritative identity enrichment — social + directory profile URLs
       // captured on the verification call. Written to the snapshot by
       // resolveVerification; overwrite the campaign's profiles on promotion.
@@ -756,6 +786,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // Authoritative identity enrichment captured on the verification call.
           socialProfiles: verifiedSocialProfiles,
           directoryProfiles: verifiedDirectoryProfiles,
+          // Migration 296 — verified opening hours.
+          businessHours: verifiedHours,
           notes: [
             `Manually queued prospect (no parent campaign, scope=${campaignScope}).`,
             entry.city ? `City: ${entry.city}` : null,
@@ -849,6 +881,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
         // an overwrite after derive (the scan payload carries no socials).
         if (verifiedSocialProfiles?.length) geoPatch.social_profiles = verifiedSocialProfiles;
         if (verifiedDirectoryProfiles?.length) geoPatch.directory_profiles = verifiedDirectoryProfiles;
+        // Migration 296 — verified opening hours (scan path has no native
+        // hours input, so apply as an overwrite after derive).
+        if (verifiedHours) geoPatch.business_hours = verifiedHours;
         if (r.created && r.campaign?.id && Object.keys(geoPatch).length > 0) {
           await this.prisma.mkt_campaigns_list.update({
             where: { id: r.campaign.id },
@@ -945,6 +980,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // call — overwrite the child's social/directory profiles.
           socialProfiles: verifiedSocialProfiles,
           directoryProfiles: verifiedDirectoryProfiles,
+          // Migration 296 — verified opening hours ride onto the child campaign.
+          businessHours: verifiedHours,
           // Category corrected on the verification call overrides the
           // parent-inherited category (undefined → inherit as before).
           categoryOverride: (verifiedNap.category as string) ?? undefined,
@@ -1253,7 +1290,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // keys the derive paths read (phone, email, website, address*, owner).
       // We preserve all existing snapshot fields.
       const snapshot = (existing.business_snapshot as any) ?? {};
-      const verifiedNap: Record<string, string> = {};
+      const verifiedNap: Record<string, any> = {};
       if (input.verifiedName?.trim()) verifiedNap.name = input.verifiedName.trim();
       if (input.verifiedPhone?.trim()) verifiedNap.phone = input.verifiedPhone.trim();
       if (input.verifiedAddress?.trim()) verifiedNap.address = input.verifiedAddress.trim();
@@ -1263,6 +1300,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (input.verifiedEmail?.trim()) verifiedNap.email = input.verifiedEmail.trim();
       if (input.verifiedCategory?.trim()) verifiedNap.category = input.verifiedCategory.trim();
       if (input.verifiedOwnerName?.trim()) verifiedNap.owner_name = input.verifiedOwnerName.trim();
+      // Migration 296 — opening hours (a day-map object, not a string).
+      const verifiedHours =
+        input.verifiedHours && typeof input.verifiedHours === 'object' && Object.keys(input.verifiedHours).length > 0
+          ? input.verifiedHours
+          : null;
+      if (verifiedHours) verifiedNap.hours = verifiedHours;
 
       // Flat enrichment — mirrors verified values onto the snapshot keys the
       // campaign derive paths read, so a verified correction (e.g. phone
@@ -1278,6 +1321,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (verifiedNap.city) flatEnrichment.address_city = verifiedNap.city;
       if (verifiedNap.state) flatEnrichment.address_state = verifiedNap.state;
       if (verifiedNap.owner_name) flatEnrichment.owner_name = verifiedNap.owner_name;
+      // Migration 296 — hours are an object, not a string, so they get their
+      // own flat snapshot key (`hours`) that the seed create paths read.
+      const flatHours = verifiedHours ? { hours: verifiedHours } : {};
       if (verifiedNap.address || verifiedNap.city || verifiedNap.state) {
         flatEnrichment.location = [verifiedNap.address, verifiedNap.city ?? snapshot.address_city, verifiedNap.state ?? snapshot.address_state]
           .filter(Boolean).join(', ');
@@ -1289,6 +1335,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         ? {
             ...snapshot,
             ...flatEnrichment,
+            ...flatHours,
             ...(verifiedSocial.length > 0 ? { social_profiles: verifiedSocial } : {}),
             ...(verifiedDirectory.length > 0 ? { directory_profiles: verifiedDirectory } : {}),
             verified_nap: { ...((snapshot.verified_nap as any) ?? {}), ...verifiedNap },

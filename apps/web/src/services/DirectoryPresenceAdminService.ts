@@ -480,6 +480,12 @@ export interface OutreachTouch {
   operatorId: string | null;
   occurredAt: string;
   createdAt: string;
+  // Migration 295 — call recording (pre-campaign touches).
+  recording_url?: string | null;
+  recording_duration_seconds?: number | null;
+  recording_provider?: string | null;
+  recording_attached_at?: string | null;
+  recording_attached_by?: string | null;
 }
 
 export interface ClaimInviteQrKitMeta {
@@ -1011,6 +1017,9 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
         | 'referral_asked' | 'claimed' | 'not_interested';
       notes?: string;
       occurredAt?: string;
+      recordingUrl?: string;
+      recordingDurationSeconds?: number;
+      recordingProvider?: string;
     },
   ): Promise<{ touchId: string } | null> {
     const result = await this.makeDefaultRequest<any>(
@@ -1022,6 +1031,22 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (!result.success) return null;
     const data = result.data?.data ?? result.data;
     return { touchId: (data as any)?.touchId };
+  }
+
+  /** POST /api/admin/directory/presence-seeds/:id/touches/:touchId/recording
+   *  Attach (or replace) a call recording on an existing touch (migration 295). */
+  async attachTouchRecording(
+    seedId: string,
+    touchId: string,
+    input: { recordingUrl: string; recordingDurationSeconds?: number; recordingProvider?: string },
+  ): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/touches/${encodeURIComponent(touchId)}/recording`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    return !!result.success;
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/:id/touches */
