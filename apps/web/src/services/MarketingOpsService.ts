@@ -4242,6 +4242,63 @@ class MarketingOpsService extends AdminApiSingleton {
 
   // ─── Deliverable Construction ──────────────────────────────────────────
 
+  // Deliverable Source Material (spec: marketing_ops_deliverable_source_material_spec.md)
+  async getEligibleDeliverableTypes(campaignId: string): Promise<{
+    types: DeliverableType[];
+    signals: string[];
+    source: 'model_emitted' | 'derived' | 'fallback';
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/eligible-types`,
+      { method: 'GET' },
+      `mkt-ops-eligible-types-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve eligible deliverable types');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async getDeliverableSourceMaterial(campaignId: string): Promise<any | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/source-material`,
+      { method: 'GET' },
+      `mkt-ops-source-material-${campaignId}`,
+      0,
+    );
+    if (!result.success) return null;
+    return result.data?.data ?? result.data ?? null;
+  }
+
+  async generateDeliverableSourceMaterial(campaignId: string): Promise<{ executionId: string; sourceMaterial: any | null }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/source-material/generate`,
+      { method: 'POST' },
+      `mkt-ops-source-material-generate-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate source material');
+    }
+    await this.invalidateCachePattern(`mkt-ops-source-material-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async ingestReviewIntake(campaignId: string, rawReviews: string): Promise<{ executionId: string; intake: any | null }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/review-intake`,
+      { method: 'POST', body: JSON.stringify({ raw_reviews: rawReviews }) },
+      `mkt-ops-review-intake-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to ingest review intake');
+    }
+    await this.invalidateCachePattern(`mkt-ops-source-material-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
   // Owner Voice
   async getOwnerVoiceProfile(campaignId: string): Promise<OwnerVoiceProfile | null> {
     const result = await this.makeDefaultRequest<any>(

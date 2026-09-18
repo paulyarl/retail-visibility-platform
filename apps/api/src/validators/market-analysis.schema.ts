@@ -93,6 +93,18 @@ import {
   type LocationEnrichmentOutput,
   type CategorySetEnrichmentOutput,
 } from './directory-enrichment.schema';
+import {
+  deliverableSourceMaterialSchema,
+  DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME,
+  DELIVERABLE_SOURCE_MATERIAL_PROMPT_SUFFIX,
+  type DeliverableSourceMaterial,
+} from './deliverable-source-material.schema';
+import {
+  reviewIntakeSchema,
+  REVIEW_INTAKE_SCHEMA_NAME,
+  REVIEW_INTAKE_PROMPT_SUFFIX,
+  type ReviewIntake,
+} from './review-intake.schema';
 
 export {
   profileRepairTriageSchema,
@@ -131,6 +143,14 @@ export {
   type CategoryEnrichmentOutput,
   type LocationEnrichmentOutput,
   type CategorySetEnrichmentOutput,
+  deliverableSourceMaterialSchema,
+  DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME,
+  DELIVERABLE_SOURCE_MATERIAL_PROMPT_SUFFIX,
+  type DeliverableSourceMaterial,
+  reviewIntakeSchema,
+  REVIEW_INTAKE_SCHEMA_NAME,
+  REVIEW_INTAKE_PROMPT_SUFFIX,
+  type ReviewIntake,
 };
 
 // ============================================================================
@@ -343,6 +363,16 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: citationRepairPackageSchema,
     auditPlatform: null, // fulfill creates a deliverable, not an audit
     promptSuffix: CITATION_REPAIR_PACKAGE_PROMPT_SUFFIX,
+  },
+  [DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME]: {
+    validator: deliverableSourceMaterialSchema,
+    auditPlatform: null, // source material feeds deliverables, not an audit
+    promptSuffix: DELIVERABLE_SOURCE_MATERIAL_PROMPT_SUFFIX,
+  },
+  [REVIEW_INTAKE_SCHEMA_NAME]: {
+    validator: reviewIntakeSchema,
+    auditPlatform: null, // parsed reviews feed deliverables, not an audit
+    promptSuffix: REVIEW_INTAKE_PROMPT_SUFFIX,
   },
   [RAW_JSON_SCHEMA_NAME]: {
     validator: rawJsonSchema,

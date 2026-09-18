@@ -176,6 +176,7 @@ import ReviewSlotService from '../services/deliverable/ReviewSlotService';
 import DeliverableSectionService from '../services/deliverable/DeliverableSectionService';
 import DeliverableAssemblyService from '../services/deliverable/DeliverableAssemblyService';
 import DeliverableRenderService from '../services/deliverable/DeliverableRenderService';
+import DeliverableSourceService from '../services/deliverable/DeliverableSourceService';
 import RecoveryResolutionService from '../services/RecoveryResolutionService';
 import ProfileRepairPromptService, {
   PROFILE_REPAIR_TRIAGE_TEMPLATE_ID,
@@ -3518,6 +3519,8 @@ const deliverableGenerateSchema = z.object({
   deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
   is_preview: z.boolean().default(true),
   content: z.string().optional(),
+  // G-6: platform-staff override for a type whose governing signals did not fire.
+  allow_override: z.boolean().default(false),
 });
 
 const deliverableSendSchema = z.object({
@@ -3527,15 +3530,51 @@ const deliverableSendSchema = z.object({
 router.post('/:campaignId/deliverables/generate', async (req: any, res: Response) => {
   try {
     const parsed = deliverableGenerateSchema.parse(req.body);
+    const ctx = getCtx(req);
+
+    // G-4: review_responses has a dedicated construction workflow (owner voice +
+    // review slots). The generic path must not bypass voice calibration.
+    if (parsed.deliverable_type === 'review_responses' && !parsed.content) {
+      return res.status(400).json({
+        success: false,
+        error: 'review_responses_requires_workspace',
+        message: 'Generate review responses in the Deliverable Construction workspace so owner-voice calibration is applied.',
+      });
+    }
+
+    // G-6: enforce signal-derived eligibility unless the caller overrides.
+    if (!parsed.content && !parsed.allow_override) {
+      const eligibility = await DeliverableSourceService.resolveEligibleTypes(req.params.campaignId, ctx);
+      if (!eligibility.types.includes(parsed.deliverable_type as any)) {
+        return res.status(400).json({
+          success: false,
+          error: 'type_not_eligible',
+          message: `No governing signal fired for "${parsed.deliverable_type}". Pass allow_override: true to force it.`,
+          signals: eligibility.signals,
+          eligible_types: eligibility.types,
+        });
+      }
+    }
+
+    // G-15: resolve content from source material in the caller (not inside
+    // MarketingDeliverableService), keeping the base service prompt-agnostic.
+    let content = parsed.content;
+    if (!content) {
+      const resolved = await DeliverableSourceService.resolveDeliverableContent(
+        req.params.campaignId, parsed.deliverable_type as any, ctx,
+      );
+      content = resolved.content ?? undefined;
+    }
+
     const deliverable = await MarketingDeliverableService.generateDeliverable({
       campaignId: req.params.campaignId,
       templateId: parsed.template_id,
       executionId: parsed.execution_id,
       deliverableType: parsed.deliverable_type,
       isPreview: parsed.is_preview,
-      content: parsed.content,
+      content,
       generatedBy: req.user?.id,
-    }, getCtx(req));
+    }, ctx);
     res.status(201).json({ success: true, data: deliverable });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -5807,6 +5846,59 @@ router.post('/deliverable/:campaignId/render', async (req: any, res: Response) =
     const result = await DeliverableRenderService.renderDeliverable(req.params.campaignId, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Deliverable Source Material ──────────────────────────
+// Spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md
+
+const reviewIntakeSchemaBody = z.object({
+  raw_reviews: z.string().min(1),
+});
+
+// Signal-derived eligible deliverable types for this campaign
+router.get('/deliverable/:campaignId/eligible-types', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableSourceService.resolveEligibleTypes(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Cached source material (or null)
+router.get('/deliverable/:campaignId/source-material', async (req: any, res: Response) => {
+  try {
+    const data = await DeliverableSourceService.getSourceMaterial(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Run the post-audit analyst prompt (synchronous, idempotent by audit + signals)
+router.post('/deliverable/:campaignId/source-material/generate', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableSourceService.generateSourceMaterial(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Operator-pasted review intake (G-1 Option D)
+router.post('/deliverable/:campaignId/review-intake', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewIntakeSchemaBody.parse(req.body || {});
+    const result = await DeliverableSourceService.ingestReviewIntake(
+      req.params.campaignId, parsed.raw_reviews, getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

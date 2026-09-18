@@ -28,6 +28,12 @@ doppler run --config local -- npx tsx src/scripts/seed-profile-repair-triage-bri
 doppler run --config local -- npx tsx src/scripts/seed-marketing-ops-templates.ts
 doppler run --config local -- npx tsx src/scripts/seed-gold-standard-scan-template.ts
 
+# Deliverable source material (spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md)
+# Seeds 7 prompt templates: mpt-review-intake, mpt-deliverable-source-material,
+# mpt-seed-fulfill-004..008. Data-only — NO migration. Bump SEED_VERSION_MARKER
+# in the script to force a body re-sync.
+doppler run --config local -- npx tsx src/scripts/seed-deliverable-source-material-templates.ts
+
 # Business Audit V2 (Category-Integrated mpt-j9bbem3l + Signal-Aligned mpt-6oeuiizo)
 # — wires Category Intelligence + Gold Standard + Website Accessibility Verification
 #   directive into both variants. Bump SEED_VERSION_MARKER in the script to re-apply.

@@ -285,6 +285,14 @@ export default function CampaignDetailClient({
     isPreview: true,
     content: '',
   });
+  // Deliverable source material — signal-derived eligible types + readiness.
+  // Spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md
+  const [eligibleTypes, setEligibleTypes] = useState<DeliverableType[] | null>(null);
+  const [sourceMaterialReady, setSourceMaterialReady] = useState<boolean | null>(null);
+  const [sourceMaterialBusy, setSourceMaterialBusy] = useState(false);
+  const [reviewIntakeText, setReviewIntakeText] = useState('');
+  const [reviewIntakeBusy, setReviewIntakeBusy] = useState(false);
+  const [modalNotice, setModalNotice] = useState<string | null>(null);
 
   const fetchCampaign = useCallback(async () => {
     setLoading(true);
@@ -453,6 +461,31 @@ export default function CampaignDetailClient({
       fetchDeliverables();
     }
   }, [activeTab, fetchDeliverables]);
+
+  // Generate Deliverable modal — resolve signal-derived eligible types and
+  // source-material readiness on open (spec §8, §9.1).
+  useEffect(() => {
+    if (!showGenerateModal) return;
+    let cancelled = false;
+    setModalNotice(null);
+    (async () => {
+      try {
+        const [elig, material] = await Promise.all([
+          marketingOpsService.getEligibleDeliverableTypes(campaignId),
+          marketingOpsService.getDeliverableSourceMaterial(campaignId),
+        ]);
+        if (cancelled) return;
+        setEligibleTypes(elig?.types ?? null);
+        setSourceMaterialReady(Boolean(material));
+        if (elig?.types?.length) {
+          setGenForm((f) => (elig.types.includes(f.deliverableType) ? f : { ...f, deliverableType: elig.types[0] }));
+        }
+      } catch {
+        if (!cancelled) setEligibleTypes(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showGenerateModal, campaignId]);
 
   // Prompts tab: fetch scope-matching prompt templates. Stage filtering is
   // applied client-side via STAGE_PROMPT_TYPES so the operator sees only
@@ -2390,6 +2423,48 @@ export default function CampaignDetailClient({
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Source-material readiness (spec §9.1) */}
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Source material:</span>{' '}
+                    {sourceMaterialReady === null
+                      ? <span className="text-gray-500">checking…</span>
+                      : sourceMaterialReady
+                        ? <span className="text-green-600 dark:text-green-400">ready</span>
+                        : <span className="text-amber-600 dark:text-amber-400">not generated — will run on Generate</span>}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setSourceMaterialBusy(true);
+                      setModalNotice(null);
+                      try {
+                        const r = await marketingOpsService.generateDeliverableSourceMaterial(campaignId);
+                        setSourceMaterialReady(Boolean(r?.sourceMaterial));
+                        if (!r?.sourceMaterial) setModalNotice('Source material ran but returned no content.');
+                      } catch (err: any) {
+                        setModalNotice(err.message || 'Failed to generate source material');
+                      } finally {
+                        setSourceMaterialBusy(false);
+                      }
+                    }}
+                    disabled={sourceMaterialBusy}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {sourceMaterialBusy ? 'Generating…' : 'Generate Source Material'}
+                  </button>
+                </div>
+                {eligibleTypes && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Signal-derived types: {eligibleTypes.length ? eligibleTypes.join(', ') : 'none — showing all'}
+                  </p>
+                )}
+              </div>
+
+              {modalNotice && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">{modalNotice}</p>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Template (optional)</label>
                 <select
@@ -2411,25 +2486,71 @@ export default function CampaignDetailClient({
                   onChange={(e) => setGenForm({ ...genForm, deliverableType: e.target.value as DeliverableType })}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
-                  <option value="review_responses">Review Responses</option>
-                  <option value="service_menu">Service Menu</option>
-                  <option value="gbp_audit">GBP Audit Report</option>
-                  <option value="testimonial_cards">Testimonial Cards</option>
-                  <option value="nap_report">NAP Consistency Report</option>
-                  <option value="seo_content">SEO Content</option>
-                  <option value="lead_magnet">Lead Magnet</option>
-                  <option value="product_visibility_preview">Product Visibility Preview</option>
+                  {([
+                    ['review_responses', 'Review Responses'],
+                    ['service_menu', 'Service Menu'],
+                    ['gbp_audit', 'GBP Audit Report'],
+                    ['testimonial_cards', 'Testimonial Cards'],
+                    ['nap_report', 'NAP Consistency Report'],
+                    ['seo_content', 'SEO Content'],
+                    ['lead_magnet', 'Lead Magnet'],
+                    ['product_visibility_preview', 'Product Visibility Preview'],
+                  ] as [DeliverableType, string][])
+                    .filter(([v]) => !eligibleTypes || eligibleTypes.length === 0 || eligibleTypes.includes(v))
+                    .map(([v, label]) => <option key={v} value={v}>{label}</option>)}
                 </select>
+                {genForm.deliverableType === 'review_responses' && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Review responses are built in the{' '}
+                    <a className="underline" href={`/settings/admin/marketing-ops/deliverables/${campaignId}`}>
+                      Deliverable Construction workspace
+                    </a>{' '}
+                    so owner-voice calibration is applied.
+                  </p>
+                )}
               </div>
 
+              {(genForm.deliverableType === 'review_responses' || genForm.deliverableType === 'testimonial_cards') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paste reviews (source)</label>
+                  <textarea
+                    rows={3}
+                    value={reviewIntakeText}
+                    onChange={(e) => setReviewIntakeText(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                    placeholder="Paste reviews verbatim from Google/Yelp/Facebook. These are parsed into source material."
+                  />
+                  <button
+                    onClick={async () => {
+                      setReviewIntakeBusy(true);
+                      setModalNotice(null);
+                      try {
+                        const r = await marketingOpsService.ingestReviewIntake(campaignId, reviewIntakeText);
+                        const n = r?.intake?.reviews?.length ?? 0;
+                        setModalNotice(`Parsed ${n} review(s). Re-generate source material to apply.`);
+                        setReviewIntakeText('');
+                      } catch (err: any) {
+                        setModalNotice(err.message || 'Failed to parse reviews');
+                      } finally {
+                        setReviewIntakeBusy(false);
+                      }
+                    }}
+                    disabled={reviewIntakeBusy || !reviewIntakeText.trim()}
+                    className="mt-2 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {reviewIntakeBusy ? 'Parsing…' : 'Parse & save reviews'}
+                  </button>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content (optional — overrides source material)</label>
                 <textarea
                   rows={4}
                   value={genForm.content}
                   onChange={(e) => setGenForm({ ...genForm, content: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="Custom content for the deliverable. Leave empty to use execution output."
+                  placeholder="Custom content for the deliverable. Leave empty to build from source material."
                 />
               </div>
 

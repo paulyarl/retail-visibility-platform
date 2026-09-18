@@ -11,7 +11,7 @@
  * execution metadata can identify which directive version produced a run.
  */
 
-export const REPORT_DIRECTIVES_VERSION = 'report_directives_v1';
+export const REPORT_DIRECTIVES_VERSION = 'report_directives_v2';
 
 /**
  * §6.10 — Shared business-intelligence tone directive.
@@ -106,4 +106,58 @@ report_evidence shape:
  */
 export function composeReportDirectives(): string {
   return [SHARED_BUSINESS_INTELLIGENCE_TONE_DIRECTIVE, REPORT_EVIDENCE_DIRECTIVE].join('\n\n');
+}
+
+// ============================================================================
+// Deliverable Source Material — tone directives
+// (spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md §5.4)
+//
+// Two registers, split by audience. Composed ONCE by the prompt layer — never
+// copied into seed bodies. Bump REPORT_DIRECTIVES_VERSION on text changes.
+// ============================================================================
+
+/**
+ * Register A — internal analyst voice (the post-audit source-material prompt
+ * and the review-intake prompt). Mirrors the outreach-problems directive tone.
+ */
+export const DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE = `DELIVERABLE ANALYST TONE DIRECTIVE
+
+Write for a capable business owner or operator. Be clear, specific, useful, and
+forward-looking. The writing should feel intelligent and commercially aware,
+never dull, dry, bureaucratic, alarmist, or generic.
+
+Tone — warm, professional, helpful: write copy the operator can read aloud to the
+owner with a straight face and a smile. Never dry, never dull.
+
+Do not shame the business. Do not imply that incomplete public information proves
+poor business quality. Do not convert an unavailable field into a negative finding —
+absence is not a negative. Ground every claim in the supplied audit or review data.`;
+
+/**
+ * Register B — owner-facing deliverable copy (the eight fulfill prompts).
+ * Mirrors the public/listing voice used by the enrichment prompts and
+ * public_narrative.
+ */
+export const DELIVERABLE_FULFILL_TONE_DIRECTIVE = `DELIVERABLE OWNER-FACING TONE DIRECTIVE
+
+Warm and professional — a knowledgeable local speaking to a neighbor. Welcoming and
+plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no
+hype. Ground every claim in the supplied source material; do not invent details.
+
+Close fix-implying deliverables on the claim-and-fix motion ("claim your profile and
+we fix it"), never a purchase ask. Do not invent fees, tiers, or package names.`;
+
+/**
+ * Compose the analyst-side directive for the source-material / review-intake
+ * prompts.
+ */
+export function composeDeliverableAnalystDirectives(): string {
+  return [DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE].join('\n\n');
+}
+
+/**
+ * Compose the owner-facing directive for the eight fulfill prompts.
+ */
+export function composeDeliverableFulfillDirectives(): string {
+  return [DELIVERABLE_FULFILL_TONE_DIRECTIVE].join('\n\n');
 }

@@ -447,14 +447,15 @@ and the shared business-intelligence directive (`SHARED_BUSINESS_INTELLIGENCE_TO
 
 #### Composition rule (non-negotiable)
 
-Per the shared-directive contract (`report-directives.ts` header) and the AGENTS.md "Shared prompt directives" rule: **the tone directive is composed ONCE by the prompt layer and never copied into fragment bodies or seed transforms.** Copying causes tone drift and seed-insertion failures.
+The directive text is defined **once** in `report-directives.ts` and never hand-copied — the seed script **imports** the constant and interpolates it into the body. This satisfies the shared-directive contract's purpose (no tone drift between surfaces) while keeping the seeded body self-contained for the copy-paste bridge and external-import execution modes.
 
 Concretely:
 
-- Add `DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE` (Register A) and `DELIVERABLE_FULFILL_TONE_DIRECTIVE` (Register B) to `report-directives.ts`, and compose them in `composeReportDirectives()` (or the deliverable-source composer) so the analyst prompt receives Register A and all eight fulfill prompts (3 existing + 5 new) receive Register B at render time.
-- The seeded template bodies (§5.1, §5.2) carry a `TONE` / `Tone:` placeholder line, **not** the directive text.
+- `DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE` (Register A) and `DELIVERABLE_FULFILL_TONE_DIRECTIVE` (Register B) live in `report-directives.ts` and are exported.
+- `seed-deliverable-source-material-templates.ts` imports both and interpolates them into the seeded bodies — so the body text is generated from the single definition, not duplicated by hand.
 - Bump `REPORT_DIRECTIVES_VERSION` on any text change so execution metadata identifies which directive version produced a run.
 - Register A and Register B are **different** — the analyst must not write in the owner's marketing voice, and the fulfill prompts must not write internal analyst prose. Do not collapse them into one directive.
+- **Implementation note:** an earlier draft specified a `TONE` placeholder composed at render time. That was changed to import-and-interpolate because `MarketingExecutionService.executeSingle` renders the seeded body directly; interpolating the constant achieves the same no-drift guarantee without patching the core execution service.
 
 ### 5.5 Reusable content patterns — reuse the shape, not the instance
 
@@ -579,15 +580,9 @@ export const reviewIntakeSchema = z.object({
 
 ### 6.1 Migration
 
-`database/migrations/300_mkt_deliverable_source_material_templates.sql` (next free number — current max is 299)
+**No schema migration.** This work adds prompt-template **data** only — no tables, columns, indexes, or CHECK constraints change. The authoritative source is the seed script (§6.2); inlining the bodies into a numbered `.sql` file would duplicate them and reintroduce the drift the seed script exists to prevent. (Contrast migration 130, which was the initial bootstrap of the default template set; subsequent template changes in this repo are seed-script-only.)
 
-- Inserts 7 prompt templates into `mkt_prompt_templates_list`:
-  - `mpt-deliverable-source-material` (seek, `output_schema = {"name":"deliverable_source_material"}`)
-  - `mpt-review-intake` (seek, `output_schema = {"name":"review_intake"}`) — §5.7
-  - `mpt-seed-fulfill-004` … `mpt-seed-fulfill-008` (fulfill, `output_schema = {"name":"raw_json"}`)
-- Uses `INSERT ... ON CONFLICT (id) DO UPDATE` (idempotent re-seed convention, migration 130 pattern).
-- **No new tables, no CHECK constraints.**
-- Applied **in tandem — local + prd** (AGENTS.md migration SOP).
+If a future change to this feature adds a column or table, ship it as `300_*.sql` (next free number — current max is 299) and run it tandem local + prd per the AGENTS.md migration SOP.
 
 ### 6.2 Seed script
 
@@ -721,7 +716,7 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 - **Signal-gating tests** — fixture audits with: only RA signals → only `review_responses` populated; only CP signals → only `nap_report`; A6 signals → only `product_visibility_preview`; no signals → derived tier; no audit → fallback (all types).
 - **Eligibility mapping tests** — `resolveEligibleTypes` returns the exact §3.2 sets; assert `preview_deliverable_type` is NOT trusted for PB-03/05/06.
 - **Fulfill prompt render tests** — each new template renders with its declared variables and no unresolved `{{...}}` tokens (the `renderTemplate` out-of-scope detector must not suppress them via the override path).
-- **Tone composition tests (§5.4)** — the analyst prompt renders with Register A and each fulfill prompt with Register B; neither directive's text appears literally in any seeded body (guards the compose-once rule); `REPORT_DIRECTIVES_VERSION` is bumped when directive text changes.
+- **Tone composition tests (§5.4)** — the analyst prompt body contains Register A and each fulfill body contains Register B; the directive text is imported from `report-directives.ts` (assert the seeded body matches the exported constant, i.e. no hand-copied drift); `REPORT_DIRECTIVES_VERSION` is bumped when directive text changes.
 - **Repetition-guard tests (§5.5)** — `prior_outreach` is populated from the latest opener + pitch hook when they exist, empty otherwise; a deliverable body that repeats the opener hook verbatim is flagged by the extended quality gate; two source blocks opening with the same sentence pattern are flagged.
 - **Framing tests (§5.6)** — deliverable bodies for the fix-implying types carry the claim-and-fix CTA (not a purchase ask); the claim/report URLs resolve through `outreach-link-vars.ts` and match the canonical `/place/claim` path; no body asserts a published listing when the audit has none.
 - **Resolution-order test** — `generateDeliverable` with `content` set ignores source material; with `content` empty uses the fulfill output; with no source material falls back to the placeholder.
@@ -748,7 +743,7 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 3. `DeliverableSourceService` — eligibility resolution, source-material generation, idempotency, `serializeAuditResults()`.
 4. Author the 5 new fulfill prompt bodies + the post-audit analyst prompt body.
 5. Add `DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE` (Register A) + `DELIVERABLE_FULFILL_TONE_DIRECTIVE` (Register B) to `report-directives.ts`, compose them in the deliverable-source/fulfill render path, and bump `REPORT_DIRECTIVES_VERSION` (§5.4).
-6. Migration `<n>_mkt_deliverable_source_material_templates.sql` (6 templates).
+6. Seed script only — **no migration** (data-only change; §6.1).
 7. `seed-deliverable-source-material-templates.ts` + `package.json` script entry.
 8. Extend `MarketingDeliverableService.generateDeliverable()` resolution order + provenance stamp.
 9. Routes: `source-material`, `source-material/generate`, `eligible-types`.
@@ -769,6 +764,34 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 0e. **G-10** — deterministic post-normalization of ineligible source blocks.
 0f. **G-3** — `nap_report` non-Google rows from `nap_consistency` variations.
 0g. **G-12/G-13** — signal-family filter on `signals_consumed`; business-scope-only with audit-aware degradation (no audit → report unavailable blocks, don't fail).
+
+### 12.1 Implementation status (2026-09-18)
+
+| # | Task | Status | Artifact |
+|---|---|---|---|
+| 1 | Schemas + prompt suffixes | ✅ | `apps/api/src/validators/deliverable-source-material.schema.ts`, `review-intake.schema.ts` |
+| 2 | Registry registration | ✅ | `market-analysis.schema.ts` (`auditPlatform: null` for both) |
+| 3 | `DeliverableSourceService` | ✅ | `apps/api/src/services/deliverable/DeliverableSourceService.ts` |
+| 4 | Prompt bodies (7) | ✅ | `apps/api/src/scripts/seed-deliverable-source-material-templates.ts` |
+| 5 | Tone directives (Register A/B) | ✅ | `apps/api/src/services/intelligence/report-directives.ts` (v2) |
+| 6 | Seed script (no migration) | ✅ | same as #4 |
+| 7 | `generateDeliverable` resolution | ✅ | resolved in the route, not the base service (G-15) |
+| 8 | Routes | ✅ | `marketing-ops.ts` — `eligible-types`, `source-material`, `source-material/generate`, `review-intake`; eligibility check on `deliverables/generate` |
+| 9 | Frontend service methods | ✅ | `MarketingOpsService.ts` |
+| 10 | Modal wiring | ✅ | `CampaignDetailClient.tsx` (status panel, data-driven types, paste-reviews, relabel) |
+| 11 | Quality gate for 7 non-review types | ⏳ **deferred** | §7.4 — reuse the review-response gate pattern |
+| 12 | Repetition guard | ⚠ **partial** | `prior_outreach` built + prompt rule in place; quality-gate extension not yet added |
+| 13 | Seeding/claiming framing | ⚠ **partial** | Register B carries the claim-and-fix rule; link-variable injection into fulfill prompts not yet wired |
+| 14 | Tests | ✅ | 14 passing (2 files) |
+| 15 | `pnpm checkapi` / `checkweb` | ✅ | both clean |
+| 16 | Re-run seed local + prd | ⏳ **required** | run `seed-deliverable-source-material-templates.ts` on both configs |
+
+**Deferred / follow-up (not blocking):**
+- G-1b — latent `ReviewSlotService` bug (reads `platforms[*].reviews[]`, which the schema never emits). Out of scope per Option D; log separately.
+- G-7 — best-effort source-material run at audit import (currently synchronous endpoint only).
+- G-8 — per-type `layout_spec` templates (new types render with the generic 2-heading layout).
+- G-11 — no migration (data-only); `300_*.sql` reserved for a future schema change.
+- G-14/G-19 — `lead_magnet` source thinness; see §11.
 
 ---
 
