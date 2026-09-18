@@ -94,6 +94,8 @@ const seedTouch = (overrides: Partial<any> = {}) => ({
   notes: 'Verified NAP',
   operator_id: 'uid-2',
   occurred_at: new Date('2026-09-01T00:00:00Z'),
+  recording_url: null,
+  recording_duration_seconds: null,
   ...overrides,
 });
 
@@ -237,6 +239,32 @@ describe('ProspectCommunicationService.getTimeline', () => {
       verified_nap: { name: 'Joe Pizza', phone: '512-555-0100' },
     });
     expect(timeline.prospect.verification).toEqual({ requested_at: '2026-09-02T00:00:00.000Z' });
+  });
+
+  // Migration 295 — pre-campaign call recordings live on the seed touch.
+  it('surfaces a seed-touch recording url + duration on the timeline event', async () => {
+    mockQueue.findUnique.mockResolvedValue(queueEntry({ status: 'queued', processed_campaign_id: null }));
+    mockListOutreachTouches.mockResolvedValue([
+      seedTouch({
+        recording_url: 'https://recordings.example.com/touch-001.mp3',
+        recording_duration_seconds: 143,
+      }),
+    ]);
+
+    const timeline = await ProspectCommunicationService.getTimeline(QUEUE_ID);
+
+    expect(timeline.events[0].recording_url).toBe('https://recordings.example.com/touch-001.mp3');
+    expect(timeline.events[0].recording_duration_seconds).toBe(143);
+  });
+
+  it('leaves recording fields null when no recording is attached', async () => {
+    mockQueue.findUnique.mockResolvedValue(queueEntry({ status: 'queued', processed_campaign_id: null }));
+    mockListOutreachTouches.mockResolvedValue([seedTouch()]);
+
+    const timeline = await ProspectCommunicationService.getTimeline(QUEUE_ID);
+
+    expect(timeline.events[0].recording_url).toBeNull();
+    expect(timeline.events[0].recording_duration_seconds).toBeNull();
   });
 });
 

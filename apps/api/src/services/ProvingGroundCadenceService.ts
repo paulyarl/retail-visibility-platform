@@ -59,6 +59,10 @@ export interface LogTouchInput {
   channel: TouchChannel;
   outcome?: TouchOutcome;
   notes?: string;
+  // Migration 295 — optional call recording captured with the touch.
+  recordingUrl?: string;
+  recordingDurationSeconds?: number;
+  recordingProvider?: string;
 }
 
 export interface LogTouchResult {
@@ -182,6 +186,9 @@ class ProvingGroundCadenceServiceClass extends BaseService {
           outcome: input.outcome,
           notes: input.notes,
           occurredAt: now,
+          recordingUrl: input.recordingUrl,
+          recordingDurationSeconds: input.recordingDurationSeconds,
+          recordingProvider: input.recordingProvider,
         },
         ctx ? { actorId: ctx.userId, actorType: 'user' } : undefined,
       );

@@ -1125,6 +1125,27 @@ Owner must confirm categories + attributes (a consent contract) before a directo
 
 
 
+## Prospect Communications (prospect-scoped communication history)
+
+Page: `/settings/admin/marketing-ops/communications` (`ProspectCommunicationsClient.tsx`) — picker → unified timeline, patterned after the openers/follow-ups workspaces. Deep-link: `?prospect=<queueEntryId>`.
+
+- **Anchor = the queue entry.** `mkt_prospect_queue` is the prospect registry; it links the seed (pre-campaign) and the processed campaign (post-campaign). A campaign created straight from an audit card without ever entering the queue is NOT listed.
+- **Aggregator:** `apps/api/src/services/ProspectCommunicationService.ts` (read-only). `listProspects()` → picker + rolled-up contact counts; `getTimeline(queueEntryId)` → merged events. Routes: `GET /api/admin/marketing-ops/prospects`, `GET /prospects/:id/timeline`.
+- **Sources merged:** `directory_seed_outreach_touches` (by `seed_id`, pre-campaign) + `mkt_outreach_log` (by campaign, incl. siblings sharing `business_prospect_id`). Siblings fold into one conversation.
+- **Channel normalization:** `normalizeChannel` maps `call`→`phone`, `visit`→`in_person`; everything else passes through. `raw_channel` preserves the stored value. Kept separate from `ProvingGroundCadenceService.CHANNEL_TO_OUTREACH` (that one collapses channels for the campaign-log taxonomy).
+- **Card actions** mirror the PG promote panel: `queued` → Verify (`requestVerification`); `verify_then_outreach` → Resolve (`ResolveVerificationModal`); campaign present → Log contact (`LogContactModal`); pre-campaign seeded → Log touch (`logProspectTouch`).
+- **`ResolveVerificationModal` prop is `VerificationEntryLike`,** a structural minimal shape (not `ProspectQueueEntry`) so non-queue surfaces can open it. `ProspectQueueEntry` still satisfies it.
+- **Migration `295_directory_seed_outreach_touch_recording.sql`** — adds `recording_url`, `recording_duration_seconds` (+ CHECK ≥ 0), `recording_provider`, `recording_attached_at`, `recording_attached_by` to `directory_seed_outreach_touches` (pre-campaign call recordings). Additive/idempotent; guarded on migration 259. Campaign-side recordings already live in `mkt_outreach_log.call_details.recording_url`. Writers: `addOutreachTouch` (recording at log time), `attachTouchRecording` (attach later — `POST .../presence-seeds/:id/touches/:touchId/recording`). Apply to `local` + `prd`, then `pnpm prisma:generate`.
+- **Business-hours journey (migration 296).** Opening hours pasted from the GBP listing in the resolve-verification modal travel **queue → campaign → seed listing**:
+  1. Modal pastes/parses (`parseGoogleHoursPaste`) → `verifiedHours` on `resolveVerification`.
+  2. Written to the queue snapshot as **both** `verified_nap.hours` (provenance) and flat `hours`.
+  3. `createCampaignFromQueue` reads `verified_nap.hours ?? snapshot.hours` and passes `businessHours` to `deriveBusinessCampaign`/`createCampaign` → `mkt_campaigns_list.business_hours` (added by migration 296). The scan path applies it via `geoPatch.business_hours` post-derive.
+  4. `DirectoryPresenceSeedService.createFromCampaign` reads `campaign.business_hours || audit.business_hours`; the queue→seed batch paths (`createSeedsFromBatch`, `createSeedsForProvingGround`) read `snapshot.hours || snapshot.verified_nap.hours`.
+  5. `createSeed`/`updateSeed` write `directory_listings_list.business_hours` and sync `business_hours_list` (public hours endpoint).
+  Canonical shape + parser live in **`apps/web/src/lib/business-hours.ts`** (shared by the seed detail page and the verification modal — do not re-inline the parser). Apply migration 296 to `local` + `prd`.
+  **Editable at every leg via one component:** `apps/web/src/components/business-hours/BusinessHoursEditor.tsx` (timezone + GBP paste/parse + per-day grid). Mounted on the seed detail page (refactored to it), the campaign create/edit form (`CampaignFormClient`, `business_hours` field), and the prospect card on the communications page (queue leg). Queue writes go through `PATCH /prospect-queue/:id` `hours` (null clears) and merge into `business_snapshot.hours` + `verified_nap.hours`; hours are treated as identity enrichment, so they stay editable on `hold`/`in_thread` rows but not after graduation. Campaign writes go through the campaign create/update body `business_hours` (null clears via `Prisma.DbNull`).
+- Tests: `ProspectCommunicationService.test.ts`, `DirectoryPresenceSeedService.outreachTouchRecording.test.ts`, `DirectoryPresenceSeedService.businessHours.test.ts`, hours cases in `MarketingProspectQueueService.test.ts`.
+
 ## Proving Ground Campaigns (Migration 262)
 
 Spec: `docs/LocalBiz/PROVING_GROUND_CAMPAIGN_SPEC.md` � Sprint plan: `docs/LocalBiz/proving_ground_sprint_plan.md`

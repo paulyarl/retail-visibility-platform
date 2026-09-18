@@ -173,6 +173,9 @@ export interface Campaign {
   address_zip: string | null;
   address_country: string | null;
   directory_profiles: DirectoryProfileEntry[] | null;
+  // Migration 296 — opening hours (day-map + timezone), carried from the
+  // verification call and onto the seed listing.
+  business_hours?: Record<string, any> | null;
   gbp_claimed: boolean | null;
   unaddressed_reviews: number | null;
   last_review_date: string | null;
@@ -1168,6 +1171,9 @@ export interface VerificationResolutionInput {
   verifiedEmail?: string;
   verifiedCategory?: string;
   verifiedOwnerName?: string;
+  // Migration 296 — opening hours pasted from the GBP listing on the call.
+  // Carried queue → campaign → seed listing.
+  verifiedHours?: Record<string, any>;
   // Authoritative identity enrichment — overwrite the campaign's social /
   // directory profiles on promotion (not fill-null).
   verifiedSocialProfiles?: VerifiedSocialProfile[];
@@ -1264,6 +1270,9 @@ export interface ProspectQueuePatch {
   // Migration 262 — account-family grouping (one owner → one operator/thread);
   // also editable on hold/in_thread rows.
   account_family?: string | null;
+  // Migration 296 — opening hours on the queue snapshot (null clears);
+  // editable on hold/in_thread rows too.
+  hours?: Record<string, any> | null;
 }
 
 export interface ProspectQueueEntry {
@@ -1388,6 +1397,7 @@ export interface ProspectCommunicationEvent {
   delivery_status: string | null;
   call_details: Record<string, any> | null;
   recording_url: string | null;
+  recording_duration_seconds: number | null;
   anchor_snapshot: Record<string, any> | null;
   verification_results: Record<string, any>[] | null;
   system_generated: boolean;
@@ -1764,6 +1774,8 @@ export interface CampaignCreateInput {
   address_state?: string;
   address_zip?: string;
   address_country?: string;
+  // Migration 296 — opening hours (null clears).
+  business_hours?: Record<string, any> | null;
   directory_profiles?: DirectoryProfileEntry[];
   display_id?: string;
   gbp_claimed?: boolean;
@@ -5240,6 +5252,9 @@ class MarketingOpsService extends AdminApiSingleton {
       | 'bad_number' | 'bounce' | 'unread' | 'read_no_reply' | 'form_submitted'
       | 'referral_asked' | 'claimed' | 'not_interested';
     notes?: string;
+    recording_url?: string;
+    recording_duration_seconds?: number;
+    recording_provider?: string;
   }): Promise<{
     touchId: string;
     queueEntryId: string;

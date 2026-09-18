@@ -10,6 +10,8 @@ import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/Sug
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { addressParser } from '@/lib/address-parser';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
+import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
+import { parseHours } from '@/lib/business-hours';
 
 const STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
@@ -62,6 +64,9 @@ interface FormState {
   address_zip: string;
   address_country: string;
   directory_profiles: DirectoryProfileEntry[];
+  // Migration 296 — opening hours (day-map + timezone), editable on the
+  // campaign leg of the queue → campaign → seed journey. null = none sourced.
+  business_hours: Record<string, any> | null;
   display_id: string;
   gbp_claimed: boolean | '';
   unaddressed_reviews: number | '';
@@ -126,6 +131,7 @@ const EMPTY_FORM: FormState = {
   address_zip: '',
   address_country: 'US',
   directory_profiles: [],
+  business_hours: null,
   display_id: '',
   gbp_claimed: '',
   unaddressed_reviews: '',
@@ -372,6 +378,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         address_zip: c.address_zip ?? '',
         address_country: c.address_country ?? 'US',
         directory_profiles: c.directory_profiles ?? [],
+        business_hours: c.business_hours ?? null,
         display_id: c.display_id ?? '',
         gbp_claimed: c.gbp_claimed ?? '',
         unaddressed_reviews: c.unaddressed_reviews ?? '',
@@ -493,7 +500,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
   }, [form.campaign_category, form.scope, form.category, form.city, form.state, enrichmentTitleSuffix, titleManuallyEdited]);
 
-  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[]) => {
+  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[] | DirectoryProfileEntry[] | Record<string, any> | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -643,6 +650,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           address_state: strOrUndef(form.address_state),
           address_zip: strOrUndef(form.address_zip),
           address_country: strOrUndef(form.address_country),
+          business_hours: form.business_hours ?? undefined,
           directory_profiles: cleanDirectoryProfiles.length > 0 ? cleanDirectoryProfiles : undefined,
           display_id: strOrUndef(form.display_id),
           gbp_claimed: boolOrUndef(form.gbp_claimed),
@@ -717,6 +725,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           address_state: form.address_state,
           address_zip: form.address_zip,
           address_country: form.address_country,
+          // null clears the column (Prisma DbNull server-side).
+          business_hours: form.business_hours,
           directory_profiles: cleanDirectoryProfiles,
           gbp_claimed: boolOrFalse(form.gbp_claimed),
           unaddressed_reviews: numOrZero(form.unaddressed_reviews),
@@ -1339,6 +1349,28 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 placeholder="US"
                 maxLength={2}
                 className={inputClass} />
+            </FormField>
+            <FormField label="Business Hours" className="sm:col-span-2">
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Verified on the call or pasted from Google. Carries onto the seed listing
+                  when you add this business to the directory.
+                </p>
+                <BusinessHoursEditor
+                  compact
+                  hours={parseHours(form.business_hours)}
+                  timezone={form.business_hours?.timezone || 'America/New_York'}
+                  onHoursChange={(hours) =>
+                    handleChange('business_hours', {
+                      ...hours,
+                      timezone: form.business_hours?.timezone || 'America/New_York',
+                    })
+                  }
+                  onTimezoneChange={(tz) =>
+                    handleChange('business_hours', { ...parseHours(form.business_hours), timezone: tz })
+                  }
+                />
+              </div>
             </FormField>
             <FormField label="Directory Profiles" className="sm:col-span-2">
               <div className="space-y-3">

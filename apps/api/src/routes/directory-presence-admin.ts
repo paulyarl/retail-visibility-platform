@@ -435,6 +435,10 @@ const touchSchema = z.object({
   ]).optional(),
   notes: z.string().max(2000).optional(),
   occurredAt: z.string().datetime().optional(),
+  // Migration 295 — optional call recording captured with the touch.
+  recordingUrl: z.string().max(2000).optional(),
+  recordingDurationSeconds: z.number().int().nonnegative().optional(),
+  recordingProvider: z.string().max(40).optional(),
 });
 
 router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Request, res: Response) => {
@@ -454,6 +458,9 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
         outcome: parsed.data.outcome,
         notes: parsed.data.notes,
         occurredAt: parsed.data.occurredAt ? new Date(parsed.data.occurredAt) : undefined,
+        recordingUrl: parsed.data.recordingUrl,
+        recordingDurationSeconds: parsed.data.recordingDurationSeconds,
+        recordingProvider: parsed.data.recordingProvider,
       },
       ctx,
     );
@@ -463,6 +470,43 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
       return res.status(404).json({ error: 'seed_not_found' });
     }
     logger.error('[POST /api/admin/directory/presence-seeds/:id/touches] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/touches/:touchId/recording
+ *
+ * Attach (or replace) a call recording on an existing touch (migration 295).
+ * Recordings usually land after the touch is logged, so this is a separate
+ * write from the touch POST.
+ */
+const touchRecordingSchema = z.object({
+  recordingUrl: z.string().min(1).max(2000),
+  recordingDurationSeconds: z.number().int().nonnegative().optional(),
+  recordingProvider: z.string().max(40).optional(),
+});
+
+router.post('/presence-seeds/:id/touches/:touchId/recording', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const parsed = touchRecordingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'validation_error', details: parsed.error.flatten() });
+    }
+    const result = await DirectoryPresenceSeedService.attachTouchRecording(
+      req.params.id,
+      req.params.touchId,
+      parsed.data,
+      { actorId: (req as any).user?.id, actorType: 'user' as const },
+    );
+    res.json({ success: true, touchId: result.id });
+  } catch (error) {
+    if ((error as Error).message === 'touch_not_found') {
+      return res.status(404).json({ error: 'touch_not_found' });
+    }
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/touches/:touchId/recording] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

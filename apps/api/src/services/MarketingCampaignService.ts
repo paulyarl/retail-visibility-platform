@@ -10,6 +10,7 @@
 
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ValidationError, ConflictError, HttpError } from '../middleware/errorHandler';
@@ -292,6 +293,11 @@ export interface CampaignInput {
   addressZip?: string;
   addressCountry?: string;
   directoryProfiles?: DirectoryProfileEntry[];
+  // Migration 296 — opening hours captured on the verification call (or
+  // supplied by a discovery pass). Shape mirrors
+  // directory_listings_list.business_hours; flows onto the seed listing at
+  // "Add to place listing" time.
+  businessHours?: Record<string, any>;
   displayId?: string;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
@@ -358,6 +364,9 @@ export interface CampaignUpdateInput {
   addressZip?: string;
   addressCountry?: string;
   directoryProfiles?: DirectoryProfileEntry[];
+  // Migration 296 — opening hours, editable on the campaign leg. `null`
+  // clears them (Prisma needs DbNull for a nullable Json column).
+  businessHours?: Record<string, any> | null;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
   lastReviewDate?: Date | null;
@@ -786,6 +795,8 @@ export class MarketingCampaignService extends BaseService {
           address_zip: input.addressZip || null,
           address_country: input.addressCountry || null,
           directory_profiles: (input.directoryProfiles ?? undefined) as any,
+          // Migration 296 — verified opening hours ride the campaign leg.
+          business_hours: (input.businessHours ?? undefined) as any,
           gbp_claimed: input.directoryProfiles
             ? (input.directoryProfiles.find((p) => p.platform.toLowerCase() === 'google')?.claim_status === 'claimed') || input.gbpClaimed || false
             : input.gbpClaimed || false,
@@ -1894,6 +1905,9 @@ export class MarketingCampaignService extends BaseService {
     categoryOverride?: string;
     cityOverride?: string;
     stateOverride?: string;
+    // Migration 296 — opening hours captured on the verification call, carried
+    // onto the derived campaign so "Add to place listing" can seed them.
+    businessHours?: Record<string, any>;
   }, ctx?: RequestCtx): Promise<any> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -1987,6 +2001,8 @@ export class MarketingCampaignService extends BaseService {
         addressCountry: input.addressCountry,
         socialProfiles: input.socialProfiles,
         ownerNames: input.ownerNames,
+        // Migration 296 — verified opening hours ride onto the child campaign.
+        businessHours: input.businessHours,
         directoryProfiles: input.directoryProfiles ??
           (input.gbpUrl
             ? [{
@@ -2341,6 +2357,10 @@ export class MarketingCampaignService extends BaseService {
     if (input.addressState !== undefined) data.address_state = input.addressState || null;
     if (input.addressZip !== undefined) data.address_zip = input.addressZip || null;
     if (input.addressCountry !== undefined) data.address_country = input.addressCountry || null;
+    // Migration 296 — opening hours. `null` clears the column.
+    if (input.businessHours !== undefined) {
+      data.business_hours = input.businessHours === null ? Prisma.DbNull : input.businessHours;
+    }
     if (input.directoryProfiles !== undefined) {
       data.directory_profiles = (input.directoryProfiles || undefined) as any;
       // Auto-sync legacy GBP fields from the Google row

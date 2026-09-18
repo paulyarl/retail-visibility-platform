@@ -24,6 +24,14 @@ import { clientLogger } from '@/lib/client-logger';
 import { generateQrDataUrl } from '@/lib/qr-engine';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import {
+  DAYS,
+  type DayHours,
+  EMPTY_HOURS,
+  parseHours,
+  formatHoursForDisplay,
+} from '@/lib/business-hours';
+import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
+import {
   ArrowLeft,
   Send,
   CheckCircle,
@@ -104,163 +112,6 @@ interface EditProvenanceRow {
   sourceUrl: string;
   confidence: 'high' | 'medium' | 'low';
   showOnPublic: boolean;
-}
-
-const DAYS = [
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
-] as const;
-
-interface DayHours {
-  open: string;
-  close: string;
-  closed: boolean;
-}
-
-const EMPTY_HOURS: Record<string, DayHours> = DAYS.reduce((acc, day) => {
-  acc[day] = { open: '09:00', close: '18:00', closed: true };
-  return acc;
-}, {} as Record<string, DayHours>);
-
-function parseHours(raw: any): Record<string, DayHours> {
-  if (!raw || typeof raw !== 'object') return { ...EMPTY_HOURS };
-  const result: Record<string, DayHours> = { ...EMPTY_HOURS };
-  for (const day of DAYS) {
-    const d = raw[day];
-    if (d && typeof d === 'object') {
-      result[day] = {
-        open: d.open ?? '09:00',
-        close: d.close ?? '18:00',
-        closed: d.closed ?? false,
-      };
-    }
-  }
-  return result;
-}
-
-function formatHoursForDisplay(raw: any): string {
-  const hours = parseHours(raw);
-  const parts: string[] = [];
-  for (const day of DAYS) {
-    const h = hours[day];
-    if (h.closed) {
-      parts.push(`${day[0].toUpperCase()}${day.slice(1)}: Closed`);
-    } else {
-      parts.push(`${day[0].toUpperCase()}${day.slice(1)}: ${h.open}–${h.close}`);
-    }
-  }
-  return parts.join(' · ');
-}
-
-// --- Google Business Profile hours paste parser ---------------------------
-// Parses a hours block copied from the GBP "Hours" section into the
-// DayHours structure used by the seed editor. Mirrors the addressParser
-// paste-and-split pattern used on the Create Seed form.
-
-const GOOGLE_DAY_NAMES: Record<string, string> = {
-  monday: 'monday',
-  mon: 'monday',
-  tuesday: 'tuesday',
-  tue: 'tuesday',
-  tues: 'tuesday',
-  wednesday: 'wednesday',
-  wed: 'wednesday',
-  weds: 'wednesday',
-  thursday: 'thursday',
-  thu: 'thursday',
-  thur: 'thursday',
-  thurs: 'thursday',
-  friday: 'friday',
-  fri: 'friday',
-  saturday: 'saturday',
-  sat: 'saturday',
-  sunday: 'sunday',
-  sun: 'sunday',
-};
-
-/** Convert a 12-hour time token ("9 AM", "8:30 PM", "12 AM") to "HH:MM". */
-function parseTimeTo24h(timeStr: string): string | null {
-  const m = timeStr.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
-  if (!m) return null;
-  let hour = parseInt(m[1], 10);
-  const minute = m[2] ? parseInt(m[2], 10) : 0;
-  const period = m[3].toUpperCase();
-  if (period === 'AM') {
-    if (hour === 12) hour = 0;
-  } else {
-    if (hour !== 12) hour += 12;
-  }
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-/**
- * Parse a single hours line (e.g. "- 9 AM–8:30 PM") into a DayHours entry.
- * Handles "Closed", "Open 24 hours", and split ranges (takes the first
- * range — the DayHours model only stores one open/close pair per day).
- */
-function parseHoursLine(line: string): DayHours | null {
-  const trimmed = line.replace(/^[-•*]\s*/, '').trim();
-  if (!trimmed) return null;
-  if (/^closed/i.test(trimmed)) {
-    return { open: '09:00', close: '18:00', closed: true };
-  }
-  if (/open\s*24\s*hours?/i.test(trimmed)) {
-    return { open: '00:00', close: '23:59', closed: false };
-  }
-  // Time range — separator can be en-dash (–), em-dash (—), or hyphen (-).
-  const rangeMatch = trimmed.match(
-    /(\d{1,2}(?::\d{2})?\s*(?:AM|PM))\s*[–—-]\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM))/i,
-  );
-  if (!rangeMatch) return null;
-  const open = parseTimeTo24h(rangeMatch[1]);
-  const close = parseTimeTo24h(rangeMatch[2]);
-  if (!open || !close) return null;
-  return { open, close, closed: false };
-}
-
-/**
- * Parse a Google Business Profile hours block into a per-day DayHours map.
- * Returns null when no day could be parsed (so the caller can show an error).
- *
- * Expected format (one day per block, hours on the following line):
- *   Saturday
- *   - 12 AM–8:30 PM
- *   Sunday
- *   - 9 AM–8:30 PM
- *   ...
- */
-function parseGoogleHoursPaste(text: string): Record<string, DayHours> | null {
-  if (!text.trim()) return null;
-  const result: Record<string, DayHours> = { ...EMPTY_HOURS };
-  let foundAny = false;
-  const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const dayKey = GOOGLE_DAY_NAMES[lines[i].trim().toLowerCase()];
-    if (!dayKey) continue;
-    // Find the next non-empty line for the hours. Stop if it's another day
-    // name (means this day had no hours listed).
-    let hoursLine = '';
-    for (let j = i + 1; j < lines.length; j++) {
-      const next = lines[j].trim();
-      if (!next) continue;
-      if (GOOGLE_DAY_NAMES[next.toLowerCase()]) break;
-      hoursLine = next;
-      break;
-    }
-    if (hoursLine) {
-      const parsed = parseHoursLine(hoursLine);
-      if (parsed) {
-        result[dayKey] = parsed;
-        foundAny = true;
-      }
-    }
-  }
-  return foundAny ? result : null;
 }
 
 export const dynamic = 'force-dynamic';
@@ -439,11 +290,6 @@ export default function PresenceSeedDetailPage() {
   const [editTimezone, setEditTimezone] = useState('America/New_York');
   const [editHoursSource, setEditHoursSource] = useState('');
   const [editHoursSourceUrl, setEditHoursSourceUrl] = useState('');
-  // Google Business Profile hours paste helper
-  const [showHoursPaste, setShowHoursPaste] = useState(false);
-  const [hoursPasteText, setHoursPasteText] = useState('');
-  const [hoursPasteError, setHoursPasteError] = useState<string | null>(null);
-  const [hoursParsedCount, setHoursParsedCount] = useState<number | null>(null);
   const [editPrimaryCategory, setEditPrimaryCategory] = useState('');
   const [editSecondaryCategories, setEditSecondaryCategories] = useState<string[]>([]);
   const [editSlug, setEditSlug] = useState('');
@@ -1040,21 +886,6 @@ export default function PresenceSeedDetailPage() {
     }
   };
 
-  const handleParseHoursPaste = () => {
-    setHoursPasteError(null);
-    setHoursParsedCount(null);
-    const parsed = parseGoogleHoursPaste(hoursPasteText);
-    if (!parsed) {
-      setHoursPasteError(
-        'Could not parse any days. Paste the hours block copied from the Google Business Profile "Hours" section (day name on one line, hours like "9 AM–8:30 PM" on the next).',
-      );
-      return;
-    }
-    const count = DAYS.filter((day) => !parsed[day].closed).length;
-    setEditHours(parsed);
-    setHoursParsedCount(count);
-  };
-
   const startEditing = () => {
     setEditPhone(listing?.phone ?? '');
     setEditWebsite(listing?.website ?? '');
@@ -1118,10 +949,6 @@ export default function PresenceSeedDetailPage() {
     const hoursProv = provenance.find((p) => p.fieldKey === 'hours');
     setEditHoursSource(hoursProv?.sourceName ?? '');
     setEditHoursSourceUrl(hoursProv?.sourceUrl ?? '');
-    setHoursPasteText('');
-    setHoursPasteError(null);
-    setHoursParsedCount(null);
-    setShowHoursPaste(false);
     setActionError(null);
     setActionSuccess(null);
     setEditing(true);
@@ -1130,10 +957,6 @@ export default function PresenceSeedDetailPage() {
   const cancelEditing = () => {
     setEditing(false);
     setActionError(null);
-    setHoursPasteText('');
-    setHoursPasteError(null);
-    setHoursParsedCount(null);
-    setShowHoursPaste(false);
   };
 
   const addEditProvenanceRow = () =>
@@ -3589,185 +3412,16 @@ export default function PresenceSeedDetailPage() {
               Only set hours when sourced. Unsourced hours are omitted from the
               public listing per the directory presence contract.
             </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                value={editTimezone}
-                onChange={(e) => setEditTimezone(e.target.value)}
-              >
-                {[
-                  'America/New_York',
-                  'America/Chicago',
-                  'America/Denver',
-                  'America/Los_Angeles',
-                  'America/Phoenix',
-                  'America/Anchorage',
-                  'Pacific/Honolulu',
-                  'UTC',
-                  'Europe/London',
-                  'Europe/Paris',
-                  'Europe/Berlin',
-                  'Europe/Madrid',
-                  'Asia/Tokyo',
-                  'Asia/Hong_Kong',
-                  'Asia/Singapore',
-                  'Australia/Sydney',
-                ].map((tz) => (
-                  <option key={tz} value={tz}>{tz}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Paste from Google Business Profile — mirrors the address
-                paste-and-split on the Create Seed form. Paste the GBP
-                "Hours" block, click Parse & apply, and each day's open/close
-                populates the daily schedule below. */}
-            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50/40 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Paste hours from Google
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowHoursPaste((v) => !v)}
-                  className="text-xs text-blue-600 hover:text-blue-800"
-                >
-                  {showHoursPaste ? 'Hide' : 'Show'}
-                </button>
-              </div>
-              {showHoursPaste && (
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-500">
-                    Copy the hours block from the Google Business Profile
-                    &ldquo;Hours&rdquo; section and paste it below. Each
-                    day&rsquo;s hours will populate the daily schedule.
-                  </p>
-                  <textarea
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
-                    rows={10}
-                    value={hoursPasteText}
-                    onChange={(e) => {
-                      setHoursPasteText(e.target.value);
-                      setHoursPasteError(null);
-                      setHoursParsedCount(null);
-                    }}
-                    placeholder={'Saturday\n- 12 AM\u20138:30 PM\n\nSunday\n- 9 AM\u20138:30 PM\n\nMonday\n- 9 AM\u20138:30 PM\n\u2026'}
-                  />
-                  {hoursPasteError && (
-                    <p className="text-xs text-red-600">{hoursPasteError}</p>
-                  )}
-                  {hoursParsedCount !== null && !hoursPasteError && (
-                    <p className="text-xs text-green-600">
-                      Populated {hoursParsedCount} day{hoursParsedCount === 1 ? '' : 's'}.
-                    </p>
-                  )}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleParseHoursPaste}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      Parse & apply
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHoursPasteText('');
-                        setHoursPasteError(null);
-                        setHoursParsedCount(null);
-                      }}
-                      className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              {DAYS.map((day) => {
-                const h = editHours[day];
-                return (
-                  <div
-                    key={day}
-                    className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
-                  >
-                    <div className="md:col-span-3">
-                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={!h.closed}
-                          onChange={(e) =>
-                            setEditHours((prev) => ({
-                              ...prev,
-                              [day]: { ...prev[day], closed: !e.target.checked },
-                            }))
-                          }
-                        />
-                        <span className="capitalize">{day}</span>
-                      </label>
-                    </div>
-                    {!h.closed && (
-                      <>
-                        <div className="md:col-span-4">
-                          <input
-                            type="time"
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                            value={h.open}
-                            onChange={(e) =>
-                              setEditHours((prev) => ({
-                                ...prev,
-                                [day]: { ...prev[day], open: e.target.value },
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="md:col-span-1 text-center text-xs text-gray-400">to</div>
-                        <div className="md:col-span-4">
-                          <input
-                            type="time"
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                            value={h.close}
-                            onChange={(e) =>
-                              setEditHours((prev) => ({
-                                ...prev,
-                                [day]: { ...prev[day], close: e.target.value },
-                              }))
-                            }
-                          />
-                        </div>
-                      </>
-                    )}
-                    {h.closed && (
-                      <div className="md:col-span-9 text-sm text-gray-400">Closed</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Hours source name</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                  value={editHoursSource}
-                  onChange={(e) => setEditHoursSource(e.target.value)}
-                  placeholder="Google Maps, owner confirmation, etc."
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Hours source URL</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                  value={editHoursSourceUrl}
-                  onChange={(e) => setEditHoursSourceUrl(e.target.value)}
-                  placeholder="https://"
-                />
-              </div>
-            </div>
+            <BusinessHoursEditor
+              hours={editHours}
+              timezone={editTimezone}
+              onHoursChange={setEditHours}
+              onTimezoneChange={setEditTimezone}
+              sourceName={editHoursSource}
+              sourceUrl={editHoursSourceUrl}
+              onSourceNameChange={setEditHoursSource}
+              onSourceUrlChange={setEditHoursSourceUrl}
+            />
           </div>
 
           <div className="border-t border-gray-100 pt-4">

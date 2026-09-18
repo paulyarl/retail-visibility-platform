@@ -646,6 +646,69 @@ describe('MarketingProspectQueueService', () => {
         MarketingProspectQueueService.update('pque-missing', { priority: 'high' }),
       ).rejects.toThrow(/not found/i);
     });
+
+    // Migration 296 — opening hours are identity enrichment on the snapshot.
+    describe('opening hours', () => {
+      const hours = {
+        monday: { open: '09:00', close: '17:00', closed: false },
+        sunday: { open: '09:00', close: '18:00', closed: true },
+      };
+
+      it('merges hours into the snapshot, keeping verified_nap.hours in sync', async () => {
+        mockQueue.findUnique.mockResolvedValue(queueRow({
+          status: 'queued',
+          business_snapshot: { address: '1 Main St', verified_nap: { phone: '512-555-0100' } },
+        }));
+        mockQueue.update.mockResolvedValue(queueRow());
+
+        await MarketingProspectQueueService.update('pque-test-001', { hours });
+
+        expect(mockQueue.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              business_snapshot: expect.objectContaining({
+                address: '1 Main St',
+                hours,
+                verified_nap: expect.objectContaining({ phone: '512-555-0100', hours }),
+              }),
+            }),
+          }),
+        );
+      });
+
+      it('clears hours from both snapshot keys when null', async () => {
+        mockQueue.findUnique.mockResolvedValue(queueRow({
+          status: 'queued',
+          business_snapshot: { hours, verified_nap: { hours, phone: '512-555-0100' } },
+        }));
+        mockQueue.update.mockResolvedValue(queueRow());
+
+        await MarketingProspectQueueService.update('pque-test-001', { hours: null });
+
+        const snapshot = (mockQueue.update.mock.calls[0][0] as any).data.business_snapshot;
+        expect(snapshot.hours).toBeUndefined();
+        expect(snapshot.verified_nap.hours).toBeUndefined();
+        // Other verified fields survive.
+        expect(snapshot.verified_nap.phone).toBe('512-555-0100');
+      });
+
+      it('is editable on hold / in_thread rows (identity, not cadence)', async () => {
+        mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'hold' }));
+        mockQueue.update.mockResolvedValue(queueRow({ status: 'hold' }));
+
+        await MarketingProspectQueueService.update('pque-test-001', { hours });
+
+        expect(mockQueue.update).toHaveBeenCalled();
+      });
+
+      it('is not editable once the prospect graduated to a campaign', async () => {
+        mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'campaign_created' }));
+
+        await expect(
+          MarketingProspectQueueService.update('pque-test-001', { hours }),
+        ).rejects.toThrow(/not editable/i);
+      });
+    });
   });
 
   // ─── createCampaignFromQueue ───────────────────────────────────────────
@@ -816,6 +879,61 @@ describe('MarketingProspectQueueService', () => {
           ownerNames: ['Kenji Sato'],
           categoryOverride: 'Japanese Grocery',
         }),
+        undefined,
+      );
+    });
+
+    // Migration 296 — verified hours ride onto the derived campaign.
+    it('passes verified hours through to deriveBusinessCampaign on the thin path', async () => {
+      const hours = {
+        monday: { open: '09:00', close: '17:00', closed: false },
+        sunday: { open: '09:00', close: '18:00', closed: true },
+      };
+      const entry = queueRow({
+        business_name: 'Sushi Bar',
+        source_kind: 'category_analysis',
+        business_snapshot: thinSnapshot({ verified_nap: { hours } }),
+        detected_signals: ['RA_NO_WEBSITE'],
+        signal_count: 1,
+        assigned_to: null,
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      (MarketingCampaignService as any).deriveBusinessCampaign.mockResolvedValue({ id: 'mcamp-child-004' });
+      mockQueue.update.mockResolvedValue({ ...entry, status: 'campaign_created', processed_campaign_id: 'mcamp-child-004' });
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(MarketingCampaignService.deriveBusinessCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({ businessHours: hours }),
+        undefined,
+      );
+    });
+
+    it('prefers verified_nap.hours over a stale flat snapshot hours when both exist', async () => {
+      const flatHours = { monday: { open: '08:00', close: '16:00', closed: false } };
+      const napHours = { monday: { open: '09:00', close: '17:00', closed: false } };
+      const entry = queueRow({
+        business_name: 'Sushi Bar',
+        source_kind: 'category_analysis',
+        business_snapshot: thinSnapshot({ hours: flatHours, verified_nap: { hours: napHours } }),
+        detected_signals: ['RA_NO_WEBSITE'],
+        signal_count: 1,
+        assigned_to: null,
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      (MarketingCampaignService as any).deriveBusinessCampaign.mockResolvedValue({ id: 'mcamp-child-005' });
+      mockQueue.update.mockResolvedValue({ ...entry, status: 'campaign_created', processed_campaign_id: 'mcamp-child-005' });
+
+      await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(MarketingCampaignService.deriveBusinessCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({ businessHours: napHours }),
         undefined,
       );
     });
@@ -1174,8 +1292,67 @@ describe('MarketingProspectQueueService', () => {
       );
     });
 
-    it('writes verified enrichment (website/email/category/owner) onto the entry when nextAction=requeue', async () => {
+    // Migration 296 — opening hours captured on the verification call.
+    it('writes verified opening hours onto the snapshot (verified_nap.hours + flat hours)', async () => {
       const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      const hours = {
+        monday: { open: '09:00', close: '17:00', closed: false },
+        sunday: { open: '09:00', close: '18:00', closed: true },
+      };
+
+      await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedHours: hours,
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            business_snapshot: expect.objectContaining({
+              hours,
+              verified_nap: expect.objectContaining({ hours }),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('omits hours from the snapshot when none were captured', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedName: 'Joe Pizza',
+        verifiedHours: {},
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      const snapshot = (mockQueue.update.mock.calls[0][0] as any).data.business_snapshot;
+      expect(snapshot.hours).toBeUndefined();
+      expect(snapshot.verified_nap.hours).toBeUndefined();
+    });
+
+    it('writes verified enrichment (website/email/category/owner) onto the entry when nextAction=requeue', async () => {      const verifyRow = queueRow({
         status: 'verify_then_outreach',
         business_snapshot: { website: 'https://stale.example.com', email: 'old@example.com' },
         verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },

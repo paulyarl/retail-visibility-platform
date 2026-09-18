@@ -256,31 +256,29 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken }: Ma
                   <button
                     className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     onClick={async () => {
-                      // Fetch the PDF with auth headers, then trigger download.
-                      try {
-                        const token = typeof window !== 'undefined'
-                          ? localStorage.getItem('customer_auth_token')
-                          : null;
-                        const resp = await fetch(
-                          `/api/customer/place/${encodeURIComponent(slug)}/market-intel/report.pdf`,
-                          token ? { headers: { Authorization: `Bearer ${token}` } } : {},
-                        );
-                        if (!resp.ok) {
+                      // Fetch the PDF via the customer service (adds JWT headers),
+                      // then trigger the browser download.
+                      const res = await marketIntelCustomerService.downloadReportPdf(slug);
+                      if (!res.blob) {
+                        if (res.error === 'unauthorized') {
+                          window.alert('Please sign in to download your report.');
+                        } else if (res.error === 'unlock_required') {
+                          window.alert(
+                            "This account doesn't have access to the full report. If you claimed or purchased it, make sure you're signed in with the same email.",
+                          );
+                        } else {
                           window.alert('Failed to download report. Please try again.');
-                          return;
                         }
-                        const blob = await resp.blob();
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `market-intel-report-${slug}.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                      } catch {
-                        window.alert('Failed to download report. Please try again.');
+                        return;
                       }
+                      const url = URL.createObjectURL(res.blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `market-intel-report-${slug}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
                     }}
                   >
                     <Download className="w-4 h-4" /> Download PDF Report
