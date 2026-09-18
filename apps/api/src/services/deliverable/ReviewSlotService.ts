@@ -22,6 +22,7 @@ import { buildDeliverableReviewResponsePrompt } from './prompts';
 import type { OwnerVoiceFields, BusinessContextFields } from './prompts';
 import OwnerVoiceService, { type OwnerVoiceProfile } from './OwnerVoiceService';
 import BusinessContextService from './BusinessContextService';
+import DeliverableSourceService from './DeliverableSourceService';
 
 export interface ReviewSlot {
   id: string;
@@ -46,6 +47,47 @@ export interface ReviewSlot {
   slotIndex: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ReviewCandidate {
+  platform: string;
+  text: string;
+  rating: number | null;
+  date: string | null;
+  author: string | null;
+  sentiment: string;
+  theme: string | null;
+  isNegativeFirst: boolean;
+}
+
+/**
+ * Map a parsed review intake (G-1b) to review-slot candidates. Keeps only
+ * unanswered reviews with non-empty text; verbatim text is preserved.
+ */
+export function reviewCandidatesFromIntake(intake: {
+  reviews?: Array<{
+    platform?: string | null;
+    text: string;
+    rating?: number | null;
+    date?: string | null;
+    author?: string | null;
+    sentiment?: string | null;
+    is_negative_first?: boolean;
+    answered?: boolean;
+  }>;
+}): ReviewCandidate[] {
+  return (intake.reviews ?? [])
+    .filter((r) => !r.answered && r.text && r.text.trim().length > 0)
+    .map((r) => ({
+      platform: r.platform ?? 'unknown',
+      text: r.text,
+      rating: r.rating ?? null,
+      date: r.date ?? null,
+      author: r.author ?? null,
+      sentiment: r.sentiment ?? 'neutral',
+      theme: null,
+      isNegativeFirst: r.is_negative_first ?? false,
+    }));
 }
 
 export class ReviewSlotService extends BaseService {
@@ -81,19 +123,39 @@ export class ReviewSlotService extends BaseService {
         return { ingested: 0, slots: existing.map(this.mapRow) };
       }
 
-      // Fetch audit data
-      const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
-      if (!auditResult) {
-        throw new Error('No business_analysis audit found for this campaign');
+      // G-1b: prefer the operator-pasted review intake — it carries VERBATIM
+      // review text. The audit fallback below is best-effort only:
+      // business_analysis emits no verbatim review text, so it yields at most
+      // complaint_summary rows (summaries, not the real reviews), which produce
+      // poor response drafts.
+      let reviews: Array<{
+        platform: string;
+        text: string;
+        rating: number | null;
+        date: string | null;
+        author: string | null;
+        sentiment: string;
+        theme: string | null;
+        isNegativeFirst: boolean;
+      }> = [];
+
+      const intake = await DeliverableSourceService.getReviewIntake(campaignId, ctx);
+      if (intake?.reviews?.length) {
+        reviews = reviewCandidatesFromIntake(intake);
+        logger.info('Review slots sourced from review intake', ctx, { campaignId, count: reviews.length });
+      } else {
+        const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+        if (auditResult) {
+          reviews = this.extractUnansweredReviews(auditResult.auditData);
+        }
       }
 
-      const { auditData } = auditResult;
-
-      // Extract all unanswered reviews from audit data
-      const reviews = this.extractUnansweredReviews(auditData);
-
       if (reviews.length === 0) {
-        throw new Error('No unanswered reviews found in audit data');
+        throw new Error(
+          'No reviews found. Paste the business\'s reviews in the Generate Deliverable modal ' +
+          '(Paste reviews) — or run the "Seek: Review Intake" prompt — then ingest again. ' +
+          'The business_analysis audit does not carry verbatim review text.',
+        );
       }
 
       // Sort: negative-first (lowest rating), then by date desc

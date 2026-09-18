@@ -790,10 +790,17 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 | 17 | Align `fulfill-001..003` with Register B + CTA | ✅ | `seed-marketing-ops-templates.ts` — Register B tone + claim-and-fix CTA + `claim_url` on review_responses / service_menu / gbp_audit. **Re-seed required** (`seed-marketing-ops-templates.ts`, local + prd) |
 
 **Deferred / follow-up (not blocking):**
-- G-1b — latent `ReviewSlotService` bug (reads `platforms[*].reviews[]`, which the schema never emits). Out of scope per Option D; log separately.
 - G-7 — best-effort source-material run at audit import (currently synchronous endpoint only).
 - G-11 — no migration (data-only); `300_*.sql` reserved for a future schema change.
 - G-14/G-19 — `lead_magnet` source thinness; see §11.
+
+### 12.4 G-1b — ReviewSlotService review source (2026-09-18)
+
+`ReviewSlotService.ingestReviews` read `auditData.platforms[*].reviews[]`, which `business_analysis` never emits — so the construction workflow could only ever fall back to `unanswered_negative_review_examples[].complaint_summary` (**summaries, not verbatim reviews**), producing response drafts that answer a summary rather than the actual review.
+
+**Fix:** ingest now sources from the operator-pasted **review intake** (`DeliverableSourceService.getReviewIntake`) — the same canonical review source the source-material path uses — and keeps the audit extraction only as a best-effort fallback. The mapping is an exported pure function (`reviewCandidatesFromIntake`) with 5 unit tests.
+
+The empty-result error now guides the operator: *paste reviews in the Generate Deliverable modal (Paste reviews), or run the `Seek: Review Intake` prompt, then ingest again.*
 
 ### 12.2 G-8 — Per-type layout templates (2026-09-18)
 
