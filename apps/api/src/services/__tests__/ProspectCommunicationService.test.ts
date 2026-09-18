@@ -224,6 +224,20 @@ describe('ProspectCommunicationService.getTimeline', () => {
     expect(timeline.events).toHaveLength(1);
     expect(timeline.campaigns).toEqual([]);
   });
+
+  it('surfaces the raw queue snapshot + verification for the resolve modal', async () => {
+    mockQueue.findUnique.mockResolvedValue(queueEntry({
+      business_snapshot: { verified_nap: { name: 'Joe Pizza', phone: '512-555-0100' } },
+      verification: { requested_at: '2026-09-02T00:00:00.000Z' },
+    }));
+
+    const timeline = await ProspectCommunicationService.getTimeline(QUEUE_ID);
+
+    expect(timeline.prospect.business_snapshot).toEqual({
+      verified_nap: { name: 'Joe Pizza', phone: '512-555-0100' },
+    });
+    expect(timeline.prospect.verification).toEqual({ requested_at: '2026-09-02T00:00:00.000Z' });
+  });
 });
 
 // ─── listProspects ────────────────────────────────────────────────────────
