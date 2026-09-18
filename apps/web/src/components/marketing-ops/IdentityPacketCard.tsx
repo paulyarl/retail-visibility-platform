@@ -37,7 +37,7 @@ import directoryPresenceAdminService, {
   type IdentityRecommendationBand,
   type IdentitySourceTier,
 } from '@/services/DirectoryPresenceAdminService';
-import { IDENTITY_FIELD_LABELS, IDENTITY_EVIDENCE_STATE_LABELS, IDENTITY_TIER_LABELS } from '@/lib/identity-evidence';
+import { IDENTITY_FIELD_LABELS, IDENTITY_EVIDENCE_STATE_LABELS, IDENTITY_TIER_LABELS, sourceLabel } from '@/lib/identity-evidence';
 import AddIdentityEvidenceModal from './AddIdentityEvidenceModal';
 
 const TIER_LABEL: Record<IdentitySourceTier, string> = IDENTITY_TIER_LABELS;
@@ -64,7 +64,7 @@ const BAND_META: Record<IdentityRecommendationBand, { label: string; cls: string
   blocked: {
     label: 'Blocked',
     cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
-    blurb: 'A veto or weak identity blocks seeding. Verify by phone and re-audit before pushing.',
+    blurb: 'A hard veto or weak identity is blocking this seed.',
   },
 };
 
@@ -74,18 +74,86 @@ function Badge({ children, cls }: { children: React.ReactNode; cls: string }) {
   return <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{children}</span>;
 }
 
-function ScoreBox({ label, value, hint }: { label: string; value: number; hint: string }) {
-  const tone =
-    value >= 80
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : value >= 50
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-red-600 dark:text-red-400';
+/** Numeric tone for a 0-100 score, keyed to the same thresholds as the scorer. */
+function scoreToneClass(value: number): string {
+  return value >= 80
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : value >= 50
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-red-600 dark:text-red-400';
+}
+
+/**
+ * A 0-100 axis score. `muted` neutralizes the color when a hard veto has
+ * already blocked the seed — a green "92" sitting above a red "Blocked" reads
+ * as healthy and contradicts the decision the operator is being asked to make.
+ */
+function ScoreBox({
+  label,
+  value,
+  hint,
+  muted = false,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  muted?: boolean;
+}) {
+  const tone = muted ? 'text-gray-400 dark:text-gray-500' : scoreToneClass(value);
   return (
     <div className="rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${tone}`}>{value}</div>
+      <div className={`mt-1 text-2xl font-semibold ${tone}`} aria-label={`${label}: ${value} out of 100`}>
+        {value}
+        {muted && <span className="ml-1 align-middle text-[10px] font-medium text-red-600 dark:text-red-400">blocked</span>}
+      </div>
       <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{hint}</div>
+    </div>
+  );
+}
+
+/**
+ * Source chips for one field. Conflicting sources are always shown (they are
+ * what the veto is about); agreeing sources collapse behind a "+N more" chip so
+ * a 9-source field stays scannable instead of wrapping over four lines.
+ */
+function SourceChips({
+  sources,
+  tierClass,
+}: {
+  sources: Array<{ name: string; tier: IdentitySourceTier; agrees: boolean; manual?: boolean }>;
+  tierClass: Record<IdentitySourceTier, string>;
+}) {
+  if (sources.length === 0) return <span className="text-gray-400">none</span>;
+  const conflicts = sources.filter((s) => !s.agrees);
+  const agreeing = sources.filter((s) => s.agrees);
+  const MAX_VISIBLE = 3;
+  const visible = agreeing.slice(0, MAX_VISIBLE);
+  const hidden = agreeing.slice(MAX_VISIBLE);
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {conflicts.map((s, i) => (
+        <Badge key={`conflict-${s.name}-${i}`} cls="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          {sourceLabel(s.name)}
+          {s.manual && <span className="ml-1 opacity-70">·operator</span>}
+          <span aria-hidden="true"> ✕</span>
+          <span className="sr-only"> (conflicts with the resolved value)</span>
+        </Badge>
+      ))}
+      {visible.map((s, i) => (
+        <Badge key={`agree-${s.name}-${i}`} cls={tierClass[s.tier]}>
+          {sourceLabel(s.name)}
+          {s.manual && <span className="ml-1 opacity-70">·operator</span>}
+        </Badge>
+      ))}
+      {hidden.length > 0 && (
+        <span
+          className="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-neutral-700 dark:text-gray-300"
+          title={hidden.map((s) => sourceLabel(s.name)).join(', ')}
+        >
+          +{hidden.length} more
+        </span>
+      )}
     </div>
   );
 }
@@ -182,6 +250,7 @@ export default function IdentityPacketCard({
   const band = BAND_META[score.band];
   const blocked = score.vetoes.length > 0;
   const seed = packet.seed;
+  const visibleFields = score.fields.filter((f) => f.value != null || f.sources.length > 0);
 
   return (
     <div className="space-y-4">
@@ -216,8 +285,18 @@ export default function IdentityPacketCard({
 
       {/* Scores */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <ScoreBox label="Identity score" value={score.identityScore} hint="Weakest-link over required fields" />
-        <ScoreBox label="Operational recency" value={score.operationalScore} hint="Recent activity evidence" />
+        <ScoreBox
+          label="Identity score"
+          value={score.identityScore}
+          hint="Limited by the weakest required field"
+          muted={blocked}
+        />
+        <ScoreBox
+          label="Operational recency"
+          value={score.operationalScore}
+          hint="Evidence of recent activity"
+          muted={blocked}
+        />
         <div className="rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Recommendation
@@ -236,8 +315,8 @@ export default function IdentityPacketCard({
             <AlertTriangle className="h-3.5 w-3.5" /> Hard vetoes
           </div>
           <ul className="mt-1.5 space-y-1">
-            {score.vetoes.map((v) => (
-              <li key={v.code} className="text-xs text-red-700 dark:text-red-400">
+            {score.vetoes.map((v, i) => (
+              <li key={`${v.code}-${i}`} className="text-xs text-red-700 dark:text-red-400">
                 <span className="font-mono text-[10px] opacity-70">{v.code}</span> — {v.message}
               </li>
             ))}
@@ -252,8 +331,8 @@ export default function IdentityPacketCard({
             <Info className="h-3.5 w-3.5" /> QC signals
           </div>
           <ul className="mt-1.5 space-y-1">
-            {score.qcSignals.map((s) => (
-              <li key={s.code} className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            {score.qcSignals.map((s, i) => (
+              <li key={`${s.code}-${i}`} className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
                 <span
                   className={`mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
                     s.severity === 'error' ? 'bg-red-500' : s.severity === 'warn' ? 'bg-amber-500' : 'bg-gray-400'
@@ -305,6 +384,8 @@ export default function IdentityPacketCard({
               onClick={push}
               disabled={pushing || blocked}
               title={blocked ? 'Resolve the hard vetoes before seeding' : 'Create the draft seed'}
+              aria-disabled={pushing || blocked}
+              aria-describedby={blocked ? 'identity-push-blocked' : undefined}
               className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               <ArrowUpRight className="h-3.5 w-3.5" /> {pushing ? 'Pushing…' : 'Push draft seed'}
@@ -317,11 +398,15 @@ export default function IdentityPacketCard({
               <PauseCircle className="h-3.5 w-3.5" /> {waited ? 'Waiting' : 'Wait'}
             </button>
             {blocked && (
-              <span className="text-xs text-red-600 dark:text-red-400">Blocked — resolve vetoes to enable Push.</span>
+              <span id="identity-push-blocked" className="text-xs text-red-600 dark:text-red-400">
+                Resolve the vetoes above to enable Push.
+              </span>
             )}
             {waited && (
+              // Not persisted — this only acknowledges the packet for the current
+              // view. Copy must not imply a stored "wait" decision.
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Marked as waiting. Resolve the QC signals, then push.
+                Not seeding yet. The packet re-scores as you add evidence or resolve vetoes.
               </span>
             )}
           </div>
@@ -331,63 +416,88 @@ export default function IdentityPacketCard({
 
       {/* Field breakdown */}
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Field evidence
-        </h4>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-neutral-700 text-left text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                <th className="py-1.5 pr-3 font-semibold">Field</th>
-                <th className="py-1.5 pr-3 font-semibold">Value</th>
-                <th className="py-1.5 pr-3 font-semibold">Score</th>
-                <th className="py-1.5 font-semibold">Sources</th>
-              </tr>
-            </thead>
-            <tbody>
-              {score.fields
-                .filter((f) => f.value != null || f.sources.length > 0)
-                .map((f) => (
-                  <tr key={f.field} className="border-b border-gray-100 dark:border-neutral-800">
-                    <td className="py-1.5 pr-3 font-medium text-gray-700 dark:text-gray-200">
-                      {FIELD_LABEL[f.field] ?? f.field}
-                      {f.required && <span className="ml-1 text-[10px] text-red-500">required</span>}
-                    </td>
-                    <td className="py-1.5 pr-3 text-gray-600 dark:text-gray-300">{f.value ?? '—'}</td>
-                    <td className="py-1.5 pr-3">
-                      <span
-                        className={
-                          f.score >= 80
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : f.score >= 50
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-red-600 dark:text-red-400'
-                        }
-                      >
-                        {f.score}
-                      </span>
-                      {f.conflictWeight > 0 && <span className="ml-1 text-[10px] text-red-500">conflict</span>}
-                    </td>
-                    <td className="py-1.5">
-                      <div className="flex flex-wrap gap-1">
-                        {f.sources.length === 0 && <span className="text-gray-400">none</span>}
-                        {f.sources.map((s, i) => (
-                          <Badge
-                            key={`${s.name}-${i}`}
-                            cls={s.agrees ? TIER_CLASS[s.tier] : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}
-                          >
-                            {s.name}
-                            {s.manual && <span className="ml-1 opacity-70">·operator</span>}
-                            {!s.agrees && ' ✕'}
-                          </Badge>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Field evidence
+          </h4>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500">
+            Chips are sources; a red <span className="text-red-500">✕</span> source conflicts with the resolved value.
+          </p>
         </div>
+        {visibleFields.length === 0 ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            No field evidence yet — use <span className="font-medium">Add evidence</span> to record a source.
+          </p>
+        ) : (
+          <>
+            {/* Desktop / tablet table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-neutral-700 text-left text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    <th scope="col" className="py-1.5 pr-3 font-semibold">Field</th>
+                    <th scope="col" className="py-1.5 pr-3 font-semibold">Value</th>
+                    <th scope="col" className="py-1.5 pr-3 font-semibold">Score</th>
+                    <th scope="col" className="py-1.5 font-semibold">Sources</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleFields.map((f) => {
+                    const conflicted = f.conflictWeight > 0;
+                    return (
+                      <tr key={f.field} className="border-b border-gray-100 dark:border-neutral-800">
+                        <td className="py-1.5 pr-3 font-medium text-gray-700 dark:text-gray-200">
+                          {FIELD_LABEL[f.field] ?? f.field}
+                          {f.required && <span className="ml-1 text-[10px] text-red-500">required</span>}
+                        </td>
+                        <td className="py-1.5 pr-3 text-gray-600 dark:text-gray-300">{f.value ?? '—'}</td>
+                        <td className="py-1.5 pr-3 whitespace-nowrap">
+                          <span
+                            className={conflicted ? 'text-amber-600 dark:text-amber-400' : scoreToneClass(f.score)}
+                            title={conflicted ? 'Conflicting sources lower the effective score' : undefined}
+                          >
+                            {f.score}
+                          </span>
+                          {conflicted && <span className="ml-1 text-[10px] text-red-500">conflict</span>}
+                        </td>
+                        <td className="py-1.5">
+                          <SourceChips sources={f.sources} tierClass={TIER_CLASS} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: stacked cards — no horizontal scroll for the core table */}
+            <ul className="space-y-2 sm:hidden">
+              {visibleFields.map((f) => {
+                const conflicted = f.conflictWeight > 0;
+                return (
+                  <li key={f.field} className="rounded-lg border border-gray-200 dark:border-neutral-700 p-2.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                        {FIELD_LABEL[f.field] ?? f.field}
+                        {f.required && <span className="ml-1 text-[10px] text-red-500">required</span>}
+                      </span>
+                      <span className="shrink-0 text-xs">
+                        <span className={conflicted ? 'text-amber-600 dark:text-amber-400' : scoreToneClass(f.score)}>
+                          {f.score}
+                        </span>
+                        {conflicted && <span className="ml-1 text-[10px] text-red-500">conflict</span>}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 break-words text-xs text-gray-600 dark:text-gray-300">{f.value ?? '—'}</div>
+                    <div className="mt-1.5">
+                      <SourceChips sources={f.sources} tierClass={TIER_CLASS} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </div>
 
       {/* Source ledger */}
@@ -402,10 +512,10 @@ export default function IdentityPacketCard({
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-neutral-700 text-left text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  <th className="py-1.5 pr-3 font-semibold">Source</th>
-                  <th className="py-1.5 pr-3 font-semibold">Tier</th>
-                  <th className="py-1.5 pr-3 font-semibold">Corroborates</th>
-                  <th className="py-1.5 font-semibold">Accessed</th>
+                  <th scope="col" className="py-1.5 pr-3 font-semibold">Source</th>
+                  <th scope="col" className="py-1.5 pr-3 font-semibold">Tier</th>
+                  <th scope="col" className="py-1.5 pr-3 font-semibold">Corroborates</th>
+                  <th scope="col" className="py-1.5 font-semibold">Accessed</th>
                 </tr>
               </thead>
               <tbody>
@@ -414,10 +524,10 @@ export default function IdentityPacketCard({
                     <td className="py-1.5 pr-3 text-gray-700 dark:text-gray-200">
                       {l.url ? (
                         <a href={l.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                          {l.name} <ExternalLink className="h-3 w-3" />
+                          {sourceLabel(l.name)} <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : (
-                        l.name
+                        sourceLabel(l.name)
                       )}
                       {l.manual && (
                         <span className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">

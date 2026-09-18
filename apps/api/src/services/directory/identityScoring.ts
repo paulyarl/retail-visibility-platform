@@ -150,7 +150,13 @@ export function inferSourceTier(name: string): IdentitySourceTier {
   if (/secretary of state|\bsos\b|\bso?s\b|business registration|registry|sam\.gov|federal|usda|snap retailer|\bstate\b|license|permit/.test(s)) {
     return 'authoritative';
   }
-  if (/\bgoogle\b|\bgmb\b|g\.page|apple maps|\bapple\b/.test(s)) return 'major_aggregator';
+  // The business's own site (audit slug `official_website`, or a human spelling)
+  // is first-party evidence — it must not fall through to the aggregator
+  // default, which understates the record and mislabels the ledger tier.
+  if (/official[_\s]website|owner[_\s]website|first.?party|\bwebsite\b/.test(s)) return 'first_party';
+  // Substring (not word-boundary) match: the audit emits `apple_maps`, where the
+  // trailing underscore defeats `\bapple\b`.
+  if (/google|gmb|g\.page|apple/.test(s)) return 'major_aggregator';
   return 'secondary_aggregator';
 }
 

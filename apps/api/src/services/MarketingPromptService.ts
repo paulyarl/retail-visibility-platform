@@ -14,6 +14,7 @@ import type { RequestCtx } from '../context';
 import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { applyRenderControlCoverageGate, BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
 import { normalizeIntelligenceDiscoveryPayload, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
@@ -736,7 +737,13 @@ export class MarketingPromptService extends BaseService {
 
         const candidateResult = resolved.validator.safeParse(candidateJson);
         if (candidateResult.success) {
-          parsedJson = candidateJson;
+          // §6.4 coverage gate — suppress recommended_tier / fee when the
+          // render-control coverage is too low for the assessment to mean
+          // anything. Applied here rather than in the validator because this
+          // path persists the RAW parsed JSON (not the Zod output).
+          parsedJson = schemaName === BUSINESS_ANALYSIS_SCHEMA_NAME
+            ? applyRenderControlCoverageGate(candidateJson)
+            : candidateJson;
           break;
         }
         // Preserve the first candidate's validation issues for error reporting

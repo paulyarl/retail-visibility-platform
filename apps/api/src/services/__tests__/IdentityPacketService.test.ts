@@ -105,6 +105,17 @@ describe('inferSourceTier', () => {
     expect(inferSourceTier('Yelp')).toBe('secondary_aggregator');
     expect(inferSourceTier('Some Random Directory')).toBe('secondary_aggregator');
   });
+
+  it('classifies the business audit snake_case slugs correctly', () => {
+    // `apple_maps` — the trailing underscore defeats a `\bapple\b` word-boundary.
+    expect(inferSourceTier('apple_maps')).toBe('major_aggregator');
+    // The owner's own site discovered by the audit is first-party, not an
+    // aggregator — falling through to the default mislabels the ledger tier.
+    expect(inferSourceTier('official_website')).toBe('first_party');
+    expect(inferSourceTier('owner_website')).toBe('first_party');
+    // Authoritative slugs must still win over the website/first-party rule.
+    expect(inferSourceTier('usda_fns_snap_retailer_listing')).toBe('authoritative');
+  });
 });
 
 describe('sourceGroupSlug', () => {

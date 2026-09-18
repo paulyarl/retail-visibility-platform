@@ -162,6 +162,18 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
   const highAttention = d.high_attention === true;
   const tier = d.recommended_tier ?? '';
   const fee = d.estimated_monthly_service_fee ?? {};
+  // Platform Availability Verification — render-control records + coverage
+  // (AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC §7.4). `render_control_coverage`
+  // is stamped server-side by applyRenderControlCoverageGate; fall back to
+  // computing it here for audits imported before that gate shipped.
+  const renderControls: any[] = Array.isArray(d.render_controls) ? d.render_controls : [];
+  const coverage: { attempted: number; rendered: number; rate: number; tier_suppressed: boolean } | null = (() => {
+    if (d.render_control_coverage) return d.render_control_coverage;
+    if (renderControls.length === 0) return null;
+    const attempted = renderControls.length;
+    const rendered = renderControls.filter((rc: any) => rc?.control_rendered === true).length;
+    return { attempted, rendered, rate: rendered / attempted, tier_suppressed: false };
+  })();
   const dq = d.data_quality ?? {};
   const sources = d.sources ?? [];
   const operational = d.operational_status ?? {};
@@ -202,6 +214,12 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
     if (state === 'not_observed') return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
     if (state === 'verify_with_owner') return 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300';
     return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'; // unverifiable
+  };
+
+  const determinationColor = (det: string) => {
+    if (det === 'business_specific_failure') return 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300';
+    if (det === 'platform_available') return 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400';
+    return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
   };
 
   const handleCopySummary = () => {
@@ -495,6 +513,74 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
           </table>
         </Section>
 
+        {/* 3b. Platform availability — render-control outcomes.
+             A platform is only marked unavailable when a gold-standard control
+             rendered on it and the business's profile did not; otherwise the
+             outcome is unable_to_verify with no signal. Surfacing this lets the
+             operator see whether "not found" means "absent" or "couldn't load". */}
+        {renderControls.length > 0 && (
+          <Section title="Platform Availability (render control)">
+            {coverage && (
+              <div className="mb-2 flex items-center gap-2 flex-wrap text-xs">
+                <Badge
+                  cls={
+                    coverage.tier_suppressed
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                  }
+                >
+                  Coverage {coverage.rendered}/{coverage.attempted}
+                </Badge>
+                <span className="text-gray-600 dark:text-gray-400">
+                  {coverage.tier_suppressed
+                    ? 'Too few control profiles rendered to assess this business — tier suppressed.'
+                    : `${Math.round(coverage.rate * 100)}% of control profiles rendered.`}
+                </span>
+              </div>
+            )}
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-400">
+                  <th className="text-left py-1">Platform</th>
+                  <th className="text-left">Business</th>
+                  <th className="text-left">Control</th>
+                  <th className="text-left">Determination</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-700 dark:text-gray-300">
+                {renderControls.map((rc: any, i: number) => (
+                  <tr key={`${rc.platform}-${i}`} className="border-t border-gray-50 dark:border-gray-700/50">
+                    <td className="py-1 font-medium">{rc.platform}</td>
+                    <td>{rc.business_rendered ? 'rendered' : 'not rendered'}</td>
+                    <td className="text-gray-500 dark:text-gray-400">
+                      {rc.control_business
+                        ? `${rc.control_business} — ${rc.control_rendered ? 'rendered' : 'not rendered'}`
+                        : 'no control'}
+                    </td>
+                    <td>
+                      <Badge cls={determinationColor(rc.determination)}>
+                        {String(rc.determination ?? '').replace(/_/g, ' ')}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {renderControls.some((rc: any) => rc.access_barrier && rc.access_barrier !== 'none') && (
+              <p className="mt-1 text-[10px] text-gray-400">
+                Access barriers:{' '}
+                {Array.from(
+                  new Set(
+                    renderControls
+                      .filter((rc: any) => rc.access_barrier && rc.access_barrier !== 'none')
+                      .map((rc: any) => `${rc.platform}=${rc.access_barrier}`),
+                  ),
+                ).join(', ')}
+              </p>
+            )}
+          </Section>
+        )}
+
         {/* 4. GBP assessment (Google-specific fields) */}
         <Section title="Google Business Profile">
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -746,8 +832,22 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
         {/* 12. Recommended tier */}
         <Section title="Recommended Tier">
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            {tier && <Badge cls={tierColor(tier)}>{tier.replace(/_/g, ' ')}</Badge>}
-            <span className="text-gray-600 dark:text-gray-400">Fee: {formatFee(fee)}</span>
+            {tier ? (
+              <>
+                <Badge cls={tierColor(tier)}>{tier.replace(/_/g, ' ')}</Badge>
+                <span className="text-gray-600 dark:text-gray-400">Fee: {formatFee(fee)}</span>
+              </>
+            ) : (
+              // §6.4 — the tier/fee are suppressed when the render-control
+              // coverage is too low for the assessment to be meaningful.
+              <span className="text-amber-700 dark:text-amber-400">
+                Tier suppressed
+                {coverage
+                  ? ` — only ${coverage.rendered}/${coverage.attempted} control profiles rendered`
+                  : ' — not emitted by the audit'}
+                .
+              </span>
+            )}
           </div>
           {d.tier_rationale && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{d.tier_rationale}</p>}
           {d.recommended_services?.length > 0 && (

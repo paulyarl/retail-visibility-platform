@@ -474,7 +474,10 @@ const specializedSourceSchema = z.object({
 
 const alignmentScoringSchema = z.object({
   misalignment_index: coercedNumberNullable.optional(),
-  action_classification: actionClassificationEnum.optional(),
+  // Nullable so the audit can distinguish "not computed" (no rating data on any
+  // platform) from "computed as BALANCED_HEALTHY". See
+  // AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC §6.3 (B3).
+  action_classification: actionClassificationEnum.nullable().optional(),
   lead_disposition: leadDispositionEnum.optional(),
   primary_outreach_hook: z.string().nullable().optional(),
   alignment_breakdown: z.object({
@@ -673,7 +676,12 @@ export const businessAnalysisSchema = z.object({
   digital_opportunity_score: digitalOpportunityScoreSchema,
   high_attention: z.boolean(),
   high_attention_reasons: z.array(z.string()).optional(),
-  recommended_tier: tierEnum,
+  // Nullable + optional so the coverage gate (applyRenderControlCoverageGate)
+  // can suppress the tier when the render-control coverage is too low for the
+  // assessment to mean anything — an emitted tier_3 on an unassessable audit
+  // reads as a real assessment. See
+  // AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC §6.4 (B4).
+  recommended_tier: tierEnum.nullable().optional(),
   tier_rationale: z.string().nullable().optional(),
   estimated_monthly_service_fee: estimatedFeeSchema.optional(),
   recommended_services: z.array(z.string()).optional(),
@@ -715,6 +723,64 @@ export const businessAnalysisSchema = z.object({
 }).passthrough();
 
 export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
+
+// ---- Render-control coverage gate (§6.4) ----
+
+/**
+ * Minimum share of attempted render controls that must have rendered for the
+ * audit's tier assessment to be meaningful. Below this the audit could not
+ * observe enough platforms to justify a tier, so `recommended_tier` and
+ * `estimated_monthly_service_fee` are suppressed rather than emitted — an
+ * emitted `tier_3` on an unassessable audit reads as a real assessment.
+ *
+ * See AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC §6.4.
+ */
+export const MIN_RENDER_CONTROL_COVERAGE_FOR_TIER = 0.5;
+
+export interface RenderControlCoverage {
+  attempted: number;
+  rendered: number;
+  /** rendered / attempted, rounded to 2dp. 0 when nothing was attempted. */
+  rate: number;
+  /** True when the tier + fee were suppressed for insufficient coverage. */
+  tier_suppressed: boolean;
+}
+
+/**
+ * Compute render-control coverage and suppress the tier/fee when it is too low.
+ *
+ * Only applies when `render_controls` is present and non-empty. Audits run
+ * without a gold-standard control set (no `render_controls`) keep today's
+ * behaviour exactly — the gate never subtracts where no control existed
+ * (spec §8 Regression).
+ *
+ * Mutates and returns the passed audit object so callers can apply it inline
+ * on the parsed payload before it is persisted.
+ */
+export function applyRenderControlCoverageGate<T extends Record<string, any>>(audit: T): T {
+  const a = audit as Record<string, any>;
+  const controls = Array.isArray(a.render_controls) ? a.render_controls : null;
+  if (!controls || controls.length === 0) return audit;
+
+  const attempted = controls.length;
+  const rendered = controls.filter((rc: any) => rc?.control_rendered === true).length;
+  const rate = Math.round((rendered / attempted) * 100) / 100;
+  const tierSuppressed = rate < MIN_RENDER_CONTROL_COVERAGE_FOR_TIER;
+
+  if (tierSuppressed) {
+    a.recommended_tier = null;
+    delete a.estimated_monthly_service_fee;
+  }
+
+  a.render_control_coverage = {
+    attempted,
+    rendered,
+    rate,
+    tier_suppressed: tierSuppressed,
+  } satisfies RenderControlCoverage;
+
+  return audit;
+}
 
 export const BUSINESS_ANALYSIS_SCHEMA_NAME = 'business_analysis' as const;
 
@@ -799,7 +865,7 @@ Return your response as JSON matching this exact schema:
   },
   "alignment_scoring": {
     "misalignment_index": <number|null>,
-    "action_classification": "ADMIN_NEGLECT|CORPORATE_SHIELD|CRITICAL_DISTRESS|BALANCED_HEALTHY",
+    "action_classification": "ADMIN_NEGLECT|CORPORATE_SHIELD|CRITICAL_DISTRESS|BALANCED_HEALTHY|null",
     "lead_disposition": "HIGH_PRIORITY_OUTREACH|DISCARD|REHABILITATION_OUTREACH|STANDARD_OUTREACH",
     "primary_outreach_hook": "<string>",
     "alignment_breakdown": { "admin_score": <number|null>, "public_sentiment_score": <number|null>, "delta": <number|null> }
@@ -873,7 +939,7 @@ Return your response as JSON matching this exact schema:
   },
   "high_attention": <boolean>,
   "high_attention_reasons": ["<string>", ...],
-  "recommended_tier": "tier_1|tier_2|tier_3",
+  "recommended_tier": "tier_1|tier_2|tier_3|null",
   "tier_rationale": "<string>",
   "estimated_monthly_service_fee": { "minimum": <number>, "maximum": <number>, "currency": "<string>" },
   "recommended_services": ["<string>", ...],

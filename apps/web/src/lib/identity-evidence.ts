@@ -52,6 +52,52 @@ export const IDENTITY_TIER_HINTS: Record<IdentitySourceTier, string> = {
   inferred: 'Category-based inference. Never counts for SNAP/EBT',
 };
 
+/**
+ * Human labels for the source identifiers the audits emit. The business audit
+ * writes snake_case slugs (e.g. `usda_fns_snap_retailer_listing`), which must
+ * never surface raw in the ledger. Keys are the slug lowercased with runs of
+ * spaces/hyphens folded to underscores; `sourceLabel` falls back to title-cased
+ * words for anything not listed.
+ */
+export const IDENTITY_SOURCE_LABELS: Record<string, string> = {
+  official_website: 'Official website',
+  owner_website: 'Owner website',
+  apple_maps: 'Apple Maps',
+  google: 'Google Business Profile',
+  google_business_profile: 'Google Business Profile',
+  yelp: 'Yelp',
+  facebook: 'Facebook',
+  bbb: 'Better Business Bureau',
+  usda_fns_snap_retailer_listing: 'USDA SNAP retailer list',
+  cap_times_press: 'Cap Times',
+  mapquest: 'MapQuest',
+  grubhub: 'Grubhub',
+  linkedin: 'LinkedIn',
+  zabihah: 'Zabihah',
+};
+
+/** Known acronyms that should stay uppercase in a prettified fallback label. */
+const SOURCE_LABEL_ACRONYMS = new Set(['usda', 'fns', 'snap', 'gmb', 'bbb', 'nap', 'sos', 'sam']);
+
+/**
+ * Display label for a raw source name. Known slugs map to a curated label;
+ * anything else is prettified (underscores → spaces, words title-cased) so the
+ * UI never shows `cap_times_press`-style identifiers.
+ */
+export function sourceLabel(name: string): string {
+  const raw = String(name ?? '').trim();
+  if (!raw) return '';
+  const key = raw.toLowerCase().replace(/[\s-]+/g, '_');
+  const known = IDENTITY_SOURCE_LABELS[key];
+  if (known) return known;
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => (SOURCE_LABEL_ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ');
+}
+
 export const IDENTITY_EVIDENCE_STATE_LABELS: Record<IdentityEvidenceState, string> = {
   confirmed: 'Confirmed',
   observed: 'Observed',

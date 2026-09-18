@@ -50,7 +50,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-16-outreach-problems-1 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-18-availability-scoring-3 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -353,6 +353,19 @@ If the URL redirects to a bot-defense, notification-permission, login, or other 
 const WC_BROKEN_WEBSITE_DEFINITION_FROM = '* `WC_BROKEN_WEBSITE`: Website URL returns 404, SSL error, or dead domain.';
 const WC_BROKEN_WEBSITE_DEFINITION_TO = '* `WC_BROKEN_WEBSITE`: Website URL returns 404, SSL error, dead domain, or redirects to a bot-defense / notification-permission / login / access-blocking page that prevents an ordinary visitor from reaching business content (per the Website Accessibility Verification directive).';
 
+// ─── §6.1 scoring amendment: google_profile_maintenance rubric.
+//     The old rule scored unverifiability as health — "0 points when the
+//     profile appears maintained OR STATUS IS UNAVAILABLE" — so the more
+//     platforms failed to render, the lower the score and the tier. Split the
+//     rule so control-confirmed absence scores 2, verified-maintained scores 0,
+//     and `unable_to_verify` is excluded from the denominator rather than
+//     scored 0. The sentence is identical in all three audit templates
+//     (Category-Integrated, Signal-Aligned, V1); the Signal-Aligned variant
+//     prefixes it with a markdown bullet, so only the sentence itself is
+//     matched. Idempotent via replaceFirst (no-op if already updated or absent).
+const GP_MAINTENANCE_RUBRIC_FROM = '0 points when the profile appears maintained or status is unavailable';
+const GP_MAINTENANCE_RUBRIC_TO = '0 points when the profile is verified maintained; 2 points when the Platform Availability Verification directive establishes `business_specific_failure` for Google; excluded from the denominator (not scored 0) when the platform is `unable_to_verify`';
+
 // ─── Directive: Platform Availability Verification (inserted at the end of
 //     the Platforms section for Signal-Aligned, or after the Website
 //     Accessibility directive for Category-Integrated which has no Platforms
@@ -398,6 +411,27 @@ Do not record positive platform attributes (rating, reviews, hours, categories, 
 
 Emit \`DS_MISSING_PROFILE\` ONLY when the control rendered on that platform and the business profile did not. Do not emit it when the control also failed, when no control was available, or when the platform was not attempted. Non-primary platforms (bing, apple_maps, etc.) record \`business_specific_failure\` in \`render_controls\` but do NOT emit \`DS_MISSING_PROFILE\` — the signal is restricted to the four primary platforms (google, yelp, facebook, bbb).
 `;
+
+// ─── §6.1 gap_analysis cascade (C3): a control-confirmed platform absence must
+//     be recorded ONCE, not fanned out across every expected field. A platform's
+//     expected-fields set can be large (hours, categories, photos, attributes),
+//     so per-field gaps would flood gap_analysis. Inserted as a separate block
+//     (its own fingerprint) AFTER the Platform Availability directive — never
+//     folded into that directive's constant, because insertAfter fingerprints
+//     only the first 80 chars and would skip the whole insertion.
+const PLATFORM_GAP_CASCADE_DIRECTIVE = `When the determination for a platform is \`business_specific_failure\`, record the absence once rather than fanning it out across every expected field:
+
+* Record one \`quality_gate_results.results\` entry per non_negotiable gate on that platform with \`passed: false\` and \`notes: "platform verified absent per render control"\`.
+* Record one \`gap_analysis.gaps\` entry for the platform with \`field: "profile_presence"\`, \`expected: "profile exists and renders"\`, \`actual: "profile not discoverable (control-confirmed)"\`, \`severity: "non_negotiable"\`.
+* Do NOT add per-field gaps (hours, photos, categories, attributes) for that platform — they are subsumed by the profile-presence gap.`;
+
+// ─── §6.3 action_classification null: the BALANCED_HEALTHY rule reads "all
+//     other VERIFIED profiles where administrative score and public sentiment
+//     are aligned" — but when nothing could be verified the model still
+//     defaults to BALANCED_HEALTHY, making "not computed" indistinguishable
+//     from "computed and healthy". Inserted as its own block (own fingerprint)
+//     right after that rationale. Idempotent via fingerprint.
+const ACTION_CLASSIFICATION_NULL_DIRECTIVE = `When no platform's rating or sentiment could be verified — every in-scope platform is unable_to_verify, so neither the administrative score nor the public sentiment score can be computed — emit \`action_classification: null\` instead of defaulting to BALANCED_HEALTHY. BALANCED_HEALTHY means "computed and aligned", not "could not be computed".`;
 
 // ─── Targeted content update: fix the buggy "bbb has no platform object" note
 //     from availability-control-1/2 and replace it with the data_status mapping
@@ -950,6 +984,11 @@ function transformCategoryIntegrated(body: string): string {
   //     redirects. Idempotent (no-op if already updated).
   out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
 
+  // 4e1. §6.1 scoring amendment — split the google_profile_maintenance rubric
+  //      so unverifiability is excluded from the denominator instead of being
+  //      scored as health. Idempotent (no-op if already updated).
+  out = replaceFirst(out, GP_MAINTENANCE_RUBRIC_FROM, GP_MAINTENANCE_RUBRIC_TO);
+
   // 4e2. Platform Availability Verification directive — insert after the
   //      Website Accessibility Verification directive (Category-Integrated
   //      has no ## Platforms heading). Idempotent via fingerprint. Fallback
@@ -976,6 +1015,34 @@ function transformCategoryIntegrated(body: string): string {
   // 4e3. Amend DS_MISSING_PROFILE definition to require a render control.
   //      Idempotent (no-op if already updated).
   out = replaceFirst(out, DS_MISSING_PROFILE_FROM_CATEGORY, DS_MISSING_PROFILE_TO_CATEGORY);
+
+  // 4e3b. §6.1 gap_analysis cascade (C3) — record a control-confirmed platform
+  //       absence ONCE (one platform-level gap + one gate entry per
+  //       non_negotiable gate) instead of fanning out per expected field.
+  //       Idempotent via fingerprint; skipped when the Platform Availability
+  //       directive is absent from this variant.
+  try {
+    out = insertAfter(
+      out,
+      'Do not bypass bot defenses, solve access controls, or perform intrusive testing.',
+      PLATFORM_GAP_CASCADE_DIRECTIVE,
+    );
+  } catch {
+    // Platform Availability directive not present in this variant — nothing to amend.
+  }
+
+  // 4e3c. §6.3 — allow action_classification: null when nothing could be
+  //       verified, instead of silently defaulting to BALANCED_HEALTHY.
+  //       Idempotent via fingerprint; no-op if the anchor is absent.
+  try {
+    out = insertAfter(
+      out,
+      'Rationale: Normal operational profile. Suitable for general local SEO, conversion optimization, or review-gating software.',
+      ACTION_CLASSIFICATION_NULL_DIRECTIVE,
+    );
+  } catch {
+    // Alignment-scoring section not present in this variant — nothing to amend.
+  }
 
   // 4e4. Fix the buggy "bbb has no platform object" note from earlier seed
   //      versions and replace it with the data_status mapping + corrected
@@ -1335,6 +1402,11 @@ function transformSignalAligned(body: string): string {
   //      redirects. Idempotent (no-op if already updated).
   out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
 
+  // 19e1. §6.1 scoring amendment — split the google_profile_maintenance rubric
+  //       so unverifiability is excluded from the denominator instead of being
+  //       scored as health. Idempotent (no-op if already updated).
+  out = replaceFirst(out, GP_MAINTENANCE_RUBRIC_FROM, GP_MAINTENANCE_RUBRIC_TO);
+
   // 19e2. Platform Availability Verification directive — insert at the end
   //       of the Platforms section. Idempotent via fingerprint. Fallback
   //       anchors cover bodies where the Platforms section's last line may
@@ -1364,6 +1436,34 @@ function transformSignalAligned(body: string): string {
   // 19e3. Amend DS_MISSING_PROFILE definition to require a render control.
   //       Idempotent (no-op if already updated).
   out = replaceFirst(out, DS_MISSING_PROFILE_FROM_SIGNAL, DS_MISSING_PROFILE_TO_SIGNAL);
+
+  // 19e3b. §6.1 gap_analysis cascade (C3) — record a control-confirmed platform
+  //        absence ONCE (one platform-level gap + one gate entry per
+  //        non_negotiable gate) instead of fanning out per expected field.
+  //        Idempotent via fingerprint; skipped when the Platform Availability
+  //        directive is absent from this variant.
+  try {
+    out = insertAfter(
+      out,
+      'Do not bypass bot defenses, solve access controls, or perform intrusive testing.',
+      PLATFORM_GAP_CASCADE_DIRECTIVE,
+    );
+  } catch {
+    // Platform Availability directive not present in this variant — nothing to amend.
+  }
+
+  // 19e3c. §6.3 — allow action_classification: null when nothing could be
+  //        verified, instead of silently defaulting to BALANCED_HEALTHY.
+  //        Idempotent via fingerprint; no-op if the anchor is absent.
+  try {
+    out = insertAfter(
+      out,
+      'Rationale: Normal operational profile. Suitable for general local SEO, conversion optimization, or review-gating software.',
+      ACTION_CLASSIFICATION_NULL_DIRECTIVE,
+    );
+  } catch {
+    // Alignment-scoring section not present in this variant — nothing to amend.
+  }
 
   // 19e4. Fix the buggy "bbb has no platform object" note from earlier seed
   //       versions and replace it with the data_status mapping + corrected
@@ -1487,6 +1587,11 @@ function transformBusinessAuditV1(body: string): string {
   //     or Gold Standard binding, so only the Market Context alignment applies.
   //     Idempotent.
   out = alignBindingText(out, false);
+
+  // 1b. §6.1 scoring amendment — split the google_profile_maintenance rubric
+  //     so unverifiability is excluded from the denominator instead of being
+  //     scored as health. Idempotent (no-op if already updated).
+  out = replaceFirst(out, GP_MAINTENANCE_RUBRIC_FROM, GP_MAINTENANCE_RUBRIC_TO);
 
   // 2. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
