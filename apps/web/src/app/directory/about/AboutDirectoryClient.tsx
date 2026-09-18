@@ -42,41 +42,28 @@ export default function AboutDirectoryClient() {
       {/* The Magic Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-6xl mx-auto">
-          {/* One Action, Three Benefits */}
+          {/* One listing, three surfaces */}
           <div className="mb-20">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
-                One Action, Three Benefits
+                One listing, three surfaces
               </h2>
               <p className="text-lg text-neutral-600 dark:text-neutral-400">
-                When a store owner adds a product, magic happens everywhere
+                Your business lives in one place — and shows up everywhere shoppers look
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              {/* Storefront */}
-              <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-4">
-                  <Store className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
-                  1. Their Storefront
-                </h3>
-                <p className="text-neutral-600 dark:text-neutral-400">
-                  Product appears instantly on their custom storefront, ready for customers to discover
-                </p>
-              </div>
-
               {/* Directory */}
               <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700">
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mb-4">
                   <Globe className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
-                  2. This Directory
+                  1. This Directory
                 </h3>
                 <p className="text-neutral-600 dark:text-neutral-400">
-                  Store automatically appears in category listings, making them discoverable to new customers
+                  Your business appears in category, location, and store-type listings — free, and discoverable to new customers
                 </p>
               </div>
 
@@ -86,10 +73,23 @@ export default function AboutDirectoryClient() {
                   <Package className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
-                  3. Google Search
+                  2. Google
                 </h3>
                 <p className="text-neutral-600 dark:text-neutral-400">
-                  Product syncs to Google Business Profile, showing up in local searches
+                  Add Google visibility and your products show up in local Search, Shopping, and Maps
+                </p>
+              </div>
+
+              {/* Storefront */}
+              <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-4">
+                  <Store className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
+                  3. Your Storefront
+                </h3>
+                <p className="text-neutral-600 dark:text-neutral-400">
+                  Add a branded storefront and shoppers can browse your full catalog on VisibleShelf
                 </p>
               </div>
             </div>
@@ -114,10 +114,10 @@ export default function AboutDirectoryClient() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2">
-                    Store Owner Adds Product
+                    We seed the directory
                   </h3>
                   <p className="text-neutral-600 dark:text-neutral-400">
-                    They scan a barcode or enter product details. That's it. That's all they do.
+                    We list local businesses from public information. No signup, no data entry, no action required.
                   </p>
                 </div>
               </div>
@@ -129,10 +129,10 @@ export default function AboutDirectoryClient() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2">
-                    Platform Enriches Everything
+                    You claim your listing
                   </h3>
                   <p className="text-neutral-600 dark:text-neutral-400">
-                    AI fills in missing details, optimizes descriptions, assigns categories, and prepares the product for discovery.
+                    Claiming is free and takes about two minutes. Fix your name, address, and phone so they're right everywhere.
                   </p>
                 </div>
               </div>
@@ -144,10 +144,10 @@ export default function AboutDirectoryClient() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2">
-                    Directory Updates Automatically
+                    The platform enriches it
                   </h3>
                   <p className="text-neutral-600 dark:text-neutral-400">
-                    This directory rebuilds itself in real-time. New products? New categories? New stores? All automatic.
+                    AI fills gaps, assigns categories, and prepares your discovery surfaces — directory, Google, and storefront.
                   </p>
                 </div>
               </div>
@@ -159,10 +159,10 @@ export default function AboutDirectoryClient() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2">
-                    Customers Discover Stores
+                    Shoppers discover you
                   </h3>
                   <p className="text-neutral-600 dark:text-neutral-400">
-                    Shoppers browse by category, find exactly what they need, and discover local merchants they didn't know existed.
+                    Customers browse by category, location, or store type — and find businesses they didn't know existed.
                   </p>
                 </div>
               </div>
@@ -230,10 +230,10 @@ export default function AboutDirectoryClient() {
                 <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-semibold text-neutral-900 dark:text-white mb-1">
-                    Dual Discovery
+                    Multiple ways to discover
                   </h3>
                   <p className="text-neutral-600 dark:text-neutral-400 text-sm">
-                    Browse by product category OR store type. Two ways to find what you need.
+                    Browse by product category, location, or store type. Several ways to find what you need.
                   </p>
                 </div>
               </div>

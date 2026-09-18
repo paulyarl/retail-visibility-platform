@@ -24,6 +24,49 @@ import { MarketingScorecardService } from './MarketingScorecardService';
 import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 import { normalizeReferenceState } from './intelligence/IntelligenceProfileService.js';
 import type { DiscoveryContext } from '../validators/intelligence-discovery.schema';
+import type { IdentityFieldKey } from './directory/identityScoring';
+
+/** Call outcome — mirrors the queue's VerificationOutcome. */
+export type CampaignVerificationOutcome =
+  | 'operational'
+  | 'closed'
+  | 'closed_temporarily'
+  | 'relocated'
+  | 'unreachable'
+  | 'wrong_business';
+
+/**
+ * Input for `resolveCampaignVerification` — the campaign-scoped counterpart of
+ * the queue's `VerificationResolutionInput`. Same verified-record fields; the
+ * queue-only `nextAction` is absent (the campaign already exists, so there is
+ * nothing to graduate). `outcome` is provenance, not a gate.
+ */
+export interface CampaignVerificationInput {
+  outcome: CampaignVerificationOutcome;
+  verifiedName?: string;
+  verifiedPhone?: string;
+  verifiedAddress?: string;
+  verifiedCity?: string;
+  verifiedState?: string;
+  verifiedWebsite?: string;
+  verifiedEmail?: string;
+  verifiedCategory?: string;
+  verifiedOwnerName?: string;
+  verifiedOwnerPhone?: string;
+  verifiedOwnerEmail?: string;
+  verifiedHours?: Record<string, any>;
+  verifiedSocialProfiles?: Array<{ platform: string; url: string }>;
+  verifiedDirectoryProfiles?: Array<Record<string, any>>;
+  ownerReceptivity?: 'interested' | 'neutral' | 'defensive' | 'no_answer';
+  callNotes?: string;
+  /**
+   * Required by the UI only when the edit clears a conflict — recorded on the
+   * attributed evidence row so the correction is explainable beyond `updated_at`.
+   */
+  reason?: string;
+  /** Provenance label for the captured source (defaults to 'Owner phone call'). */
+  sourceName?: string;
+}
 
 // ─── INT signal labels (Migration 253 — GAP-E3) ──────────────────────────
 // Hardcoded label map for the INT_* discovery signal family. The intelligence
@@ -2420,6 +2463,97 @@ export class MarketingCampaignService extends BaseService {
       logger.error('Failed to update campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
     }
+  }
+
+  // ====================
+  // CAMPAIGN VERIFICATION (record verification — campaign target)
+  // ====================
+
+  /**
+   * Resolve a record verification against an EXISTING campaign — the
+   * campaign-scoped counterpart of `MarketingProspectQueueService.resolveVerification`.
+   *
+   * Same fields, different target. The queue leg writes the row's
+   * `business_snapshot` and the values reach the campaign only on promotion;
+   * here the campaign already exists, so the verified NAP is written to the
+   * campaign record directly — the canonical the Identity Packet reads — and
+   * the capture is recorded as ATTRIBUTED owner evidence.
+   *
+   * Two writes, one call:
+   *   1. NAP → `updateCampaign` (canonical: business_name / address / phone /
+   *      website / category / hours / profiles).
+   *   2. Owner evidence → `IdentityEvidenceService.create` with the call outcome
+   *      as provenance (`owner_confirmed`). Feeds the packet's ownerContact and
+   *      the owner axis, and back-fills the campaign's owner contact fields.
+   *
+   * The outcome is PROVENANCE here, not a graduation gate — the campaign exists.
+   * Spec: docs/LocalBiz/CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC.md §2 (owner axis).
+   */
+  async resolveCampaignVerification(
+    campaignId: string,
+    input: CampaignVerificationInput,
+    ctx?: RequestCtx,
+  ): Promise<any> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+    if (!campaign) throw new NotFoundError('Campaign not found');
+
+    // 1. Canonical NAP → the campaign record (the source of truth the packet reads).
+    const napPatch: CampaignUpdateInput = {};
+    if (input.verifiedName?.trim()) napPatch.businessName = input.verifiedName.trim();
+    if (input.verifiedPhone?.trim()) napPatch.phone = input.verifiedPhone.trim();
+    if (input.verifiedEmail?.trim()) napPatch.email = input.verifiedEmail.trim();
+    if (input.verifiedWebsite?.trim()) napPatch.websiteUrl = input.verifiedWebsite.trim();
+    if (input.verifiedAddress?.trim()) napPatch.addressLine1 = input.verifiedAddress.trim();
+    if (input.verifiedCity?.trim()) napPatch.addressCity = input.verifiedCity.trim();
+    if (input.verifiedState?.trim()) napPatch.addressState = input.verifiedState.trim();
+    if (input.verifiedCategory?.trim()) napPatch.category = input.verifiedCategory.trim();
+    if (input.verifiedHours) napPatch.businessHours = input.verifiedHours as any;
+    if (input.verifiedSocialProfiles?.length) napPatch.socialProfiles = input.verifiedSocialProfiles as any;
+    if (input.verifiedDirectoryProfiles?.length) napPatch.directoryProfiles = input.verifiedDirectoryProfiles as any;
+
+    const updated =
+      Object.keys(napPatch).length > 0 ? await this.updateCampaign(campaignId, napPatch, ctx) : campaign;
+
+    // 2. Owner evidence — attributed capture (who/when + call outcome). Owner is
+    //    the fifth axis: this is the owner testimony the gate over-rule needs.
+    const corroborates: IdentityFieldKey[] = [];
+    if (input.verifiedName?.trim()) corroborates.push('name');
+    if (input.verifiedAddress?.trim()) corroborates.push('address');
+    if (input.verifiedPhone?.trim()) corroborates.push('phone');
+    if (input.verifiedWebsite?.trim()) corroborates.push('website');
+
+    const ownerName = input.verifiedOwnerName?.trim() || null;
+    const ownerPhone = input.verifiedOwnerPhone?.trim() || null;
+    const ownerEmail = input.verifiedOwnerEmail?.trim() || null;
+
+    if (corroborates.length > 0 || ownerName || ownerPhone || ownerEmail) {
+      try {
+        // Dynamic import — IdentityEvidenceService reads the packet, which reads
+        // this service's campaign rows; a static import risks a cycle.
+        const { default: IdentityEvidenceService } = await import('./IdentityEvidenceService');
+        await IdentityEvidenceService.create({
+          campaignId,
+          sourceName: input.sourceName?.trim() || 'Owner phone call',
+          tier: 'first_party',
+          evidenceState: 'owner_confirmed',
+          corroborates,
+          ownerName,
+          ownerPhone,
+          ownerEmail,
+          notes: `Campaign verification — outcome: ${input.outcome}${
+            input.reason ? `; reason: ${input.reason}` : ''
+          }${input.callNotes ? `; ${input.callNotes}` : ''}`,
+          createdBy: ctx?.userId ?? null,
+        });
+      } catch (error) {
+        logger.warn('resolveCampaignVerification: owner evidence capture failed (non-fatal)', ctx, {
+          campaignId,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    return updated;
   }
 
   // ====================

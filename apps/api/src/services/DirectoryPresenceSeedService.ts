@@ -2142,7 +2142,7 @@ class DirectoryPresenceSeedService {
    */
   async createFromCampaign(
     campaignId: string,
-    opts: { publish?: boolean } = {},
+    opts: { publish?: boolean; lane?: 'guarded' | 'manual' } = {},
     ctx?: SeedAuditCtx,
   ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean; published: boolean }> {
     const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
@@ -2171,6 +2171,22 @@ class DirectoryPresenceSeedService {
 
     if (meta.identity_status === 'mismatched') {
       throw new Error('identity_mismatch');
+    }
+
+    // Guarded lane (spec §6): the Identity tab's Push evaluates the seed gate
+    // server-side. The raw capability stays open for the manual lane
+    // ("Add to place listing", testing/back channels) — those deliberately
+    // bypass the gate. This is the enforcement point; without it the block is
+    // advisory (UI-only).
+    if (opts.lane === 'guarded') {
+      const { default: IdentityPacketService } = await import('./IdentityPacketService');
+      const packet = await IdentityPacketService.buildForCampaign(campaignId);
+      if (!packet.score.pushRecommended) {
+        const gateError: any = new Error('gate_blocked');
+        gateError.gate = packet.score.gate;
+        gateError.vetoes = packet.score.vetoes;
+        throw gateError;
+      }
     }
 
     const businessName =

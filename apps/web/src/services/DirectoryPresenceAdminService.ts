@@ -97,6 +97,10 @@ export interface IdentityPacketSourceRef {
   url?: string | null;
   accessedAt?: string | null;
   manual?: boolean;
+  /** Authority class (eligibility axis) — which dimension this source testifies on. */
+  authorityClass?: string | null;
+  /** The evidence dimension; null for the owner axis. */
+  dimension?: string | null;
 }
 
 export interface IdentityPacketFieldScore {
@@ -105,7 +109,14 @@ export interface IdentityPacketFieldScore {
   required: boolean;
   score: number;
   agreementWeight: number;
+  /** Authoritative disagreement weight — material (drives the veto). */
   conflictWeight: number;
+  /** Corroborator disagreement weight — NAP drift (reportable, never a veto). */
+  driftWeight?: number;
+  /** True when operator authority evidence adjudicated this field's conflict. */
+  adjudicated?: boolean;
+  /** The operator source that adjudicated, when `adjudicated`. */
+  adjudicatedBy?: string | null;
   independentSources: number;
   sources: IdentityPacketSourceRef[];
 }
@@ -142,6 +153,22 @@ export interface IdentityPacket {
     vetoes: Array<{ code: string; message: string }>;
     qcSignals: Array<{ code: string; severity: 'info' | 'warn' | 'error'; message: string; field?: IdentityFieldKey }>;
     fields: IdentityPacketFieldScore[];
+    /** The dimension gate — the seed decision (spec §2). */
+    gate?: {
+      decision: 'guaranteed' | 'earned' | 'rescued' | 'blocked';
+      satisfiedCount: number;
+      totalStrength: number;
+      earned: boolean;
+      guaranteed: boolean;
+      ownerOverRule: boolean;
+      blockers: string[];
+      dimensions: Array<{
+        dimension: string;
+        satisfied: boolean;
+        strength: number;
+        sourceCount: number;
+      }>;
+    };
   };
   seed: { id: string; status: string; publicUrl: string | null } | null;
   generatedAt: string;
@@ -1963,14 +1990,17 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data;
   }
 
-  /** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId */
+  /** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId
+   *  `lane: 'guarded'` evaluates the seed gate server-side (the Identity tab's
+   *  Push). Omit for the manual lane (raw capability, deliberately unguarded). */
   async createSeedFromCampaign(
     campaignId: string,
     publish = false,
+    lane?: 'guarded' | 'manual',
   ): Promise<{ seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean; published: boolean }> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/from-campaign/${encodeURIComponent(campaignId)}`,
-      { method: 'POST', body: JSON.stringify({ publish }) },
+      { method: 'POST', body: JSON.stringify(lane ? { publish, lane } : { publish }) },
       undefined,
       0,
     );

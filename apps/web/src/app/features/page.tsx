@@ -380,7 +380,6 @@ const features = [
       'Role-based access control',
       'Audit logging',
       'Data encryption',
-      'SOC 2 compliant',
       'Dedicated support'
     ],
     color: 'bg-red-100 text-red-600',
@@ -443,232 +442,170 @@ const features = [
   }
 ];
 
+// Organized by the V3 layer model: Entry Presence (choose a visibility
+// surface) then Commerce (choose how customers pay). Prices/names mirror
+// apps/web/src/lib/tiers/tier-features.ts.
 const tiers = [
+  // ── Entry Presence — where you're visible ──────────────────────────────
+  {
+    name: 'Directory Presence',
+    layer: 'presence',
+    price: 'Free',
+    period: '',
+    tagline: "You're on the map",
+    description: 'A truthful, claimable listing in the VisibleShelf directory — sourced from public information.',
+    trial: 'Always free',
+    features: [
+      'Listed in the VisibleShelf directory',
+      'Name, address, phone, hours & map when sourced',
+      'Claim your listing and correct your details',
+      'Directory QR code',
+      'SNAP/EBT visibility badge when sourced'
+    ],
+    excluded: ['Owner branding & layouts', 'Google visibility', 'Platform storefront', 'Any checkout'],
+    commerceMode: 'Payments: none',
+    cta: 'Claim your free listing',
+    popular: false,
+    badge: 'START FREE',
+    color: 'from-emerald-500 to-teal-600'
+  },
+  {
+    name: 'Starter',
+    layer: 'presence',
+    price: '$19',
+    period: '/month',
+    tagline: 'Own your directory listing',
+    description: 'The directory visibility surface — your logo, story, photos, and richer layouts.',
+    trial: '14-day free trial',
+    features: [
+      'Everything in Directory Presence',
+      'Owner-controlled listing: logo, about, gallery, social',
+      'Editorial & immersive layouts',
+      'Your directory listing as the primary surface'
+    ],
+    excluded: ['Google visibility', 'Platform storefront', 'Any checkout'],
+    commerceMode: 'Payments: none',
+    cta: 'Start free trial',
+    popular: false,
+    badge: 'DIRECTORY',
+    color: 'from-blue-500 to-indigo-600'
+  },
   {
     name: 'Discovery',
+    layer: 'presence',
     price: '$29',
     period: '/month',
-    tagline: 'Get Found on Google',
-    description: 'Complete Google visibility stack for small retailers',
+    tagline: 'Get found on Google',
+    description: 'The Google visibility surface — Search, Shopping, and Maps.',
     trial: '14-day free trial',
-    identity: 'I exist online',
-    realization: 'People are finding my products on Google',
-    upgradeTrigger: 'Now I want them to find my whole store',
     features: [
-      'Clover POS integration & real-time inventory sync',
-      'SEO-optimised product pages (hosted on platform)',
+      'Everything in Directory Presence',
       'Google Search indexing',
-      'Google Shopping visibility', 
-      'Google Maps / SWIS (See What\'s In Store)',
-      'Platform directory listing',
-      'Basic QR codes (product, storefront, directory)',
-      '14-day free trial'
+      'Google Shopping visibility',
+      "Google Maps / See What's In Store",
+      'Product pages hosted on VisibleShelf',
+      'Directory QR codes'
     ],
-    excluded: [
-      'Platform product visibility',
-      'Branded storefront page',
-      'Store logo on QR codes',
-      'Add to cart / checkout',
-      'Conversion features',
-      'Payment processing'
-    ],
-    commerceMode: '❌ Commerce Disabled',
-    cta: 'Start Free Trial',
-    popular: false,
-    badge: 'GET ONLINE',
-    color: 'from-blue-500 to-purple-600'
+    excluded: ['Platform storefront', 'Any checkout'],
+    commerceMode: 'Payments: none',
+    cta: 'Start free trial',
+    popular: true,
+    badge: 'GOOGLE',
+    color: 'from-green-500 to-emerald-600'
   },
   {
     name: 'Storefront',
+    layer: 'presence',
     price: '$59',
     period: '/month',
-    tagline: 'Own Your Platform Presence',
-    description: 'Branded storefront inside Visible Shelf marketplace',
+    tagline: 'Open your platform store',
+    description: 'The platform marketplace surface — a branded storefront shoppers can browse.',
     trial: '14-day free trial',
-    identity: 'I have a store online',
-    realization: 'Shoppers are browsing — but can\'t act on it',
-    upgradeTrigger: 'I want shoppers to commit to buying',
     features: [
       'Everything in Discovery',
-      'Branded public storefront page',
-      'Platform product visibility',
+      'Branded public storefront',
       'Platform search & browse',
       'Product categories & filtering',
       'Store profile, hours & details',
-      'Shopper inquiry / contact seller',
-      'Enhanced directory listing',
-      'Basic QR codes (product, storefront, directory)',
-      '14-day free trial'
+      'Shopper inquiry / contact seller'
     ],
-    excluded: [
-      'Store logo on QR codes',
-      'Add to cart / checkout flow',
-      'Conversion & reservation features',
-      'Payment processing'
-    ],
-    commerceMode: '❌ Commerce Disabled',
-    cta: 'Start Free Trial',
-    popular: true,
-    badge: 'MOST POPULAR',
+    excluded: ['Any checkout'],
+    commerceMode: 'Payments: none',
+    cta: 'Start free trial',
+    popular: false,
+    badge: 'STOREFRONT',
     color: 'from-purple-500 to-indigo-600'
   },
+  // ── Commerce — how customers pay ───────────────────────────────────────
   {
     name: 'Commitment',
+    layer: 'commerce',
     price: '$79',
     period: '/month',
-    tagline: 'Capture Intent and Drive Foot Traffic',
-    description: 'Deposit-based commerce to drive in-store pickup',
+    tagline: 'Take deposits, drive foot traffic',
+    description: 'Deposit-based commerce with in-store pickup.',
     trial: '14-day free trial',
-    identity: 'I am selling online',
-    realization: 'Shoppers reserve and show up — but some want to pay fully online',
-    upgradeTrigger: 'I want to offer flexible payment options',
     features: [
-      'Everything in Discovery & Storefront',
-      'Add to cart',
-      'Checkout flow',
-      'Deposit collection (10-15%)',
+      'Everything in the presence tiers',
+      'Add to cart & checkout',
+      'Holding deposits (10–15%)',
       'Reserve / hold in store',
-      'Click and collect / BOPIS',
+      'Click & collect / BOPIS',
       'Shopper notifications',
-      'Real-time inventory availability indicators',
-      'Conversion analytics & reporting',
-      'Branded QR codes with store logo',
-      '14-day free trial'
+      'Conversion analytics'
     ],
-    excluded: [
-      'Full online payment collection',
-      'Delivery / fulfilment options'
-    ],
-    commerceMode: '💳 Deposit Only Required',
-    cta: 'Start Free Trial',
+    excluded: ['Full online payment', 'Delivery / shipping'],
+    commerceMode: 'Payments: deposit only',
+    cta: 'Start free trial',
     popular: false,
-    badge: 'DEPOSIT COMMERCE',
+    badge: 'DEPOSIT',
     color: 'from-green-500 to-emerald-600'
   },
   {
     name: 'E-commerce',
+    layer: 'commerce',
     price: '$99',
     period: '/month',
-    tagline: 'Full Online Payment Processing',
-    description: 'Complete e-commerce with full payment collection and delivery',
+    tagline: 'Sell with full online payment',
+    description: 'Complete online payment with delivery and shipping.',
     trial: '14-day free trial',
-    identity: 'I need full online sales capabilities',
-    realization: 'I can process complete transactions online',
-    upgradeTrigger: 'I want to offer both deposit and full payment options',
     features: [
-      'Everything in Discovery, Storefront & Commitment',
-      'Add to cart',
+      'Everything in the presence tiers',
       'Full online payment collection',
-      'Delivery / fulfilment options',
+      'Delivery / fulfilment',
       'Shipping integration',
       'Order management',
-      'Conversion analytics & reporting',
-      'Branded QR codes with store logo',
-      '14-day free trial'
+      'Conversion analytics'
     ],
-    excluded: [
-      'Deposit payment options',
-      'Multi-location support'
-    ],
-    commerceMode: '💰 Full Payment Only',
-    cta: 'Start Free Trial',
+    excluded: ['Deposit payment options'],
+    commerceMode: 'Payments: full payment only',
+    cta: 'Start free trial',
     popular: false,
-    badge: 'FULL ECOMMERCE',
+    badge: 'FULL PAYMENT',
     color: 'from-cyan-500 to-blue-600'
   },
   {
     name: 'Omnichannel',
+    layer: 'commerce',
     price: '$149',
     period: '/month',
-    tagline: 'Flexible Commerce - All Channels',
-    description: 'Multi-channel retail with pickup, delivery, and shipping',
+    tagline: 'Every channel, every payment',
+    description: 'Deposit or full payment, pickup, delivery, and shipping.',
     trial: '14-day free trial',
-    identity: 'I sell across multiple channels',
-    realization: 'Customers can choose how they shop and pay',
-    upgradeTrigger: 'I need advanced features and higher limits',
     features: [
-      'Everything in Discovery, Storefront, Commitment & E-commerce',
-      'Flexible payment options (deposit OR full payment)',
-      'Delivery / fulfilment options',
-      'Shipping integration',
-      'Advanced analytics & reporting',
-      'Branded QR codes with store logo',
+      'Everything in the presence tiers',
+      'Flexible payment (deposit OR full payment)',
+      'Delivery / fulfilment & shipping',
+      'Advanced analytics',
       'API access & custom integrations',
-      'Priority directory placement',
-      '14-day free trial'
+      'Priority directory placement'
     ],
-    excluded: [
-      'Multi-location support (beyond 10 locations)',
-      'Enterprise features'
-    ],
-    commerceMode: '🔁 Flexible (Deposit or Full Payment)',
-    cta: 'Start Free Trial',
+    excluded: [],
+    commerceMode: 'Payments: deposit or full payment',
+    cta: 'Start free trial',
     popular: false,
     badge: 'OMNICHANNEL',
     color: 'from-indigo-500 to-purple-600'
-  },
-  {
-    name: 'Professional',
-    price: '$199',
-    period: '/month',
-    tagline: 'Premium Commerce Platform',
-    description: 'Maximum flexibility with all payment options and multi-location support',
-    trial: '14-day free trial',
-    identity: 'I need the most powerful commerce solution',
-    realization: 'I have complete control over customer experience',
-    upgradeTrigger: 'Growth, scale, and advanced business needs',
-    features: [
-      'Everything in all lower tiers',
-      'Flexible payment options (deposit OR full payment)',
-      'Delivery / fulfilment options',
-      'Shipping integration',
-      'Advanced analytics & reporting',
-      'Branded QR codes with store logo',
-      'API access & custom integrations',
-      'Priority directory placement',
-      'Multi-location support (up to 5 locations)',
-      'Higher limits (2000 SKUs)',
-      '14-day free trial'
-    ],
-    excluded: [
-      'Multi-location support (beyond 5 locations)',
-      'Enterprise security & compliance'
-    ],
-    commerceMode: '🔁 Flexible (Deposit or Full Payment)',
-    cta: 'Start Free Trial',
-    popular: false,
-    badge: 'PREMIUM',
-    color: 'from-amber-500 to-orange-600'
-  },
-  {
-    name: 'Enterprise',
-    price: '$499',
-    period: '/month',
-    tagline: 'Complete Business Solution',
-    description: 'Full e-commerce plus enterprise features and multi-location support',
-    trial: '14-day free trial',
-    identity: 'I am running a complete business operation',
-    realization: 'I have enterprise-grade tools and support',
-    upgradeTrigger: 'Maximum scale and customization',
-    features: [
-      'Everything in all lower tiers',
-      'Flexible payment options (deposit OR full payment)',
-      'Multi-location support (20 locations)',
-      'Advanced analytics dashboard',
-      'Dedicated onboarding & support',
-      'Enterprise security & compliance',
-      'Custom contracts & pricing',
-      'White-label options',
-      'Priority directory & platform placement',
-      'Highest limits (10,000 SKUs)',
-      '14-day free trial'
-    ],
-    excluded: [],
-    commerceMode: '🔁 Flexible (Deposit or Full Payment)',
-    cta: 'Start Free Trial',
-    popular: false,
-    badge: 'ENTERPRISE',
-    color: 'from-red-500 to-pink-600'
   }
 ];
 
@@ -719,13 +656,13 @@ export default function FeaturesPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <Badge className="mb-4">Trusted by 1,500+ Retailers</Badge>
+            <Badge className="mb-4">Free to start — claim your listing</Badge>
             <h1 className="text-5xl md:text-6xl font-bold text-neutral-900 mb-6">
-              Complete Online Presence<br />
-              <span className="text-primary-600">In Minutes, Not Months</span>
+              Get found. Get claimed.<br />
+              <span className="text-primary-600">Get selling — when you're ready.</span>
             </h1>
             <p className="text-xl text-neutral-600 mb-8 max-w-3xl mx-auto">
-              Everything you need to dominate local search and drive customers to your store. No website developer needed.
+              One platform for the whole journey: a free directory listing sourced from public information, Google visibility, your own storefront, and the tools to turn discovery into sales. No developer, no agency.
             </p>
             <div className="flex items-center justify-center gap-4">
               <a href={withUTM('/auth/signup')}>
@@ -827,7 +764,7 @@ export default function FeaturesPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Save $2,400/month in labor</strong></span>
+                  <span><strong>Start with a free listing</strong></span>
                 </li>
               </ul>
             </motion.div>
@@ -1664,52 +1601,63 @@ export default function FeaturesPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {tiers.map((tier, index) => (
-              <motion.div
-                key={tier.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className={`bg-white rounded-xl p-8 ${
-                  tier.popular ? 'ring-2 ring-primary-600 shadow-xl scale-105' : 'border border-neutral-200'
-                }`}
-              >
-                {tier.popular && (
-                  <Badge className="mb-4">Most Popular</Badge>
-                )}
-                <h3 className="text-2xl font-bold text-neutral-900 mb-2">{tier.name}</h3>
-                <p className="text-neutral-600 mb-4">{tier.description}</p>
-                <div className="mb-6">
-                  <span className="text-5xl font-bold text-neutral-900">{tier.price}</span>
-                  <span className="text-neutral-600">{tier.period}</span>
+          <div className="space-y-14">
+            {([
+              { layer: 'presence', title: 'Entry Presence — choose your visibility surface', blurb: 'Pick where you want to be found. Start free, then upgrade the surface you need.' },
+              { layer: 'commerce', title: 'Commerce — choose how customers pay', blurb: "Add selling when you're ready: deposits, full online payment, or both." },
+            ] as const).map(({ layer, title, blurb }) => (
+              <div key={layer}>
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold text-neutral-900 mb-2">{title}</h3>
+                  <p className="text-neutral-600 max-w-2xl mx-auto">{blurb}</p>
                 </div>
-                
-                {/* V2 Commerce Mode Display */}
-                {tier.commerceMode && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="text-sm font-medium text-blue-800 mb-1">Checkout Mode:</div>
-                    <div className="text-sm text-blue-700">{tier.commerceMode}</div>
-                  </div>
-                )}
-                
-                <a href={withUTM('/auth/signup')} className="block mb-6">
-                  <Button className="w-full" variant={tier.popular ? 'primary' : 'secondary'}>
-                    {tier.cta}
-                  </Button>
-                </a>
-                <ul className="space-y-3">
-                  {tier.features.map((feature: any, idx: number) => (
-                    <li key={idx} className="flex items-start text-sm text-neutral-700">
-                      <svg className="w-5 h-5 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
-                    </li>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {tiers.filter((t) => t.layer === layer).map((tier, index) => (
+                    <motion.div
+                      key={tier.name}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.1 }}
+                      className={`bg-white rounded-xl p-8 ${
+                        tier.popular ? 'ring-2 ring-primary-600 shadow-xl scale-105' : 'border border-neutral-200'
+                      }`}
+                    >
+                      {tier.popular && (
+                        <Badge className="mb-4">Most Popular</Badge>
+                      )}
+                      <h3 className="text-2xl font-bold text-neutral-900 mb-2">{tier.name}</h3>
+                      <p className="text-neutral-600 mb-4">{tier.description}</p>
+                      <div className="mb-6">
+                        <span className="text-5xl font-bold text-neutral-900">{tier.price}</span>
+                        <span className="text-neutral-600">{tier.period}</span>
+                      </div>
+
+                      {tier.commerceMode && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="text-sm text-blue-700">{tier.commerceMode}</div>
+                        </div>
+                      )}
+
+                      <a href={tier.price === 'Free' ? '/directory/add-business' : withUTM('/auth/signup')} className="block mb-6">
+                        <Button className="w-full" variant={tier.popular ? 'primary' : 'secondary'}>
+                          {tier.cta}
+                        </Button>
+                      </a>
+                      <ul className="space-y-3">
+                        {tier.features.map((feature: any, idx: number) => (
+                          <li key={idx} className="flex items-start text-sm text-neutral-700">
+                            <svg className="w-5 h-5 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </motion.div>
                   ))}
-                </ul>
-              </motion.div>
+                </div>
+              </div>
             ))}
           </div>
 
@@ -2914,58 +2862,58 @@ export default function FeaturesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-neutral-900 mb-4">
-              Complete Feature Comparison
+              Capabilities, not just features
             </h2>
             <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
-              See exactly what's included in each tier. Every capability builds on the previous tier, creating a clear path for growth.
+              Your plan unlocks capabilities — commerce types, fulfillment, storefront options, coupons, funnels, and more. "Flexible" means every option in that capability is unlocked.
             </p>
           </div>
 
           {/* Capability Matrix Table - capability-aware, powered by shared component */}
           <CapabilityComparisonMatrix />
 
-          {/* Tier Progression Visual */}
+          {/* Tier Progression Visual — the V3 layer journey */}
           <div className="mt-16 text-center">
-            <h3 className="text-2xl font-bold text-neutral-900 mb-8">Your Growth Journey</h3>
+            <h3 className="text-2xl font-bold text-neutral-900 mb-8">Your growth journey</h3>
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
               <div className="flex-1 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   1
                 </div>
-                <h4 className="font-semibold text-blue-600 mb-1">Discovery</h4>
-                <p className="text-sm text-neutral-600">Get Found on Google</p>
+                <h4 className="font-semibold text-emerald-600 mb-1">Free</h4>
+                <p className="text-sm text-neutral-600">You're on the map</p>
               </div>
               <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   2
                 </div>
-                <h4 className="font-semibold text-purple-600 mb-1">Storefront</h4>
-                <p className="text-sm text-neutral-600">Platform Presence</p>
+                <h4 className="font-semibold text-blue-600 mb-1">Starter</h4>
+                <p className="text-sm text-neutral-600">Own your listing</p>
               </div>
               <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   3
                 </div>
-                <h4 className="font-semibold text-green-600 mb-1">Commitment</h4>
-                <p className="text-sm text-neutral-600">Capture Intent</p>
+                <h4 className="font-semibold text-green-600 mb-1">Discovery</h4>
+                <p className="text-sm text-neutral-600">Get found on Google</p>
+              </div>
+              <div className="hidden lg:block text-2xl text-neutral-400">→</div>
+              <div className="flex-1 text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
+                  4
+                </div>
+                <h4 className="font-semibold text-purple-600 mb-1">Storefront</h4>
+                <p className="text-sm text-neutral-600">Open your store</p>
               </div>
               <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
-                  4
-                </div>
-                <h4 className="font-semibold text-amber-600 mb-1">Professional</h4>
-                <p className="text-sm text-neutral-600">Full E-Commerce</p>
-              </div>
-              <div className="hidden lg:block text-2xl text-neutral-400">→</div>
-              <div className="flex-1 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   5
                 </div>
-                <h4 className="font-semibold text-red-600 mb-1">Enterprise</h4>
-                <p className="text-sm text-neutral-600">Business Solution</p>
+                <h4 className="font-semibold text-amber-600 mb-1">Commerce</h4>
+                <p className="text-sm text-neutral-600">Start selling</p>
               </div>
             </div>
           </div>
@@ -2980,7 +2928,7 @@ export default function FeaturesPage() {
               Shopper Choice, Retailer Control
             </h2>
             <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
-              Professional and Enterprise tiers give shoppers the freedom to choose their payment path while retailers maintain complete control over their business.
+              Our commerce plans give shoppers the freedom to choose their payment path while retailers maintain complete control over their business.
             </p>
           </div>
 

@@ -30,6 +30,7 @@ import {
   ExternalLink,
   ArrowUpRight,
   PauseCircle,
+  Phone,
   Trash2,
 } from 'lucide-react';
 import directoryPresenceAdminService, {
@@ -39,6 +40,7 @@ import directoryPresenceAdminService, {
 } from '@/services/DirectoryPresenceAdminService';
 import { IDENTITY_FIELD_LABELS, IDENTITY_EVIDENCE_STATE_LABELS, IDENTITY_TIER_LABELS, sourceLabel } from '@/lib/identity-evidence';
 import AddIdentityEvidenceModal from './AddIdentityEvidenceModal';
+import ResolveVerificationModal, { type VerificationEntryLike } from './ResolveVerificationModal';
 
 const TIER_LABEL: Record<IdentitySourceTier, string> = IDENTITY_TIER_LABELS;
 
@@ -174,6 +176,7 @@ export default function IdentityPacketCard({
   const [waited, setWaited] = useState(false);
   const [pushed, setPushed] = useState<{ publicUrl: string } | null>(null);
   const [showAddEvidence, setShowAddEvidence] = useState(false);
+  const [showVerify, setShowVerify] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -210,7 +213,8 @@ export default function IdentityPacketCard({
     setPushing(true);
     setError(null);
     try {
-      const r = await directoryPresenceAdminService.createSeedFromCampaign(campaignId, false);
+      // Guarded lane — the server evaluates the seed gate (spec §6).
+      const r = await directoryPresenceAdminService.createSeedFromCampaign(campaignId, false, 'guarded');
       setPushed({ publicUrl: r.publicUrl });
       await load();
       onSeedCreated?.();
@@ -251,8 +255,44 @@ export default function IdentityPacketCard({
   const { score } = packet;
   const band = BAND_META[score.band];
   const blocked = score.vetoes.length > 0;
+  // The SERVER gate (spec §2) decides pushability — the client must agree, or
+  // the button enables a Push the API will reject with 409. Fall back to the
+  // veto check for a pre-gate packet (no `gate` field).
+  const gateBlocked = score.gate ? score.gate.decision === 'blocked' : blocked;
+  const gateBlockReason = (() => {
+    if (!gateBlocked) return '';
+    if (blocked) return 'Resolve the vetoes above to enable Push.';
+    if (score.gate?.blockers.includes('no_operational_evidence'))
+      return 'No recent activity evidence — verify the business is operating.';
+    if (score.gate?.blockers.includes('insufficient_dimensions'))
+      return 'Not enough evidence yet — add sources or verify the record to earn a seed.';
+    return 'This seed is blocked.';
+  })();
   const seed = packet.seed;
   const visibleFields = score.fields.filter((f) => f.value != null || f.sources.length > 0);
+
+  // The record-verification modal is campaign-scoped here: it prefills from the
+  // packet's canonical values and writes the campaign record. Reuses the queue
+  // modal's field panels rather than a parallel component.
+  const canonicalValue = (key: string) => packet.fields.find((f) => f.field === key)?.value ?? '';
+  // Fields in conflict — a verification that CHANGES one of these clears a
+  // conflict, so the modal requires a reason.
+  const conflictFields = score.fields.filter((f) => f.conflictWeight > 0).map((f) => f.field);
+  const verificationEntry: VerificationEntryLike = {
+    id: campaignId,
+    business_name: packet.businessName,
+    category: canonicalValue('primary_category'),
+    business_snapshot: {
+      verified_nap: {
+        name: canonicalValue('name'),
+        address: canonicalValue('address'),
+        phone: canonicalValue('phone'),
+        website: canonicalValue('website'),
+        category: canonicalValue('primary_category'),
+        owner_name: packet.ownerContact?.name ?? '',
+      },
+    },
+  };
 
   return (
     <div className="space-y-4">
@@ -274,6 +314,13 @@ export default function IdentityPacketCard({
             className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
           >
             <ShieldPlus className="h-3.5 w-3.5" /> Add evidence
+          </button>
+          <button
+            onClick={() => setShowVerify(true)}
+            title="Record a verification call — writes the campaign record (canonical NAP + attributed owner evidence)"
+            className="inline-flex items-center gap-1.5 rounded border border-gray-300 dark:border-neutral-600 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800"
+          >
+            <Phone className="h-3.5 w-3.5" /> Verify record
           </button>
           <button
             onClick={load}
@@ -389,10 +436,10 @@ export default function IdentityPacketCard({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={push}
-              disabled={pushing || blocked}
-              title={blocked ? 'Resolve the hard vetoes before seeding' : 'Create the draft seed'}
-              aria-disabled={pushing || blocked}
-              aria-describedby={blocked ? 'identity-push-blocked' : undefined}
+              disabled={pushing || gateBlocked}
+              title={gateBlocked ? gateBlockReason : 'Create the draft seed'}
+              aria-disabled={pushing || gateBlocked}
+              aria-describedby={gateBlocked ? 'identity-push-blocked' : undefined}
               className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               <ArrowUpRight className="h-3.5 w-3.5" /> {pushing ? 'Pushing…' : 'Push draft seed'}
@@ -404,9 +451,9 @@ export default function IdentityPacketCard({
             >
               <PauseCircle className="h-3.5 w-3.5" /> {waited ? 'Waiting' : 'Wait'}
             </button>
-            {blocked && (
+            {gateBlocked && (
               <span id="identity-push-blocked" className="text-xs text-red-600 dark:text-red-400">
-                Resolve the vetoes above to enable Push.
+                {gateBlockReason}
               </span>
             )}
             {waited && (
@@ -647,6 +694,16 @@ export default function IdentityPacketCard({
           businessName={packet.businessName}
           onClose={() => setShowAddEvidence(false)}
           onAdded={setPacket}
+        />
+      )}
+
+      {showVerify && (
+        <ResolveVerificationModal
+          mode="campaign"
+          entry={verificationEntry}
+          conflictFields={conflictFields}
+          onClose={() => setShowVerify(false)}
+          onResolved={load}
         />
       )}
     </div>

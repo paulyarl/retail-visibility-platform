@@ -1,5 +1,17 @@
 # Retail Visibility Platform - Complete Documentation
 
+> **⚠️ SUPERSEDED (2026-09-18).** This document describes a pre-V3 product — "Retail
+> Visibility Platform", an inventory + Google Merchant Center system — and is no longer
+> accurate. It predates the free Directory Presence gateway, the directory discovery
+> surfaces, the capability architecture, and the V3 presence model.
+>
+> **Current sources of truth:**
+> - `docs/PLATFORM_STRATEGY_V3.md` — product, tier, and layer strategy
+> - `docs/PLATFORM_COPY_PLATFORM.md` — positioning, message architecture, voice
+> - `docs/PLATFORM_ROOT_COPY_ALIGNMENT_SPEC.md` — public-copy change list
+>
+> Retained for historical reference only. Do not cite.
+
 ## 🎯 Platform Overview
 
 The Retail Visibility Platform is an enterprise-grade inventory management system designed for multi-location retailers. It provides real-time inventory visibility, Google Merchant Center integration, and comprehensive business management tools.

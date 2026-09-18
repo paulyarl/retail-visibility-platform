@@ -5331,6 +5331,51 @@ router.post('/prospect-queue/:id/resolve-verification', async (req: any, res: Re
   }
 });
 
+// POST /:id/resolve-verification — record verification against an EXISTING
+// campaign (the campaign-scoped counterpart of the queue route above). Same
+// verified-record fields; the queue-only nextAction is absent because the
+// campaign already exists. The verified NAP is written to the campaign record —
+// the canonical the Identity Packet reads — and the capture is recorded as
+// attributed owner evidence. See MarketingCampaignService.resolveCampaignVerification.
+const campaignVerificationResolveSchema = z.object({
+  outcome: z.enum(['operational', 'closed', 'closed_temporarily', 'relocated', 'unreachable', 'wrong_business']),
+  verifiedName: z.string().max(255).optional(),
+  verifiedPhone: z.string().max(50).optional(),
+  verifiedAddress: z.string().max(500).optional(),
+  verifiedCity: z.string().max(255).optional(),
+  verifiedState: z.string().max(255).optional(),
+  verifiedWebsite: z.string().max(500).optional(),
+  verifiedEmail: z.string().max(255).optional(),
+  verifiedCategory: z.string().max(255).optional(),
+  verifiedOwnerName: z.string().max(255).optional(),
+  verifiedOwnerPhone: z.string().max(50).optional(),
+  verifiedOwnerEmail: z.string().max(255).optional(),
+  verifiedHours: businessHoursSchema.optional(),
+  verifiedSocialProfiles: z.array(verifiedSocialProfileSchema).max(20).optional(),
+  verifiedDirectoryProfiles: z.array(verifiedDirectoryProfileSchema).max(20).optional(),
+  ownerReceptivity: z.enum(['interested', 'neutral', 'defensive', 'no_answer']).optional(),
+  callNotes: z.string().max(2000).optional(),
+  reason: z.string().max(500).optional(),
+  sourceName: z.string().max(255).optional(),
+});
+
+router.post('/:id/resolve-verification', async (req: any, res: Response) => {
+  try {
+    const parsed = campaignVerificationResolveSchema.parse(req.body ?? {});
+    const campaign = await MarketingCampaignService.resolveCampaignVerification(
+      req.params.id,
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ====================
 // PROSPECT COMMUNICATION ROUTES
 // ====================

@@ -5331,6 +5331,36 @@ class MarketingOpsService extends AdminApiSingleton {
     };
   }
 
+  /**
+   * POST /api/admin/marketing-ops/:id/resolve-verification — record verification
+   * against an EXISTING campaign (the campaign-scoped counterpart of the queue
+   * resolve). Verified NAP is written to the campaign record — the canonical the
+   * Identity Packet reads — and the capture is recorded as attributed owner
+   * evidence. The queue-only `nextAction` is not part of this input.
+   */
+  async resolveCampaignVerification(
+    id: string,
+    input: Omit<VerificationResolutionInput, 'nextAction'> & {
+      verifiedOwnerPhone?: string;
+      verifiedOwnerEmail?: string;
+      reason?: string;
+    },
+  ): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/resolve-verification`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-campaign-verification-resolve-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(
+        typeof result.error === 'string' ? result.error : 'Failed to resolve campaign verification',
+      );
+    }
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    return (result.data?.data ?? result.data) as Campaign;
+  }
+
   // ─── Proving Ground (Migration 262) ────────────────────────────────────
 
   /** POST /prospect-queue/:id/log-touch — canonical seed touch + cadence

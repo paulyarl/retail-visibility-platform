@@ -235,9 +235,38 @@ describe('assembleIdentityPacket', () => {
       }),
     );
     expect(p.score.identityScore).toBe(100);
-    expect(p.score.band).toBe('review');
+    // A registry alone satisfies the IDENTITY dimension only — one dimension
+    // cannot earn a seed under the 2-of-4 gate.
+    expect(p.score.gate.satisfiedCount).toBe(1);
+    expect(p.score.gate.decision).toBe('blocked');
+    expect(p.score.band).toBe('blocked');
     expect(p.ledger.map((l) => l.name)).toEqual(['State business registry']);
     expect(p.ledger[0].manual).toBe(true);
+  });
+
+  it('rescues an unaudited business when the operator captures owner confirmation', () => {
+    // Identity (registry) + an owner_confirmed capture — the owner is the fifth
+    // axis, so a seed short of earning is rescued.
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        manualEvidence: [
+          manualRow({
+            id: 'idev-reg',
+            sourceName: 'State business registry',
+            tier: 'authoritative',
+            evidenceState: 'confirmed',
+            corroborates: ['name', 'address'],
+          }),
+          manualRow({ id: 'idev-owner', evidenceState: 'owner_confirmed', corroborates: ['name'] }),
+        ],
+      }),
+    );
+    expect(p.score.gate.satisfiedCount).toBe(1);
+    expect(p.score.gate.ownerOverRule).toBe(true);
+    expect(p.score.gate.decision).toBe('rescued');
+    expect(p.score.band).toBe('review');
+    expect(p.score.pushRecommended).toBe(true);
   });
 
   it('discounts a manual source that echoes a platform the audit already read', () => {
@@ -302,5 +331,21 @@ describe('assembleIdentityPacket', () => {
     );
     expect(p.ledger).toHaveLength(0);
     expect(p.manualEvidence).toHaveLength(1);
+  });
+
+  it('treats an operator dispute (owner_disputed) as a disagreement, not agreement', () => {
+    // The old `agrees: true` hardcode made every operator row agree. A dispute
+    // must count as a disagreement — and owner is an authority for identity, so
+    // it is a conflict, not drift.
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        manualEvidence: [manualRow({ evidenceState: 'owner_disputed', corroborates: ['name'] })],
+      }),
+    );
+    const name = p.score.fields.find((f) => f.field === 'name')!;
+    const manual = name.sources.find((s) => s.manual)!;
+    expect(manual.agrees).toBe(false);
+    expect(name.conflictWeight).toBeGreaterThan(0);
   });
 });

@@ -273,7 +273,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {/* Animated shader hero for unauthenticated visitors */}
-      {showHero && <LandingHero />}
+      {showHero && <LandingHero businessCount={platformStats.activeRetailers} />}
 
       {/* Main Content */}
       <main 
@@ -431,7 +431,7 @@ function Home() {
               </AnimatedCard>
             </div>
 
-            {/* Mission Statement - For visitors */}
+            {/* Mission / Vision / Promise — the executive summary, for visitors */}
             <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -439,10 +439,16 @@ function Home() {
                 transition={{ duration: 0.6, delay: 0.2 }}
               >
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-neutral-900 mb-3 sm:mb-4">
-                  Empowering Local Retailers to Compete Online
+                  Every local business, findable — and ready to sell
                 </h2>
                 <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
-                  We built this platform as the missing connector between your physical shelves and the internet. Think of it as the Amazon of local retail on your terms and the Shopify of offline retail: it plugs into the tools you already use, uses AI and automation to keep everything in sync, and makes your inventory discoverable on Google, your storefront, and our directory—the same way social media connected people to the world.
+                  Most neighborhood businesses are missing from the places shoppers actually look — and it's
+                  almost never for lack of a good business. We start you free: your business may already be
+                  listed in our directory, sourced from public information, and claiming it takes about two
+                  minutes at no cost. From there you choose how you show up — a richer directory listing,
+                  Google Search and Shopping, or a storefront on our marketplace — and when you're ready to
+                  sell, turn on deposits, pickup, delivery, or full online payment. No developer, no
+                  enterprise budget, no months of setup.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
                   <motion.div
@@ -454,7 +460,7 @@ function Home() {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎯</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Make every local shelf visible online and give small retailers big-brand style visibility.
+                      Put every local business on the map — and give it the same tools to turn discovery into sales that the big chains built for themselves.
                     </p>
                   </motion.div>
                   <motion.div
@@ -466,7 +472,7 @@ function Home() {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💡</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      A world where local businesses are connected to the world as easily as people are on social media.
+                      A world where finding and buying from a neighborhood business is as easy as finding and buying from a national chain.
                     </p>
                   </motion.div>
                   <motion.div
@@ -478,7 +484,7 @@ function Home() {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">⚡</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Promise</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Enterprise features with an "it just works" experience, small business pricing, and setup in minutes—not months.
+                      Start free, stay in control: claim your listing at no cost, unlock only what you need, and pay when you're ready to grow.
                     </p>
                   </motion.div>
                 </div>
@@ -517,20 +523,20 @@ function Home() {
             {/* CTA for visitors */}
             <Card className="p-6 sm:p-8 text-center bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200">
               <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-2">
-                Join Thousands of Retailers
+                Make your products visible — and make yourself found
               </h3>
               <p className="text-sm sm:text-base text-neutral-600 mb-6 max-w-2xl mx-auto">
-                Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
+                Start with a free listing in our directory. Then show up on Google and your own storefront — and turn discovery into sales when you're ready.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <a href={withUTM('/auth/signup')} className="w-full sm:w-auto">
+                <Link href="/directory/add-business" className="w-full sm:w-auto">
                   <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
-                    Start Free Trial →
+                    Claim your free listing →
                   </Button>
-                </a>
+                </Link>
                 <Link href={withUTM('/features')} className="w-full sm:w-auto">
                   <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
-                    Learn More
+                    See features &amp; pricing
                   </Button>
                 </Link>
               </div>
@@ -983,6 +989,28 @@ function Home() {
               </AnimatedCard>
             </>
           )}
+        </div>
+
+        {/* Already listed — free. Contextual top-of-funnel CTA above the directory pillar. */}
+        <div className="mt-8 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-100 p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+            <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
+              Already listed — free
+            </h3>
+            <p className="text-sm text-neutral-600">
+              We seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming it takes about two minutes and costs nothing — then you own the listing and can fix your details.
+            </p>
+          </div>
+          <Link href="/directory/add-business" className="flex-shrink-0">
+            <Button variant="gradient" size="md" style={{ color: 'white' }}>
+              Claim your free listing →
+            </Button>
+          </Link>
         </div>
 
         {/* Browse Directory - Prominent Platform Pillar */}

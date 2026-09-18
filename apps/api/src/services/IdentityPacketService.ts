@@ -24,6 +24,7 @@ import IdentityEvidenceService, {
   type OwnerContact,
 } from './IdentityEvidenceService';
 import {
+  evidenceStateDisputes,
   inferSourceTier,
   isIdentityEvidenceState,
   isIdentityFieldKey,
@@ -39,6 +40,7 @@ import {
   type IdentityStatus,
   type OperationalStatus,
 } from './directory/identityScoring';
+import { dimensionForClass, inferAuthorityClass } from './directory/evidenceDimensions';
 
 // Tier inference lives with the rest of the scoring vocabulary (identityScoring)
 // so the evidence service can use it without importing this module — the two
@@ -316,18 +318,39 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
   for (const m of manualEvidence) {
     const tier = isIdentitySourceTier(m.tier) ? m.tier : inferSourceTier(m.sourceName);
     const group = m.independenceGroup || sourceGroupSlug(m.sourceName) || 'manual';
+    const evidenceState = isIdentityEvidenceState(m.evidenceState) ? m.evidenceState : null;
+    // Operator evidence is NOT unconditionally agreeing: an `owner_disputed` /
+    // `conflicting` row disputes the canonical (spec §2, operator judgment
+    // trust). This replaces the old `agrees: true` hardcode, which made the
+    // operator's tool able only to add agreement — never to adjudicate or
+    // dispute. An agreeing operator row whose class is an authority for the
+    // field now adjudicates the field's conflicts (see scoreField).
+    const agrees = !evidenceStateDisputes(evidenceState);
     for (const field of m.corroborates) {
       if (!isIdentityFieldKey(field) || !(field in evidence)) continue;
       evidence[field].push({
         name: m.sourceName,
         tier,
         independenceGroup: group,
-        agrees: true,
-        evidenceState: isIdentityEvidenceState(m.evidenceState) ? m.evidenceState : null,
+        agrees,
+        evidenceState,
         url: m.sourceUrl ?? null,
         accessedAt: m.accessedAt ? new Date(m.accessedAt).toISOString() : null,
         manual: true,
       });
+    }
+  }
+
+  // Annotate every source with its authority class + evidence dimension — the
+  // eligibility axis (see directory/evidenceDimensions.ts). Additive metadata:
+  // the scorer does not consume it yet (sprint Phase 3), but the packet carries
+  // it so the gate and the UI can. Conservative inference — an unrecognized
+  // source defaults to directory (→ operational).
+  for (const field of Object.keys(evidence) as IdentityFieldKey[]) {
+    for (const s of evidence[field]) {
+      const cls = inferAuthorityClass(s.name, s.tier);
+      s.authorityClass = cls;
+      s.dimension = dimensionForClass(cls);
     }
   }
 

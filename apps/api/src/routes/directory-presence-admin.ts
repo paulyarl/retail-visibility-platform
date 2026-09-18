@@ -1893,6 +1893,10 @@ router.post('/claim-requests/:id/verify', requirePlatformAdmin, async (req: Requ
 /** POST /api/admin/directory-presence/presence-seeds/from-campaign/:campaignId — create a seed from a campaign audit */
 const fromCampaignSchema = z.object({
   publish: z.boolean().optional().default(false),
+  // 'guarded' evaluates the seed gate server-side (the Identity tab's Push);
+  // 'manual' (default) is the raw capability for back channels — deliberately
+  // unguarded. See CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §6.
+  lane: z.enum(['guarded', 'manual']).optional().default('manual'),
 });
 
 router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, async (req: Request, res: Response) => {
@@ -1905,7 +1909,7 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
 
     const result = await DirectoryPresenceSeedService.createFromCampaign(
       campaignId,
-      { publish: validation.data.publish },
+      { publish: validation.data.publish, lane: validation.data.lane },
       {
         actorType: 'user',
         actorId: (req as any).user?.userId || (req as any).user?.id,
@@ -1921,6 +1925,7 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
       business_analysis_audit_not_found: 400,
       identity_mismatch: 409,
       incomplete_nap: 400,
+      gate_blocked: 409,
     };
     const status = statusMap[error?.message] || 500;
     if (status === 500) {
@@ -1928,7 +1933,11 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
         error: { name: error?.name || 'Error', message: error?.message || String(error) },
       });
     }
-    res.status(status).json({ error: error?.message || 'internal_error' });
+    // gate_blocked carries the gate + vetoes so the UI can render why.
+    res.status(status).json({
+      error: error?.message || 'internal_error',
+      ...(error?.gate ? { gate: error.gate, vetoes: error.vetoes ?? [] } : {}),
+    });
   }
 });
 

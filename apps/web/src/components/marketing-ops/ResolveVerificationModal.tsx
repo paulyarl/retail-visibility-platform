@@ -51,6 +51,21 @@ interface ResolveVerificationModalProps {
   onClose: () => void;
   /** Called after a successful resolve — refresh the host surface. */
   onResolved: () => void | Promise<void>;
+  /**
+   * 'queue' (default) writes the queue row's business_snapshot via
+   * resolveVerification — the verify-then-outreach graduation gate.
+   * 'campaign' writes the campaign record directly (the campaign-scoped
+   * counterpart): the verified NAP lands on the campaign, the capture is
+   * recorded as attributed owner evidence, and the queue-only "next action"
+   * is hidden — the campaign already exists, so the call outcome is provenance.
+   */
+  mode?: 'queue' | 'campaign';
+  /**
+   * Campaign mode only — field keys currently in conflict on the packet. When
+   * the operator CHANGES one of these, a reason becomes required (the edit is
+   * clearing a conflict, so it must be attributable beyond `updated_at`).
+   */
+  conflictFields?: string[];
 }
 
 type VerificationTab = 'nap' | 'enrichment' | 'notes';
@@ -72,7 +87,8 @@ function snapshotWebsite(value: unknown): string {
   return '';
 }
 
-export default function ResolveVerificationModal({ entry, onClose, onResolved }: ResolveVerificationModalProps) {
+export default function ResolveVerificationModal({ entry, onClose, onResolved, mode = 'queue', conflictFields = [] }: ResolveVerificationModalProps) {
+  const isCampaign = mode === 'campaign';
   const snap = entry.business_snapshot ?? {};
   const nap = snap.verified_nap ?? snap.nap ?? {};
 
@@ -87,6 +103,8 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
     verifiedEmail: nap.email ?? snap.email ?? '',
     verifiedCategory: entry.category ?? nap.category ?? snap.category ?? '',
     verifiedOwnerName: nap.owner_name ?? snap.owner_name ?? (Array.isArray(snap.owner_names) ? snap.owner_names[0] : '') ?? '',
+    verifiedOwnerPhone: nap.owner_phone ?? snap.owner_phone ?? '',
+    verifiedOwnerEmail: nap.owner_email ?? snap.owner_email ?? '',
     ownerReceptivity: '' as OwnerReceptivity | '',
     callNotes: '',
     nextAction: 'create_campaign' as VerificationNextAction,
@@ -112,6 +130,8 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
   const [tab, setTab] = useState<VerificationTab>('nap');
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Campaign mode — required only when the edit clears a conflict (below).
+  const [reason, setReason] = useState('');
 
   // ─── Opening hours (migration 296) ──────────────────────────────────────
   // Paste the block straight from the GBP "Hours" section; it's parsed into
@@ -156,6 +176,33 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
   // gating that previously wrapped the whole NAP + enrichment block.
   const napApplicable = verificationClearsCampaign(form.outcome);
 
+  // A reason is required only when the operator CHANGES a field that is
+  // currently in conflict — that edit clears a conflict, so it must be
+  // attributable beyond the campaign's `updated_at`.
+  const CONFLICT_FIELD_FORM_KEY: Record<
+    string,
+    'verifiedName' | 'verifiedAddress' | 'verifiedPhone' | 'verifiedWebsite' | 'verifiedCategory'
+  > = {
+    name: 'verifiedName',
+    address: 'verifiedAddress',
+    phone: 'verifiedPhone',
+    website: 'verifiedWebsite',
+    primary_category: 'verifiedCategory',
+  };
+  const CONFLICT_FIELD_INITIAL: Record<string, string> = {
+    name: nap.name ?? entry.business_name ?? '',
+    address: nap.address ?? snap.address ?? '',
+    phone: nap.phone ?? snap.phone ?? '',
+    website: nap.website ?? snapshotWebsite(snap.website),
+    primary_category: entry.category ?? nap.category ?? snap.category ?? '',
+  };
+  const reasonRequired =
+    isCampaign &&
+    conflictFields.some((f) => {
+      const key = CONFLICT_FIELD_FORM_KEY[f];
+      return key ? form[key] !== (CONFLICT_FIELD_INITIAL[f] ?? '') : false;
+    });
+
   const handleOutcomeChange = (outcome: VerificationOutcome) => {
     // Auto-select nextAction based on outcome heuristics.
     let nextAction: VerificationNextAction = 'requeue';
@@ -171,7 +218,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
     setResolving(true);
     setError(null);
     try {
-      const input: VerificationResolutionInput = {
+      const baseInput = {
         outcome: form.outcome,
         verifiedName: form.verifiedName || undefined,
         verifiedPhone: form.verifiedPhone || undefined,
@@ -187,9 +234,21 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
         verifiedDirectoryProfiles: directoryProfiles.filter((p) => p.platform.trim() && p.url.trim()),
         ownerReceptivity: form.ownerReceptivity || undefined,
         callNotes: form.callNotes || undefined,
-        nextAction: form.nextAction,
       };
-      await marketingOpsService.resolveVerification(entry.id, input);
+      if (isCampaign) {
+        // Campaign target — the campaign already exists, so there is no
+        // graduation action; the outcome rides along as provenance. Owner
+        // phone/email are campaign-only (the queue path captures owner name).
+        await marketingOpsService.resolveCampaignVerification(entry.id, {
+          ...baseInput,
+          verifiedOwnerPhone: form.verifiedOwnerPhone || undefined,
+          verifiedOwnerEmail: form.verifiedOwnerEmail || undefined,
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        const input: VerificationResolutionInput = { ...baseInput, nextAction: form.nextAction };
+        await marketingOpsService.resolveVerification(entry.id, input);
+      }
       await onResolved();
       onClose();
     } catch (err: any) {
@@ -211,9 +270,14 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
         <div className="flex items-start gap-3 mb-4">
           <Phone className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Resolve verification</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              {isCampaign ? 'Verify record' : 'Resolve verification'}
+            </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {entry.business_name ?? entry.title} · {entry.city ?? '—'}
+              {entry.business_name ?? entry.title}
+              {isCampaign
+                ? ' · writes the campaign record (canonical NAP + attributed owner evidence)'
+                : ` · ${entry.city ?? '—'}`}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -330,6 +394,24 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
                     placeholder="Owner name"
                     value={form.verifiedOwnerName}
                     onChange={(e) => setForm((f) => ({ ...f, verifiedOwnerName: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                {/* Owner contact — the claim-invite channel and the owner axis.
+                    Captured once; back-fills the campaign's owner fields. */}
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    placeholder="Owner phone"
+                    value={form.verifiedOwnerPhone}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedOwnerPhone: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Owner email"
+                    value={form.verifiedOwnerEmail}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedOwnerEmail: e.target.value }))}
                     className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -479,24 +561,48 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
           </TabsContent>
         </Tabs>
 
-        {/* Next action — workflow-critical, kept outside the tab panels. */}
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">Next action</label>
-        <select
-          value={form.nextAction}
-          onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value as VerificationNextAction }))}
-          className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-        >
-          <option value="requeue">Re-queue (back to Queued with verified NAP)</option>
-          <option value="create_campaign" disabled={!canCreateCampaign}>
-            Create campaign (graduate immediately){canCreateCampaign ? '' : ' — blocked: not operational'}
-          </option>
-          <option value="dismiss">Dismiss (unverified_closed)</option>
-        </select>
-        {!canCreateCampaign && (
-          <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 mb-4">
-            This outcome cannot graduate to a campaign — only operational or relocated prospects do. Re-queue the
-            prospect and re-verify as operational once confirmed.
-          </p>
+        {/* Next action — workflow-critical, kept outside the tab panels. Queue
+            target only: in campaign mode the campaign already exists, so there
+            is nothing to graduate. */}
+        {!isCampaign && (
+          <>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">Next action</label>
+            <select
+              value={form.nextAction}
+              onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value as VerificationNextAction }))}
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+            >
+              <option value="requeue">Re-queue (back to Queued with verified NAP)</option>
+              <option value="create_campaign" disabled={!canCreateCampaign}>
+                Create campaign (graduate immediately){canCreateCampaign ? '' : ' — blocked: not operational'}
+              </option>
+              <option value="dismiss">Dismiss (unverified_closed)</option>
+            </select>
+            {!canCreateCampaign && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 mb-4">
+                This outcome cannot graduate to a campaign — only operational or relocated prospects do. Re-queue the
+                prospect and re-verify as operational once confirmed.
+              </p>
+            )}
+          </>
+        )}
+        {isCampaign && (
+          <>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">
+              Reason {reasonRequired && <span className="text-red-500">*</span>}
+            </label>
+            <textarea
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={
+                reasonRequired
+                  ? 'This edit clears a conflict — say what changed and why (e.g. "owner corrected the street number on the call").'
+                  : 'Optional — why the record was verified.'
+              }
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+            />
+          </>
         )}
         <div className="mb-4" />
 
@@ -506,10 +612,10 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
           </button>
           <button
             onClick={handleResolve}
-            disabled={resolving}
+            disabled={resolving || (reasonRequired && !reason.trim())}
             className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
           >
-            {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Resolve'}
+            {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isCampaign ? 'Save record' : 'Resolve'}
           </button>
         </div>
       </div>

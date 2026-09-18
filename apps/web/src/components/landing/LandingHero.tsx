@@ -5,18 +5,16 @@ import Link from "next/link";
 import { ShelfShader } from "./ShelfShader";
 
 const CAPABILITIES = [
-  "sync products to Google Shopping",
-  "build a storefront that sells",
-  "list products in our retail directory",
-  "let an AI chatbot sell your products",
-  "track product sales with real-time analytics",
-  "make every product compete with the giants",
-  "turn your shelves into a digital storefront",
+  "Make yourself found.",
+  "Get found on Google.",
+  "Open your own storefront.",
+  "Sell online when you're ready.",
+  "Get found where shoppers look.",
 ];
 
-const BASE_TEXT = "Make every product visible —";
+const BASE_TEXT = "Make your products visible.";
 
-export function LandingHero() {
+export function LandingHero({ businessCount }: { businessCount?: number }) {
   const [animatedSuffix, setAnimatedSuffix] = useState<string>("");
   const typingStateRef = useRef({
     suggestionIndex: 0,
@@ -190,6 +188,9 @@ export function LandingHero() {
         style={{ pointerEvents: "none", padding: "24px" }}
       >
         <div className="max-w-3xl w-full text-center" style={{ pointerEvents: "auto" }}>
+          <p className="text-white/70 text-xs sm:text-sm font-medium uppercase tracking-[0.22em] mb-3 sm:mb-4">
+            Your shelf, made visible.
+          </p>
           <h1 className="text-white text-3xl sm:text-5xl md:text-6xl font-semibold tracking-tight drop-shadow-[0_1px_8px_rgba(31,61,188,0.25)]">
             {BASE_TEXT}
           </h1>
@@ -198,26 +199,47 @@ export function LandingHero() {
             <span className="inline-block w-[3px] h-[0.9em] ml-1 align-middle bg-white/70 animate-pulse" />
           </div>
           <p className="text-gray-300/90 mt-4 sm:mt-6 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
-            The platform that puts your products in front of every shopper — inventory sync,
-            storefronts, AI chatbots, and a retail directory, all working to make your products visible.
+            Most local shops are missing from the places shoppers actually look — and it's
+            rarely their fault. We start you free: your business can be listed in our directory
+            from public information, and claiming it takes about two minutes. From there, show
+            up on Google and your own storefront — and sell when you're ready.
           </p>
 
-          {/* CTA buttons */}
-          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <button
-              onClick={scrollToContent}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold border border-white/20 hover:border-white/40 transition-colors"
-              style={{ background: "rgba(15,15,20,0.5)", backdropFilter: "blur(8px)" }}
-            >
-              Explore the platform
-            </button>
+          {/* CTA buttons — claim is the primary top-of-funnel action */}
+          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Link
-              href="/auth/signup"
+              href="/directory/add-business"
               className="w-full sm:w-auto px-6 py-3 rounded-xl text-black font-semibold hover:bg-gray-100 transition-colors"
               style={{ background: "rgba(255,255,255,0.95)" }}
             >
-              Get started free →
+              Claim your free listing →
             </Link>
+            <Link
+              href="/directory/about"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold border border-white/20 hover:border-white/40 transition-colors"
+              style={{ background: "rgba(15,15,20,0.5)", backdropFilter: "blur(8px)" }}
+            >
+              See how it works
+            </Link>
+          </div>
+
+          {/* Trust strip */}
+          <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm text-white/70">
+            {typeof businessCount === "number" && businessCount > 0 && (
+              <span>✓ {businessCount.toLocaleString()} local businesses listed</span>
+            )}
+            <span>✓ Built by retailers, for retailers</span>
+          </div>
+
+          {/* Discoverability */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-sm text-white/60">
+            <Link href="/directory/about" className="hover:text-white transition-colors">How it works</Link>
+            <span aria-hidden>·</span>
+            <Link href="/features" className="hover:text-white transition-colors">Features</Link>
+            <span aria-hidden>·</span>
+            <Link href="/directory" className="hover:text-white transition-colors">Browse the directory</Link>
+            <span aria-hidden>·</span>
+            <Link href="/features#pricing" className="hover:text-white transition-colors">Pricing</Link>
           </div>
         </div>
       </div>

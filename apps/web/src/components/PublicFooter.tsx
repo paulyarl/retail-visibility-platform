@@ -21,11 +21,11 @@ export default function PublicFooter() {
                 VS
               </div>
               <span className="text-xl font-extrabold tracking-wider text-neutral-900 uppercase font-sans">
-                {settings?.platformName || 'Visible Shelf'}
+                {settings?.platformName || 'VisibleShelf'}
               </span>
             </div>
             <p className="text-neutral-600 text-sm mb-4 max-w-md">
-              {settings?.platformDescription || 'Manage your retail operations with ease'}
+              {settings?.platformDescription || 'Free directory listing, Google visibility, and a storefront — one platform to be found and get paid.'}
             </p>
             <div className="flex space-x-4">
               {/* Social Links - placeholder for now */}
@@ -104,7 +104,7 @@ export default function PublicFooter() {
         {/* Bottom Bar */}
         <div className="mt-8 pt-8 border-t border-neutral-200">
           <p className="text-neutral-500 text-sm text-center">
-            © {currentYear} {settings?.platformName || 'Visible Shelf'}. All rights reserved.
+            © {currentYear} {settings?.platformName || 'VisibleShelf'}. All rights reserved.
           </p>
         </div>
       </div>

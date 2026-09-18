@@ -22,6 +22,15 @@
  *   5. The recommendation is advisory. The operator decides Push vs. Wait.
  */
 
+import {
+  AUTHORITY_CLASS_DIMENSION,
+  EVIDENCE_DIMENSIONS,
+  FIELD_DIMENSIONS,
+  inferAuthorityClass,
+  type AuthorityClass,
+  type EvidenceDimension,
+} from './evidenceDimensions';
+
 // ─── Types ───────────────────────────────────────────────────────────────
 
 /**
@@ -109,6 +118,18 @@ export function isIdentityEvidenceState(value: unknown): value is IdentityEviden
   return IDENTITY_EVIDENCE_STATES.includes(value as IdentityEvidenceState);
 }
 
+/**
+ * Evidence states that assert a DISAGREEMENT with the resolved value rather
+ * than corroboration. Operator evidence is not unconditionally agreeing — an
+ * `owner_disputed` / `conflicting` row disputes the canonical, so it must count
+ * as a disagreement (this is what replaces the old `agrees: true` hardcode).
+ */
+const DISPUTING_EVIDENCE_STATES: readonly IdentityEvidenceState[] = ['owner_disputed', 'conflicting'];
+
+export function evidenceStateDisputes(state?: IdentityEvidenceState | null): boolean {
+  return state != null && DISPUTING_EVIDENCE_STATES.includes(state);
+}
+
 export function isIdentityFieldKey(value: unknown): value is IdentityFieldKey {
   return IDENTITY_FIELD_KEYS.includes(value as IdentityFieldKey);
 }
@@ -179,6 +200,14 @@ export interface IdentitySourceRef {
   accessedAt?: string | null;
   /** True when an operator entered this source by hand (mkt_identity_evidence). */
   manual?: boolean;
+  /**
+   * Authority class — the eligibility axis. Decides which evidence dimension
+   * this source may testify on (see evidenceDimensions.ts). Annotated by the
+   * packet assembler; not yet consumed by scoring (sprint Phase 3).
+   */
+  authorityClass?: AuthorityClass | null;
+  /** The dimension the class maps to; null for the owner axis. */
+  dimension?: EvidenceDimension | null;
 }
 
 /** All evidence for a single field, plus its resolved consensus value. */
@@ -206,7 +235,27 @@ export interface FieldScore {
   /** 0-100 */
   score: number;
   agreementWeight: number;
+  /**
+   * Weight of AUTHORITATIVE disagreement — a source whose dimension owns this
+   * field (government/owner on a NAP field, trade on a category field)
+   * disagreeing with the resolved value. Material: drives the veto.
+   */
   conflictWeight: number;
+  /**
+   * Weight of CORROBORATOR disagreement — a NAP corroborator (directory/social)
+   * disagreeing on a NAP field. NOT a conflict: a reportable, repairable signal
+   * (NAP drift), never a veto. Excluded from the purity penalty.
+   */
+  driftWeight: number;
+  /**
+   * True when an operator-supplied AUTHORITY source (manual + owns this field's
+   * dimension) agreed, so the field's authoritative disagreement was adjudicated
+   * down to drift. The operator is a peer of the analyst: attributable evidence
+   * unblocks (spec §2, "Operator judgment trust").
+   */
+  adjudicated: boolean;
+  /** The operator source that adjudicated, when `adjudicated`. */
+  adjudicatedBy: string | null;
   /** Independent corroborating sources (one per independence group). */
   independentSources: number;
   sources: IdentitySourceRef[];
@@ -232,11 +281,41 @@ export interface IdentityPacketScore {
   /** 0-100, recency axis — kept separate from identityScore. */
   operationalScore: number;
   band: RecommendationBand;
-  /** True only in the 'ready' band. */
+  /** True only when the gate is not blocked. */
   pushRecommended: boolean;
   vetoes: IdentityVeto[];
   qcSignals: IdentityQcSignal[];
   fields: FieldScore[];
+  /** The dimension gate — the seed decision (spec §2). */
+  gate: SeedGate;
+}
+
+/** The seed gate verdict. */
+export type SeedGateDecision = 'guaranteed' | 'earned' | 'rescued' | 'blocked';
+
+export interface SeedGateDimension {
+  dimension: EvidenceDimension;
+  /** At least one agreeing source testifies on this dimension. */
+  satisfied: boolean;
+  /** Sum of distinct agreeing sources' tier weights on this dimension. */
+  strength: number;
+  /** Distinct agreeing sources (one per independence group). */
+  sourceCount: number;
+}
+
+export interface SeedGate {
+  dimensions: SeedGateDimension[];
+  satisfiedCount: number;
+  totalStrength: number;
+  /** >= EARN_DIMENSION_COUNT dimensions satisfied. */
+  earned: boolean;
+  /** Earned AND totalStrength >= GUARANTEE_STRENGTH_THRESHOLD. */
+  guaranteed: boolean;
+  /** An `owner_confirmed` capture is present and the gate is short of earning. */
+  ownerOverRule: boolean;
+  decision: SeedGateDecision;
+  /** Machine-readable blockers (veto codes + prerequisites). */
+  blockers: string[];
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -261,15 +340,43 @@ const REQUIRED_FIELDS: IdentityFieldKey[] = ['name', 'address'];
 /** Important-but-not-required fields — missing ones penalize the score. */
 const IMPORTANT_FIELDS: IdentityFieldKey[] = ['phone', 'website'];
 
+/** NAP fields — a corroborator's disagreement on these is reportable drift. */
+const NAP_FIELDS: IdentityFieldKey[] = ['name', 'address', 'phone', 'website'];
+
 const MISSING_IMPORTANT_PENALTY = 10;
 
-const READY_IDENTITY_THRESHOLD = 80;
 const READY_OPERATIONAL_THRESHOLD = 70;
-const REVIEW_IDENTITY_THRESHOLD = 50;
+
+/** Dimensions required to EARN a seed (spec §2). */
+const EARN_DIMENSION_COUNT = 2;
+
+/**
+ * Total dimension strength required to GUARANTEE a seed. PROVISIONAL — this is
+ * the single number to calibrate against a real sample (spec §10). Strength is
+ * the sum of distinct agreeing sources' tier weights across the four dimensions.
+ */
+const GUARANTEE_STRENGTH_THRESHOLD = 6;
 
 // ─── Field scoring ───────────────────────────────────────────────────────
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Whether a source is an AUTHORITY for a field — i.e. its evidence dimension
+ * owns the field. Only an authority's disagreement is a conflict; every other
+ * source is a NAP corroborator whose disagreement is drift (spec §2).
+ *
+ * The owner axis is always authoritative (it sits above the dimensions).
+ * Unknown fields (no dimension entry) default to authoritative — conservative,
+ * so an unrecognized field can still gate.
+ */
+function isFieldAuthority(s: IdentitySourceRef, fieldDims: readonly EvidenceDimension[]): boolean {
+  if (fieldDims.length === 0) return true;
+  const cls = s.authorityClass ?? inferAuthorityClass(s.name, s.tier);
+  if (cls === 'owner') return true;
+  const dim = AUTHORITY_CLASS_DIMENSION[cls];
+  return dim != null && fieldDims.includes(dim);
+}
 
 /**
  * Score one field from its source evidence.
@@ -278,12 +385,29 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * purity    = agreementWeight / (agreementWeight + conflictWeight)
  * magnitude = min(1, agreementWeight / MAGNITUDE_CAP)
  * score     = round(100 × purity × magnitude)
+ *
+ * A disagreement is bucketed by the source's standing on this field:
+ *   - authority (owns the field's dimension) → conflictWeight (material)
+ *   - corroborator (NAP corroborator)        → driftWeight   (signal, not veto)
+ * Drift is deliberately excluded from purity: a stale aggregator value is a
+ * repair opportunity, not a defect in the record we hold.
  */
 export function scoreField(ev: IdentityFieldEvidence): FieldScore {
   const seenGroups = new Set<string>();
   let agreementWeight = 0;
   let conflictWeight = 0;
+  let driftWeight = 0;
   let independentSources = 0;
+  let adjudicated = false;
+
+  const fieldDims = FIELD_DIMENSIONS[ev.field] ?? [];
+
+  // An operator-supplied AUTHORITY on this field (manual + owns the dimension)
+  // adjudicates the field's authoritative disagreement: attributable evidence
+  // from a peer of the analyst resolves the discrepancy down to drift.
+  const operatorAuthority = ev.sources.find(
+    (s) => s.manual && s.agrees && isFieldAuthority(s, fieldDims),
+  );
 
   for (const s of ev.sources) {
     const base = TIER_WEIGHT[s.tier] ?? 0.5;
@@ -293,8 +417,13 @@ export function scoreField(ev: IdentityFieldEvidence): FieldScore {
     if (s.agrees) {
       agreementWeight += effective;
       if (isFirst) independentSources += 1;
-    } else {
+    } else if (operatorAuthority) {
+      driftWeight += effective;
+      adjudicated = true;
+    } else if (isFieldAuthority(s, fieldDims)) {
       conflictWeight += effective;
+    } else {
+      driftWeight += effective;
     }
   }
 
@@ -311,6 +440,9 @@ export function scoreField(ev: IdentityFieldEvidence): FieldScore {
     score,
     agreementWeight: round2(agreementWeight),
     conflictWeight: round2(conflictWeight),
+    driftWeight: round2(driftWeight),
+    adjudicated,
+    adjudicatedBy: adjudicated && operatorAuthority ? operatorAuthority.name : null,
     independentSources,
     sources: ev.sources,
   };
@@ -422,6 +554,37 @@ function collectQcSignals(
     });
   }
 
+  // NAP drift — a corroborating source (directory/social) disagrees with the
+  // resolved NAP value. Reportable and repairable: a stale aggregator value is
+  // a repair opportunity, not an identity conflict, so it never vetoes.
+  for (const key of NAP_FIELDS) {
+    const f = byField.get(key);
+    if (f && f.driftWeight > 0) {
+      signals.push({
+        code: `nap_drift_${key}`,
+        severity: 'info',
+        message: `NAP drift on "${key}" — a corroborating source disagrees; reportable and repairable.`,
+        field: key,
+      });
+    }
+  }
+
+  // Operator adjudication — an operator authority resolved an authoritative
+  // disagreement on this field. Recorded with attribution, not silent.
+  for (const key of NAP_FIELDS) {
+    const f = byField.get(key);
+    if (f && f.adjudicated) {
+      signals.push({
+        code: `conflict_adjudicated_${key}`,
+        severity: 'info',
+        message: `Conflict on "${key}" adjudicated by operator evidence${
+          f.adjudicatedBy ? ` (${f.adjudicatedBy})` : ''
+        }.`,
+        field: key,
+      });
+    }
+  }
+
   if (operationalScore < READY_OPERATIONAL_THRESHOLD) {
     signals.push({
       code: 'low_operational_recency',
@@ -443,6 +606,110 @@ function collectQcSignals(
   }
 
   return signals;
+}
+
+// ─── Dimension gate (spec §2) ────────────────────────────────────────────
+
+/**
+ * The dimension gate. A source testifies on its AUTHORITY CLASS dimension
+ * (government → identity, directory/social → operational, trade → category,
+ * community → location). The owner axis is NOT a dimension — an
+ * `owner_confirmed` capture is the fifth axis that RESCUES a seed short of
+ * earning.
+ *
+ *   earned      = >= 2 dimensions satisfied AND the business reads as operating
+ *   guaranteed  = earned AND totalStrength >= GUARANTEE_STRENGTH_THRESHOLD
+ *   rescued     = owner_confirmed AND not earned AND no veto
+ *   blocked     = a veto, no operational evidence, or none of the above
+ *
+ * Owner "rescues only what hasn't earned": it never overrides a hard veto or a
+ * guaranteed seed.
+ */
+function scoreSeedGate(
+  fields: FieldScore[],
+  vetoes: IdentityVeto[],
+  operationalScore: number,
+): SeedGate {
+  const strength: Record<EvidenceDimension, number> = {
+    operational: 0,
+    identity: 0,
+    category: 0,
+    location: 0,
+  };
+  const counts: Record<EvidenceDimension, number> = {
+    operational: 0,
+    identity: 0,
+    category: 0,
+    location: 0,
+  };
+  const seen: Record<EvidenceDimension, Set<string>> = {
+    operational: new Set(),
+    identity: new Set(),
+    category: new Set(),
+    location: new Set(),
+  };
+  let ownerConfirmed = false;
+
+  for (const f of fields) {
+    for (const s of f.sources) {
+      if (!s.agrees) continue;
+      const cls = s.authorityClass ?? inferAuthorityClass(s.name, s.tier);
+      if (cls === 'owner') {
+        // Owner is the fifth axis — rescue trigger, not a dimension.
+        if (s.evidenceState === 'owner_confirmed') ownerConfirmed = true;
+        continue;
+      }
+      const dim = s.dimension ?? AUTHORITY_CLASS_DIMENSION[cls];
+      if (!dim) continue;
+      if (seen[dim].has(s.independenceGroup)) continue;
+      seen[dim].add(s.independenceGroup);
+      strength[dim] += TIER_WEIGHT[s.tier] ?? 0.5;
+      counts[dim] += 1;
+    }
+  }
+
+  const dimensions: SeedGateDimension[] = EVIDENCE_DIMENSIONS.map((dimension) => ({
+    dimension,
+    satisfied: counts[dimension] > 0,
+    strength: round2(strength[dimension]),
+    sourceCount: counts[dimension],
+  }));
+
+  const satisfiedCount = dimensions.filter((d) => d.satisfied).length;
+  const totalStrength = round2(dimensions.reduce((sum, d) => sum + d.strength, 0));
+
+  const operationalOk = operationalScore > 0;
+  const earned = satisfiedCount >= EARN_DIMENSION_COUNT && operationalOk;
+  const guaranteed = earned && totalStrength >= GUARANTEE_STRENGTH_THRESHOLD;
+  const vetoBlocked = vetoes.length > 0;
+  const ownerOverRule = ownerConfirmed && !earned && !vetoBlocked;
+
+  const decision: SeedGateDecision = vetoBlocked
+    ? 'blocked'
+    : guaranteed
+      ? 'guaranteed'
+      : earned
+        ? 'earned'
+        : ownerOverRule
+          ? 'rescued'
+          : 'blocked';
+
+  const blockers: string[] = vetoes.map((v) => v.code);
+  if (decision === 'blocked') {
+    if (!operationalOk) blockers.push('no_operational_evidence');
+    if (satisfiedCount < EARN_DIMENSION_COUNT) blockers.push('insufficient_dimensions');
+  }
+
+  return {
+    dimensions,
+    satisfiedCount,
+    totalStrength,
+    earned,
+    guaranteed,
+    ownerOverRule,
+    decision,
+    blockers,
+  };
 }
 
 // ─── Packet scoring ──────────────────────────────────────────────────────
@@ -473,28 +740,21 @@ export function scoreIdentityPacket(input: IdentityPacketInput): IdentityPacketS
 
   const vetoes = collectVetoes(input, fields);
   const qcSignals = collectQcSignals(input, fields, operationalScore);
+  const gate = scoreSeedGate(fields, vetoes, operationalScore);
 
-  let band: RecommendationBand;
-  if (vetoes.length > 0) {
-    band = 'blocked';
-  } else if (
-    identityScore >= READY_IDENTITY_THRESHOLD &&
-    operationalScore >= READY_OPERATIONAL_THRESHOLD
-  ) {
-    band = 'ready';
-  } else if (identityScore >= REVIEW_IDENTITY_THRESHOLD) {
-    band = 'review';
-  } else {
-    band = 'blocked';
-  }
+  // The band is derived from the gate: guaranteed → ready, earned/rescued →
+  // review (pushable, not guaranteed), blocked → blocked.
+  const band: RecommendationBand =
+    gate.decision === 'guaranteed' ? 'ready' : gate.decision === 'blocked' ? 'blocked' : 'review';
 
   return {
     identityScore,
     operationalScore,
     band,
-    pushRecommended: band === 'ready',
+    pushRecommended: gate.decision !== 'blocked',
     vetoes,
     qcSignals,
     fields,
+    gate,
   };
 }
