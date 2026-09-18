@@ -200,6 +200,25 @@ describe('mkt_identity_evidence CHECK constraint parity', () => {
     expect(sql!).toMatch(/owner_phone IS NOT NULL/);
     expect(sql!).toMatch(/owner_email IS NOT NULL/);
   });
+
+  it('the content CHECK actually bites on an empty corroborates array', () => {
+    // array_length('{}', 1) is NULL in Postgres and a NULL CHECK passes, so the
+    // guard must COALESCE to 0 or it silently allows a contentless row.
+    const sql = migrations.find((s) => s.includes('chk_identity_evidence_content'));
+    expect(sql).toBeTruthy();
+    expect(sql!).toMatch(/COALESCE\s*\(\s*array_length\s*\(\s*corroborates\s*,\s*1\s*\)\s*,\s*0\s*\)\s*>=\s*1/);
+  });
+
+  it('no migration leaves an owner-less content constraint in force', () => {
+    // 297 rev A shipped chk_identity_evidence_corroborates_nonempty, which
+    // rejected owner-contact-only rows. A later migration must drop it.
+    const defined = migrations.some((s) => s.includes('chk_identity_evidence_corroborates_nonempty'));
+    const dropped = migrations.some((s) =>
+      /DROP CONSTRAINT IF EXISTS chk_identity_evidence_corroborates_nonempty/i.test(s),
+    );
+    if (defined) expect(dropped).toBe(true);
+    expect(dropped).toBe(true);
+  });
 });
 
 describe('IdentityEvidenceService', () => {
