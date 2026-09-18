@@ -195,7 +195,8 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       ])
       .mockResolvedValueOnce([
         { shelf: 'place/category/indian-grocery', views: 8n, unique_sessions: 4n },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ source: 'qr', views: 5n, unique_sessions: 3n }]);
 
     const result = await directoryTrafficService.getTrafficDashboard(30);
 
@@ -232,7 +233,8 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
     expect(result.shelfReferrals).toEqual([
       { shelf: 'place/category/indian-grocery', views: 8, uniqueSessions: 4 },
     ]);
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(7);
+    expect(result.entrySources).toEqual([{ source: 'qr', views: 5, uniqueSessions: 3 }]);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(8);
   });
 
   it('binds seed filters as positional params on the entry queries only', async () => {
@@ -246,11 +248,11 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       state: 'IL',
     });
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(7);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(8);
     const calls = mockQueryRawUnsafe.mock.calls;
     // Entry queries carry the seed filters: totals → top seeds → categories →
-    // daily → surfaces → shelf referrals (call index 6).
-    for (const idx of [0, 1, 2, 3, 4, 6]) {
+    // daily → surfaces → shelf referrals → entry sources (shelf query is index 5).
+    for (const idx of [0, 1, 2, 3, 4, 6, 7]) {
       expect(calls[idx].slice(1)).toEqual(['batch-9', 'invited', 'Halal Grocery', 'Chicago', 'IL']);
       expect(String(calls[idx][0])).toContain('s.seed_batch = $1');
       expect(String(calls[idx][0])).toContain('s.state = $5');
@@ -268,7 +270,7 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
       surface: 'place',
     });
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(7);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(8);
     const calls = mockQueryRawUnsafe.mock.calls;
     // First four queries bind [category, surface] and reference $2.
     for (const call of calls.slice(0, 4)) {
@@ -281,8 +283,11 @@ describe('DirectoryPresenceTrafficService.getTrafficDashboard', () => {
     // The shelf query takes the surface param alone.
     expect(calls[5].slice(1)).toEqual(['place']);
     expect(String(calls[5][0])).toContain("context->>'surface' = $1");
-    // Shelf referrals is entry-scoped — binds [category, surface] like the others.
-    expect(calls[6].slice(1)).toEqual(['Halal Grocery', 'place']);
+    // Shelf referrals + entry sources are entry-scoped — bind [category, surface].
+    for (const idx of [6, 7]) {
+      expect(calls[idx].slice(1)).toEqual(['Halal Grocery', 'place']);
+    }
     expect(String(calls[6][0])).toContain("b.context->>'referrer_shelf' IS NOT NULL");
+    expect(String(calls[7][0])).toContain("b.context->>'entry_source' IS NOT NULL");
   });
 });

@@ -39,7 +39,7 @@ export default function StorefrontActions({ tenantId, businessName, tenantSlug, 
       <div className="flex items-center gap-2">
         {directoryPublished && tenantSlug && (
           <Link
-            href={`/directory/${tenantSlug}`}
+            href={`/directory/${tenantSlug}?source=storefront`}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
             title="View this store's full directory listing"
           >

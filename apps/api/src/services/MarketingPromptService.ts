@@ -904,7 +904,7 @@ export class MarketingPromptService extends BaseService {
           // already reads intelligence_platform.
           const campaign = await this.prisma.mkt_campaigns_list.findUnique({
             where: { id: input.campaignId },
-            select: { intelligence_focus: true, city: true, intelligence_platform: true },
+            select: { intelligence_focus: true, city: true, state: true, intelligence_platform: true, intelligence_zip_codes: true },
           });
           const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards';
           const referenceCity = campaign?.city || null;
@@ -926,6 +926,32 @@ export class MarketingPromptService extends BaseService {
             referencePlatform,
             campaignId: input.campaignId,
           });
+
+          // Geography grid cache (migration 295): the profile's geography_grid is
+          // CATEGORY-INDEPENDENT — it describes the market's retail catchment, not
+          // the category. Cache it once per (city, state) so every other category
+          // in the market reuses the same sweep units instead of re-deriving them.
+          // Best-effort: a cache failure never fails the import.
+          try {
+            const { GeographyGridService } = await import('./intelligence/GeographyGridService.js');
+            const { parseZipCodes } = await import('./intelligence/geography-grid.js');
+            const grid = (parsedJson as any)?.geography_grid ?? null;
+            const campaignZips = parseZipCodes((campaign as any)?.intelligence_zip_codes);
+            const state = (campaign as any)?.state ?? (grid as any)?.state ?? null;
+            await GeographyGridService.getInstance().upsertGrid({
+              city: referenceCity,
+              state,
+              zips: campaignZips,
+              grid: grid ?? (campaignZips.length > 0 ? { zips: campaignZips } : null),
+              derivation: grid ? 'profile_import' : campaignZips.length > 0 ? 'campaign_zip_codes' : 'ai_derived',
+              sourceProfileId: profile.id,
+            }, ctx);
+          } catch (gridErr) {
+            logger.warn('Geography grid cache upsert failed (best-effort)', ctx, {
+              error: (gridErr as Error).message,
+              campaignId: input.campaignId,
+            });
+          }
         } catch (profileErr) {
           logger.error('Intelligence profile draft persistence failed (best-effort, GAP-P8)', ctx, {
             error: (profileErr as Error).message,

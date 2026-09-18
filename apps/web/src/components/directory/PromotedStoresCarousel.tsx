@@ -98,7 +98,7 @@ export default function PromotedStoresCarousel() {
           return (
             <Link
               key={store.tenantId}
-              href={`/directory/${store.slug || store.tenantId}`}
+              href={`/directory/${store.slug || store.tenantId}?source=promoted`}
               className="flex-shrink-0 w-64 snap-start group"
               onClick={() => DirectoryPromotionService.trackClick(store.tenantId)}
             >

@@ -105,6 +105,7 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
               loading={data.loading}
               viewMode={data.viewMode}
               appearance="discovery"
+              shelfRef="directory/home"
             />
 
             {/* Pagination */}

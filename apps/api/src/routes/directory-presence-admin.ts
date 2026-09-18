@@ -3,12 +3,14 @@
  *
  *   GET    /api/admin/directory/presence-seeds           — list seeds
  *   GET    /api/admin/directory/presence-seeds/seo-preview — compose a campaign's SEO packet (form prefill)
+ *   GET    /api/admin/directory-presence/presence-seeds/identity-packet — source-scored Identity Packet for a campaign
  *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
  *   GET    /api/admin/directory-presence/traffic                — cross-seed traffic rollup
  *   GET    /api/admin/directory-presence/presence-seeds/:id/traffic — per-seed traffic readout
  *   GET    /api/admin/directory-presence/engagement             — cross-seed Layer 3 engagement rollup
  *   GET    /api/admin/directory-presence/presence-seeds/:id/engagement — per-seed Layer 3 engagement
  *   GET    /api/admin/directory-presence/presence-seeds/:id/funnel — per-seed claim funnel
+ *   GET    /api/admin/directory-presence/surface-engagement     — per-surface engagement (entries + shelves)
  *   POST   /api/admin/directory/presence-seeds/:id/touches — log an outreach touch
  *   GET    /api/admin/directory/presence-seeds/:id/touches — list outreach touches
  *   GET    /api/admin/directory/presence-seeds/:id       — seed detail
@@ -38,6 +40,7 @@ import BatchSeekService from '../services/BatchSeekService';
 import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
 import DirectoryPresenceTrafficService from '../services/DirectoryPresenceTrafficService';
 import DirectoryPresenceAnalyticsService from '../services/DirectoryPresenceAnalyticsService';
+import IdentityPacketService from '../services/IdentityPacketService';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import {
@@ -336,6 +339,27 @@ router.get('/presence-seeds/:id/funnel', requirePlatformStaff, async (req: Reque
     res.json({ success: true, funnel });
   } catch (error) {
     logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/funnel] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/surface-engagement
+ *
+ * Per-surface engagement rollup spanning entries AND shelves (migration 295):
+ * views, sessions, click-throughs, CTA clicks, filters, avg dwell, CTR.
+ */
+router.get('/surface-engagement', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const daysBack = req.query.daysBack !== undefined ? Number(req.query.daysBack) : undefined;
+    const surfaces = await DirectoryPresenceAnalyticsService.getSurfaceEngagement(
+      Number.isFinite(daysBack) ? daysBack : undefined,
+    );
+    res.json({ success: true, surfaces });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/surface-engagement] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ success: false, error: 'internal_error', message: (error as any)?.message || String(error) });
@@ -679,6 +703,31 @@ router.get('/presence-seeds/seo-preview', requirePlatformStaff, async (req: Requ
     res.json({ success: true, ...preview });
   } catch (error: any) {
     logger.error('[GET /api/admin/directory/presence-seeds/seo-preview] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/identity-packet?campaignId=<id>
+ *
+ * Assemble the source-scored Identity Packet for a business-scope campaign:
+ * the per-field evidence ledger, identity + operational-recency scores, hard
+ * vetoes, QC signals, and a Push/Wait recommendation band. Advisory only —
+ * the operator decides whether to push the draft seed. Declared before
+ * /presence-seeds/:id so 'identity-packet' is not swallowed as an id.
+ */
+router.get('/presence-seeds/identity-packet', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const campaignId = (req.query.campaignId as string | undefined)?.trim();
+    if (!campaignId) {
+      return res.status(400).json({ error: 'campaignId_required' });
+    }
+    const packet = await IdentityPacketService.buildForCampaign(campaignId);
+    res.json({ success: true, packet });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/identity-packet] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

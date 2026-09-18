@@ -199,7 +199,7 @@ export default function PlacesSearchClient() {
               {results.places.map((p) => (
                 <Link
                   key={p.id}
-                  href={`/place/${p.slug}`}
+                  href={`/place/${p.slug}?source=search`}
                   className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start gap-3">

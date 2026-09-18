@@ -10,6 +10,7 @@ import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { useDirectoryShelfTracking } from '@/hooks/useDirectoryShelfTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
@@ -84,6 +85,13 @@ export default function StoreTypeViewClient({
   
   // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+
+  // Layer 3 — shelf engagement for the store-type shelf surface.
+  useDirectoryShelfTracking({
+    surface: 'directory_store_type',
+    ref: storeTypeSlug,
+    filterSignature: `${viewMode}|${searchParams.lat ?? ''}|${searchParams.lng ?? ''}|${searchParams.radius ?? ''}`,
+  });
 
   // Load saved view mode after hydration
   useEffect(() => {
@@ -351,6 +359,7 @@ export default function StoreTypeViewClient({
             listings={data?.listings || []}
             useMapEndpoint={false} // Use the listings directly since map endpoint doesn't support store type filtering
             filters={{}}
+            shelfRef={`directory/store-type/${storeTypeSlug}`}
           />
         )}
 
@@ -397,7 +406,7 @@ function StoreTypeRecommendations({ storeTypeSlug }: { storeTypeSlug: string }) 
         {recommendations.map((rec, index) => (
           <Link
             key={rec.tenantId}
-            href={`/directory/${rec.slug}`}
+            href={`/directory/${rec.slug}?source=recommendation`}
             className="flex items-center justify-between p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-colors"
           >
             <div className="flex-1">

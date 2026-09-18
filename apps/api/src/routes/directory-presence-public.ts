@@ -82,9 +82,134 @@ async function resolveEntryListingBySlug(slug: string) {
       is_published: true,
       listing_origin: { in: ['directory_seed', 'claimed'] },
     },
-    select: { id: true, tenant_id: true, slug: true },
+    select: { id: true, tenant_id: true, slug: true, listing_origin: true },
   });
 }
+
+// ─── Layer 3 — shelf surface engagement (public, slug-gated) ─────────────
+// Shelf surfaces (category / location / store-type / home) are public browse
+// pages with no listing row, so they get their own event route. The surface is
+// enum-validated and the ref is slug-shaped; no DB lookup (rate limit bounds
+// junk — see AGENTS.md "Directory Presence Traffic Surface").
+
+const SHELF_EVENT_SCHEMA = z.object({
+  sessionId: z.string().max(100).optional(),
+  eventType: z.enum([
+    'shelf_viewed',
+    'listing_clicked',
+    'filter_applied',
+    'session_heartbeat',
+    'session_end',
+  ]),
+  dwellMs: z.number().int().min(0).max(24 * 60 * 60 * 1000).optional(),
+  referrer: z.string().max(500).optional(),
+  /** Event-specific detail — e.g. the filter key for `filter_applied`. */
+  detail: z.string().max(255).optional(),
+});
+
+const shelfEventBatchSchema = z.object({
+  events: z.array(SHELF_EVENT_SCHEMA).min(1).max(50),
+});
+
+const shelfSurfaceSchema = z.enum([
+  'place_category',
+  'place_city',
+  'directory_category',
+  'directory_location',
+  'directory_store_type',
+  'directory_home',
+]);
+
+const shelfRefSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
+
+/**
+ * POST /api/public/directory/surfaces/:surface/:ref/events
+ *
+ * Track one shelf engagement event. Public, surface-enum + slug-validated,
+ * rate limited, fire-and-forget (always 200 on valid input).
+ */
+router.post('/surfaces/:surface/:ref/events', async (req: Request, res: Response) => {
+  try {
+    const surface = shelfSurfaceSchema.safeParse(req.params.surface);
+    const ref = shelfRefSchema.safeParse(req.params.ref);
+    const parsed = SHELF_EVENT_SCHEMA.safeParse(req.body);
+    if (!surface.success || !ref.success || !parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error' });
+    }
+
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
+    }
+
+    directoryPresenceAnalyticsService.trackEvent({
+      tenantId: null,
+      listingId: null,
+      slug: ref.data,
+      surface: surface.data,
+      entityRef: ref.data,
+      sessionId: parsed.data.sessionId,
+      eventType: parsed.data.eventType,
+      dwellMs: parsed.data.dwellMs,
+      referrer: parsed.data.referrer,
+      detail: parsed.data.detail,
+      userAgent: req.headers['user-agent'],
+      ip,
+    }).catch(() => { /* fire-and-forget */ });
+
+    return res.status(200).json({ success: true, tracked: true });
+  } catch (error: any) {
+    logger.error('[POST /api/public/directory/surfaces/:surface/:ref/events] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    return res.status(200).json({ success: true, tracked: false });
+  }
+});
+
+/** POST /api/public/directory/surfaces/:surface/:ref/events/batch — up to 50 events. */
+router.post('/surfaces/:surface/:ref/events/batch', async (req: Request, res: Response) => {
+  try {
+    const surface = shelfSurfaceSchema.safeParse(req.params.surface);
+    const ref = shelfRefSchema.safeParse(req.params.ref);
+    const parsed = shelfEventBatchSchema.safeParse(req.body);
+    if (!surface.success || !ref.success || !parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error' });
+    }
+
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
+    }
+
+    const inputs = parsed.data.events.map((e) => ({
+      tenantId: null,
+      listingId: null,
+      slug: ref.data,
+      surface: surface.data,
+      entityRef: ref.data,
+      sessionId: e.sessionId,
+      eventType: e.eventType,
+      dwellMs: e.dwellMs,
+      referrer: e.referrer,
+      detail: e.detail,
+      userAgent: req.headers['user-agent'],
+      ip,
+    }));
+
+    directoryPresenceAnalyticsService.trackEvents(inputs).catch(() => { /* fire-and-forget */ });
+
+    return res.status(200).json({ success: true, tracked: inputs.length });
+  } catch (error: any) {
+    logger.error('[POST /api/public/directory/surfaces/:surface/:ref/events/batch] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    return res.status(200).json({ success: true, tracked: 0 });
+  }
+});
 
 /**
  * POST /api/public/directory/places/:slug/events
@@ -114,6 +239,8 @@ router.post('/places/:slug/events', async (req: Request, res: Response) => {
       tenantId: listing.tenant_id,
       listingId: listing.id,
       slug: listing.slug ?? req.params.slug,
+      surface: listing.listing_origin === 'directory_seed' ? 'place_entry' : 'directory_entry',
+      entityRef: listing.slug ?? req.params.slug,
       sessionId: parsed.data.sessionId,
       eventType: parsed.data.eventType,
       dwellMs: parsed.data.dwellMs,
@@ -158,6 +285,8 @@ router.post('/places/:slug/events/batch', async (req: Request, res: Response) =>
       tenantId: listing.tenant_id,
       listingId: listing.id,
       slug: listing.slug ?? req.params.slug,
+      surface: listing.listing_origin === 'directory_seed' ? 'place_entry' : 'directory_entry',
+      entityRef: listing.slug ?? req.params.slug,
       sessionId: e.sessionId,
       eventType: e.eventType,
       dwellMs: e.dwellMs,

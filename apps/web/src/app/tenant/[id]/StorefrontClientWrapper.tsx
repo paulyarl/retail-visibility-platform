@@ -688,7 +688,7 @@ export default function StorefrontClientWrapper({
                   <><h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
                     Quick Links
                   </h3><Link
-                    href={`/directory/${tenantSlug}`}
+                    href={`/directory/${tenantSlug}?source=storefront`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
                   >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

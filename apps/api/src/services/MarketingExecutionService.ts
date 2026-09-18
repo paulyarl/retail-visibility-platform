@@ -23,6 +23,8 @@ import { IntelligenceProfileService, type PromptResolution } from './intelligenc
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
+import { buildGeographyGridDirective, buildGeographyGrid, parseZipCodes } from './intelligence/geography-grid';
+import { GeographyGridService } from './intelligence/GeographyGridService';
 import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
 import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
@@ -1180,6 +1182,26 @@ export class MarketingExecutionService extends BaseService {
         }
       }
 
+      // ─── Geography grid injection (category-independent enumeration floor) ─
+      // Derived from the campaign (city/state + intelligence_zip_codes), else the
+      // city-level cache, else AI-derivation — not authored per category. This is
+      // the fix for the "name does not self-identify with the category" blind
+      // spot: a business invisible to every category-token query is still reached
+      // by sweeping the grid exhaustively.
+      const cachedGrid = await GeographyGridService.getInstance()
+        .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
+      const geoGridDirective = buildGeographyGridDirective(input.campaign, cachedGrid);
+      if (geoGridDirective) {
+        rendered = rendered + '\n' + geoGridDirective;
+        logger.info('Geography grid injected into intelligence discovery scan', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          focus,
+          zipCount: buildGeographyGrid(input.campaign).zips.length,
+          cachedGrid: !!cachedGrid,
+        });
+      }
+
       logger.info('Intelligence-scope prompt composed', ctx, {
         campaignId: input.campaign.id,
         category,
@@ -1274,15 +1296,28 @@ export class MarketingExecutionService extends BaseService {
         }
       }
 
+      // ─── Geography grid injection (establishment) ────────────────────────
+      // The establishment prompt AUTHORS the profile, so the authoritative grid
+      // is injected here for the AI to copy verbatim into the profile's
+      // "geography_grid" field. Precedence: campaign ZIPs > city-level cache >
+      // AI-derivation (the scale path for markets with no ZIPs at deploy time).
+      const estCachedGrid = await GeographyGridService.getInstance()
+        .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
+      const estGeoGridDirective = buildGeographyGridDirective(input.campaign, estCachedGrid);
+
       logger.info('Intelligence Profile Establishment prompt resolved with focus', ctx, {
         campaignId: input.campaign.id,
         category,
         focus,
         platform: campaignPlatform ?? 'none',
+        zipCount: buildGeographyGrid(input.campaign).zips.length,
       });
 
       return {
-        renderedPrompt: this.appendPromptSuffix(rendered, promptSuffix) + bronzeFoldDirective,
+        renderedPrompt:
+          this.appendPromptSuffix(rendered, promptSuffix)
+          + bronzeFoldDirective
+          + (estGeoGridDirective ? '\n' + estGeoGridDirective : ''),
         resolution: {
           profile_id: null,
           profile_version: null,

@@ -12,6 +12,7 @@ import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 import DemoBadge from '@/components/shared/DemoBadge';
 import { getDirectoryListingUrl } from '@/utils/slug';
+import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 
 export interface DirectoryListing {
   id: string;
@@ -55,6 +56,10 @@ interface UnifiedStoreCardProps {
   className?: string;
   /** Shelf→entry attribution ref appended as `?shelf=` to internal entry links. */
   shelfRef?: string;
+  /** Entry SOURCE ref appended as `?source=` (e.g. `related`, `recent`) — for
+   *  non-shelf surfaces whose clicks still load an entry page. Recorded as
+   *  `context.entry_source` on the entry view (the Entry Sources readout). */
+  sourceRef?: string;
   enhancedStats?: {
     totalProducts: number;
     categories: Array<{
@@ -94,7 +99,8 @@ export function UnifiedStoreCard({
   showLogo = true,
   className = '',
   enhancedStats,
-  shelfRef
+  shelfRef,
+  sourceRef
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
@@ -128,9 +134,24 @@ export function UnifiedStoreCard({
     : getDirectoryListingUrl(listing);
 
   // Shelf→entry attribution — stamp the referring shelf onto internal entry links.
-  const entryHref = shelfRef && linkType !== 'storefront'
-    ? `${linkHref}${linkHref.includes('?') ? '&' : '?'}shelf=${encodeURIComponent(shelfRef)}`
-    : linkHref;
+  // `sourceRef` stamps the entry SOURCE instead (non-shelf surfaces that still
+  // load an entry page, e.g. related stores / recently viewed).
+  const entryHref = (() => {
+    if (linkType === 'storefront') return linkHref;
+    let href = linkHref;
+    const append = (qs: string) => {
+      href = `${href}${href.includes('?') ? '&' : '?'}${qs}`;
+    };
+    if (shelfRef) append(`shelf=${encodeURIComponent(shelfRef)}`);
+    if (sourceRef) append(`source=${encodeURIComponent(sourceRef)}`);
+    return href;
+  })();
+
+  // Shelf → entry click-through — self-reported from the ref this card carries.
+  const handleEntryClick = () => {
+    if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId);
+    reportShelfListingClick(shelfRef);
+  };
 
   // Prioritize category display: enhancedStats → contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
   // const displayCategory = categories.length > 0 
@@ -194,7 +215,7 @@ export function UnifiedStoreCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <Link href={entryHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+                    <Link href={entryHref} className={`block ${className}`} onClick={handleEntryClick}>
                       <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate flex items-center gap-1.5">
                         {listing.businessName}
                         {listing.isDemo && <DemoBadge isDemo={listing.isDemo} demoExpiresAt={listing.demoExpiresAt} size="sm" />}
@@ -321,7 +342,7 @@ export function UnifiedStoreCard({
           <Card.Section>
             <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center relative overflow-hidden">
               {listing.logoUrl ? (
-                <Link href={entryHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+                <Link href={entryHref} className={`block ${className}`} onClick={handleEntryClick}>
                 <Image
                   src={listing.logoUrl}
                   alt={listing.businessName}
@@ -360,7 +381,7 @@ export function UnifiedStoreCard({
         <Card.Section className="p-4">
           <Group justify="space-between" mb="xs" align="start">
             <div className="flex-1">
-               <Link href={entryHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+               <Link href={entryHref} className={`block ${className}`} onClick={handleEntryClick}>
               <Text 
                 fw={600} 
                 size="lg" 
@@ -480,7 +501,7 @@ export function UnifiedStoreCard({
         {/* Enhanced Action Buttons */}
         <Card.Section className="pt-3">
           <Group gap={8}>
-            <Link href={entryHref} className="flex-1" onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
+            <Link href={entryHref} className="flex-1" onClick={handleEntryClick}>
               <Button 
                 radius="md" 
                 size="sm" 

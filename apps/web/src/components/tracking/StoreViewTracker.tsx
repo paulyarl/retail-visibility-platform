@@ -25,12 +25,20 @@ export default function StoreViewTracker({
   surface,
 }: StoreViewTrackerProps) {
   useEffect(() => {
-    // Shelf→entry attribution — category / location / store-type shelf pages
-    // append `?shelf=<surface>/<type>/<slug>` to their entry links. Recorded on
-    // the Layer 1 entry view so the readout can rank referring shelves.
-    const referrerShelf =
-      typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('shelf')
+    // Entry attribution — two independent dimensions, both read from the URL:
+    //  - `?shelf=<surface>/<type>/<slug>` → which SHELF referred this view.
+    //  - `?utm_source=` / `?source=` → which SOURCE/channel (e.g. `qr`).
+    //    A QR code printed for this listing encodes `?source=qr`, so the entry
+    //    view is attributed to QR even though the scan itself is recorded in
+    //    `qr_scan_events` (channel metrics) rather than here.
+    const params =
+      typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const referrerShelf = params?.get('shelf') ?? null;
+    const rawSource = (params?.get('utm_source') || params?.get('source') || '').trim();
+    const entrySource = rawSource
+      ? rawSource.toLowerCase().slice(0, 40)
+      : referrerShelf
+        ? 'shelf'
         : null;
 
     // Track store view on page load
@@ -46,6 +54,7 @@ export default function StoreViewTracker({
         ...(listingOrigin ? { listing_origin: listingOrigin } : {}),
         ...(surface ? { surface } : {}),
         ...(referrerShelf ? { referrer_shelf: referrerShelf } : {}),
+        ...(entrySource ? { entry_source: entrySource } : {}),
       },
       pageType: 'directory_detail'
     });

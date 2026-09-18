@@ -97,6 +97,14 @@ export interface ShelfReferralRow {
   uniqueSessions: number;
 }
 
+/** Entry views grouped by source/channel (`context->>'entry_source'`).
+ *  Includes `qr` (QR-encoded entry links), `shelf`, and any `utm_source`. */
+export interface EntrySourceRow {
+  source: string;
+  views: number;
+  uniqueSessions: number;
+}
+
 export interface SeedTrafficDetail {
   seedId: string;
   tenantId: string;
@@ -146,6 +154,10 @@ export interface TrafficDashboard {
   /** Entry views grouped by the referring shelf (`context->>'referrer_shelf'`,
    *  stamped from the `?shelf=` link param). Respects seed + surface filters. */
   shelfReferrals: ShelfReferralRow[];
+  /** Entry views grouped by source/channel (`context->>'entry_source'`), from
+   *  `?utm_source=` / `?source=` (e.g. `qr`) or `shelf`. Respects seed +
+   *  surface filters. Unattributed (organic/direct) views are not listed. */
+  entrySources: EntrySourceRow[];
 }
 
 interface TrafficCountRow {
@@ -589,8 +601,34 @@ class DirectoryPresenceTrafficService extends BaseService {
       params,
     );
 
-    const totalsRow = totalsRows[0];
-    return {
+    // Entry sources — which channel drove the entry view. QR-encoded listing
+    // links carry `?source=qr`; shelf links carry `?shelf=` (→ 'shelf'); any
+    // `?utm_source=` is used verbatim. Organic/direct views are unattributed.
+    const entrySourceRows = await this.executeQuery<{
+      source: string;
+      views: number | bigint;
+      unique_sessions: number | bigint;
+    }>(
+      `SELECT
+         b.context->>'entry_source' AS source,
+         COUNT(b.id)::int AS views,
+         COUNT(DISTINCT b.session_id)::int AS unique_sessions
+       FROM directory_presence_seeds s
+       LEFT JOIN user_behavior_simple b
+         ON b.entity_id = s.tenant_id
+        AND b.entity_type = 'store'
+        AND b.page_type = 'directory_detail'
+        AND b.timestamp >= NOW() - INTERVAL '${window} days'
+        ${surfaceJoin}
+       WHERE TRUE ${clause}
+         AND b.context->>'entry_source' IS NOT NULL
+       GROUP BY 1
+       ORDER BY views DESC
+       LIMIT 50`,
+      params,
+    );
+
+    const totalsRow = totalsRows[0];    return {
       daysBack: window,
       surface: filters.surface ?? null,
       totals: {
@@ -641,6 +679,11 @@ class DirectoryPresenceTrafficService extends BaseService {
       })),
       shelfReferrals: shelfReferralRows.map((row) => ({
         shelf: row.shelf,
+        views: toNumber(row.views),
+        uniqueSessions: toNumber(row.unique_sessions),
+      })),
+      entrySources: entrySourceRows.map((row) => ({
+        source: row.source,
         views: toNumber(row.views),
         uniqueSessions: toNumber(row.unique_sessions),
       })),

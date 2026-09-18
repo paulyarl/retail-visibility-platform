@@ -204,4 +204,61 @@ describe('intelligence_profile schema (GAP-P8)', () => {
       expect(result.data.specialized_sources[1].url).toBeUndefined();
     }
   });
+
+  // ─── Discovery substrate (category-independent enumeration) ─────────────
+
+  it('discovery substrate fields → pass (optional but validated when present)', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      geography_grid: {
+        city: 'Kansas City',
+        state: 'MO',
+        zips: ['64118', '64124', '64111'],
+        corridors: ['Independence Ave / US-24', 'North Oak Trafficway'],
+      },
+      generic_label_set: [
+        { platform: 'google', labels: ['Grocery store', 'Convenience store', 'Supermarket'] },
+      ],
+      label_independent_sweeps: [
+        {
+          dataset: 'Missouri Secretary of State business entity registry',
+          url: 'https://bsd.sos.mo.gov/BusinessEntity/BESearch.aspx',
+          sweep_key: 'geography',
+          filter: 'none',
+          post_filter: 'assortment',
+        },
+      ],
+    }));
+    expect(result.success).toBe(true);
+  });
+
+  it('generic_label_set entry without labels → fail', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      generic_label_set: [{ platform: 'google', labels: [] }],
+    }));
+    expect(result.success).toBe(false);
+  });
+
+  it('label_independent_sweep with invalid url → fail', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      label_independent_sweeps: [{ dataset: 'SNAP retailer locator', url: 'not-a-url' }],
+    }));
+    expect(result.success).toBe(false);
+  });
+
+  it('label_independent_sweep with null url → pass (coerced to undefined)', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      label_independent_sweeps: [{ dataset: 'SNAP retailer locator', url: null, sweep_key: 'geography' }],
+    }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.label_independent_sweeps?.[0].url).toBeUndefined();
+    }
+  });
+
+  it('geography_grid accepts a bare zip list without city/state', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      geography_grid: { zips: ['64118'] },
+    }));
+    expect(result.success).toBe(true);
+  });
 });

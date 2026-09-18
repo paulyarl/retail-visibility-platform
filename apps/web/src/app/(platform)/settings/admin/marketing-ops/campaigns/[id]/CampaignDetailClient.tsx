@@ -39,13 +39,14 @@ import GalleryPanel from './GalleryPanel';
 import GalleryAnalyticsTab from './GalleryAnalyticsTab';
 import SiblingsTab from './SiblingsTab';
 import OutreachIntelligenceTab from './OutreachIntelligenceTab';
+import IdentityPacketCard from '@/components/marketing-ops/IdentityPacketCard';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
+type Tab = 'overview' | 'identity' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
 
 // Valid tab keys for deep-link validation (e.g. ?tab=checklist from the
 // openers workspace Next Steps). Invalid values fall back to 'overview'.
 const PIPELINE_TABS: readonly string[] = [
-  'overview', 'audits', 'files', 'deliverables', 'prompts', 'checklist',
+  'overview', 'identity', 'audits', 'files', 'deliverables', 'prompts', 'checklist',
   'outreach-prep', 'history', 'lineage', 'cascade', 'gallery', 'siblings',
 ] as const;
 
@@ -739,6 +740,9 @@ export default function CampaignDetailClient({
   //      12. Deliverables — campaign info / artifacts
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'overview', label: 'Overview' },
+    // Identity Packet — source-scored evidence ledger behind the seed
+    // decision (business-scope campaigns only).
+    ...((campaign?.scope === 'business') ? [{ key: 'identity' as Tab, label: 'Identity' }] : []),
     { key: 'checklist', label: 'Checklist' },
     { key: 'prompts', label: 'Prompts' },
     { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
@@ -2264,6 +2268,12 @@ export default function CampaignDetailClient({
                 campaignId={campaign.id}
                 campaignName={campaign.business_name}
               />
+            )}
+
+            {activeTab === 'identity' && campaign && (
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+                <IdentityPacketCard campaignId={campaign.id} onSeedCreated={fetchCampaign} />
+              </div>
             )}
 
             {activeTab === 'history' && (

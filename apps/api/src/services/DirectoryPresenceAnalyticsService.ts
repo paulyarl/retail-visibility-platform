@@ -31,6 +31,9 @@ import { clampTrafficWindow, type TrafficWindow } from './DirectoryPresenceTraff
 
 export type DirectoryPresenceEventType =
   | 'listing_viewed'
+  | 'shelf_viewed'
+  | 'listing_clicked'
+  | 'filter_applied'
   | 'claim_clicked'
   | 'call_clicked'
   | 'directions_clicked'
@@ -41,8 +44,35 @@ export type DirectoryPresenceEventType =
 
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
 
+/** Which directory surface emitted an event (migration 295). */
+export const DIRECTORY_SURFACES = [
+  'place_entry',
+  'directory_entry',
+  'place_category',
+  'place_city',
+  'directory_category',
+  'directory_location',
+  'directory_store_type',
+  'directory_home',
+] as const;
+
+export type DirectorySurface = (typeof DIRECTORY_SURFACES)[number];
+
+/** Shelf surfaces only — the ones served by the public shelf event route. */
+export const DIRECTORY_SHELF_SURFACES = [
+  'place_category',
+  'place_city',
+  'directory_category',
+  'directory_location',
+  'directory_store_type',
+  'directory_home',
+] as const;
+
 export const ALLOWED_DIRECTORY_PRESENCE_EVENT_TYPES: DirectoryPresenceEventType[] = [
   'listing_viewed',
+  'shelf_viewed',
+  'listing_clicked',
+  'filter_applied',
   'claim_clicked',
   'call_clicked',
   'directions_clicked',
@@ -53,8 +83,10 @@ export const ALLOWED_DIRECTORY_PRESENCE_EVENT_TYPES: DirectoryPresenceEventType[
 ];
 
 export interface DirectoryPresenceEventInput {
-  tenantId: string;
-  listingId: string;
+  /** Nullable — shelf events carry no tenant. */
+  tenantId?: string | null;
+  /** Nullable — shelf events carry no listing. */
+  listingId?: string | null;
   slug: string;
   sessionId?: string;
   eventType: DirectoryPresenceEventType;
@@ -62,6 +94,24 @@ export interface DirectoryPresenceEventInput {
   referrer?: string;
   userAgent?: string;
   ip?: string;
+  /** Which surface emitted the event (migration 295). */
+  surface?: DirectorySurface | string | null;
+  /** The surface's own reference (shelf slug, or entry slug). */
+  entityRef?: string | null;
+  /** Event-specific detail (e.g. the filter key for `filter_applied`). */
+  detail?: string | null;
+}
+
+/** Per-surface engagement rollup (entries + shelves in one grid). */
+export interface SurfaceEngagementRow {
+  surface: string;
+  views: number;
+  sessions: number;
+  clickThroughs: number;
+  ctaClicks: number;
+  filters: number;
+  avgDwellMs: number;
+  clickThroughRate: number | null;
 }
 
 export interface DirectoryEngagementSummary {
@@ -197,8 +247,8 @@ class DirectoryPresenceAnalyticsService extends BaseService {
   private buildRow(input: DirectoryPresenceEventInput): unknown[] {
     return [
       generateDirectoryPresenceEventId(),
-      input.tenantId,
-      input.listingId,
+      input.tenantId ?? null,
+      input.listingId ?? null,
       input.slug,
       input.sessionId || null,
       input.eventType,
@@ -207,8 +257,15 @@ class DirectoryPresenceAnalyticsService extends BaseService {
       hashDirectoryIp(input.ip),
       parseDeviceType(input.userAgent),
       input.dwellMs ?? null,
+      input.surface ?? null,
+      input.entityRef ?? null,
+      input.detail ?? null,
     ];
   }
+
+  /** Column list for the events insert (kept in sync with `buildRow`). */
+  private static readonly EVENT_COLUMNS =
+    'id, tenant_id, listing_id, slug, session_id, event_type, referrer, user_agent, ip_hash, device_type, dwell_ms, surface, entity_ref, detail';
 
   // ====================
   // EVENT TRACKING (fire-and-forget)
@@ -219,8 +276,8 @@ class DirectoryPresenceAnalyticsService extends BaseService {
     try {
       await this.prisma.$executeRawUnsafe(
         `INSERT INTO directory_presence_events
-           (id, tenant_id, listing_id, slug, session_id, event_type, referrer, user_agent, ip_hash, device_type, dwell_ms)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+           (${DirectoryPresenceAnalyticsService.EVENT_COLUMNS})
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
         ...this.buildRow(input),
       );
     } catch (error) {
@@ -247,7 +304,7 @@ class DirectoryPresenceAnalyticsService extends BaseService {
       }
       await this.prisma.$executeRawUnsafe(
         `INSERT INTO directory_presence_events
-           (id, tenant_id, listing_id, slug, session_id, event_type, referrer, user_agent, ip_hash, device_type, dwell_ms)
+           (${DirectoryPresenceAnalyticsService.EVENT_COLUMNS})
          VALUES ${placeholders.join(', ')}`,
         ...params,
       );
@@ -552,6 +609,74 @@ class DirectoryPresenceAnalyticsService extends BaseService {
         viewToAcceptRate: rate(claimsAccepted, viewCount),
       },
     };
+  }
+
+  // ====================
+  // PER-SURFACE ENGAGEMENT (entries + shelves)
+  // ====================
+
+  /**
+   * Per-surface engagement rollup — entries AND shelves in one grid.
+   * views = listing_viewed + shelf_viewed; clickThroughs = listing_clicked;
+   * ctaClicks = claim/storefront/call/directions; filters = filter_applied.
+   * avgDwellMs = MAX(dwell_ms) per session, then averaged.
+   */
+  async getSurfaceEngagement(daysBack?: number): Promise<SurfaceEngagementRow[]> {
+    const window = clampTrafficWindow(daysBack);
+
+    const counts = await this.executeQuery<{
+      surface: string;
+      views: number | bigint;
+      sessions: number | bigint;
+      click_throughs: number | bigint;
+      cta_clicks: number | bigint;
+      filters: number | bigint;
+    }>(
+      `SELECT
+         COALESCE(surface, 'unknown') AS surface,
+         COUNT(*) FILTER (WHERE event_type IN ('listing_viewed', 'shelf_viewed'))::int AS views,
+         COUNT(DISTINCT session_id) FILTER (WHERE event_type IN ('listing_viewed', 'shelf_viewed'))::int AS sessions,
+         COUNT(*) FILTER (WHERE event_type = 'listing_clicked')::int AS click_throughs,
+         COUNT(*) FILTER (WHERE event_type IN ('claim_clicked', 'storefront_clicked', 'call_clicked', 'directions_clicked'))::int AS cta_clicks,
+         COUNT(*) FILTER (WHERE event_type = 'filter_applied')::int AS filters
+       FROM directory_presence_events
+       WHERE created_at >= NOW() - INTERVAL '${window} days'
+       GROUP BY 1
+       ORDER BY views DESC`,
+      [],
+    );
+
+    const dwell = await this.executeQuery<{ surface: string; avg_dwell_ms: number | null }>(
+      `SELECT COALESCE(surface, 'unknown') AS surface,
+              COALESCE(AVG(max_dwell), 0)::float AS avg_dwell_ms
+       FROM (
+         SELECT surface, session_id, MAX(dwell_ms) AS max_dwell
+         FROM directory_presence_events
+         WHERE created_at >= NOW() - INTERVAL '${window} days'
+           AND session_id IS NOT NULL
+           AND dwell_ms IS NOT NULL
+         GROUP BY surface, session_id
+       ) per_session
+       GROUP BY 1`,
+      [],
+    );
+
+    const dwellBySurface = new Map(dwell.map((row) => [row.surface, row.avg_dwell_ms ?? 0]));
+
+    return counts.map((row) => {
+      const views = toNumber(row.views);
+      const clickThroughs = toNumber(row.click_throughs);
+      return {
+        surface: row.surface,
+        views,
+        sessions: toNumber(row.sessions),
+        clickThroughs,
+        ctaClicks: toNumber(row.cta_clicks),
+        filters: toNumber(row.filters),
+        avgDwellMs: dwellBySurface.get(row.surface) ?? 0,
+        clickThroughRate: rate(clickThroughs, views),
+      };
+    });
   }
 
   // ====================

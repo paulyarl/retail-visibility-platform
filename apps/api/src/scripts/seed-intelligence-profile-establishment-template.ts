@@ -29,8 +29,23 @@ import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-pro
  * hosted storefront platforms as a first-class source class, query-shape family
  * (incl. site-scoped sweeps), corridor derivation from evidence, and the
  * required coverage self-test.
+ *
+ * 2026-09-18-geography-substrate: adds the REQUIRED, category-independent
+ * discovery substrate (geography_grid / generic_label_set /
+ * label_independent_sweeps), coverage self-test classes (6) and (7), and the
+ * hard rule that label-independent sweeps must be geography-keyed, never
+ * name-token-keyed. Fixes the "name does not self-identify with the category"
+ * blind spot for every category (African Grocery, Asian Grocery, Middle Eastern
+ * Grocery, Beauty Supply, …), not just the one that surfaced it.
+ *
+ * 2026-09-18-metro-catchment: sharpens the geography_grid instruction for the
+ * SCALE PATH (markets with no ZIPs at deployment time): scope is the RETAIL
+ * CATCHMENT, not the administrative city — the principal city plus contiguous
+ * commercial suburbs, including separately-incorporated municipalities that
+ * share ZIPs with it (the shared-ZIP suburb class, e.g. Gladstone, MO / 64118).
+ * Adds adjacent_municipalities to geography_grid.
  */
-const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-16-diaspora-discovery';
+const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-18-metro-catchment';
 
 const ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-intel-profile-establishment-001',
@@ -144,6 +159,15 @@ an industrial or arterial stretch that no general city guide mentions.
    - The sweep surfaces only operators who adopted that host, so it carries selection bias toward slightly more digitized businesses. Absence from the sweep means nothing.
    - Hosted pages are typically client-side rendered, so a search-index hit proves the URL exists, not that it renders for an ordinary visitor.
 
+4b. DISCOVERY SUBSTRATE (REQUIRED — CATEGORY-INDEPENDENT) — This section must NOT depend on the category's name, vocabulary, or tokens. It is the enumeration floor that surfaces businesses whose names do NOT self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). Produce three structured fields:
+   - geography_grid — the sweep units for this market, independent of category: { "city", "state", "zips": [every ZIP the market's commercial addresses fall in], "corridors": [arterial commercial stretches, derived from address evidence where possible], "adjacent_municipalities": [separately-incorporated suburbs / contiguous commercial municipalities in the catchment], "radius_miles" }. SCOPE IS THE RETAIL CATCHMENT, NOT THE ADMINISTRATIVE CITY: the principal city PLUS its contiguous commercial suburbs, including separately-incorporated municipalities that share ZIPs with the principal city (e.g. a suburb like Gladstone, MO sharing 64118 with Kansas City). List EVERY ZIP the catchment's commercial addresses fall in — not only the ZIPs where category businesses were already found, and not only the principal city's administrative ZIPs. Name the shared-ZIP suburbs explicitly in adjacent_municipalities; a ZIP spanning the principal city and a suburb is ONE sweep unit. The grid is the exhaustive enumeration unit: every ZIP must be swept, and a ZIP with zero findings must be reported as an executed-empty result, never silently skipped.
+   - generic_label_set — the platform labels that SWALLOW this category: the generic buckets a mislabeled business sits under. One entry per platform: { "platform", "labels": [...] }. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). Do NOT list the correct category label — that is the label the business is MISSING.
+   - label_independent_sweeps — the address-indexed datasets to sweep WITHOUT a category name token. One entry per dataset: { "dataset", "url", "sweep_key": "geography", "filter": "none", "post_filter": "assortment" }. The sweep_key MUST be "geography": these datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. Never keyed by the category name.
+
+   A profile whose only discovery paths are keyed on the category's own tokens is incomplete. The substrate is what makes discovery category-independent.
+
+   HARD RULE — LABEL-INDEPENDENT SWEEPS MUST BE GEOGRAPHY-KEYED. When you name an address-indexed dataset (state registry, benefit-program authorization, licensing, permit registries), specify that it is swept by GEOGRAPHY (ZIP/address) and filtered to category fit afterward. Do NOT implement it as a name-token query. Token-keying a label-independent dataset makes it label-dependent and defeats its purpose: a business whose legal name carries no category token will be invisible to it.
+
 5. DISCOVERY PATTERNS — How should an analyst search for businesses in this category? What vertical directories, professional networks, or niche platforms should be searched? What search strategies surface businesses that are invisible to mainstream search? Provide at least one concrete pattern for EACH of these query shapes, with real examples for this category and {{city}}:
    (a) CATEGORY-TAXONOMY queries — the platform's own category labels, including the wrong or generic labels a mis-categorized business would sit under.
    (b) NAME-TOKEN queries — business names built from endonyms, transliterations, personal names, or place names. These carry no English category word and are invisible to category-name searches.
@@ -173,15 +197,17 @@ Before finalizing, audit your own pattern set for blind spots. For each class be
   (3) A business with no website and no claimed profile on any platform.
   (4) A business whose storefront is not on any corridor you listed.
   (5) A business that is well known in its community but has no customer reviews.
+  (6) A business whose name contains NO category token and NO endonym — a generic-looking name that does not self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). Confirm a pattern surfaces it WITHOUT relying on the name.
+  (7) A business reachable ONLY by sweeping a ZIP × generic-label matrix or an address-indexed dataset by geography — i.e. it is invisible to every name, endonym, and product query.
 Record the result in discovery_patterns under the key "coverage_self_test", stating for each class which pattern covers it — or that it is uncovered. A pattern set that can only find businesses that already look like the category is not finished.
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-2026-09-16-diaspora-discovery -->`,
+<!-- seed-version: intel-profile-establishment-2026-09-18-metro-catchment -->`,
   variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,
-    description: 'Category Intelligence Profile — §10 structure with terminology, specialized sources (capabilities + limitations), discovery patterns, evidence rules, prohibited inferences, and category signals.',
+    description: 'Category Intelligence Profile — §10 structure with terminology, specialized sources (capabilities + limitations), the category-independent discovery substrate (geography_grid / generic_label_set / label_independent_sweeps), discovery patterns, evidence rules, prohibited inferences, and category signals.',
   },
   isDefault: false,
   intelligenceCampaignKind: 'establishment' as const,

@@ -16,17 +16,23 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 import { getDirectoryListingUrl } from '@/utils/slug';
+import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 import type { DirectoryStore } from '@/services/DirectorySingletonService';
 import type { DirectoryLayoutKey } from './types';
 
 interface StoreCardV2Props {
   store: DirectoryStore;
   appearance?: DirectoryLayoutKey;
+  /** Shelf→entry attribution ref (`<surface>/<type>/<slug>`), e.g.
+   *  `directory/home`. Stamps `?shelf=` on internal entry links and
+   *  self-reports `listing_clicked`. */
+  shelfRef?: string;
 }
 
 export default function StoreCardV2({
   store,
   appearance = 'discovery',
+  shelfRef,
 }: StoreCardV2Props) {
   const router = useRouter();
   const { status: hoursStatus } = useStoreStatus(store.tenantId, true);
@@ -36,10 +42,15 @@ export default function StoreCardV2({
 
   // Use external link only when capability flag is set and website exists
   const canUseExternal = store.canUseExternalLink && !!store.website;
-  const destinationUrl = canUseExternal
-    ? (store.website as string)
-    : getDirectoryListingUrl(store);
+  const baseEntryUrl = getDirectoryListingUrl(store);
+  const entryUrl = shelfRef
+    ? `${baseEntryUrl}${baseEntryUrl.includes('?') ? '&' : '?'}shelf=${encodeURIComponent(shelfRef)}`
+    : baseEntryUrl;
+  const destinationUrl = canUseExternal ? (store.website as string) : entryUrl;
   const isExternalLink = canUseExternal;
+
+  // Shelf → entry click-through — self-reported from the ref this card carries.
+  const handleEntryClick = () => reportShelfListingClick(shelfRef);
 
   const formatRating = (rating: number) =>
     rating > 0 ? rating.toFixed(1) : 'New';
@@ -50,14 +61,16 @@ export default function StoreCardV2({
   const handleDirectoryClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(getDirectoryListingUrl(store));
+    reportShelfListingClick(shelfRef);
+    router.push(entryUrl);
   };
 
   // Compact layout for immersive — always links to directory entry page
   if (isImmersive) {
     return (
       <Link
-        href={getDirectoryListingUrl(store)}
+        href={entryUrl}
+        onClick={handleEntryClick}
         className="block group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 rounded-xl"
       >
         <div className="flex items-start gap-3 p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:shadow-md transition-all duration-200">
@@ -116,6 +129,7 @@ export default function StoreCardV2({
   return (
     <Link
       href={destinationUrl}
+      onClick={handleEntryClick}
       target={isExternalLink ? '_blank' : undefined}
       rel={isExternalLink ? 'noopener noreferrer' : undefined}
       className={`block group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 rounded-2xl ${cardSize}`}
