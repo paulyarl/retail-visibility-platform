@@ -790,9 +790,18 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 | 17 | Align `fulfill-001..003` with Register B + CTA | ✅ | `seed-marketing-ops-templates.ts` — Register B tone + claim-and-fix CTA + `claim_url` on review_responses / service_menu / gbp_audit. **Re-seed required** (`seed-marketing-ops-templates.ts`, local + prd) |
 
 **Deferred / follow-up (not blocking):**
-- G-7 — best-effort source-material run at audit import (currently synchronous endpoint only).
 - G-11 — no migration (data-only); `300_*.sql` reserved for a future schema change.
 - G-14/G-19 — `lead_magnet` source thinness; see §11.
+
+### 12.5 G-7 — Source-material warm-up at audit import (2026-09-18)
+
+`MarketingPromptService.importExternalResult` now fires a **best-effort, fire-and-forget** source-material warm-up after a `business_analysis` audit is created — sibling to the existing hot-prospect auto-sync hook. The first "Generate Deliverable" then reads cached source material instead of paying the analyst-prompt cost synchronously.
+
+- Dynamic `import('./deliverable/DeliverableSourceService.js')` inside the hook avoids a static cycle (`MarketingPromptService → DeliverableSourceService → MarketingExecutionService → MarketingPromptService`).
+- Fire-and-forget with `.catch()` — matches the spec's "non-blocking" wording, and the modal already renders a "not generated — will run on Generate" state, so a slow/failed warm-up degrades gracefully.
+- Idempotent: `generateSourceMaterial` short-circuits on the audit+signal hash.
+
+**Scope note:** the hook covers the **external-import** path only — the canonical route for business audits. Audits created elsewhere (`MarketingProspectQueueService` batch/proving-ground, `MarketingCampaignService`, `MarketingAuditService`, `MarketingHotProspectService`) are not hooked; those campaigns warm on first Generate. Extending coverage would mean touching four more creation sites.
 
 ### 12.4 G-1b — ReviewSlotService review source (2026-09-18)
 

@@ -855,6 +855,30 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
+      // Deliverable Source Material (G-7) — best-effort warm-up after a
+      // business_analysis audit lands, so the first "Generate Deliverable" in
+      // the modal reads cached source material instead of paying the
+      // analyst-prompt cost synchronously. Fire-and-forget: the modal already
+      // renders a "not generated — will run on Generate" state, so a slow or
+      // failed warm-up degrades gracefully. Idempotent by audit+signal hash.
+      if (result.audit && resolved.auditPlatform === 'business_analysis') {
+        void (async () => {
+          try {
+            const { default: sourceService } = await import('./deliverable/DeliverableSourceService.js');
+            await sourceService.generateSourceMaterial(input.campaignId, ctx);
+            logger.info('Deliverable source material warmed from business_analysis import', ctx, {
+              campaignId: input.campaignId,
+              auditId: result.audit.id,
+            });
+          } catch (warmErr: any) {
+            logger.warn('Deliverable source material warm-up failed (non-blocking)', ctx, {
+              campaignId: input.campaignId,
+              error: warmErr?.message,
+            });
+          }
+        })();
+      }
+
       // Category-identification audit → best-effort NAP enrichment of the
       // campaign. Syncs contact fields (business_name, phone, website_url,
       // address) from the audit's structured `nap` block using a
