@@ -54,6 +54,33 @@ Repeat each command with `--config prd` for production.
 - **`insertAfter` fingerprints only the first 80 chars of the insertion.** Never combine multiple bindings into one `insertAfter` call — if the first chunk is already present, the whole insertion is skipped and the later chunks are silently dropped while the version marker still gets appended.
 - **`removeSection` deletes up to the next `##`/`###` heading and swallows headingless content.** A binding inserted between a removable directive and the next heading gets eaten on the next run. Insert headingless bindings (e.g. `MARKET_CONTEXT_BINDING`) AFTER all `removeSection` calls in the transform so each run self-heals.
 
+## Business Audit — Platform Availability Control (render controls)
+
+Spec: `docs/LocalBiz/AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC.md` (status block is current as of 2026-09-18).
+
+The audit could not previously distinguish "this business is not discoverable on Google" from "the analyst could not render Google" — both produced `unable_to_verify`, emitted no signal, and scored zero, so unverifiability was scored as health. A **render control** (a gold-standard exemplar on the same platform) makes the failure attributable. `signal-extractor.ts` fires `DS_MISSING_PROFILE` only on a `business_specific_failure` determination, falling back to the legacy `!google` rule when `render_controls` is absent.
+
+**Scoring amendments (shipped 2026-09-18):**
+- `action_classification` is `nullable().optional()` — the model emits `null` (not `BALANCED_HEALTHY`) when no rating/sentiment could be verified.
+- `recommended_tier` is `tierEnum.nullable().optional()`. `applyRenderControlCoverageGate()` (in `business-analysis.schema.ts`) computes `controls_rendered / controls_attempted` from `render_controls`, and when the rate is below `MIN_RENDER_CONTROL_COVERAGE_FOR_TIER` (0.5) it nulls the tier, deletes `estimated_monthly_service_fee`, and stamps `render_control_coverage`. Audits with no `render_controls` are untouched (legacy behaviour preserved).
+- **Apply the gate in the import path, not the validator.** `MarketingPromptService.importExternalResult` persists the **raw** parsed JSON (`audit_data: parsedJson`), not the Zod output — a Zod `.transform()` would never reach the stored audit.
+- `google_profile_maintenance` rubric split: control-confirmed absence scores 2; verified-maintained scores 0; `unable_to_verify` is excluded from the denominator rather than scored 0.
+
+**Prompt amendments** (all in `seed-business-audit-v2-templates.ts`, each its own fingerprint-safe `insertAfter`/`replaceFirst`, marker `business-audit-v2-2026-09-18-availability-scoring-4`): rubric split, `PLATFORM_GAP_CASCADE_DIRECTIVE` (one `profile_presence` gap + one gate entry per non_negotiable gate — no per-field fan-out), `ACTION_CLASSIFICATION_NULL_DIRECTIVE`, `PLATFORM_SYNDICATION_CLAUSE` (a platform captured via a syndication path is `partial`, not `unable_to_verify`), `DATA_QUALITY_CONFLICTS_CLAUSE` (`conflicts` is for conflicting evidence about the business, not prompt-block provenance).
+
+**Audit card:** `BusinessAnalysisAuditCard.tsx` renders a "Platform Availability (render control)" section + coverage badge, and shows "Tier suppressed" instead of a bare tier when the gate fired.
+
+## Diagnostic Gallery — Eligibility, Rendering & the `preview_built` Gate
+
+Spec: `docs/LocalBiz/MARKETING_OPS_DIAGNOSTIC_GALLERY_SPEC.md`.
+
+- **Storage:** diagnostic screenshots live in the private Supabase **`disputes`** bucket (`StorageBuckets.DISPUTES`), created by migration **299** (`INSERT INTO storage.buckets … ON CONFLICT DO NOTHING`). Service-role key bypasses RLS, so no storage policies are needed. A missing bucket surfaces as `500 upload_failed: Bucket not found`.
+- **Admin read path:** `GET /api/admin/marketing-ops/:campaignId/files/diagnostic-screenshots` returns `signed_url` + `download_url` (5-min TTL). The web fallback degrades to `listFiles` if the endpoint 404s, so a web-before-API deploy does not break the tab.
+- **Eligibility precheck:** `GET /api/admin/marketing-ops/campaigns/:id/gallery-eligibility` (`GalleryEligibilityService`) returns `{ eligible, reason, action, archetype, hasBusinessAnalysisAudit, hasAcceptedTriage, … }`. `reason` ∈ `invalid_stage | no_screenshots | no_business_analysis_audit | archetype_unresolved`. The Gallery tab shows an amber banner + disables Generate from this.
+- **Archetype source:** the chain (openers, headers, closers, gallery defaults, deliverable sections) derives from an **operator-accepted triage** or a real (non-stub) `business_analysis` audit. Stub audits (`manual_queue` / `queue_promotion` / `derived_from_parent`) do **not** satisfy it.
+- **Hard gate:** `POST /api/admin/marketing-ops/:id/transition` returns `409 business_analysis_required` when `to_stage === 'preview_built'` and no archetype resolves. There is **no acknowledge override** — `preview_built` has no back-edge to `seed` (`REVIEW_TRANSITIONS` is one-way), so entering it without an audit strands the campaign. Fix forward by running the seek-stage business analysis.
+- **Stage is not editable via the generic update.** `PUT /api/admin/marketing-ops/:id` returns `400 stage_not_editable` if `stage` is present; the edit form's Stage field is read-only. Previously the field was accepted and then silently dropped by `updateCampaign`, making the dropdown a no-op.
+
 ## DB CHECK Constraints — Enum Sync Discipline
 
 `mkt_prospect_queue` (and other mkt_* tables) carry Postgres CHECK constraints that are **not** managed by Prisma (schema.prisma is db-pulled and ignores them). When you add a value to an app-layer enum, you MUST also ship a numbered migration that drops + re-adds the CHECK with the full value set, or inserts with the new value fail with `23514 check constraint violated` (500 `internal_error` at runtime).

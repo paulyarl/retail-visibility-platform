@@ -2,7 +2,7 @@
 
 > The audit cannot currently distinguish "this business is not discoverable on Google" from "the analyst could not render Google." Both produce `unable_to_verify`, both emit no signal, and both score zero. This spec adds a render control — the gold standard's profiles — so an unrendered platform becomes attributable evidence instead of an unscored gap.
 
-**Status:** Partially shipped — control mechanism live, scoring amendments outstanding. See the implementation status block below.
+**Status:** Shipped — control mechanism + scoring amendments live (2026-09-18). See the implementation status block below.
 **Owner:** TBD
 **Scope:** `apps/api` audit seed template + business-analysis schema + audit card
 
@@ -20,16 +20,22 @@ This doc previously read "Not started — spec only". That was stale: the contro
 | §5 `render_controls` validator field (Option B) | **Shipped** | `business-analysis.schema.ts:709`, `renderControlSchema` at 586-595 |
 | §7.3 server-side extractor gate (D3) | **Shipped** | `signal-extractor.ts:258-289`, legacy `!google` fallback retained |
 | §7.3 extractor tests | **Shipped** | `TriageEngineService.test.ts:731-812` (8 cases incl. legacy fallback) |
-| §7.2 B3 `action_classification` → nullable | **Not shipped** | `business-analysis.schema.ts:477` still `.optional()` |
-| §7.2 B4 `recommended_tier` → nullable | **Not shipped** | `business-analysis.schema.ts:676` still required `tierEnum` |
-| §7.4 audit card surface | **Not shipped** | no `render_controls` reference in `BusinessAnalysisAuditCard.tsx` |
-| §7.5 §6.1 rubric amendment (`google_profile_maintenance`) | **Not shipped** | rubric sentence still reads "0 points when the profile appears maintained or status is unavailable" |
-| §7.5 §6.3 / §6.4 scoring amendments | **Not shipped** | consistent with B3/B4 above |
+| §7.2 B3 `action_classification` → nullable | **Shipped** | `business-analysis.schema.ts` — `nullable().optional()`; prompt guidance added via seed (`ACTION_CLASSIFICATION_NULL_DIRECTIVE`) |
+| §7.2 B4 `recommended_tier` → nullable | **Shipped** | `business-analysis.schema.ts` — `tierEnum.nullable().optional()` |
+| §7.4 audit card surface | **Shipped** | `BusinessAnalysisAuditCard.tsx` — "Platform Availability (render control)" section + coverage qualifier + suppressed-tier state |
+| §7.5 §6.1 rubric amendment (`google_profile_maintenance`) | **Shipped** | seed `GP_MAINTENANCE_RUBRIC_FROM/TO`; applied to all three audit templates (V2 ×2 + V1) |
+| §7.5 §6.3 / §6.4 scoring amendments | **Shipped** | B3/B4 above + `applyRenderControlCoverageGate` (`MIN_RENDER_CONTROL_COVERAGE_FOR_TIER = 0.5`) wired into the external-import path |
 | §8 render-rate measurement prerequisite | **No artefact in-repo** | cannot confirm the §8 graduated decision rule was ever applied per platform |
 
-Seed marker history: the proposed `availability-control-1` landed, then was superseded by `business-audit-v2-2026-09-16-outreach-problems-1` (current).
+**Also shipped alongside (not separate spec items):**
 
-**Practical consequence:** the mechanism is live but produces no *new* signal on the platforms that block most (Facebook, Yelp) — every determination there collapses to `unable_to_verify` via §3.3. §12 addresses exactly that gap.
+- **§6.1 gap_analysis cascade (C3)** — seed `PLATFORM_GAP_CASCADE_DIRECTIVE`: a control-confirmed platform absence records ONE `profile_presence` gap + one gate entry per non_negotiable gate, instead of fanning out per expected field.
+- **Platform-syndication precision** — seed `PLATFORM_SYNDICATION_CLAUSE`: a platform captured via a syndication/integration path (e.g. Yelp metrics inside an Apple Maps place card) is `partial` with the capture path noted, and must NOT be grouped with platforms recorded `unable_to_verify`.
+- **`data_quality.conflicts` scope** — seed `DATA_QUALITY_CONFLICTS_CLAUSE`: conflicts is for conflicting EVIDENCE about the business, not prompt-block provenance notes.
+
+**Seed marker history:** the proposed `availability-control-1` landed, then was superseded by `business-audit-v2-2026-09-16-outreach-problems-1`, then by `business-audit-v2-2026-09-18-availability-scoring-4` (current).
+
+**Practical consequence:** the scoring amendments close the "unverifiability scored as health" defect — `unable_to_verify` components no longer count against the denominator, and the tier + fee are suppressed entirely when render-control coverage falls below the threshold, so an unassessable audit no longer emits a confident `tier_3`. What remains open is the *signal* gap: on the platforms that block most (Facebook, Yelp) every determination still collapses to `unable_to_verify` per §3.3, so no `DS_MISSING_PROFILE` is emitted there. §9.3 (control result feeding the discovery surface) is the natural place to close that.
 
 ---
 
@@ -328,16 +334,16 @@ Also add a **coverage qualifier**: `controls_rendered / controls_attempted`. Sup
 - [ ] **Seed-insertion safety (E1):** Per AGENTS.md, `insertAfter` fingerprints only the first 80 chars of the insertion — never combine multiple bindings into one `insertAfter` call. The directive is a single block, so this is safe, but if the directive is later split into multiple bindings, each must be a separate `insertAfter`. Do NOT use `removeSection` on the Platforms section (it would eat up to the next `##` heading). If a prior version of the directive needs removal for a version bump, use a `replaceFirst` on the directive's heading line (`### Platform Availability Verification — REQUIRED`) instead.
 - [ ] Amend the `Absence vs. Non-Negotiable` paragraph (§4.1). This paragraph lives in the `GOLD_STANDARD_BINDING` const (seed line 82) and is inserted via `insertAfter` at step 1. Use `replaceFirst` on the existing paragraph text to append the exception clause.
 - [ ] Amend the `DS_MISSING_PROFILE` definition (§4.2). The definition lives in the DB template body — extract the exact source text from the live template and use `replaceFirst`.
-- [ ] If §6.1 rubric amendment is in scope: extract the `google_profile_maintenance` rubric sentence from the live template body and add a `replaceFirst` transform (see §6.1).
-- [ ] Bump `SEED_VERSION_MARKER` in the seed script. Current value: `business-audit-v2-2026-09-15-narrative-tone-6`. New value: `business-audit-v2-2026-09-15-availability-control-1`. The marker bump is what triggers re-application — a marker collision with the existing value would silently skip all transforms.
-- [ ] Re-run the seed against **both** configs per AGENTS.md: `doppler run --config local -- npx tsx src/scripts/seed-business-audit-v2-templates.ts`, then again with `--config prd`
-- [ ] Verify the live template's `updated_at` moved (or regenerate the dump via `dump-prompt-templates.ts`)
+- [x] If §6.1 rubric amendment is in scope: extract the `google_profile_maintenance` rubric sentence from the live template body and add a `replaceFirst` transform (see §6.1).
+- [x] Bump `SEED_VERSION_MARKER` in the seed script. Applied value: `business-audit-v2-2026-09-18-availability-scoring-4`. The marker bump is what triggers re-application — a marker collision with the existing value would silently skip all transforms.
+- [x] Re-run the seed against **both** configs per AGENTS.md: `doppler run --config local -- npx tsx src/scripts/seed-business-audit-v2-templates.ts`, then again with `--config prd`
+- [x] Verify the live template's `updated_at` moved (or regenerate the dump via `dump-prompt-templates.ts`)
 
 ### 7.2 Validator (schema-level)
 
 - [ ] Add the `render_controls` array to `business-analysis.schema.ts` with typed fields per §5 (C1 enums for `access_barrier` and `determination`)
-- [ ] Change `action_classification` from `actionClassificationEnum.optional()` to `actionClassificationEnum.nullable().optional()` (B3, line 477)
-- [ ] Change `recommended_tier` from `tierEnum` (required) to `tierEnum.nullable().optional()` (B4, line 612) — only if §6.4 coverage-suppression is in scope
+- [x] Change `action_classification` from `actionClassificationEnum.optional()` to `actionClassificationEnum.nullable().optional()` (B3, line 477)
+- [x] Change `recommended_tier` from `tierEnum` (required) to `tierEnum.nullable().optional()` (B4, line 612) — only if §6.4 coverage-suppression is in scope
 - [ ] Add the `render_controls` schema fragment to the seed's embedded JSON schema (precedent: `GAP_AND_GATES_SCHEMA` insertion pattern, step 3)
 - [ ] Verify with a real import through the external-import path — do not rely on reading the schema (§5.1)
 
@@ -361,14 +367,14 @@ Also add a **coverage qualifier**: `controls_rendered / controls_attempted`. Sup
 
 ### 7.4 Audit card (frontend)
 
-- [ ] If Option B: surface control results on the audit card
-- [ ] Surface the coverage qualifier (`controls_rendered / controls_attempted`) on the audit card when below threshold
+- [x] If Option B: surface control results on the audit card
+- [x] Surface the coverage qualifier (`controls_rendered / controls_attempted`) on the audit card when below threshold
 
 ### 7.5 Scoring amendments (deferred-capable)
 
-- [ ] Apply the §6.1 scoring amendment (`google_profile_maintenance` split) — or defer to a follow-on spec if the control ships first
-- [ ] Apply the §6.3 `action_classification: null` amendment — or defer
-- [ ] Apply the §6.4 coverage qualifier + tier suppression — or defer
+- [x] Apply the §6.1 scoring amendment (`google_profile_maintenance` split) — or defer to a follow-on spec if the control ships first
+- [x] Apply the §6.3 `action_classification: null` amendment — or defer
+- [x] Apply the §6.4 coverage qualifier + tier suppression — or defer
 - [ ] §6.2 score-inversion redesign — deferred to a separate spec (C4)
 
 ---
