@@ -4,7 +4,7 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Ecommerce+Checkout';
-const title = 'Clean Ecommerce Checkout for Local Retail | Visible Shelf';
+const title = 'Clean Ecommerce Checkout for Local Retail | VisibleShelf';
 const description =
   'A fast, branded checkout for local retailers. Shipping, local delivery, in-store pickup, and digital products — all in one clean experience.';
 

@@ -320,8 +320,8 @@ export function simulateInventoryUpdate(item_id: string, newStock: number): Demo
  */
 export type SimulationScenario = 
   // Item scenarios
-  | 'stock_update'          // Clover stock changed, needs sync to Visible Shelf
-  | 'price_update'          // Clover price changed, needs sync to Visible Shelf
+  | 'stock_update'          // Clover stock changed, needs sync to VisibleShelf
+  | 'price_update'          // Clover price changed, needs sync to VisibleShelf
   | 'new_item'              // New item added in Clover
   | 'item_deleted'          // Item deleted in Clover
   | 'conflict'              // SKU conflict between systems
@@ -363,7 +363,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       { field: 'stock', oldValue: 65, newValue: 52 }
     ],
     message: 'Stock levels updated in Clover POS after sales transactions',
-    resolution: 'Auto-sync will update Visible Shelf inventory to match Clover'
+    resolution: 'Auto-sync will update VisibleShelf inventory to match Clover'
   }),
   
   price_update: () => ({
@@ -376,7 +376,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       { field: 'price', oldValue: 2999, newValue: 2499 }
     ],
     message: 'Price reduced in Clover POS for promotional sale',
-    resolution: 'Price will sync to Visible Shelf and update storefront listings'
+    resolution: 'Price will sync to VisibleShelf and update storefront listings'
   }),
   
   new_item: () => ({
@@ -395,7 +395,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       }}
     ],
     message: 'New product added to Clover inventory',
-    resolution: 'Item will be imported to Visible Shelf with auto-categorization'
+    resolution: 'Item will be imported to VisibleShelf with auto-categorization'
   }),
   
   item_deleted: () => ({
@@ -408,7 +408,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       { field: 'status', oldValue: 'active', newValue: 'deleted' }
     ],
     message: 'Item discontinued and removed from Clover',
-    resolution: 'Visible Shelf item will be marked as archived (not deleted)'
+    resolution: 'VisibleShelf item will be marked as archived (not deleted)'
   }),
   
   conflict: () => ({
@@ -419,10 +419,10 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
     affectedItems: ['demo_item_011'],
     changes: [
       { field: 'price', oldValue: 1999, newValue: 2199 }, // Clover price
-      { field: 'price_rvp', oldValue: 1999, newValue: 1799 } // Visible Shelf price (edited locally)
+      { field: 'price_rvp', oldValue: 1999, newValue: 1799 } // VisibleShelf price (edited locally)
     ],
-    message: 'Price conflict detected: Item was edited in both Clover and Visible Shelf',
-    resolution: 'Manual resolution required: Choose Clover value, Visible Shelf value, or custom'
+    message: 'Price conflict detected: Item was edited in both Clover and VisibleShelf',
+    resolution: 'Manual resolution required: Choose Clover value, VisibleShelf value, or custom'
   }),
   
   sync_failure: () => ({
@@ -468,7 +468,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       }}
     ],
     message: 'New category "Seasonal Specials" created in Clover',
-    resolution: 'Category will be synced to Visible Shelf and available for item assignment'
+    resolution: 'Category will be synced to VisibleShelf and available for item assignment'
   }),
 
   category_renamed: () => ({
@@ -481,7 +481,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       { field: 'category_name', oldValue: 'Electronics', newValue: 'Tech & Gadgets' }
     ],
     message: 'Category renamed from "Electronics" to "Tech & Gadgets" in Clover',
-    resolution: 'Visible Shelf category will be updated, all linked items remain assigned'
+    resolution: 'VisibleShelf category will be updated, all linked items remain assigned'
   }),
 
   category_items_moved: () => ({
@@ -495,7 +495,7 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
       { field: 'items_moved', oldValue: 2, newValue: 2 }
     ],
     message: '2 items moved from "Home & Kitchen" to "Office Supplies" in Clover',
-    resolution: 'Item category assignments will update in Visible Shelf to match Clover'
+    resolution: 'Item category assignments will update in VisibleShelf to match Clover'
   }),
 
   category_conflict: () => ({
@@ -506,10 +506,10 @@ const SIMULATION_SCENARIOS: Record<SimulationScenario, () => SimulationEvent> = 
     affectedItems: [],
     changes: [
       { field: 'category_name', oldValue: 'Sports & Outdoors', newValue: 'Sports & Fitness' }, // Clover
-      { field: 'category_name_rvp', oldValue: 'Sports & Outdoors', newValue: 'Outdoor Recreation' } // Visible Shelf
+      { field: 'category_name_rvp', oldValue: 'Sports & Outdoors', newValue: 'Outdoor Recreation' } // VisibleShelf
     ],
     message: 'Category conflict: "Sports & Outdoors" renamed differently in both systems',
-    resolution: 'Manual resolution required: Choose Clover name, Visible Shelf name, or merge categories'
+    resolution: 'Manual resolution required: Choose Clover name, VisibleShelf name, or merge categories'
   })
 };
 
@@ -545,7 +545,7 @@ export function getAvailableScenarios(): { scenario: SimulationScenario; name: s
     {
       scenario: 'new_item',
       name: 'New Item Added',
-      description: 'Simulates adding a new product in Clover that needs to sync to Visible Shelf',
+      description: 'Simulates adding a new product in Clover that needs to sync to VisibleShelf',
       type: 'item'
     },
     {
@@ -576,13 +576,13 @@ export function getAvailableScenarios(): { scenario: SimulationScenario; name: s
     {
       scenario: 'new_category',
       name: 'New Category Added',
-      description: 'Simulates Clover adding a new category that syncs to Visible Shelf',
+      description: 'Simulates Clover adding a new category that syncs to VisibleShelf',
       type: 'category'
     },
     {
       scenario: 'category_renamed',
       name: 'Category Renamed',
-      description: 'Simulates renaming a category in Clover and syncing to Visible Shelf',
+      description: 'Simulates renaming a category in Clover and syncing to VisibleShelf',
       type: 'category'
     },
     {
@@ -594,7 +594,7 @@ export function getAvailableScenarios(): { scenario: SimulationScenario; name: s
     {
       scenario: 'category_conflict',
       name: 'Category Conflict',
-      description: 'Simulates a category name conflict between Clover and Visible Shelf',
+      description: 'Simulates a category name conflict between Clover and VisibleShelf',
       type: 'category'
     }
   ];

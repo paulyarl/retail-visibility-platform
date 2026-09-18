@@ -20,7 +20,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const SHOWCASE_STORE_NAME = 'Visible Shelf Demo Store';
+const SHOWCASE_STORE_NAME = 'VisibleShelf Demo Store';
 
 async function getShowcaseStore() {
   const tenant = await prisma.tenant.findFirst({

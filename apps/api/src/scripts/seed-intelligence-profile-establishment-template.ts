@@ -44,8 +44,14 @@ import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-pro
  * commercial suburbs, including separately-incorporated municipalities that
  * share ZIPs with it (the shared-ZIP suburb class, e.g. Gladstone, MO / 64118).
  * Adds adjacent_municipalities to geography_grid.
+ *
+ * 2026-09-18-signal-weights: adds PLATFORM SIGNAL WEIGHTS (§4c) — the local
+ * estimate of signal_weight(category, platform) ∈ [0,1] with basis +
+ * confidence + observations, the market-layer counterpart of the national
+ * gold-standard estimate. A confident local weight outranks the national one
+ * at resolution time.
  */
-const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-18-metro-catchment';
+const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-18-signal-weights';
 
 const ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-intel-profile-establishment-001',
@@ -168,6 +174,10 @@ an industrial or arterial stretch that no general city guide mentions.
 
    HARD RULE — LABEL-INDEPENDENT SWEEPS MUST BE GEOGRAPHY-KEYED. When you name an address-indexed dataset (state registry, benefit-program authorization, licensing, permit registries), specify that it is swept by GEOGRAPHY (ZIP/address) and filtered to category fit afterward. Do NOT implement it as a name-token query. Token-keying a label-independent dataset makes it label-dependent and defeats its purpose: a business whose legal name carries no category token will be invisible to it.
 
+4c. PLATFORM SIGNAL WEIGHTS (REQUIRED) — Estimate signal_weight(category, platform) for this market: how much each platform's signals (category traffic, reviews, ratings, profiles) should move a score for this category, as a number in [0,1]. This is the LOCAL estimate — derive it from what you observed in {{city}}: prevalence x depth, i.e. what share of the category's customer-facing activity in this market actually happens on that platform.
+
+   Emit "platform_signal_weights" with one entry per platform: { "platform", "weight", "basis", "confidence", "observations" }. weight is 0-1 and honest — a platform this market's category barely uses scores low; do NOT inflate. basis records the observed evidence behind the number (e.g. "7/8 category businesses found here carry active Google profiles with recent reviews; Yelp listings are sparse and stale"). confidence (0-1) is how reliable the estimate is given what you actually saw, and observations is the sample size. A confident local estimate outranks the national gold-standard weight at scoring time — the confidence you record is what lets it.
+
 5. DISCOVERY PATTERNS — How should an analyst search for businesses in this category? What vertical directories, professional networks, or niche platforms should be searched? What search strategies surface businesses that are invisible to mainstream search? Provide at least one concrete pattern for EACH of these query shapes, with real examples for this category and {{city}}:
    (a) CATEGORY-TAXONOMY queries — the platform's own category labels, including the wrong or generic labels a mis-categorized business would sit under.
    (b) NAME-TOKEN queries — business names built from endonyms, transliterations, personal names, or place names. These carry no English category word and are invisible to category-name searches.
@@ -203,7 +213,7 @@ Record the result in discovery_patterns under the key "coverage_self_test", stat
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-2026-09-18-metro-catchment -->`,
+<!-- seed-version: intel-profile-establishment-2026-09-18-signal-weights -->`,
   variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,

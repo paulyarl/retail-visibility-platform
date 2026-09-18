@@ -17,7 +17,7 @@ export function PoweredByFooter({ note, showBusinessOwnersLink = true }: { note?
         <div className="flex items-center justify-center gap-2">
           <span className="text-sm text-neutral-600 dark:text-neutral-400">⚡Powered by</span>
           {platformSettings?.logoUrl && (
-            <Link href="/" title={platformSettings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >
+            <Link href="/" title={platformSettings?.platformName || 'VisibleShelf'} style={{ textDecoration: 'none' }} >
             <img
               src={platformSettings.logoUrl}
               alt={platformSettings.platformName || 'Platform Logo'}
@@ -31,7 +31,7 @@ export function PoweredByFooter({ note, showBusinessOwnersLink = true }: { note?
           )}
           <Link href="/" style={{ textDecoration: 'none' }}>
             <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-              {platformSettings?.platformName || 'Visible Shelf'}
+              {platformSettings?.platformName || 'VisibleShelf'}
             </span>
           </Link>
         </div>

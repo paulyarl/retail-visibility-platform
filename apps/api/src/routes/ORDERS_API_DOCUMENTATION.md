@@ -2,7 +2,7 @@
 **Phase 3A: Order Management Foundation**
 
 ## Overview
-The Orders API provides endpoints for creating and managing orders in the Visible Shelf platform. Orders support optional payment processing, allowing tenants to use the platform for order tracking without payment integration if desired.
+The Orders API provides endpoints for creating and managing orders in the VisibleShelf platform. Orders support optional payment processing, allowing tenants to use the platform for order tracking without payment integration if desired.
 
 ## Base URL
 ```

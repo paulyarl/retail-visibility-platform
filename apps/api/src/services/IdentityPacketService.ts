@@ -113,6 +113,12 @@ export interface AssembleInput {
    */
   manualEvidence?: IdentityEvidenceRow[];
   seed?: { id: string; status: string; publicUrl: string | null } | null;
+  /**
+   * Resolved signal_weight(category, platform) keyed by platform key
+   * (google, yelp, …), from the category's intelligence profiles (Phase 5).
+   * Absent/empty → every source scores unweighted (legacy byte-identity).
+   */
+  signalWeights?: Record<string, number>;
 }
 
 const PLATFORM_SOURCES: Array<{ key: string; name: string; tier: IdentitySourceTier; group: string }> = [
@@ -351,6 +357,14 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
       const cls = inferAuthorityClass(s.name, s.tier);
       s.authorityClass = cls;
       s.dimension = dimensionForClass(cls);
+      // Signal weight — platform-keyed sources (audit blocks carry the
+      // platform key as their independence group; manual/provenance sources
+      // resolve it from the source name) get their resolved weight. Sources
+      // with no platform key stay unweighted (→ 1 in the scorer).
+      const w =
+        input.signalWeights?.[s.independenceGroup] ??
+        input.signalWeights?.[sourceGroupSlug(s.name)];
+      if (w != null) s.signalWeight = w;
     }
   }
 
@@ -545,6 +559,31 @@ class IdentityPacketService {
       });
     }
 
+    // Signal weights — signal_weight(category, platform) resolved from the
+    // category's intelligence profiles (Phase 5). Non-fatal: an empty map
+    // leaves every source unweighted and the scoring byte-identical to the
+    // pre-weight model.
+    let signalWeights: Record<string, number> = {};
+    try {
+      if (campaign?.category) {
+        const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
+        const platformKeys = new Set<string>(PLATFORM_SOURCES.map((p) => p.key));
+        for (const k of Object.keys(audit?.platforms ?? {})) platformKeys.add(k);
+        const resolved = await IntelligenceProfileService.getInstance().resolveSignalWeights({
+          category: campaign.category,
+          platforms: [...platformKeys],
+          city: campaign.city ?? null,
+          state: campaign.state ?? null,
+        });
+        for (const [k, v] of resolved) signalWeights[k] = v.weight;
+      }
+    } catch (error) {
+      logger.warn('IdentityPacket: signal-weight resolution failed (non-fatal)', undefined, {
+        campaignId,
+        error: (error as Error).message,
+      });
+    }
+
     return assembleIdentityPacket({
       campaignId,
       campaign,
@@ -554,6 +593,7 @@ class IdentityPacketService {
       attributes,
       manualEvidence,
       seed,
+      signalWeights,
     });
   }
 }

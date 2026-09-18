@@ -654,7 +654,7 @@ export function pickOrgGrowthTip(ctx: OrgTipContext, seed: number = 0): OrgGrowt
       id: 'org-default',
       category: 'engagement',
       priority: 'low',
-      title: 'Grow your chain with Visible Shelf',
+      title: 'Grow your chain with VisibleShelf',
       body: 'Set up your hero location, add products, and propagate across all locations to maximize your chain\'s visibility on Google and the platform directory.',
       cta: 'View settings',
       ctaLink: ctx.tenantId ? `/t/${ctx.tenantId}/settings/organization` : '/settings/organization',

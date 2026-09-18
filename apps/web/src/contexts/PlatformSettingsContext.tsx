@@ -65,7 +65,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
         }
 
         const mappedSettings: PlatformSettings = {
-          platformName: settingsData.platformName || 'Visible Shelf',
+          platformName: settingsData.platformName || 'VisibleShelf',
           platformDescription: settingsData.platformDescription || 'Manage your retail operations with ease',
           logoUrl: settingsData.logoUrl || null,
           faviconUrl: settingsData.faviconUrl || null,
@@ -110,7 +110,7 @@ export function usePlatformSettings() {
     // Return default values instead of throwing during SSR/build
     return {
       settings: {
-        platformName: 'Visible Shelf',
+        platformName: 'VisibleShelf',
         platformDescription: 'Manage your retail operations with ease',
         logoUrl: null,
         faviconUrl: null,

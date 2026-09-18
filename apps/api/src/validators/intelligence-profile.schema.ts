@@ -100,6 +100,29 @@ const labelIndependentSweepSchema = z.object({
   note: z.string().optional(),
 }).passthrough();
 
+// ─── Platform signal weights (signal-weight spec) ────────────────────────
+//
+// signal_weight(category, platform) ∈ [0,1] — the single source of truth for
+// how much a platform's signal should move a score for this category. A
+// gold-standard (national) establishment derives it from coast-to-coast
+// samples; a market establishment derives it locally with the same estimator,
+// and a confidence factor decides whether the local weight outranks the
+// national one.
+
+const platformSignalWeightSchema = z.object({
+  platform: z.string().min(1),
+  // How much this platform's signal should move a score for this category.
+  weight: z.number().min(0).max(1),
+  // The observed prevalence × depth behind the estimate — auditable, not a
+  // bare number (e.g. "8/10 category businesses carry active profiles with
+  // recent reviews").
+  basis: z.string().optional(),
+  // Derivation confidence ∈ [0,1] — the local-precedence gate reads this.
+  confidence: z.number().min(0).max(1).optional(),
+  // Sample size behind the estimate (category businesses observed).
+  observations: z.number().int().optional(),
+}).passthrough();
+
 // ─── Profile Configuration (§10 structure) ───────────────────────────────
 
 export const intelligenceProfileSchema = z.object({
@@ -125,6 +148,14 @@ export const intelligenceProfileSchema = z.object({
   geography_grid: geographyGridSchema.optional(),
   generic_label_set: z.array(genericLabelSetEntrySchema).optional(),
   label_independent_sweeps: z.array(labelIndependentSweepSchema).optional(),
+
+  // Platform signal weights — signal_weight(category, platform) ∈ [0,1].
+  // Optional so legacy profiles still validate; the establishment template +
+  // prompt suffix require it for every NEW profile.
+  platform_signal_weights: z.array(platformSignalWeightSchema).optional(),
+  // Local-vs-national divergence per platform (local.weight − national.weight)
+  // — recorded by market establishments that observed both layers.
+  platform_signal_divergence: z.record(z.string(), z.number()).optional(),
 
   // Discovery patterns — how to find businesses in this category
   discovery_patterns: z.record(z.string(), z.any()).optional(),
@@ -187,6 +218,18 @@ Return a single JSON object with this structure (the Category Intelligence Profi
       "note": "<optional>"
     }
   ],
+  "platform_signal_weights": [
+    {
+      "platform": "<platform key: google | yelp | facebook | apple | bbb | instagram | ...>",
+      "weight": <number 0-1>,
+      "basis": "<observed prevalence x depth behind the estimate>",
+      "confidence": <number 0-1>,
+      "observations": <integer — category businesses observed>
+    }
+  ],
+  "platform_signal_divergence": {
+    "<platform>": <local weight - national weight, when both were observed>
+  },
   "discovery_patterns": {
     "<pattern_name>": "<description or instructions>",
     ...
@@ -209,6 +252,8 @@ Rules:
 - geography_grid.zips MUST list every ZIP the market's commercial addresses fall in, not only the ZIPs where category businesses were already found. Every ZIP is swept independently; a ZIP with zero findings is an executed-empty result, not a silent skip.
 - geography_grid scope is the RETAIL CATCHMENT, not the administrative city: the principal city PLUS its contiguous commercial suburbs. geography_grid.adjacent_municipalities MUST list the separately-incorporated municipalities in the catchment — including any that share a ZIP with the principal city (the shared-ZIP suburb class). A ZIP spanning the principal city and a suburb is ONE sweep unit.
 - generic_label_set MUST name the generic/misleading labels that hide this category on each platform, not the correct category label.
+- platform_signal_weights is REQUIRED for every new profile. For each platform where this category's customers actually are (reviews, ratings, profiles, category traffic), estimate signal_weight = prevalence x depth — how much of the category's customer-facing activity happens on that platform — as a number in [0,1]. Each entry MUST carry "basis" (the observed evidence behind the number), "confidence" (how reliable the estimate is, in [0,1]), and "observations" (the sample size). A platform with high signal weight outranks a low-signal one in scoring; do not inflate weights for platforms the category barely uses.
+- platform_signal_divergence is OPTIONAL — record it only when both a national and a local estimate were observed for the same platform (local weight - national weight).
 - For each specialized_source that has a canonical web address (a homepage, directory index, organization page, or store locator), include its "url". Vertical directories, community organizations, professional networks, and official brand/chain websites should always carry a url — it is the operator's entry point to the source. Omit "url" only for sources that have no single canonical web address (e.g. "storefront photo evidence", "SNAP listings" as a class).
 - limitations are critical — they describe what the source does NOT measure (e.g. "CARFAX service history is NOT a review system").
 - prohibited_inferences MUST list at least one inference that must not be made (e.g. "Absence from CARFAX does NOT mean the business is inactive").

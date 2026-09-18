@@ -46,7 +46,7 @@ export default function QuickStartEmptyState({ tenantId }: QuickStartEmptyStateP
                   </span>
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Generate 25-100 pre-built products in 1 second! Perfect for getting started quickly. 
+                  Generate 25-100 pre-built products in seconds — the fastest way to get started.
                   All products are created as drafts so you can customize them before publishing.
                 </p>
                 <div className="flex flex-wrap gap-2 mb-4">

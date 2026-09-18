@@ -235,27 +235,28 @@ describe('assembleIdentityPacket', () => {
       }),
     );
     expect(p.score.identityScore).toBe(100);
-    // A registry alone satisfies the IDENTITY dimension only — one dimension
-    // cannot earn a seed under the 2-of-4 gate.
+    // A registry alone satisfies only the IDENTITY dimension — but its depth
+    // (weight 4) clears the strength bar, so a single strong signal seeds.
     expect(p.score.gate.satisfiedCount).toBe(1);
-    expect(p.score.gate.decision).toBe('blocked');
-    expect(p.score.band).toBe('blocked');
+    expect(p.score.gate.decision).toBe('guaranteed');
+    expect(p.score.band).toBe('ready');
     expect(p.ledger.map((l) => l.name)).toEqual(['State business registry']);
     expect(p.ledger[0].manual).toBe(true);
   });
 
   it('rescues an unaudited business when the operator captures owner confirmation', () => {
-    // Identity (registry) + an owner_confirmed capture — the owner is the fifth
-    // axis, so a seed short of earning is rescued.
+    // One weak directory capture (short of earning AND below the strength
+    // bar) + an owner_confirmed capture — the owner is the fifth axis, so the
+    // seed is rescued.
     const p = assembleIdentityPacket(
       base({
         audit: null,
         manualEvidence: [
           manualRow({
-            id: 'idev-reg',
-            sourceName: 'State business registry',
-            tier: 'authoritative',
-            evidenceState: 'confirmed',
+            id: 'idev-dir',
+            sourceName: 'Some Directory',
+            tier: 'secondary_aggregator',
+            evidenceState: 'observed',
             corroborates: ['name', 'address'],
           }),
           manualRow({ id: 'idev-owner', evidenceState: 'owner_confirmed', corroborates: ['name'] }),
@@ -263,6 +264,7 @@ describe('assembleIdentityPacket', () => {
       }),
     );
     expect(p.score.gate.satisfiedCount).toBe(1);
+    expect(p.score.gate.guaranteed).toBe(false);
     expect(p.score.gate.ownerOverRule).toBe(true);
     expect(p.score.gate.decision).toBe('rescued');
     expect(p.score.band).toBe('review');
@@ -347,5 +349,21 @@ describe('assembleIdentityPacket', () => {
     const manual = name.sources.find((s) => s.manual)!;
     expect(manual.agrees).toBe(false);
     expect(name.conflictWeight).toBeGreaterThan(0);
+  });
+
+  it('applies resolved signal weights to platform sources — and leaves others unweighted', () => {
+    const p = assembleIdentityPacket(base({ signalWeights: { google: 0.5 } }));
+    const google = p.score.fields
+      .find((f) => f.field === 'name')!
+      .sources.find((s) => s.name === 'Google Business Profile')!;
+    expect(google.signalWeight).toBe(0.5);
+    // Google 2 × 0.5 = 1 — the operational dimension's strength reflects it.
+    const op = p.score.gate.dimensions.find((d) => d.dimension === 'operational')!;
+    expect(op.strength).toBe(1);
+    // A non-platform source (the registry) gets no weight → scores at 1.
+    const registry = p.score.fields
+      .flatMap((f) => f.sources)
+      .find((s) => s.name === 'Indiana Secretary of State')!;
+    expect(registry.signalWeight).toBeUndefined();
   });
 });

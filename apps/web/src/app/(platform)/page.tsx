@@ -867,7 +867,7 @@ function Home() {
                     <div className="h-3 w-3 rounded-full bg-green-500"></div>
                     <div className="flex-1">
                       <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Getting Started</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Set up your Visible Shelf</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Set up your VisibleShelf</p>
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">

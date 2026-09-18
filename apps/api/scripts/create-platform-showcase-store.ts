@@ -20,12 +20,12 @@ const prisma = new PrismaClient();
 // Platform showcase store configuration
 const SHOWCASE_CONFIG = {
   tenant: {
-    name: 'Visible Shelf Demo Store',
+    name: 'VisibleShelf Demo Store',
     subscriptionTier: 'professional', // Give it Pro features
     subscriptionStatus: 'active',
   },
   businessProfile: {
-    businessName: 'Visible Shelf Demo Store',
+    businessName: 'VisibleShelf Demo Store',
     businessLine1: '123 Demo Street',
     city: 'San Francisco',
     state: 'CA',
@@ -47,8 +47,8 @@ const SHOWCASE_CONFIG = {
       instagram: 'https://instagram.com/visibleshelf',
     },
     seoTags: {
-      title: 'Visible Shelf Demo Store - See What\'s Possible',
-      description: 'Explore our showcase store featuring products across multiple categories. See how Visible Shelf can transform your retail business.',
+      title: 'VisibleShelf Demo Store - See What\'s Possible',
+      description: 'Explore our showcase store featuring products across multiple categories. See how VisibleShelf can transform your retail business.',
       keywords: ['demo store', 'retail showcase', 'inventory management', 'visible shelf'],
     },
     updatedAt: new Date(),

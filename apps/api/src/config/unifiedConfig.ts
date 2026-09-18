@@ -438,7 +438,7 @@ class UnifiedConfig {
   }
 
   get emailFromName(): string {
-    return this.env.EMAIL_FROM_NAME || 'Visible Shelf Platform';
+    return this.env.EMAIL_FROM_NAME || 'VisibleShelf';
   }
 
   // ─── Upload ───────────────────────────────────────────────────────────

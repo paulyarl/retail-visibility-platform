@@ -4,7 +4,7 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Google+Visibility+Checklist';
-const title = 'Google Visibility Checklist for Local Retail | Visible Shelf';
+const title = 'Google Visibility Checklist for Local Retail | VisibleShelf';
 const description =
   'Download the free checklist to diagnose why your store is not showing up on Google and get the exact steps to fix it.';
 

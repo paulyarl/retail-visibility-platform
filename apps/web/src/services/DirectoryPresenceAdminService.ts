@@ -157,6 +157,11 @@ export interface IdentityPacket {
     gate?: {
       decision: 'guaranteed' | 'earned' | 'rescued' | 'blocked';
       satisfiedCount: number;
+      /** Sum of the four dimension strengths (presence + citations). */
+      dimensionStrength: number;
+      /** Proven recent activity (reviews / ratings / recency axis) — not a dimension. */
+      supportingStrength: number;
+      /** dimensionStrength + supportingStrength. */
       totalStrength: number;
       earned: boolean;
       guaranteed: boolean;

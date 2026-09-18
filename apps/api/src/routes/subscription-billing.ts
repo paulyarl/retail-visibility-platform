@@ -928,7 +928,7 @@ router.get('/invoices/:id/pdf', requirePermission('CAN_MANAGE_TENANT_BILLING'), 
     // Get platform branding settings
     const platformSettings = await prisma.platform_settings_list.findFirst();
     const branding = {
-      platformName: platformSettings?.platform_name || 'Visible Shelf',
+      platformName: platformSettings?.platform_name || 'VisibleShelf',
       logoUrl: platformSettings?.logo_url,
       primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
       contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',

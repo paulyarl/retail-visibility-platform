@@ -208,6 +208,17 @@ export const goldStandardScanSchema = z.object({
 
   candidates: z.array(candidateBusinessSchema).optional(),
 
+  // National signal_weight(category, platform) ∈ [0,1], derived from the
+  // observed candidate pool (signal-weight spec). Lands in the profile's
+  // configuration_json, where the resolver reads it.
+  platform_signal_weights: z.array(z.object({
+    platform: z.string().min(1),
+    weight: z.number().min(0).max(1),
+    basis: z.string().optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    observations: z.number().int().optional(),
+  }).passthrough()).optional(),
+
   scan_metadata: scanMetadataSchema.optional(),
 }).passthrough();
 
@@ -311,6 +322,16 @@ Return a single JSON object with this structure (the Gold Standard Scan result):
     }
   ],
 
+  "platform_signal_weights": [
+    {
+      "platform": "<google|yelp|facebook|bbb|apple_maps|bing|instagram|...>",
+      "weight": <number 0-1>,
+      "basis": "<observed prevalence x depth behind the estimate>",
+      "confidence": <number 0-1>,
+      "observations": <integer — candidates evaluated>
+    }
+  ],
+
   "scan_metadata": {
     "scan_date": "<ISO date>",
     "sources_consulted": ["<source name>", ...],
@@ -372,6 +393,12 @@ Rules:
   Each candidate MUST include ownership_type, location_count_estimate, and
   independence_rationale. A candidate with ownership_type "franchise" or "chain"
   cannot have is_gold_standard = true.
+- platform_signal_weights — REQUIRED. For each platform you observed, emit
+  signal_weight(category, platform) ∈ [0,1]: the share of the category's
+  customer-facing activity that happens on that platform (prevalence x depth).
+  Each entry MUST carry "basis" (the observed evidence behind the number),
+  "confidence" (0-1), and "observations" (the candidate count behind it). Do
+  not inflate weights for platforms the category barely uses.
 - Geographic scope is specified in the SEARCH SCOPE section at the end of this
   prompt. Follow it — do not assume nationwide unless it says nationwide.
 `;

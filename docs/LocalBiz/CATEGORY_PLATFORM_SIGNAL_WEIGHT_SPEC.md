@@ -61,9 +61,11 @@ Source authorities have **roles relative to a profile**, and the role determines
 
 **The gate:**
 
-- **2 of 4 dimensions → earns a seed.**
-- **The full threshold → guarantees a seed.**
-- **Owner confirmation → over-rules the threshold; proceeds to seed.**
+- **2 of 4 dimensions → earns a seed** (breadth).
+- **The strength threshold → guarantees a seed** (depth *or* breadth — a single high-signal platform presence is enough on its own).
+- **Owner confirmation → over-rules the threshold; proceeds to seed** — but only when the prospect is *short of earning*. It never overrides a hard veto and is not needed once a seed is guaranteed or earned.
+
+**Strength is presence + activity.** Total strength is the sum of two parts: **dimension strength** — the tier-weighted presence/citation of distinct agreeing sources per dimension — and **supporting strength** — proven recent activity (reviews, ratings, recent comments, secondary citations) feeding the operational recency axis. Third-party sources that are *not category-recognizable* still count as supporting signals. **Platform presence alone is sufficient**: a strong single platform (e.g. Google) seeds with no second dimension and no activity signal, while a weaker presence can still cross the bar on the strength of its recent activity.
 
 **Reachability does not gate seeding.** Seeding status is driven by **signal strength** — the dimension threshold (2/4 earns, full threshold guarantees) plus the owner axis. Owner reachability is orthogonal: it governs the *claim invite*, not the *seed*. A seed publishes on signal strength; the invite is a separate operational step that needs a channel, and its absence does not block publishing.
 
@@ -95,7 +97,7 @@ The operator is a peer of the analyst, not a data-entry clerk. Just as the analy
 - it can **adjudicate a conflict** within a dimension, and
 - it can record the **owner axis** (over-rule).
 
-**"Add evidence" is the operator's instrument**, and it must be able to actually unblock — raise a dimension toward 2/4, adjudicate a conflict, or record owner confirmation. It is not a silent override: it is attributed, logged evidence with the same standing as analyst-collected public signal.
+**"Add evidence" is the operator's instrument**, and it must be able to actually unblock — satisfy a dimension toward 2/4, lift strength toward the bar (a supporting citation counts even when it is not category-recognizable), adjudicate a conflict, or record owner confirmation. It is not a silent override: it is attributed, logged evidence with the same standing as analyst-collected public signal.
 
 *This corrects the current implementation*, where operator evidence is hardcoded `agrees: true` (`IdentityPacketService.assembleIdentityPacket` step 6) and can only *add* agreement — it can never clear a veto. That makes the tool unable to do the job the operator needs it for.
 
@@ -273,21 +275,21 @@ Scoped to the scoring remit (§2). Anything not on this list is a non-goal.
 - [ ] Make the guarded lane real: extract the gate into a **shared evaluator** (pure service) and route the Identity tab Push through a server-side guarded entry that calls it. The PG cockpit Push is the likely second consumer — same evaluator, no re-implementation (identity-packet access from the cockpit is out of scope). Leave the raw `createFromCampaign` endpoint for the manual lane.
 - [ ] Classify each source's authority class → evidence dimension (operational / identity / category / location); scope each conflict to its dimension.
 - [ ] Operational dimension: density-weighted corroboration — social/directory count × signal weight; multiple independent socials score high.
-- [ ] Seed gate: replace the single veto with the dimension threshold — **2 of 4 earns**, full threshold guarantees.
+- [ ] Seed gate: replace the single veto with the dimension threshold — **2 of 4 earns** (breadth), the strength threshold **guarantees** (depth or breadth; a single high-signal platform presence is enough).
 - [ ] Owner fifth axis: the over-rule path — recorded owner testimony (`owner_confirmed`, who/when) that clears a block and proceeds to seed; logged as the unblocking axis; connected-contact gated (§20.4).
 - [ ] Operator evidence is first-class: operator-entered sources count toward dimensions, adjudicate conflicts, and can record the owner axis — i.e. **"Add evidence" can unblock**. Remove the `agrees: true` hardcode; carry authority + attribution.
 - [ ] Reachability stays out of the seed gate: seeding status is signal-driven; the claim invite is a separate operational step.
-- [ ] Extend `intelligenceProfileSchema` with `platform_signal_weights` + `platform_signal_divergence`; update `INTELLIGENCE_PROFILE_PROMPT_SUFFIX`.
-- [ ] Gold-standard establishment template (`seed-gold-standard-scan-template.ts`): task the analyst to derive the national `platform_signal_weights` (prevalence × depth, with `basis`) across the coast-to-coast sample. Bump `SEED_VERSION_MARKER`; re-run against `local` + `prd` per AGENTS.md.
-- [ ] Market/category establishment template: derive the local `platform_signal_weights` with the same estimator + `basis`.
-- [ ] `IntelligenceProfileService`: resolve/expose `signal_weight(category, platform, city)` with the confidence gate; carry `basis` + `confidence` through.
-- [ ] `identityScoring.ts` — **source influence**: consume signal weight; preserve the legacy `TIER_WEIGHT` path byte-identically when no profile resolves.
-- [ ] `identityScoring.ts` — **veto materiality**: replace `conflictWeight > 0` with the weighted comparison.
+- [x] Extend `intelligenceProfileSchema` with `platform_signal_weights` + `platform_signal_divergence`; update `INTELLIGENCE_PROFILE_PROMPT_SUFFIX`.
+- [x] Gold-standard establishment + discovery templates (`seed-gold-standard-scan-template.ts`): task the analyst to derive the national `platform_signal_weights` (prevalence × depth, with `basis`, `confidence`, `observations`) across the coast-to-coast sample; `gold-standard-scan.schema.ts` accepts the field and the output suffix documents the rules. Re-run against `local` + `prd` per AGENTS.md.
+- [x] Market/category establishment template: derive the local `platform_signal_weights` with the same estimator + `basis` + `confidence` + `observations` (§4c; seed marker `intel-profile-establishment-2026-09-18-signal-weights`). Re-run against `local` + `prd`.
+- [x] `IntelligenceProfileService`: resolve/expose `signal_weight(category, platform, city)` with the confidence gate — a confident local estimate outranks national; carry `basis` + `confidence` through; missing profile data → legacy behavior.
+- [x] `identityScoring.ts` — **source influence**: consume signal weight via `sourceWeight` (tier weight × resolved signal weight); `signalWeight == null` → 1, preserving the legacy `TIER_WEIGHT` path byte-identically when no profile resolves.
+- [x] `identityScoring.ts` — **veto materiality**: `required_field_conflict` fires ⇔ `conflictWeight ≥ agreementWeight` (§2's comparison, on signal-weighted contributions). An outvoted authoritative disagreement no longer blocks — it emits `conflict_outvoted_<field>` and still drags the field score.
 - [ ] `signal-extractor.ts` / coverage gate — make `unable_to_verify` signal-aligned: inert below `τ_gap` (no `DS_MISSING_PROFILE`, excluded from the denominator), weighted by `signal_weight` above it.
 - [ ] Emit `platform_signal_divergence` as a new INT_* code; seed it via `seed-intelligence-discovery-signals.ts` (local + prd).
 - [ ] `IdentityPacketCard.tsx`: show the suppressed-conflict reason (scoring transparency only).
 - [ ] Pitch/deliverable: select the lead platform by `argmax(signal_weight × gap_severity)` using the effective weight; ground the "customers are on this platform" premise in the measured `basis`.
-- [ ] Tests: estimator unit tests (national + local), confidence-gate boundary, veto-comparison (Yelp-vs-Google case), legacy-fallback byte-identity, divergence emission threshold, §S1 regression guard.
+- [x] Tests (partial): resolver unit tests — national + local, confidence-gate boundary, missing-profile legacy fallback (`IntelligenceProfileService.signalWeights.test.ts`); weighted scoring + unweighted byte-identity (`identityScoring.test.ts`). Still open: divergence emission threshold, §S1 regression guard.
 
 ## 10. Deferred / open questions
 

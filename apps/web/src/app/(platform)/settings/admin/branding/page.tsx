@@ -384,7 +384,7 @@ export default function PlatformBrandingPage() {
               id="platformName"
               value={branding.platformName}
               onChange={(e) => setBranding({ ...branding, platformName: e.target.value })}
-              placeholder="Visible Shelf"
+              placeholder="VisibleShelf"
             />
           </div>
           <div>

@@ -66,7 +66,7 @@ export const CHAIN_TIERS: ChainTier[] = [
     price: '$39',
     period: '/location/month',
     tagline: 'Own Your Platform Presence',
-    description: 'Branded storefront inside Visible Shelf marketplace for chains',
+    description: 'Branded storefront inside VisibleShelf marketplace for chains',
     identity: 'I have a store online',
     realization: 'Shoppers are browsing — but can\'t act on it',
     upgradeTrigger: 'I want shoppers to commit to buying',

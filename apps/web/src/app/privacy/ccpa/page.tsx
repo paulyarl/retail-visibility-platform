@@ -7,7 +7,7 @@ import { ccpaService } from '@/services/CcpaService';
 
 export default function CcpaPage() {
   const { settings } = usePlatformSettings();
-  const platformName = settings?.platformName || 'Visible Shelf';
+  const platformName = settings?.platformName || 'VisibleShelf';
 
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');

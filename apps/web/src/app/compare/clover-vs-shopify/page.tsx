@@ -4,9 +4,9 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Clover+vs+Shopify';
-const title = 'Clover vs Shopify for Local Retail | Visible Shelf';
+const title = 'Clover vs Shopify for Local Retail | VisibleShelf';
 const description =
-  'Compare Clover POS + Visible Shelf against Shopify for local retailers. See which setup is simpler, cheaper, and built for in-store first.';
+  'Compare Clover POS + VisibleShelf against Shopify for local retailers. See which setup is simpler, cheaper, and built for in-store first.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -45,7 +45,7 @@ export default function CloverVsShopifyPage() {
         'E-commerce and omnichannel built in',
         'Lower total cost than running two systems',
       ]}
-      primaryCtaLabel="Start with Clover + Visible Shelf"
+      primaryCtaLabel="Start with Clover + VisibleShelf"
       primaryCtaHref="/auth/signup?ref=pinterest"
       secondaryCtaLabel="See all solutions"
       secondaryCtaHref="/solutions/clover-storefront?ref=pinterest"
@@ -62,7 +62,7 @@ export default function CloverVsShopifyPage() {
                 Feature
               </th>
               <th className="py-3 pr-4 font-semibold text-red-600">
-                Clover + Visible Shelf
+                Clover + VisibleShelf
               </th>
               <th className="py-3 font-semibold text-neutral-600 dark:text-neutral-300">
                 Shopify alone

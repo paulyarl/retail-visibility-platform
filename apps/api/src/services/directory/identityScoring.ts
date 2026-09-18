@@ -208,6 +208,14 @@ export interface IdentitySourceRef {
   authorityClass?: AuthorityClass | null;
   /** The dimension the class maps to; null for the owner axis. */
   dimension?: EvidenceDimension | null;
+  /**
+   * Signal weight — signal_weight(category, platform) ∈ [0,1] resolved from
+   * the category's intelligence profile (sprint Phase 5). Scales this
+   * source's contribution everywhere tier weight applies. Absent → treated
+   * as 1, so an unweighted source (no profile, or no platform key) scores
+   * exactly as before — legacy byte-identity.
+   */
+  signalWeight?: number | null;
 }
 
 /** All evidence for a single field, plus its resolved consensus value. */
@@ -306,10 +314,19 @@ export interface SeedGateDimension {
 export interface SeedGate {
   dimensions: SeedGateDimension[];
   satisfiedCount: number;
+  /** Sum of the four dimension strengths (presence + citations). */
+  dimensionStrength: number;
+  /**
+   * Supporting-signal strength that is NOT a dimension — proven recent activity
+   * (reviews / ratings / recent comments, via the operational recency axis).
+   * Third-party sources may not be category-recognizable but are still signals.
+   */
+  supportingStrength: number;
+  /** dimensionStrength + supportingStrength. */
   totalStrength: number;
   /** >= EARN_DIMENSION_COUNT dimensions satisfied. */
   earned: boolean;
-  /** Earned AND totalStrength >= GUARANTEE_STRENGTH_THRESHOLD. */
+  /** totalStrength >= GUARANTEE_STRENGTH_THRESHOLD — depth alone can seed. */
   guaranteed: boolean;
   /** An `owner_confirmed` capture is present and the gate is short of earning. */
   ownerOverRule: boolean;
@@ -353,11 +370,25 @@ const EARN_DIMENSION_COUNT = 2;
 /**
  * Total dimension strength required to GUARANTEE a seed. PROVISIONAL — this is
  * the single number to calibrate against a real sample (spec §10). Strength is
- * the sum of distinct agreeing sources' tier weights across the four dimensions.
+ * the sum of distinct agreeing sources' tier weights across the dimensions.
+ *
+ * At 2, a single major aggregator (Google / Apple = 2) or any authoritative
+ * source (4) is enough to seed WITHOUT a second dimension — a strong single
+ * signal must not be blocked for lack of breadth.
  */
-const GUARANTEE_STRENGTH_THRESHOLD = 6;
+const GUARANTEE_STRENGTH_THRESHOLD = 2;
 
 // ─── Field scoring ───────────────────────────────────────────────────────
+
+/**
+ * A source's scoring weight: tier weight scaled by the resolved platform
+ * signal weight. `signalWeight == null` → 1, so an unweighted source scores
+ * exactly as it did before signal weight existed (legacy byte-identity).
+ */
+function sourceWeight(s: IdentitySourceRef): number {
+  const w = s.signalWeight == null ? 1 : s.signalWeight;
+  return (TIER_WEIGHT[s.tier] ?? 0.5) * w;
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -410,7 +441,7 @@ export function scoreField(ev: IdentityFieldEvidence): FieldScore {
   );
 
   for (const s of ev.sources) {
-    const base = TIER_WEIGHT[s.tier] ?? 0.5;
+    const base = sourceWeight(s);
     const isFirst = !seenGroups.has(s.independenceGroup);
     if (isFirst) seenGroups.add(s.independenceGroup);
     const effective = base * (isFirst ? 1 : INDEPENDENCE_DISCOUNT);
@@ -496,7 +527,10 @@ function collectVetoes(
         code: 'missing_required_field',
         message: `Required field "${key}" has no resolved value.`,
       });
-    } else if (f.conflictWeight > 0) {
+    } else if (f.conflictWeight > 0 && f.conflictWeight >= f.agreementWeight) {
+      // Signal-weight comparison, not an existence test (spec §2): an
+      // authoritative disagreement vetoes only when its weighted influence
+      // meets or beats the agreement — an outvoted conflict reports instead.
       vetoes.push({
         code: 'required_field_conflict',
         message: `Required field "${key}" has conflicting sources — resolve before seeding.`,
@@ -569,6 +603,22 @@ function collectQcSignals(
     }
   }
 
+  // Outvoted authoritative conflict — an authority disagreed on a required
+  // field but its weighted influence fell below the agreement, so the veto
+  // did not fire (spec §2). Reportable, not silent: the conflict still drags
+  // the field score and stays visible for repair.
+  for (const key of REQUIRED_FIELDS) {
+    const f = byField.get(key);
+    if (f && f.conflictWeight > 0 && f.conflictWeight < f.agreementWeight) {
+      signals.push({
+        code: `conflict_outvoted_${key}`,
+        severity: 'info',
+        message: `Authoritative disagreement on "${key}" was outvoted by stronger agreement — reportable, not blocking.`,
+        field: key,
+      });
+    }
+  }
+
   // Operator adjudication — an operator authority resolved an authoritative
   // disagreement on this field. Recorded with attribution, not silent.
   for (const key of NAP_FIELDS) {
@@ -617,10 +667,11 @@ function collectQcSignals(
  * `owner_confirmed` capture is the fifth axis that RESCUES a seed short of
  * earning.
  *
- *   earned      = >= 2 dimensions satisfied AND the business reads as operating
- *   guaranteed  = earned AND totalStrength >= GUARANTEE_STRENGTH_THRESHOLD
+ *   earned      = >= 2 dimensions satisfied (breadth)
+ *   guaranteed  = totalStrength >= GUARANTEE_STRENGTH_THRESHOLD (depth OR breadth
+ *                 — a single high-signal platform presence is enough)
  *   rescued     = owner_confirmed AND not earned AND no veto
- *   blocked     = a veto, no operational evidence, or none of the above
+ *   blocked     = a veto, or none of the above
  *
  * Owner "rescues only what hasn't earned": it never overrides a hard veto or a
  * guaranteed seed.
@@ -663,7 +714,7 @@ function scoreSeedGate(
       if (!dim) continue;
       if (seen[dim].has(s.independenceGroup)) continue;
       seen[dim].add(s.independenceGroup);
-      strength[dim] += TIER_WEIGHT[s.tier] ?? 0.5;
+      strength[dim] += sourceWeight(s);
       counts[dim] += 1;
     }
   }
@@ -676,13 +727,19 @@ function scoreSeedGate(
   }));
 
   const satisfiedCount = dimensions.filter((d) => d.satisfied).length;
-  const totalStrength = round2(dimensions.reduce((sum, d) => sum + d.strength, 0));
+  const dimensionStrength = round2(dimensions.reduce((sum, d) => sum + d.strength, 0));
+  // Supporting signals that are not a dimension: proven recent activity
+  // (reviews / ratings / recent comments feed the operational recency axis).
+  // A third-party source may not be category-recognizable and still count.
+  const supportingStrength = round2(operationalScore / 100);
+  const totalStrength = round2(dimensionStrength + supportingStrength);
 
-  const operationalOk = operationalScore > 0;
-  const earned = satisfiedCount >= EARN_DIMENSION_COUNT && operationalOk;
-  const guaranteed = earned && totalStrength >= GUARANTEE_STRENGTH_THRESHOLD;
+  const earned = satisfiedCount >= EARN_DIMENSION_COUNT;
+  // Depth alone seeds — a single high-signal platform presence is enough,
+  // regardless of activity (spec §2).
+  const guaranteed = totalStrength >= GUARANTEE_STRENGTH_THRESHOLD;
   const vetoBlocked = vetoes.length > 0;
-  const ownerOverRule = ownerConfirmed && !earned && !vetoBlocked;
+  const ownerOverRule = ownerConfirmed && !earned && !vetoBlocked && !guaranteed;
 
   const decision: SeedGateDecision = vetoBlocked
     ? 'blocked'
@@ -695,14 +752,15 @@ function scoreSeedGate(
           : 'blocked';
 
   const blockers: string[] = vetoes.map((v) => v.code);
-  if (decision === 'blocked') {
-    if (!operationalOk) blockers.push('no_operational_evidence');
-    if (satisfiedCount < EARN_DIMENSION_COUNT) blockers.push('insufficient_dimensions');
+  if (decision === 'blocked' && satisfiedCount < EARN_DIMENSION_COUNT) {
+    blockers.push('insufficient_dimensions');
   }
 
   return {
     dimensions,
     satisfiedCount,
+    dimensionStrength,
+    supportingStrength,
     totalStrength,
     earned,
     guaranteed,

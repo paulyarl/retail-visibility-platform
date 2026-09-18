@@ -154,7 +154,7 @@ export default function SignupWizardPage() {
       image: '/images/wizard/step-01-mission.png',
       iconImage: '/images/wizard/icon-01-mission.png',
       title: "Big-Box Retailers Built This for Themselves. Now It's Yours.",
-      description: "Local retailers need a way to move shoppers from discovery to purchase — because big-box retailers built end-to-end inventory visibility and commerce infrastructure internally, leaving small retailers without an affordable path to compete. Visible Shelf changes that. No IT team required. Just your Clover POS and a few minutes.",
+      description: "Local retailers need a way to move shoppers from discovery to purchase — because big-box retailers built end-to-end inventory visibility and commerce infrastructure internally, leaving small retailers without an affordable path to compete. VisibleShelf changes that. No IT team required. Just your Clover POS and a few minutes.",
       highlight: "Clover-connected • Google-visible • Zero IT required"
     },
     {
@@ -175,8 +175,8 @@ export default function SignupWizardPage() {
       image: '/images/wizard/step-04-commitment.png',
       iconImage: '/images/wizard/icon-04-commitment.png',
       title: "Commitment — Capture Intent & Drive Foot Traffic",
-      description: "You're a physical retailer. Shoppers browse online, but they buy in your store. Collect a small holding fee (10–15%) to guarantee their visit, then close the sale at your Clover POS. No abandoned inventory. No wasted prep time. Just guaranteed foot traffic with real financial commitment.",
-      highlight: "Deposit-based reservations • Guaranteed store visits • Clover POS synced"
+      description: "You're a physical retailer. Shoppers browse online, but they buy in your store. Collect a small holding fee (10–15%) so their visit is committed, then close the sale at your Clover POS. No abandoned inventory. No wasted prep time. Just deposit-backed visits with real financial commitment.",
+      highlight: "Deposit-based reservations • Committed store visits • Clover POS synced"
     },
     {
       image: '/images/wizard/step-05-ecommerce.png',
@@ -224,7 +224,7 @@ export default function SignupWizardPage() {
     { 
       value: 'commitment', 
       label: 'Commitment ($79/mo)',
-      description: 'Deposit-based commerce for physical retailers — drive guaranteed foot traffic to your store'
+      description: 'Deposit-based commerce for physical retailers — turn browsing into committed store visits'
     },
     { 
       value: 'ecommerce', 

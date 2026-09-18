@@ -13,7 +13,7 @@ import Image from 'next/image';
 import { clientLogger } from '@/lib/client-logger';
 
 const ONBOARDING_STEPS = [
-  { id: 'welcome', title: 'Welcome to Visible Shelf!', description: 'Let\'s get your account set up' },
+  { id: 'welcome', title: 'Welcome to VisibleShelf!', description: 'Let\'s get your account set up' },
   { id: 'profile', title: 'Your Profile', description: 'Tell us a bit about yourself' },
   { id: 'business', title: 'Your Business', description: 'What type of business do you have?' },
   { id: 'complete', title: 'All Set!', description: 'You\'re ready to start' },
@@ -243,7 +243,7 @@ function OnboardingContent() {
           </div>
           </div>
           <h1 className="text-3xl font-bold text-neutral-900 mb-2">
-            Welcome to Visible Shelf
+            Welcome to VisibleShelf
           </h1>
           <p className="text-neutral-600">
             Let's set up your account in just a few steps
@@ -288,7 +288,7 @@ function OnboardingContent() {
               {currentStep === 0 && (
                 <div className="space-y-4">
                   <p className="text-neutral-700">
-                    Welcome to Visible Shelf! We'll help you set up your account and get started with managing your products online.
+                    Welcome to VisibleShelf! We'll help you set up your account and get started with managing your products online.
                   </p>
                   <ul className="space-y-2 text-neutral-600">
                     <li className="flex items-center gap-2">

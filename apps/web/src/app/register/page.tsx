@@ -38,7 +38,7 @@ export default function RegisterPage() {
           </div>
         )}
         <h1 className="text-2xl font-bold text-neutral-900 mb-2">
-          {settings?.platformName || 'Visible Shelf'}
+          {settings?.platformName || 'VisibleShelf'}
         </h1>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
         <p className="text-neutral-600">Redirecting to secure signup...</p>

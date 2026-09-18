@@ -701,7 +701,7 @@ class PWAService extends PublicApiSingleton {
    */
   private getDefaultManifest(): PWAConfig {
     return {
-      name: 'Visible Shelf',
+      name: 'VisibleShelf',
       shortName: 'VS',
       description: 'Advanced e-commerce platform with AI-powered recommendations',
       themeColor: '#1971c2',

@@ -46,9 +46,9 @@ What the verification pass confirmed, and what it found missing.
 
 ## §3 Phases
 
-**Progress:** Phase 1 ✅ (authority classes → dimensions; NAP corroborators + drift) · Phase 2 ✅ (operator evidence first-class) · Phase 3 ✅ (dimension gate + owner axis) · Phase 4 ✅ (server-side guarded lane) · Phase 5–7 pending.
+**Progress:** Phase 1 ✅ (authority classes → dimensions; NAP corroborators + drift) · Phase 2 ✅ (operator evidence first-class) · Phase 3 ✅ (dimension gate + owner axis) · Phase 4 ✅ (server-side guarded lane) · Phase 5 ✅ (signal weight — derivation, resolution, consumption) · Phase 6–7 pending.
 
-**Gate constants (provisional):** `EARN_DIMENSION_COUNT = 2`, `GUARANTEE_STRENGTH_THRESHOLD = 6` — the single number to calibrate (spec §10). Operational recency is a prerequisite (an inactive business blocks regardless of dimensions).
+**Gate constants (provisional):** `EARN_DIMENSION_COUNT = 2`, `GUARANTEE_STRENGTH_THRESHOLD = 2` — the single number to calibrate (spec §10). Strength = **dimension strength** (tier-weighted presence/citations per dimension) + **supporting strength** (proven recent activity via the operational recency axis). The threshold is *depth-or-breadth*: a single high-signal platform presence (e.g. Google = 2) guarantees on its own, with no second dimension and no activity; recency is supporting strength, not a prerequisite.
 
 **Off-plan (shipped alongside):** campaign-scoped record verification — `MarketingCampaignService.resolveCampaignVerification` + `POST /:id/resolve-verification` + `ResolveVerificationModal` campaign mode + the Identity tab "Verify record" button. Reuses the queue modal rather than a parallel one; writes the campaign's canonical NAP and records an attributed owner-evidence capture.
 
@@ -59,9 +59,9 @@ What the verification pass confirmed, and what it found missing.
 - Define the authority-class vocabulary and the `class → dimension` map (`directory, social → operational`; `government → identity`; `trade → category`; `community → location`; `owner → above`).
 - Map onto `inferSourceTier` (authoritative ≈ government, first_party ≈ owner, aggregators ≈ directory/social) so existing inference feeds the new classes.
 - Scope every conflict to its dimension in `identityScoring`.
-- Extend `IdentityEvidenceService` + `mkt_identity_evidence` with the authority class — **CHECK-constrained**: numbered migration (drop/re-add) + parity test per AGENTS.md enum-sync discipline.
+- ~~Extend `mkt_identity_evidence` with the authority class (CHECK-constrained migration).~~ **Decided: inferred only** — `inferAuthorityClass(name, tier)` derives the class; no column, no migration. A stored class remains the follow-up if operators need to correct a misinference.
 
-**Done:** a source carries a class; conflicts are dimension-scoped; parity test green.
+**Done:** a source carries a class (inferred); conflicts are dimension-scoped; directory/social disagreement on NAP surfaces as `nap_drift_<field>` (reportable), never a veto.
 
 ### Phase 2 — Operator evidence is first-class
 
@@ -77,12 +77,13 @@ What the verification pass confirmed, and what it found missing.
 
 **Goal:** replace the binary veto with the dimension threshold.
 
-- Replace `collectVetoes`/band with the dimension gate: **2 of 4 earns**, full threshold guarantees.
+- Replace `collectVetoes`/band with the dimension gate: **2 of 4 earns** (breadth); the strength threshold **guarantees** — *depth or breadth*, so a single high-signal platform presence seeds without a second dimension.
+- Strength = dimension strength (presence + citations) + supporting strength (proven recent activity — reviews / ratings / recent comments / secondary citations via the operational recency axis). Presence alone is sufficient; third-party sources count even when not category-recognizable.
 - Operational density weighting (social/directory count × signal weight).
-- **Owner fifth axis:** over-rule path — recorded `owner_confirmed` testimony (who/when), logged as the unblocking axis, connected-contact gated (§20.4). Extends the `callConfirmed` precedent.
+- **Owner fifth axis:** over-rule path — recorded `owner_confirmed` testimony (who/when), logged as the unblocking axis, connected-contact gated (§20.4). Extends the `callConfirmed` precedent. *Rescue only*: it applies when the prospect is short of earning — never over a hard veto, never needed once guaranteed/earned.
 - **Legacy byte-identity:** no resolvable profile → today's scoring, unchanged.
 
-**Done:** the Istanbul case earns on identity + operational; the legacy path is byte-identical.
+**Done:** one strong Google presence seeds alone (depth); two dimensions still earn (breadth); a weak lone source without activity blocks; the Istanbul case earns on identity + operational; the legacy path is byte-identical.
 
 ### Phase 4 — Enforce the guard server-side *(shared)*
 
@@ -106,7 +107,7 @@ What the verification pass confirmed, and what it found missing.
 - `IntelligenceProfileService`: resolve/expose `signal_weight(category, platform, city)` with the confidence gate; carry `basis` + `confidence`.
 - `identityScoring`: consume the weight for source influence + veto materiality.
 
-**Done:** the scorer reads a measured weight; no profile → legacy behavior.
+**Done:** the scorer reads a measured weight — `sourceWeight` = tier weight × resolved `signalWeight` (`null` → 1, so no-profile scoring is byte-identical). `IntelligenceProfileService.resolveSignalWeight(s)` picks the confidence-gated effective weight (a confident local estimate outranks national) and carries `basis` + `confidence`; `buildForCampaign` resolves per-source weights and the assembler annotates each source. Derivation prompts landed: gold-standard establishment + discovery templates emit national `platform_signal_weights` (prevalence × depth, `basis`/`confidence`/`observations`, honest-low for unobserved platforms), the market establishment template derives the local layer (§4c, marker `intel-profile-establishment-2026-09-18-signal-weights`), and both schemas accept the field. Veto materiality landed too: `required_field_conflict` fires ⇔ `conflictWeight ≥ agreementWeight` (the spec §2 comparison on weighted contributions); an outvoted authoritative disagreement emits `conflict_outvoted_<field>` and still drags the field score rather than blocking.
 
 ### Phase 6 — Render-control alignment
 
@@ -128,12 +129,12 @@ What the verification pass confirmed, and what it found missing.
 
 - **Estimator** — national + local derivation, confidence-gate boundary.
 - **Authority/dimension** — class → dimension mapping; conflict scoping.
-- **Gate** — 2-of-4 earns; threshold guarantees; owner over-rule; legacy byte-identity.
+- **Gate** — 2-of-4 earns; strength threshold guarantees (single strong platform alone, and presence alone without activity); supporting activity lifts a weak presence over the bar; owner over-rule only when short of earning; legacy byte-identity.
 - **Operator evidence** — can unblock; attribution carried.
 - **Enforcement** — blocked Push rejected server-side; manual lane unaffected.
 - **Render-control** — signal-aligned inertness; `DS_MISSING_PROFILE` gating; existing control suite intact.
 - **§S1 regression** — divergence never enters `detected_signals` / the extractor / playbook rules.
-- **CHECK parity** — `mkt_identity_evidence` authority-class constraint.
+- ~~**CHECK parity** — `mkt_identity_evidence` authority-class constraint.~~ Not needed — authority class is inferred, not stored (Phase 1 decision).
 
 ## §5 Migration & ops
 

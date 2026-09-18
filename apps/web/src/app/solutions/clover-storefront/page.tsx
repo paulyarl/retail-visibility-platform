@@ -4,7 +4,7 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Clover+POS+Storefront';
-const title = 'Clover POS Storefront for Local Retail | Visible Shelf';
+const title = 'Clover POS Storefront for Local Retail | VisibleShelf';
 const description =
   'Sync your Clover POS to a live online storefront. Real-time inventory, local pickup, delivery, and a checkout that matches your in-store data.';
 

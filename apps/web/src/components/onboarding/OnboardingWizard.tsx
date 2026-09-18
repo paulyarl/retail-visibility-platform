@@ -259,7 +259,7 @@ export default function OnboardingWizard({
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-neutral-900 mb-2">
-            Welcome to Visible Shelf
+            Welcome to VisibleShelf
           </h1>
           <p className="text-neutral-600">
             Let's set up your store in just a few steps

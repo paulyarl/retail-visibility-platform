@@ -100,7 +100,7 @@ export default function StorefrontFooter({
   primaryColor,
   storefrontPolicies = null,
 }: StorefrontFooterProps) {
-  const platformName = platformSettings?.platformName || 'Visible Shelf';
+  const platformName = platformSettings?.platformName || 'VisibleShelf';
   const platformLogo = platformSettings?.logoUrl;
   const removeBranding = features?.removePlatformBranding ?? false;
 

@@ -32,7 +32,7 @@ export default function OfferingsPage() {
         <section>
           <Title order={2} ta="center" mb="md">Complete Online Presence Solution</Title>
           <Text size="lg" c="dimmed" ta="center" maw={600} mx="auto" mb="xl">
-            Everything you need to dominate local search and drive customers to your store
+            Everything you need to show up where shoppers look — and turn that discovery into visits and sales
           </Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -44,13 +44,13 @@ export default function OfferingsPage() {
               <div className="text-4xl mb-3">⚡</div>
               <h3 className="text-lg font-bold mb-2">Quick Start Wizard</h3>
               <ul className="space-y-1 text-sm">
-                <li>• 50 products in 1 second!</li>
-                <li>• 360x faster than manual</li>
+                <li>• 50 products in seconds</li>
+                <li>• Dramatically faster than manual entry</li>
                 <li>• No scanning, no CSV</li>
                 <li>• Auto-categorized</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-blue-300">
-                <span className="text-xs font-semibold">GAME CHANGER!</span>
+                <span className="text-xs font-semibold">Fastest way to a full catalog</span>
               </div>
             </div>
 
@@ -99,7 +99,7 @@ export default function OfferingsPage() {
                 <li>• Local SEO optimization</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-green-300">
-                <span className="text-xs font-semibold text-green-800">Dominate local search!</span>
+                <span className="text-xs font-semibold text-green-800">Show up where shoppers search</span>
               </div>
             </div>
 
@@ -136,10 +136,10 @@ export default function OfferingsPage() {
 
           {/* Second row of features */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-            {/* SKU Scanning + Analytics - BREAKTHROUGH! */}
+            {/* SKU Scanning + Analytics */}
             <div className="bg-gradient-to-br from-green-500 to-emerald-600 border-2 border-green-400 rounded-lg p-6 text-white relative shadow-xl">
               <div className="absolute -top-2 -right-2 bg-yellow-400 text-green-900 text-xs px-3 py-1 rounded-full font-bold">
-                BREAKTHROUGH
+                PRODUCT DATA
               </div>
               <div className="text-4xl mb-3">🎯</div>
               <h3 className="text-lg font-bold mb-2">Scanning + Intelligence</h3>
@@ -207,11 +207,11 @@ export default function OfferingsPage() {
           <div className="mt-6 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-xl p-8 text-white">
             <div className="text-center mb-6">
               <div className="inline-block bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold text-sm mb-3">
-                ⚡ POWER COMBO
+                ⚡ WORK TOGETHER
               </div>
-              <h3 className="text-2xl font-bold mb-2">Quick Start + Scanning Work Together!</h3>
+              <h3 className="text-2xl font-bold mb-2">Quick Start + Scanning Work Together</h3>
               <p className="text-blue-100 max-w-2xl mx-auto">
-                These aren't competing features—they're a <strong className="text-yellow-300">perfectly aligned system</strong>
+                These aren't competing features — they're a <strong className="text-yellow-300">single workflow</strong>
               </p>
             </div>
 
@@ -264,10 +264,10 @@ export default function OfferingsPage() {
 
             <div className="bg-white/10 backdrop-blur rounded-lg p-4 border border-white/20 text-center">
               <p className="text-sm mb-1">
-                <strong className="text-yellow-300">Save $394.58 and 15.75 hours</strong> per 100 products
+                <strong className="text-yellow-300">Generate the catalog, then scan to enrich it</strong>
               </p>
               <p className="text-xs text-blue-100">
-                vs. 16.7 hours of manual entry • 94% time reduction
+                No per-product re-typing — the barcode fills in what Quick Start started
               </p>
             </div>
           </div>
@@ -902,7 +902,7 @@ export default function OfferingsPage() {
         {/* All Benefits Summary */}
         <section>
           <Title order={2} mb="xs">Everything You Need to Succeed Online</Title>
-          <Text c="dimmed" mb="xl">All the tools to drive foot traffic and dominate local search</Text>
+          <Text c="dimmed" mb="xl">All the tools to drive foot traffic and show up where shoppers look</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card withBorder padding="lg" radius="md">

@@ -44,7 +44,7 @@ export interface GeneratedReceipt {
 export async function loadPlatformBranding(): Promise<ReceiptBranding> {
   const platformSettings = await prisma.platform_settings_list.findFirst();
   return {
-    platformName: platformSettings?.platform_name || 'Visible Shelf',
+    platformName: platformSettings?.platform_name || 'VisibleShelf',
     logoUrl: platformSettings?.logo_url,
     primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
     contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',

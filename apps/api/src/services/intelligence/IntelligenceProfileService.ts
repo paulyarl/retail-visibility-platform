@@ -294,6 +294,185 @@ export function normalizePlatformScope(s: string | null | undefined): string | n
   return normalized === 'all' ? null : normalized;
 }
 
+// ─── Platform signal weights (signal-weight spec) ────────────────────────
+//
+// signal_weight(category, platform) ∈ [0,1] — the single source of truth for
+// how much a platform's signal should move a score. National gold-standard
+// establishments derive it coast-to-coast; market establishments derive it
+// locally with the same estimator, and a confidence gate decides whether the
+// local weight outranks the national one. The divergence between the two is
+// itself an intelligence observation.
+
+export interface PlatformSignalWeight {
+  platform: string;
+  /** signal_weight ∈ [0,1]. */
+  weight: number;
+  /** Observed prevalence × depth behind the estimate. */
+  basis?: string | null;
+  /** Derivation confidence ∈ [0,1] — the local-precedence gate reads this. */
+  confidence?: number | null;
+  /** Sample size behind the estimate. */
+  observations?: number | null;
+}
+
+export type SignalWeightScope = 'local' | 'regional' | 'national';
+
+export interface ResolvedSignalWeight extends PlatformSignalWeight {
+  /** Which geographic layer produced the winning estimate. */
+  scope: SignalWeightScope;
+  profileId: string;
+  profileVersion: number;
+  /** local.weight − national.weight, when both layers observed the platform. */
+  divergence?: number | null;
+}
+
+/**
+ * Minimum confidence for a local (or regional) weight to outrank the national
+ * estimate. PROVISIONAL — calibrate against a real sample (spec §10).
+ */
+export const LOCAL_PRECEDENCE_CONFIDENCE = 0.6;
+
+/**
+ * Normalize a platform key for signal-weight lookup. Profile entries use the
+ * audit platform vocabulary (google, yelp, facebook, apple, bbb, …); this
+ * folds the common aliases onto those keys.
+ */
+export function normalizeSignalPlatformKey(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const k = s.trim().toLowerCase().replace(/[\s_.-]+/g, '');
+  if (!k) return null;
+  const ALIASES: Record<string, string> = {
+    googlemaps: 'google',
+    googlebusinessprofile: 'google',
+    gbp: 'google',
+    applemaps: 'apple',
+    betterbusinessbureau: 'bbb',
+    meta: 'facebook',
+  };
+  return ALIASES[k] ?? k;
+}
+
+const clamp01 = (n: unknown): number | null =>
+  typeof n === 'number' && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : null;
+
+/** Extract the platform_signal_weights array from a profile configuration. */
+function extractSignalWeightEntries(config: any): Map<string, PlatformSignalWeight> {
+  const out = new Map<string, PlatformSignalWeight>();
+  const arr = config?.platform_signal_weights;
+  if (!Array.isArray(arr)) return out;
+  for (const e of arr) {
+    const platform = normalizeSignalPlatformKey(e?.platform);
+    const weight = clamp01(e?.weight);
+    if (!platform || weight == null) continue;
+    out.set(platform, {
+      platform,
+      weight,
+      basis: typeof e?.basis === 'string' ? e.basis : null,
+      confidence: clamp01(e?.confidence),
+      observations: Number.isInteger(e?.observations) ? e.observations : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Resolve signal_weight for a set of platforms from already-fetched active
+ * profiles. Pure — the DB-free half of resolveSignalWeights, unit-testable.
+ *
+ * Precedence: a local (city-matched) or regional (state-matched) estimate
+ * outranks the national one only when its confidence clears
+ * LOCAL_PRECEDENCE_CONFIDENCE; otherwise the national estimate wins. When no
+ * estimate clears the gate, the broadest available layer wins (national →
+ * regional → local) — a low-confidence local reading is still reported, with
+ * its confidence, rather than silently discarded.
+ */
+export function resolveSignalWeightsFromProfiles(
+  profiles: Array<Pick<
+    IntelligenceProfile,
+    'id' | 'version' | 'reference_city' | 'reference_state' | 'reference_platform' | 'configuration_json'
+  >>,
+  input: { platforms: string[]; city?: string | null; state?: string | null },
+): Map<string, ResolvedSignalWeight> {
+  const out = new Map<string, ResolvedSignalWeight>();
+  const city = normalizeReferenceCity(input.city);
+  const state = normalizeReferenceState(input.state);
+
+  const candidates = profiles.map((p) => ({
+    profile: p,
+    scope: (p.reference_city ? 'local' : p.reference_state ? 'regional' : 'national') as SignalWeightScope,
+    entries: extractSignalWeightEntries(p.configuration_json),
+  }));
+
+  // Is this profile's scope relevant to the requested geography?
+  const matches = (c: (typeof candidates)[number]): boolean => {
+    if (c.scope === 'national') return true;
+    if (c.scope === 'regional') {
+      return state != null && c.profile.reference_state === state;
+    }
+    return (
+      city != null &&
+      c.profile.reference_city === city &&
+      (state == null || c.profile.reference_state == null || c.profile.reference_state === state)
+    );
+  };
+
+  for (const raw of input.platforms) {
+    const platform = normalizeSignalPlatformKey(raw);
+    if (!platform) continue;
+
+    const pick = (scope: SignalWeightScope) => {
+      let fallback: { profile: (typeof candidates)[number]['profile']; entry: PlatformSignalWeight } | null = null;
+      for (const c of candidates) {
+        if (c.scope !== scope || !matches(c)) continue;
+        const entry = c.entries.get(platform);
+        if (!entry) continue;
+        // A platform-scoped profile is the better witness for its platform.
+        if (normalizeSignalPlatformKey(c.profile.reference_platform) === platform) {
+          return { profile: c.profile, entry };
+        }
+        if (!fallback) fallback = { profile: c.profile, entry };
+      }
+      return fallback;
+    };
+
+    const local = pick('local');
+    const regional = pick('regional');
+    const national = pick('national');
+
+    const confident = (c: typeof local) =>
+      c != null && (c.entry.confidence ?? 0) >= LOCAL_PRECEDENCE_CONFIDENCE;
+
+    const winner = confident(local)
+      ? { ...local!, scope: 'local' as const }
+      : confident(regional)
+        ? { ...regional!, scope: 'regional' as const }
+        : national
+          ? { ...national, scope: 'national' as const }
+          : regional
+            ? { ...regional, scope: 'regional' as const }
+            : local
+              ? { ...local, scope: 'local' as const }
+              : null;
+
+    if (!winner) continue;
+
+    const divergence =
+      local && national
+        ? Math.round((local.entry.weight - national.entry.weight) * 1000) / 1000
+        : null;
+
+    out.set(platform, {
+      ...winner.entry,
+      scope: winner.scope,
+      profileId: winner.profile.id,
+      profileVersion: winner.profile.version,
+      divergence,
+    });
+  }
+
+  return out;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────
 
 export class IntelligenceProfileService extends BaseService {
@@ -2046,6 +2225,46 @@ export class IntelligenceProfileService extends BaseService {
         requestedCity: normalizedCity,
         requestedState: normalizedState,
         requestedPlatform: normalizedPlatform,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Resolve signal_weight(category, platform) for a set of platforms.
+   *
+   * Scans every active profile for the category (any focus — gold-standard
+   * establishments carry national weights, market establishments carry local
+   * ones) and applies the confidence-gated local-over-national rule in
+   * resolveSignalWeightsFromProfiles.
+   *
+   * Returns a Map keyed by normalized platform key. A platform with no
+   * resolvable weight is simply absent — callers treat that as unweighted
+   * legacy scoring (no profile → byte-identical behavior).
+   */
+  async resolveSignalWeights(
+    input: {
+      category: string;
+      platforms: string[];
+      city?: string | null;
+      state?: string | null;
+    },
+    ctx?: RequestCtx,
+  ): Promise<Map<string, ResolvedSignalWeight>> {
+    const key = normalizeCategoryKey(input.category);
+    if (!key || !Array.isArray(input.platforms) || input.platforms.length === 0) {
+      return new Map();
+    }
+    try {
+      const profiles = await this.prisma.mkt_intelligence_profiles.findMany({
+        where: { category_key: key, status: 'active' },
+        orderBy: { version: 'desc' },
+      });
+      return resolveSignalWeightsFromProfiles(profiles as IntelligenceProfile[], input);
+    } catch (error) {
+      logger.error('IntelligenceProfileService.resolveSignalWeights failed', ctx, {
+        error: (error as Error).message,
+        categoryKey: key,
       });
       throw this.handleError(error, ctx);
     }

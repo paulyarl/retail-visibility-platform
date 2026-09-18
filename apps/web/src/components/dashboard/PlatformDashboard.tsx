@@ -130,7 +130,7 @@ export default function PlatformDashboard() {
             ) : (
               <Link href="/">
                 <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
-                  {settings?.platformName || 'Visible Shelf'}
+                  {settings?.platformName || 'VisibleShelf'}
                 </h1>
               </Link>
             )}
@@ -289,7 +289,7 @@ export default function PlatformDashboard() {
                       : (user?.businessName 
                           ? `${user.businessName} | Platform Dashboard`
                           : 'Platform Dashboard'))
-                  : 'Welcome to Visible Shelf'}
+                  : 'Welcome to VisibleShelf'}
               </h2>
               <p className="text-sm sm:text-base text-neutral-600 mt-1">
                 {isAuthenticated 

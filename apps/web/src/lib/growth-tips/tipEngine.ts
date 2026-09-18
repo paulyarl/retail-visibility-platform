@@ -930,7 +930,7 @@ export function pickGrowthTip(ctx: TipContext, seed: number = 0): GrowthTip {
       id: 'default',
       category: 'engagement',
       priority: 'low',
-      title: 'Grow your store with Visible Shelf',
+      title: 'Grow your store with VisibleShelf',
       body: 'Complete your store profile, add products, and keep your information up to date to maximize your visibility on Google and the platform directory.',
       cta: 'View settings',
       ctaLink: `/t/${ctx.tenantId}/settings/tenant`,

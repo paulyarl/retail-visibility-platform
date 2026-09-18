@@ -1,5 +1,19 @@
 # Mission, Vision & Storytelling Implementation
 
+> **⚠️ SUPERSEDED (2026-09-18).** This document records the November 2025 storytelling
+> pass. The copy it describes — "Empowering Local Retailers to Compete Online", the
+> Amazon/Shopify comparisons, "Save $2,400/month", "Trusted by 1,500+ Retailers", and the
+> trial-first CTAs — has been replaced. It predates the free Directory Presence gateway,
+> the directory discovery surfaces, the capability architecture, and the VisibleShelf
+> brand rename.
+>
+> **Current sources of truth:**
+> - `docs/PLATFORM_COPY_PLATFORM.md` — positioning, message architecture, voice, claims ledger
+> - `docs/PLATFORM_ROOT_COPY_ALIGNMENT_SPEC.md` — the public-copy change list that replaced this copy
+> - `docs/PLATFORM_STRATEGY_V3.md` — product, tier, and layer strategy
+>
+> Retained for historical reference only. Do not cite as current messaging guidance.
+
 ## 🎯 Overview
 
 Added **emotional connection and storytelling** to both the platform dashboard and features page to address the "empty feeling" that was missing. These sections establish **why the platform exists** before diving into features.

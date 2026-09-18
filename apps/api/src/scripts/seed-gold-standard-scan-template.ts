@@ -88,6 +88,23 @@ Capture branding artifacts for each candidate:
 
 These become branding quality gates and audit gap-analysis inputs.`;
 
+// PLATFORM SIGNAL WEIGHT — the national estimate. signal_weight(category,
+// platform) is the single source of truth for how much a platform's signals
+// (category traffic, reviews, ratings, profiles) should move a score for this
+// category. The establishment derives it from the observed pool; a discovery
+// scan refreshes it from the new pool it saw.
+const SIGNAL_WEIGHT_SECTION = `=== PLATFORM SIGNAL WEIGHT ===
+Estimate signal_weight(category, platform) for each platform you observed — how much this platform's signals (category traffic, reviews, ratings, profiles) should move a score for this category, as a number in [0,1]. Derive it from the candidate pool's prevalence x depth: what share of the category's customer-facing activity actually happens on that platform.
+
+Emit a top-level "platform_signal_weights" array with one entry per platform:
+- platform: the platform key (google, yelp, facebook, apple_maps, bbb, bing, instagram, ...)
+- weight: 0-1 — a platform the category barely uses scores low; do NOT inflate
+- basis: the observed evidence behind the number (e.g. "4/5 candidates carry active profiles with recent reviews here; the other platforms show sparse or stale listings")
+- confidence: 0-1 — how reliable the estimate is given the pool you observed
+- observations: the sample size behind the estimate (candidates evaluated)
+
+A platform with high signal weight outranks a low-signal one in scoring — the estimate IS the influence, so make it honest. A platform you could not observe at all gets a low weight with low confidence, not a guess.`;
+
 // NOTE: The full EXPECTED OUTPUT FORMAT + Rules block is appended at runtime
 // by GOLD_STANDARD_SCAN_PROMPT_SUFFIX (in gold-standard-scan.schema.ts) via the
 // OUTPUT_SCHEMA_REGISTRY. Do NOT duplicate it here — that would render the
@@ -146,6 +163,8 @@ Derive expected_fields from the top candidates:
 - quality_gates: non_negotiable (must-have) and recommended (nice-to-have) gates
 
 ${BRANDING_ARTIFACTS_SECTION}
+
+${SIGNAL_WEIGHT_SECTION}
 
 === SCAN METADATA ===
 Record:
@@ -224,6 +243,8 @@ The GOLD STANDARD DISCOVERY CRITERIA section below (injected by the platform) co
 If no GOLD STANDARD DISCOVERY CRITERIA section appears below, the platform is running in degraded mode (no active gold-standard profile). In that case, fall back to deriving expected_fields from the top candidates you find, and note this in scan_metadata.expected_field_derivation.
 
 ${BRANDING_ARTIFACTS_SECTION}
+
+${SIGNAL_WEIGHT_SECTION}
 
 === SCAN METADATA ===
 Record:

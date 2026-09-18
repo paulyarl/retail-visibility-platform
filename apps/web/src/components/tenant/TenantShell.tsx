@@ -74,7 +74,7 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
             {settings?.logoUrl ? (
               <Image src={settings.logoUrl} alt={settings.platformName || 'Platform Logo'} width={140} height={32} className="h-8 w-auto object-contain" />
             ) : (
-              <span className="font-semibold text-gray-900 hover:text-blue-600" suppressHydrationWarning>{settings?.platformName || 'Visible Shelf'}</span>
+              <span className="font-semibold text-gray-900 hover:text-blue-600" suppressHydrationWarning>{settings?.platformName || 'VisibleShelf'}</span>
             )}
           </Link>
         </div>

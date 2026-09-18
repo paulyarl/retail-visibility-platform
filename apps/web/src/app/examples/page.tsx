@@ -4,9 +4,9 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Storefront+Examples';
-const title = 'Storefront Examples Built with Visible Shelf';
+const title = 'Storefront Examples Built with VisibleShelf';
 const description =
-  'See how local retailers use Visible Shelf to build clean, modern storefronts with Clover sync, local pickup, and Google visibility.';
+  'See how local retailers use VisibleShelf to build clean, modern storefronts with Clover sync, local pickup, and Google visibility.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -69,7 +69,7 @@ export default function ExamplesPage() {
   return (
     <PinterestLandingPage
       title={title}
-      headline="See real storefronts built with Visible Shelf"
+      headline="See real storefronts built with VisibleShelf"
       subheadline="Five example stores across retail categories, each built with the same Clover, Google, and omnichannel tools."
       description={description}
       features={[

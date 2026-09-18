@@ -1054,7 +1054,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           }
           
           const change = event.changes[0]; // Price change from Clover
-          const rvpChange = event.changes[1]; // Price change from Visible Shelf
+          const rvpChange = event.changes[1]; // Price change from VisibleShelf
           
           results.push({ 
             itemId: mapping?.rvp_item_id || cloverItemId,
@@ -1064,7 +1064,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
             oldValue: change?.oldValue,
             newValue: change?.newValue,
             action: 'conflict',
-            formattedOld: `Visible Shelf: $${((rvpChange?.newValue || change?.oldValue) / 100).toFixed(2)}`,
+            formattedOld: `VisibleShelf: $${((rvpChange?.newValue || change?.oldValue) / 100).toFixed(2)}`,
             formattedNew: `Clover: $${((change?.newValue || 0) / 100).toFixed(2)}`
           });
         }
@@ -1300,7 +1300,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
         break;
 
       case 'category_conflict':
-        // Category name conflict between Clover and Visible Shelf
+        // Category name conflict between Clover and VisibleShelf
         const cloverCatChange = event.changes[0];
         const rvpCatChange = event.changes[1];
         
@@ -1312,7 +1312,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           oldValue: cloverCatChange.oldValue,
           newValue: cloverCatChange.newValue,
           action: 'conflict',
-          formattedOld: `Visible Shelf: "${rvpCatChange?.newValue || cloverCatChange.oldValue}"`,
+          formattedOld: `VisibleShelf: "${rvpCatChange?.newValue || cloverCatChange.oldValue}"`,
           formattedNew: `Clover: "${cloverCatChange.newValue}"`
         });
         event.status = 'conflict';
@@ -1390,7 +1390,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/cancel', authenticateToken
 
 /**
  * Get item mappings for demo mode
- * Shows how Clover items are mapped to Visible Shelf items
+ * Shows how Clover items are mapped to VisibleShelf items
  */
 router.get('/:tenantId/clover/demo/mappings', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -1420,7 +1420,7 @@ router.get('/:tenantId/clover/demo/mappings', authenticateToken, async (req: Req
       prisma.clover_item_mappings_list.count({ where })
     ]);
 
-    // Enrich with Visible Shelf item data
+    // Enrich with VisibleShelf item data
     const enrichedMappings = await Promise.all(
       mappings.map(async (mapping) => {
         let rvpItem = null;
@@ -1508,7 +1508,7 @@ router.post('/:tenantId/clover/demo/mappings/:mappingId/resolve', authenticateTo
         }
         break;
       case 'use_rvp':
-        // Keep current Visible Shelf values - no update needed
+        // Keep current VisibleShelf values - no update needed
         break;
       case 'custom':
         if (customValues) {
@@ -1527,7 +1527,7 @@ router.post('/:tenantId/clover/demo/mappings/:mappingId/resolve', authenticateTo
         break;
     }
 
-    // Update Visible Shelf item if needed
+    // Update VisibleShelf item if needed
     if (Object.keys(updateData).length > 0 && mapping.rvp_item_id) {
       await prisma.inventory_items.update({
         where: { id: mapping.rvp_item_id },
@@ -1695,7 +1695,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
 
 /**
  * Trigger a sync from Clover (Production Mode)
- * Imports items and categories from connected Clover account into Visible Shelf inventory
+ * Imports items and categories from connected Clover account into VisibleShelf inventory
  * Supports 2-way category sync
  */
 router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
@@ -1748,7 +1748,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
     let itemsFailed = 0;
 
     // ========================================
-    // STEP 1: Sync Categories (Clover → Visible Shelf)
+    // STEP 1: Sync Categories (Clover → VisibleShelf)
     // ========================================
     if (syncCategories && cloverData.categories.length > 0) {
       console.log(`[Clover Sync] Syncing ${cloverData.categories.length} categories...`);
@@ -1770,7 +1770,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
             rvpCategoryId = categoryMapping.rvp_category_id;
             categoriesMapped++;
           } else {
-            // Create or find Visible Shelf category
+            // Create or find VisibleShelf category
             const slug = cloverCat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
             
             let rvpCategory = await prisma.directory_category.findFirst({
@@ -1781,7 +1781,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
             });
 
             if (!rvpCategory) {
-              // Create new Visible Shelf category
+              // Create new VisibleShelf category
               rvpCategory = await prisma.directory_category.create({
                 data: { 
                   id: generateProductCatId(tenantId),
@@ -1839,7 +1839,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
     }
 
     // ========================================
-    // STEP 2: Sync Items (Clover → Visible Shelf)
+    // STEP 2: Sync Items (Clover → VisibleShelf)
     // ========================================
     console.log(`[Clover Sync] Syncing ${cloverData.items.length} items...`);
     
@@ -1889,7 +1889,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
             itemsUpdated++;
           }
         } else if (importNew) {
-          // Create new Visible Shelf item
+          // Create new VisibleShelf item
           const newItem = await prisma.inventory_items.create({
             data: { 
               id: generateCloverItemId(),
@@ -2043,7 +2043,7 @@ router.post('/:tenantId/clover/disconnect', authenticateToken, requireTierFeatur
 
 /**
  * Get item mappings (Production Mode)
- * Works for both demo and production - returns all Clover↔Visible Shelf item mappings
+ * Works for both demo and production - returns all Clover↔VisibleShelf item mappings
  */
 router.get('/:tenantId/clover/mappings', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -2069,7 +2069,7 @@ router.get('/:tenantId/clover/mappings', authenticateToken, async (req: Request,
       orderBy: { last_synced_at: 'desc' }
     });
 
-    // Fetch Visible Shelf items for each mapping
+    // Fetch VisibleShelf items for each mapping
     const rvpItemIds = mappings.map(m => m.rvp_item_id).filter((id): id is string => id !== null);
     const rvpItems = await prisma.inventory_items.findMany({
       where: { id: { in: rvpItemIds } },
@@ -2131,7 +2131,7 @@ router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, 
 
     // Apply resolution
     if (resolution === 'use_clover' && mapping.rvp_item_id) {
-      // Update Visible Shelf item with Clover values
+      // Update VisibleShelf item with Clover values
       // In production, would fetch current Clover values and apply
       await prisma.inventory_items.update({
         where: { id: mapping.rvp_item_id },
@@ -2141,8 +2141,8 @@ router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, 
         }
       });
     } else if (resolution === 'use_rvp') {
-      // Keep Visible Shelf values, mark as resolved
-      // In production, would push Visible Shelf values to Clover
+      // Keep VisibleShelf values, mark as resolved
+      // In production, would push VisibleShelf values to Clover
     } else if (resolution === 'custom' && customValues && mapping.rvp_item_id) {
       // Apply custom values
       await prisma.inventory_items.update({
@@ -2180,7 +2180,7 @@ router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, 
 
 /**
  * Get category mappings (Production Mode)
- * Returns all Clover↔Visible Shelf category mappings for 2-way category sync
+ * Returns all Clover↔VisibleShelf category mappings for 2-way category sync
  */
 router.get('/:tenantId/clover/category-mappings', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -2206,7 +2206,7 @@ router.get('/:tenantId/clover/category-mappings', authenticateToken, async (req:
       orderBy: { last_synced_at: 'desc' }
     });
 
-    // Fetch Visible Shelf categories for each mapping
+    // Fetch VisibleShelf categories for each mapping
     const rvpCategoryIds = categoryMappings
       .map(m => m.rvp_category_id)
       .filter((id): id is string => id !== null);

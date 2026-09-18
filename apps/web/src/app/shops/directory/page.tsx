@@ -226,7 +226,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                {platformBranding?.platformName || 'Visible Shelf'}
+                {platformBranding?.platformName || 'VisibleShelf'}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Retail visibility platform

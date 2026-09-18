@@ -48,8 +48,8 @@ router.get('/platform-settings', async (_req, res) => {
       console.warn('[Platform Settings] Prisma client not properly initialized, using defaults');
       return res.json({
         id: 1,
-        platformName: 'Visible Shelf',
-        platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
+        platformName: 'VisibleShelf',
+        platformDescription: 'Free directory listing, Google visibility, and a storefront — one platform to be found and get paid.',
         logoUrl: null,
         faviconUrl: null,
         createdAt: new Date().toISOString(),
@@ -66,8 +66,8 @@ router.get('/platform-settings', async (_req, res) => {
       settings = await prisma.platform_settings_list.create({
         data: {
           id: 1, 
-          platform_name: 'Visible Shelf',
-          platform_description: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
+          platform_name: 'VisibleShelf',
+          platform_description: 'Free directory listing, Google visibility, and a storefront — one platform to be found and get paid.',
           updated_at: new Date(),
         },
       });
@@ -301,8 +301,8 @@ router.post(
         update: updateData,
         create: {
           id: 1,
-          platform_name: updateData.platform_name || 'Visible Shelf',
-          platform_description: updateData.platform_description || 'Manage your retail operations with ease',
+          platform_name: updateData.platform_name || 'VisibleShelf',
+          platform_description: updateData.platform_description || 'Free directory listing, Google visibility, and a storefront — one platform to be found and get paid.',
           logo_url: updateData.logo_url,
           favicon_url: updateData.favicon_url,
           banner_url: updateData.banner_url,

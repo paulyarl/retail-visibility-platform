@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "Visible Shelf - Latency by Region",
+    "title": "VisibleShelf - Latency by Region",
     "description": "Request latency grouped by tenant region (REQ-2025-904)",
     "panels": [
       {

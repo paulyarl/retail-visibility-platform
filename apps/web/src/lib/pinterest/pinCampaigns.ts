@@ -10,7 +10,7 @@ export interface PinterestPin {
   loopId: string;
   /** Pin headline shown on Pinterest */
   headline: string;
-  /** Destination path on the Visible Shelf site */
+  /** Destination path on the VisibleShelf site */
   destinationPath: string;
   /** Pinterest board name */
   board: string;

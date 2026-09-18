@@ -219,7 +219,7 @@ export const TIER_PROGRESSIONS = {
 export const CATEGORY_DESCRIPTIONS = {
   'clover-inventory': 'Single source of truth for all your products',
   'google-visibility': 'Get discovered on Search, Shopping & Maps',
-  'platform-presence': 'Your store inside the Visible Shelf marketplace',
+  'platform-presence': 'Your store inside the VisibleShelf marketplace',
   'commerce-conversion': 'From browsing to buying and fulfillment',
   'management-growth': 'Analytics, multi-location & advanced features'
 } as const;

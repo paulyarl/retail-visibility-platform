@@ -1,6 +1,17 @@
 # Platform Root Copy — Alignment Upgrade Spec
 
-**Status:** Draft for review · **Owner:** Product / Brand · **Date:** 2026-09-18
+**Status:** Implemented · **Owner:** Product / Brand · **Date:** 2026-09-18
+
+> Implementation note (2026-09-18): S1–S7 shipped. The features page additionally had its
+> risk claims swept (unverifiable savings/ROI numbers, "GAME CHANGER"/"POWER COMBO" badges,
+> "the only platform", stale chain prices corrected to `TIER_PRICING` $199/$1,999/$4,999),
+> `COMPARISON_TIERS` now includes `directory_presence` and `presence`, the brand is
+> `VisibleShelf` (one word) across public surfaces and platform-name fallbacks, and the
+> platform-settings API defaults (`apps/api/src/routes/platform-settings.ts`) were updated
+> to match. The `VisibleShelf` rename was also swept across the API's user-facing strings —
+> email From-name defaults (SES/SendGrid/Mailtrap/`unifiedConfig`), invoice/receipt/billing
+> `platformName` fallbacks, public-catalog payloads, and Clover conflict-resolution strings.
+> `pnpm checkweb` and `pnpm checkapi` pass.
 **Subject:** The mission / vision / promise copy at the platform root (`/`), plus the public copy surfaces that repeat its framing.
 **Foundation:** `docs/PLATFORM_COPY_PLATFORM.md` — the one-page positioning, message architecture, voice rules, and claims ledger the replacement copy derives from. Read it first; this spec is the change list that follows from it.
 **Trigger:** The root copy was written before the V3 presence model, the free Directory Presence seeding gateway, the directory discovery surfaces, and the capability architecture shipped. It now describes a smaller, more Google-centric product than the one that exists.

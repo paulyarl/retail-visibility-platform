@@ -108,7 +108,7 @@ export function PinterestLandingPage({
         {secondaryCtaLabel && secondaryCtaHref && (
           <div className="mt-16 pt-10 border-t border-neutral-200 dark:border-neutral-800 text-center">
             <p className="text-neutral-600 dark:text-neutral-300 mb-4">
-              Not ready to start? Explore what else Visible Shelf can do.
+              Not ready to start? Explore what else VisibleShelf can do.
             </p>
             <Link
               href={withUTM(secondaryCtaHref)}

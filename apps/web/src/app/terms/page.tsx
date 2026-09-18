@@ -9,7 +9,7 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 
 export default function TermsPage() {
   const { settings } = usePlatformSettings();
-  const platformName = settings?.platformName || 'Visible Shelf';
+  const platformName = settings?.platformName || 'VisibleShelf';
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

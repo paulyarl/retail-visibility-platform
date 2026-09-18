@@ -78,7 +78,7 @@ export default function SigninPage() {
             </div>
           )}
           <h1 className="text-2xl font-bold text-neutral-900 mb-2">
-            {settings?.platformName || 'Visible Shelf'}
+            {settings?.platformName || 'VisibleShelf'}
           </h1>
           <p className="text-neutral-600">Sign in to your account</p>
         </div>

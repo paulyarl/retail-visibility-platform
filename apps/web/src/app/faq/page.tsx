@@ -247,7 +247,7 @@ export default function FAQPage() {
             ) : (
               <Link href="/">
                 <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
-                  {settings?.platformName || 'Visible Shelf'}
+                  {settings?.platformName || 'VisibleShelf'}
                 </h1>
               </Link>
             )}

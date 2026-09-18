@@ -1179,7 +1179,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-blue-500',
-          stats: '360x faster than manual',
+          stats: 'Catalog in seconds, not hours',
           badge: 'NEW',
         },
         {

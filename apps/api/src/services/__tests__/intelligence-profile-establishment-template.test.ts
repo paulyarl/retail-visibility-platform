@@ -54,8 +54,14 @@ describe('intelligence-profile establishment template — discovery substrate co
     expect(SEED_SOURCE).toContain('beauty-supply store');
   });
 
-  it('stamps the metro-catchment seed version', () => {
-    expect(SEED_SOURCE).toContain("'intel-profile-establishment-2026-09-18-metro-catchment'");
-    expect(SEED_SOURCE).toContain('seed-version: intel-profile-establishment-2026-09-18-metro-catchment');
+  it('stamps the signal-weights seed version', () => {
+    expect(SEED_SOURCE).toContain("'intel-profile-establishment-2026-09-18-signal-weights'");
+    expect(SEED_SOURCE).toContain('seed-version: intel-profile-establishment-2026-09-18-signal-weights');
+  });
+
+  it('requires the local platform-signal-weight estimate', () => {
+    expect(SEED_SOURCE).toContain('PLATFORM SIGNAL WEIGHTS');
+    expect(SEED_SOURCE).toContain('platform_signal_weights');
+    expect(SEED_SOURCE).toContain('confidence');
   });
 });

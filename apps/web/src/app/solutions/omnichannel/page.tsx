@@ -4,7 +4,7 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Omnichannel';
-const title = 'Omnichannel Retail System | Visible Shelf';
+const title = 'Omnichannel Retail System | VisibleShelf';
 const description =
   'Run one connected retail system across in-store, online, and local pickup. Give shoppers the choice to pay, pick up, or ship without adding work.';
 

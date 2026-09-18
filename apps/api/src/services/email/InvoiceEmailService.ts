@@ -72,7 +72,7 @@ export class InvoiceEmailService {
 
     // Fallback to default branding
     return {
-      platformName: 'Visible Shelf',
+      platformName: 'VisibleShelf',
       platformDescription: 'Retail visibility platform empowering local businesses',
       logoUrl: '',
       faviconUrl: '',

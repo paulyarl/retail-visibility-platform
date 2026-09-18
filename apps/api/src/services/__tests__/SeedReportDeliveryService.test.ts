@@ -34,7 +34,7 @@ vi.mock('../../config/unifiedConfig', () => ({
 
 vi.mock('../marketing/MarketingReceiptPdfService', () => ({
   loadPlatformBranding: vi.fn().mockResolvedValue({
-    platformName: 'Visible Shelf',
+    platformName: 'VisibleShelf',
     primaryColor: '#000000',
   }),
 }));

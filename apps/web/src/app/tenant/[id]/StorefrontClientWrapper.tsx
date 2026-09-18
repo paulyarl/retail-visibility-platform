@@ -733,7 +733,7 @@ export default function StorefrontClientWrapper({
           {/* Platform Branding */}
           {!features.removePlatformBranding && (
             <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500">
-              <Link href="/" title={platformSettings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }}>
+              <Link href="/" title={platformSettings?.platformName || 'VisibleShelf'} style={{ textDecoration: 'none' }}>
                 <div className="flex items-center justify-center gap-2">
                   <span>⚡Powered by</span>
                   <img
@@ -745,7 +745,7 @@ export default function StorefrontClientWrapper({
                     width="32"
                     height="32"
                   />
-                  <span>{platformSettings?.platformName || 'Visible Shelf'}</span>
+                  <span>{platformSettings?.platformName || 'VisibleShelf'}</span>
                 </div>
               </Link>
             </div>

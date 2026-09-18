@@ -30,7 +30,7 @@ const featureCategories = [
   {
     name: 'Platform Presence',
     icon: '🏪',
-    description: 'Your store inside the Visible Shelf marketplace',
+    description: 'Your store inside the VisibleShelf marketplace',
     color: 'from-purple-500 to-indigo-600'
   },
   {
@@ -87,7 +87,7 @@ const features = [
       </svg>
     ),
     title: 'SKU Scanning + Inventory Intelligence',
-    description: '🎯 BREAKTHROUGH: Scan barcodes and capture nutrition facts, allergens, specifications, and real-time analytics.',
+    description: 'Scan barcodes to capture nutrition facts, allergens, and specifications — with real-time inventory analytics.',
     benefits: [
       'Complete nutrition facts & Nutri-Score',
       'Allergen warnings & dietary info',
@@ -97,7 +97,7 @@ const features = [
       'Cost savings visibility & ROI tracking'
     ],
     color: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white',
-    badge: 'NEW!',
+    badge: 'NEW',
     category: 'Clover & Inventory'
   },
 
@@ -223,7 +223,7 @@ const features = [
       </svg>
     ),
     title: 'Platform Directory & Discovery',
-    description: 'Get discovered by shoppers browsing the Visible Shelf marketplace with enhanced directory listings.',
+    description: 'Get discovered by shoppers browsing the VisibleShelf marketplace with enhanced directory listings.',
     benefits: [
       'Platform directory listing',
       'Enhanced store discovery',
@@ -262,10 +262,10 @@ const features = [
       </svg>
     ),
     title: 'Commitment Commerce - Holding Deposits',
-    description: '🎯 Capture shopper intent with 10-15% holding deposits. Guarantee foot traffic without full payment.',
+    description: 'Capture shopper intent with 10–15% holding deposits — a committed visit without requiring full payment upfront.',
     benefits: [
       '10–15% holding fee collected',
-      'Inventory reservation guaranteed',
+      'Inventory reserved on deposit',
       'Shopper commitment verification',
       'Forfeiture protection for retailers',
       'Reduced no-shows significantly'
@@ -428,16 +428,16 @@ const features = [
       </svg>
     ),
     title: 'Quick Start Wizard',
-    description: '🚀 Generate 50-100 realistic products in 1 SECOND. No manual data entry, no spreadsheets.',
+    description: 'Generate a starter catalog of 50–100 realistic products in seconds — no manual data entry, no spreadsheets.',
     benefits: [
-      '360x faster than manual entry',
-      'Beats barcode scanning (no equipment!)',
-      'Beats CSV import (no data cleanup!)',
+      'Dramatically faster than manual entry',
+      'No scanning equipment needed',
+      'No CSV cleanup required',
       '4 ready-to-go business scenarios',
       'Auto-categorized with real prices'
     ],
     color: 'bg-gradient-to-br from-blue-500 to-purple-600 text-white',
-    badge: 'GAME CHANGER',
+    badge: 'QUICK START',
     category: 'Clover & Inventory'
   }
 ];
@@ -632,7 +632,7 @@ export default function FeaturesPage() {
             ) : (
               <Link href="/">
                 <h1 className="text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
-                  {settings?.platformName || 'Visible Shelf'}
+                  {settings?.platformName || 'VisibleShelf'}
                 </h1>
               </Link>
             )}
@@ -665,8 +665,8 @@ export default function FeaturesPage() {
               One platform for the whole journey: a free directory listing sourced from public information, Google visibility, your own storefront, and the tools to turn discovery into sales. No developer, no agency.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <a href={withUTM('/auth/signup')}>
-                <Button size="lg">Start Free Trial</Button>
+              <a href={withUTM('/directory/add-business')}>
+                <Button size="lg">Claim Your Free Listing</Button>
               </a>
               <Link href="#pricing">
                 <Button variant="secondary" size="lg">View Pricing</Button>
@@ -744,7 +744,7 @@ export default function FeaturesPage() {
               <ul className="space-y-3 text-neutral-700">
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Generate 100 products in 1 second</strong></span>
+                  <span><strong>Generate a starter catalog in seconds</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
@@ -817,13 +817,13 @@ export default function FeaturesPage() {
             className="text-center mb-12"
           >
             <div className="inline-block bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold text-sm mb-4">
-              ⚡ POWER COMBO
+              ⚡ WORK TOGETHER
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Quick Start Wizard + Product Scanning
             </h2>
             <p className="text-xl text-blue-100 max-w-3xl mx-auto">
-              These aren't competing features—they're a <strong className="text-yellow-300">perfectly aligned system</strong> that saves you 15+ hours per 100 products
+              These aren't competing features — they're a <strong className="text-yellow-300">single workflow</strong>: generate a starter catalog, then scan to enrich it with real product data.
             </p>
           </motion.div>
 
@@ -990,10 +990,10 @@ export default function FeaturesPage() {
             <div className="mt-8 pt-8 border-t-2 border-neutral-200">
               <div className="text-center">
                 <p className="text-2xl font-bold text-neutral-900 mb-2">
-                  💰 Save <span className="text-green-600">$394.58</span> and <span className="text-blue-600">15.75 hours</span> per 100 products
+                  💰 Hours of data entry become a starter catalog in seconds
                 </p>
                 <p className="text-neutral-600">
-                  That's a <strong className="text-purple-600">94% time reduction</strong> with better quality data!
+                  Generate the products, then scan barcodes to enrich them with real data.
                 </p>
               </div>
             </div>
@@ -1022,7 +1022,7 @@ export default function FeaturesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-neutral-900 mb-4 text-center">Complete Online Presence Solution</h2>
           <p className="text-lg text-neutral-600 mb-8 text-center max-w-3xl mx-auto">
-            Everything you need to dominate local search and drive customers to your store
+            Everything you need to show up where shoppers look — and turn that discovery into visits and sales
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1052,7 +1052,7 @@ export default function FeaturesPage() {
                 <li>• Local SEO optimization</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-green-300">
-                <span className="text-xs font-semibold text-green-800">Dominate local search!</span>
+                <span className="text-xs font-semibold text-green-800">Show up where shoppers search</span>
               </div>
             </div>
 
@@ -1161,12 +1161,12 @@ export default function FeaturesPage() {
               <div className="text-center mb-4">
                 <div className="text-4xl mb-2">⚡</div>
                 <h3 className="font-bold text-lg text-white">Quick Start Wizard</h3>
-                <div className="text-yellow-300 font-semibold text-sm mt-1">GAME CHANGER! 🚀</div>
+                <div className="text-yellow-300 font-semibold text-sm mt-1">Fastest way to a full catalog</div>
               </div>
               <ul className="space-y-2 text-sm text-white">
                 <li className="flex items-start gap-2">
                   <span className="text-green-300 mt-0.5">✓</span>
-                  <span className="font-medium">1 SECOND for 50 products!</span>
+                  <span className="font-medium">50 products in seconds</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-300 mt-0.5">✓</span>
@@ -1178,7 +1178,7 @@ export default function FeaturesPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-300 mt-0.5">✓</span>
-                  <span className="font-medium">360x faster than manual</span>
+                  <span className="font-medium">Dramatically faster than manual entry</span>
                 </li>
               </ul>
             </div>
@@ -1187,17 +1187,14 @@ export default function FeaturesPage() {
           <div className="mt-8 text-center">
             <div className="inline-block bg-white rounded-lg px-6 py-4 shadow-lg border-2 border-green-200">
               <p className="text-lg font-bold text-neutral-900 mb-1">
-                ⏱️ Time Comparison: 50 Products
+                ⏱️ Getting to a first catalog
               </p>
               <div className="flex items-center justify-center gap-6 text-sm">
                 <div>
-                  <span className="text-red-600 font-semibold">Scanning:</span> 3 hours
+                  <span className="text-red-600 font-semibold">Scanning or CSV:</span> hours of prep
                 </div>
                 <div>
-                  <span className="text-orange-600 font-semibold">CSV:</span> 1-2 hours
-                </div>
-                <div>
-                  <span className="text-green-600 font-bold">Quick Start:</span> 1 second ⚡
+                  <span className="text-green-600 font-bold">Quick Start:</span> a starter catalog in seconds ⚡
                 </div>
               </div>
             </div>
@@ -1205,18 +1202,18 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* SKU Scanning Comparison - BREAKTHROUGH */}
+      {/* SKU Scanning Comparison - Product Intelligence */}
       <section className="py-16 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="inline-block bg-yellow-400 text-green-900 text-sm px-4 py-1 rounded-full font-bold mb-4">
-              🎯 BREAKTHROUGH FEATURE
+              🎯 PRODUCT INTELLIGENCE
             </div>
             <h2 className="text-4xl font-bold text-neutral-900 mb-4">
-              Product Intelligence That Beats Shopify & WooCommerce
+              Rich product data, without a data team
             </h2>
             <p className="text-xl text-neutral-600">
-              Get the same rich product pages as CVS, Walmart, and Target. Impossible with traditional e-commerce platforms.
+              Give shoppers the nutrition facts, allergen warnings, and specs they expect from big-chain sites — automatically, from a barcode scan.
             </p>
           </div>
 
@@ -1225,29 +1222,25 @@ export default function FeaturesPage() {
             <div className="bg-white rounded-xl p-6 border-2 border-red-200">
               <div className="text-center mb-4">
                 <div className="text-4xl mb-2">🛒</div>
-                <h3 className="font-bold text-lg text-neutral-900">Shopify/WooCommerce</h3>
-                <div className="text-red-600 font-semibold text-sm mt-1">Manual Entry Only ❌</div>
+                <h3 className="font-bold text-lg text-neutral-900">Typical store builders</h3>
+                <div className="text-red-600 font-semibold text-sm mt-1">Manual by default</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">✗</span>
-                  <span>Type everything manually</span>
+                  <span>Product details entered by hand</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">✗</span>
-                  <span>No nutrition facts</span>
+                  <span>Nutrition & allergen data not built in</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">✗</span>
-                  <span>No allergen warnings</span>
+                  <span>Rich product data needs plugins or apps</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">✗</span>
-                  <span>No environmental data</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">✗</span>
-                  <span>Basic product pages only</span>
+                  <span>Basic product pages out of the box</span>
                 </li>
               </ul>
             </div>
@@ -1256,8 +1249,8 @@ export default function FeaturesPage() {
             <div className="bg-white rounded-xl p-6 border-2 border-orange-200">
               <div className="text-center mb-4">
                 <div className="text-4xl mb-2">🏬</div>
-                <h3 className="font-bold text-lg text-neutral-900">CVS/Walmart/Target</h3>
-                <div className="text-orange-600 font-semibold text-sm mt-1">Rich Data, But... ⚠️</div>
+                <h3 className="font-bold text-lg text-neutral-900">Major chains</h3>
+                <div className="text-orange-600 font-semibold text-sm mt-1">Rich data — for a price</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
@@ -1274,11 +1267,11 @@ export default function FeaturesPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-orange-500 mt-0.5">✗</span>
-                  <span>Only for major chains</span>
+                  <span>Requires enterprise data teams</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-orange-500 mt-0.5">✗</span>
-                  <span>Small retailers left behind</span>
+                  <span>Out of reach for independents</span>
                 </li>
               </ul>
             </div>
@@ -1287,8 +1280,8 @@ export default function FeaturesPage() {
             <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 border-2 border-green-400 shadow-xl scale-105">
               <div className="text-center mb-4">
                 <div className="text-4xl mb-2">✨</div>
-                <h3 className="font-bold text-lg text-white">Our Platform</h3>
-                <div className="text-yellow-300 font-semibold text-sm mt-1">LEVEL PLAYING FIELD! 🎯</div>
+                <h3 className="font-bold text-lg text-white">VisibleShelf</h3>
+                <div className="text-yellow-300 font-semibold text-sm mt-1">Big-chain data, small-retailer simple</div>
               </div>
               <ul className="space-y-2 text-sm text-white">
                 <li className="flex items-start gap-2">
@@ -1309,7 +1302,7 @@ export default function FeaturesPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-300 mt-0.5">✓</span>
-                  <span className="font-medium">For EVERY small retailer!</span>
+                  <span className="font-medium">Built for local retailers</span>
                 </li>
               </ul>
             </div>
@@ -1334,7 +1327,7 @@ export default function FeaturesPage() {
                   </div>
                 </div>
                 <p className="text-sm text-neutral-600 italic">
-                  Shopify/WooCommerce: Basic product info only. No nutrition, no allergens, no trust.
+                  A typical online listing: name and price — and not much else to build a shopper's confidence.
                 </p>
               </div>
 
@@ -1407,12 +1400,12 @@ export default function FeaturesPage() {
           <div className="mt-8 text-center">
             <div className="inline-block bg-white rounded-lg px-6 py-4 shadow-lg border-2 border-green-400">
               <p className="text-lg font-bold text-neutral-900 mb-1">
-                🎯 The Breakthrough
+                Why it matters
               </p>
               <p className="text-sm text-neutral-700">
-                Small retailers can now compete with major chains on product information quality.
+                Small retailers can now match major chains on product information quality.
                 <br />
-                <span className="text-green-600 font-semibold">This was impossible before. Now it's automatic.</span>
+                <span className="text-green-600 font-semibold">What used to take a data team now happens automatically.</span>
               </p>
             </div>
           </div>
@@ -1708,14 +1701,14 @@ export default function FeaturesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div>
-                      <p className="font-semibold text-emerald-900">Save 400+ Hours</p>
-                      <p className="text-sm text-emerald-700">Per product rollout vs manual entry</p>
+                      <p className="font-semibold text-emerald-900">Enter once, publish everywhere</p>
+                      <p className="text-sm text-emerald-700">Update products at HQ instead of every location</p>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-emerald-200">
                   <p className="text-sm text-emerald-800 text-center">
-                    <strong>ROI Example:</strong> 50-location chain saves $25,000+ in labor costs per product rollout
+                    One catalog update at headquarters propagates to every location — no per-store re-entry.
                   </p>
                 </div>
               </div>
@@ -1726,9 +1719,9 @@ export default function FeaturesPage() {
               <div className="bg-white border-2 border-neutral-200 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xl font-bold text-neutral-900">Chain Starter</h4>
-                  <Badge className="bg-blue-100 text-blue-800">$149/mo</Badge>
+                  <Badge className="bg-blue-100 text-blue-800">$199/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600 mb-4">Up to 5 locations • 2,500 total SKUs</p>
+                <p className="text-sm text-neutral-600 mb-4">Up to 5 locations • shared SKU pool</p>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1762,7 +1755,7 @@ export default function FeaturesPage() {
                   </li>
                 </ul>
                 <div className="mt-4 pt-4 border-t border-neutral-200">
-                  <p className="text-xs text-green-700 font-semibold">Save 39% vs individual plans</p>
+                  <p className="text-xs text-green-700 font-semibold">One plan for every location</p>
                 </div>
               </div>
 
@@ -1773,9 +1766,9 @@ export default function FeaturesPage() {
                 </div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xl font-bold text-neutral-900">Chain Professional</h4>
-                  <Badge className="bg-purple-100 text-purple-800">$499/mo</Badge>
+                  <Badge className="bg-purple-100 text-purple-800">$1,999/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600 mb-4">Up to 10 locations • 50,000 total SKUs</p>
+                <p className="text-sm text-neutral-600 mb-4">Up to 25 locations • shared SKU pool</p>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1803,7 +1796,7 @@ export default function FeaturesPage() {
                   </li>
                 </ul>
                 <div className="mt-4 pt-4 border-t border-neutral-200">
-                  <p className="text-xs text-green-700 font-semibold">Save 66% vs individual plans ($1,490 → $499)</p>
+                  <p className="text-xs text-green-700 font-semibold">Google visibility + maps for all locations</p>
                 </div>
               </div>
 
@@ -1811,7 +1804,7 @@ export default function FeaturesPage() {
               <div className="bg-white border-2 border-neutral-200 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xl font-bold text-neutral-900">Chain Enterprise</h4>
-                  <Badge className="bg-amber-100 text-amber-800">$1,499/mo</Badge>
+                  <Badge className="bg-amber-100 text-amber-800">$4,999/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600 mb-4">Unlimited locations • Unlimited SKUs</p>
                 <ul className="space-y-2 text-sm">
@@ -1848,7 +1841,7 @@ export default function FeaturesPage() {
 
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
               <p className="text-sm text-green-900">
-                <strong>Example Savings:</strong> 10-location chain saves 66% ($1,490/mo → $499/mo with Chain Professional)
+                <strong>One subscription, every location:</strong> chain plans cover your whole footprint — no per-store billing to manage.
               </p>
             </div>
           </div>
@@ -1860,10 +1853,10 @@ export default function FeaturesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-neutral-900 mb-4">
-              Revolutionizing Retail Commerce
+              Commitment Commerce: a fairer way to sell
             </h2>
             <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
-              Our unique Commitment Commerce model protects retailers while giving shoppers the flexibility they want. No more abandoned carts - just guaranteed foot traffic.
+              Our Commitment Commerce model protects retailers while giving shoppers the flexibility they want. A small deposit turns a maybe into a committed visit.
             </p>
           </div>
 
@@ -1911,7 +1904,7 @@ export default function FeaturesPage() {
             <div className="bg-white border-2 border-green-500 rounded-xl p-6 shadow-lg relative">
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-bold">
-                  VISIBLE SHELF
+                  VISIBLESHELF
                 </span>
               </div>
               <div className="text-center mb-4 mt-2">
@@ -1942,7 +1935,7 @@ export default function FeaturesPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Guaranteed foot traffic & pickup</span>
+                  <span>Deposit-backed commitment & pickup</span>
                 </li>
               </ul>
               <div className="mt-4 p-3 bg-green-50 rounded-lg text-center">
@@ -2020,7 +2013,7 @@ export default function FeaturesPage() {
                   Inventory is reserved with financial commitment. No more holding products for shoppers who never show up.
                 </p>
                 <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  Guaranteed foot traffic
+                  Deposit-backed visits
                 </div>
               </div>
 
@@ -2461,7 +2454,7 @@ export default function FeaturesPage() {
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 text-center">
               <p className="text-sm text-neutral-800 font-semibold mb-2">
                 🎯 <strong>Platform Advantage:</strong> Even large retailers struggle with multi-location inventory visibility. 
-                Visible Shelf delivers it natively through a single Clover integration.
+                VisibleShelf delivers it natively through a single Clover integration.
               </p>
               <p className="text-xs text-neutral-600">
                 Shoppers see availability across all your locations and choose their preferred store - driving traffic to your entire network.
@@ -2653,20 +2646,20 @@ export default function FeaturesPage() {
                   Clover Ecosystem Access
                 </h4>
                 <p className="text-sm text-green-800 mb-4">
-                  Clover serves hundreds of thousands of small businesses - instant distribution.
+                  Meet retailers where they already work — inside the POS they use every day.
                 </p>
                 <ul className="space-y-2 text-sm text-green-700">
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">•</span>
-                    <span>Native integration provides immediate market access</span>
+                    <span>Native integration with your existing Clover setup</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">•</span>
-                    <span>Ready-made customer base of small retailers</span>
+                    <span>Your catalog syncs from the system you already run</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-600 mt-0.5">•</span>
-                    <span>Trusted POS system with existing relationships</span>
+                    <span>No new hardware or workflow to learn</span>
                   </li>
                 </ul>
               </div>
@@ -2762,7 +2755,7 @@ export default function FeaturesPage() {
               <div className="p-6 bg-green-50 rounded-lg">
                 <h4 className="font-semibold text-green-900 mb-4">We Own the Gap</h4>
                 <p className="text-sm text-green-800 mb-4">
-                  Visible Shelf is built specifically for the retailers everyone else forgot - with the exact features they need.
+                  VisibleShelf is built specifically for the retailers everyone else forgot — with the exact features they need.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
@@ -2783,8 +2776,8 @@ export default function FeaturesPage() {
 
             <div className="mt-8 p-4 bg-gradient-to-r from-purple-50 to-red-50 rounded-lg text-center">
               <p className="text-sm text-neutral-800 font-semibold">
-                🎯 <strong>Positioning Statement:</strong> We're the only platform that bridges local retail inventory to 
-                online discovery with guaranteed foot traffic - built for the retailers who need it most.
+                🎯 <strong>Positioning Statement:</strong> We bridge local retail inventory to 
+                online discovery — with deposit-backed visits — built for the retailers who need it most.
               </p>
             </div>
           </div>
@@ -2799,7 +2792,7 @@ export default function FeaturesPage() {
           </h2>
           <div className="text-xl mb-8 space-y-4">
             <p className="text-neutral-200">
-              <strong>Visible Shelf meets retailers where they are — and shows them where they could be.</strong>
+              <strong>VisibleShelf meets retailers where they are — and shows them where they could be.</strong>
             </p>
             <p className="text-neutral-300">
               Every tier is powered by the same Clover integration and the same platform infrastructure. 
@@ -2836,9 +2829,9 @@ export default function FeaturesPage() {
                 <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
                   <span className="text-white font-bold">3</span>
                 </div>
-                <h4 className="font-semibold mb-2">Guaranteed Results</h4>
+                <h4 className="font-semibold mb-2">Built to Deliver</h4>
                 <p className="text-neutral-300">
-                  From Google indexing to guaranteed foot traffic, every tier delivers value
+                  From Google indexing to deposit-backed visits, every tier delivers value
                 </p>
               </div>
             </div>
@@ -2846,11 +2839,11 @@ export default function FeaturesPage() {
           
           <div className="text-center">
             <p className="text-lg text-neutral-300 mb-6">
-              This isn't just software — it's a complete business transformation platform.
+              Start with a free listing. Add a surface when you're ready. Turn on commerce when it pays.
             </p>
-            <a href={withUTM('/auth/signup')}>
+            <a href={withUTM('/directory/add-business')}>
               <Button size="lg" className="bg-white text-neutral-900 hover:bg-neutral-100">
-                Start Your Transformation
+                Claim Your Free Listing
               </Button>
             </a>
           </div>
@@ -2944,7 +2937,7 @@ export default function FeaturesPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-green-600">Commitment Path</h3>
-                  <p className="text-sm text-neutral-600">Available in all tiers</p>
+                  <p className="text-sm text-neutral-600">Commitment tier &amp; above</p>
                 </div>
               </div>
               
@@ -2966,7 +2959,7 @@ export default function FeaturesPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">•</span>
-                      <span>Guaranteed foot traffic to store</span>
+                      <span>Deposit-backed store visits</span>
                     </li>
                   </ul>
                 </div>
@@ -2993,7 +2986,7 @@ export default function FeaturesPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-amber-600">Full Payment Path</h3>
-                  <p className="text-sm text-neutral-600">Professional & Enterprise tiers</p>
+                  <p className="text-sm text-neutral-600">E-commerce & Omnichannel tiers</p>
                 </div>
               </div>
               
@@ -3096,7 +3089,7 @@ export default function FeaturesPage() {
 
             <div className="mt-8 p-4 bg-gradient-to-r from-green-50 to-amber-50 rounded-lg text-center">
               <p className="text-sm text-neutral-800 font-semibold">
-                🎯 <strong>Result:</strong> Retailer gets guaranteed commitment or full payment. 
+                🎯 <strong>Result:</strong> Retailer gets a deposit-backed commitment or full payment. 
                 Shopper gets the flexibility they want. Everyone wins.
               </p>
             </div>
@@ -3108,15 +3101,15 @@ export default function FeaturesPage() {
       <section className="py-20 bg-primary-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to Transform Your Retail Business?
+            Ready to be found — and ready to sell?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Join 1,500+ retailers who trust our platform to manage and grow their business.
+            Your business may already be listed. Claim it free, choose how you show up, and turn on commerce when you're ready.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <a href={withUTM('/auth/signup')}>
+            <a href={withUTM('/directory/add-business')}>
               <Button size="lg" variant="secondary">
-                Start Free Trial
+                Claim Your Free Listing
               </Button>
             </a>
             <Link href="/settings/contact">

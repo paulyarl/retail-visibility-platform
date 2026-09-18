@@ -57,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Logo */}
               {settings?.logoUrl && (
-                <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >
+                <Link href="/" title={settings?.platformName || 'VisibleShelf'} style={{ textDecoration: 'none' }} >
                   <img
                     src={settings.logoUrl}
                     alt={settings.platformName || 'Platform Logo'}
@@ -75,8 +75,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </Link>
               )}
               <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
-                <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >
-                  {settings?.platformName || 'Visible Shelf'}
+                <Link href="/" title={settings?.platformName || 'VisibleShelf'} style={{ textDecoration: 'none' }} >
+                  {settings?.platformName || 'VisibleShelf'}
                 </Link>
               </span>
               {/* Visual separator between branding and navigation */}

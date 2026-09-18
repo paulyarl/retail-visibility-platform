@@ -4,7 +4,7 @@ import { PinterestLandingPage } from '@/components/marketing/PinterestLandingPag
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com';
 const heroImage =
   'https://placehold.co/1200x1800/e60023/ffffff?text=Google+Visibility';
-const title = 'Google Visibility for Local Stores | Visible Shelf';
+const title = 'Google Visibility for Local Stores | VisibleShelf';
 const description =
   'Get found on Google Search, Maps, and Shopping. Sync your Google Business Profile, product catalog, and local listings in one place.';
 

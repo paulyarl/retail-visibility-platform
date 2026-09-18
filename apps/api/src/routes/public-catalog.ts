@@ -3146,7 +3146,7 @@ router.get('/platform/branding', async (req, res) => {
     if (!prisma || !prisma.platform_settings_list) {
       console.warn('[Public Platform Branding] Prisma client not properly initialized, using defaults');
       return res.json({
-        platformName: 'Visible Shelf',
+        platformName: 'VisibleShelf',
         platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
         logoUrl: null,
         faviconUrl: null,
@@ -3182,7 +3182,7 @@ router.get('/platform/branding', async (req, res) => {
       settings = await prisma.platform_settings_list.create({
         data: {
           id: 1, 
-          platform_name: 'Visible Shelf',
+          platform_name: 'VisibleShelf',
           platform_description: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
           updated_at: new Date(),
         },
@@ -3221,7 +3221,7 @@ router.get('/platform/branding', async (req, res) => {
     logger.error('[Public Platform Branding] Error fetching public branding:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Return safe defaults on error
     res.json({
-      platformName: 'Visible Shelf',
+      platformName: 'VisibleShelf',
       platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
       logoUrl: null,
       faviconUrl: null,

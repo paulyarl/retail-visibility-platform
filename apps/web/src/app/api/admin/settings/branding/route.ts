@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('[Branding Route] Error fetching platform settings:', error);
     return NextResponse.json({
-      platformName: 'Visible Shelf',
+      platformName: 'VisibleShelf',
       logoUrl: null,
       faviconUrl: null,
       primaryColor: '#3b82f6',
