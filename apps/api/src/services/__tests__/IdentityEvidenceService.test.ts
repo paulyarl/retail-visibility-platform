@@ -304,6 +304,24 @@ describe('IdentityEvidenceService', () => {
     ).toBe(false);
   });
 
+  it('casts the DATE placeholder — Postgres will not implicitly cast text', async () => {
+    // Prisma binds a JS string parameter as `text`, and `text` → `date` is not
+    // an implicit cast, so the insert fails with 42804 without `::date`. The
+    // mocked prisma here cannot surface that (it is a Postgres type-binding
+    // requirement, not a value problem), so this asserts the cast is present —
+    // the write path was verified against a real DB separately.
+    await IdentityEvidenceService.create({
+      campaignId: 'camp-1',
+      sourceName: 'Google Business Profile',
+      corroborates: ['name'],
+      accessedAt: '2026-09-18',
+    });
+
+    const [strings, ...values] = mockExecuteRaw.mock.calls[0];
+    expect(strings.join('?')).toContain('::date');
+    expect(values).toContain('2026-09-18');
+  });
+
   it('mirrors corroborated fields into provenance with DO NOTHING', async () => {
     stubQueries({ seedLink: true });
     await IdentityEvidenceService.create({
@@ -320,6 +338,8 @@ describe('IdentityEvidenceService', () => {
     expect(provenanceCalls).toHaveLength(2);
     const sql = provenanceCalls[0][0].join('?');
     expect(sql).toContain('ON CONFLICT (seed_id, field_key) DO NOTHING');
+    // directory_field_provenance.accessed_at is also a DATE column.
+    expect(sql).toContain('::date');
     // Never auto-publishes operator evidence to the public listing.
     expect(sql).toContain('false');
     // Resolved value comes from the packet, not a duplicated canonicalization.

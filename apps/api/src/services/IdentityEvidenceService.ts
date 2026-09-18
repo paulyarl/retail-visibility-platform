@@ -195,7 +195,7 @@ class IdentityEvidenceService {
         ${clean(input.sourceUrl)}, ${tier}, ${sourceGroupSlug(input.sourceName) || 'manual'},
         ${evidenceState}, ${corroborates}::text[],
         ${ownerName}, ${ownerPhone}, ${ownerEmail},
-        ${accessedAt}, ${clean(input.notes)}, ${input.createdBy ?? null}, now(), now()
+        ${accessedAt}::date, ${clean(input.notes)}, ${input.createdBy ?? null}, now(), now()
       )
     `;
 
@@ -316,7 +316,7 @@ class IdentityEvidenceService {
             ${resolvedValues.get(field) ?? null},
             ${source.sourceName},
             ${source.sourceUrl},
-            ${source.accessedAt},
+            ${source.accessedAt}::date,
             ${PROVENANCE_CONFIDENCE[source.tier]},
             false,
             ${source.evidenceState},
