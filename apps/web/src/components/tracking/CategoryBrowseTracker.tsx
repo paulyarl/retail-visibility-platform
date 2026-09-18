@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { useDirectoryShelfTracking } from '@/hooks/useDirectoryShelfTracking';
 
 interface CategoryBrowseTrackerProps {
   categoryId: string;
@@ -11,6 +12,8 @@ interface CategoryBrowseTrackerProps {
   surface?: 'directory' | 'place';
   city?: string;
   state?: string;
+  /** Serialized filter/sort state — fires `filter_applied` when it changes. */
+  filterSignature?: string;
 }
 
 export default function CategoryBrowseTracker({
@@ -21,8 +24,17 @@ export default function CategoryBrowseTracker({
   surface = 'directory',
   city,
   state,
+  filterSignature,
 }: CategoryBrowseTrackerProps) {
   const trackedRef = useRef<string | null>(null);
+
+  // Layer 3 — shelf engagement (shelf_viewed / heartbeat / session_end /
+  // filter_applied) for the category shelf surface.
+  useDirectoryShelfTracking({
+    surface: surface === 'place' ? 'place_category' : 'directory_category',
+    ref: categorySlug,
+    filterSignature,
+  });
 
   useEffect(() => {
     // Use a path-shaped entity_id so analytics can reconstruct the public URL.

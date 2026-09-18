@@ -328,7 +328,7 @@ function getStorefrontUrl(tenantId: string, tenantSlug?: string): string {
   // Primary: use tenantId
   // Secondary: use slug if available
   if (tenantSlug) {
-    return `/directory/${tenantSlug}`;
+    return `/directory/${tenantSlug}?source=storefront`;
   }
   return `/tenant/${tenantId}`;
 }

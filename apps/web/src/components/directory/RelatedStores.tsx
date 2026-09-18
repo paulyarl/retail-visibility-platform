@@ -149,6 +149,7 @@ export default function RelatedStores({
                 listing={store}
                 viewMode="grid"
                 linkType="directory"
+                sourceRef="related"
               />
             ))}
           </div>

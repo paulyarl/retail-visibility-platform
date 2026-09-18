@@ -15,6 +15,76 @@
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
+// ─── Identity Packet (source-scored seed decision) ───────────────────────
+export type IdentitySourceTier =
+  | 'authoritative'
+  | 'first_party'
+  | 'major_aggregator'
+  | 'secondary_aggregator'
+  | 'inferred';
+export type IdentityFieldKey =
+  | 'name'
+  | 'address'
+  | 'phone'
+  | 'website'
+  | 'hours'
+  | 'primary_category'
+  | 'snap_ebt'
+  | 'attributes';
+export type IdentityRecommendationBand = 'ready' | 'review' | 'blocked';
+
+export interface IdentityPacketSourceRef {
+  name: string;
+  tier: IdentitySourceTier;
+  independenceGroup: string;
+  agrees: boolean;
+  evidenceState?: string | null;
+  url?: string | null;
+  accessedAt?: string | null;
+}
+
+export interface IdentityPacketFieldScore {
+  field: IdentityFieldKey;
+  value: string | null;
+  required: boolean;
+  score: number;
+  agreementWeight: number;
+  conflictWeight: number;
+  independentSources: number;
+  sources: IdentityPacketSourceRef[];
+}
+
+export interface IdentityPacketLedgerEntry {
+  name: string;
+  tier: IdentitySourceTier;
+  independenceGroup: string;
+  url: string | null;
+  accessedAt: string | null;
+  fields: IdentityFieldKey[];
+}
+
+export interface IdentityPacket {
+  campaignId: string;
+  businessName: string | null;
+  identityStatus: 'confirmed' | 'ambiguous' | 'mismatched';
+  operationalStatus: 'active' | 'likely_active' | 'inactive' | 'unable_to_verify';
+  callConfirmed: boolean | null;
+  snapSourced: boolean;
+  fields: Array<{ field: IdentityFieldKey; value: string | null; sources: IdentityPacketSourceRef[] }>;
+  ledger: IdentityPacketLedgerEntry[];
+  score: {
+    identityScore: number;
+    operationalScore: number;
+    band: IdentityRecommendationBand;
+    pushRecommended: boolean;
+    vetoes: Array<{ code: string; message: string }>;
+    qcSignals: Array<{ code: string; severity: 'info' | 'warn' | 'error'; message: string; field?: IdentityFieldKey }>;
+    fields: IdentityPacketFieldScore[];
+  };
+  seed: { id: string; status: string; publicUrl: string | null } | null;
+  generatedAt: string;
+}
+
 export interface DirectoryPresenceSeedSummary {
   id: string;
   tenantId: string;
@@ -350,6 +420,18 @@ export interface DirectoryEngagementDashboard {
     sessions: number;
   }>;
   funnel: DirectoryClaimFunnel;
+}
+
+/** Per-surface engagement rollup spanning entries AND shelves (migration 295). */
+export interface SurfaceEngagementRow {
+  surface: string;
+  views: number;
+  sessions: number;
+  clickThroughs: number;
+  ctaClicks: number;
+  filters: number;
+  avgDwellMs: number;
+  clickThroughRate: number | null;
 }
 
 // ============================
@@ -1004,6 +1086,21 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (!result.success) return null;
     const data = result.data?.data ?? result.data;
     return (data as any)?.funnel ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/surface-engagement — per-surface rollup
+   *  spanning entries AND shelves. */
+  async getSurfaceEngagement(daysBack?: number): Promise<SurfaceEngagementRow[]> {
+    const qs = daysBack ? `?daysBack=${daysBack}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/surface-engagement${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.surfaces ?? [];
   }
 
   // ============================
@@ -1797,6 +1894,23 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     }
     const data = result.data?.data ?? result.data;
     return data as { seedId: string; listingId: string; tenantId: string; slug: string; publicUrl: string; created: boolean; seoEnriched: boolean; published: boolean };
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/identity-packet?campaignId=<id>
+   *  Source-scored Identity Packet for a business-scope campaign. */
+  async getIdentityPacket(campaignId: string): Promise<IdentityPacket> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/identity-packet?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const message = typeof err === 'string' ? err : err?.message;
+      throw new Error(message || 'Failed to load identity packet');
+    }
+    return (result.data?.packet ?? result.data) as IdentityPacket;
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/by-campaign/:campaignId

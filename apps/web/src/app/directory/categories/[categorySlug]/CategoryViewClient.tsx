@@ -205,6 +205,7 @@ export default function CategoryViewClient({
         categoryName={category?.name}
         pageType="directory_category"
         surface="directory"
+        filterSignature={searchParams.toString()}
       />
 
       {/* Page Title Section */}
@@ -356,6 +357,7 @@ export default function CategoryViewClient({
               listings={data?.listings || []} // Use the already-filtered listings
               useMapEndpoint={false} // Don't use the endpoint to avoid data sync issues
               filters={{}}
+              shelfRef={`directory/category/${categorySlug}`}
             />
           </>
         )}

@@ -23,6 +23,7 @@ import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
 import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
+import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 
 interface PlaceCategoryClientProps {
   categorySlug: string;
@@ -126,6 +127,7 @@ export default function PlaceCategoryClient({
         surface="place"
         city={city}
         state={state}
+        filterSignature={city ?? ''}
       />
       {jsonLd && (
         <script
@@ -452,6 +454,7 @@ function PlaceCard({
         <div className="flex items-start justify-between gap-2 mb-2">
           <Link
             href={`/place/${place.slug}?shelf=${encodeURIComponent(shelfRef)}`}
+            onClick={() => reportShelfListingClick(shelfRef)}
             className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 hover:text-blue-600 dark:hover:text-blue-400"
           >
             {place.businessName}
@@ -500,6 +503,7 @@ function PlaceCard({
         <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-700 flex items-center justify-between">
           <Link
             href={`/place/${place.slug}?shelf=${encodeURIComponent(shelfRef)}`}
+            onClick={() => reportShelfListingClick(shelfRef)}
             className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 inline-flex items-center"
           >
             View details

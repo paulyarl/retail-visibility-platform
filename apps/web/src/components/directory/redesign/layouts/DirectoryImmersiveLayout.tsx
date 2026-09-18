@@ -126,6 +126,7 @@ export default function DirectoryImmersiveLayout({ data }: DirectoryLayoutProps)
               loading={data.loading}
               viewMode="grid"
               appearance="immersive"
+              shelfRef="directory/home"
             />
           </div>
 

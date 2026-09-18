@@ -165,6 +165,7 @@ export default function DirectoryEditorialLayout({ data }: DirectoryLayoutProps)
             loading={data.loading}
             viewMode={data.viewMode}
             appearance="editorial"
+            shelfRef="directory/home"
           />
 
           {/* Pagination */}

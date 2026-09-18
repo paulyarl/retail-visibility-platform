@@ -75,11 +75,32 @@ describe('DirectoryPresenceAnalyticsService.trackEvent', () => {
     expect(mockExecuteRawUnsafe).toHaveBeenCalledTimes(1);
     const [sql, ...params] = mockExecuteRawUnsafe.mock.calls[0];
     expect(String(sql)).toContain('INSERT INTO directory_presence_events');
-    expect(params).toHaveLength(11);
+    expect(params).toHaveLength(14);
     expect(params[0]).toMatch(/^dpe-/);
     expect(params[1]).toBe('tenant-1');
     expect(params[5]).toBe('listing_viewed');
     expect(params[9]).toBe('mobile');
+  });
+
+  it('carries surface, entity_ref and detail for shelf events', async () => {
+    mockExecuteRawUnsafe.mockResolvedValueOnce(1);
+
+    await directoryPresenceAnalyticsService.trackEvent({
+      tenantId: null,
+      listingId: null,
+      slug: 'indian-grocery',
+      surface: 'place_category',
+      entityRef: 'indian-grocery',
+      eventType: 'filter_applied',
+      detail: 'sort:snap',
+    });
+
+    const [, ...params] = mockExecuteRawUnsafe.mock.calls[0];
+    expect(params[1]).toBeNull(); // tenant_id
+    expect(params[2]).toBeNull(); // listing_id
+    expect(params[11]).toBe('place_category');
+    expect(params[12]).toBe('indian-grocery');
+    expect(params[13]).toBe('sort:snap');
   });
 
   it('never throws when the insert fails', async () => {
@@ -112,8 +133,8 @@ describe('DirectoryPresenceAnalyticsService.trackEvents', () => {
     expect(tracked).toBe(2);
     const [sql, ...params] = mockExecuteRawUnsafe.mock.calls[0];
     expect(String(sql)).toContain('VALUES ($1');
-    expect(String(sql)).toContain('$22)');
-    expect(params).toHaveLength(22);
+    expect(String(sql)).toContain('$28)');
+    expect(params).toHaveLength(28);
   });
 
   it('returns 0 without querying when the batch is empty', async () => {
@@ -193,5 +214,52 @@ describe('DirectoryPresenceAnalyticsService.getSeedEngagement', () => {
     const result = await directoryPresenceAnalyticsService.getSeedEngagement('missing', 30);
     expect(result).toBeNull();
     expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+  });
+});
+
+describe('DirectoryPresenceAnalyticsService.getSurfaceEngagement', () => {
+  beforeEach(() => {
+    mockQueryRawUnsafe.mockReset();
+  });
+
+  it('merges per-surface counts with dwell and computes CTR', async () => {
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([
+        { surface: 'place_category', views: 100n, sessions: 40n, click_throughs: 25n, cta_clicks: 3n, filters: 10n },
+        { surface: 'place_entry', views: 20n, sessions: 12n, click_throughs: 0n, cta_clicks: 4n, filters: 0n },
+      ])
+      .mockResolvedValueOnce([
+        { surface: 'place_category', avg_dwell_ms: 42000 },
+        { surface: 'place_entry', avg_dwell_ms: 18000 },
+      ]);
+
+    const rows = await directoryPresenceAnalyticsService.getSurfaceEngagement(30);
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      surface: 'place_category',
+      views: 100,
+      sessions: 40,
+      clickThroughs: 25,
+      ctaClicks: 3,
+      filters: 10,
+      avgDwellMs: 42000,
+    });
+    expect(rows[0].clickThroughRate).toBe(0.25);
+    expect(rows[1].clickThroughRate).toBe(0);
+    expect(rows[1].avgDwellMs).toBe(18000);
+  });
+
+  it('defaults dwell to 0 when a surface has no dwell rows', async () => {
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([
+        { surface: 'directory_home', views: 5n, sessions: 3n, click_throughs: 0n, cta_clicks: 0n, filters: 0n },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const rows = await directoryPresenceAnalyticsService.getSurfaceEngagement(7);
+
+    expect(rows[0].avgDwellMs).toBe(0);
+    expect(rows[0].clickThroughRate).toBe(0);
   });
 });

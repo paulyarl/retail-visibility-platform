@@ -15,6 +15,7 @@ import PageHeader from '@/components/PageHeader';
 import directoryPresenceAdminService, {
   type DirectoryTrafficDashboard,
   type DirectoryEngagementDashboard,
+  type SurfaceEngagementRow,
   type SeedTrafficDetail,
   type SeedTrafficSummary,
 } from '@/services/DirectoryPresenceAdminService';
@@ -37,6 +38,7 @@ import {
   Navigation,
   Clock,
   ExternalLink,
+  Activity,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -54,6 +56,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default function DirectoryTrafficPage() {
   const [dashboard, setDashboard] = useState<DirectoryTrafficDashboard | null>(null);
   const [engagement, setEngagement] = useState<DirectoryEngagementDashboard | null>(null);
+  const [surfaceEngagement, setSurfaceEngagement] = useState<SurfaceEngagementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -80,22 +83,25 @@ export default function DirectoryTrafficPage() {
       if (filters.state.trim()) cleanFilters.state = filters.state.trim();
       if (filters.status) cleanFilters.status = filters.status;
       if (filters.seedBatch.trim()) cleanFilters.seedBatch = filters.seedBatch.trim();
-      const [data, eng] = await Promise.all([
+      const [data, eng, surfaces] = await Promise.all([
         directoryPresenceAdminService.getTrafficDashboard({
           daysBack: filters.daysBack,
           surface: filters.surface || undefined,
           ...cleanFilters,
         }),
         directoryPresenceAdminService.getEngagementDashboard(filters.daysBack),
+        directoryPresenceAdminService.getSurfaceEngagement(filters.daysBack),
       ]);
       if (!data) {
         setError('Failed to load directory traffic.');
         setDashboard(null);
         setEngagement(null);
+        setSurfaceEngagement([]);
         return;
       }
       setDashboard(data);
       setEngagement(eng);
+      setSurfaceEngagement(surfaces);
     } catch {
       setError('Failed to load directory traffic.');
     } finally {
@@ -588,6 +594,77 @@ export default function DirectoryTrafficPage() {
         </section>
       )}
 
+      {/* Surface Engagement — entries AND shelves in one grid (migration 295) */}
+      <section className="mb-8 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Surface Engagement</h2>
+          </div>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            last {filters.daysBack} days · entries + shelves
+          </span>
+        </div>
+        {surfaceEngagement.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No engagement events recorded in this window yet. Entry and shelf events are captured
+              by useDirectoryPresenceTracking / useDirectoryShelfTracking.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                  <th className="py-2 px-4 font-medium">Surface</th>
+                  <th className="py-2 px-4 font-medium text-right">Views</th>
+                  <th className="py-2 px-4 font-medium text-right">Sessions</th>
+                  <th className="py-2 px-4 font-medium text-right">Avg dwell</th>
+                  <th className="py-2 px-4 font-medium text-right">Click-throughs</th>
+                  <th className="py-2 px-4 font-medium text-right">CTR</th>
+                  <th className="py-2 px-4 font-medium text-right">Filters</th>
+                  <th className="py-2 px-4 font-medium text-right">CTA clicks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {surfaceEngagement.map((row) => (
+                  <tr
+                    key={row.surface}
+                    className="border-b border-gray-100 dark:border-gray-700/60 last:border-0"
+                  >
+                    <td className="py-2 px-4 text-gray-900 dark:text-white">
+                      {surfaceKeyLabel(row.surface)}
+                    </td>
+                    <td className="py-2 px-4 text-right font-medium text-gray-900 dark:text-white">
+                      {row.views.toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {row.sessions.toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {(row.avgDwellMs / 1000).toFixed(1)}s
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {row.clickThroughs.toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {row.clickThroughRate != null ? `${Math.round(row.clickThroughRate * 100)}%` : '—'}
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {row.filters.toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 text-right text-gray-600 dark:text-gray-300">
+                      {row.ctaClicks.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* Category breakdown + surface split + all-seeds trend */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
@@ -719,9 +796,13 @@ export default function DirectoryTrafficPage() {
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           Which channel drove the entry view — QR-encoded listing links (
           <code className="text-[11px]">?source=qr</code>), shelf links (
-          <code className="text-[11px]">?shelf=</code>), or any{' '}
-          <code className="text-[11px]">utm_source</code>. QR scan channel metrics stay in QR
-          Analytics; this counts QR as an entry <em>source</em>. Organic/direct views are
+          <code className="text-[11px]">?shelf=</code>), cross-sell / search / storefront
+          surfaces (
+          <code className="text-[11px]">
+            ?source=related|recent|recommendation|search|storefront|promoted
+          </code>
+          ), or any <code className="text-[11px]">utm_source</code>. QR scan channel metrics stay
+          in QR Analytics; this counts QR as an entry <em>source</em>. Organic/direct views are
           unattributed and not listed.
         </p>
         {!dashboard || dashboard.entrySources.length === 0 ? (
@@ -883,7 +964,28 @@ function shelfTypeLabel(pageType: string): string {
 function sourceLabel(source: string): string {
   if (source === 'qr') return 'QR code';
   if (source === 'shelf') return 'Shelf browse';
+  if (source === 'related') return 'Related stores';
+  if (source === 'recent') return 'Recently viewed';
+  if (source === 'recommendation') return 'Recommendations';
+  if (source === 'search') return 'Search results';
+  if (source === 'storefront') return 'Storefront / product page';
+  if (source === 'promoted') return 'Promoted carousel';
   return source;
+}
+
+function surfaceKeyLabel(surface: string): string {
+  const map: Record<string, string> = {
+    place_entry: 'Place entry (/place/[slug])',
+    directory_entry: 'Directory entry (/directory/[slug])',
+    place_category: 'Place category shelf',
+    place_city: 'Place city shelf',
+    directory_category: 'Directory category shelf',
+    directory_location: 'Directory location shelf',
+    directory_store_type: 'Directory store-type shelf',
+    directory_home: 'Directory home',
+    unknown: 'Unknown',
+  };
+  return map[surface] ?? surface;
 }
 
 function deviceIcon(deviceType: string) {

@@ -71,6 +71,10 @@ interface DirectoryMapGoogleProps {
   center?: { lat: number; lng: number };
   zoom?: number;
   useMapEndpoint?: boolean; // Use unified map endpoint instead of passed listings
+  /** Shelf→entry attribution ref — appended as `?shelf=` to the InfoWindow
+   *  entry link (the map is a shelf surface, so its click-through is
+   *  attributable on the entry view). */
+  shelfRef?: string;
   filters?: {
     category?: string;
     storeType?: string;
@@ -91,7 +95,8 @@ export default function DirectoryMapGoogle({
   center = { lat: 39.8283, lng: -98.5795 }, // Center of USA
   zoom = 4,
   useMapEndpoint = false,
-  filters = {}
+  filters = {},
+  shelfRef,
 }: DirectoryMapGoogleProps) {
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -321,6 +326,10 @@ export default function DirectoryMapGoogle({
       }
 
       // Create info window content
+      const listingUrl = getDirectoryListingUrl(listing);
+      const entryHref = shelfRef
+        ? `${listingUrl}${listingUrl.includes('?') ? '&' : '?'}shelf=${encodeURIComponent(shelfRef)}`
+        : listingUrl;
       const infoContent = `
         <div style="padding: 12px; max-width: 250px; ${isPromoted ? 'border-left: 4px solid #f59e0b;' : ''}">
           ${isPromoted ? `
@@ -352,7 +361,7 @@ export default function DirectoryMapGoogle({
             </p>
           ` : ''}
           <a 
-            href="${getDirectoryListingUrl(listing)}" 
+            href="${entryHref}" 
             style="display: inline-block; margin-top: 8px; padding: 6px 12px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;"
           >
             View Store

@@ -148,7 +148,7 @@ export default function StorefrontFooter({
                 {directoryPublished && tenantSlug && isRetailStore && (
                   <>
                     <li>
-                      <Link href={`/directory/${tenantSlug}`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                      <Link href={`/directory/${tenantSlug}?source=storefront`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                         Directory
                       </Link>
                     </li>
@@ -305,7 +305,7 @@ export default function StorefrontFooter({
               {directoryPublished && tenantSlug && isRetailStore && (
                 <>
                   <li>
-                    <Link href={`/directory/${tenantSlug}`} className="text-neutral-400 hover:text-white transition-colors">
+                    <Link href={`/directory/${tenantSlug}?source=storefront`} className="text-neutral-400 hover:text-white transition-colors">
                       Directory
                     </Link>
                   </li>

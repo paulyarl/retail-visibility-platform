@@ -130,7 +130,7 @@ export function ProductHeaderSection({
             )}
             {tenantProfile?.slug && (
               <a
-                href={`/directory/${tenantProfile.slug}`}
+                href={`/directory/${tenantProfile.slug}?source=storefront`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

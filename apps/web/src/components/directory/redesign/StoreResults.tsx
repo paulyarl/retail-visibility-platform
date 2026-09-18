@@ -39,6 +39,8 @@ interface StoreResultsProps {
   viewMode: DirectoryViewMode;
   appearance?: DirectoryLayoutKey;
   searchParams?: { category?: string; city?: string; q?: string };
+  /** Shelf→entry attribution ref forwarded to cards / list / map. */
+  shelfRef?: string;
 }
 
 export default function StoreResults({
@@ -47,6 +49,7 @@ export default function StoreResults({
   viewMode,
   appearance = 'discovery',
   searchParams: sp = {},
+  shelfRef,
 }: StoreResultsProps) {
   const router = useRouter();
   const urlSearchParams = useSearchParams();
@@ -110,6 +113,7 @@ export default function StoreResults({
             key={store.id || store.tenantId}
             store={store}
             appearance={appearance}
+            shelfRef={shelfRef}
           />
         ))}
       </div>
@@ -124,6 +128,7 @@ export default function StoreResults({
         loading={false}
         showLogo={true}
         viewMode="list"
+        shelfRef={shelfRef}
       />
     );
   }
@@ -133,6 +138,7 @@ export default function StoreResults({
     <DirectoryMapGoogle
       listings={stores as any[]}
       useMapEndpoint={true}
+      shelfRef={shelfRef}
       filters={{
         category: sp.category || urlSearchParams.get('category') || undefined,
         city: sp.city || urlSearchParams.get('city') || undefined,

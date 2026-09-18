@@ -9,6 +9,7 @@ import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@m
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 import { getDirectoryListingUrl } from '@/utils/slug';
+import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 
 // ==================== TYPES ====================
 
@@ -133,6 +134,10 @@ export function StoreCard({
   const withQuery = (href: string, qs: string) =>
     `${href}${href.includes('?') ? '&' : '?'}${qs}`;
 
+  // Shelf → entry click-through — self-reported from the ref this card already
+  // carries (no callback plumbing). Fire-and-forget.
+  const handleEntryClick = () => reportShelfListingClick(shelfRef);
+
   // console.log(`linkType: ${linkType}`);
   // console.log(`linkHref: ${linkHref}`);
 
@@ -230,6 +235,7 @@ export function StoreCard({
           <div className="mb-4">
             <Link
               href={entryHref}
+              onClick={handleEntryClick}
               className="text-lg font-semibold text-neutral-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <span>{store.name}</span>
@@ -344,6 +350,7 @@ export function StoreCard({
           {/* Action Button */}
           <Link
             href={entryHref}
+            onClick={handleEntryClick}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
           >
             Visit Store
@@ -357,7 +364,7 @@ export function StoreCard({
   // ==================== LIST VIEW ====================
   if (viewMode === 'list') {
     return (
-      <Link href={entryHref} className={`block ${className}`}>
+      <Link href={entryHref} onClick={handleEntryClick} className={`block ${className}`}>
         <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 hover:shadow-md transition-shadow">
           <div className="flex items-start space-x-4">
             {/* Logo */}
@@ -561,6 +568,7 @@ export function StoreCard({
         {/* Action Button */}
         <Link
           href={entryHref}
+          onClick={handleEntryClick}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
         >
           Visit Store

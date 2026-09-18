@@ -585,6 +585,7 @@ export default function LastViewed({
                       return (
                         <UnifiedStoreCard
                           key={`store-${storeData.tenantId}-${index}`}
+                          sourceRef="recent"
                           listing={{
                             id: storeData.tenantId,
                             tenantId: storeData.tenantId,

@@ -651,6 +651,7 @@ export default function DirectoryClient() {
             <DirectoryMapGoogle
               listings={data || []}
               useMapEndpoint={true}
+              shelfRef="directory/home"
               filters={{
                 category: searchParams.get('category') || undefined,
                 city: searchParams.get('city') || undefined,
@@ -833,7 +834,7 @@ function DirectoryHomeRecommendations() {
         {Array.isArray(recommendations) && recommendations.map((rec, index) => (
           <Link
             key={rec.tenantId}
-            href={`/directory/${rec.slug}`}
+            href={`/directory/${rec.slug}?source=recommendation`}
             className="block p-6 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-green-500 dark:hover:border-green-400 transition-all hover:shadow-lg"
           >
             <div className="flex items-start justify-between mb-4">
