@@ -258,6 +258,19 @@ select option {
   color: rgb(249 250 251);
 }
 
+/* The popup itself is drawn by the UA, not the page, so it also ignores the
+   .dark overrides applied to the control — the container, hover highlight and
+   scrollbar all stayed light. color-scheme tells the UA which palette to use
+   for the popup. Pinned per-theme so the app's class-based theme wins over the
+   OS preference. */
+select {
+  color-scheme: light;
+}
+
+.dark select {
+  color-scheme: dark;
+}
+
 /* Global Text Visibility - Ensure all text has proper contrast */
 li span:not([class*="text-"]) {
   color: var(--neutral-800);
