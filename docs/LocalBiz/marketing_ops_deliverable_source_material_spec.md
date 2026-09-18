@@ -500,8 +500,10 @@ Supporting copy already in the library shows the register (`hook-library.ts:114`
 1. **Carry the framing.** Every deliverable that implies a fix (`nap_report`, `gbp_audit`, `product_visibility_preview`, `citation_repair_package`, `service_menu`) closes on the claim-and-fix motion, not a purchase ask.
 2. **Free / low-friction framing is truthful.** "Claim it and fix it yourself — about two minutes, no cost" is the established register for the self-serve path. Do not invent fees, tiers, or package names (§5.5's solution rule).
 3. **Never assert a listing exists unless the audit shows one.** Same caveat as the directive — the framing works whether or not the seed is live.
-4. **Resolve links through `outreach-link-vars.ts`, never hand-roll them.** The deliverable's claim/report URLs must come from `resolveClaimUrlForSeed` / `resolveClaimUrlForCampaign` / `getTrackedLinkVars` (`outreach-openers/outreach-link-vars.ts`) so the `/place/claim` vs `/directory/claim` split cannot drift (the G7 regression that module exists to prevent). The fulfill prompts receive `claim_url`, `claim_short_url`, and `report_url` as resolved variables.
-5. **Same framing, not the same words.** This is the framing counterpart to §5.5's de-dup rule: the deliverable keeps the claim-and-fix *motion* while avoiding the opener's exact *phrasing*.
+4. **Resolve links through `outreach-link-vars.ts`, never hand-roll them.** The deliverable's claim/report URLs must come from `resolveClaimUrlForSeed` / `resolveClaimUrlForCampaign` / `buildOutreachLinkVars` (`outreach-openers/outreach-link-vars.ts`) so the `/place/claim` vs `/directory/claim` split cannot drift (the G7 regression that module exists to prevent).
+5. **Mint when missing, degrade when impossible.** `DeliverableSourceService.ensureClaimUrl` resolves the campaign's linked seed; if no active token exists it **mints one** via `DirectoryPresenceSeedService.inviteSeed(seedId, 90, { actorType: 'system' })` — mirroring the §13.5 claim handoff in `SeedIntelligenceReportService`. It returns `null` when there is no linked seed or the seed is already claimed.
+6. **Never leak `{{claim_url}}`.** The fulfill bodies reference a single `{{claim_cta}}` variable, resolved to either the link-bearing CTA or a link-less variant (`buildClaimCta`). A body therefore never renders a literal placeholder, whether or not a claim path resolves.
+7. **Same framing, not the same words.** This is the framing counterpart to §5.5's de-dup rule: the deliverable keeps the claim-and-fix *motion* while avoiding the opener's exact *phrasing*.
 
 ### 5.7 NEW — `Seek: Review Intake` (operator-pasted reviews)
 
@@ -785,6 +787,7 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 | 14 | Tests | ✅ | 24 passing (3 files) |
 | 15 | `pnpm checkapi` / `checkweb` | ✅ | both clean |
 | 16 | Re-run seed local + prd | ✅ | V2 seeded — 7 updated on both `local` and `prd` (2026-09-18) |
+| 17 | Align `fulfill-001..003` with Register B + CTA | ✅ | `seed-marketing-ops-templates.ts` — Register B tone + claim-and-fix CTA + `claim_url` on review_responses / service_menu / gbp_audit. **Re-seed required** (`seed-marketing-ops-templates.ts`, local + prd) |
 
 **Deferred / follow-up (not blocking):**
 - G-1b — latent `ReviewSlotService` bug (reads `platforms[*].reviews[]`, which the schema never emits). Out of scope per Option D; log separately.
@@ -801,6 +804,16 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 **Modal changes:** the Template dropdown is now filtered to the selected deliverable type, and the type's `is_default` template is auto-selected on open. This also fixes the pre-existing wart where every active template (all types) appeared in the dropdown.
 
 Run `seed-deliverable-layout-templates.ts` on `local` + `prd` to populate the templates.
+
+### 12.3 Claim-link mint + `claim_cta` (2026-09-18)
+
+`claim_url` is **not** operator-supplied — it is derived server-side, and now minted on demand:
+
+- `DeliverableSourceService.ensureClaimUrl(campaignId)` → `resolveCampaignSeedId` → `resolveClaimUrlForSeed`. If that yields nothing and the seed is unclaimed, it mints via `DirectoryPresenceSeedService.inviteSeed(seedId, 90, { actorType: 'system' })` (same pattern as `SeedIntelligenceReportService` §13.5), then re-resolves. Returns `null` for no linked seed / already claimed. Best-effort, never throws.
+- Side effect to know: `inviteSeed` flips `directory_presence_seeds.status = 'invited'`. Funnel analytics do **not** count a bare token as an invite (delivery evidence is still required), so this does not inflate the funnel — but it is a real state change.
+- The fulfill bodies now use a single **`{{claim_cta}}`** variable (`buildClaimCta`), so a body renders either the link-bearing CTA or a link-less variant — never a literal `{{claim_url}}`. SEED_VERSION_MARKER bumped to **V3** in `seed-deliverable-source-material-templates.ts`; re-seed both scripts.
+
+**Still open:** the prompt workspace and external-import paths for `fulfill-001/002/003` do not resolve `claim_cta`, so those render the placeholder. Fix is to route their variable builder through `buildClaimCta` too.
 
 ---
 

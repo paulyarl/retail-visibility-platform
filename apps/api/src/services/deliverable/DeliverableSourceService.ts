@@ -30,6 +30,7 @@ import {
 import { reviewIntakeSchema, type ReviewIntake } from '../../validators/review-intake.schema';
 import {
   resolveCampaignSeedId,
+  resolveClaimUrlForSeed,
   buildOutreachLinkVars,
 } from '../outreach-openers/outreach-link-vars';
 import {
@@ -83,6 +84,17 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
 
 /** Families the analyst consumes — OX (outreach state) is excluded (G-12). */
 export const DELIVERABLE_RELEVANT_FAMILIES = ['RA', 'DS', 'WC', 'CP', 'VP', 'INT'];
+
+/**
+ * Build the claim-and-fix CTA text for a fulfill prompt. When a claim URL
+ * resolves, the CTA carries it; otherwise a link-less variant is used so the
+ * body never renders a literal `{{claim_url}}` placeholder.
+ */
+export function buildClaimCta(claimUrl: string | null): string {
+  return claimUrl
+    ? `Claim your listing and correct it here: ${claimUrl} — it takes about two minutes and there is no cost.`
+    : 'Ask your contact to claim this listing on your behalf — it takes about two minutes and there is no cost.';
+}
 
 export interface DeliverableSourceResolution {
   types: DeliverableType[];
@@ -317,12 +329,17 @@ export class DeliverableSourceService extends BaseService {
     if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
     // Resolve claim/report links through the canonical module so the
-    // /place/claim vs /directory/claim split cannot drift (§5.6).
+    // /place/claim vs /directory/claim split cannot drift (§5.6). Mint a claim
+    // token when the seed has none, mirroring SeedIntelligenceReportService
+    // (§13.5 claim handoff) — so the deliverable CTA always carries a working
+    // link when the campaign has a linked seed.
+    const claimUrl = await this.ensureClaimUrl(campaignId, ctx);
+
     let linkVars: Record<string, string> = {};
     try {
       const seedId = await resolveCampaignSeedId(campaignId);
       const built = await buildOutreachLinkVars(seedId);
-      if (built.claim_url) linkVars.claim_url = built.claim_url;
+      if (claimUrl) linkVars.claim_url = claimUrl;
       if (built.claim_short_url) linkVars.claim_short_url = built.claim_short_url;
       if (built.report_url) linkVars.report_url = built.report_url;
     } catch (e) {
@@ -338,6 +355,9 @@ export class DeliverableSourceService extends BaseService {
       category: campaign.category ?? '',
       city: campaign.city ?? '',
       [blockKey]: sourceText,
+      // A single CTA variable so the seeded body never renders a literal
+      // {{claim_url}} when no link resolves (link-less variant instead).
+      claim_cta: buildClaimCta(claimUrl),
       ...linkVars,
     };
 
@@ -520,9 +540,45 @@ export class DeliverableSourceService extends BaseService {
     return lines.join('\n');
   }
 
+  /**
+   * Resolve a working claim URL for the campaign's linked seed, minting a claim
+   * token when none is active (mirrors SeedIntelligenceReportService §13.5
+   * claim handoff). Returns null when the campaign has no linked seed, or the
+   * seed is already claimed — the caller then uses the link-less CTA variant.
+   * Best-effort: never throws.
+   */
+  private async ensureClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
+    try {
+      const seedId = await resolveCampaignSeedId(campaignId);
+      if (!seedId) return null;
+
+      const existing = await resolveClaimUrlForSeed(seedId);
+      if (existing) return existing;
+
+      // Already claimed → there is no claim path left to offer.
+      const seed = await this.prisma.$queryRaw<any[]>`
+        SELECT status, claimed_at FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      `;
+      if (!seed[0] || seed[0].status === 'claimed' || seed[0].claimed_at) return null;
+
+      const { default: seedService } = await import('../DirectoryPresenceSeedService.js');
+      await seedService.inviteSeed(seedId, 90, {
+        actorType: 'system',
+        actorId: ctx?.userId ?? 'system',
+      });
+      logger.info('Deliverable source: minted claim token for CTA', ctx, { campaignId, seedId });
+
+      return await resolveClaimUrlForSeed(seedId);
+    } catch (err: any) {
+      logger.warn('Deliverable source: claim URL resolution/mint failed (non-blocking)', ctx, {
+        campaignId, error: err?.message,
+      });
+      return null;
+    }
+  }
+
   /** Assemble the campaign's already-emitted outreach lines (spec §7.2). */
-  private async buildPriorOutreach(campaignId: string): Promise<string> {
-    const lines: string[] = [];
+  private async buildPriorOutreach(campaignId: string): Promise<string> {    const lines: string[] = [];
     try {
       const opener = await this.prisma.mkt_outreach_openers_list.findFirst({
         where: { campaign_id: campaignId },

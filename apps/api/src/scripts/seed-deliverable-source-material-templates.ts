@@ -30,7 +30,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V2 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V3 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -128,10 +128,11 @@ ${DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE}`;
 
 const FULFILL_TONE = `Tone: ${DELIVERABLE_FULFILL_TONE_DIRECTIVE}`;
 
-// Claim-and-fix closing CTA (spec §5.6). Link variables are resolved per
-// campaign through outreach-link-vars.ts — never hand-built.
-const CLAIM_CTA = `Close with the claim-and-fix CTA, using the supplied link:
-"Claim your listing and correct it here: {{claim_url}} — it takes about two minutes and there is no cost."`;
+// Claim-and-fix closing CTA (spec §5.6). `claim_cta` is a single resolved
+// variable (link present, or a link-less variant when no claim path resolves),
+// so the body never renders a literal {{claim_url}}.
+const CLAIM_CTA = `Close with the claim-and-fix CTA, using the supplied text verbatim:
+"{{claim_cta}}"`;
 
 const FULFILL_004 = `${SEED_VERSION_MARKER}
 You are producing ready-to-publish testimonial cards for {{business_name}}, a
@@ -258,11 +259,11 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     outputSchema: { name: DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME },
     isDefault: false,
   },
-  { id: 'mpt-seed-fulfill-004', name: 'Fulfill: Testimonial Cards', promptType: 'fulfill', body: FULFILL_004, variables: ['business_name', 'category', 'city', 'testimonials', 'claim_url'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-005', name: 'Fulfill: NAP Consistency Report', promptType: 'fulfill', body: FULFILL_005, variables: ['business_name', 'category', 'city', 'nap_status', 'claim_url'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'claim_url'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_url'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_url'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-004', name: 'Fulfill: Testimonial Cards', promptType: 'fulfill', body: FULFILL_004, variables: ['business_name', 'category', 'city', 'testimonials', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-005', name: 'Fulfill: NAP Consistency Report', promptType: 'fulfill', body: FULFILL_005, variables: ['business_name', 'category', 'city', 'nap_status', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {

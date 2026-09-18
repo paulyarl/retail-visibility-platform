@@ -9,6 +9,7 @@ import {
   TYPE_GOVERNING_SIGNALS,
   DELIVERABLE_RELEVANT_FAMILIES,
   FULFILL_TEMPLATE_BY_TYPE,
+  buildClaimCta,
 } from '../DeliverableSourceService';
 import { KNOWN_SIGNAL_CODES } from '../../triage/signal-taxonomy';
 import {
@@ -69,5 +70,20 @@ describe('tone directives (§5.4)', () => {
   it('the two registers are distinct', () => {
     expect(DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE).not.toBe(DELIVERABLE_FULFILL_TONE_DIRECTIVE);
     expect(DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE).not.toContain(DELIVERABLE_FULFILL_TONE_DIRECTIVE);
+  });
+});
+
+describe('buildClaimCta', () => {
+  it('carries the claim URL when one resolves', () => {
+    const cta = buildClaimCta('https://example.com/place/claim/abc123');
+    expect(cta).toContain('https://example.com/place/claim/abc123');
+    expect(cta).toContain('no cost');
+  });
+
+  it('falls back to a link-less variant and never leaks a placeholder', () => {
+    const cta = buildClaimCta(null);
+    expect(cta).not.toContain('{{claim_url}}');
+    expect(cta).not.toContain('http');
+    expect(cta).toMatch(/claim this listing/i);
   });
 });

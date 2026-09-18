@@ -16,6 +16,15 @@ import { logger } from '../logger';
 import { BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
 import { CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME } from '../validators/city-category-opportunity.schema';
 import { RAW_JSON_SCHEMA_NAME } from '../validators/market-analysis.schema';
+import { DELIVERABLE_FULFILL_TONE_DIRECTIVE } from '../services/intelligence/report-directives';
+
+// Register B (owner-facing tone) + the claim-and-fix CTA. Defined once in
+// report-directives.ts and interpolated here so the deliverable fulfill
+// templates read in one voice with mpt-seed-fulfill-004..008.
+// Spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md §5.4, §5.6
+const FULFILL_TONE = `Tone: ${DELIVERABLE_FULFILL_TONE_DIRECTIVE}`;
+const CLAIM_CTA = `Close with the claim-and-fix CTA, using the supplied text verbatim:
+"{{claim_cta}}"`;
 
 const SEED_TEMPLATES = [
   {
@@ -123,8 +132,12 @@ Guidelines:
 - Do NOT invent details not in the review
 - Ensure proper grammar and spelling
 
-Format: Number each response to match the review number.`,
-    variables: ['business_name', 'city', 'category', 'voice', 'reviews'],
+Format: Number each response to match the review number.
+
+${CLAIM_CTA}
+
+${FULFILL_TONE}`,
+    variables: ['business_name', 'city', 'category', 'voice', 'reviews', 'claim_cta'],
     outputSchema: {
       name: RAW_JSON_SCHEMA_NAME,
       description: 'Review response fulfill — numbered review responses matching business voice. Permissive schema (freeform text/JSON).',
@@ -148,8 +161,12 @@ Provide:
 5. Contact information placeholder
 6. Brief "Why choose us" section (3 bullet points)
 
-Tone: Professional, approachable, locally-rooted. Avoid jargon.`,
-    variables: ['business_name', 'category', 'services'],
+Tone: Professional, approachable, locally-rooted. Avoid jargon.
+
+${CLAIM_CTA}
+
+${FULFILL_TONE}`,
+    variables: ['business_name', 'category', 'services', 'claim_cta'],
     outputSchema: {
       name: RAW_JSON_SCHEMA_NAME,
       description: 'Service menu fulfill — business name, tagline, core services, pricing tiers, CTA, contact, why-choose-us. Permissive schema (freeform text/JSON).',
@@ -179,8 +196,12 @@ Provide:
 8. Hours sync checklist — list every platform where hours should be synchronized (GBP, website, Yelp, Facebook, Apple Maps, Bing Places) + holiday hours calendar for the next 12 months (include culturally relevant holidays for ethnic markets — e.g., Eid, Kwanzaa, Lunar New Year — alongside US federal holidays)
 9. Fulfillment attributes — recommend enabling "In-store shopping", "Curbside pickup", "Delivery" attributes if applicable to the business type
 
-Format as structured JSON.`,
-    variables: ['business_name', 'city', 'category', 'services'],
+Format as structured JSON.
+
+${CLAIM_CTA}
+
+${FULFILL_TONE}`,
+    variables: ['business_name', 'city', 'category', 'services', 'claim_cta'],
     outputSchema: {
       name: RAW_JSON_SCHEMA_NAME,
       description: 'GBP optimization plan — description, categories, service area, posts, attributes, Q&A, photo recommendations, hours sync, fulfillment attributes. Permissive schema (variable shape).',
