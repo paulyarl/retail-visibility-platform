@@ -779,19 +779,28 @@ The modal's hardcoded `<option>` list (lines 2414–2421) currently omits `recov
 | 8 | Routes | ✅ | `marketing-ops.ts` — `eligible-types`, `source-material`, `source-material/generate`, `review-intake`; eligibility check on `deliverables/generate` |
 | 9 | Frontend service methods | ✅ | `MarketingOpsService.ts` |
 | 10 | Modal wiring | ✅ | `CampaignDetailClient.tsx` (status panel, data-driven types, paste-reviews, relabel) |
-| 11 | Quality gate for 7 non-review types | ⏳ **deferred** | §7.4 — reuse the review-response gate pattern |
-| 12 | Repetition guard | ⚠ **partial** | `prior_outreach` built + prompt rule in place; quality-gate extension not yet added |
-| 13 | Seeding/claiming framing | ⚠ **partial** | Register B carries the claim-and-fix rule; link-variable injection into fulfill prompts not yet wired |
-| 14 | Tests | ✅ | 14 passing (2 files) |
+| 11 | Quality gate for 7 non-review types | ✅ | `services/deliverable/deliverable-quality-gate.ts` — wired into `resolveDeliverableContent`, surfaced as `warnings` on the generate response |
+| 12 | Repetition guard | ✅ | `runRepetitionGate` + `prior_outreach` builder + prompt rule |
+| 13 | Seeding/claiming framing | ✅ | `claim_url`/`claim_short_url`/`report_url` resolved via `outreach-link-vars.ts` and passed to fulfill prompts; Register B carries the claim-and-fix rule |
+| 14 | Tests | ✅ | 24 passing (3 files) |
 | 15 | `pnpm checkapi` / `checkweb` | ✅ | both clean |
-| 16 | Re-run seed local + prd | ⏳ **required** | run `seed-deliverable-source-material-templates.ts` on both configs |
+| 16 | Re-run seed local + prd | ✅ | V2 seeded — 7 updated on both `local` and `prd` (2026-09-18) |
 
 **Deferred / follow-up (not blocking):**
 - G-1b — latent `ReviewSlotService` bug (reads `platforms[*].reviews[]`, which the schema never emits). Out of scope per Option D; log separately.
 - G-7 — best-effort source-material run at audit import (currently synchronous endpoint only).
-- G-8 — per-type `layout_spec` templates (new types render with the generic 2-heading layout).
 - G-11 — no migration (data-only); `300_*.sql` reserved for a future schema change.
 - G-14/G-19 — `lead_magnet` source thinness; see §11.
+
+### 12.2 G-8 — Per-type layout templates (2026-09-18)
+
+`seed-deliverable-layout-templates.ts` seeds 8 default `layout_spec` rows into `mkt_deliverable_templates_list` (one per modal type, `is_default = true`), so the modal's Template dropdown has a designed layout instead of `getDefaultLayoutSpec()` (heading + body).
+
+**Layout contract:** `renderLayoutSections` renders a `body` section's explicit `text` when present, otherwise the full generated content. Therefore each spec has **exactly one text-less `body` section**; every other section carries explicit text. Each layout is: heading → subheading → divider → **body (generated content)** → spacing → divider → subheading ("Next step") → body (claim-and-fix CTA).
+
+**Modal changes:** the Template dropdown is now filtered to the selected deliverable type, and the type's `is_default` template is auto-selected on open. This also fixes the pre-existing wart where every active template (all types) appeared in the dropdown.
+
+Run `seed-deliverable-layout-templates.ts` on `local` + `prd` to populate the templates.
 
 ---
 

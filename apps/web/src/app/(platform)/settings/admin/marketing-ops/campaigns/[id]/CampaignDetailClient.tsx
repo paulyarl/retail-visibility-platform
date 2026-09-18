@@ -487,6 +487,20 @@ export default function CampaignDetailClient({
     return () => { cancelled = true; };
   }, [showGenerateModal, campaignId]);
 
+  // Auto-select the default layout template once per deliverable type (G-8).
+  // Fires only when the type changes — so an explicit "No template" choice is
+  // not immediately overridden.
+  const lastAutoTemplateTypeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!showGenerateModal) return;
+    if (lastAutoTemplateTypeRef.current === genForm.deliverableType) return;
+    const forType = deliverableTemplates.filter((t) => t.deliverable_type === genForm.deliverableType);
+    if (forType.length === 0) return;
+    const def = forType.find((t) => t.is_default) ?? forType[0];
+    lastAutoTemplateTypeRef.current = genForm.deliverableType;
+    setGenForm((f) => ({ ...f, templateId: def.id }));
+  }, [showGenerateModal, genForm.deliverableType, deliverableTemplates]);
+
   // Prompts tab: fetch scope-matching prompt templates. Stage filtering is
   // applied client-side via STAGE_PROMPT_TYPES so the operator sees only
   // stage-relevant prompts for this campaign. Intelligence-scope campaigns
@@ -2473,9 +2487,11 @@ export default function CampaignDetailClient({
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
                   <option value="">No template (use default layout)</option>
-                  {deliverableTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
+                  {deliverableTemplates
+                    .filter((t) => t.deliverable_type === genForm.deliverableType)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (default)' : ''}</option>
+                    ))}
                 </select>
               </div>
 

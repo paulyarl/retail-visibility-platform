@@ -34,6 +34,11 @@ doppler run --config local -- npx tsx src/scripts/seed-gold-standard-scan-templa
 # in the script to force a body re-sync.
 doppler run --config local -- npx tsx src/scripts/seed-deliverable-source-material-templates.ts
 
+# Deliverable layout templates (G-8) — one default jsPDF layout_spec per
+# deliverable type in mkt_deliverable_templates_list, so the Generate
+# Deliverable modal's Template dropdown has a designed layout per type.
+doppler run --config local -- npx tsx src/scripts/seed-deliverable-layout-templates.ts
+
 # Business Audit V2 (Category-Integrated mpt-j9bbem3l + Signal-Aligned mpt-6oeuiizo)
 # — wires Category Intelligence + Gold Standard + Website Accessibility Verification
 #   directive into both variants. Bump SEED_VERSION_MARKER in the script to re-apply.
