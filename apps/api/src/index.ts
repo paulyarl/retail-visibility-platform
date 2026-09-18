@@ -156,6 +156,16 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start BSaaS renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start monthly fee summary job (1st of each month at 00:05 UTC) — sends
+      // Stripe Connect fee summaries to merchants
+      try {
+        const { startMonthlyFeeSummaryJob } = await import('./jobs/monthly-fee-summary');
+        startMonthlyFeeSummaryJob();
+        logger.info('Monthly fee summary job started (1st of each month)');
+      } catch (err) {
+        logger.error('Failed to start monthly fee summary job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start featured products expiry monitor (daily at midnight)
       try {
         const { startFeaturedExpiryMonitor } = await import('./jobs/featured-products-expiry-monitor');
@@ -395,6 +405,17 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Marketing ops auto-follow-up scheduler started');
       } catch (err) {
         logger.error('Failed to start marketing ops auto-follow-up scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start proving-ground hold-release job (hourly) — re-enters `hold`
+      // prospects into the `queued` worklist once next_touch_at passes
+      // (cadence spec §4.6: hold ──due date──▶ queued)
+      try {
+        const { startProvingGroundHoldRelease } = await import('./jobs/proving-ground-hold-release');
+        await startProvingGroundHoldRelease();
+        logger.info('Proving-ground hold-release job started (hourly)');
+      } catch (err) {
+        logger.error('Failed to start proving-ground hold-release job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start seed outreach no-response job (daily) — marks stale

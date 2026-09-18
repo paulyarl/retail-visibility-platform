@@ -4892,7 +4892,20 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       includeCampaigns: req.query.include === 'campaigns',
     }, getCtx(req));
 
-    res.json({ success: true, data: result.entries, queuedCount: result.queuedCount });
+    // Spec §5.8 — surface the mail rung's at-due QR-scan decision (scanned →
+    // second postcard / in_thread; no_scan → advance the rung) so the worklist
+    // drives it instead of the operator. Only rows whose current rung is 'mail'
+    // need the lookup; the resolver batches them into three queries.
+    const mailRungSeedIds = result.entries
+      .filter((e: any) => e.seed_id && e.channel_sequence?.[e.current_channel_index ?? 0]?.channel === 'mail')
+      .map((e: any) => e.seed_id as string);
+    const mailOutcomes = await ProvingGroundCadenceService.getMailScanOutcomes(mailRungSeedIds);
+    const entries = result.entries.map((e: any) => ({
+      ...e,
+      mail_scan_outcome: e.seed_id ? (mailOutcomes.get(e.seed_id) ?? null) : null,
+    }));
+
+    res.json({ success: true, data: entries, queuedCount: result.queuedCount });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

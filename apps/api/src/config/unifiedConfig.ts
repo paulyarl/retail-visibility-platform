@@ -214,6 +214,18 @@ class UnifiedConfig {
     };
   }
 
+  // ─── Proving Ground cadence (Migration 262) ───────────────────────────
+  // Releases `hold` prospects whose nurture date has passed back into the
+  // `queued` worklist (spec §4.6: hold ──due date──▶ queued).
+  get provingGroundHoldReleaseIntervalHours(): number {
+    const parsed = parseInt(this.env.PROVING_GROUND_HOLD_RELEASE_INTERVAL_HOURS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  }
+  get disableProvingGroundHoldReleaseJob(): boolean {
+    const v = (this.env.DISABLE_PROVING_GROUND_HOLD_RELEASE_JOB || '').toLowerCase();
+    return v === 'true' || v === '1';
+  }
+
   // ─── Seed Outreach Courtesy Window ────────────────────────────────────
   // Config for the post-seed outreach trigger + no-response job.
   get seedOutreachNoResponseDays(): number {

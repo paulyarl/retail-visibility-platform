@@ -22,7 +22,7 @@ const {
 } = vi.hoisted(() => ({
   mockQueue: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   mockTouches: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
-  mockSeeds: { findUnique: vi.fn(), update: vi.fn() },
+  mockSeeds: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   mockVerdicts: { upsert: vi.fn(), findMany: vi.fn() },
   mockCampaigns: { findUnique: vi.fn() },
   mockOutreachLog: { create: vi.fn() },
@@ -295,6 +295,108 @@ describe('ProvingGroundCadenceService.logTouch', () => {
     });
 
     expect(mockOutreachLog.create).not.toHaveBeenCalled();
+  });
+});
+
+// ====================
+// CADENCE — releaseDueHolds (spec §4.6 hold ──due──▶ queued)
+// ====================
+
+describe('ProvingGroundCadenceService.releaseDueHolds', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQueue.updateMany.mockResolvedValue({ count: 0 });
+  });
+
+  it('releases due hold rows back to queued', async () => {
+    mockQueue.findMany.mockResolvedValue([{ id: 'pque-1' }, { id: 'pque-2' }]);
+
+    const ids = await ProvingGroundCadenceService.releaseDueHolds();
+
+    expect(ids).toEqual(['pque-1', 'pque-2']);
+    expect(mockQueue.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['pque-1', 'pque-2'] } },
+      data: { status: 'queued' },
+    });
+  });
+
+  it('is a no-op when no hold is due', async () => {
+    mockQueue.findMany.mockResolvedValue([]);
+
+    const ids = await ProvingGroundCadenceService.releaseDueHolds();
+
+    expect(ids).toEqual([]);
+    expect(mockQueue.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+// ====================
+// CADENCE — getMailScanOutcomes (spec §5.8 mail rung at-due decision)
+// ====================
+
+describe('ProvingGroundCadenceService.getMailScanOutcomes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSeeds.findMany.mockResolvedValue([{ id: 'seed-001', tenant_id: 'tenant-1' }]);
+    mockQueryRaw.mockResolvedValue([]);
+  });
+
+  it('returns not_mailed when there is no mail touch', async () => {
+    mockTouches.findMany.mockResolvedValue([]);
+
+    const map = await ProvingGroundCadenceService.getMailScanOutcomes(['seed-001']);
+
+    expect(map.get('seed-001')).toBe('not_mailed');
+    expect(mockQueryRaw).not.toHaveBeenCalled();
+  });
+
+  it('returns not_mailed while the mail touch is younger than 10 days', async () => {
+    mockTouches.findMany.mockResolvedValue([
+      { seed_id: 'seed-001', occurred_at: new Date(Date.now() - 3 * 86_400_000) },
+    ]);
+
+    const map = await ProvingGroundCadenceService.getMailScanOutcomes(['seed-001']);
+
+    expect(map.get('seed-001')).toBe('not_mailed');
+    expect(mockQueryRaw).not.toHaveBeenCalled();
+  });
+
+  it('returns scanned when a claim/report QR was scanned after 10 days', async () => {
+    mockTouches.findMany.mockResolvedValue([
+      { seed_id: 'seed-001', occurred_at: new Date(Date.now() - 11 * 86_400_000) },
+    ]);
+    mockQueryRaw.mockResolvedValue([{ tenant_id: 'tenant-1' }]);
+
+    const map = await ProvingGroundCadenceService.getMailScanOutcomes(['seed-001']);
+
+    expect(map.get('seed-001')).toBe('scanned');
+  });
+
+  it('returns no_scan when no scan exists after 10 days', async () => {
+    mockTouches.findMany.mockResolvedValue([
+      { seed_id: 'seed-001', occurred_at: new Date(Date.now() - 11 * 86_400_000) },
+    ]);
+
+    const map = await ProvingGroundCadenceService.getMailScanOutcomes(['seed-001']);
+
+    expect(map.get('seed-001')).toBe('no_scan');
+  });
+
+  it('resolves a mixed batch in one pass', async () => {
+    mockTouches.findMany.mockResolvedValue([
+      { seed_id: 'seed-due', occurred_at: new Date(Date.now() - 12 * 86_400_000) },
+      { seed_id: 'seed-fresh', occurred_at: new Date(Date.now() - 2 * 86_400_000) },
+    ]);
+    mockSeeds.findMany.mockResolvedValue([{ id: 'seed-due', tenant_id: 'tenant-1' }]);
+    mockQueryRaw.mockResolvedValue([{ tenant_id: 'tenant-1' }]);
+
+    const map = await ProvingGroundCadenceService.getMailScanOutcomes([
+      'seed-due', 'seed-fresh', 'seed-none',
+    ]);
+
+    expect(map.get('seed-due')).toBe('scanned');
+    expect(map.get('seed-fresh')).toBe('not_mailed');
+    expect(map.get('seed-none')).toBe('not_mailed');
   });
 });
 

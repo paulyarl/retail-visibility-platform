@@ -8,10 +8,16 @@
  * human phone call. Captured values are written to the queue row's
  * business_snapshot (verified_nap + flat keys) by resolveVerification and
  * follow the prospect into its campaign on promotion.
+ *
+ * The form is split into three tab panels (Verified NAP / Enrichment &
+ * Profiles / Call Notes) so the modal stays short. Call outcome and next
+ * action sit outside the panels — they are the graduation gate and must never
+ * be hidden behind a tab.
  */
 
 import { useState } from 'react';
 import { Loader2, Phone, Plus, Trash2, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import marketingOpsService, {
   VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
   VerifiedSocialProfile, VerifiedDirectoryProfile, verificationClearsCampaign,
@@ -39,6 +45,12 @@ interface ResolveVerificationModalProps {
   /** Called after a successful resolve — refresh the host surface. */
   onResolved: () => void | Promise<void>;
 }
+
+type VerificationTab = 'nap' | 'enrichment' | 'notes';
+
+/** Shown in the NAP + enrichment panels for outcomes that capture no identity. */
+const NAP_GATE_NOTICE =
+  'Verified NAP and enrichment are captured only for operational or relocated businesses. Change the call outcome above to record them.';
 
 /**
  * Snapshots may store `website` either as a flat string or as a scan-shape
@@ -90,10 +102,14 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
         }))
       : [],
   );
+  const [tab, setTab] = useState<VerificationTab>('nap');
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canCreateCampaign = verificationClearsCampaign(form.outcome);
+  // Only operational / relocated outcomes carry identity fields — mirrors the
+  // gating that previously wrapped the whole NAP + enrichment block.
+  const napApplicable = verificationClearsCampaign(form.outcome);
 
   const handleOutcomeChange = (outcome: VerificationOutcome) => {
     // Auto-select nextAction based on outcome heuristics.
@@ -137,6 +153,12 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
     }
   };
 
+  const gateNotice = (
+    <p className="rounded-lg bg-gray-50 dark:bg-neutral-900/40 border border-gray-200 dark:border-neutral-700 px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400">
+      {NAP_GATE_NOTICE}
+    </p>
+  );
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 max-w-lg w-full max-h-[90vh] overflow-auto">
@@ -159,7 +181,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
           </div>
         )}
 
-        {/* Outcome */}
+        {/* Call outcome — workflow-critical, kept outside the tab panels. */}
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call outcome</label>
         <select
           value={form.outcome}
@@ -174,186 +196,204 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved }:
           <option value="wrong_business">Wrong business — not the target</option>
         </select>
 
-        {/* Verified NAP — shown for operational + relocated */}
-        {(form.outcome === 'operational' || form.outcome === 'relocated') && (
-          <div className="mb-3 space-y-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Verified NAP</label>
-            <input
-              type="text"
-              placeholder="Business name"
-              value={form.verifiedName}
-              onChange={(e) => setForm((f) => ({ ...f, verifiedName: e.target.value }))}
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-            />
-            <input
-              type="tel"
-              placeholder="Phone"
-              value={form.verifiedPhone}
-              onChange={(e) => setForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-            />
-            <input
-              type="text"
-              placeholder="Street address"
-              value={form.verifiedAddress}
-              onChange={(e) => setForm((f) => ({ ...f, verifiedAddress: e.target.value }))}
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-            />
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="City"
-                value={form.verifiedCity}
-                onChange={(e) => setForm((f) => ({ ...f, verifiedCity: e.target.value }))}
-                className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-              />
-              <input
-                type="text"
-                placeholder="State"
-                value={form.verifiedState}
-                onChange={(e) => setForm((f) => ({ ...f, verifiedState: e.target.value }))}
-                className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-              />
-            </div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
-              Enrichment <span className="font-normal text-gray-400 dark:text-gray-500">— flows into the campaign record</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                placeholder="Website (https://…)"
-                value={form.verifiedWebsite}
-                onChange={(e) => setForm((f) => ({ ...f, verifiedWebsite: e.target.value }))}
-                className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={form.verifiedEmail}
-                onChange={(e) => setForm((f) => ({ ...f, verifiedEmail: e.target.value }))}
-                className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Category"
-                value={form.verifiedCategory}
-                onChange={(e) => setForm((f) => ({ ...f, verifiedCategory: e.target.value }))}
-                className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-              />
-              <input
-                type="text"
-                placeholder="Owner name"
-                value={form.verifiedOwnerName}
-                onChange={(e) => setForm((f) => ({ ...f, verifiedOwnerName: e.target.value }))}
-                className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-              />
-            </div>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as VerificationTab)}>
+          <TabsList aria-label="Verification details" className="h-auto w-full justify-start gap-1 overflow-x-auto">
+            <TabsTrigger value="nap" className="text-xs px-2.5 py-1.5">Verified NAP</TabsTrigger>
+            <TabsTrigger value="enrichment" className="text-xs px-2.5 py-1.5">Enrichment &amp; Profiles</TabsTrigger>
+            <TabsTrigger value="notes" className="text-xs px-2.5 py-1.5">Call Notes</TabsTrigger>
+          </TabsList>
 
-            {/* Social profiles — repeatable platform + URL rows (authoritative). */}
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
-              Social profiles <span className="font-normal text-gray-400 dark:text-gray-500">— overwrite on promotion</span>
-            </label>
-            {socialProfiles.map((p, i) => (
-              <div key={i} className="flex gap-2">
+          {/* Verified NAP — shown for operational + relocated */}
+          <TabsContent value="nap" className="space-y-2">
+            {napApplicable ? (
+              <>
                 <input
                   type="text"
-                  placeholder="Platform (facebook…)"
-                  value={p.platform}
-                  onChange={(e) => setSocialProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, platform: e.target.value } : r)))}
-                  className="w-32 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  placeholder="Business name"
+                  value={form.verifiedName}
+                  onChange={(e) => setForm((f) => ({ ...f, verifiedName: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                 />
                 <input
-                  type="url"
-                  placeholder="https://…"
-                  value={p.url}
-                  onChange={(e) => setSocialProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, url: e.target.value } : r)))}
-                  className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  type="tel"
+                  placeholder="Phone"
+                  value={form.verifiedPhone}
+                  onChange={(e) => setForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                 />
-                <button
-                  type="button"
-                  onClick={() => setSocialProfiles((rows) => rows.filter((_, j) => j !== i))}
-                  className="text-gray-400 hover:text-red-600"
-                  title="Remove"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setSocialProfiles((rows) => [...rows, { platform: '', url: '' }])}
-              className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
-            >
-              <Plus className="w-3 h-3" /> Add social profile
-            </button>
-
-            {/* Directory profiles — repeatable platform + URL rows (profile URLs). */}
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
-              Directory profiles <span className="font-normal text-gray-400 dark:text-gray-500">— profile URLs (Google, Yelp…)</span>
-            </label>
-            {directoryProfiles.map((p, i) => (
-              <div key={i} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Platform (google…)"
-                  value={p.platform}
-                  onChange={(e) => setDirectoryProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, platform: e.target.value } : r)))}
-                  className="w-32 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  placeholder="Street address"
+                  value={form.verifiedAddress}
+                  onChange={(e) => setForm((f) => ({ ...f, verifiedAddress: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                 />
-                <input
-                  type="url"
-                  placeholder="https://…"
-                  value={p.url}
-                  onChange={(e) => setDirectoryProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, url: e.target.value } : r)))}
-                  className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={form.verifiedCity}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedCity: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    value={form.verifiedState}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedState: e.target.value }))}
+                    className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </>
+            ) : gateNotice}
+          </TabsContent>
+
+          {/* Enrichment + authoritative profiles — flows into the campaign record */}
+          <TabsContent value="enrichment" className="space-y-2">
+            {napApplicable ? (
+              <>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                  Flows into the campaign record
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="Website (https://…)"
+                    value={form.verifiedWebsite}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedWebsite: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={form.verifiedEmail}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedEmail: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Category"
+                    value={form.verifiedCategory}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedCategory: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Owner name"
+                    value={form.verifiedOwnerName}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedOwnerName: e.target.value }))}
+                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Social profiles — repeatable platform + URL rows (authoritative). */}
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
+                  Social profiles <span className="font-normal text-gray-400 dark:text-gray-500">— overwrite on promotion</span>
+                </label>
+                {socialProfiles.map((p, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Platform (facebook…)"
+                      value={p.platform}
+                      onChange={(e) => setSocialProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, platform: e.target.value } : r)))}
+                      className="w-32 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="url"
+                      placeholder="https://…"
+                      value={p.url}
+                      onChange={(e) => setSocialProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, url: e.target.value } : r)))}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSocialProfiles((rows) => rows.filter((_, j) => j !== i))}
+                      className="text-gray-400 hover:text-red-600"
+                      title="Remove"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
                 <button
                   type="button"
-                  onClick={() => setDirectoryProfiles((rows) => rows.filter((_, j) => j !== i))}
-                  className="text-gray-400 hover:text-red-600"
-                  title="Remove"
+                  onClick={() => setSocialProfiles((rows) => [...rows, { platform: '', url: '' }])}
+                  className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Plus className="w-3 h-3" /> Add social profile
                 </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setDirectoryProfiles((rows) => [...rows, { platform: '', url: '', claim_status: 'unknown' }])}
-              className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+
+                {/* Directory profiles — repeatable platform + URL rows (profile URLs). */}
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
+                  Directory profiles <span className="font-normal text-gray-400 dark:text-gray-500">— profile URLs (Google, Yelp…)</span>
+                </label>
+                {directoryProfiles.map((p, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Platform (google…)"
+                      value={p.platform}
+                      onChange={(e) => setDirectoryProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, platform: e.target.value } : r)))}
+                      className="w-32 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="url"
+                      placeholder="https://…"
+                      value={p.url}
+                      onChange={(e) => setDirectoryProfiles((rows) => rows.map((r, j) => (j === i ? { ...r, url: e.target.value } : r)))}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDirectoryProfiles((rows) => rows.filter((_, j) => j !== i))}
+                      className="text-gray-400 hover:text-red-600"
+                      title="Remove"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setDirectoryProfiles((rows) => [...rows, { platform: '', url: '', claim_status: 'unknown' }])}
+                  className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+                >
+                  <Plus className="w-3 h-3" /> Add directory profile
+                </button>
+              </>
+            ) : gateNotice}
+          </TabsContent>
+
+          {/* Call notes — receptivity + free-form notes. */}
+          <TabsContent value="notes" className="space-y-2">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Owner receptivity</label>
+            <select
+              value={form.ownerReceptivity}
+              onChange={(e) => setForm((f) => ({ ...f, ownerReceptivity: e.target.value as OwnerReceptivity | '' }))}
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
             >
-              <Plus className="w-3 h-3" /> Add directory profile
-            </button>
-          </div>
-        )}
+              <option value="">—</option>
+              <option value="interested">Interested</option>
+              <option value="neutral">Neutral</option>
+              <option value="defensive">Defensive</option>
+              <option value="no_answer">No answer</option>
+            </select>
 
-        {/* Owner receptivity */}
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Owner receptivity</label>
-        <select
-          value={form.ownerReceptivity}
-          onChange={(e) => setForm((f) => ({ ...f, ownerReceptivity: e.target.value as OwnerReceptivity | '' }))}
-          className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-        >
-          <option value="">—</option>
-          <option value="interested">Interested</option>
-          <option value="neutral">Neutral</option>
-          <option value="defensive">Defensive</option>
-          <option value="no_answer">No answer</option>
-        </select>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Call notes</label>
+            <textarea
+              rows={5}
+              value={form.callNotes}
+              onChange={(e) => setForm((f) => ({ ...f, callNotes: e.target.value }))}
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+            />
+          </TabsContent>
+        </Tabs>
 
-        {/* Call notes */}
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call notes</label>
-        <textarea
-          rows={3}
-          value={form.callNotes}
-          onChange={(e) => setForm((f) => ({ ...f, callNotes: e.target.value }))}
-          className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-        />
-
-        {/* Next action */}
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Next action</label>
+        {/* Next action — workflow-critical, kept outside the tab panels. */}
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">Next action</label>
         <select
           value={form.nextAction}
           onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value as VerificationNextAction }))}

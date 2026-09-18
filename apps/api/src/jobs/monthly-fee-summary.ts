@@ -37,6 +37,11 @@ export async function sendMonthlyFeeSummaries(): Promise<MonthlyFeeSummaryResult
 let jobInterval: NodeJS.Timeout | null = null;
 
 export function startMonthlyFeeSummaryJob(): void {
+  if (process.env.DISABLE_MONTHLY_FEE_SUMMARY_JOB === 'true') {
+    logger.info('[MonthlyFeeSummaryJob] Disabled by env var');
+    return;
+  }
+
   if (jobInterval) {
     console.log('[MonthlyFeeSummaryJob] Job already running');
     return;

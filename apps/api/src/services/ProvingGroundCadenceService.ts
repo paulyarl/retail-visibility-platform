@@ -70,6 +70,9 @@ export interface LogTouchResult {
   channelSequence: ChannelRung[];
 }
 
+/** Spec §5.8 — derived mail-rung outcome at the 10-day decision point. */
+export type MailScanOutcome = 'scanned' | 'no_scan' | 'not_mailed';
+
 // ─── Cadence map ─────────────────────────────────────────────────────────
 
 interface CadenceRule {
@@ -255,8 +258,9 @@ class ProvingGroundCadenceServiceClass extends BaseService {
   }
 
   /**
-   * Release holds whose next_touch_at has passed — called by a scheduled
-   * job or lazily. Returns the released ids.
+   * Release holds whose next_touch_at has passed — called by the scheduled
+   * proving-ground-hold-release job (spec §4.6: `hold ──due date──▶ queued`).
+   * Returns the released ids.
    */
   async releaseDueHolds(ctx?: RequestCtx): Promise<string[]> {
     const rows = await this.prisma.mkt_prospect_queue.findMany({
@@ -287,36 +291,72 @@ class ProvingGroundCadenceServiceClass extends BaseService {
   async getMailScanOutcome(
     seedId: string,
     ctx?: RequestCtx,
-  ): Promise<'scanned' | 'no_scan' | 'not_mailed'> {
+  ): Promise<MailScanOutcome> {
+    const outcomes = await this.getMailScanOutcomes([seedId]);
+    return outcomes.get(seedId) ?? 'not_mailed';
+  }
+
+  /**
+   * Batched form of getMailScanOutcome for the queue worklist. Resolves the
+   * at-due mail-rung decision for many seeds in three queries (first mail
+   * touch → seed tenant → claim/report scan) instead of 3×N. Seeds without a
+   * mail touch, or whose first mail touch is younger than 10 days, resolve to
+   * 'not_mailed'.
+   */
+  async getMailScanOutcomes(seedIds: string[]): Promise<Map<string, MailScanOutcome>> {
+    const outcomes = new Map<string, MailScanOutcome>();
+    const ids = [...new Set(seedIds.filter(Boolean))];
+    for (const id of ids) outcomes.set(id, 'not_mailed');
+    if (!ids.length) return outcomes;
+
     try {
-      const mailTouch = await this.prisma.directory_seed_outreach_touches.findFirst({
-        where: { seed_id: seedId, channel: 'mail' },
+      // First mail touch per seed — the rung's clock start.
+      const touches = await this.prisma.directory_seed_outreach_touches.findMany({
+        where: { seed_id: { in: ids }, channel: 'mail' },
         orderBy: { occurred_at: 'asc' },
-        select: { occurred_at: true },
+        select: { seed_id: true, occurred_at: true },
       });
-      if (!mailTouch?.occurred_at) return 'not_mailed';
+      const firstMail = new Map<string, Date>();
+      for (const t of touches) {
+        if (t.seed_id && t.occurred_at && !firstMail.has(t.seed_id)) {
+          firstMail.set(t.seed_id, new Date(t.occurred_at));
+        }
+      }
 
-      const ageDays = Math.floor(
-        (Date.now() - new Date(mailTouch.occurred_at).getTime()) / 86_400_000,
-      );
-      if (ageDays < 10) return 'not_mailed';
+      const now = Date.now();
+      const due = [...firstMail.entries()]
+        .filter(([, at]) => Math.floor((now - at.getTime()) / 86_400_000) >= 10)
+        .map(([id]) => id);
+      if (!due.length) return outcomes;
 
-      const seed = await this.prisma.directory_presence_seeds.findUnique({
-        where: { id: seedId },
-        select: { tenant_id: true },
+      const seeds = await this.prisma.directory_presence_seeds.findMany({
+        where: { id: { in: due } },
+        select: { id: true, tenant_id: true },
       });
-      if (!seed?.tenant_id) return 'no_scan';
+      const tenantBySeed = new Map<string, string | null>();
+      for (const s of seeds) tenantBySeed.set(s.id, s.tenant_id ?? null);
 
-      const scans = await this.prisma.$queryRaw<any[]>`
-        SELECT 1 FROM qr_scan_events
-        WHERE tenant_id = ${seed.tenant_id}
-          AND (surface LIKE 'claim_invite%' OR surface LIKE 'report_delivery%')
-        LIMIT 1
-      `;
-      return scans.length > 0 ? 'scanned' : 'no_scan';
+      const tenantIds = [...new Set([...tenantBySeed.values()].filter((t): t is string => !!t))];
+      const scanned = new Set<string>();
+      if (tenantIds.length) {
+        const scans = await this.prisma.$queryRaw<{ tenant_id: string }[]>`
+          SELECT DISTINCT tenant_id FROM qr_scan_events
+          WHERE tenant_id = ANY(${tenantIds}::text[])
+            AND (surface LIKE 'claim_invite%' OR surface LIKE 'report_delivery%')
+        `;
+        for (const r of scans) scanned.add(r.tenant_id);
+      }
+
+      for (const id of due) {
+        const tenantId = tenantBySeed.get(id);
+        if (!tenantId) { outcomes.set(id, 'no_scan'); continue; }
+        outcomes.set(id, scanned.has(tenantId) ? 'scanned' : 'no_scan');
+      }
     } catch {
-      return 'not_mailed';
+      // Best-effort — leave the 'not_mailed' defaults on failure (mirrors the
+      // single-seed method's graceful degradation).
     }
+    return outcomes;
   }
 
   private resolveRule(channel: TouchChannel, outcome?: TouchOutcome): CadenceRule {

@@ -1335,6 +1335,9 @@ export interface ProspectQueueEntry {
   current_channel_index?: number;
   next_touch_at?: string | null;
   account_family?: string | null;
+  // Spec §5.8 — derived mail-rung outcome at the 10-day decision point
+  // (only present for rows whose current rung is 'mail').
+  mail_scan_outcome?: 'scanned' | 'no_scan' | 'not_mailed' | null;
 }
 
 // ─── Prospect communications (prospect-scoped history) ───────────────────

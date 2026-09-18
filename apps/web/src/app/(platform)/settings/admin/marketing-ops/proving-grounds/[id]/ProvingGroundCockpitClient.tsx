@@ -7,6 +7,12 @@
  * the launch operator's system-state overview: G1–G4 gates, preflight
  * progress, due-today, mid-run gap log, tree children, and the dedup
  * resolution panel (preflight step 1 — duplicateSeedCount must reach 0).
+ *
+ * The operational surfaces live in three tabs (preflight + duplicate
+ * resolution, promote to listings, discovery + attached campaigns) so each can
+ * grow without lengthening the page. The overview cards above the strip stay
+ * unconditional. Deep links from the checklist bridge select the owning tab
+ * before scrolling — see HASH_TABS.
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -73,6 +79,20 @@ function gateChip(pass: boolean | null): string {
   if (pass === false) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
   return 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400';
 }
+
+// Cockpit tab keys — the three operational surfaces (preflight, promotion,
+// discovery) each own a panel so any of them can grow without lengthening
+// the page.
+type CockpitTab = 'preflight' | 'promote' | 'discovery';
+
+// Deep-link fragments minted by OutreachChecklistBridgeService.resolveInternalLinkUrl
+// resolve to the tab that owns the anchor. A panel is unmounted while its tab
+// is inactive, so the tab must be selected before the browser can scroll to it.
+const HASH_TABS: Record<string, CockpitTab> = {
+  queue: 'promote',
+  prospects: 'discovery',
+  children: 'discovery',
+};
 
 // ─── PG domain model (Migration 283 — describe + auto-expand) ────────────
 // A proving ground's constraint domain is two axes:
@@ -147,6 +167,10 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const [attachable, setAttachable] = useState<CampaignLineageEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<CockpitTab>('preflight');
+  // Anchor from a deep link that must be revealed (tab switch) before the
+  // browser can scroll to it.
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
   const [attachId, setAttachId] = useState('');
   const [attaching, setAttaching] = useState(false);
   const [verdictBusy, setVerdictBusy] = useState<string | null>(null);
@@ -228,7 +252,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   // the dedicated endpoint: includes dismissed rows, dedupes AC84 double
   // graduations, and counts business grandchildren the queue can't see.
   const [stageDist, setStageDist] = useState<StageDistribution | null>(null);
-  // The queue payload is capped at 200 rows — the promote list below can be
+  // The queue payload is capped at 200 rows — the promote list can be
   // partial even though the endpoint's distribution counts are complete.
   const [queueTruncated, setQueueTruncated] = useState(false);
 
@@ -823,6 +847,43 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     requestAnimationFrame(() => gapLogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }, []);
 
+  // Deep links (#queue / #prospects / #children) select the owning tab, then
+  // scroll to the anchor. The campaign gate defers the first pass until the
+  // panels exist; a ref keeps later reloads from re-snapping the operator's
+  // chosen tab.
+  const applyHash = useCallback(() => {
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash) return;
+    const target = HASH_TABS[hash];
+    if (target) setTab(target);
+    setPendingAnchor(hash);
+  }, []);
+
+  const hashAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!campaign || hashAppliedRef.current) return;
+    hashAppliedRef.current = true;
+    applyHash();
+  }, [campaign, applyHash]);
+
+  useEffect(() => {
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, [applyHash]);
+
+  useEffect(() => {
+    if (!pendingAnchor) return;
+    const el = document.getElementById(pendingAnchor);
+    if (el) {
+      el.scrollIntoView({ block: 'start' });
+      setPendingAnchor(null);
+    } else if (!HASH_TABS[pendingAnchor]) {
+      // Anchor lives outside the tabs and isn't rendered (e.g. #enrich on a
+      // PG with no market) — drop it instead of retrying on every tab change.
+      setPendingAnchor(null);
+    }
+  }, [pendingAnchor, tab]);
+
   if (loading && !campaign) {
     return (
       <div className="flex items-center justify-center py-16 text-gray-500 dark:text-gray-400">
@@ -838,6 +899,16 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const combined = funnel?.combined;
   const gates = combined?.gates ?? [];
   const dupGroups = funnel?.potentialDuplicateSeeds ?? [];
+
+  // Tab strip model. The counts are the "where is the work" signals:
+  // unresolved duplicate groups block preflight step 1, the un-promoted
+  // prospects are the promotion queue, and the attached campaigns feed the
+  // discovery pull.
+  const COCKPIT_TABS: Array<{ key: CockpitTab; label: string; count: number; warn?: boolean }> = [
+    { key: 'preflight', label: 'Preflight checklist', count: dupGroups.length, warn: true },
+    { key: 'promote', label: 'Promote to listings', count: promoteEntries.filter((e) => !e.seed_id).length },
+    { key: 'discovery', label: 'Discovery prospects', count: children.length },
+  ];
 
   return (
     <div className="space-y-6">
@@ -1396,7 +1467,8 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           </div>
           {Object.keys(stageDist.byStage).length === 0 ? (
             <p className="text-xs text-gray-400">
-              No graduated campaigns yet — promote prospects to the queue below, then graduate them to business campaigns.
+              No graduated campaigns yet — promote prospects to the queue in the Promote to listings tab, then graduate
+              them to business campaigns.
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
@@ -1424,309 +1496,480 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             <span>· {stageDist.dismissed} dismissed</span>
             {queueTruncated && (
               <span className="text-amber-600 dark:text-amber-400">
-                · queue list capped at 200 rows — counts above are authoritative, the promote list below may be partial
+                · queue list capped at 200 rows — counts above are authoritative, the Promote to listings list may be
+                partial
               </span>
             )}
           </div>
         </div>
       )}
 
-      {/* Preflight checklist — PG-01 attaches directly, no triage needed */}
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Preflight checklist (PG-01)</h2>
-        <CampaignChecklistTab campaignId={campaignId} currentStage={campaign.stage} />
+      {/* Operational tabs — preflight, promotion, and discovery each own a
+          panel so any of them can grow without lengthening the cockpit.
+          Deep links (#queue / #prospects / #children) select the owning tab
+          before the browser scrolls to the anchor. */}
+      <div
+        role="tablist"
+        aria-label="Proving ground operations"
+        className="flex items-center gap-1 overflow-x-auto border-b border-gray-200 dark:border-neutral-700"
+      >
+        {COCKPIT_TABS.map((t) => (
+          <button
+            key={t.key}
+            id={`cockpit-tab-${t.key}`}
+            role="tab"
+            aria-selected={tab === t.key}
+            aria-controls={`cockpit-panel-${t.key}`}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              tab === t.key
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span className={`ml-1.5 text-xs ${t.warn ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'}`}>({t.count})</span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Duplicate resolution — preflight step 1's data surface */}
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-4 h-4" /> Duplicate seed groups
-        </h2>
-        {dupGroups.length === 0 ? (
-          <p className="text-xs text-green-700 dark:text-green-400">
-            No unresolved duplicate groups — the funnel identity gate is clean.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {dupGroups.map((g) => (
-              <li key={g.seedIds.join(',')} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 px-3 py-2">
-                <div className="text-xs text-gray-700 dark:text-gray-300">
-                  <span className="font-mono text-[10px] uppercase text-gray-400 mr-2">{g.matchKey}</span>
-                  {g.names.join('  ↔  ')}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleVerdict(g, 'same_entity')}
-                    disabled={verdictBusy === g.seedIds.join(',')}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
-                    title="Same entity — merges identity into the first seed"
-                  >
-                    {verdictBusy === g.seedIds.join(',') ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
-                    Same entity
-                  </button>
-                  <button
-                    onClick={() => handleVerdict(g, 'distinct')}
-                    disabled={verdictBusy === g.seedIds.join(',')}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 disabled:opacity-50"
-                  >
-                    <Unlink className="w-3 h-3" />
-                    Distinct
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {tab === 'preflight' && (
+        <div role="tabpanel" id="cockpit-panel-preflight" aria-labelledby="cockpit-tab-preflight" className="space-y-6">
+        {/* Preflight checklist — PG-01 attaches directly, no triage needed */}
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Preflight checklist (PG-01)</h2>
+          <CampaignChecklistTab campaignId={campaignId} currentStage={campaign.stage} />
+        </div>
 
-      {/* Promote to listings — preflight step 2's data surface: selective
-          seeding of tree prospects. Hold-priority rows default unchecked.
-          id="queue" — this panel IS the PG's tree-filtered queue view;
-          the seed_claim_kit deep-link target resolves here. */}
-      <div id="queue" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
-        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <MapPin className="w-4 h-4" /> Promote to listings (preflight step 2)
+        {/* Duplicate resolution — preflight step 1's data surface */}
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4" /> Duplicate seed groups
           </h2>
+          {dupGroups.length === 0 ? (
+            <p className="text-xs text-green-700 dark:text-green-400">
+              No unresolved duplicate groups — the funnel identity gate is clean.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {dupGroups.map((g) => (
+                <li key={g.seedIds.join(',')} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 px-3 py-2">
+                  <div className="text-xs text-gray-700 dark:text-gray-300">
+                    <span className="font-mono text-[10px] uppercase text-gray-400 mr-2">{g.matchKey}</span>
+                    {g.names.join('  ↔  ')}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleVerdict(g, 'same_entity')}
+                      disabled={verdictBusy === g.seedIds.join(',')}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+                      title="Same entity — merges identity into the first seed"
+                    >
+                      {verdictBusy === g.seedIds.join(',') ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                      Same entity
+                    </button>
+                    <button
+                      onClick={() => handleVerdict(g, 'distinct')}
+                      disabled={verdictBusy === g.seedIds.join(',')}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 disabled:opacity-50"
+                    >
+                      <Unlink className="w-3 h-3" />
+                      Distinct
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        </div>
+      )}
+
+      {tab === 'promote' && (
+        <div role="tabpanel" id="cockpit-panel-promote" aria-labelledby="cockpit-tab-promote" className="space-y-6">
+        {/* Promote to listings — preflight step 2's data surface: selective
+            seeding of tree prospects. Hold-priority rows default unchecked.
+            id="queue" — this panel IS the PG's tree-filtered queue view;
+            the seed_claim_kit deep-link target resolves here. */}
+        <div id="queue" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
+          <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <MapPin className="w-4 h-4" /> Promote to listings (preflight step 2)
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleAllPromote}
+                disabled={promoteBusy || promoteEntries.every((e) => e.seed_id)}
+                className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50 disabled:no-underline"
+              >
+                {promoteEntries.filter((e) => !e.seed_id).length > 0
+                  && promoteEntries.filter((e) => !e.seed_id).every((e) => promoteSelected.has(e.id))
+                  ? 'clear all' : 'select all'}
+              </button>
+              <button
+                onClick={handlePromoteSelected}
+                disabled={promoteBusy || promoteSelected.size === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                title="Create + publish a directory listing per selected prospect, link it to its discovery campaign, and mint a claim token"
+              >
+                {promoteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                Promote selected ({promoteSelected.size})
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400 mb-2">
+            Creates + publishes a directory listing per selected prospect, links it to its discovery campaign, and mints a claim token.
+            Audit-backed prospects are pre-checked — a business audit per prospect makes richer seed data. Hold-priority prospects stay
+            unchecked until an analyst's hold is resolved; dismiss removes a prospect from the list entirely.
+          </p>
+          {promoteEntries.length === 0 ? (
+            <p className="text-xs text-gray-400">
+              No workable prospects yet — queue businesses from the Discovery prospects tab, then promote selectively
+              here.
+            </p>
+          ) : (
+            <>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
+                {promoteEntries.filter((e) => e.campaign_has_business_audit === true).length} of {promoteEntries.length} prospects have a
+                business audit
+                {promoteEntries.some((e) => !e.seed_id && e.campaign_has_business_audit !== true) && (
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {' '}· {promoteEntries.filter((e) => !e.seed_id && e.campaign_has_business_audit !== true).length} awaiting campaign/audit
+                  </span>
+                )}
+                {[...promoteSelected].filter((id) => {
+                  const e = promoteEntries.find((p) => p.id === id);
+                  return e && e.campaign_has_business_audit !== true;
+                }).length > 0 && (
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {' '}· {promoteSelected.size - promoteEntries.filter((e) => promoteSelected.has(e.id) && e.campaign_has_business_audit === true).length} selected without audit (thinner seed data)
+                  </span>
+                )}
+              </p>
+              <ul className="space-y-1">
+                {promoteEntries.map((e) => {
+                  const isHold = e.business_seek_priority === 'hold';
+                  const promoted = !!e.seed_id;
+                  const checked = promoted || promoteSelected.has(e.id);
+                  return (
+                    <li
+                      key={e.id}
+                      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                        promoted
+                          ? 'bg-green-50/60 dark:bg-green-900/10'
+                          : isHold
+                            ? 'bg-gray-50 dark:bg-neutral-700/20'
+                            : 'hover:bg-gray-50 dark:hover:bg-neutral-700/30'
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={promoted || promoteBusy}
+                          onChange={() => togglePromote(e.id)}
+                          className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
+                        />
+                        <span className={`truncate font-medium ${promoted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}>
+                          {e.business_name || e.title || e.id}
+                        </span>
+                        {e.verification && <VerificationBadge verification={e.verification} />}
+                        {isHold && !promoted && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 flex-shrink-0">
+                            <AlertTriangle className="w-2.5 h-2.5" /> hold
+                          </span>
+                        )}
+                        {promoted && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 flex-shrink-0">
+                            promoted
+                          </span>
+                        )}
+                      </label>
+                      <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5">
+                        {dismissId === e.id ? (
+                          <>
+                            <select
+                              value={dismissReason}
+                              onChange={(ev) => setDismissReason(ev.target.value as ProspectDismissReason)}
+                              className="px-1 py-0.5 text-[10px] border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+                              title="Why is this prospect being dismissed?"
+                            >
+                              <option value="bad_fit">bad fit</option>
+                              <option value="duplicate">duplicate</option>
+                              <option value="already_customer">already customer</option>
+                              <option value="unverified_closed">closed</option>
+                              <option value="other">other</option>
+                            </select>
+                            <button
+                              onClick={() => handleDismiss(e.id)}
+                              disabled={dismissBusy}
+                              className="text-[10px] font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+                            >
+                              {dismissBusy ? '…' : 'confirm'}
+                            </button>
+                            <button
+                              onClick={() => setDismissId(null)}
+                              className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            >
+                              cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {e.processed_campaign_id ? (
+                              <>
+                                <Link
+                                  href={`/settings/admin/marketing-ops/campaigns/${e.processed_campaign_id}`}
+                                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  title="Open the prospect's campaign"
+                                >
+                                  campaign{e.campaign_stage ? ` · ${STAGE_LABELS[e.campaign_stage] ?? e.campaign_stage}` : ''}
+                                </Link>
+                                <ProspectArtifactChips
+                                  processedCampaignId={e.processed_campaign_id}
+                                  hasBusinessAudit={e.campaign_has_business_audit}
+                                  businessAuditAt={e.business_audit_at}
+                                  checklistCompleted={e.checklist_completed}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
+                                {e.status === 'verify_then_outreach' ? (
+                                  <button
+                                    onClick={() => setResolveEntry(e)}
+                                    className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
+                                    title="Resolve the verification call — capture the outcome + verified NAP; it flows into the campaign on promotion"
+                                  >
+                                    resolve →
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleCreateCampaign(e)}
+                                      disabled={creatingId === e.id || promoteBusy || dismissBusy || !verificationClearsCampaign(e.verification?.outcome)}
+                                      className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+                                      title={!verificationClearsCampaign(e.verification?.outcome)
+                                        ? 'Blocked — this prospect failed verification (closed/unreachable). Re-verify as operational first.'
+                                        : `Create a ${e.source_scope ?? 'business'}-scope campaign from this prospect`}
+                                    >
+                                      {creatingId === e.id ? '…' : 'create →'}
+                                    </button>
+                                    {e.status === 'queued' && (
+                                      <button
+                                        onClick={() => handleRequestVerification(e.id)}
+                                        disabled={verifyBusy === e.id || promoteBusy || dismissBusy}
+                                        className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline disabled:opacity-50"
+                                        title="Gate outreach on a phone call — moves the prospect to Verify, then resolve with the verified NAP"
+                                      >
+                                        {verifyBusy === e.id ? '…' : 'verify →'}
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                                <ProspectArtifactChips processedCampaignId={null} />
+                              </>
+                            )}
+                            {promoted && e.seed_id && (
+                              <>
+                                <Link
+                                  href={`/settings/admin/directory/presence-seeds/${e.seed_id}`}
+                                  className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline"
+                                  title="Open the seed workspace"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  seed
+                                </Link>
+                                <button
+                                  onClick={() => setDeleteSeedTarget({ id: e.id, seedId: e.seed_id!, name: e.business_name || e.title || e.id })}
+                                  disabled={promoteBusy || dismissBusy || deleteSeedBusy}
+                                  className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                                  title="Delete this seed — permanently removes the listing and its tenant; the prospect returns to the promote list"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+                            {!promoted && (e.status === 'queued' || e.status === 'verify_then_outreach') && (
+                              <button
+                                onClick={() => handleTogglePriority(e)}
+                                disabled={priorityBusy === e.id || promoteBusy || dismissBusy}
+                                className={`text-[10px] px-1.5 py-0.5 rounded border disabled:opacity-50 ${
+                                  e.priority === 'high'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800'
+                                    : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-neutral-700/40 dark:text-gray-400 dark:border-neutral-600'
+                                }`}
+                                title={e.priority === 'high'
+                                  ? 'High priority — works first, top of this list. Click to lower.'
+                                  : 'Normal priority — click to raise (floats to the top of this list)'}
+                              >
+                                {priorityBusy === e.id ? '…' : (e.priority ?? 'normal')}
+                              </button>
+                            )}
+                            <span>
+                              {e.status}
+                              {e.identity_confidence ? ` · conf: ${e.identity_confidence}` : ''}
+                            </span>
+                            {!promoted && (
+                              <button
+                                onClick={() => { setDismissId(e.id); setDismissReason('bad_fit'); }}
+                                disabled={promoteBusy || dismissBusy}
+                                className="text-[10px] text-gray-400 hover:text-red-600 disabled:opacity-50"
+                                title="Dismiss this prospect — removes it from the promote list and the worklist (viewable under 'dismissed' on the queue page)"
+                              >
+                                dismiss
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+          {promoteResult && (
+            <div className="mt-2 text-xs text-green-600 dark:text-green-400">{promoteResult}</div>
+          )}
+          {promoteError && (
+            <div className="mt-2 text-xs text-red-600 dark:text-red-400">{promoteError}</div>
+          )}
+        </div>
+
+        </div>
+      )}
+
+      {tab === 'discovery' && (
+        <div role="tabpanel" id="cockpit-panel-discovery" aria-labelledby="cockpit-tab-discovery" className="space-y-6">
+        {/* Children */}
+        <div id="children" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            Attached campaigns ({children.length})
+          </h2>
+          {children.length > 0 && (
+            <ul className="space-y-1.5 mb-3">
+              {children.map((c) => (
+                <li key={c.id} className="flex items-center justify-between text-xs">
+                  <Link
+                    href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                    className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    {/* Scope badge: intelligence discovery runs, directory
+                        enrichment campaigns, and (geography-free PGs only)
+                        directly-attached business campaigns. */}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      c.scope === 'intelligence'
+                        ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                        : c.scope === 'business'
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                          : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    }`}>
+                      {c.scope === 'intelligence' ? 'intelligence' : c.scope === 'business' ? 'business' : 'enrichment'}
+                    </span>
+                    <span className="text-[10px] text-gray-400">{c.stage}</span>
+                    <button
+                      onClick={() => handleDetach(c.id)}
+                      className="text-[10px] text-gray-400 hover:text-red-600"
+                      title="Detach from this proving ground (breadcrumbs only)"
+                    >
+                      detach
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="flex items-center gap-2">
-            <button
-              onClick={toggleAllPromote}
-              disabled={promoteBusy || promoteEntries.every((e) => e.seed_id)}
-              className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50 disabled:no-underline"
+            <select
+              value={attachId}
+              onChange={(e) => setAttachId(e.target.value)}
+              className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
             >
-              {promoteEntries.filter((e) => !e.seed_id).length > 0
-                && promoteEntries.filter((e) => !e.seed_id).every((e) => promoteSelected.has(e.id))
-                ? 'clear all' : 'select all'}
-            </button>
+              <option value="">
+                {campaign?.city ? 'Attach an unparented discovery campaign…' : 'Attach a discovery or business campaign…'}
+              </option>
+              {attachable.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.scope === 'business' ? '[biz] ' : ''}{c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
+                </option>
+              ))}
+            </select>
             <button
-              onClick={handlePromoteSelected}
-              disabled={promoteBusy || promoteSelected.size === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
-              title="Create + publish a directory listing per selected prospect, link it to its discovery campaign, and mint a claim token"
+              onClick={handleAttach}
+              disabled={!attachId || attaching}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
             >
-              {promoteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
-              Promote selected ({promoteSelected.size})
+              {attaching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+              Attach
             </button>
           </div>
         </div>
-        <p className="text-[10px] text-gray-400 mb-2">
-          Creates + publishes a directory listing per selected prospect, links it to its discovery campaign, and mints a claim token.
-          Audit-backed prospects are pre-checked — a business audit per prospect makes richer seed data. Hold-priority prospects stay
-          unchecked until an analyst's hold is resolved; dismiss removes a prospect from the list entirely.
-        </p>
-        {promoteEntries.length === 0 ? (
-          <p className="text-xs text-gray-400">
-            No workable prospects yet — queue businesses from the discovery panel below, then promote selectively here.
-          </p>
-        ) : (
-          <>
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
-              {promoteEntries.filter((e) => e.campaign_has_business_audit === true).length} of {promoteEntries.length} prospects have a
-              business audit
-              {promoteEntries.some((e) => !e.seed_id && e.campaign_has_business_audit !== true) && (
-                <span className="text-amber-600 dark:text-amber-400">
-                  {' '}· {promoteEntries.filter((e) => !e.seed_id && e.campaign_has_business_audit !== true).length} awaiting campaign/audit
-                </span>
-              )}
-              {[...promoteSelected].filter((id) => {
-                const e = promoteEntries.find((p) => p.id === id);
-                return e && e.campaign_has_business_audit !== true;
-              }).length > 0 && (
-                <span className="text-amber-600 dark:text-amber-400">
-                  {' '}· {promoteSelected.size - promoteEntries.filter((e) => promoteSelected.has(e.id) && e.campaign_has_business_audit === true).length} selected without audit (thinner seed data)
-                </span>
-              )}
+
+        {/* Discovery prospects — loaded on demand from the attached intelligence campaigns */}
+        <div id="prospects" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Users className="w-4 h-4" /> Discovery prospects
+            </h2>
+            <button
+              onClick={loadDiscoveryProspects}
+              disabled={prospectsLoading || children.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 disabled:opacity-50"
+              title={children.length === 0 ? 'Attach an intelligence campaign first' : 'Load the businesses the attached discovery campaign(s) found'}
+            >
+              {prospectsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+              {prospectsLoaded ? 'Reload prospects' : 'Load prospects'}
+            </button>
+          </div>
+          {children.length === 0 ? (
+            <p className="text-xs text-gray-400">
+              No intelligence campaigns attached — attach a discovery campaign above, then load its prospects here.
             </p>
-            <ul className="space-y-1">
-              {promoteEntries.map((e) => {
-                const isHold = e.business_seek_priority === 'hold';
-                const promoted = !!e.seed_id;
-                const checked = promoted || promoteSelected.has(e.id);
-                return (
-                  <li
-                    key={e.id}
-                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs ${
-                      promoted
-                        ? 'bg-green-50/60 dark:bg-green-900/10'
-                        : isHold
-                          ? 'bg-gray-50 dark:bg-neutral-700/20'
-                          : 'hover:bg-gray-50 dark:hover:bg-neutral-700/30'
-                    }`}
-                  >
-                    <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={promoted || promoteBusy}
-                        onChange={() => togglePromote(e.id)}
-                        className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
-                      />
-                      <span className={`truncate font-medium ${promoted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}>
-                        {e.business_name || e.title || e.id}
-                      </span>
-                      {e.verification && <VerificationBadge verification={e.verification} />}
-                      {isHold && !promoted && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 flex-shrink-0">
-                          <AlertTriangle className="w-2.5 h-2.5" /> hold
-                        </span>
-                      )}
-                      {promoted && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 flex-shrink-0">
-                          promoted
-                        </span>
-                      )}
-                    </label>
-                    <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5">
-                      {dismissId === e.id ? (
-                        <>
-                          <select
-                            value={dismissReason}
-                            onChange={(ev) => setDismissReason(ev.target.value as ProspectDismissReason)}
-                            className="px-1 py-0.5 text-[10px] border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                            title="Why is this prospect being dismissed?"
-                          >
-                            <option value="bad_fit">bad fit</option>
-                            <option value="duplicate">duplicate</option>
-                            <option value="already_customer">already customer</option>
-                            <option value="unverified_closed">closed</option>
-                            <option value="other">other</option>
-                          </select>
-                          <button
-                            onClick={() => handleDismiss(e.id)}
-                            disabled={dismissBusy}
-                            className="text-[10px] font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
-                          >
-                            {dismissBusy ? '…' : 'confirm'}
-                          </button>
-                          <button
-                            onClick={() => setDismissId(null)}
-                            className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                          >
-                            cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          {e.processed_campaign_id ? (
-                            <>
-                              <Link
-                                href={`/settings/admin/marketing-ops/campaigns/${e.processed_campaign_id}`}
-                                className="text-blue-600 dark:text-blue-400 hover:underline"
-                                title="Open the prospect's campaign"
-                              >
-                                campaign{e.campaign_stage ? ` · ${STAGE_LABELS[e.campaign_stage] ?? e.campaign_stage}` : ''}
-                              </Link>
-                              <ProspectArtifactChips
-                                processedCampaignId={e.processed_campaign_id}
-                                hasBusinessAudit={e.campaign_has_business_audit}
-                                businessAuditAt={e.business_audit_at}
-                                checklistCompleted={e.checklist_completed}
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <span title="No campaign yet — seeding uses the discovery snapshot only">no campaign</span>
-                              {e.status === 'verify_then_outreach' ? (
-                                <button
-                                  onClick={() => setResolveEntry(e)}
-                                  className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
-                                  title="Resolve the verification call — capture the outcome + verified NAP; it flows into the campaign on promotion"
-                                >
-                                  resolve →
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => handleCreateCampaign(e)}
-                                    disabled={creatingId === e.id || promoteBusy || dismissBusy || !verificationClearsCampaign(e.verification?.outcome)}
-                                    className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
-                                    title={!verificationClearsCampaign(e.verification?.outcome)
-                                      ? 'Blocked — this prospect failed verification (closed/unreachable). Re-verify as operational first.'
-                                      : `Create a ${e.source_scope ?? 'business'}-scope campaign from this prospect`}
-                                  >
-                                    {creatingId === e.id ? '…' : 'create →'}
-                                  </button>
-                                  {e.status === 'queued' && (
-                                    <button
-                                      onClick={() => handleRequestVerification(e.id)}
-                                      disabled={verifyBusy === e.id || promoteBusy || dismissBusy}
-                                      className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline disabled:opacity-50"
-                                      title="Gate outreach on a phone call — moves the prospect to Verify, then resolve with the verified NAP"
-                                    >
-                                      {verifyBusy === e.id ? '…' : 'verify →'}
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                              <ProspectArtifactChips processedCampaignId={null} />
-                            </>
-                          )}
-                          {promoted && e.seed_id && (
-                            <>
-                              <Link
-                                href={`/settings/admin/directory/presence-seeds/${e.seed_id}`}
-                                className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline"
-                                title="Open the seed workspace"
-                              >
-                                <Eye className="w-3 h-3" />
-                                seed
-                              </Link>
-                              <button
-                                onClick={() => setDeleteSeedTarget({ id: e.id, seedId: e.seed_id!, name: e.business_name || e.title || e.id })}
-                                disabled={promoteBusy || dismissBusy || deleteSeedBusy}
-                                className="text-gray-400 hover:text-red-600 disabled:opacity-50"
-                                title="Delete this seed — permanently removes the listing and its tenant; the prospect returns to the promote list"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </>
-                          )}
-                          {!promoted && (e.status === 'queued' || e.status === 'verify_then_outreach') && (
-                            <button
-                              onClick={() => handleTogglePriority(e)}
-                              disabled={priorityBusy === e.id || promoteBusy || dismissBusy}
-                              className={`text-[10px] px-1.5 py-0.5 rounded border disabled:opacity-50 ${
-                                e.priority === 'high'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800'
-                                  : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-neutral-700/40 dark:text-gray-400 dark:border-neutral-600'
-                              }`}
-                              title={e.priority === 'high'
-                                ? 'High priority — works first, top of this list. Click to lower.'
-                                : 'Normal priority — click to raise (floats to the top of this list)'}
-                            >
-                              {priorityBusy === e.id ? '…' : (e.priority ?? 'normal')}
-                            </button>
-                          )}
-                          <span>
-                            {e.status}
-                            {e.identity_confidence ? ` · conf: ${e.identity_confidence}` : ''}
-                          </span>
-                          {!promoted && (
-                            <button
-                              onClick={() => { setDismissId(e.id); setDismissReason('bad_fit'); }}
-                              disabled={promoteBusy || dismissBusy}
-                              className="text-[10px] text-gray-400 hover:text-red-600 disabled:opacity-50"
-                              title="Dismiss this prospect — removes it from the promote list and the worklist (viewable under 'dismissed' on the queue page)"
-                            >
-                              dismiss
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-        {promoteResult && (
-          <div className="mt-2 text-xs text-green-600 dark:text-green-400">{promoteResult}</div>
-        )}
-        {promoteError && (
-          <div className="mt-2 text-xs text-red-600 dark:text-red-400">{promoteError}</div>
-        )}
-      </div>
+          ) : prospectsLoading ? (
+            <p className="text-xs text-gray-400 flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading businesses from the attached discovery campaign{children.length !== 1 ? 's' : ''}…
+            </p>
+          ) : prospectsError ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">{prospectsError}</p>
+          ) : discoveryAudits.length === 0 ? (
+            <p className="text-xs text-gray-400">
+              Click "Load prospects" to pull the businesses the attached discovery campaign{children.length !== 1 ? 's' : ''} found into this panel.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {discoveryAudits.map(({ childId, childTitle, audit }) => (
+                <div key={audit.id}>
+                  {discoveryAudits.length > 1 && (
+                    <p className="text-[10px] text-gray-400 mb-1">
+                      from{' '}
+                      <Link href={`/settings/admin/marketing-ops/campaigns/${childId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                        {childTitle}
+                      </Link>
+                    </p>
+                  )}
+                  <IntelligenceDiscoveryAuditCard
+                    audit={audit}
+                    campaignId={childId}
+                    queueEntries={queueEntries}
+                    onLogGap={(biz) => handleProspectGap(biz.business_name, biz.city, biz.state)}
+                    onQueued={load}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        </div>
+      )}
 
       {/* Seed delete confirmation — mirrors the presence-seeds page's modal */}
       {deleteSeedTarget && (
@@ -1937,129 +2180,6 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             );
           })()}
         </div>
-      </div>
-
-      {/* Children */}
-      <div id="children" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-          Attached campaigns ({children.length})
-        </h2>
-        {children.length > 0 && (
-          <ul className="space-y-1.5 mb-3">
-            {children.map((c) => (
-              <li key={c.id} className="flex items-center justify-between text-xs">
-                <Link
-                  href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
-                  className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  {c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
-                </Link>
-                <div className="flex items-center gap-2">
-                  {/* Scope badge: intelligence discovery runs, directory
-                      enrichment campaigns, and (geography-free PGs only)
-                      directly-attached business campaigns. */}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                    c.scope === 'intelligence'
-                      ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
-                      : c.scope === 'business'
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                  }`}>
-                    {c.scope === 'intelligence' ? 'intelligence' : c.scope === 'business' ? 'business' : 'enrichment'}
-                  </span>
-                  <span className="text-[10px] text-gray-400">{c.stage}</span>
-                  <button
-                    onClick={() => handleDetach(c.id)}
-                    className="text-[10px] text-gray-400 hover:text-red-600"
-                    title="Detach from this proving ground (breadcrumbs only)"
-                  >
-                    detach
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex items-center gap-2">
-          <select
-            value={attachId}
-            onChange={(e) => setAttachId(e.target.value)}
-            className="flex-1 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-          >
-            <option value="">
-              {campaign?.city ? 'Attach an unparented discovery campaign…' : 'Attach a discovery or business campaign…'}
-            </option>
-            {attachable.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.scope === 'business' ? '[biz] ' : ''}{c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleAttach}
-            disabled={!attachId || attaching}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
-          >
-            {attaching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
-            Attach
-          </button>
-        </div>
-      </div>
-
-      {/* Discovery prospects — loaded on demand from the attached intelligence campaigns */}
-      <div id="prospects" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
-        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <Users className="w-4 h-4" /> Discovery prospects
-          </h2>
-          <button
-            onClick={loadDiscoveryProspects}
-            disabled={prospectsLoading || children.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 disabled:opacity-50"
-            title={children.length === 0 ? 'Attach an intelligence campaign first' : 'Load the businesses the attached discovery campaign(s) found'}
-          >
-            {prospectsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-            {prospectsLoaded ? 'Reload prospects' : 'Load prospects'}
-          </button>
-        </div>
-        {children.length === 0 ? (
-          <p className="text-xs text-gray-400">
-            No intelligence campaigns attached — attach a discovery campaign above, then load its prospects here.
-          </p>
-        ) : prospectsLoading ? (
-          <p className="text-xs text-gray-400 flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading businesses from the attached discovery campaign{children.length !== 1 ? 's' : ''}…
-          </p>
-        ) : prospectsError ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">{prospectsError}</p>
-        ) : discoveryAudits.length === 0 ? (
-          <p className="text-xs text-gray-400">
-            Click "Load prospects" to pull the businesses the attached discovery campaign{children.length !== 1 ? 's' : ''} found into this panel.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {discoveryAudits.map(({ childId, childTitle, audit }) => (
-              <div key={audit.id}>
-                {discoveryAudits.length > 1 && (
-                  <p className="text-[10px] text-gray-400 mb-1">
-                    from{' '}
-                    <Link href={`/settings/admin/marketing-ops/campaigns/${childId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                      {childTitle}
-                    </Link>
-                  </p>
-                )}
-                <IntelligenceDiscoveryAuditCard
-                  audit={audit}
-                  campaignId={childId}
-                  queueEntries={queueEntries}
-                  onLogGap={(biz) => handleProspectGap(biz.business_name, biz.city, biz.state)}
-                  onQueued={load}
-                />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Gap log — append-only mid-run incident record (spec §4.5) */}

@@ -860,6 +860,30 @@ export default function ProspectQueueClient() {
                               ))}
                             </div>
                           )}
+                          {/* Spec §5.8 — mail rung at-due QR-scan decision
+                              (worklist-driven; only set for mail-rung rows). */}
+                          {entry.seed_id && (() => {
+                            const idx = entry.current_channel_index ?? 0;
+                            const onMail = entry.channel_sequence?.[idx]?.channel === 'mail';
+                            if (!onMail || !entry.mail_scan_outcome || entry.mail_scan_outcome === 'not_mailed') return null;
+                            const scanned = entry.mail_scan_outcome === 'scanned';
+                            return (
+                              <div className="mt-1">
+                                <span
+                                  className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-medium ${
+                                    scanned
+                                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                      : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300'
+                                  }`}
+                                  title={scanned
+                                    ? 'QR scanned without claiming — owner engaged: send a second postcard or move to in_thread'
+                                    : 'No QR scan after the 10-day mail window — advance the rung (or hold)'}
+                                >
+                                  {scanned ? 'QR scanned → follow up' : 'no scan → advance'}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           {/* Account family — one owner → one operator/thread
                               (Migration 262). Click to set/edit. */}
                           {(entry.account_family || entry.seed_id) && (
