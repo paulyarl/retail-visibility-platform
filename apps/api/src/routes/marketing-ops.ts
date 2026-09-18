@@ -191,7 +191,11 @@ import { BusinessProspectService } from '../services/BusinessProspectService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
 import ProspectCommunicationService from '../services/ProspectCommunicationService';
 import ProvingGroundCadenceService from '../services/ProvingGroundCadenceService';
-import OutreachIntelligenceService, { UpsertInput } from '../services/OutreachIntelligenceService';
+import OutreachIntelligenceService, {
+  UpsertInput,
+  mapEvidenceToWorksheetPrefill,
+} from '../services/OutreachIntelligenceService';
+import IdentityEvidenceService from '../services/IdentityEvidenceService';
 import HookSuggestionService from '../services/HookSuggestionService';
 import CallScriptService from '../services/CallScriptService';
 import ManualOutreachScriptService from '../services/ManualOutreachScriptService';
@@ -2394,6 +2398,23 @@ router.get('/:campaignId/outreach-intelligence', async (req: any, res: Response)
   }
 });
 
+// GET /:campaignId/outreach-intelligence/identity-prefill — suggested worksheet
+// values built from the campaign's Identity evidence ledger (mkt_identity_evidence).
+//
+// READ-ONLY: it computes and returns suggestions; nothing is written. The
+// operator reviews them in the form and uses the normal PUT to save, so the
+// worksheet's "business-published sources only" gate and its
+// confirmed-requires-a-citation rule stay human-enforced. Declared before the
+// /:id catch-all; three segments, so no /:campaignId/:x route can shadow it.
+router.get('/:campaignId/outreach-intelligence/identity-prefill', async (req: any, res: Response) => {
+  try {
+    const evidence = await IdentityEvidenceService.listForCampaign(req.params.campaignId);
+    res.json({ success: true, data: mapEvidenceToWorksheetPrefill(evidence) });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // PUT /:campaignId/outreach-intelligence — upsert (validates + computes salutation)
 router.put('/:campaignId/outreach-intelligence', async (req: any, res: Response) => {
   try {
@@ -2802,6 +2823,69 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
     logger.info('Diagnostic screenshot uploaded', getCtx(req), { campaignId, fileId: fileRecord.id, fileName: file.originalname });
 
     return res.status(201).json({ success: true, data: fileRecord });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * GET /:campaignId/files/diagnostic-screenshots
+ *
+ * Diagnostic screenshots for a campaign with short-lived (5 min) Supabase
+ * signed URLs so the admin Diagnostic Gallery tab can render thumbnails and
+ * offer downloads. The disputes bucket is private, so a signed URL is required;
+ * mirrors the public gallery endpoint in marketing-ops-public.ts.
+ *
+ * Signed URLs expire, so callers must not cache this response.
+ */
+router.get('/:campaignId/files/diagnostic-screenshots', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const files = await prisma.mkt_files_list.findMany({
+      where: { campaign_id: campaignId, file_type: 'diagnostic_screenshot' },
+      orderBy: { uploaded_at: 'asc' },
+      select: {
+        id: true,
+        file_name: true,
+        storage_path: true,
+        mime_type: true,
+        file_size: true,
+        uploaded_at: true,
+      },
+    });
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const { StorageBuckets } = await import('../storage-config');
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+    const data = await Promise.all(
+      files.map(async (f) => {
+        let signedUrl: string | null = null;
+        if (supabase) {
+          const { data: signed, error } = await supabase.storage
+            .from(StorageBuckets.DISPUTES.name)
+            .createSignedUrl(f.storage_path, 300);
+          if (!error && signed) signedUrl = signed.signedUrl;
+        }
+        // Signed URLs always carry ?token=…, so the download param appends with &.
+        const downloadUrl = signedUrl
+          ? `${signedUrl}&download=${encodeURIComponent(f.file_name)}`
+          : null;
+        return {
+          id: f.id,
+          file_name: f.file_name,
+          signed_url: signedUrl,
+          download_url: downloadUrl,
+          mime_type: f.mime_type,
+          file_size: f.file_size,
+          uploaded_at: f.uploaded_at,
+        };
+      })
+    );
+
+    res.json({ success: true, data });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -131,8 +131,7 @@ export default function AddIdentityEvidenceModal({
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Add identity evidence</h3>
             <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-              {businessName ?? 'This business'} · recorded on the packet ledger and shared with this
-              business&apos;s campaigns
+              {businessName ?? 'This business'} · shared across this business&apos;s campaigns
             </p>
           </div>
           <button
@@ -203,7 +202,7 @@ export default function AddIdentityEvidenceModal({
           />
         </div>
 
-        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1.15fr_1fr]">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
               Authority tier
@@ -213,7 +212,7 @@ export default function AddIdentityEvidenceModal({
               onChange={(e) => setTier(e.target.value as IdentitySourceTier | '')}
               className={INPUT_CLASS}
             >
-              <option value="">Auto-detect from source name</option>
+              <option value="">Auto-detect</option>
               {TIER_OPTIONS.map((t) => (
                 <option key={t} value={t}>
                   {IDENTITY_TIER_LABELS[t]}
@@ -221,7 +220,9 @@ export default function AddIdentityEvidenceModal({
               ))}
             </select>
             <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-              {tier ? IDENTITY_TIER_HINTS[tier] : 'Unrecognized sources default to Aggregator.'}
+              {tier
+                ? IDENTITY_TIER_HINTS[tier]
+                : 'Inferred from the source name — unrecognized sources default to Aggregator.'}
             </p>
           </div>
           <div>
@@ -320,12 +321,14 @@ export default function AddIdentityEvidenceModal({
           className={`${INPUT_CLASS} mb-4 resize-y`}
         />
 
+        {/* Validation hint sits above the actions — inline it and the button
+            label wraps at narrow widths. */}
+        {!canSave && (
+          <p className="mb-2 text-[11px] text-gray-400 dark:text-gray-500">
+            Add a source name and corroborate a field or capture owner contact.
+          </p>
+        )}
         <div className="flex items-center justify-end gap-2">
-          {!canSave && (
-            <span className="mr-auto text-[11px] text-gray-400 dark:text-gray-500">
-              Add a source name and corroborate a field or capture owner contact.
-            </span>
-          )}
           <button
             type="button"
             onClick={onClose}
@@ -337,7 +340,7 @@ export default function AddIdentityEvidenceModal({
             type="button"
             onClick={save}
             disabled={!canSave || saving}
-            className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldPlus className="h-3.5 w-3.5" />}
             {saving ? 'Saving…' : 'Add evidence'}

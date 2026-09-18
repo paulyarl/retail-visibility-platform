@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Upload, Link2, Copy, RefreshCw, Check, Clock, AlertCircle, ImageIcon, Trash2, ExternalLink } from 'lucide-react';
+import { Upload, Link2, Copy, RefreshCw, Check, Clock, AlertCircle, ImageIcon, Trash2, ExternalLink, Download } from 'lucide-react';
 import marketingOpsService, {
   CampaignDetail,
-  MarketingFile,
+  DiagnosticScreenshot,
   GalleryToken,
   GalleryTokenParams,
 } from '@/services/MarketingOpsService';
@@ -16,7 +16,7 @@ interface GalleryPanelProps {
 }
 
 export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps) {
-  const [screenshots, setScreenshots] = useState<MarketingFile[]>([]);
+  const [screenshots, setScreenshots] = useState<DiagnosticScreenshot[]>([]);
   const [galleryTokens, setGalleryTokens] = useState<GalleryToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -39,10 +39,10 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
     setError(null);
     try {
       const [files, tokens] = await Promise.all([
-        marketingOpsService.listFiles(campaignId),
+        marketingOpsService.listDiagnosticScreenshots(campaignId),
         marketingOpsService.listGalleryTokens(campaignId),
       ]);
-      setScreenshots(files.filter((f) => f.file_type === 'diagnostic_screenshot'));
+      setScreenshots(files);
       setGalleryTokens(tokens);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load gallery data');
@@ -179,21 +179,62 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
             {screenshots.map((s, idx) => (
               <div
                 key={s.id}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-lg"
+                className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-lg"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xs font-mono text-gray-400">#{idx + 1}</span>
-                  <div>
-                    <p className="text-sm font-medium">{s.file_name}</p>
+                  {s.signed_url ? (
+                    <a
+                      href={s.signed_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0"
+                      title="View full size"
+                    >
+                      <img
+                        src={s.signed_url}
+                        alt={s.file_name}
+                        className="h-12 w-12 rounded object-cover border border-gray-200 dark:border-neutral-600"
+                      />
+                    </a>
+                  ) : (
+                    <div className="h-12 w-12 flex-shrink-0 rounded bg-gray-200 dark:bg-neutral-600 flex items-center justify-center">
+                      <ImageIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{s.file_name}</p>
                     <p className="text-xs text-gray-500">
                       {s.file_size ? `${(s.file_size / 1024).toFixed(1)} KB` : '—'}
                       {s.mime_type ? ` · ${s.mime_type}` : ''}
                     </p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-400">
-                  {s.uploaded_at ? new Date(s.uploaded_at).toLocaleDateString() : '—'}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-gray-400">
+                    {s.uploaded_at ? new Date(s.uploaded_at).toLocaleDateString() : '—'}
+                  </span>
+                  {s.signed_url && (
+                    <a
+                      href={s.signed_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
+                      title="View"
+                    >
+                      <ExternalLink className="h-4 w-4 text-gray-500" />
+                    </a>
+                  )}
+                  {s.download_url && (
+                    <a
+                      href={s.download_url}
+                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
+                      title="Download"
+                    >
+                      <Download className="h-4 w-4 text-gray-500" />
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>

@@ -18,11 +18,19 @@
  *   - Non-primary siblings inherit the primary sibling's worksheet (read-only).
  *   - Writes are rejected on non-primary siblings — edit the primary's worksheet.
  *
+ * "Prefill from identity evidence" pulls suggestions from the campaign's
+ * Identity evidence ledger (mkt_identity_evidence) — owner/contact name,
+ * business-published email, and a derived preferred channel, each with a
+ * citation and a confidence. It fills the form only; the operator reviews and
+ * saves through the normal path, so the business-published-only gate and the
+ * confirmed-requires-a-citation rule stay human-enforced. Owner phone is never
+ * copied (the worksheet forbids personal phone numbers).
+ *
  * Spec: docs/LocalBiz/marketing_ops_outreach_intelligence_prep_sprint_plan.md
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Trash2, AlertCircle, Info, User, Mail, Users, MessageSquare, ExternalLink } from 'lucide-react';
+import { Save, Trash2, AlertCircle, Info, User, Mail, Users, MessageSquare, ExternalLink, Wand2 } from 'lucide-react';
 import marketingOpsService, {
   type OutreachIntelligenceResult,
   type OutreachIntelligenceInput,
@@ -76,6 +84,7 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [prefilling, setPrefilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -160,6 +169,54 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
 
   const updateTeamSignal = (patch: Partial<TeamSignalField>) => {
     setForm((prev) => ({ ...prev, team_signal: { ...prev.team_signal, ...patch } }));
+  };
+
+  /**
+   * Copy the Identity ledger's suggestions into the form — never straight to the
+   * DB. A field whose prefill is `unavailable` carries no suggestion and is left
+   * alone, so an existing operator entry is never blanked out.
+   */
+  const handlePrefill = async () => {
+    setPrefilling(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const prefill = await marketingOpsService.getOutreachIntelligenceIdentityPrefill(campaignId);
+      const applyField = (current: SourcedField, suggested: SourcedField): SourcedField =>
+        suggested.source_confidence === 'unavailable' ? current : suggested;
+
+      setForm((prev) => {
+        const notesLines = prefill.researcher_notes_lines.filter(
+          (line) => !prev.researcher_notes.includes(line),
+        );
+        return {
+          ...prev,
+          owner_name: applyField(prev.owner_name, prefill.owner_name),
+          business_email: applyField(prev.business_email, prefill.business_email),
+          preferred_contact_channel: applyField(
+            prev.preferred_contact_channel,
+            prefill.preferred_contact_channel,
+          ),
+          researcher_notes: notesLines.length
+            ? [prev.researcher_notes.trim(), ...notesLines].filter(Boolean).join('\n')
+            : prev.researcher_notes,
+        };
+      });
+      const applied = [
+        prefill.owner_name.source_confidence !== 'unavailable' ? 'owner name' : null,
+        prefill.business_email.source_confidence !== 'unavailable' ? 'business email' : null,
+        prefill.preferred_contact_channel.source_confidence !== 'unavailable' ? 'channel' : null,
+      ].filter(Boolean);
+      setSuccess(
+        applied.length
+          ? `Prefilled ${applied.join(', ')} from the Identity ledger. Review the citations, then save.`
+          : 'The Identity ledger has no owner contact yet — add evidence on the Identity tab first.',
+      );
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to build the prefill');
+    } finally {
+      setPrefilling(false);
+    }
   };
 
   if (loading) {
@@ -397,6 +454,20 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving…' : 'Save worksheet'}
+            </button>
+            {/* Suggestions only — copies owner/contact name, business-published
+                email, and a derived channel out of the Identity ledger. Owner
+                phone is deliberately never copied (the worksheet forbids
+                personal phone numbers); team signal stays operator-entered. */}
+            <button
+              type="button"
+              onClick={handlePrefill}
+              disabled={prefilling}
+              title="Suggest owner name, business email, and preferred channel from the Identity evidence ledger"
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-neutral-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-700 disabled:opacity-50"
+            >
+              <Wand2 className="w-4 h-4" />
+              {prefilling ? 'Reading ledger…' : 'Prefill from identity evidence'}
             </button>
             {data && (
               <button

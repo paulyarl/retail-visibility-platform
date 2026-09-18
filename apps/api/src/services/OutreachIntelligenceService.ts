@@ -139,6 +139,130 @@ function isUsableAsGreeting(name: string): boolean {
   return true;
 }
 
+// ─── Identity-evidence prefill (pure) ───────────────────────────────────
+
+/**
+ * Evidence states whose VALUE must not be copied into the worksheet: the
+ * ledger recorded that the value is disputed, contradicted, or was never
+ * established. The row still exists as a record — it just cannot supply a
+ * value. (These are exactly the states where the operator would otherwise
+ * inherit a wrong owner name or email.)
+ */
+const UNUSABLE_EVIDENCE_STATES: ReadonlySet<string> = new Set([
+  'conflicting',
+  'owner_disputed',
+  'not_checked',
+  'not_found_during_discovery',
+]);
+
+export interface WorksheetPrefill {
+  owner_name: SourcedField;
+  business_email: SourcedField;
+  preferred_contact_channel: SourcedField;
+  /**
+   * Provenance lines to append to researcher_notes — one per prefilled field.
+   * The operator reviews them; the UI appends only lines not already present.
+   */
+  researcher_notes_lines: string[];
+  /** Ledger rows the prefill drew on, for the UI's "from the Identity ledger" note. */
+  evidence_ids: string[];
+  /** Channels the ledger can currently support (drives the derived channel). */
+  available_channels: Array<'email' | 'phone'>;
+}
+
+const EMPTY_SOURCED_FIELD: SourcedField = { value: null, source: null, source_confidence: 'unavailable' };
+
+/**
+ * Map a ledger row's authority to the worksheet's three-value confidence.
+ *
+ * The worksheet's own rule is that `confirmed` demands a citation, and it is
+ * about how much we trust the value — not where it was found. An owner telling
+ * us directly, or a registry/owner-published page, is `confirmed`; an
+ * aggregator listing is `inferred_low_risk` (read off a third party, not
+ * published by the business itself).
+ */
+export function confidenceForEvidence(row: { tier: string; evidenceState: string }): SourceConfidence {
+  if (row.evidenceState === 'owner_confirmed' || row.evidenceState === 'owner_corrected') return 'confirmed';
+  if (row.tier === 'authoritative' || row.tier === 'first_party') return 'confirmed';
+  return 'inferred_low_risk';
+}
+
+/** `"{source} ({date})"` — the worksheet's citation format. */
+function citationFor(row: { sourceName: string; accessedAt: string | null }): string {
+  return row.accessedAt ? `${row.sourceName} (${row.accessedAt})` : row.sourceName;
+}
+
+/**
+ * Build the worksheet prefill from the Identity ledger (rows arrive
+ * newest-first, prospect-scoped, so a sibling's capture counts).
+ *
+ * Pure — no DB access, no writes. Deliberately copies only what the ledger can
+ * legitimately support:
+ *   - owner / contact name and business-published email, each from the NEWEST
+ *     row that carries it, with that row's citation and derived confidence;
+ *   - preferred contact channel DERIVED from what was captured (email beats
+ *     phone), always marked inferred_low_risk and cited as derived, because a
+ *     channel is our inference rather than a published fact.
+ *
+ * Never maps `owner_phone`. The worksheet has no phone field on purpose and its
+ * guardrail banner forbids personal phone numbers; the owner's cell belongs on
+ * the campaign record (`phones`/`phone`), which the evidence write already
+ * back-fills. Team signal is a judgement read from published About copy and is
+ * left entirely to the operator.
+ */
+export function mapEvidenceToWorksheetPrefill(
+  rows: Array<{
+    id: string;
+    sourceName: string;
+    tier: string;
+    evidenceState: string;
+    accessedAt: string | null;
+    ownerName: string | null;
+    ownerEmail: string | null;
+    ownerPhone: string | null;
+  }>,
+): WorksheetPrefill {
+  const usable = rows.filter((r) => !UNUSABLE_EVIDENCE_STATES.has(r.evidenceState));
+
+  const ownerRow = usable.find((r) => r.ownerName);
+  const emailRow = usable.find((r) => r.ownerEmail);
+  const phoneRow = usable.find((r) => r.ownerPhone);
+
+  const sourced = (row: (typeof usable)[number] | undefined, value: string | null): SourcedField =>
+    row && value
+      ? { value, source: citationFor(row), source_confidence: confidenceForEvidence(row) }
+      : { ...EMPTY_SOURCED_FIELD };
+
+  // Email outranks phone: an email channel is the one the cascade can actually
+  // fire on, and the operator has to have captured it to reach this branch.
+  const channelRow = emailRow ?? phoneRow;
+  const channel = emailRow ? 'email' : phoneRow ? 'phone' : null;
+
+  const lines: string[] = [];
+  if (ownerRow?.ownerName) lines.push(`Owner name: ${citationFor(ownerRow)}`);
+  if (emailRow?.ownerEmail) lines.push(`Business email: ${citationFor(emailRow)}`);
+  if (channelRow && channel) lines.push(`Preferred channel (${channel}): derived from ${citationFor(channelRow)}`);
+
+  // Kept in the ledger's own order (newest-first) rather than per-field order,
+  // so the UI's provenance note reads chronologically.
+  const usedIds = new Set([ownerRow?.id, emailRow?.id, phoneRow?.id].filter(Boolean) as string[]);
+  const evidenceIds = rows.filter((r) => usedIds.has(r.id)).map((r) => r.id);  return {
+    owner_name: sourced(ownerRow, ownerRow?.ownerName ?? null),
+    business_email: sourced(emailRow, emailRow?.ownerEmail ?? null),
+    preferred_contact_channel:
+      channelRow && channel
+        ? {
+            value: channel,
+            source: `Derived from ${citationFor(channelRow)}`,
+            source_confidence: 'inferred_low_risk',
+          }
+        : { ...EMPTY_SOURCED_FIELD },
+    researcher_notes_lines: lines,
+    evidence_ids: evidenceIds,
+    available_channels: [...(emailRow ? (['email'] as const) : []), ...(phoneRow ? (['phone'] as const) : [])],
+  };
+}
+
 // ─── Service ────────────────────────────────────────────────────────────
 
 export class OutreachIntelligenceService extends BaseService {

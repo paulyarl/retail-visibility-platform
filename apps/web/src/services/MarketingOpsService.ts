@@ -1490,6 +1490,21 @@ export interface MarketingFile {
   uploaded_at: string;
 }
 
+/**
+ * Diagnostic screenshot with short-lived (5 min) Supabase signed URLs.
+ * The disputes bucket is private, so `signed_url`/`download_url` are required
+ * to render or download the file. Do not cache — the URLs expire.
+ */
+export interface DiagnosticScreenshot {
+  id: string;
+  file_name: string;
+  signed_url: string | null;
+  download_url: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  uploaded_at: string | null;
+}
+
 export interface PromptTemplate {
   id: string;
   name: string;
@@ -5528,11 +5543,29 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data ?? null;
   }
 
+  /**
+   * GET /:campaignId/outreach-intelligence/identity-prefill
+   *
+   * Suggested worksheet values built from the campaign's Identity evidence
+   * ledger. Read-only — the operator reviews the suggestions in the form and
+   * saves through the normal upsert, which keeps the worksheet's
+   * business-published-only gate human-enforced.
+   */
+  async getOutreachIntelligenceIdentityPrefill(campaignId: string): Promise<WorksheetPrefill> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-intelligence/identity-prefill`,
+      { method: 'GET' },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to build prefill');
+    }
+    return result.data?.data ?? result.data;
+  }
+
   async upsertOutreachIntelligence(
     campaignId: string,
     payload: OutreachIntelligenceInput,
-  ): Promise<OutreachIntelligenceResult> {
-    const result = await this.makeDefaultRequest<any>(
+  ): Promise<OutreachIntelligenceResult> {    const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${campaignId}/outreach-intelligence`,
       {
         method: 'PUT',
@@ -6242,6 +6275,7 @@ interface MarketingOpsService {
   getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;
   getGalleryDashboard(daysBack?: number): Promise<GalleryDashboard>;
   uploadDiagnosticScreenshot(campaignId: string, file: File): Promise<MarketingFile>;
+  listDiagnosticScreenshots(campaignId: string): Promise<DiagnosticScreenshot[]>;
   // Intelligence Profile + Run methods (Sprint 2 — Seek Intelligence Scope)
   listIntelligenceProfiles(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
   listIntelligenceProfileDrafts(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
@@ -6423,6 +6457,24 @@ MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
   await this.invalidateCachePattern(`mkt-ops-files-${campaignId}`);
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
   return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.listDiagnosticScreenshots = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+): Promise<DiagnosticScreenshot[]> {
+  // ttl 0 — signed URLs expire after 5 min, so this must never be cached.
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/${campaignId}/files/diagnostic-screenshots`,
+    {},
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch screenshots');
+  }
+  const data = result.data?.data ?? result.data;
+  return Array.isArray(data) ? data : [];
 };
 
 // ─── Intelligence Profile Methods (Sprint 2 — Seek Intelligence Scope) ────
@@ -7214,6 +7266,22 @@ export interface OutreachIntelligenceInput {
   team_signal: TeamSignalField;
   preferred_contact_channel: SourcedField;
   researcher_notes: string;
+}
+
+/**
+ * Suggested worksheet values built from the campaign's Identity evidence ledger
+ * (`GET /:campaignId/outreach-intelligence/identity-prefill`). Read-only
+ * suggestions — the operator reviews them and saves through the normal upsert.
+ * A field whose `source_confidence` is `unavailable` carries no suggestion and
+ * must not overwrite anything the operator already entered.
+ */
+export interface WorksheetPrefill {
+  owner_name: SourcedField;
+  business_email: SourcedField;
+  preferred_contact_channel: SourcedField;
+  researcher_notes_lines: string[];
+  evidence_ids: string[];
+  available_channels: Array<'email' | 'phone'>;
 }
 
 export interface OutreachIntelligencePayload extends OutreachIntelligenceInput {

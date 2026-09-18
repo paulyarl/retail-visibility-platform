@@ -68,7 +68,12 @@ vi.mock('../../middleware/errorHandler', () => ({
 }));
 
 // Import after mocks are set up
-import { resolveSalutation, OutreachIntelligenceService } from '../OutreachIntelligenceService';
+import {
+  resolveSalutation,
+  OutreachIntelligenceService,
+  mapEvidenceToWorksheetPrefill,
+  confidenceForEvidence,
+} from '../OutreachIntelligenceService';
 import type { SourcedField } from '../OutreachIntelligenceService';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
@@ -557,5 +562,162 @@ describe('OutreachIntelligenceService.delete', () => {
 
     await expect(service.delete('mcamp-test001')).rejects.toThrow('not found');
     expect(mockOi.delete).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Identity-evidence prefill (pure) ────────────────────────────────────
+
+/** Ledger row fixture (IdentityEvidenceRow satisfies this shape). */
+const evidenceRow = (over: Record<string, any> = {}) => ({
+  id: 'idev-1',
+  sourceName: 'Owner phone call',
+  tier: 'first_party',
+  evidenceState: 'owner_confirmed',
+  accessedAt: '2026-09-18',
+  ownerName: null,
+  ownerEmail: null,
+  ownerPhone: null,
+  ...over,
+});
+
+const allFields = (p: ReturnType<typeof mapEvidenceToWorksheetPrefill>) => [
+  p.owner_name,
+  p.business_email,
+  p.preferred_contact_channel,
+];
+
+describe('confidenceForEvidence', () => {
+  it('treats owner-confirmed or first-party/registry evidence as confirmed', () => {
+    expect(confidenceForEvidence({ tier: 'first_party', evidenceState: 'observed' })).toBe('confirmed');
+    expect(confidenceForEvidence({ tier: 'authoritative', evidenceState: 'confirmed' })).toBe('confirmed');
+    expect(confidenceForEvidence({ tier: 'major_aggregator', evidenceState: 'owner_confirmed' })).toBe('confirmed');
+  });
+
+  it('downgrades aggregator evidence to inferred_low_risk', () => {
+    expect(confidenceForEvidence({ tier: 'major_aggregator', evidenceState: 'observed' })).toBe('inferred_low_risk');
+    expect(confidenceForEvidence({ tier: 'secondary_aggregator', evidenceState: 'probable' })).toBe('inferred_low_risk');
+  });
+});
+
+describe('mapEvidenceToWorksheetPrefill', () => {
+  it('maps owner name + email with a citation and a derived confidence', () => {
+    const p = mapEvidenceToWorksheetPrefill([
+      evidenceRow({ id: 'idev-1', sourceName: 'Owner website', tier: 'first_party', ownerName: 'Maria Daree', ownerEmail: 'maria@daree.example' }),
+    ]);
+
+    expect(p.owner_name).toEqual({
+      value: 'Maria Daree',
+      source: 'Owner website (2026-09-18)',
+      source_confidence: 'confirmed',
+    });
+    expect(p.business_email.value).toBe('maria@daree.example');
+    expect(p.evidence_ids).toEqual(['idev-1']);
+  });
+
+  it('takes each field from the newest row that carries it', () => {
+    const p = mapEvidenceToWorksheetPrefill([
+      evidenceRow({ id: 'idev-new', sourceName: 'Owner phone call', ownerPhone: '608-555-0000' }),
+      evidenceRow({ id: 'idev-old', sourceName: 'Google Business Profile', tier: 'major_aggregator', evidenceState: 'observed', ownerName: 'Old Owner', ownerEmail: 'info@old.example' }),
+    ]);
+
+    expect(p.owner_name.value).toBe('Old Owner');
+    expect(p.owner_name.source_confidence).toBe('inferred_low_risk');
+    expect(p.business_email.source).toBe('Google Business Profile (2026-09-18)');
+    expect(p.evidence_ids).toEqual(['idev-new', 'idev-old']);
+  });
+
+  it('NEVER copies the owner phone into the worksheet', () => {
+    const p = mapEvidenceToWorksheetPrefill([
+      evidenceRow({ ownerName: 'Maria Daree', ownerPhone: '608-555-0000' }),
+    ]);
+
+    // No worksheet field carries a phone number — the guardrail banner forbids
+    // personal phone numbers, so the only phone-derived output is the channel.
+    for (const field of allFields(p)) {
+      expect(field.value ?? '').not.toContain('608');
+      expect(field.source ?? '').not.toContain('608');
+    }
+    expect(p.preferred_contact_channel.value).toBe('phone');
+    expect(p.available_channels).toEqual(['phone']);
+  });
+
+  it('derives the channel from what was captured, email first', () => {
+    const both = mapEvidenceToWorksheetPrefill([
+      evidenceRow({ ownerName: 'Maria', ownerEmail: 'maria@daree.example', ownerPhone: '608-555-0000' }),
+    ]);
+    expect(both.preferred_contact_channel.value).toBe('email');
+    expect(both.available_channels).toEqual(['email', 'phone']);
+
+    const neither = mapEvidenceToWorksheetPrefill([evidenceRow({ ownerName: 'Maria' })]);
+    expect(neither.preferred_contact_channel).toEqual({
+      value: null,
+      source: null,
+      source_confidence: 'unavailable',
+    });
+  });
+
+  it('marks the derived channel inferred_low_risk and cites it as derived', () => {
+    const p = mapEvidenceToWorksheetPrefill([evidenceRow({ ownerPhone: '608-555-0000' })]);
+    expect(p.preferred_contact_channel.source_confidence).toBe('inferred_low_risk');
+    expect(p.preferred_contact_channel.source).toBe('Derived from Owner phone call (2026-09-18)');
+  });
+
+  it('skips values whose evidence state says they are not established', () => {
+    for (const state of ['conflicting', 'owner_disputed', 'not_checked', 'not_found_during_discovery']) {
+      const p = mapEvidenceToWorksheetPrefill([
+        evidenceRow({ id: 'bad', evidenceState: state, ownerName: 'Disputed Name' }),
+        evidenceRow({ id: 'good', sourceName: 'Google Business Profile', tier: 'major_aggregator', evidenceState: 'observed', ownerName: 'Trusted Name' }),
+      ]);
+      expect(p.owner_name.value).toBe('Trusted Name');
+      expect(p.evidence_ids).toEqual(['good']);
+    }
+  });
+
+  it('returns unavailable fields when the ledger has nothing to offer', () => {
+    const p = mapEvidenceToWorksheetPrefill([]);
+    expect(allFields(p)).toEqual([
+      { value: null, source: null, source_confidence: 'unavailable' },
+      { value: null, source: null, source_confidence: 'unavailable' },
+      { value: null, source: null, source_confidence: 'unavailable' },
+    ]);
+    expect(p.researcher_notes_lines).toEqual([]);
+    expect(p.evidence_ids).toEqual([]);
+  });
+
+  it('omits the date from the citation when the row has none', () => {
+    const p = mapEvidenceToWorksheetPrefill([evidenceRow({ accessedAt: null, ownerName: 'Maria' })]);
+    expect(p.owner_name.source).toBe('Owner phone call');
+  });
+
+  it('emits one provenance note per prefilled field', () => {
+    const p = mapEvidenceToWorksheetPrefill([
+      evidenceRow({ sourceName: 'Owner website', ownerName: 'Maria', ownerEmail: 'maria@daree.example' }),
+    ]);
+    expect(p.researcher_notes_lines).toEqual([
+      'Owner name: Owner website (2026-09-18)',
+      'Business email: Owner website (2026-09-18)',
+      'Preferred channel (email): derived from Owner website (2026-09-18)',
+    ]);
+  });
+
+  it('honours the worksheet invariants: confirmed ⇒ citation, no value ⇒ unavailable', () => {
+    // The API's Zod superRefine rejects a confirmed field without a citation,
+    // and the form clears value+source when confidence is unavailable. Every
+    // prefill must satisfy both or the operator cannot save it.
+    const p = mapEvidenceToWorksheetPrefill([
+      evidenceRow({ sourceName: 'Owner phone call', ownerName: 'Maria', ownerEmail: 'maria@daree.example', ownerPhone: '608-555-0000' }),
+      evidenceRow({ id: 'idev-2', sourceName: 'Yelp', tier: 'secondary_aggregator', evidenceState: 'observed', ownerName: 'Maria' }),
+    ]);
+
+    for (const field of allFields(p)) {
+      if (field.source_confidence === 'confirmed') {
+        expect(field.source).toBeTruthy();
+        expect(field.source!.trim().length).toBeGreaterThan(0);
+      }
+      if (field.source_confidence === 'unavailable') {
+        expect(field.value).toBeNull();
+        expect(field.source).toBeNull();
+      }
+    }
   });
 });
