@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Sparkles, RefreshCw, Link2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails, ContactResult, OtherSubtype } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
@@ -118,6 +119,11 @@ interface LogContactModalProps {
   initialAngleUsed?: string;
 }
 
+// Channel, contact date, and outcome stay pinned above the tab strip — the
+// channel drives which fields the Details panel renders, and outcome is
+// auto-derived from the channel's result picker inside it.
+type LogContactTab = 'details' | 'writeback' | 'notes';
+
 export default function LogContactModal({ campaign, onClose, onLogged, initialAngleUsed }: LogContactModalProps) {
   // Pre-fill channel selector with channels the campaign actually has.
   const availableChannels: ContactChannel[] = [];
@@ -139,6 +145,7 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [insertingLink, setInsertingLink] = useState(false);
+  const [tab, setTab] = useState<LogContactTab>('details');
 
   // ─── Phone-mode call details state (Sprint 1 — Cold Call Channel) ────
   const [callResult, setCallResult] = useState<CallResult>('connected');
@@ -192,6 +199,13 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
+
+  // The Write-back panel exists only for a connected phone call. Leaving that
+  // state while sitting on it unmounts both the trigger and the panel, so fall
+  // back to Details rather than stranding the operator on an empty tab.
+  useEffect(() => {
+    if (tab === 'writeback' && !(isPhoneMode && isConnected)) setTab('details');
+  }, [tab, isPhoneMode, isConnected]);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,126 +354,173 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
             </select>
           </label>
 
-          {/* ─── Non-phone-mode contact result + Other subtype ─────────── */}
-          {!isPhoneMode && contactResultOptions.length > 0 && (
-            <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Contact result</span>
-                <select
-                  value={contactResult ?? contactResultOptions[0].value}
-                  onChange={(e) => {
-                    const result = e.target.value as ContactResult;
-                    setContactResult(result);
-                    // Auto-set outcome to match contact_result (same pattern as phone Call result).
-                    const mapping = contactResultOptions.find((o) => o.value === result);
-                    if (mapping) setOutcome(mapping.outcome);
-                  }}
-                  className={inputClass}
-                >
-                  {contactResultOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </label>
-
-              {isOtherChannel && (
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Other type</span>
-                  <select
-                    value={otherSubtype ?? OTHER_SUBTYPE_OPTIONS[0].value}
-                    onChange={(e) => setOtherSubtype(e.target.value as OtherSubtype)}
-                    className={inputClass}
-                  >
-                    {OTHER_SUBTYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </label>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as LogContactTab)}>
+            <TabsList aria-label="Contact details" className="h-auto w-full justify-start gap-1 overflow-x-auto">
+              <TabsTrigger value="details" className="text-sm px-3 py-1.5">{isPhoneMode ? 'Call details' : 'Details'}</TabsTrigger>
+              {isPhoneMode && isConnected && (
+                <TabsTrigger value="writeback" className="text-sm px-3 py-1.5">Write-back</TabsTrigger>
               )}
-            </div>
-          )}
+              <TabsTrigger value="notes" className="text-sm px-3 py-1.5">Notes</TabsTrigger>
+            </TabsList>
 
-          {/* ─── Phone-mode call details (Sprint 1 — Cold Call Channel) ─── */}
-          {isPhoneMode && (
-            <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Call result</span>
-                <select
-                  value={callResult}
-                  onChange={(e) => {
-                    const result = e.target.value as CallResult;
-                    setCallResult(result);
-                    // Auto-set outcome to match call_result
-                    const mapping = CALL_RESULT_OPTIONS.find((o) => o.value === result);
-                    if (mapping) setOutcome(mapping.outcome);
-                  }}
-                  className={inputClass}
-                >
-                  {CALL_RESULT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </label>
-
-              {isConnected && (
-                <>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <input type="checkbox" checked={identityVerified} onChange={(e) => setIdentityVerified(e.target.checked)} className="rounded" />
-                      Identity verified
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <input type="checkbox" checked={operatingConfirmed} onChange={(e) => setOperatingConfirmed(e.target.checked)} className="rounded" />
-                      Operating status confirmed
-                    </label>
-                  </div>
-
+            <TabsContent value="details" className="mt-3 space-y-3">
+              {/* ─── Non-phone-mode contact result + Other subtype ─────────── */}
+              {!isPhoneMode && contactResultOptions.length > 0 && (
+                <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
                   <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Angle used</span>
-                    <input type="text" value={angleUsed} onChange={(e) => setAngleUsed(e.target.value)} placeholder="e.g. gbp_verification" className={inputClass} />
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Contact result</span>
+                    <select
+                      value={contactResult ?? contactResultOptions[0].value}
+                      onChange={(e) => {
+                        const result = e.target.value as ContactResult;
+                        setContactResult(result);
+                        // Auto-set outcome to match contact_result (same pattern as phone Call result).
+                        const mapping = contactResultOptions.find((o) => o.value === result);
+                        if (mapping) setOutcome(mapping.outcome);
+                      }}
+                      className={inputClass}
+                    >
+                      {contactResultOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                   </label>
 
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Hook response notes</span>
-                    <textarea value={hookResponseNotes} onChange={(e) => setHookResponseNotes(e.target.value)} rows={2} placeholder="What they said to the hook" className={inputClass} />
-                  </label>
-
-                  <div className="grid grid-cols-2 gap-3">
+                  {isOtherChannel && (
                     <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Email obtained?</span>
-                      <select value={emailObtained ? 'yes' : 'no'} onChange={(e) => setEmailObtained(e.target.value === 'yes')} className={inputClass}>
-                        <option value="no">No</option>
-                        <option value="yes">Yes</option>
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Other type</span>
+                      <select
+                        value={otherSubtype ?? OTHER_SUBTYPE_OPTIONS[0].value}
+                        onChange={(e) => setOtherSubtype(e.target.value as OtherSubtype)}
+                        className={inputClass}
+                      >
+                        {OTHER_SUBTYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </label>
-                    {emailObtained && (
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Email value</span>
-                        <input type="email" value={emailValue} onChange={(e) => setEmailValue(e.target.value)} placeholder="owner@business.com" className={inputClass} required={emailObtained} />
-                      </label>
-                    )}
-                  </div>
+                  )}
+                </div>
+              )}
 
-                  <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    <input type="checkbox" checked={callbackNumberLeft} onChange={(e) => setCallbackNumberLeft(e.target.checked)} className="rounded" />
-                    Callback number left (declined-email fallback)
+              {/* ─── Phone-mode call details (Sprint 1 — Cold Call Channel) ─── */}
+              {isPhoneMode && (
+                <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Call result</span>
+                    <select
+                      value={callResult}
+                      onChange={(e) => {
+                        const result = e.target.value as CallResult;
+                        setCallResult(result);
+                        // Auto-set outcome to match call_result
+                        const mapping = CALL_RESULT_OPTIONS.find((o) => o.value === result);
+                        if (mapping) setOutcome(mapping.outcome);
+                      }}
+                      className={inputClass}
+                    >
+                      {CALL_RESULT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                   </label>
 
-                  {/* Write-back fields */}
-                  <div className="space-y-2 border-t border-gray-100 pt-2 dark:border-gray-800">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Confirmed fields (write-back candidates)</p>
-                    <div className="grid grid-cols-2 gap-3">
+                  {isConnected && (
+                    <>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          <input type="checkbox" checked={identityVerified} onChange={(e) => setIdentityVerified(e.target.checked)} className="rounded" />
+                          Identity verified
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          <input type="checkbox" checked={operatingConfirmed} onChange={(e) => setOperatingConfirmed(e.target.checked)} className="rounded" />
+                          Operating status confirmed
+                        </label>
+                      </div>
+
                       <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Owner name confirmed</span>
-                        <input type="text" value={ownerNameConfirmed} onChange={(e) => setOwnerNameConfirmed(e.target.value)} placeholder="Spoken confirmation" className={inputClass} />
+                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Angle used</span>
+                        <input type="text" value={angleUsed} onChange={(e) => setAngleUsed(e.target.value)} placeholder="e.g. gbp_verification" className={inputClass} />
                       </label>
+
                       <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Team signal</span>
-                        <select value={teamSignalConfirmed} onChange={(e) => setTeamSignalConfirmed(e.target.value)} className={inputClass}>
-                          <option value="">—</option>
-                          {TEAM_SIGNAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Hook response notes</span>
+                        <textarea value={hookResponseNotes} onChange={(e) => setHookResponseNotes(e.target.value)} rows={2} placeholder="What they said to the hook" className={inputClass} />
                       </label>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Email obtained?</span>
+                          <select value={emailObtained ? 'yes' : 'no'} onChange={(e) => setEmailObtained(e.target.value === 'yes')} className={inputClass}>
+                            <option value="no">No</option>
+                            <option value="yes">Yes</option>
+                          </select>
+                        </label>
+                        {emailObtained && (
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Email value</span>
+                            <input type="email" value={emailValue} onChange={(e) => setEmailValue(e.target.value)} placeholder="owner@business.com" className={inputClass} required={emailObtained} />
+                          </label>
+                        )}
+                      </div>
+
+                      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <input type="checkbox" checked={callbackNumberLeft} onChange={(e) => setCallbackNumberLeft(e.target.checked)} className="rounded" />
+                        Callback number left (declined-email fallback)
+                      </label>
+                    </>
+                  )}
+
+                  {isDeadNumber && (
+                    <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                      This won't change the campaign's phone number automatically. Review it in Business Contact Details.
                     </div>
+                  )}
+                </div>
+              )}
+
+              {channel === 'email' && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Message subject</span>
+                  <input type="text" value={messageSubject} onChange={(e) => setMessageSubject(e.target.value)} placeholder="Subject line sent to prospect" className={inputClass} />
+                </label>
+              )}
+
+              {!isPhoneMode && (
+                <label className="block">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">Message sent (optional)</span>
+                    <button
+                      type="button"
+                      onClick={handleInsertGalleryLink}
+                      disabled={insertingLink}
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400"
+                      title="Insert the active diagnostic gallery link into the message body"
+                    >
+                      {insertingLink ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                      Insert Gallery Link
+                    </button>
+                  </div>
+                  <textarea value={messageSnapshot} onChange={(e) => setMessageSnapshot(e.target.value)} rows={4} placeholder="Paste the message body you sent to the prospect" className={inputClass} />
+                </label>
+              )}
+            </TabsContent>
+
+            <TabsContent value="writeback" className="mt-3 space-y-3">
+              {isConnected && (
+                <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Confirmed fields (write-back candidates)</p>
+                  <div className="grid grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Preferred channel confirmed</span>
-                      <input type="text" value={preferredChannelConfirmed} onChange={(e) => setPreferredChannelConfirmed(e.target.value)} placeholder="phone, email, text, …" className={inputClass} />
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Owner name confirmed</span>
+                      <input type="text" value={ownerNameConfirmed} onChange={(e) => setOwnerNameConfirmed(e.target.value)} placeholder="Spoken confirmation" className={inputClass} />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Team signal</span>
+                      <select value={teamSignalConfirmed} onChange={(e) => setTeamSignalConfirmed(e.target.value)} className={inputClass}>
+                        <option value="">—</option>
+                        {TEAM_SIGNAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
                     </label>
                   </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Preferred channel confirmed</span>
+                    <input type="text" value={preferredChannelConfirmed} onChange={(e) => setPreferredChannelConfirmed(e.target.value)} placeholder="phone, email, text, …" className={inputClass} />
+                  </label>
 
                   {hasWriteBackFields && (
                     <label className="flex items-start gap-2 rounded-md bg-blue-50 p-2 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
@@ -467,52 +528,22 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
                       <span>Update Outreach Prep worksheet with confirmed fields. Writes to the primary sibling's worksheet as <code>confirmed</code> with source &ldquo;Phone call {contactDate}&rdquo;. Conflicting existing values are never overwritten.</span>
                     </label>
                   )}
-                </>
-              )}
-
-              {isDeadNumber && (
-                <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                  This won't change the campaign's phone number automatically. Review it in Business Contact Details.
                 </div>
               )}
-            </div>
-          )}
+            </TabsContent>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Follow-up date (optional)</span>
-            <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className={inputClass} />
-          </label>
+            <TabsContent value="notes" className="mt-3 space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Follow-up date (optional)</span>
+                <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className={inputClass} />
+              </label>
 
-          {channel === 'email' && (
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Message subject</span>
-              <input type="text" value={messageSubject} onChange={(e) => setMessageSubject(e.target.value)} placeholder="Subject line sent to prospect" className={inputClass} />
-            </label>
-          )}
-
-          {!isPhoneMode && (
-            <label className="block">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">Message sent (optional)</span>
-                <button
-                  type="button"
-                  onClick={handleInsertGalleryLink}
-                  disabled={insertingLink}
-                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400"
-                  title="Insert the active diagnostic gallery link into the message body"
-                >
-                  {insertingLink ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
-                  Insert Gallery Link
-                </button>
-              </div>
-              <textarea value={messageSnapshot} onChange={(e) => setMessageSnapshot(e.target.value)} rows={4} placeholder="Paste the message body you sent to the prospect" className={inputClass} />
-            </label>
-          )}
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Notes</span>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="What happened on the call/email?" className={inputClass} />
-          </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Notes</span>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="What happened on the call/email?" className={inputClass} />
+              </label>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">Cancel</button>

@@ -243,6 +243,21 @@ select:focus {
   }
 }
 
+/* Native <select> popups don't inherit the control's background — the options
+   render with the UA default (white) while inheriting the select's text color,
+   which the dark-mode overrides below flip to near-white. That makes the
+   selected row white-on-white. Style the options explicitly so the popup is
+   legible in both themes. */
+select option {
+  background-color: #ffffff;
+  color: var(--neutral-900);
+}
+
+.dark select option {
+  background-color: #262626;
+  color: rgb(249 250 251);
+}
+
 /* Global Text Visibility - Ensure all text has proper contrast */
 li span:not([class*="text-"]) {
   color: var(--neutral-800);
