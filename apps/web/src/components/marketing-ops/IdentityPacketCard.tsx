@@ -103,9 +103,11 @@ function ScoreBox({
   return (
     <div className="rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${tone}`} aria-label={`${label}: ${value} out of 100`}>
+      <div
+        className={`mt-1 text-2xl font-semibold ${tone}`}
+        aria-label={`${label}: ${value} out of 100${muted ? ' — informational, a hard veto blocks seeding' : ''}`}
+      >
         {value}
-        {muted && <span className="ml-1 align-middle text-[10px] font-medium text-red-600 dark:text-red-400">blocked</span>}
       </div>
       <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{hint}</div>
     </div>
@@ -307,6 +309,11 @@ export default function IdentityPacketCard({
           <div className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">{band.blurb}</div>
         </div>
       </div>
+      {blocked && (
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          Scores are informational — a hard veto blocks seeding regardless of how high they read.
+        </p>
+      )}
 
       {/* Vetoes */}
       {blocked && (

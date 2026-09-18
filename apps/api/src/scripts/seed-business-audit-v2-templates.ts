@@ -50,7 +50,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-18-availability-scoring-3 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-18-availability-scoring-4 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -432,6 +432,21 @@ const PLATFORM_GAP_CASCADE_DIRECTIVE = `When the determination for a platform is
 //     from "computed and healthy". Inserted as its own block (own fingerprint)
 //     right after that rationale. Idempotent via fingerprint.
 const ACTION_CLASSIFICATION_NULL_DIRECTIVE = `When no platform's rating or sentiment could be verified — every in-scope platform is unable_to_verify, so neither the administrative score nor the public sentiment score can be computed — emit \`action_classification: null\` instead of defaulting to BALANCED_HEALTHY. BALANCED_HEALTHY means "computed and aligned", not "could not be computed".`;
+
+// ─── Platform directive clarification: a platform captured via a syndication /
+//     integration path is `partial`, NOT `unable_to_verify`. Observed drift:
+//     the summary and score rationale lumped Yelp in with the platforms that
+//     genuinely failed to render, even though Yelp metrics had been captured
+//     from the Apple Maps place card. Inserted as its own block (own
+//     fingerprint). Idempotent via fingerprint.
+const PLATFORM_SYNDICATION_CLAUSE = `A platform whose data was captured through a syndication or integration path rather than a direct profile render — for example Yelp metrics surfaced inside an Apple Maps place card — is recorded \`partial\`, with the capture path noted in \`data_quality.limitations\`. Do NOT list such a platform among those recorded \`unable_to_verify\`, and do not describe it as one that "could not be rendered": the profile may well be reachable, you simply did not render it directly.`;
+
+// ─── data_quality.conflicts clarification. Observed drift: the model emitted a
+//     meta-note about which prompt blocks were present ("No Category
+//     Intelligence block absence — block was present and applied throughout")
+//     into `conflicts`, which is reserved for conflicting EVIDENCE about the
+//     business. Inserted as its own block (own fingerprint). Idempotent.
+const DATA_QUALITY_CONFLICTS_CLAUSE = `Do NOT record notes about which prompt blocks were present or absent in \`data_quality.conflicts\` — that field is for conflicting EVIDENCE about the business (two different phone numbers in circulation, disagreeing published hours, a name variant published as a separate listing). Block-presence notes belong in \`data_quality.limitations\`, and only when a block is actually missing; if the Category Intelligence block was present and applied, record nothing about it.`;
 
 // ─── Targeted content update: fix the buggy "bbb has no platform object" note
 //     from availability-control-1/2 and replace it with the data_status mapping
@@ -1044,6 +1059,32 @@ function transformCategoryIntegrated(body: string): string {
     // Alignment-scoring section not present in this variant — nothing to amend.
   }
 
+  // 4e3d. Platform directive clarification — a platform captured via a
+  //       syndication/integration path is `partial`, not `unable_to_verify`.
+  //       Idempotent via fingerprint; no-op if the anchor is absent.
+  try {
+    out = insertAfter(
+      out,
+      'Do not record positive platform attributes (rating, reviews, hours, categories, attribute chips) unless the profile content actually loaded.',
+      PLATFORM_SYNDICATION_CLAUSE,
+    );
+  } catch {
+    // Platform Availability directive not present in this variant — nothing to amend.
+  }
+
+  // 4e3e. data_quality.conflicts clarification — conflicts is for conflicting
+  //       EVIDENCE about the business, not prompt-block provenance notes.
+  //       Idempotent via fingerprint; no-op if the anchor is absent.
+  try {
+    out = insertAfter(
+      out,
+      'If the Category Intelligence block is missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations.',
+      DATA_QUALITY_CONFLICTS_CLAUSE,
+    );
+  } catch {
+    // Category Intelligence binding not present in this variant — nothing to amend.
+  }
+
   // 4e4. Fix the buggy "bbb has no platform object" note from earlier seed
   //      versions and replace it with the data_status mapping + corrected
   //      non-primary platform guidance. Idempotent (no-op if already updated).
@@ -1463,6 +1504,32 @@ function transformSignalAligned(body: string): string {
     );
   } catch {
     // Alignment-scoring section not present in this variant — nothing to amend.
+  }
+
+  // 19e3d. Platform directive clarification — a platform captured via a
+  //        syndication/integration path is `partial`, not `unable_to_verify`.
+  //        Idempotent via fingerprint; no-op if the anchor is absent.
+  try {
+    out = insertAfter(
+      out,
+      'Do not record positive platform attributes (rating, reviews, hours, categories, attribute chips) unless the profile content actually loaded.',
+      PLATFORM_SYNDICATION_CLAUSE,
+    );
+  } catch {
+    // Platform Availability directive not present in this variant — nothing to amend.
+  }
+
+  // 19e3e. data_quality.conflicts clarification — conflicts is for conflicting
+  //        EVIDENCE about the business, not prompt-block provenance notes.
+  //        Idempotent via fingerprint; no-op if the anchor is absent.
+  try {
+    out = insertAfter(
+      out,
+      'If the Category Intelligence block is missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations.',
+      DATA_QUALITY_CONFLICTS_CLAUSE,
+    );
+  } catch {
+    // Category Intelligence binding not present in this variant — nothing to amend.
   }
 
   // 19e4. Fix the buggy "bbb has no platform object" note from earlier seed
