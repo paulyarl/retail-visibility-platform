@@ -2173,6 +2173,16 @@ export function generateManualPlayTemplateId(): string {
 }
 
 /**
+ * Generate identity evidence ID (operator-entered ledger source on the
+ * campaign Identity tab)
+ * Format: idev-{nanoid} (13 chars)
+ */
+export function generateIdentityEvidenceId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `idev-${nanoid()}`;
+}
+
+/**
  * Generate customer claim token ID (row ID for mkt_customer_claim_tokens)
  * Format: mclm-{nanoid} (13 chars)
  * Global (not tenant-scoped) — claim tokens are keyed by email, not tenant.

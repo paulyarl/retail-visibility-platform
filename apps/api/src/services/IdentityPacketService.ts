@@ -19,8 +19,17 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import IdentityEvidenceService, {
+  type IdentityEvidenceRow,
+  type OwnerContact,
+} from './IdentityEvidenceService';
 import {
+  inferSourceTier,
+  isIdentityEvidenceState,
+  isIdentityFieldKey,
+  isIdentitySourceTier,
   scoreIdentityPacket,
+  sourceGroupSlug,
   type IdentityEvidenceState,
   type IdentityFieldEvidence,
   type IdentityFieldKey,
@@ -31,6 +40,11 @@ import {
   type OperationalStatus,
 } from './directory/identityScoring';
 
+// Tier inference lives with the rest of the scoring vocabulary (identityScoring)
+// so the evidence service can use it without importing this module — the two
+// would otherwise form an import cycle. Re-exported here for existing callers.
+export { inferSourceTier };
+
 // ─── DTO ─────────────────────────────────────────────────────────────────
 
 export interface IdentityPacketLedgerEntry {
@@ -40,6 +54,8 @@ export interface IdentityPacketLedgerEntry {
   url: string | null;
   accessedAt: string | null;
   fields: IdentityFieldKey[];
+  /** True when an operator-entered source contributed to this ledger row. */
+  manual: boolean;
 }
 
 export interface IdentityPacket {
@@ -51,6 +67,10 @@ export interface IdentityPacket {
   snapSourced: boolean;
   fields: Array<{ field: IdentityFieldKey; value: string | null; sources: IdentitySourceRef[] }>;
   ledger: IdentityPacketLedgerEntry[];
+  /** Operator-entered sources visible to this campaign (own + siblings'). */
+  manualEvidence: IdentityEvidenceRow[];
+  /** Newest captured owner contact, or null when none has been captured. */
+  ownerContact: OwnerContact | null;
   score: IdentityPacketScore;
   seed: { id: string; status: string; publicUrl: string | null } | null;
   generatedAt: string;
@@ -84,6 +104,12 @@ export interface AssembleInput {
   callConfirmed?: boolean | null;
   /** Sourced attribute chips mined from scan audits. */
   attributes?: Array<{ key: string; label: string; sourcePlatform?: string | null; sourceUrl?: string | null; asOf?: string | null }>;
+  /**
+   * Operator-entered sources (mkt_identity_evidence). Prospect-scoped, so a
+   * sibling campaign's captures count here too. Also returned on the packet so
+   * the Identity tab can list and retract them.
+   */
+  manualEvidence?: IdentityEvidenceRow[];
   seed?: { id: string; status: string; publicUrl: string | null } | null;
 }
 
@@ -94,19 +120,6 @@ const PLATFORM_SOURCES: Array<{ key: string; name: string; tier: IdentitySourceT
   { key: 'facebook', name: 'Facebook', tier: 'secondary_aggregator', group: 'facebook' },
   { key: 'bbb', name: 'Better Business Bureau', tier: 'secondary_aggregator', group: 'bbb' },
 ];
-
-/**
- * Infer a source tier from its name. Defaults to secondary_aggregator so an
- * unrecognized source can never inflate the score.
- */
-export function inferSourceTier(name: string): IdentitySourceTier {
-  const s = String(name || '').toLowerCase();
-  if (/secretary of state|\bsos\b|\bso?s\b|business registration|registry|sam\.gov|federal|usda|snap retailer|\bstate\b|license|permit/.test(s)) {
-    return 'authoritative';
-  }
-  if (/google|apple maps|apple/.test(s)) return 'major_aggregator';
-  return 'secondary_aggregator';
-}
 
 function normalizeValue(field: IdentityFieldKey, v: string | null | undefined): string {
   if (v == null) return '';
@@ -127,7 +140,28 @@ function agreesWith(
   return a === b;
 }
 
-const slug = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const slug = sourceGroupSlug;
+
+/**
+ * Newest captured owner contact across the evidence rows (rows arrive
+ * newest-first). Owner identity is not scored — it is the reusable source for
+ * owner outreach, so the packet surfaces the most recent capture and the
+ * evidence row that produced it.
+ */
+export function newestOwnerContact(rows: IdentityEvidenceRow[]): OwnerContact | null {
+  for (const r of rows) {
+    if (!r.ownerName && !r.ownerPhone && !r.ownerEmail) continue;
+    return {
+      name: r.ownerName,
+      phone: r.ownerPhone,
+      email: r.ownerEmail,
+      sourceName: r.sourceName,
+      evidenceId: r.id,
+      capturedAt: r.accessedAt ?? r.createdAt,
+    };
+  }
+  return null;
+}
 
 /**
  * Assemble + score an identity packet from already-fetched rows. Pure.
@@ -224,7 +258,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     if (!name) continue;
     const url = typeof c === 'object' ? c?.url ?? null : null;
     const tier = inferSourceTier(name);
-    const group = slug(name) || 'corroboration';
+    const group = sourceGroupSlug(name) || 'corroboration';
     for (const field of ['name', 'address'] as IdentityFieldKey[]) {
       evidence[field].push({
         name: String(name),
@@ -242,7 +276,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     evidence.attributes.push({
       name: a.sourcePlatform ?? 'scan',
       tier: inferSourceTier(a.sourcePlatform ?? ''),
-      independenceGroup: slug(a.sourcePlatform ?? 'scan') || 'scan',
+      independenceGroup: sourceGroupSlug(a.sourcePlatform ?? 'scan') || 'scan',
       agrees: true,
       url: a.sourceUrl ?? null,
       accessedAt: a.asOf ?? null,
@@ -261,7 +295,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     evidence[field].push({
       name: p.source_name ?? 'provenance',
       tier: inferSourceTier(p.source_name ?? ''),
-      independenceGroup: slug(p.source_name ?? 'provenance') || 'provenance',
+      independenceGroup: sourceGroupSlug(p.source_name ?? 'provenance') || 'provenance',
       agrees: true,
       evidenceState: (p.evidence_state as IdentityEvidenceState) ?? null,
       url: p.source_url ?? null,
@@ -269,6 +303,31 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     });
     if (field === 'snap_ebt') {
       snapSourced = p.evidence_state !== 'probable' && p.evidence_state !== 'not_checked';
+    }
+  }
+
+  // 6. Operator-entered sources (mkt_identity_evidence). The operator asserts
+  //    corroboration, so `agrees` is true by construction — there is no
+  //    competing value to compare against. The independence group stays the
+  //    natural one for the source name, so a manual "Google Business Profile"
+  //    still discounts against the audit's own Google block instead of
+  //    double-counting the same platform.
+  const manualEvidence = input.manualEvidence ?? [];
+  for (const m of manualEvidence) {
+    const tier = isIdentitySourceTier(m.tier) ? m.tier : inferSourceTier(m.sourceName);
+    const group = m.independenceGroup || sourceGroupSlug(m.sourceName) || 'manual';
+    for (const field of m.corroborates) {
+      if (!isIdentityFieldKey(field) || !(field in evidence)) continue;
+      evidence[field].push({
+        name: m.sourceName,
+        tier,
+        independenceGroup: group,
+        agrees: true,
+        evidenceState: isIdentityEvidenceState(m.evidenceState) ? m.evidenceState : null,
+        url: m.sourceUrl ?? null,
+        accessedAt: m.accessedAt ? new Date(m.accessedAt).toISOString() : null,
+        manual: true,
+      });
     }
   }
 
@@ -295,6 +354,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
       const existing = ledgerByKey.get(key);
       if (existing) {
         if (!existing.fields.includes(f.field)) existing.fields.push(f.field);
+        if (s.manual) existing.manual = true;
       } else {
         ledgerByKey.set(key, {
           name: s.name,
@@ -303,6 +363,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
           url: s.url ?? null,
           accessedAt: s.accessedAt ?? null,
           fields: [f.field],
+          manual: s.manual === true,
         });
       }
     }
@@ -317,6 +378,8 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     snapSourced,
     fields,
     ledger: [...ledgerByKey.values()],
+    manualEvidence,
+    ownerContact: newestOwnerContact(manualEvidence),
     score,
     seed: input.seed ?? null,
     generatedAt: new Date().toISOString(),
@@ -447,6 +510,18 @@ class IdentityPacketService {
       });
     }
 
+    // Operator-entered sources — prospect-scoped, so a sibling campaign's
+    // captures count here too.
+    let manualEvidence: IdentityEvidenceRow[] = [];
+    try {
+      manualEvidence = await IdentityEvidenceService.listForCampaign(campaignId);
+    } catch (error) {
+      logger.warn('IdentityPacket: manual evidence lookup failed (non-fatal)', undefined, {
+        campaignId,
+        error: (error as Error).message,
+      });
+    }
+
     return assembleIdentityPacket({
       campaignId,
       campaign,
@@ -454,6 +529,7 @@ class IdentityPacketService {
       provenance,
       callConfirmed,
       attributes,
+      manualEvidence,
       seed,
     });
   }

@@ -8012,6 +8012,31 @@ model mkt_manual_play_templates {
   @@index([status], map: "idx_mkt_manual_play_templates_status")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_identity_evidence {
+  id                   String    @id @db.VarChar(60)
+  campaign_id          String?   @db.VarChar(255)
+  business_prospect_id String?   @db.VarChar(255)
+  source_name          String    @db.VarChar(200)
+  source_url           String?
+  tier                 String    @default("secondary_aggregator") @db.VarChar(40)
+  independence_group   String?   @db.VarChar(120)
+  evidence_state       String    @default("observed") @db.VarChar(40)
+  corroborates         String[]  @default([])
+  owner_name           String?   @db.VarChar(255)
+  owner_phone          String?   @db.VarChar(40)
+  owner_email          String?   @db.VarChar(255)
+  accessed_at          DateTime? @db.Date
+  notes                String?
+  created_by           String?   @db.VarChar(255)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([business_prospect_id], map: "idx_mkt_identity_evidence_prospect")
+  @@index([campaign_id], map: "idx_mkt_identity_evidence_campaign")
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_bronze_catalog_meta {
   id               String   @id

@@ -63,6 +63,97 @@ export type IdentityEvidenceState =
   | 'owner_corrected'
   | 'owner_disputed';
 
+/**
+ * Runtime value sets for the three identity enums. These are the single source
+ * of truth for route validation (zod) and for the CHECK constraints on
+ * mkt_identity_evidence (migration 297) — the parity test in
+ * __tests__/IdentityEvidenceService.test.ts parses the effective CHECK sets
+ * from database/migrations and asserts they match these arrays.
+ */
+export const IDENTITY_SOURCE_TIERS: readonly IdentitySourceTier[] = [
+  'authoritative',
+  'first_party',
+  'major_aggregator',
+  'secondary_aggregator',
+  'inferred',
+];
+
+export const IDENTITY_EVIDENCE_STATES: readonly IdentityEvidenceState[] = [
+  'confirmed',
+  'observed',
+  'probable',
+  'conflicting',
+  'not_found_during_discovery',
+  'not_checked',
+  'owner_confirmed',
+  'owner_corrected',
+  'owner_disputed',
+];
+
+export const IDENTITY_FIELD_KEYS: readonly IdentityFieldKey[] = [
+  'name',
+  'address',
+  'phone',
+  'website',
+  'hours',
+  'primary_category',
+  'snap_ebt',
+  'attributes',
+];
+
+export function isIdentitySourceTier(value: unknown): value is IdentitySourceTier {
+  return IDENTITY_SOURCE_TIERS.includes(value as IdentitySourceTier);
+}
+
+export function isIdentityEvidenceState(value: unknown): value is IdentityEvidenceState {
+  return IDENTITY_EVIDENCE_STATES.includes(value as IdentityEvidenceState);
+}
+
+export function isIdentityFieldKey(value: unknown): value is IdentityFieldKey {
+  return IDENTITY_FIELD_KEYS.includes(value as IdentityFieldKey);
+}
+
+/**
+ * Canonical independence groups for the platforms the business audit reads
+ * directly (PLATFORM_SOURCES keys in IdentityPacketService). Mapping a source
+ * NAME onto these keys is what makes a hand-entered "Google Business Profile"
+ * discount against the audit's own Google block instead of double-counting the
+ * same platform — the two must land in one group.
+ */
+const PLATFORM_GROUPS: Array<[RegExp, string]> = [
+  [/\bgoogle\b|\bgmb\b|g\.page/, 'google'],
+  [/\bapple\b|apple maps/, 'apple'],
+  [/\byelp\b/, 'yelp'],
+  [/\bfacebook\b|\bfb\b|\bmeta\b/, 'facebook'],
+  [/\bbbb\b|better business bureau/, 'bbb'],
+];
+
+/**
+ * Slug used to group a source name into its independence group, so two
+ * spellings of the same platform ("Google" / "Google Business Profile")
+ * discount against each other instead of double-counting.
+ */
+export function sourceGroupSlug(name: string): string {
+  const raw = String(name || '').toLowerCase();
+  for (const [pattern, group] of PLATFORM_GROUPS) {
+    if (pattern.test(raw)) return group;
+  }
+  return raw.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+/**
+ * Infer a source tier from its name. Defaults to secondary_aggregator so an
+ * unrecognized source can never inflate the score.
+ */
+export function inferSourceTier(name: string): IdentitySourceTier {
+  const s = String(name || '').toLowerCase();
+  if (/secretary of state|\bsos\b|\bso?s\b|business registration|registry|sam\.gov|federal|usda|snap retailer|\bstate\b|license|permit/.test(s)) {
+    return 'authoritative';
+  }
+  if (/\bgoogle\b|\bgmb\b|g\.page|apple maps|\bapple\b/.test(s)) return 'major_aggregator';
+  return 'secondary_aggregator';
+}
+
 /** Operational status from the business audit. */
 export type OperationalStatus = 'active' | 'likely_active' | 'inactive' | 'unable_to_verify';
 
@@ -80,6 +171,8 @@ export interface IdentitySourceRef {
   evidenceState?: IdentityEvidenceState | null;
   url?: string | null;
   accessedAt?: string | null;
+  /** True when an operator entered this source by hand (mkt_identity_evidence). */
+  manual?: boolean;
 }
 
 /** All evidence for a single field, plus its resolved consensus value. */

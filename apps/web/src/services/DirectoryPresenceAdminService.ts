@@ -32,6 +32,61 @@ export type IdentityFieldKey =
   | 'snap_ebt'
   | 'attributes';
 export type IdentityRecommendationBand = 'ready' | 'review' | 'blocked';
+export type IdentityEvidenceState =
+  | 'confirmed'
+  | 'observed'
+  | 'probable'
+  | 'conflicting'
+  | 'not_found_during_discovery'
+  | 'not_checked'
+  | 'owner_confirmed'
+  | 'owner_corrected'
+  | 'owner_disputed';
+
+/** Operator-entered ledger source (mkt_identity_evidence). */
+export interface IdentityEvidenceRow {
+  id: string;
+  campaignId: string | null;
+  businessProspectId: string | null;
+  sourceName: string;
+  sourceUrl: string | null;
+  tier: IdentitySourceTier;
+  independenceGroup: string;
+  evidenceState: IdentityEvidenceState;
+  corroborates: IdentityFieldKey[];
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  accessedAt: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  /** Captured on a sibling campaign in the same business prospect group. */
+  shared: boolean;
+}
+
+export interface IdentityOwnerContact {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  sourceName: string;
+  evidenceId: string;
+  capturedAt: string | null;
+}
+
+export interface IdentityEvidenceInput {
+  campaignId: string;
+  sourceName: string;
+  sourceUrl?: string | null;
+  tier?: IdentitySourceTier;
+  evidenceState?: IdentityEvidenceState;
+  corroborates?: IdentityFieldKey[];
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
+  accessedAt?: string | null;
+  notes?: string | null;
+}
 
 export interface IdentityPacketSourceRef {
   name: string;
@@ -41,6 +96,7 @@ export interface IdentityPacketSourceRef {
   evidenceState?: string | null;
   url?: string | null;
   accessedAt?: string | null;
+  manual?: boolean;
 }
 
 export interface IdentityPacketFieldScore {
@@ -61,6 +117,8 @@ export interface IdentityPacketLedgerEntry {
   url: string | null;
   accessedAt: string | null;
   fields: IdentityFieldKey[];
+  /** True when an operator-entered source contributed to this row. */
+  manual: boolean;
 }
 
 export interface IdentityPacket {
@@ -72,6 +130,10 @@ export interface IdentityPacket {
   snapSourced: boolean;
   fields: Array<{ field: IdentityFieldKey; value: string | null; sources: IdentityPacketSourceRef[] }>;
   ledger: IdentityPacketLedgerEntry[];
+  /** Operator-entered sources visible here (own campaign + prospect siblings). */
+  manualEvidence: IdentityEvidenceRow[];
+  /** Newest captured owner contact, or null when none captured yet. */
+  ownerContact: IdentityOwnerContact | null;
   score: {
     identityScore: number;
     operationalScore: number;
@@ -1936,6 +1998,46 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       throw new Error(message || 'Failed to load identity packet');
     }
     return (result.data?.packet ?? result.data) as IdentityPacket;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/identity-evidence
+   *  Record an operator-entered source on the Identity Packet ledger. Returns
+   *  the stored row plus the re-assembled packet, so the tab re-renders scores
+   *  without a second round trip. */
+  async addIdentityEvidence(
+    input: IdentityEvidenceInput,
+  ): Promise<{ evidence: IdentityEvidenceRow; packet: IdentityPacket }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/admin/directory-presence/presence-seeds/identity-evidence',
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const message = typeof err === 'string' ? err : err?.message;
+      throw new Error(message || 'Failed to add evidence');
+    }
+    const data = result.data?.data ?? result.data;
+    return { evidence: data.evidence, packet: data.packet };
+  }
+
+  /** DELETE /api/admin/directory-presence/presence-seeds/identity-evidence/:id
+   *  Retract an operator-entered source (and the provenance rows it mirrored). */
+  async removeIdentityEvidence(id: string, campaignId: string): Promise<IdentityPacket | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/identity-evidence/${encodeURIComponent(id)}?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const message = typeof err === 'string' ? err : err?.message;
+      throw new Error(message || 'Failed to remove evidence');
+    }
+    const data = result.data?.data ?? result.data;
+    return (data.packet ?? null) as IdentityPacket | null;
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/by-campaign/:campaignId

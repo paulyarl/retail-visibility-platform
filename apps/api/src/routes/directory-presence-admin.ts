@@ -4,6 +4,8 @@
  *   GET    /api/admin/directory/presence-seeds           — list seeds
  *   GET    /api/admin/directory/presence-seeds/seo-preview — compose a campaign's SEO packet (form prefill)
  *   GET    /api/admin/directory-presence/presence-seeds/identity-packet — source-scored Identity Packet for a campaign
+ *   POST   /api/admin/directory-presence/presence-seeds/identity-evidence — record an operator-entered ledger source
+ *   DELETE /api/admin/directory-presence/presence-seeds/identity-evidence/:id — retract one (and its provenance mirror)
  *   GET    /api/admin/directory/presence-seeds/funnel/cohorts — cohort funnel metrics + benchmark gates
  *   GET    /api/admin/directory-presence/traffic                — cross-seed traffic rollup
  *   GET    /api/admin/directory-presence/presence-seeds/:id/traffic — per-seed traffic readout
@@ -41,6 +43,12 @@ import SeedFunnelAnalyticsService from '../services/SeedFunnelAnalyticsService';
 import DirectoryPresenceTrafficService from '../services/DirectoryPresenceTrafficService';
 import DirectoryPresenceAnalyticsService from '../services/DirectoryPresenceAnalyticsService';
 import IdentityPacketService from '../services/IdentityPacketService';
+import IdentityEvidenceService from '../services/IdentityEvidenceService';
+import {
+  IDENTITY_EVIDENCE_STATES,
+  IDENTITY_FIELD_KEYS,
+  IDENTITY_SOURCE_TIERS,
+} from '../services/directory/identityScoring';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import {
@@ -728,6 +736,77 @@ router.get('/presence-seeds/identity-packet', requirePlatformStaff, async (req: 
     res.json({ success: true, packet });
   } catch (error: any) {
     logger.error('[GET /api/admin/directory-presence/presence-seeds/identity-packet] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory-presence/presence-seeds/identity-evidence
+ *
+ * Record an operator-entered source on the Identity Packet ledger (see
+ * IdentityEvidenceService). Rows are shared across the campaign's business
+ * prospect group. A row may corroborate identity fields and/or carry the
+ * owner's name/phone/email for owner outreach. Declared before
+ * /presence-seeds/:id so 'identity-evidence' is not swallowed as an id.
+ */
+const identityEvidenceSchema = z.object({
+  campaignId: z.string().min(1).max(255),
+  sourceName: z.string().min(1).max(200),
+  sourceUrl: z.string().max(1000).optional().nullable(),
+  tier: z.enum(IDENTITY_SOURCE_TIERS as unknown as [string, ...string[]]).optional(),
+  evidenceState: z.enum(IDENTITY_EVIDENCE_STATES as unknown as [string, ...string[]]).optional(),
+  corroborates: z.array(z.enum(IDENTITY_FIELD_KEYS as unknown as [string, ...string[]])).max(8).optional(),
+  ownerName: z.string().max(255).optional().nullable(),
+  ownerPhone: z.string().max(40).optional().nullable(),
+  ownerEmail: z.string().max(255).optional().nullable(),
+  accessedAt: z.string().max(40).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+});
+
+router.post('/presence-seeds/identity-evidence', requirePlatformStaff, async (req: Request, res: Response) => {
+  const parsed = identityEvidenceSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+  }
+  try {
+    const evidence = await IdentityEvidenceService.create({
+      ...parsed.data,
+      tier: parsed.data.tier as any,
+      evidenceState: parsed.data.evidenceState as any,
+      corroborates: parsed.data.corroborates as any,
+      createdBy: (req as any).user?.userId || (req as any).user?.id || null,
+    });
+    const packet = await IdentityPacketService.buildForCampaign(parsed.data.campaignId);
+    res.json({ success: true, evidence, packet });
+  } catch (error: any) {
+    if (String(error?.message ?? '').startsWith('evidence_empty')) {
+      return res.status(400).json({ error: 'evidence_empty' });
+    }
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/identity-evidence] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * DELETE /api/admin/directory-presence/presence-seeds/identity-evidence/:id
+ *
+ * Retract an operator-entered source (typo, wrong business) and the provenance
+ * rows it mirrored in. The packet is returned so the Identity tab re-renders
+ * the corrected scores.
+ */
+router.delete('/presence-seeds/identity-evidence/:id', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const removed = await IdentityEvidenceService.remove(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'not_found' });
+    const campaignId = (req.query.campaignId as string | undefined)?.trim();
+    const packet = campaignId ? await IdentityPacketService.buildForCampaign(campaignId) : null;
+    res.json({ success: true, packet });
+  } catch (error: any) {
+    logger.error('[DELETE /api/admin/directory-presence/presence-seeds/identity-evidence/:id] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

@@ -23,6 +23,8 @@ import {
   inferSourceTier,
   type AssembleInput,
 } from '../IdentityPacketService';
+import { sourceGroupSlug } from '../directory/identityScoring';
+import type { IdentityEvidenceRow } from '../IdentityEvidenceService';
 
 const campaign = {
   business_name: 'Arsema Market',
@@ -68,6 +70,28 @@ const base = (over: Partial<AssembleInput> = {}): AssembleInput => ({
   ...over,
 });
 
+/** Operator-entered evidence row (mkt_identity_evidence) for assembly tests. */
+const manualRow = (over: Partial<IdentityEvidenceRow> = {}): IdentityEvidenceRow => ({
+  id: 'idev-1',
+  campaignId: 'camp-1',
+  businessProspectId: 'pros-1',
+  sourceName: 'Owner phone call',
+  sourceUrl: null,
+  tier: 'first_party',
+  independenceGroup: 'owner-phone-call',
+  evidenceState: 'owner_confirmed',
+  corroborates: ['name', 'address'],
+  ownerName: null,
+  ownerPhone: null,
+  ownerEmail: null,
+  accessedAt: '2026-09-18',
+  notes: null,
+  createdBy: 'user-1',
+  createdAt: '2026-09-18T10:00:00.000Z',
+  shared: false,
+  ...over,
+});
+
 describe('inferSourceTier', () => {
   it('classifies registry/authoritative sources', () => {
     expect(inferSourceTier('Indiana Secretary of State')).toBe('authoritative');
@@ -80,6 +104,24 @@ describe('inferSourceTier', () => {
     expect(inferSourceTier('Apple Maps')).toBe('major_aggregator');
     expect(inferSourceTier('Yelp')).toBe('secondary_aggregator');
     expect(inferSourceTier('Some Random Directory')).toBe('secondary_aggregator');
+  });
+});
+
+describe('sourceGroupSlug', () => {
+  it('maps platform names onto the audit platform keys', () => {
+    // A hand-entered "Google Business Profile" must land in the same
+    // independence group as the audit's own Google block.
+    expect(sourceGroupSlug('Google Business Profile')).toBe('google');
+    expect(sourceGroupSlug('Google')).toBe('google');
+    expect(sourceGroupSlug('Apple Maps')).toBe('apple');
+    expect(sourceGroupSlug('Yelp')).toBe('yelp');
+    expect(sourceGroupSlug('Facebook page')).toBe('facebook');
+    expect(sourceGroupSlug('Better Business Bureau')).toBe('bbb');
+  });
+
+  it('slugs everything else', () => {
+    expect(sourceGroupSlug('Indiana Secretary of State')).toBe('indiana-secretary-of-state');
+    expect(sourceGroupSlug('Owner phone call')).toBe('owner-phone-call');
   });
 });
 
@@ -159,5 +201,95 @@ describe('assembleIdentityPacket', () => {
       base({ seed: { id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market' } }),
     );
     expect(p.seed).toEqual({ id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market' });
+  });
+
+  it('scores an unaudited business from operator evidence alone', () => {
+    // The Identity tab's zero-state: no audit, so nothing is sourced yet.
+    const empty = assembleIdentityPacket(base({ audit: null }));
+    expect(empty.score.identityScore).toBe(0);
+    expect(empty.score.band).toBe('blocked');
+    expect(empty.ledger).toHaveLength(0);
+
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        manualEvidence: [
+          manualRow({
+            sourceName: 'State business registry',
+            tier: 'authoritative',
+            evidenceState: 'confirmed',
+            corroborates: ['name', 'address'],
+          }),
+        ],
+      }),
+    );
+    expect(p.score.identityScore).toBe(100);
+    expect(p.score.band).toBe('review');
+    expect(p.ledger.map((l) => l.name)).toEqual(['State business registry']);
+    expect(p.ledger[0].manual).toBe(true);
+  });
+
+  it('discounts a manual source that echoes a platform the audit already read', () => {
+    // Google-only audit — the manual row below restates what the audit already
+    // read, so it must not add a second independent corroboration.
+    const googleOnlyAudit = {
+      ...strongAudit,
+      audit_metadata: { identity_status: 'confirmed' },
+    };
+    const withEcho = assembleIdentityPacket(
+      base({
+        audit: googleOnlyAudit,
+        manualEvidence: [
+          manualRow({
+            sourceName: 'Google Business Profile',
+            tier: 'major_aggregator',
+            // Blank group → the assembler derives it from the source name, and
+            // a platform name maps onto the audit's own platform key.
+            independenceGroup: '',
+            corroborates: ['name', 'address', 'phone'],
+          }),
+        ],
+      }),
+    );
+    // Same independence group as the audit's Google block → one ledger row,
+    // marked as operator-touched, and no extra independent corroboration.
+    expect(withEcho.ledger.filter((l) => l.name === 'Google Business Profile')).toHaveLength(1);
+    expect(withEcho.ledger.find((l) => l.name === 'Google Business Profile')!.manual).toBe(true);
+    const name = withEcho.score.fields.find((f) => f.field === 'name')!;
+    expect(name.independentSources).toBe(1);
+    // 2 (Google, first in group) + 2 × 0.3 (the echo) — not 2 + 2.
+    expect(name.agreementWeight).toBe(2.6);
+    expect(name.score).toBe(65);
+  });
+
+  it('surfaces the newest captured owner contact without scoring it', () => {
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        manualEvidence: [
+          manualRow({ id: 'idev-new', ownerName: 'Maria Daree', ownerPhone: '608-555-0100', corroborates: [] }),
+          manualRow({ id: 'idev-old', ownerName: 'Old Owner', corroborates: [] }),
+        ],
+      }),
+    );
+    expect(p.ownerContact).toEqual({
+      name: 'Maria Daree',
+      phone: '608-555-0100',
+      email: null,
+      sourceName: 'Owner phone call',
+      evidenceId: 'idev-new',
+      capturedAt: '2026-09-18',
+    });
+    // Owner identity is not an identity field — it never inflates the score.
+    expect(p.score.identityScore).toBe(0);
+    expect(p.score.fields.every((f) => f.sources.length === 0)).toBe(true);
+  });
+
+  it('ignores manual evidence that corroborates nothing', () => {
+    const p = assembleIdentityPacket(
+      base({ audit: null, manualEvidence: [manualRow({ corroborates: [] })] }),
+    );
+    expect(p.ledger).toHaveLength(0);
+    expect(p.manualEvidence).toHaveLength(1);
   });
 });

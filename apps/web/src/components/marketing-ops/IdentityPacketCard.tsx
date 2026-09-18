@@ -9,11 +9,19 @@
  * Push/Wait recommendation. The operator decides — Push creates the DRAFT seed
  * (publish stays a separate, human step); Wait acknowledges the packet without
  * seeding.
+ *
+ * The ledger is derived from audits and seed provenance, so a business with no
+ * audit yet reads 0 on both axes. "Add evidence" is the operator write path
+ * (mkt_identity_evidence): record a source as it becomes available — a call
+ * with the owner, a GBP page, the SNAP retailer list — and the packet
+ * re-scores. Rows are shared across the business prospect's sibling campaigns,
+ * and owner contact captured on a row is reused for owner outreach.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import {
   ShieldCheck,
+  ShieldPlus,
   RefreshCw,
   Clock,
   AlertTriangle,
@@ -22,20 +30,17 @@ import {
   ExternalLink,
   ArrowUpRight,
   PauseCircle,
+  Trash2,
 } from 'lucide-react';
 import directoryPresenceAdminService, {
   type IdentityPacket,
   type IdentityRecommendationBand,
   type IdentitySourceTier,
 } from '@/services/DirectoryPresenceAdminService';
+import { IDENTITY_FIELD_LABELS, IDENTITY_EVIDENCE_STATE_LABELS, IDENTITY_TIER_LABELS } from '@/lib/identity-evidence';
+import AddIdentityEvidenceModal from './AddIdentityEvidenceModal';
 
-const TIER_LABEL: Record<IdentitySourceTier, string> = {
-  authoritative: 'Authoritative',
-  first_party: 'First-party',
-  major_aggregator: 'Major aggregator',
-  secondary_aggregator: 'Aggregator',
-  inferred: 'Inferred',
-};
+const TIER_LABEL: Record<IdentitySourceTier, string> = IDENTITY_TIER_LABELS;
 
 const TIER_CLASS: Record<IdentitySourceTier, string> = {
   authoritative: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
@@ -63,16 +68,7 @@ const BAND_META: Record<IdentityRecommendationBand, { label: string; cls: string
   },
 };
 
-const FIELD_LABEL: Record<string, string> = {
-  name: 'Name',
-  address: 'Address',
-  phone: 'Phone',
-  website: 'Website',
-  hours: 'Hours',
-  primary_category: 'Primary category',
-  snap_ebt: 'SNAP / EBT',
-  attributes: 'Attributes',
-};
+const FIELD_LABEL: Record<string, string> = IDENTITY_FIELD_LABELS;
 
 function Badge({ children, cls }: { children: React.ReactNode; cls: string }) {
   return <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{children}</span>;
@@ -107,6 +103,8 @@ export default function IdentityPacketCard({
   const [pushing, setPushing] = useState(false);
   const [waited, setWaited] = useState(false);
   const [pushed, setPushed] = useState<{ publicUrl: string } | null>(null);
+  const [showAddEvidence, setShowAddEvidence] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,6 +121,20 @@ export default function IdentityPacketCard({
   useEffect(() => {
     load();
   }, [load]);
+
+  const removeEvidence = async (id: string) => {
+    setRemovingId(id);
+    setError(null);
+    try {
+      const next = await directoryPresenceAdminService.removeIdentityEvidence(id, campaignId);
+      if (next) setPacket(next);
+      else await load();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to remove evidence');
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   const push = async () => {
     setPushing(true);
@@ -185,13 +197,21 @@ export default function IdentityPacketCard({
             </p>
           </div>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded border border-gray-300 dark:border-neutral-600 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddEvidence(true)}
+            className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+          >
+            <ShieldPlus className="h-3.5 w-3.5" /> Add evidence
+          </button>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded border border-gray-300 dark:border-neutral-600 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Scores */}
@@ -357,6 +377,7 @@ export default function IdentityPacketCard({
                             cls={s.agrees ? TIER_CLASS[s.tier] : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}
                           >
                             {s.name}
+                            {s.manual && <span className="ml-1 opacity-70">·operator</span>}
                             {!s.agrees && ' ✕'}
                           </Badge>
                         ))}
@@ -398,6 +419,11 @@ export default function IdentityPacketCard({
                       ) : (
                         l.name
                       )}
+                      {l.manual && (
+                        <span className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                          operator
+                        </span>
+                      )}
                     </td>
                     <td className="py-1.5 pr-3">
                       <Badge cls={TIER_CLASS[l.tier]}>{TIER_LABEL[l.tier]}</Badge>
@@ -422,6 +448,90 @@ export default function IdentityPacketCard({
           </div>
         )}
       </div>
+
+      {/* Operator evidence — the retractable half of the ledger. */}
+      {packet.manualEvidence.length > 0 && (
+        <div>
+          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Operator evidence
+            </h4>
+            {packet.ownerContact && (
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                Owner contact on file:{' '}
+                <span className="font-medium text-gray-700 dark:text-gray-200">
+                  {[packet.ownerContact.name, packet.ownerContact.phone, packet.ownerContact.email]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>{' '}
+                — reused for owner outreach
+              </span>
+            )}
+          </div>
+          <ul className="space-y-1.5">
+            {packet.manualEvidence.map((e) => (
+              <li
+                key={e.id}
+                className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-neutral-700"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-700 dark:text-gray-200">
+                    {e.sourceUrl ? (
+                      <a
+                        href={e.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-medium hover:underline"
+                      >
+                        {e.sourceName} <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="font-medium">{e.sourceName}</span>
+                    )}
+                    <Badge cls={TIER_CLASS[e.tier]}>{TIER_LABEL[e.tier]}</Badge>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                      {IDENTITY_EVIDENCE_STATE_LABELS[e.evidenceState]}
+                    </span>
+                    {e.shared && (
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600 dark:bg-neutral-700 dark:text-gray-300">
+                        shared from sibling
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                    {e.corroborates.length > 0
+                      ? e.corroborates.map((f) => FIELD_LABEL[f] ?? f).join(', ')
+                      : 'owner contact only'}
+                    {e.accessedAt && ` · accessed ${new Date(e.accessedAt).toLocaleDateString()}`}
+                    {e.ownerName || e.ownerPhone || e.ownerEmail
+                      ? ` · owner: ${[e.ownerName, e.ownerPhone, e.ownerEmail].filter(Boolean).join(' · ')}`
+                      : ''}
+                  </div>
+                  {e.notes && <div className="mt-0.5 text-[11px] italic text-gray-500 dark:text-gray-400">{e.notes}</div>}
+                </div>
+                <button
+                  onClick={() => removeEvidence(e.id)}
+                  disabled={removingId === e.id}
+                  title="Remove this source"
+                  aria-label={`Remove ${e.sourceName}`}
+                  className="mt-0.5 shrink-0 text-gray-400 hover:text-red-600 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {showAddEvidence && (
+        <AddIdentityEvidenceModal
+          campaignId={campaignId}
+          businessName={packet.businessName}
+          onClose={() => setShowAddEvidence(false)}
+          onAdded={setPacket}
+        />
+      )}
     </div>
   );
 }
