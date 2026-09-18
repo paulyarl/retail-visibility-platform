@@ -158,12 +158,12 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-/* Dark mode disabled - force light mode only */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --border: #262626;
-  }
-}
+/* Removed: an `@media (prefers-color-scheme: dark) { :root { --border: #262626 } }`
+   block. Its own comment claimed "force light mode only" but it did the
+   opposite — it darkened `--border` whenever the OS was dark, while the app
+   itself is always light (`--border` is `oklch(0.922 0 0)` in :root). Consumed
+   by `border-border/*` utilities. Same OS-leak class as the form-control block
+   removed further down (D3); see docs/DARK_MODE_THEME_SYSTEM_SPEC.md. */
 
 body {
   font-family: var(--font-sans);
@@ -223,31 +223,28 @@ select:focus {
   color: var(--neutral-900) !important;
 }
 
-/* Dark mode adjustments - DISABLED */
-@media (prefers-color-scheme: dark) {
-  input[type="text"],
-  input[type="email"],
-  input[type="tel"],
-  input[type="password"],
-  input[type="number"],
-  input[type="search"],
-  input[type="url"],
-  textarea,
-  select {
-    color: var(--indigo-700) !important;
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--neutral-500) !important;
-  }
-}
+/* Removed: a "Dark mode adjustments - DISABLED" block used to key form-control
+   colours to the OS preference, setting `color: var(--indigo-700) !important`
+   on inputs/selects/textareas. Two problems. (1) Despite the label it was LIVE
+   css. (2) The variable name is a typo — this file defines `--color-indigo-700`
+   (see "Indigo for secondary actions"), not `--indigo-700` — so an undefined
+   var() with no fallback made the declaration invalid at computed-value time,
+   and `color` silently fell back to `inherit` for every form control whenever
+   the OS was dark.
+   It was deleted rather than repointed at `--color-indigo-700` because the
+   premise is wrong: the app's theme is class-based (see
+   docs/DARK_MODE_THEME_SYSTEM_SPEC.md D3), so keying control colours to the OS
+   preference is the same class of bug as the native <select> popup issue below.
+   Placeholders keep the single `var(--neutral-400)` rule above. */
 
 /* Native <select> popups don't inherit the control's background — the options
-   render with the UA default (white) while inheriting the select's text color,
-   which the dark-mode overrides below flip to near-white. That makes the
-   selected row white-on-white. Style the options explicitly so the popup is
-   legible in both themes. */
+   render with the UA default (white) while inheriting the select's text color.
+   Style them explicitly so the popup is legible regardless of the UA palette.
+
+   The `.dark` halves of the rules below are currently INERT: no element ever
+   carries the `dark` class (next-themes writes `data-theme`, not `class` — see
+   docs/DARK_MODE_THEME_SYSTEM_SPEC.md). They are kept as forward-looking for a
+   future dark mode. Do NOT read their presence as evidence dark mode works. */
 select option {
   background-color: #ffffff;
   color: var(--neutral-900);
@@ -260,9 +257,9 @@ select option {
 
 /* The popup itself is drawn by the UA, not the page, so it also ignores the
    .dark overrides applied to the control — the container, hover highlight and
-   scrollbar all stayed light. color-scheme tells the UA which palette to use
-   for the popup. Pinned per-theme so the app's class-based theme wins over the
-   OS preference. */
+   scrollbar all stayed light. color-scheme tells the UA which palette to use.
+   This is the rule that fixed the reported bug: it pins the popup to light so
+   the OS preference cannot leak into an app that is always light. */
 select {
   color-scheme: light;
 }

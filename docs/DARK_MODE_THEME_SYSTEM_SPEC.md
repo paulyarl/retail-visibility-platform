@@ -103,9 +103,11 @@ The operative rule is **`select { color-scheme: light }`** — it overrides the 
 `color-scheme: dark` for selects only, so the popup renders light and matches the (light) app.
 Confirmed against light + dark Firefox screenshots: popup light and legible in both.
 
-**Carry into the sprint:** the two `.dark select …` rules are currently **inert** (nothing has the
-class). Either delete them or keep them as forward-looking — decide in Phase 0. Do not read their
-presence as evidence that dark mode works.
+**Phase 0 decision (made):** the two `.dark select …` rules are currently **inert** (nothing
+carries the `dark` class). They are **kept**, with an explicit comment in `globals.css` stating
+they are forward-looking, so no future reader mistakes them for evidence that dark mode works.
+They mirror the many other inert `.dark …` rules already in that file — deleting only these two
+would have been inconsistent, and they are what a future dark mode would need.
 
 **Not covered by the mitigation:** every other UA-drawn surface — see §8.
 
@@ -176,8 +178,9 @@ reduction measurable — each row is a target in §9.
 | Theme mechanisms | — | 3 (1 live) | Duplicate sources of truth |
 | `MantineProvider` instances | — | 2 | Duplicate providers |
 | Theme storage keys in play | — | 3 (`theme` next-themes · `rvp-theme` dead · `mantine-color-scheme-value` Mantine) | Collision risk (D4) |
-| `!important` declarations in `globals.css` | — | 11 | Fight Tailwind; 4 are colour rules |
-| Undefined `var()` refs in `globals.css` | — | 1 (`--indigo-700`) | D3 |
+| `!important` declarations in `globals.css` | — | 9 (was 11) | Fight Tailwind; colour rules remain (D6) |
+| Undefined `var()` refs in `globals.css` | — | 0 (was 1) | D3 — **fixed** |
+| OS-reactive `@media (prefers-color-scheme)` blocks in `globals.css` | — | 0 (was 2) | D2 class — **fixed** |
 
 **Read this as:** ~250 files carry per-usage theme risk that could be per-component risk; 299 files
 carry a second theming system that is one call away from diverging from the first; 18,463 utilities
@@ -191,12 +194,13 @@ carry zero information because they cannot render.
 |---|---|---|---|
 | D1 | `attribute="data-theme"` vs `@custom-variant dark (&:is(.dark *))` — dark variants unreachable | §2 | **Critical** |
 | D2 | `enableColorScheme` makes UA chrome follow the OS while the app stays light | §3 | **High** |
-| D3 | `var(--indigo-700)` used but **defined nowhere** → declaration invalid at computed-value time → `color` silently becomes `inherit` for all inputs/selects/textareas whenever the OS is dark | `globals.css:237` (only undefined ref, confirmed by scan) | **High** |
+| D3 | ~~`var(--indigo-700)` used but defined nowhere~~ — it is a **typo**: the file defines `--color-indigo-700` ("Indigo for secondary actions"), not `--indigo-700`. An undefined `var()` with no fallback made the declaration invalid at computed-value time, so `color` silently became `inherit` for all inputs/selects/textareas whenever the OS was dark | `globals.css` (was line 237) | **Resolved** |
 | D4 | `storageKey` collision: `hooks/useTheme.ts:18` writes `localStorage['theme']`, next-themes' own key. If that hook is ever mounted it will pin the theme and fight next-themes | `hooks/useTheme.ts:18` vs §2 | Medium (latent) |
 | D5 | Three theme mechanisms, two `MantineProvider`s, one unused toggle — no single source of truth | §4 | Medium |
 | D6 | `!important` colour rules in `globals.css` that fight Tailwind (`:209`, `:223`, `:237`, `:328-329`) | §3, §4 | Medium |
 | D7 | Mantine's colour scheme is light by **default**, bound to no signal — one `setColorScheme` call, Mantine toggle, or `mantine-color-scheme-value` write flips 299 files to dark while Tailwind stays light | §4 | Medium (latent, wide) |
 | D8 | No theme toggle is reachable, so `"system"` can never be overridden by a user | §4 | Low/Product |
+| D9 | An `@media (prefers-color-scheme: dark)` block darkened `--border` (`:root`) whenever the OS was dark, while its own comment claimed "force light mode only". Consumed by `border-border/*` utilities — same OS-leak class as D2 | `globals.css` (was lines 161-166) | **Resolved** |
 
 ---
 
@@ -429,8 +433,8 @@ Established by reading code, not by rendering:
 - `<ThemeProvider>` mounted prop-less at `ClientRootLayout.tsx:32`.
 - `@custom-variant dark (&:is(.dark *))` at `globals.css:6`.
 - `ThemeContext` / `useTheme` imported nowhere; `ThemeToggle` never rendered (repo-wide grep).
-- `--indigo-700` is the **only** undefined `var()` reference in `globals.css` (scan: 42 distinct
-  refs, 161 defined vars).
+- `--indigo-700` was the **only** undefined `var()` reference in `globals.css` (scan: 42 distinct
+  refs, 161 defined vars) — now **0**, see the closing-session note below.
 - Mantine 9.6.1 defaults read from `esm/core/MantineProvider/MantineProvider.mjs`:
   `colorSchemeManager = localStorageColorSchemeManager()`, `defaultColorScheme = "light"`.
 - No `setColorScheme` / `useMantineColorScheme` / `colorScheme=` usage anywhere in `apps/web/src`,
@@ -445,3 +449,22 @@ Established by reading code, not by rendering:
 - Exact Firefox popup behaviour with `color-scheme` set on the control vs inherited from the root.
 - Whether any surface currently *depends* on the UA dark palette for legibility.
 - How Leaflet is loaded (no static imports found).
+
+### Closing-session follow-up (shipped alongside this doc)
+
+Two OS-reactive blocks were removed from `globals.css`, both of which were labelled as inactive but
+were live:
+
+- **D3 fixed.** The form-control block keying `color` to `prefers-color-scheme` was **deleted, not
+  repointed** at `--color-indigo-700` — the premise (letting the OS preference colour form controls
+  in a class-based light app) is the same bug being fixed, so preserving the behaviour would have
+  preserved the defect.
+- **D9 fixed.** The block that darkened `--border` in OS-dark was deleted.
+- `globals.css` now has **0** undefined `var()` refs, **0** `prefers-color-scheme` blocks, and
+  **9** `!important` declarations (down from 11). Brace balance verified 0 after both removals.
+- The inert `.dark select …` rules were **kept and annotated** — see the Phase 0 decision in §3.
+
+**Not done, deliberately:** the `!important` colour rules at the top of the form-input section
+(`globals.css:209`, `:223`) were left in place. They are the reason the popup text was dark in the
+first place, but they are also load-bearing for legibility across the app, so removing them is a
+D6/R5 sprint item with a surface sweep — not a closing-session change.
