@@ -9,8 +9,8 @@ import {
   TYPE_GOVERNING_SIGNALS,
   DELIVERABLE_RELEVANT_FAMILIES,
   FULFILL_TEMPLATE_BY_TYPE,
-  buildClaimCta,
 } from '../DeliverableSourceService';
+import { buildClaimCta } from '../deliverable-cta';
 import { KNOWN_SIGNAL_CODES } from '../../triage/signal-taxonomy';
 import {
   DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE,

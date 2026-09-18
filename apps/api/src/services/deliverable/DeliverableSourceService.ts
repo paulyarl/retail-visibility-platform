@@ -37,6 +37,7 @@ import {
   runDeliverableQualityGate,
   runRepetitionGate,
 } from './deliverable-quality-gate';
+import { buildClaimCta } from './deliverable-cta';
 
 // ─── Template IDs ────────────────────────────────────────────────────────
 
@@ -84,17 +85,6 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
 
 /** Families the analyst consumes — OX (outreach state) is excluded (G-12). */
 export const DELIVERABLE_RELEVANT_FAMILIES = ['RA', 'DS', 'WC', 'CP', 'VP', 'INT'];
-
-/**
- * Build the claim-and-fix CTA text for a fulfill prompt. When a claim URL
- * resolves, the CTA carries it; otherwise a link-less variant is used so the
- * body never renders a literal `{{claim_url}}` placeholder.
- */
-export function buildClaimCta(claimUrl: string | null): string {
-  return claimUrl
-    ? `Claim your listing and correct it here: ${claimUrl} — it takes about two minutes and there is no cost.`
-    : 'Ask your contact to claim this listing on your behalf — it takes about two minutes and there is no cost.';
-}
 
 export interface DeliverableSourceResolution {
   types: DeliverableType[];

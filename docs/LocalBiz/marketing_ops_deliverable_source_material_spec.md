@@ -813,7 +813,9 @@ Run `seed-deliverable-layout-templates.ts` on `local` + `prd` to populate the te
 - Side effect to know: `inviteSeed` flips `directory_presence_seeds.status = 'invited'`. Funnel analytics do **not** count a bare token as an invite (delivery evidence is still required), so this does not inflate the funnel — but it is a real state change.
 - The fulfill bodies now use a single **`{{claim_cta}}`** variable (`buildClaimCta`), so a body renders either the link-bearing CTA or a link-less variant — never a literal `{{claim_url}}`. SEED_VERSION_MARKER bumped to **V3** in `seed-deliverable-source-material-templates.ts`; re-seed both scripts.
 
-**Still open:** the prompt workspace and external-import paths for `fulfill-001/002/003` do not resolve `claim_cta`, so those render the placeholder. Fix is to route their variable builder through `buildClaimCta` too.
+**Workspace / import path — RESOLVED.** `MarketingExecutionService.resolvePrompt` now auto-sources `claim_cta` in the generic fulfill branch (for templates that declare it), using `resolveClaimUrlForCampaign` **without minting** — render/read paths stay side-effect free, and minting remains exclusive to `DeliverableSourceService` on generation. Because `renderPrompt()` and `executeSingle()` share the `resolvePrompt` seam, the copy-paste bridge and external-import paths get the resolved CTA too.
+
+`buildClaimCta` lives in `services/deliverable/deliverable-cta.ts` (neutral, no service imports) so both paths share one definition without an import cycle.
 
 ---
 

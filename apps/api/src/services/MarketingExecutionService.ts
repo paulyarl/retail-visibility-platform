@@ -609,6 +609,22 @@ export class MarketingExecutionService extends BaseService {
               effectiveVariables.services = input.campaign.service_category;
             }
           }
+          // Claim-and-fix CTA — only for templates that declare it. Resolves
+          // the campaign's claim link WITHOUT minting (this is a read/render
+          // path; minting happens in DeliverableSourceService on generation).
+          // Falls back to the link-less variant so no {{claim_url}} leaks.
+          const declaredVars: string[] = Array.isArray(input.template.variables) ? input.template.variables : [];
+          if (
+            declaredVars.includes('claim_cta')
+            && (!effectiveVariables.claim_cta || !String(effectiveVariables.claim_cta).trim())
+          ) {
+            const { resolveClaimUrlForCampaign } = await import('./outreach-openers/outreach-link-vars');
+            const { buildClaimCta } = await import('./deliverable/deliverable-cta');
+            const claimUrl = input.campaign.id
+              ? await resolveClaimUrlForCampaign(input.campaign.id)
+              : null;
+            effectiveVariables.claim_cta = buildClaimCta(claimUrl);
+          }
         }
       } catch (err) {
         logger.warn('Failed to auto-source domain variables', ctx, {
