@@ -226,6 +226,13 @@ export interface ShelfReferralRow {
   uniqueSessions: number;
 }
 
+/** Entry views grouped by source/channel (`qr`, `shelf`, or a `utm_source`). */
+export interface EntrySourceRow {
+  source: string;
+  views: number;
+  uniqueSessions: number;
+}
+
 export interface DirectoryTrafficDashboard {
   daysBack: number;
   surface: string | null;
@@ -249,6 +256,9 @@ export interface DirectoryTrafficDashboard {
   shelves: ShelfTrafficRow[];
   /** Entry views grouped by referring shelf (respects entry filters). */
   shelfReferrals: ShelfReferralRow[];
+  /** Entry views grouped by source/channel — `qr`, `shelf`, `utm_source`
+   *  (respects entry filters; organic/direct views are unattributed). */
+  entrySources: EntrySourceRow[];
 }
 
 export interface SeedTrafficDetail {

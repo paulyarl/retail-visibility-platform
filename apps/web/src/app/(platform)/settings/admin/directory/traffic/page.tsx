@@ -713,6 +713,43 @@ export default function DirectoryTrafficPage() {
         )}
       </section>
 
+      {/* Entry sources — QR / shelf / UTM */}
+      <section className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Entry Sources</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Which channel drove the entry view — QR-encoded listing links (
+          <code className="text-[11px]">?source=qr</code>), shelf links (
+          <code className="text-[11px]">?shelf=</code>), or any{' '}
+          <code className="text-[11px]">utm_source</code>. QR scan channel metrics stay in QR
+          Analytics; this counts QR as an entry <em>source</em>. Organic/direct views are
+          unattributed and not listed.
+        </p>
+        {!dashboard || dashboard.entrySources.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No attributed entry views in this window yet.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {dashboard.entrySources.map((row) => (
+              <li key={row.source}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-gray-700 dark:text-gray-200">{sourceLabel(row.source)}</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-xs">
+                    {row.views.toLocaleString()} views · {row.uniqueSessions.toLocaleString()} sessions
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-500"
+                    style={{ width: `${barWidth(row.views, dashboard.entrySources[0]?.views)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Shelf→entry attribution */}
       <section className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Referring Shelves</h2>
@@ -841,6 +878,12 @@ function shelfTypeLabel(pageType: string): string {
   if (pageType === 'directory_store_type') return 'Store type';
   if (pageType === 'directory_home') return 'Home';
   return pageType;
+}
+
+function sourceLabel(source: string): string {
+  if (source === 'qr') return 'QR code';
+  if (source === 'shelf') return 'Shelf browse';
+  return source;
 }
 
 function deviceIcon(deviceType: string) {

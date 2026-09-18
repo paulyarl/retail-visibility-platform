@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveGoldStandard: vi.fn(async (_category: string, _platform?: string | null) => null),
@@ -54,7 +54,11 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     currentRevision: vi.fn(async () => 1),
     serializeCatalogBlock: vi.fn(() => ''),
   };
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService };
+  const mockGeographyGridService = {
+    getGrid: vi.fn(async () => null),
+    upsertGrid: vi.fn(async () => undefined),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -101,6 +105,12 @@ vi.mock('../intelligence/BronzeReasonCatalogService', () => ({
   },
 }));
 
+vi.mock('../intelligence/GeographyGridService', () => ({
+  GeographyGridService: {
+    getInstance: () => mockGeographyGridService,
+  },
+}));
+
 vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
   formatEstablishmentMarketContext: mockFormatEstablishment,
   formatDiscoveryMarketContext: mockFormatDiscovery,
@@ -135,6 +145,8 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     mockCatalogService.applicableReasons.mockImplementation(async () => []);
     mockCatalogService.currentRevision.mockImplementation(async () => 1);
     mockCatalogService.serializeCatalogBlock.mockImplementation(() => '');
+    // Reset the city-level geography grid cache to a miss (campaign-derived grid).
+    mockGeographyGridService.getGrid.mockImplementation(async () => null);
   });
 
   const makeTemplate = (promptType: string, body = 'Hello {{business_name}} in {{category}}') => ({
@@ -544,6 +556,29 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(resolution.gold_standard_profile_version).toBeNull();
     });
 
+    it('appends the campaign-derived GEOGRAPHY GRID directive (category-independent sweep)', async () => {
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: {
+          ...makeIntelCampaign('emerging', 'google'),
+          intelligence_zip_codes: '64118, 64124',
+        },
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== GEOGRAPHY GRID — AUTHORITATIVE SWEEP UNITS ===');
+      expect(renderedPrompt).toContain('Market: Kansas City, MO');
+      expect(renderedPrompt).toContain('64118, 64124');
+      // The core fix: the label-independent sweep must not be token-keyed.
+      expect(renderedPrompt).toContain('Do NOT key these datasets on the category name');
+      // Appended after the platform + gold-standard blocks — final word on scope.
+      expect(renderedPrompt.indexOf('GEOGRAPHY GRID')).toBeGreaterThan(
+        renderedPrompt.indexOf('PLATFORM DISCOVERY FOCUS'),
+      );
+    });
+
     it('passes campaign platform through to resolveGoldStandard', async () => {
       mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
       const campaign = makeIntelCampaign('emerging', 'yelp');
@@ -820,6 +855,26 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).not.toContain('DUAL-PAYLOAD OUTPUT');
       expect(mockCatalogService.applicableReasons).not.toHaveBeenCalled();
       expect(resolution.bronze_standard_profile_id).toBeNull();
+    });
+
+    it('appends the campaign-derived GEOGRAPHY GRID directive for the profile substrate', async () => {
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign({
+          city: 'Kansas City',
+          state: 'MO',
+          intelligence_zip_codes: '64118,64124',
+        }),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== GEOGRAPHY GRID — AUTHORITATIVE SWEEP UNITS ===');
+      expect(renderedPrompt).toContain('Market: Kansas City, MO');
+      expect(renderedPrompt).toContain('64118, 64124');
+      // The establishment prompt authors the profile's geography_grid from this grid.
+      expect(renderedPrompt).toContain('Copy this grid verbatim into the profile\'s "geography_grid" field');
     });
 
     it('does not fold into competitive or national establishment campaigns', async () => {

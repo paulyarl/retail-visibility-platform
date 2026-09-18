@@ -260,6 +260,29 @@ the concrete mechanism set for emerging discovery in THIS category. Integrate:
   profile names the specific independent ecosystems whose alignment establishes
   identity for THIS category — use them as the corroboration source set.
 
+=== GEOGRAPHY GRID EXECUTION (MANDATORY) ===
+The profile carries a DISCOVERY SUBSTRATE (geography_grid, generic_label_set,
+label_independent_sweeps) and this run may also carry an authoritative
+GEOGRAPHY GRID block appended after the profile. Execute the substrate as the
+enumeration floor — it is the path that surfaces businesses whose names do NOT
+self-identify with the category (a name with no category token and no endonym,
+e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an
+Asian grocery, "Sunny Beauty" for a beauty-supply store). Do NOT let the
+category's own tokens be the only discovery keys.
+
+- Sweep EVERY sweep unit (ZIP/corridor) in the grid INDEPENDENTLY. Report each as
+  executed with its result count. A unit with zero findings is an executed-empty
+  result, never a silent skip. Do not stop after the first unit that yields
+  results.
+- Run the generic-label x geography matrix: for each platform, sweep the generic
+  labels that SWALLOW this category (not the correct category label) across each
+  sweep unit, then verify assortment from photos, review text, or catalog copy.
+- Run every label_independent_sweep by GEOGRAPHY (ZIP/address) with NO
+  category-name filter, then filter to category fit by assortment evidence.
+  Never key these datasets on the category name.
+- If any sweep unit was skipped or could not be executed, say so explicitly
+  rather than omitting it.
+
 EMERGING PRIORITY: When the profile contains discovery patterns or evidence rules
 that are inherently emerging-discovery mechanisms (vertical source discovery,
 community directories, supplier lists, social-first search, marketplace catalogs,

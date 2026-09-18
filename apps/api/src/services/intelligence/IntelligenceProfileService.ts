@@ -136,11 +136,39 @@ export interface IntelligenceProfileConfiguration {
   synonyms?: string[];
   subcategories?: string[];
   specialized_sources?: SpecializedSource[];
+  // Discovery substrate — category-independent enumeration primitives authored
+  // by the establishment scan (from the campaign-derived geography grid).
+  geography_grid?: GeographyGridConfig;
+  generic_label_set?: GenericLabelSetEntry[];
+  label_independent_sweeps?: LabelIndependentSweep[];
   discovery_patterns?: Record<string, any>;
   category_evidence_rules?: Record<string, any>;
   prohibited_inferences?: string[];
   category_signals?: string[];
   [key: string]: any;
+}
+
+export interface GeographyGridConfig {
+  city?: string;
+  state?: string;
+  zips?: string[];
+  corridors?: string[];
+  adjacent_municipalities?: string[];
+  radius_miles?: number;
+}
+
+export interface GenericLabelSetEntry {
+  platform: string;
+  labels: string[];
+}
+
+export interface LabelIndependentSweep {
+  dataset: string;
+  url?: string;
+  sweep_key?: string;
+  filter?: string;
+  post_filter?: string;
+  note?: string;
 }
 
 export interface SpecializedSource {
@@ -1707,6 +1735,56 @@ export class IntelligenceProfileService extends BaseService {
           lines.push(`    Limitations: ${src.limitations.join('; ')}`);
         }
       }
+      lines.push('');
+    }
+
+    if (
+      config.geography_grid
+      || (config.generic_label_set && config.generic_label_set.length > 0)
+      || (config.label_independent_sweeps && config.label_independent_sweeps.length > 0)
+    ) {
+      lines.push('--- DISCOVERY SUBSTRATE (EXECUTION MANDATE) ---');
+      const grid = config.geography_grid;
+      if (grid) {
+        const market = [grid.city, grid.state].filter(Boolean).join(', ');
+        if (market) lines.push(`  Market: ${market}`);
+        if (grid.zips && grid.zips.length > 0) {
+          lines.push(`  ZIP sweep units (authoritative): ${grid.zips.join(', ')}`);
+        }
+        if (grid.corridors && grid.corridors.length > 0) {
+          lines.push(`  Corridors: ${grid.corridors.join('; ')}`);
+        }
+        if (grid.adjacent_municipalities && grid.adjacent_municipalities.length > 0) {
+          lines.push(`  Adjacent municipalities (retail catchment — sweep these too): ${grid.adjacent_municipalities.join(', ')}`);
+        }
+        if (typeof grid.radius_miles === 'number') {
+          lines.push(`  Search radius: ${grid.radius_miles} miles`);
+        }
+      }
+      if (config.generic_label_set && config.generic_label_set.length > 0) {
+        lines.push('  Generic labels that SWALLOW this category (sweep these, not the correct label):');
+        for (const entry of config.generic_label_set) {
+          lines.push(`    [${entry.platform}] ${(entry.labels || []).join(', ')}`);
+        }
+      }
+      if (config.label_independent_sweeps && config.label_independent_sweeps.length > 0) {
+        lines.push('  Label-independent datasets (sweep by GEOGRAPHY, no category-name filter):');
+        for (const sweep of config.label_independent_sweeps) {
+          const url = sweep.url ? ` — ${sweep.url}` : '';
+          lines.push(`    ${sweep.dataset}${url}`);
+        }
+      }
+      lines.push(
+        '  MANDATE: The sweep scope is the RETAIL CATCHMENT (principal city +',
+        '  contiguous suburbs), not the administrative city. Sweep every ZIP/corridor',
+        '  above INDEPENDENTLY. A sweep unit with zero findings is an executed-empty',
+        '  result to report, not a silent gap. Run the generic-label x geography',
+        '  matrix and every label-independent sweep by GEOGRAPHY (ZIP/address), then',
+        '  filter to category fit by assortment evidence. Do NOT key the',
+        '  label-independent sweeps on the category name — token-keying makes them',
+        '  label-dependent and hides every business whose name does not self-identify',
+        '  with the category.',
+      );
       lines.push('');
     }
 

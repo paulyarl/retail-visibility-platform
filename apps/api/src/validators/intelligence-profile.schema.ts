@@ -48,6 +48,58 @@ const specializedSourceSchema = z.object({
   limitations: z.array(z.string()).min(1),
 }).passthrough();
 
+// ─── Discovery Substrate (category-independent enumeration) ──────────────
+//
+// The substrate is what makes discovery category-independent. It is the
+// enumeration floor that surfaces businesses whose names do NOT self-identify
+// with the category (e.g. "Universal Tropical Market" for an African grocery,
+// "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store).
+// A profile whose only discovery paths are keyed on the category's own tokens
+// is incomplete — the substrate fields are what the discovery scan executes to
+// avoid that failure mode. All three are optional in the schema so legacy
+// profiles still validate, but the establishment template + prompt suffix
+// require every NEW profile to carry them.
+
+const geographyGridSchema = z.object({
+  // Reference market the grid was derived from (normally the campaign's city/state).
+  city: z.string().optional(),
+  state: z.string().optional(),
+  // Exhaustive ZIP sweep units. Every ZIP must be swept independently; a ZIP
+  // with zero findings is an executed-empty result, never a silent skip.
+  zips: z.array(z.string()).optional(),
+  // Arterial commercial stretches, derived from address evidence where possible.
+  corridors: z.array(z.string()).optional(),
+  // Separately-incorporated suburbs / contiguous commercial municipalities in
+  // the catchment — the "shared-ZIP suburb" class (e.g. Gladstone, MO sharing
+  // 64118 with Kansas City). Explicit so the retail catchment is sweepable, not
+  // implied by the principal city's administrative boundary.
+  adjacent_municipalities: z.array(z.string()).optional(),
+  // Optional radius scope from the campaign.
+  radius_miles: z.number().optional(),
+}).passthrough();
+
+const genericLabelSetEntrySchema = z.object({
+  platform: z.string().min(1),
+  // The generic buckets that SWALLOW this category — the labels a mislabeled
+  // business sits under. Category-specific in content, universal in class.
+  labels: z.array(z.string()).min(1),
+}).passthrough();
+
+const labelIndependentSweepSchema = z.object({
+  dataset: z.string().min(1),
+  url: z.preprocess(
+    (v) => (v === null ? undefined : v),
+    z.string().url().optional(),
+  ),
+  // MUST be "geography": the dataset is enumerated by ZIP/address, never by a
+  // category name token. Token-keying a label-independent dataset makes it
+  // label-dependent and defeats its purpose.
+  sweep_key: z.string().optional(),
+  filter: z.string().optional(),
+  post_filter: z.string().optional(),
+  note: z.string().optional(),
+}).passthrough();
+
 // ─── Profile Configuration (§10 structure) ───────────────────────────────
 
 export const intelligenceProfileSchema = z.object({
@@ -66,6 +118,13 @@ export const intelligenceProfileSchema = z.object({
 
   // Specialized sources — with capabilities and limitations
   specialized_sources: z.array(specializedSourceSchema).min(1),
+
+  // Discovery substrate — category-independent enumeration primitives. Optional
+  // in the schema for backward compatibility, but REQUIRED by the establishment
+  // template + prompt suffix for every new profile.
+  geography_grid: geographyGridSchema.optional(),
+  generic_label_set: z.array(genericLabelSetEntrySchema).optional(),
+  label_independent_sweeps: z.array(labelIndependentSweepSchema).optional(),
 
   // Discovery patterns — how to find businesses in this category
   discovery_patterns: z.record(z.string(), z.any()).optional(),
@@ -104,6 +163,30 @@ Return a single JSON object with this structure (the Category Intelligence Profi
       "limitations": ["<what this source cannot do or what it does NOT measure>", ...]
     }
   ],
+  "geography_grid": {
+    "city": "<reference city>",
+    "state": "<reference state>",
+    "zips": ["<every ZIP the market's commercial addresses fall in>", ...],
+    "corridors": ["<arterial commercial stretch, derived from address evidence>", ...],
+    "adjacent_municipalities": ["<separately-incorporated suburb / contiguous commercial municipality in the catchment>", ...],
+    "radius_miles": <number, if a radius scope applies>
+  },
+  "generic_label_set": [
+    {
+      "platform": "<platform>",
+      "labels": ["<generic label that SWALLOWS this category>", ...]
+    }
+  ],
+  "label_independent_sweeps": [
+    {
+      "dataset": "<address-indexed dataset name>",
+      "url": "<dataset URL, if it has a canonical web address>",
+      "sweep_key": "geography",
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "<optional>"
+    }
+  ],
   "discovery_patterns": {
     "<pattern_name>": "<description or instructions>",
     ...
@@ -121,6 +204,11 @@ Return a single JSON object with this structure (the Category Intelligence Profi
 
 Rules:
 - specialized_sources MUST have at least one entry with capabilities AND limitations.
+- geography_grid, generic_label_set, and label_independent_sweeps are REQUIRED. They are the category-independent discovery substrate: geography_grid names the exhaustive sweep units (ZIPs + corridors), generic_label_set names the generic platform labels that swallow this category, and label_independent_sweeps names the address-indexed datasets that must be swept WITHOUT a category name token.
+- label_independent_sweeps entries MUST set "sweep_key": "geography". These datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. Do NOT key them on the category name — token-keying a label-independent dataset makes it label-dependent and hides every business whose legal name carries no category token.
+- geography_grid.zips MUST list every ZIP the market's commercial addresses fall in, not only the ZIPs where category businesses were already found. Every ZIP is swept independently; a ZIP with zero findings is an executed-empty result, not a silent skip.
+- geography_grid scope is the RETAIL CATCHMENT, not the administrative city: the principal city PLUS its contiguous commercial suburbs. geography_grid.adjacent_municipalities MUST list the separately-incorporated municipalities in the catchment — including any that share a ZIP with the principal city (the shared-ZIP suburb class). A ZIP spanning the principal city and a suburb is ONE sweep unit.
+- generic_label_set MUST name the generic/misleading labels that hide this category on each platform, not the correct category label.
 - For each specialized_source that has a canonical web address (a homepage, directory index, organization page, or store locator), include its "url". Vertical directories, community organizations, professional networks, and official brand/chain websites should always carry a url — it is the operator's entry point to the source. Omit "url" only for sources that have no single canonical web address (e.g. "storefront photo evidence", "SNAP listings" as a class).
 - limitations are critical — they describe what the source does NOT measure (e.g. "CARFAX service history is NOT a review system").
 - prohibited_inferences MUST list at least one inference that must not be made (e.g. "Absence from CARFAX does NOT mean the business is inactive").
