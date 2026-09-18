@@ -3559,11 +3559,14 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
     // G-15: resolve content from source material in the caller (not inside
     // MarketingDeliverableService), keeping the base service prompt-agnostic.
     let content = parsed.content;
+    let warnings: string[] = [];
     if (!content) {
       const resolved = await DeliverableSourceService.resolveDeliverableContent(
         req.params.campaignId, parsed.deliverable_type as any, ctx,
       );
       content = resolved.content ?? undefined;
+      // Gates surface as warnings, not hard blocks (§7.4).
+      warnings = [...resolved.qualityGate.issues, ...resolved.repetitionGate.issues];
     }
 
     const deliverable = await MarketingDeliverableService.generateDeliverable({
@@ -3575,7 +3578,7 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
       content,
       generatedBy: req.user?.id,
     }, ctx);
-    res.status(201).json({ success: true, data: deliverable });
+    res.status(201).json({ success: true, data: deliverable, warnings });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });

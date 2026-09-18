@@ -28,6 +28,14 @@ import {
   type DeliverableSourceMaterial,
 } from '../../validators/deliverable-source-material.schema';
 import { reviewIntakeSchema, type ReviewIntake } from '../../validators/review-intake.schema';
+import {
+  resolveCampaignSeedId,
+  buildOutreachLinkVars,
+} from '../outreach-openers/outreach-link-vars';
+import {
+  runDeliverableQualityGate,
+  runRepetitionGate,
+} from './deliverable-quality-gate';
 
 // ─── Template IDs ────────────────────────────────────────────────────────
 
@@ -286,24 +294,51 @@ export class DeliverableSourceService extends BaseService {
     content: string | null;
     promptTemplateId: string | null;
     sourceMaterialExecutionId: string | null;
+    qualityGate: { passed: boolean; issues: string[] };
+    repetitionGate: { passed: boolean; issues: string[] };
   }> {
     const templateId = FULFILL_TEMPLATE_BY_TYPE[type];
-    if (!templateId) return { content: null, promptTemplateId: null, sourceMaterialExecutionId: null };
+    if (!templateId) {
+      return {
+        content: null, promptTemplateId: null, sourceMaterialExecutionId: null,
+        qualityGate: { passed: true, issues: [] }, repetitionGate: { passed: true, issues: [] },
+      };
+    }
 
     const source = await this.getTypeSource(campaignId, type, ctx);
-    if (!source) return { content: null, promptTemplateId: templateId, sourceMaterialExecutionId: null };
+    if (!source) {
+      return {
+        content: null, promptTemplateId: templateId, sourceMaterialExecutionId: null,
+        qualityGate: { passed: true, issues: [] }, repetitionGate: { passed: true, issues: [] },
+      };
+    }
 
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
     if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
-    // The fulfill templates declare business_name/category/city + one block
-    // variable. Pass the block as its declared key when known, else a generic.
+    // Resolve claim/report links through the canonical module so the
+    // /place/claim vs /directory/claim split cannot drift (§5.6).
+    let linkVars: Record<string, string> = {};
+    try {
+      const seedId = await resolveCampaignSeedId(campaignId);
+      const built = await buildOutreachLinkVars(seedId);
+      if (built.claim_url) linkVars.claim_url = built.claim_url;
+      if (built.claim_short_url) linkVars.claim_short_url = built.claim_short_url;
+      if (built.report_url) linkVars.report_url = built.report_url;
+    } catch (e) {
+      logger.warn('Failed to resolve deliverable link variables', ctx, {
+        error: (e as Error).message, campaignId,
+      });
+    }
+
+    const sourceText = JSON.stringify(source);
     const blockKey = this.sourceVariableKey(type);
     const variables: Record<string, any> = {
       business_name: campaign.business_name ?? '',
       category: campaign.category ?? '',
       city: campaign.city ?? '',
-      [blockKey]: JSON.stringify(source),
+      [blockKey]: sourceText,
+      ...linkVars,
     };
 
     const execution = await MarketingExecutionService.getInstance().executeSingle(
@@ -311,10 +346,31 @@ export class DeliverableSourceService extends BaseService {
       ctx,
     );
 
+    const content = execution?.filtered_output ?? execution?.raw_output ?? null;
+
+    // Gates surface as warnings, not hard blocks (§7.4).
+    const qualityGate = content
+      ? runDeliverableQualityGate(type, content, sourceText)
+      : { passed: true, issues: [] };
+    const priorOutreach = await this.buildPriorOutreach(campaignId);
+    const repetitionGate = content
+      ? runRepetitionGate(content, priorOutreach)
+      : { passed: true, issues: [] };
+
+    if (!qualityGate.passed || !repetitionGate.passed) {
+      logger.warn('Deliverable fulfill gate warnings', ctx, {
+        campaignId, type,
+        qualityIssues: qualityGate.issues,
+        repetitionIssues: repetitionGate.issues,
+      });
+    }
+
     return {
-      content: execution?.filtered_output ?? execution?.raw_output ?? null,
+      content,
       promptTemplateId: templateId,
       sourceMaterialExecutionId: execution?.id ?? null,
+      qualityGate,
+      repetitionGate,
     };
   }
 
