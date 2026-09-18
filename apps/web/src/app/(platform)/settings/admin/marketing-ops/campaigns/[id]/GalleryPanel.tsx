@@ -42,7 +42,24 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
     setError(null);
     try {
       const [files, tokens, elig] = await Promise.all([
-        marketingOpsService.listDiagnosticScreenshots(campaignId),
+        marketingOpsService.listDiagnosticScreenshots(campaignId).catch(async () => {
+          // Rollout fallback: the signed-URL endpoint may not be deployed yet
+          // (web-before-API). Fall back to the plain file list so the tab still
+          // renders — thumbnails/downloads just stay unavailable until the API
+          // catches up.
+          const all = await marketingOpsService.listFiles(campaignId);
+          return all
+            .filter((f) => f.file_type === 'diagnostic_screenshot')
+            .map((f) => ({
+              id: f.id,
+              file_name: f.file_name,
+              signed_url: null,
+              download_url: null,
+              mime_type: f.mime_type,
+              file_size: f.file_size,
+              uploaded_at: f.uploaded_at,
+            }));
+        }),
         marketingOpsService.listGalleryTokens(campaignId),
         // Degrade gracefully if the eligibility endpoint is unavailable — the
         // tab still works, it just can't warn ahead of Generate.
