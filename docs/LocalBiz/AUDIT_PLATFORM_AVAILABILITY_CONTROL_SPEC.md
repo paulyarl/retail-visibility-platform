@@ -2,9 +2,34 @@
 
 > The audit cannot currently distinguish "this business is not discoverable on Google" from "the analyst could not render Google." Both produce `unable_to_verify`, both emit no signal, and both score zero. This spec adds a render control — the gold standard's profiles — so an unrendered platform becomes attributable evidence instead of an unscored gap.
 
-**Status:** Not started — spec only
+**Status:** Partially shipped — control mechanism live, scoring amendments outstanding. See the implementation status block below.
 **Owner:** TBD
 **Scope:** `apps/api` audit seed template + business-analysis schema + audit card
+
+---
+
+## 0. Implementation status (verified 2026-09-18)
+
+This doc previously read "Not started — spec only". That was stale: the control mechanism shipped. Current state, verified against source:
+
+| Item | State | Evidence |
+|---|---|---|
+| §4 `PLATFORM_AVAILABILITY_VERIFICATION_DIRECTIVE` | **Shipped** | `seed-business-audit-v2-templates.ts:364-400`, inserted in both variants (steps 4d/19d) |
+| §4.1 `Absence vs. Non-Negotiable` exception | **Shipped** | same file, lines 83/95-96 |
+| §4.2 `DS_MISSING_PROFILE` definition amendment | **Shipped** | same file, lines 432-435, applied at steps 4e3/19e3 |
+| §5 `render_controls` validator field (Option B) | **Shipped** | `business-analysis.schema.ts:709`, `renderControlSchema` at 586-595 |
+| §7.3 server-side extractor gate (D3) | **Shipped** | `signal-extractor.ts:258-289`, legacy `!google` fallback retained |
+| §7.3 extractor tests | **Shipped** | `TriageEngineService.test.ts:731-812` (8 cases incl. legacy fallback) |
+| §7.2 B3 `action_classification` → nullable | **Not shipped** | `business-analysis.schema.ts:477` still `.optional()` |
+| §7.2 B4 `recommended_tier` → nullable | **Not shipped** | `business-analysis.schema.ts:676` still required `tierEnum` |
+| §7.4 audit card surface | **Not shipped** | no `render_controls` reference in `BusinessAnalysisAuditCard.tsx` |
+| §7.5 §6.1 rubric amendment (`google_profile_maintenance`) | **Not shipped** | rubric sentence still reads "0 points when the profile appears maintained or status is unavailable" |
+| §7.5 §6.3 / §6.4 scoring amendments | **Not shipped** | consistent with B3/B4 above |
+| §8 render-rate measurement prerequisite | **No artefact in-repo** | cannot confirm the §8 graduated decision rule was ever applied per platform |
+
+Seed marker history: the proposed `availability-control-1` landed, then was superseded by `business-audit-v2-2026-09-16-outreach-problems-1` (current).
+
+**Practical consequence:** the mechanism is live but produces no *new* signal on the platforms that block most (Facebook, Yelp) — every determination there collapses to `unable_to_verify` via §3.3. §12 addresses exactly that gap.
 
 ---
 
@@ -431,3 +456,211 @@ Also add a **coverage qualifier**: `controls_rendered / controls_attempted`. Sup
 | Exemplar exists on a platform but has no destination URL | Treat as no control for that platform; note in `data_quality.limitations` (§3.1, B5) |
 | `determination` and `data_status` drift apart | Mapping rule in §5 keeps them reconciled — `business_specific_failure` → `unavailable`, `unable_to_verify` → `unable_to_verify` |
 | `gap_analysis` floods with per-field gaps on a confirmed absence | Single `profile_presence` gap entry per platform, not per-field cascade (§6.1, C3) |
+
+---
+
+## 12. Interactive Verification — the Operator as a Second Render Client
+
+> The control mechanism is live (§0) but inert where it matters most: on Facebook and Yelp the *control* is blocked too, so every determination collapses to `unable_to_verify` and no signal fires. The analyst is the wrong render client on those platforms. §12 supplies one that is not blocked — the operator — without relaxing the "do not bypass bot defenses" constraint that makes the analyst path limited in the first place.
+
+**Status:** Not started — spec only
+**Depends on:** §3–§5 (shipped). Independent of §6 (outstanding).
+**Audience:** the **external import analyst** — the external model whose JSON result is imported via `importExternalResult()`. NOT an internal server-side AI (§12.4).
+
+### 12.1 Why §3.3 is inert on the platforms that matter
+
+§3.3's fallback is correct and, on Facebook and Yelp, dominant. The analyst is blocked by bot defense and login walls; the control URL is blocked by the same wall; every determination resolves to `unable_to_verify`; no signal fires. §8's own graduated rule then concludes *"< 20% render rate → do not ship the control for that platform"* — abandoning precisely the platforms carrying the most visibility pain.
+
+The cause is not the control design. It is that a plain fetch is the wrong render client. The directive already forbids the analyst from doing anything about it:
+
+> `Do not bypass bot defenses, solve access controls, or perform intrusive testing.`
+
+§12 supplies a render client that is not blocked, and keeps that rule intact.
+
+### 12.2 Reframe — a second render client, not a second mechanism
+
+The operator is a render client. The §3.2 determination table applies **unchanged**. Add one field to each `render_controls` entry — `attempted_by: analyst | operator` — and the mechanism needs no new logic, no new table, and no new fallback.
+
+| Control outcome | Business outcome | Determination | Signal |
+|---|---|---|---|
+| Rendered | Not rendered | `business_specific_failure` | `DS_MISSING_PROFILE` (primary platforms only) |
+| Rendered | Rendered | `platform_available` | none — proceed with normal platform audit |
+| Not rendered | any | `unable_to_verify` | none |
+| No control for this platform | any | `unable_to_verify` | none |
+
+An operator-supplied attempt is a control attempt. That is the whole design.
+
+**Decision (recorded):** an operator-established absence reuses `determination: business_specific_failure`; provenance is carried by `attempted_by`. No distinct `operator_confirmed_absence` value. This keeps the shipped `signal-extractor.ts` gate working with **zero extractor change** (§12.8). Revisit only if downstream weighting proves necessary.
+
+### 12.3 The asymmetry — design the round trip around it
+
+§2.1's argument (analyst path = customer path) does **not** transfer to a logged-in operator. The operator has a session, a device, and often an app — the customer may not. That produces an asymmetry the handoff should be built around:
+
+| Operator condition | Observation | Determination |
+|---|---|---|
+| Authenticated, profile **not found** | Verified absent | `business_specific_failure` — the strongest negative evidence available |
+| Authenticated, profile found, logged-out visitor also renders it | Present, public | `platform_available` |
+| Authenticated, profile found, **logged-out visitor cannot** render it | Present but gated | `login_wall` — platform-wide, NOT business-specific → `unable_to_verify`, no signal |
+| Not attempted / declined / timed out | — | `unable_to_verify`, `access_barrier: not_attempted` |
+
+The payoff is asymmetric on purpose. A logged-out 404 is ambiguous — many platforms 404 logged-out visitors on profiles that do exist. An authenticated miss is not. The handoff therefore converts ambiguous → attributable **most reliably when the answer is "nothing is there"** — exactly the case §1.1 shows the audit currently scores as health.
+
+**Corollary rule:** a positive observation must carry the visibility condition it was observed under. An authenticated positive may never be recorded as a public render.
+
+### 12.4 Where the pause actually happens — and to whom the directive is addressed
+
+The directive is addressed to the **external import analyst**: the external model whose JSON result is imported back through `importExternalResult()`. It is not addressed to an internal server-side AI, and there is no server-side agent loop to pause. `executeSingle` issues a single `generateChatCompletion` with no tools and `maxTokens: 2000` (`MarketingExecutionService.ts:193-201`); the browsing happens provider-side, inside the external session — which is exactly where the operator is already present.
+
+So the "pause" is a turn in an external conversation. The platform's only two responsibilities are:
+
+1. put the directive into the rendered text the operator copies out, and
+2. accept the observations back on the import side.
+
+**Injection point: render-time, not seeded.** The directive is emitted into the rendered prompt when the operator clicks to resolve — the render action at `marketing-ops.ts:3051` → `MarketingExecutionService.renderPrompt()` → `resolvePrompt()` — and appended only when interactive mode is on. It must **not** be baked into the seeded template body, for three reasons:
+
+1. **A seeded directive is always-on.** Every audit would be told it may pause — including one-shot, batch, and Direct API runs where no operator is present to answer. Render-time injection makes it a *mode*, selected at the moment an operator is actually available.
+2. **It matches the shared-directive contract.** Per AGENTS.md, shared directives are composed once by the prompt-composition layer and must never be copied into fragment bodies or seed transforms (the `report-directives.ts` pattern). The availability-control directive was seeded because it is unconditional; this one is conditional, so it belongs in the composed layer.
+3. **The directive text stays out of the body.** Only a one-line opt-in placeholder is seeded (§12.4.1); the directive itself is never duplicated into the body — so there is no tone drift between the two variants and no re-seed when the directive wording changes.
+
+**Single choke point.** `resolvePrompt` has **21 return sites** (lines 755–1796), each funnelling its assembled text through `appendPromptSuffix` (line 1811). Injecting at each return is a 21-place change that will rot the first time a branch is added. Inject **once, at the choke point**, and gate it there.
+
+**Ordering vs. the output-schema suffix.** `appendPromptSuffix(rendered, promptSuffix)` currently makes the JSON output-schema suffix the last thing the analyst reads. The codebase has a convention for directives that must override that position — the candidate search-scope directive is appended *after* the suffix explicitly "so it is the final word the analyst reads" (`MarketingExecutionService.ts:2382`). Decide deliberately which side the interactive directive lands on: it is a behavioural instruction (pause and ask) rather than an output-shape instruction, so "final word" is the natural choice — but it must not be phrased in a way that lets the analyst treat the schema as optional. If it is emitted after the suffix, it must restate that the JSON contract still governs the final output.
+
+#### 12.4.1 The opt-in is a Prompt Workspace variable
+
+The operator opts in by setting a variable in the Prompt Workspace; when it is set, the rendered prompt carries the directive and the external analyst is **on notice** that interactive mode is available for this run. When it is not set, the directive is absent and the analyst behaves exactly as today.
+
+Framing matters here: the directive gives **notice of capability**, not a mandate to pause. "Interactive verification is available in this run — if a platform blocks you and the outcome would change, you may ask the operator" rather than "you must pause." The emit-when bounds (§12.6) remain hard MUSTs; *whether to invoke* the capability is the analyst's judgment. That is what keeps a notice from becoming an interview.
+
+**How the variable reaches the render.** `resolvePrompt()` already receives the caller's `variables`, so no new route parameter or plumbing is needed. Three details make it work, and one of them is a hard-failure hazard:
+
+1. **Declare the placeholder in the template body** — `{{interactive_verification}}`. `PromptWorkspaceClient.extractedVariables` scans the *body* for `{{var}}` (`PromptWorkspaceClient.tsx:493-499`) and renders one text input per match, so a body declaration is what makes it appear in the Variables panel with **zero UI work**. `buildVariablesPayload` then sends every declared variable, defaulting to `''` (line 542).
+2. **Add `interactive_verification` to `SCOPE_VARIABLES.business`** (`scope-utils.ts:36-41`). **This is required, not optional.** `renderTemplate` rejects any body-referenced variable that is neither whitelisted nor supplied by the caller (`MarketingExecutionService.ts:2652`):
+   ```ts
+   const outOfScope = Array.from(referenced).filter(
+     (v) => !allowed.includes(v) && !(variables && v in variables));
+   if (outOfScope.length > 0) throw new Error(`Template references out-of-scope variables for scope "${scope}"...`);
+   ```
+   The copy-paste path supplies it (the workspace sends every declared var), but **`executeSingle()` (Direct API) and `importExternalResult()` do not** — they pass only their own variable sets. Without the whitelist entry, both paths would **hard-fail on the audit template** the moment the placeholder is declared. This is the same reason `detected_signals` / `audit_results` / `prior_outreach` are supplied via override rather than declared (deliverable-source-material spec §7.2) — but those templates have a single service caller, whereas the audit template has three.
+3. **Blank means off.** The seam gate treats falsy / empty / `'off'` as disabled: the directive is not appended.
+
+**Alternative if true byte-identity matters.** Declaring the placeholder in the body means a blank substitution still leaves the line (cosmetically empty) in the rendered prompt — so "off" is *not* strictly byte-identical to today (§12.10). The alternative is a dedicated workspace control (checkbox) that supplies `interactive_verification` as a caller-supplied override, which `renderTemplate` accepts via the `v in variables` clause without any body declaration. That costs a small `PromptWorkspaceClient` change but keeps the body untouched — no seed change, and a true byte-identical "off" path. Recommended only if the placeholder line in the body is judged unacceptable.
+
+**Version stamping.** Compose the directive in a shared module (sibling of `report-directives.ts`) carrying an `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION` constant, mirroring `REPORT_DIRECTIVES_VERSION`, so execution metadata can identify which directive version produced a run.
+
+**Phasing consequence.** Because the injection is render-time and conditional, the copy-paste bridge needs no runtime state at all — the operator is inside the session. Only the Direct API path (phase 2) needs job state: `mkt_prompt_executions_list.status` (`varchar(50)`, default `pending`, no CHECK constraint) gains `awaiting_operator`, the handoff requests are stored on the execution row, and a resume endpoint re-renders with `operator_observations` injected. Lower priority — that path has no browsing, so it is not where audits run today.
+
+### 12.5 Contract
+
+**Output (the ask).** Reuse the shape that already exists — `unresolved_questions[]` from `REPORT_EVIDENCE_DIRECTIVE` (`field, question, reason, suggested_verification_method`). Do not invent `verification_handoff`. The interactive directive's addition is (a) a bound on *when* to emit and (b) the requirement that the ask be actionable: exact URL, exact fields wanted, and what a negative answer looks like.
+
+**Input (the answer).** `operator_observations` as a prompt variable:
+
+```
+{ platform, url, visibility_condition: public_logged_out | authenticated | unknown,
+  observed_at, found: boolean | null, fields: {...}, notes }
+```
+
+The answer can enter by either path, and both must be supported:
+
+1. **In-session** (copy-paste bridge, the common case) — the operator answers the analyst's question inside the external conversation; the analyst records it in `render_controls[]` on its own final output. No platform variable involved.
+2. **Supplied on a re-render** — the operator pastes structured observations back and the prompt is resolved again with `operator_observations` set. This is the Direct API resume path (§12.4 phase 2) and the manual re-run path.
+
+Per the deliverable-source-material contract, `renderTemplate()`, `renderPromptText()` and `importExternalResult()` must all receive identical variables — `resolvePrompt` is the shared seam, so the variable is added there once and every mode inherits it.
+
+**Record.** `render_controls[]` entries gain `attempted_by`, `visibility_condition`, `observed_at`, `observation_notes`. `renderControlSchema` is `.passthrough()` (`business-analysis.schema.ts:595`), so **phase 1 needs no validator change**; phase 2 adds the enums for machine readability. Because the seeded example entry is not being touched (§12.4), the directive text is where the external analyst learns the extended entry shape.
+
+### 12.6 Bounds and guardrails
+
+- **One batched pause per audit**, not one per platform. Audits are already "One Hour"; wall clock, not tokens, is the cost of a pause.
+- **Ask only when the answer flips a determination:** platform in scope AND analyst blocked AND (primary platform OR gates a `non_negotiable`). Never ask about bing / apple_maps.
+- **Cap the round trips** — mirror §6's six-attempt budget. A second ask is a new pause.
+- **Never ask the operator to defeat a bot wall, solve a CAPTCHA, or use credentials they do not own.** "Open this URL in your browser and tell me what you see as yourself" is the permitted request. Anything requiring the operator to circumvent a control is out of scope — the analyst's `do not bypass bot defenses` rule is the counterpart constraint, not a loophole around it.
+- **Decline / timeout → `not_attempted`**, determination stays `unable_to_verify`. Strictly additive: a pause may never make an audit worse than today (preserves §1.4 fail-safe).
+- **Bound the ask to observables** — rating, review count, profile existence, claimed status, hours presence, primary category. Never "summarize the page."
+
+### 12.7 Provenance and honesty
+
+An operator observation is **self-reported evidence** and must stay labelled as such: `attempted_by: operator`, `observed_at`, `visibility_condition`, exact URL, exact observed value. Whenever a determination rests on one, it must be surfaced in `data_quality.limitations`. It may never be laundered into an unattributed "analyst verified."
+
+The incentive problem is the reason for the labelling: the operator sells the fix, so a finding is commercially convenient. Falsifiability is the guard — a recorded URL and a recorded value that anyone can re-check. This is §1.4's *recorded, not inferred* applied to a human observer.
+
+### 12.8 Interaction with the extractor and §6
+
+`signal-extractor.ts:258-289` already gates `DS_MISSING_PROFILE` on `render_controls.determination === 'business_specific_failure'` for the four primary platforms, with a legacy `!google` fallback. Reusing that determination value (§12.2 decision) means an operator-established absence fires the signal through the **existing gate with no extractor change**. `attempted_by` carries provenance for anything downstream that wants to weight or filter it.
+
+This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yelp stays near zero, and §6.1's "excluded from the denominator" amendment converts unverifiability into *silence* rather than *evidence* — better than scoring it as health, but still no finding. With the operator path, `controls_rendered / controls_attempted` becomes a real number and the §6.4 coverage qualifier becomes meaningful.
+
+### 12.9 Implementation tasks
+
+**Phase 1 — render-time directive + Prompt Workspace opt-in (one seeded placeholder line; no migration):**
+
+- [ ] New shared directives module (sibling of `report-directives.ts`) exporting `INTERACTIVE_VERIFICATION_DIRECTIVE` + `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION`. The **directive text** is never seeded — see §12.4
+- [ ] Encode the **notice framing** (§12.4.1), the emit-when rules (§12.6) and the authenticated / visibility-condition rule (§12.3) in the directive text
+- [ ] Document the extended `render_controls` entry shape (`attempted_by`, `visibility_condition`, `observed_at`, `observation_notes`) **in the directive** — the seeded `RENDER_CONTROLS_SCHEMA` example entry stays untouched, so the directive is where the external analyst learns the shape
+- [ ] Declare `{{interactive_verification}}` in the audit template body (both variants) so the Prompt Workspace renders the opt-in input with no UI work — this is the **only** seeded change, and it is a placeholder, not the directive
+- [ ] Add `'interactive_verification'` to `SCOPE_VARIABLES.business` (`scope-utils.ts:36-41`) — **required**; without it `renderTemplate` hard-fails on the Direct API and import paths (§12.4.1). Add a scope test alongside `MarketingExecutionService.scope.test.ts`
+- [ ] Inject the directive **once at the choke point** (`appendPromptSuffix`, line 1811), gated on the variable being truthy — never at the 21 individual return sites in `resolvePrompt`
+- [ ] The gate must hold on `executeSingle()` and `importExternalResult()` too — both share `resolvePrompt`, and a blank variable must mean "off" on every path
+- [ ] Accept `operator_observations` at the same seam, for the re-render path (§12.5)
+- [ ] Record the directive version on the execution, mirroring `REPORT_DIRECTIVES_VERSION` handling
+- [ ] Bump `SEED_VERSION_MARKER` and re-run local + prd (the placeholder declaration requires it); verify `updated_at` moved
+
+**Phase 2 — platform-side pause (only if Direct API audits become real):**
+
+- [ ] `status: 'awaiting_operator'` on `mkt_prompt_executions_list`
+- [ ] Handoff-request storage + resume endpoint
+- [ ] Operator checklist UI — the ask rendered as an actionable list, not prose
+- [ ] Operator toggle for interactive mode at resolve time (phase 1 can ship with the flag passed by the render call; phase 2 gives it a control)
+
+**Phase 3 — scoring (gated on phase 1 producing coverage):**
+
+- [ ] §6.1, §6.3, §6.4 amendments — all still outstanding (§0)
+
+### 12.10 Verification
+
+**Behaviour**
+
+- Analyst blocked on facebook, operator authenticated, profile absent → `determination: business_specific_failure`, `attempted_by: operator`, `DS_MISSING_PROFILE` fires
+- Same, profile present and also renders logged-out → `platform_available`, no signal
+- Same, profile present only authenticated → `login_wall`, `unable_to_verify`, no signal
+- Operator declines → `not_attempted`, `unable_to_verify`, output otherwise identical to today
+- Every operator-attributed determination appears in `data_quality.limitations`
+- No ask is emitted for a non-primary platform, or for a platform where the analyst was not blocked
+
+**Regression**
+
+- Interactive mode **off** → the directive is absent at every one of the 21 return sites; the only delta from today's render is the blank `{{interactive_verification}}` placeholder line (§12.4.1)
+- Direct API / batch / import runs do not receive the directive — the gate holds on `executeSingle()` and `importExternalResult()`, which share `resolvePrompt`
+- Direct API and import paths do **not** throw `out-of-scope variables for scope "business"` — the `SCOPE_VARIABLES.business` entry is what prevents this (§12.4.1)
+- No `operator_observations` supplied (legacy / one-shot run) → no behavioural change
+- The **directive text** never enters the body — only the opt-in placeholder does, so directive wording changes need no re-seed
+- Extractor suite `TriageEngineService.test.ts:731-812` passes unchanged (8 cases)
+
+**End to end**
+
+- Run one real audit in copy-paste mode with a blocked platform, supply an operator observation, import the result, and confirm the determination + signal land. Do not rely on reading the schema.
+
+### 12.11 Non-goals
+
+- Relaxing `do not bypass bot defenses` — the operator path exists *because* the analyst path is constrained
+- Treating an authenticated positive render as public evidence
+- Asking the operator to do the analyst's research (summaries, judgment calls)
+- Unbounded pausing — a pause is a budgeted event, not a mode
+- Making operator observations look like analyst observations
+- A distinct `operator_confirmed_absence` determination value (deferred; §12.2 decision)
+
+### 12.12 Risks
+
+| Risk | Mitigation |
+|---|---|
+| Operator self-report is gamed (they sell the fix) | Recorded URL + value + visibility condition + `attempted_by`; surfaced in `data_quality.limitations` |
+| Authenticated view mistaken for the public path | Mandatory `visibility_condition`; authenticated-only visibility resolves to `login_wall`, not a business finding |
+| Every audit turns into an interview | Emit-when rules + one batched pause + round-trip cap |
+| Operator asked to circumvent a control | Explicit permitted-request rule (§12.6); ask bounded to observables |
+| A pause makes audits worse than today | Fail-safe: decline/timeout → `not_attempted` → `unable_to_verify`; legacy runs byte-identical |
+| Operator-attributed signal confuses downstream weighting | Reuse `business_specific_failure` + `attempted_by` provenance; revisit only if weighting is needed |
+| Placeholder declared in the body without a scope-whitelist entry | Add `interactive_verification` to `SCOPE_VARIABLES.business` in the same change — `renderTemplate` hard-throws on the Direct API / import paths otherwise (§12.4.1) |
+| Opt-in is never used, so coverage never improves | Payoff is opt-in by design (§12.8); keep the workspace variable prominent, and consider defaulting it on for the copy-paste render path where an operator is present by definition |
+| Notice framing drifts into a mandate, turning audits into interviews | Directive is phrased as notice of capability, not an instruction to pause; emit-when bounds stay hard MUSTs (§12.4.1) |
+| Interactive mode only works in copy-paste bridge | Accepted for phase 1 — that is where audits actually run (§12.4); phase 2 covers Direct API |

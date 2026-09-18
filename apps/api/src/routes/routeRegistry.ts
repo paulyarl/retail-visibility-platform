@@ -1387,7 +1387,7 @@ export const routeRegistry: RouteEntry[] = [
     router: marketingOpsRoutes,
     domain: 'admin',
     authLevel: 'admin',
-    comment: 'Marketing Ops admin routes — campaigns, audits, files, files/upload (diagnostic screenshots), files/diagnostic-screenshots (signed URLs), prompts, executions, filter flags, scorecards, deliverables, branding, gallery-token, campaigns/:id/gallery-analytics, gallery-analytics/dashboard',
+    comment: 'Marketing Ops admin routes — campaigns, audits, files, files/upload (diagnostic screenshots), files/diagnostic-screenshots (signed URLs), prompts, executions, filter flags, scorecards, deliverables, branding, gallery-token, campaigns/:id/gallery-eligibility, campaigns/:id/gallery-analytics, gallery-analytics/dashboard',
   },
   {
     path: '/api/admin/gbp-monitor',

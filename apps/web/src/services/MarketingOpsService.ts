@@ -1825,7 +1825,8 @@ export interface CampaignCreateInput {
 }
 
 export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
-  stage?: CampaignStage;
+  // NOTE: no `stage` — stage moves through POST /:id/transition so the
+  // transition guards apply (see StageTransitionInput).
   retainer_status?: RetainerStatus;
   retainer_amount_cents?: number;
   retainer_start_date?: string;
@@ -1857,6 +1858,12 @@ export interface ChecklistIncompleteError {
   code: 'checklist_incomplete';
   incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   message: string;
+}
+
+export interface BusinessAnalysisRequiredError {
+  code: 'business_analysis_required';
+  message: string;
+  action?: string;
 }
 
 export interface ContactReadiness {
@@ -2285,6 +2292,16 @@ class MarketingOpsService extends AdminApiSingleton {
           message: 'Required checklist steps are incomplete',
         };
         throw checklistErr;
+      }
+      // Hard gate: preview_built requires a resolvable archetype. Surface the
+      // action so the UI can point the operator at the business analysis.
+      if (err?.error === 'business_analysis_required') {
+        const auditErr: BusinessAnalysisRequiredError = {
+          code: 'business_analysis_required',
+          message: err.message || 'A business_analysis audit is required before preview_built',
+          action: err.action,
+        };
+        throw auditErr;
       }
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
     }
@@ -6098,6 +6115,22 @@ export interface GalleryTokenParams {
   ctaLabel?: string;
 }
 
+/**
+ * Pre-flight for the Diagnostic Gallery tab: whether a gallery token can be
+ * minted, and if not, why. `action` is the operator's next step.
+ */
+export interface GalleryEligibility {
+  eligible: boolean;
+  stage: string;
+  stageOk: boolean;
+  screenshotCount: number;
+  hasBusinessAnalysisAudit: boolean;
+  hasAcceptedTriage: boolean;
+  archetype: string | null;
+  reason: 'invalid_stage' | 'no_screenshots' | 'no_business_analysis_audit' | 'archetype_unresolved' | null;
+  action: string | null;
+}
+
 export interface GalleryToken {
   id: string;
   token: string;
@@ -6327,6 +6360,7 @@ export interface PromptResolution {
 
 interface MarketingOpsService {
   generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GalleryToken>;
+  getGalleryEligibility(campaignId: string): Promise<GalleryEligibility>;
   generateMultiGalleryToken(prospectId: string, expiryDays?: number): Promise<GalleryToken>;
   listGalleryTokens(campaignId: string): Promise<GalleryToken[]>;
   getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;
@@ -6418,6 +6452,23 @@ MarketingOpsService.prototype.generateGalleryToken = async function (
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate gallery token');
   }
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.getGalleryEligibility = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+): Promise<GalleryEligibility> {
+  // ttl 0 — eligibility reflects live audit/screenshot state.
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/campaigns/${campaignId}/gallery-eligibility`,
+    { method: 'GET' },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve gallery eligibility');
+  }
   return result.data?.data ?? result.data;
 };
 

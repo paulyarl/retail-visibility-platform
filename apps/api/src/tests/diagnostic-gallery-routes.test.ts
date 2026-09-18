@@ -21,6 +21,7 @@ const {
   mockFilesList,
   mockGalleryEvents,
   mockGalleryAnalytics,
+  mockAuditsList,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findUnique: vi.fn(), update: vi.fn() },
   mockPreviewTokens: {
@@ -33,6 +34,7 @@ const {
   mockFilesList: { findMany: vi.fn() },
   mockGalleryEvents: { create: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), count: vi.fn() },
   mockGalleryAnalytics: { upsert: vi.fn() },
+  mockAuditsList: { findMany: vi.fn(), findFirst: vi.fn() },
 }));
 
 vi.mock('../prisma', () => ({
@@ -42,6 +44,7 @@ vi.mock('../prisma', () => ({
     mkt_files_list: mockFilesList,
     mkt_gallery_events: mockGalleryEvents,
     mkt_gallery_analytics: mockGalleryAnalytics,
+    mkt_audits_list: mockAuditsList,
   },
 }));
 
@@ -113,6 +116,13 @@ vi.mock('../services/OutreachOpenerService', () => ({
   }),
 }));
 
+// PlaybookChecklistService — the transition route's checklist soft gate runs
+// before the archetype gate; return no incomplete steps so the archetype gate
+// is the one under test.
+vi.mock('../services/PlaybookChecklistService', () => ({
+  default: { getIncompleteRequiredSteps: vi.fn().mockResolvedValue([]) },
+}));
+
 // selectArchetype is from archetype-selection — mock to avoid DB access.
 vi.mock('../services/outreach-openers/archetype-selection', () => ({
   selectArchetype: vi.fn().mockReturnValue({ archetype: 'A2', theme: null }),
@@ -156,6 +166,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 import marketingOpsPublicRouter from '../routes/marketing-ops-public';
 import marketingOpsRouter from '../routes/marketing-ops';
+import { resolveCampaignArchetype } from '../services/OutreachOpenerService';
 
 // ── Test apps ──────────────────────────────────────────────────────────
 
@@ -232,6 +243,7 @@ beforeEach(() => {
   mockCampaignsList.findUnique.mockResolvedValue(campaign);
   mockGalleryEvents.create.mockResolvedValue({ id: 'gevt-001' });
   mockGalleryEvents.createMany.mockResolvedValue({ count: 1 });
+  mockAuditsList.findMany.mockResolvedValue([]);
 });
 
 // ── Token resolution tests ─────────────────────────────────────────────
@@ -355,5 +367,81 @@ describe('POST /api/admin/marketing-ops/campaigns/:id/gallery-token — generati
       .post(`/api/admin/marketing-ops/campaigns/nonexistent/gallery-token`)
       .send({ expiryDays: 3 });
     expect(res.status).toBe(404);
+  });
+});
+
+// ── Gallery eligibility precheck (GET) ─────────────────────────────────
+
+describe('GET /api/admin/marketing-ops/campaigns/:id/gallery-eligibility', () => {
+  it('reports eligible with the resolved archetype for a shown campaign', async () => {
+    const res = await request(adminApp)
+      .get(`/api/admin/marketing-ops/campaigns/${CAMPAIGN_ID}/gallery-eligibility`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.eligible).toBe(true);
+    expect(res.body.data.archetype).toBe('A2');
+    expect(res.body.data.reason).toBeNull();
+    expect(res.body.data.hasBusinessAnalysisAudit).toBe(true);
+  });
+
+  it('reports no_business_analysis_audit when no archetype can be resolved', async () => {
+    vi.mocked(resolveCampaignArchetype).mockRejectedValueOnce(
+      new Error(`Campaign ${CAMPAIGN_ID} has no business_analysis audit.`),
+    );
+    const res = await request(adminApp)
+      .get(`/api/admin/marketing-ops/campaigns/${CAMPAIGN_ID}/gallery-eligibility`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.eligible).toBe(false);
+    expect(res.body.data.reason).toBe('no_business_analysis_audit');
+    expect(res.body.data.action).toBeTruthy();
+    expect(res.body.data.hasBusinessAnalysisAudit).toBe(false);
+  });
+
+  it('reports invalid_stage for a campaign not yet at preview_built/shown', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({ ...campaign, stage: 'seed' });
+    const res = await request(adminApp)
+      .get(`/api/admin/marketing-ops/campaigns/${CAMPAIGN_ID}/gallery-eligibility`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.eligible).toBe(false);
+    expect(res.body.data.reason).toBe('invalid_stage');
+  });
+});
+
+// ── seed → preview_built archetype guard ───────────────────────────────
+
+describe('POST /api/admin/marketing-ops/:id/transition — preview_built archetype gate', () => {
+  it('returns 409 business_analysis_required when no archetype can be resolved', async () => {
+    vi.mocked(resolveCampaignArchetype).mockRejectedValueOnce(
+      new Error(`Campaign ${CAMPAIGN_ID} has no business_analysis audit.`),
+    );
+    const res = await request(adminApp)
+      .post(`/api/admin/marketing-ops/${CAMPAIGN_ID}/transition`)
+      .send({ to_stage: 'preview_built', trigger_type: 'manual' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('business_analysis_required');
+    expect(res.body.action).toBeTruthy();
+  });
+
+  it('does not gate transitions to other stages on the archetype', async () => {
+    vi.mocked(resolveCampaignArchetype).mockRejectedValueOnce(
+      new Error(`Campaign ${CAMPAIGN_ID} has no business_analysis audit.`),
+    );
+    // seek → seed does not require an archetype; the request must get past the
+    // archetype gate (it may still fail later inside the transition service,
+    // which this test does not assert on).
+    const res = await request(adminApp)
+      .post(`/api/admin/marketing-ops/${CAMPAIGN_ID}/transition`)
+      .send({ to_stage: 'seed', trigger_type: 'manual' });
+    expect(res.status).not.toBe(409);
+  });
+
+  it('is a hard block — acknowledge_missing_audit does not bypass it', async () => {
+    vi.mocked(resolveCampaignArchetype).mockRejectedValueOnce(
+      new Error(`Campaign ${CAMPAIGN_ID} has no business_analysis audit.`),
+    );
+    const res = await request(adminApp)
+      .post(`/api/admin/marketing-ops/${CAMPAIGN_ID}/transition`)
+      .send({ to_stage: 'preview_built', trigger_type: 'manual', acknowledge_missing_audit: true });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('business_analysis_required');
   });
 });

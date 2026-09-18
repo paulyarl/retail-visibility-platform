@@ -255,6 +255,15 @@ export default function CampaignDetailClient({
     toStage: CampaignStage;
     incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   } | null>(null);
+  // Hard gate for preview_built without a resolvable archetype (no
+  // business_analysis audit and no accepted triage) — the campaign would be
+  // stranded: openers, headers, gallery defaults and deliverable sections all
+  // derive from the archetype, and there is no back-edge to seed.
+  const [missingAuditDialog, setMissingAuditDialog] = useState<{
+    toStage: CampaignStage;
+    message: string;
+    action?: string;
+  } | null>(null);
   const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
   // Ref to the stage pipeline bar — used by the focusStage deep-link
   // (e.g. ?focus=preview_built from the openers workspace) to scroll the
@@ -664,6 +673,11 @@ export default function CampaignDetailClient({
       // let the operator acknowledge and proceed (never hard-blocks).
       if (err?.code === 'checklist_incomplete' && Array.isArray(err?.incompleteSteps)) {
         setChecklistIncompleteDialog({ toStage, incompleteSteps: err.incompleteSteps });
+      } else if (err?.code === 'business_analysis_required') {
+        // Hard gate: preview_built needs a resolvable archetype, and there is no
+        // back-edge (preview_built → seed is invalid) — so this is terminal
+        // until the business analysis runs.
+        setMissingAuditDialog({ toStage, message: err.message, action: err.action });
       } else {
         setError(err.message || 'Failed to transition stage');
       }
@@ -900,6 +914,37 @@ export default function CampaignDetailClient({
                 className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {missingAuditDialog && (
+          <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+            <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">
+              Blocked: no campaign archetype
+            </h3>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-400">{missingAuditDialog.message}</p>
+            {missingAuditDialog.action && (
+              <p className="mt-1 text-xs text-red-700 dark:text-red-400">{missingAuditDialog.action}</p>
+            )}
+            <p className="mt-1 text-xs text-red-700 dark:text-red-400">
+              preview_built has no route back to seed, so this must be fixed forward.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('prompts'); setMissingAuditDialog(null); }}
+                className="rounded-md bg-white dark:bg-neutral-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-600"
+              >
+                Go to Prompts
+              </button>
+              <button
+                type="button"
+                onClick={() => setMissingAuditDialog(null)}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                Dismiss
               </button>
             </div>
           </div>

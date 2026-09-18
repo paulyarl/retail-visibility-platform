@@ -161,7 +161,7 @@ import MarketingCategoryToneService from '../services/MarketingCategoryToneServi
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 import CategoryVocabularyService from '../services/CategoryVocabularyService';
 import { ReviewResponseService } from '../services/ReviewResponseService';
-import { OutreachOpenerService, resolveCampaignArchetype } from '../services/OutreachOpenerService';
+import { OutreachOpenerService } from '../services/OutreachOpenerService';
 import { selectArchetype, type BusinessAnalysisAuditData } from '../services/outreach-openers/archetype-selection';
 import { resolveGalleryArchetypeDefaults } from '../services/marketing/GalleryArchetypeDefaults';
 import galleryAnalyticsService from '../services/GalleryAnalyticsService';
@@ -208,6 +208,7 @@ import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
 import PostalMailerService from '../services/marketing/PostalMailerService';
 import { generatePostcardPdf } from '../services/marketing/PostalMailerPdfService';
+import GalleryEligibilityService, { type GalleryEligibility } from '../services/marketing/GalleryEligibilityService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
@@ -376,7 +377,11 @@ export const campaignCreateSchema = campaignBaseSchema
   });
 
 const campaignUpdateSchema = campaignBaseSchema.partial().extend({
-  stage: z.enum(['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
+  // NOTE: `stage` is intentionally NOT updatable here. Stage moves through the
+  // transition route (POST /:id/transition) so the checklist and preview_built
+  // archetype guards apply. Previously the field was accepted here and then
+  // dropped by MarketingCampaignService.updateCampaign, which made the edit
+  // form's Stage dropdown a silent no-op.
   tone: z.string().max(50).optional(),
   retainer: z.enum(['Fast', 'Medium', 'Slow']).nullable().optional(),
   attributes: z.array(z.string()).optional(),
@@ -1379,6 +1384,15 @@ router.post('/:id/gap-log', async (req: any, res: Response) => {
 
 router.put('/:id', async (req: any, res: Response) => {
   try {
+    // Stage is not editable via the generic update — see campaignUpdateSchema.
+    // Fail loudly instead of silently dropping the value.
+    if (req.body?.stage !== undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'stage_not_editable',
+        message: 'Stage is not editable here. Use the stage pipeline (POST /:id/transition) so transition guards apply.',
+      });
+    }
     const parsed = campaignUpdateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.updateCampaign(req.params.id, {
       scope: parsed.scope,
@@ -1418,7 +1432,6 @@ router.put('/:id', async (req: any, res: Response) => {
       attributes: parsed.attributes,
       assignedTo: parsed.assigned_to,
       notes: parsed.notes,
-      stage: parsed.stage,
       retainerStatus: parsed.retainer_status,
       retainerAmountCents: parsed.retainer_amount_cents,
       retainerStartDate: parsed.retainer_start_date === null ? null : parsed.retainer_start_date ? new Date(parsed.retainer_start_date) : undefined,
@@ -1467,6 +1480,27 @@ router.post('/:id/transition', async (req: any, res: Response) => {
           success: false,
           error: 'checklist_incomplete',
           incomplete_steps: incomplete.map((s) => ({ id: s.id, title: s.title, stage_tag: s.stageTag })),
+        });
+      }
+    }
+
+    // Hard gate: entering preview_built without a resolvable archetype strands
+    // the campaign — every downstream consumer (openers, headers, closers,
+    // gallery defaults, deliverable sections) derives from it, and the
+    // transition map has no back-edge (preview_built → seed is invalid), so the
+    // operator cannot undo it. Block at the door instead.
+    if (parsed.to_stage === 'preview_built') {
+      const source = await GalleryEligibilityService.resolveArchetypeSource(req.params.id, getCtx(req));
+      if (!source.archetype) {
+        return res.status(409).json({
+          success: false,
+          error: 'business_analysis_required',
+          message:
+            'No archetype can be resolved: this campaign has no business_analysis audit and no accepted triage. ' +
+            'Run the seek-stage business analysis before entering preview_built.',
+          action: 'Run the seek-stage business analysis from the Prompts tab.',
+          has_business_analysis_audit: source.hasBusinessAnalysisAudit,
+          has_accepted_triage: source.hasAcceptedTriage,
         });
       }
     }
@@ -6605,6 +6639,34 @@ const galleryTokenCreateSchema = z.object({
   expires_in_days: z.number().int().min(1).max(365).default(7),
 });
 
+function galleryEligibilityMessage(eligibility: GalleryEligibility): string {
+  switch (eligibility.reason) {
+    case 'invalid_stage':
+      return `Gallery tokens can only be generated for campaigns at the preview_built or shown stage (current: ${eligibility.stage}).`;
+    case 'no_screenshots':
+      return 'Upload at least one screenshot before generating a gallery token.';
+    default:
+      return 'Could not resolve campaign archetype. Ensure a business_analysis audit exists or triage is accepted.';
+  }
+}
+
+/**
+ * GET /campaigns/:id/gallery-eligibility
+ *
+ * Pre-flight for the Diagnostic Gallery tab: resolves whether this campaign can
+ * mint a gallery token, and if not, why (invalid_stage | no_screenshots |
+ * no_business_analysis_audit | archetype_unresolved) plus the next action.
+ * Lets the UI warn and disable Generate instead of surfacing a 400 on click.
+ */
+router.get('/campaigns/:id/gallery-eligibility', async (req: any, res: Response) => {
+  try {
+    const eligibility = await GalleryEligibilityService.resolveEligibility(req.params.id, getCtx(req));
+    res.json({ success: true, data: eligibility });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 /**
  * POST /campaigns/:id/gallery-token
  *
@@ -6630,64 +6692,48 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
     const { id } = req.params;
     const ctx = getCtx(req);
 
-    // 1. Load campaign + stage gate
+    // 1. Load campaign (pricing + response payload)
     const campaign = await prisma.mkt_campaigns_list.findUnique({
       where: { id },
-      select: {
-        id: true,
-        stage: true,
-        package_price_cents: true,
-        mkt_files_list: {
-          where: { file_type: 'diagnostic_screenshot' },
-          select: { id: true, file_name: true },
-        },
-      },
+      select: { id: true, package_price_cents: true },
     });
     if (!campaign) {
       return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
     }
 
-    const ALLOWED_STAGES = ['preview_built', 'shown'];
-    if (!ALLOWED_STAGES.includes(campaign.stage)) {
+    // 2. Stage + screenshot + archetype gates. The eligibility service returns a
+    // machine-readable reason + action so callers render the next step instead
+    // of string-matching the message.
+    const eligibility = await GalleryEligibilityService.resolveEligibility(id, ctx);
+    if (!eligibility.eligible) {
+      const errorCode =
+        eligibility.reason === 'invalid_stage'
+          ? 'invalid_stage'
+          : eligibility.reason === 'no_screenshots'
+          ? 'no_screenshots'
+          : 'archetype_unresolved';
       return res.status(400).json({
         success: false,
-        error: 'invalid_stage',
-        message: `Gallery tokens can only be generated for campaigns at the preview_built or shown stage (current: ${campaign.stage}).`,
+        error: errorCode,
+        reason: eligibility.reason,
+        action: eligibility.action,
+        eligibility,
+        message: galleryEligibilityMessage(eligibility),
       });
     }
+    const archetype = eligibility.archetype as string;
 
-    // 2. Screenshot gate
-    if (campaign.mkt_files_list.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'no_screenshots',
-        message: 'Upload at least one screenshot before generating a gallery token.',
-      });
-    }
-
-    // 3. Resolve archetype (honors operator-accepted triage overrides)
-    let archetype: string;
+    // For A2, re-run selectArchetype to get the theme (HeaderService pattern).
+    // resolveCampaignArchetype does not return the theme field.
     let theme: any = null;
-    try {
-      const resolved = await resolveCampaignArchetype(id, ctx);
-      archetype = resolved.archetype;
-      // For A2, re-run selectArchetype to get the theme (HeaderService pattern).
-      // resolveCampaignArchetype does not return the theme field.
-      if (resolved.archetype === 'A2') {
-        // Need the audit data to re-run selectArchetype — fetch via BusinessContextService
-        const BusinessContextService = (await import('../services/deliverable/BusinessContextService')).default;
-        const auditResult = await BusinessContextService.getLatestAuditData(id, ctx);
-        if (auditResult) {
-          const autoSel = selectArchetype(auditResult.auditData as BusinessAnalysisAuditData);
-          theme = autoSel.theme ?? null;
-        }
+    if (archetype === 'A2') {
+      // Need the audit data to re-run selectArchetype — fetch via BusinessContextService
+      const BusinessContextService = (await import('../services/deliverable/BusinessContextService')).default;
+      const auditResult = await BusinessContextService.getLatestAuditData(id, ctx);
+      if (auditResult) {
+        const autoSel = selectArchetype(auditResult.auditData as BusinessAnalysisAuditData);
+        theme = autoSel.theme ?? null;
       }
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        error: 'archetype_unresolved',
-        message: 'Could not resolve campaign archetype. Ensure a business_analysis audit exists or triage is accepted.',
-      });
     }
 
     // 4. Build archetype-aware defaults
@@ -6732,7 +6778,7 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
     logger.info('Gallery token generated', ctx, {
       campaignId: id,
       archetype,
-      screenshotCount: campaign.mkt_files_list.length,
+      screenshotCount: eligibility.screenshotCount,
       expiresAt: token.expires_at,
       shortCode,
     });
@@ -6753,7 +6799,7 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
         gallerySubtitle: galleryMeta.gallerySubtitle,
         ctaLabel: galleryMeta.ctaLabel,
         ctaAmountCents: galleryMeta.ctaAmountCents ?? null,
-        screenshotCount: campaign.mkt_files_list.length,
+        screenshotCount: eligibility.screenshotCount,
       },
       priceWarning: campaign.package_price_cents == null || campaign.package_price_cents <= 0,
     });

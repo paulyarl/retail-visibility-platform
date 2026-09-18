@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { Upload, Link2, Copy, RefreshCw, Check, Clock, AlertCircle, ImageIcon, Trash2, ExternalLink, Download } from 'lucide-react';
 import marketingOpsService, {
   CampaignDetail,
   DiagnosticScreenshot,
+  GalleryEligibility,
   GalleryToken,
   GalleryTokenParams,
 } from '@/services/MarketingOpsService';
@@ -18,6 +20,7 @@ interface GalleryPanelProps {
 export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps) {
   const [screenshots, setScreenshots] = useState<DiagnosticScreenshot[]>([]);
   const [galleryTokens, setGalleryTokens] = useState<GalleryToken[]>([]);
+  const [eligibility, setEligibility] = useState<GalleryEligibility | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -38,12 +41,16 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
     setLoading(true);
     setError(null);
     try {
-      const [files, tokens] = await Promise.all([
+      const [files, tokens, elig] = await Promise.all([
         marketingOpsService.listDiagnosticScreenshots(campaignId),
         marketingOpsService.listGalleryTokens(campaignId),
+        // Degrade gracefully if the eligibility endpoint is unavailable — the
+        // tab still works, it just can't warn ahead of Generate.
+        marketingOpsService.getGalleryEligibility(campaignId).catch(() => null),
       ]);
       setScreenshots(files);
       setGalleryTokens(tokens);
+      setEligibility(elig);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load gallery data');
     } finally {
@@ -116,6 +123,19 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
   const packagePriceCents = (campaign as any).package_price_cents ?? null;
   const ctaAmountDisplay = packagePriceCents != null ? `$${(packagePriceCents / 100).toFixed(2)}` : '—';
 
+  // Gallery tokens need a resolvable archetype, which comes from an accepted
+  // triage or a real business_analysis audit. Warn before the operator clicks
+  // Generate and hits the backend gate.
+  const eligibilityBlocked = eligibility != null && !eligibility.eligible;
+  const eligibilityNeedsAudit =
+    eligibility?.reason === 'no_business_analysis_audit' || eligibility?.reason === 'archetype_unresolved';
+  const eligibilityTitle =
+    eligibility?.reason === 'invalid_stage'
+      ? 'Gallery links unlock at the Preview Built stage'
+      : eligibility?.reason === 'no_screenshots'
+      ? 'Upload a screenshot first'
+      : 'No campaign archetype yet';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -130,6 +150,27 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
         <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 flex items-start gap-2">
           <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
+      {eligibilityBlocked && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 dark:text-amber-300 space-y-1">
+            <p className="font-medium">{eligibilityTitle}</p>
+            {eligibility?.action && <p>{eligibility.action}</p>}
+            {eligibilityNeedsAudit && (
+              <p>
+                <Link
+                  href={`/settings/admin/marketing-ops/prompts?campaignId=${campaignId}`}
+                  className="underline font-medium"
+                >
+                  Open the Prompts tab
+                </Link>{' '}
+                to run the business analysis.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -266,9 +307,15 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
           </div>
           <button
             onClick={() => setShowGenerateModal(true)}
-            disabled={screenshots.length === 0}
+            disabled={screenshots.length === 0 || eligibilityBlocked}
             className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={screenshots.length === 0 ? 'Upload at least 1 screenshot first' : 'Generate a new gallery link'}
+            title={
+              screenshots.length === 0
+                ? 'Upload at least 1 screenshot first'
+                : eligibilityBlocked
+                ? eligibility?.action ?? 'This campaign is not eligible for a gallery link'
+                : 'Generate a new gallery link'
+            }
           >
             <Link2 className="h-4 w-4" />
             Generate Gallery Link

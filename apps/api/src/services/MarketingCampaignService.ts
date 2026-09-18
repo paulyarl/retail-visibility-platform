@@ -380,7 +380,6 @@ export interface CampaignUpdateInput {
   tone?: string;
   retainer?: 'Fast' | 'Medium' | 'Slow' | null;
   attributes?: string[];
-  stage?: CampaignStage;
   retainerStatus?: RetainerStatus | null;
   retainerAmountCents?: number;
   retainerStartDate?: Date | null;

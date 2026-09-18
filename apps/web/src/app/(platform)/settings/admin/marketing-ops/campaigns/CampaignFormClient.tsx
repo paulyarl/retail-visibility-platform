@@ -13,7 +13,6 @@ import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCa
 import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
 import { parseHours } from '@/lib/business-hours';
 
-const STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair', 'triage_management'];
 
@@ -741,7 +740,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           attributes: form.attributes,
           assigned_to: form.assigned_to,
           notes: form.notes,
-          stage: form.stage,
           retainer_status: enumOrNull(form.retainer_status),
           retainer_amount_cents: numOrZero(form.retainer_amount_cents),
           retainer_start_date: dateOrNull(form.retainer_start_date),
@@ -1562,10 +1560,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             {mode === 'edit' && (
               <>
                 <FormField label="Stage">
-                  <select value={form.stage} onChange={(e) => handleChange('stage', e.target.value as CampaignStage)}
-                    className={inputClass}>
-                    {STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-neutral-700 px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
+                      {STAGE_LABELS[form.stage]}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Read-only — change it on the campaign page's stage pipeline.
+                    </span>
+                  </div>
                 </FormField>
                 <FormField label="Amount Paid (cents)">
                   <input type="number" value={form.amount_paid_cents} onChange={(e) => handleChange('amount_paid_cents', e.target.value === '' ? '' : parseInt(e.target.value))}
