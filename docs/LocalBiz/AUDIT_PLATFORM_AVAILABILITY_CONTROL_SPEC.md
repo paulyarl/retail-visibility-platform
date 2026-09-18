@@ -516,15 +516,22 @@ So the "pause" is a turn in an external conversation. The platform's only two re
 1. put the directive into the rendered text the operator copies out, and
 2. accept the observations back on the import side.
 
-**Injection point: render-time, not seeded.** The directive is emitted into the rendered prompt when the operator clicks to resolve — the render action at `marketing-ops.ts:3051` → `MarketingExecutionService.renderPrompt()` → `resolvePrompt()` — and appended only when interactive mode is on. It must **not** be baked into the seeded template body, for three reasons:
+**Injection point: render-time, not seeded.** The directive is emitted into the rendered prompt when the operator clicks to resolve — the render action at `marketing-ops.ts:3051` → `MarketingExecutionService.renderPrompt()` → `resolvePrompt()` — and prefixed only when interactive mode is on. It must **not** be baked into the seeded template body, for three reasons:
 
 1. **A seeded directive is always-on.** Every audit would be told it may pause — including one-shot, batch, and Direct API runs where no operator is present to answer. Render-time injection makes it a *mode*, selected at the moment an operator is actually available.
 2. **It matches the shared-directive contract.** Per AGENTS.md, shared directives are composed once by the prompt-composition layer and must never be copied into fragment bodies or seed transforms (the `report-directives.ts` pattern). The availability-control directive was seeded because it is unconditional; this one is conditional, so it belongs in the composed layer.
 3. **The directive text stays out of the body.** Only a one-line opt-in placeholder is seeded (§12.4.1); the directive itself is never duplicated into the body — so there is no tone drift between the two variants and no re-seed when the directive wording changes.
 
-**Single choke point.** `resolvePrompt` has **21 return sites** (lines 755–1796), each funnelling its assembled text through `appendPromptSuffix` (line 1811). Injecting at each return is a 21-place change that will rot the first time a branch is added. Inject **once, at the choke point**, and gate it there.
+**Single hook — and it is a prefix, not a suffix.** `baseRendered` is computed once (`MarketingExecutionService.ts:639`) before every amplification branch, and all **21 return sites** derive from it (`baseRendered`, `amplified`, `gsAmplified`, `noProfileAmplified`, or `baseRendered + …`). Prefixing `baseRendered` there is one line that every body-rendered branch inherits. Injecting per-branch is a 21-place change that will rot the first time a branch is added.
 
-**Ordering vs. the output-schema suffix.** `appendPromptSuffix(rendered, promptSuffix)` currently makes the JSON output-schema suffix the last thing the analyst reads. The codebase has a convention for directives that must override that position — the candidate search-scope directive is appended *after* the suffix explicitly "so it is the final word the analyst reads" (`MarketingExecutionService.ts:2382`). Decide deliberately which side the interactive directive lands on: it is a behavioural instruction (pause and ask) rather than an output-shape instruction, so "final word" is the natural choice — but it must not be phrased in a way that lets the analyst treat the schema as optional. If it is emitted after the suffix, it must restate that the JSON contract still governs the final output.
+**Why prefix beats append.** The directive is a *mode header*: it tells the analyst, before it begins evaluating platforms, that interactive verification is available for this run. A capability notice governs how the whole run is approached; a trailing instruction only constrains the final answer — by the time the analyst reaches a trailing directive it has already decided what to do about the blocked platform. Prefixing also removes the ordering question entirely: the preamble is the first word and the output-schema suffix stays the last word, so the two never compete. (Contrast the two directives that are deliberately appended *after* the suffix — the candidate search-scope directive, "so it is the final word the analyst reads" (`MarketingExecutionService.ts:2382`), and the degraded gold-standard branch at line 758. Both are **output-shaping**; this one is not.)
+
+**Two caveats on prefixing.**
+
+- **Persona priming.** Template bodies open with their role definition ("You are a…"). The preamble sits ahead of it, so keep it short and mode-like — a run header, not a replacement persona, and it must not restate the task.
+- **Recency.** A top-of-prompt notice primes but does not remind. The extended `render_controls` shape (§12.5) belongs in the preamble, as part of the mode. Do **not** also add a trailing copy: two placements of the same rule is drift, and the body's existing Platform Availability directive already owns the recording obligation.
+
+**Composer branches bypass the prefix.** Intelligence-scope prompts build from a separately composed `rendered` value rather than `baseRendered`. Acceptable — `business_analysis` is a business-scope template rendered from its body, not a composed intelligence prompt.
 
 #### 12.4.1 The opt-in is a Prompt Workspace variable
 
@@ -600,7 +607,8 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 - [ ] Document the extended `render_controls` entry shape (`attempted_by`, `visibility_condition`, `observed_at`, `observation_notes`) **in the directive** — the seeded `RENDER_CONTROLS_SCHEMA` example entry stays untouched, so the directive is where the external analyst learns the shape
 - [ ] Declare `{{interactive_verification}}` in the audit template body (both variants) so the Prompt Workspace renders the opt-in input with no UI work — this is the **only** seeded change, and it is a placeholder, not the directive
 - [ ] Add `'interactive_verification'` to `SCOPE_VARIABLES.business` (`scope-utils.ts:36-41`) — **required**; without it `renderTemplate` hard-fails on the Direct API and import paths (§12.4.1). Add a scope test alongside `MarketingExecutionService.scope.test.ts`
-- [ ] Inject the directive **once at the choke point** (`appendPromptSuffix`, line 1811), gated on the variable being truthy — never at the 21 individual return sites in `resolvePrompt`
+- [ ] **Prefix** the directive onto `baseRendered` (`MarketingExecutionService.ts:639`) when the variable is truthy — one hook, inherited by all 21 return sites; never inject per-branch
+- [ ] Keep the preamble short and mode-like (run header, not persona, not a task restatement) and carry the extended `render_controls` shape in it — no trailing duplicate (§12.4)
 - [ ] The gate must hold on `executeSingle()` and `importExternalResult()` too — both share `resolvePrompt`, and a blank variable must mean "off" on every path
 - [ ] Accept `operator_observations` at the same seam, for the re-render path (§12.5)
 - [ ] Record the directive version on the execution, mirroring `REPORT_DIRECTIVES_VERSION` handling
@@ -627,6 +635,8 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 - Operator declines → `not_attempted`, `unable_to_verify`, output otherwise identical to today
 - Every operator-attributed determination appears in `data_quality.limitations`
 - No ask is emitted for a non-primary platform, or for a platform where the analyst was not blocked
+- Interactive mode **on** → the preamble is the first content in the rendered prompt, ahead of the body's role framing, and the output-schema suffix is still the last word
+- The preamble appears exactly once — no trailing duplicate (§12.4)
 
 **Regression**
 
@@ -663,4 +673,6 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 | Placeholder declared in the body without a scope-whitelist entry | Add `interactive_verification` to `SCOPE_VARIABLES.business` in the same change — `renderTemplate` hard-throws on the Direct API / import paths otherwise (§12.4.1) |
 | Opt-in is never used, so coverage never improves | Payoff is opt-in by design (§12.8); keep the workspace variable prominent, and consider defaulting it on for the copy-paste render path where an operator is present by definition |
 | Notice framing drifts into a mandate, turning audits into interviews | Directive is phrased as notice of capability, not an instruction to pause; emit-when bounds stay hard MUSTs (§12.4.1) |
+| Prefixing weakens the body's persona priming | Keep the preamble short and mode-like; it must not restate the task or the output contract (§12.4) |
+| Preamble and body directive drift into contradictory rules | Preamble owns *awareness + recording shape*; the body's Platform Availability directive keeps owning the *determination logic*. No trailing third copy |
 | Interactive mode only works in copy-paste bridge | Accepted for phase 1 — that is where audits actually run (§12.4); phase 2 covers Direct API |

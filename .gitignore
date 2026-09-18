@@ -71,3 +71,10 @@ DATABASE_MIGRATION_PLAN.md
 # LibreOffice/MS Office lock files
 .~lock.*
 ~$*
+
+# Stray root-level HTML artifacts. Tools that write to a mangled absolute path
+# (backslashes stripped) can drop a saved page at the repo root — e.g. the
+# accidental commit of UserspaulyAppDataLocalTempistanbul.html. Root-level only;
+# nested tracked HTML (apps/web/public/bot-widget/, apps/api/tests/reports/) is
+# unaffected.
+/*.html
