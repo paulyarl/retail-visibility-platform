@@ -11,6 +11,8 @@ import {
   ThemeIcon,
   Box,
   Anchor,
+  Table,
+  Tooltip,
 } from '@mantine/core';
 import {
   IconBook2,
@@ -23,6 +25,7 @@ import {
   IconBulb,
   IconTarget,
   IconExternalLink,
+  IconScale,
 } from '@tabler/icons-react';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
@@ -39,6 +42,14 @@ interface SpecializedSource {
   [k: string]: any;
 }
 
+interface PlatformSignalWeight {
+  platform: string;
+  weight: number;
+  basis?: string | null;
+  confidence?: number | null;
+  observations?: number | null;
+}
+
 interface CategoryProfileConfig {
   category_key?: string;
   category_name?: string;
@@ -46,6 +57,8 @@ interface CategoryProfileConfig {
   synonyms?: string[];
   subcategories?: string[];
   specialized_sources?: SpecializedSource[];
+  platform_signal_weights?: PlatformSignalWeight[];
+  platform_signal_divergence?: Record<string, number>;
   discovery_patterns?: Record<string, any>;
   category_evidence_rules?: Record<string, any>;
   prohibited_inferences?: string[];
@@ -70,6 +83,23 @@ function sourceTypeLabel(type: string): string {
     .split('_')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  google: 'Google',
+  yelp: 'Yelp',
+  facebook: 'Facebook',
+  apple_maps: 'Apple Maps',
+  bing: 'Bing',
+  bbb: 'BBB',
+};
+
+function platformLabel(key: string): string {
+  return PLATFORM_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function weightColor(w: number): string {
+  return w >= 0.7 ? 'green' : w >= 0.4 ? 'blue' : w >= 0.2 ? 'orange' : 'gray';
 }
 
 function renderRecordValue(value: any): string {
@@ -119,6 +149,8 @@ export default function CategoryProfileView({ profile }: Props) {
   const synonyms = config.synonyms ?? [];
   const subcategories = config.subcategories ?? [];
   const sources = config.specialized_sources ?? [];
+  const signalWeights = config.platform_signal_weights ?? [];
+  const signalDivergence = config.platform_signal_divergence ?? {};
   const discoveryPatterns = config.discovery_patterns ?? {};
   const evidenceRules = config.category_evidence_rules ?? {};
   const prohibitedInferences = config.prohibited_inferences ?? [];
@@ -127,6 +159,7 @@ export default function CategoryProfileView({ profile }: Props) {
   const terminologyKeys = Object.keys(terminology);
   const discoveryKeys = Object.keys(discoveryPatterns);
   const evidenceKeys = Object.keys(evidenceRules);
+  const divergenceKeys = Object.keys(signalDivergence);
 
   return (
     <Stack gap="md">
@@ -292,6 +325,75 @@ export default function CategoryProfileView({ profile }: Props) {
                   ))}
               </Stack>
             </Stack>
+          )}
+
+          {/* ─── Platform Signal Weights (local layer) ─── */}
+          {(signalWeights.length > 0 || divergenceKeys.length > 0) && (
+            <Paper withBorder radius="md" p="md">
+              <Stack gap="sm">
+                <SectionHeader icon={<IconScale size={16} />} title="Platform Signal Weights" count={signalWeights.length} />
+                <Text size="xs" c="dimmed">
+                  Local estimate of signal_weight(category, platform) ∈ [0,1] — prevalence × depth observed
+                  in this market. High-confidence local weights outrank the national gold-standard layer at
+                  scoring time.
+                </Text>
+                {signalWeights.length > 0 && (
+                  <Table striped highlightOnHover style={{ tableLayout: 'fixed', fontSize: 'var(--mantine-font-size-xs)' }}>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th style={{ width: 110 }}>Platform</Table.Th>
+                        <Table.Th style={{ width: 80 }}>Weight</Table.Th>
+                        <Table.Th style={{ width: 90 }}>Confidence</Table.Th>
+                        <Table.Th style={{ width: 60 }}>Obs</Table.Th>
+                        <Table.Th>Basis</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {[...signalWeights]
+                        .sort((a, b) => b.weight - a.weight)
+                        .map((w, i) => (
+                          <Table.Tr key={i}>
+                            <Table.Td><Text size="xs" fw={500}>{platformLabel(w.platform)}</Text></Table.Td>
+                            <Table.Td>
+                              <Badge size="sm" variant="filled" color={weightColor(w.weight)}>
+                                {w.weight.toFixed(2)}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              {w.confidence != null ? <Text size="xs">{w.confidence.toFixed(2)}</Text> : <Text size="xs" c="dimmed">—</Text>}
+                            </Table.Td>
+                            <Table.Td>
+                              {w.observations != null ? <Text size="xs">{w.observations}</Text> : <Text size="xs" c="dimmed">—</Text>}
+                            </Table.Td>
+                            <Table.Td>
+                              <Tooltip label={w.basis || '—'} position="top-start" multiline w={400} disabled={!w.basis}>
+                                <Text size="xs" c="dimmed" lineClamp={2}>{w.basis || '—'}</Text>
+                              </Tooltip>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                    </Table.Tbody>
+                  </Table>
+                )}
+                {divergenceKeys.length > 0 && (
+                  <Stack gap={4}>
+                    <Text size="xs" fw={600}>Local vs National Divergence</Text>
+                    <Group gap={4} wrap="wrap">
+                      {divergenceKeys.map((p) => (
+                        <Badge
+                          key={p}
+                          size="sm"
+                          variant="light"
+                          color={signalDivergence[p] > 0 ? 'teal' : 'orange'}
+                        >
+                          {platformLabel(p)} {signalDivergence[p] > 0 ? '+' : ''}{signalDivergence[p].toFixed(2)}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </Stack>
+                )}
+              </Stack>
+            </Paper>
           )}
 
           {/* ─── Discovery Patterns ─── */}

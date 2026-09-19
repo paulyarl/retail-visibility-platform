@@ -21,6 +21,7 @@ import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './sc
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
+import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
 import { buildGeographyGridDirective, buildGeographyGrid, parseZipCodes } from './intelligence/geography-grid';
@@ -641,7 +642,26 @@ export class MarketingExecutionService extends BaseService {
     }
 
     // 1. Base render — always happens first, using the existing renderTemplate().
-    const baseRendered = this.renderTemplate(input.template.body, effectiveVariables, input.campaign);
+    //
+    // Interactive verification preamble (spec §12 — AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC).
+    // Caller-supplied opt-in: a truthy `interactive_verification` variable
+    // prefixes the capability notice ahead of the body's role framing. The
+    // variable is NEVER body-declared, so renderTemplate's out-of-scope check
+    // never sees it — no SCOPE_VARIABLES whitelist is needed and the "off"
+    // path is byte-identical to a run without the feature. One prefix here is
+    // inherited by every body-rendered branch (business audits, profile
+    // establishment, gold/bronze scans, repair); the composed intelligence
+    // path below gets the same prefix at its own render site.
+    const interactivePreamble = buildInteractiveVerificationPreamble(effectiveVariables);
+    if (interactivePreamble) {
+      logger.info('Interactive verification preamble emitted', ctx, {
+        campaignId: input.campaign.id,
+        templateId: input.template.id,
+        interactiveVerificationDirectiveVersion: INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION,
+        hasOperatorObservations: Boolean(String(effectiveVariables.operator_observations ?? '').trim()),
+      });
+    }
+    const baseRendered = interactivePreamble + this.renderTemplate(input.template.body, effectiveVariables, input.campaign);
 
     // 2. Check amplification gates
     const isSeek = promptType === 'seek';
@@ -1058,7 +1078,10 @@ export class MarketingExecutionService extends BaseService {
       // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
       // since renderTemplate() only supports simple {{variable}} replacement.
       const cleanedBody = this.stripHandlebarsConditionals(composed.body, input.variables);
-      let rendered = this.renderTemplate(cleanedBody, input.variables, input.campaign);
+      // Same interactive-verification prefix as baseRendered — the composed
+      // path is the only branch that bypasses baseRendered, so it gets its
+      // own copy of the (possibly empty) preamble.
+      let rendered = interactivePreamble + this.renderTemplate(cleanedBody, input.variables, input.campaign);
 
       // ─── Platform discovery focus injection ────────────────────────
       // When the campaign has a specific platform set (e.g. 'google'), the

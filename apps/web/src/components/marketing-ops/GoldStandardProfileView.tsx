@@ -31,6 +31,7 @@ import {
   IconInfoCircle,
   IconListCheck,
   IconAlertCircle,
+  IconScale,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
@@ -135,12 +136,21 @@ interface ScanMetadata {
   excluded_candidates?: Array<{ business_name: string; reason: string }>;
 }
 
+interface PlatformSignalWeight {
+  platform: string;
+  weight: number;
+  basis?: string | null;
+  confidence?: number | null;
+  observations?: number | null;
+}
+
 interface GoldStandardConfig {
   category_key?: string;
   category_name?: string;
   platform_focus?: string;
   expected_fields?: ExpectedFields;
   candidates?: Candidate[];
+  platform_signal_weights?: PlatformSignalWeight[];
   scan_metadata?: ScanMetadata;
 }
 
@@ -165,6 +175,10 @@ function severityColor(severity?: string): string {
 
 function severityLabel(severity?: string): string {
   return severity === 'non_negotiable' ? 'Required' : severity === 'recommended' ? 'Recommended' : 'Info';
+}
+
+function weightColor(w: number): string {
+  return w >= 0.7 ? 'green' : w >= 0.4 ? 'blue' : w >= 0.2 ? 'orange' : 'gray';
 }
 
 function formatDate(iso?: string): string {
@@ -369,6 +383,44 @@ function PlatformExpectedFieldsView({ platformKey, pf }: { platformKey: string; 
   );
 }
 
+function SignalWeightsTable({ weights }: { weights: PlatformSignalWeight[] }) {
+  const sorted = [...weights].sort((a, b) => b.weight - a.weight);
+  return (
+    <Table striped highlightOnHover style={{ tableLayout: 'fixed', fontSize: 'var(--mantine-font-size-xs)' }}>
+      <Table.Thead>
+        <Table.Tr>
+          <Table.Th style={{ width: 110 }}>Platform</Table.Th>
+          <Table.Th style={{ width: 80 }}>Weight</Table.Th>
+          <Table.Th style={{ width: 90 }}>Confidence</Table.Th>
+          <Table.Th style={{ width: 60 }}>Obs</Table.Th>
+          <Table.Th>Basis</Table.Th>
+        </Table.Tr>
+      </Table.Thead>
+      <Table.Tbody>
+        {sorted.map((w, i) => (
+          <Table.Tr key={i}>
+            <Table.Td><Text size="xs" fw={500}>{platformLabel(w.platform)}</Text></Table.Td>
+            <Table.Td>
+              <Badge size="sm" variant="filled" color={weightColor(w.weight)}>{w.weight.toFixed(2)}</Badge>
+            </Table.Td>
+            <Table.Td>
+              {w.confidence != null ? <Text size="xs">{w.confidence.toFixed(2)}</Text> : <Text size="xs" c="dimmed">—</Text>}
+            </Table.Td>
+            <Table.Td>
+              {w.observations != null ? <Text size="xs">{w.observations}</Text> : <Text size="xs" c="dimmed">—</Text>}
+            </Table.Td>
+            <Table.Td>
+              <Tooltip label={w.basis || '—'} position="top-start" multiline w={400} disabled={!w.basis}>
+                <Text size="xs" c="dimmed" lineClamp={2}>{w.basis || '—'}</Text>
+              </Tooltip>
+            </Table.Td>
+          </Table.Tr>
+        ))}
+      </Table.Tbody>
+    </Table>
+  );
+}
+
 function CandidateCard({
   candidate,
   idx,
@@ -558,6 +610,7 @@ export default function GoldStandardProfileView({ profile }: Props) {
   const universal = expectedFields?.universal;
   const platforms = expectedFields?.platforms ?? {};
   const candidates = config.candidates ?? [];
+  const signalWeights = config.platform_signal_weights ?? [];
   const scanMeta = config.scan_metadata;
   const platformKeys = Object.keys(platforms);
   const goldCandidates = candidates.filter((c) =>
@@ -747,6 +800,25 @@ export default function GoldStandardProfileView({ profile }: Props) {
             </Paper>
           )}
 
+          {/* ─── Platform Signal Weights (national layer) ─── */}
+          {signalWeights.length > 0 && (
+            <Paper withBorder radius="md" p="md">
+              <Stack gap="sm">
+                <Group gap="xs">
+                  <IconScale size={16} />
+                  <Text size="sm" fw={600}>Platform Signal Weights ({signalWeights.length})</Text>
+                  <Badge size="xs" variant="dot" color="gray">National</Badge>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  signal_weight(category, platform) — how much each platform's signal moves a score for this
+                  category, derived from prevalence × depth over the candidate pool. A confident local
+                  (market) profile can outrank these weights at scoring time.
+                </Text>
+                <SignalWeightsTable weights={signalWeights} />
+              </Stack>
+            </Paper>
+          )}
+
           <Divider />
 
           {/* ─── Gold-Standard Candidates ─── */}
@@ -849,6 +921,7 @@ export function goldStandardSummary(profile: IntelligenceProfile): {
   goldCount: number;
   platformCount: number;
   gateCount: number;
+  signalWeightCount: number;
 } | null {
   const config = (profile.configuration_json ?? {}) as GoldStandardConfig;
   if (!config.expected_fields && !config.candidates) return null;
@@ -866,5 +939,6 @@ export function goldStandardSummary(profile: IntelligenceProfile): {
     goldCount,
     platformCount: Object.keys(platforms).length,
     gateCount,
+    signalWeightCount: config.platform_signal_weights?.length ?? 0,
   };
 }

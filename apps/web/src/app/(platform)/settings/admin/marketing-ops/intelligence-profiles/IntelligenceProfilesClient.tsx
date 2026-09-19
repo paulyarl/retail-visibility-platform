@@ -474,6 +474,9 @@ export default function IntelligenceProfilesClient() {
                 {' '}{gsSummary.goldCount} gold-standard ·
                 {' '}{gsSummary.platformCount} platform{gsSummary.platformCount !== 1 ? 's' : ''} ·
                 {' '}{gsSummary.gateCount} quality gate{gsSummary.gateCount !== 1 ? 's' : ''}
+                {gsSummary.signalWeightCount > 0 && (
+                  <> ·{' '}{gsSummary.signalWeightCount} signal weight{gsSummary.signalWeightCount !== 1 ? 's' : ''}</>
+                )}
               </Text>
             )}
           </Stack>
