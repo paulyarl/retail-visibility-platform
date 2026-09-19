@@ -11,7 +11,7 @@ import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 import { addressParser } from '@/lib/address-parser';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
-import { parseHours } from '@/lib/business-hours';
+import { inferTimezoneFromState, parseHours } from '@/lib/business-hours';
 
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
 const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair', 'triage_management'];
@@ -1357,11 +1357,18 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <BusinessHoursEditor
                   compact
                   hours={parseHours(form.business_hours)}
-                  timezone={form.business_hours?.timezone || 'America/New_York'}
+                  timezone={
+                    form.business_hours?.timezone ||
+                    inferTimezoneFromState(form.address_state) ||
+                    'America/New_York'
+                  }
                   onHoursChange={(hours) =>
                     handleChange('business_hours', {
                       ...hours,
-                      timezone: form.business_hours?.timezone || 'America/New_York',
+                      timezone:
+                        form.business_hours?.timezone ||
+                        inferTimezoneFromState(form.address_state) ||
+                        'America/New_York',
                     })
                   }
                   onTimezoneChange={(tz) =>

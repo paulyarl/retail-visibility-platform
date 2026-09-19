@@ -217,3 +217,70 @@ export function parseGoogleHoursPaste(text: string): Record<string, DayHours> | 
   }
   return foundAny ? result : null;
 }
+
+// --- US state → timezone inference ----------------------------------------
+// Majority-zone mapping (several states span two zones — the zone covering
+// most of the population wins). Used to default the hours editor's timezone
+// picker; the operator can always override. Accepts abbreviations or full
+// names, any case. Returns null for unrecognized / non-US values so callers
+// can keep their own fallback.
+
+const STATE_TIMEZONES: Record<string, string> = {
+  al: 'America/Chicago', alabama: 'America/Chicago',
+  ak: 'America/Anchorage', alaska: 'America/Anchorage',
+  az: 'America/Phoenix', arizona: 'America/Phoenix',
+  ar: 'America/Chicago', arkansas: 'America/Chicago',
+  ca: 'America/Los_Angeles', california: 'America/Los_Angeles',
+  co: 'America/Denver', colorado: 'America/Denver',
+  ct: 'America/New_York', connecticut: 'America/New_York',
+  de: 'America/New_York', delaware: 'America/New_York',
+  dc: 'America/New_York', 'district of columbia': 'America/New_York',
+  fl: 'America/New_York', florida: 'America/New_York',
+  ga: 'America/New_York', georgia: 'America/New_York',
+  hi: 'Pacific/Honolulu', hawaii: 'Pacific/Honolulu',
+  id: 'America/Denver', idaho: 'America/Denver',
+  il: 'America/Chicago', illinois: 'America/Chicago',
+  in: 'America/New_York', indiana: 'America/New_York',
+  ia: 'America/Chicago', iowa: 'America/Chicago',
+  ks: 'America/Chicago', kansas: 'America/Chicago',
+  ky: 'America/New_York', kentucky: 'America/New_York',
+  la: 'America/Chicago', louisiana: 'America/Chicago',
+  me: 'America/New_York', maine: 'America/New_York',
+  md: 'America/New_York', maryland: 'America/New_York',
+  ma: 'America/New_York', massachusetts: 'America/New_York',
+  mi: 'America/New_York', michigan: 'America/New_York',
+  mn: 'America/Chicago', minnesota: 'America/Chicago',
+  ms: 'America/Chicago', mississippi: 'America/Chicago',
+  mo: 'America/Chicago', missouri: 'America/Chicago',
+  mt: 'America/Denver', montana: 'America/Denver',
+  ne: 'America/Chicago', nebraska: 'America/Chicago',
+  nv: 'America/Los_Angeles', nevada: 'America/Los_Angeles',
+  nh: 'America/New_York', 'new hampshire': 'America/New_York',
+  nj: 'America/New_York', 'new jersey': 'America/New_York',
+  nm: 'America/Denver', 'new mexico': 'America/Denver',
+  ny: 'America/New_York', 'new york': 'America/New_York',
+  nc: 'America/New_York', 'north carolina': 'America/New_York',
+  nd: 'America/Chicago', 'north dakota': 'America/Chicago',
+  oh: 'America/New_York', ohio: 'America/New_York',
+  ok: 'America/Chicago', oklahoma: 'America/Chicago',
+  or: 'America/Los_Angeles', oregon: 'America/Los_Angeles',
+  pa: 'America/New_York', pennsylvania: 'America/New_York',
+  ri: 'America/New_York', 'rhode island': 'America/New_York',
+  sc: 'America/New_York', 'south carolina': 'America/New_York',
+  sd: 'America/Chicago', 'south dakota': 'America/Chicago',
+  tn: 'America/Chicago', tennessee: 'America/Chicago',
+  tx: 'America/Chicago', texas: 'America/Chicago',
+  ut: 'America/Denver', utah: 'America/Denver',
+  vt: 'America/New_York', vermont: 'America/New_York',
+  va: 'America/New_York', virginia: 'America/New_York',
+  wa: 'America/Los_Angeles', washington: 'America/Los_Angeles',
+  wv: 'America/New_York', 'west virginia': 'America/New_York',
+  wi: 'America/Chicago', wisconsin: 'America/Chicago',
+  wy: 'America/Denver', wyoming: 'America/Denver',
+};
+
+export function inferTimezoneFromState(state: string | null | undefined): string | null {
+  if (!state) return null;
+  const key = state.trim().toLowerCase().replace(/\./g, '');
+  return STATE_TIMEZONES[key] ?? null;
+}

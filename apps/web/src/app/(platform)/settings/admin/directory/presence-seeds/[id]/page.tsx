@@ -27,6 +27,7 @@ import {
   DAYS,
   type DayHours,
   EMPTY_HOURS,
+  inferTimezoneFromState,
   parseHours,
   formatHoursForDisplay,
 } from '@/lib/business-hours';
@@ -957,7 +958,11 @@ export default function PresenceSeedDetailPage() {
       })),
     );
     setEditHours(parseHours(listing?.business_hours));
-    setEditTimezone(listing?.business_hours?.timezone || 'America/New_York');
+    setEditTimezone(
+      listing?.business_hours?.timezone ||
+        inferTimezoneFromState(listing?.state) ||
+        'America/New_York',
+    );
     const hoursProv = provenance.find((p) => p.fieldKey === 'hours');
     setEditHoursSource(hoursProv?.sourceName ?? '');
     setEditHoursSourceUrl(hoursProv?.sourceUrl ?? '');

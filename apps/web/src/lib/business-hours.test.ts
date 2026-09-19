@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGoogleHoursPaste, parseHoursLine, parseTimeTo24h } from './business-hours';
+import { inferTimezoneFromState, parseGoogleHoursPaste, parseHoursLine, parseTimeTo24h } from './business-hours';
 
 describe('parseTimeTo24h', () => {
   it('converts 12-hour times', () => {
@@ -72,5 +72,22 @@ describe('parseGoogleHoursPaste', () => {
   it('returns null when no day can be parsed', () => {
     expect(parseGoogleHoursPaste('')).toBeNull();
     expect(parseGoogleHoursPaste('Call for hours')).toBeNull();
+  });
+});
+
+describe('inferTimezoneFromState', () => {
+  it('maps abbreviations and full names, any case', () => {
+    expect(inferTimezoneFromState('CA')).toBe('America/Los_Angeles');
+    expect(inferTimezoneFromState('texas')).toBe('America/Chicago');
+    expect(inferTimezoneFromState('New York')).toBe('America/New_York');
+    expect(inferTimezoneFromState('AZ')).toBe('America/Phoenix');
+    expect(inferTimezoneFromState('HI')).toBe('Pacific/Honolulu');
+  });
+
+  it('returns null for blank or non-US values', () => {
+    expect(inferTimezoneFromState('')).toBeNull();
+    expect(inferTimezoneFromState(null)).toBeNull();
+    expect(inferTimezoneFromState(undefined)).toBeNull();
+    expect(inferTimezoneFromState('ON')).toBeNull();
   });
 });
