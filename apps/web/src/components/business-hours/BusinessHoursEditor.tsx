@@ -78,7 +78,7 @@ export default function BusinessHoursEditor({
   const handleParse = () => {
     const parsed = parseGoogleHoursPaste(pasteText);
     if (!parsed) {
-      setPasteError('Could not parse any days — expected "Monday" then "- 9 AM–5 PM" per line.');
+      setPasteError('Could not parse any days — expected lines like "Monday 9 AM–5 PM" or "Monday" followed by "- 9 AM–5 PM" on the next line.');
       setParsedCount(null);
       return;
     }

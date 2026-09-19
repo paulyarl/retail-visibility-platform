@@ -154,7 +154,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
     }
     const parsed = parseGoogleHoursPaste(text);
     if (!parsed) {
-      setHoursError('Could not parse any days — expected "Monday" then "- 9 AM–5 PM" per line.');
+      setHoursError('Could not parse any days — expected lines like "Monday 9 AM–5 PM" or "Monday" followed by "- 9 AM–5 PM" on the next line.');
       setHoursParsedCount(null);
       return;
     }

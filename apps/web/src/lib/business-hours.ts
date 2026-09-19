@@ -139,16 +139,23 @@ export function parseHoursLine(line: string): DayHours | null {
   return { open, close, closed: false };
 }
 
+// A day-name range at the start of a line: "Mon–Fri 9 AM–5 PM". Checked before
+// the same-line pattern so the trailing day name isn't mistaken for hours text.
+const DAY_RANGE_RE = /^([A-Za-z]+)\s*[–—-]\s*([A-Za-z]+)\s*:?\s+(.+)$/;
+
+// A leading day name optionally followed by hours on the same line:
+// "Saturday\t9 AM–10 PM", "Monday: Closed", "Saturday - 9 AM–10 PM", or a bare
+// "Saturday" whose hours sit on the next non-empty line.
+const INLINE_DAY_RE = /^([A-Za-z]+)\s*[:–—-]?\s*(.*)$/;
+
 /**
  * Parse a Google Business Profile hours block into a per-day DayHours map.
  * Returns null when no day could be parsed (so the caller can show an error).
  *
- * Expected format (one day per block, hours on the following line):
- *   Saturday
- *   - 12 AM–8:30 PM
- *   Sunday
- *   - 9 AM–8:30 PM
- *   ...
+ * Accepted formats — the day order doesn't matter:
+ *   Saturday\n- 12 AM–8:30 PM   (stacked, GBP copy)
+ *   Saturday\t9 AM–10 PM        (day + hours on one line, tab/colon/space/dash)
+ *   Mon–Fri 9 AM–5 PM           (day range, applied to every day in the span)
  */
 export function parseGoogleHoursPaste(text: string): Record<string, DayHours> | null {
   if (!text.trim()) return null;
@@ -156,17 +163,49 @@ export function parseGoogleHoursPaste(text: string): Record<string, DayHours> | 
   let foundAny = false;
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
-    const dayKey = GOOGLE_DAY_NAMES[lines[i].trim().toLowerCase()];
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+
+    // Day range ("Mon–Fri 9 AM–5 PM") — expand to every day in the span,
+    // wrapping around the week when the end precedes the start.
+    const range = trimmed.match(DAY_RANGE_RE);
+    if (range) {
+      const start = GOOGLE_DAY_NAMES[range[1].toLowerCase()] as (typeof DAYS)[number] | undefined;
+      const end = GOOGLE_DAY_NAMES[range[2].toLowerCase()] as (typeof DAYS)[number] | undefined;
+      if (start && end && start !== end) {
+        const parsed = parseHoursLine(range[3]);
+        if (parsed) {
+          const startIdx = DAYS.indexOf(start);
+          const endIdx = DAYS.indexOf(end);
+          for (let d = startIdx; ; d = (d + 1) % DAYS.length) {
+            result[DAYS[d]] = { ...parsed };
+            foundAny = true;
+            if (d === endIdx) break;
+          }
+        }
+        continue;
+      }
+      // Not a real day range — fall through to the same-line parse.
+    }
+
+    const inline = trimmed.match(INLINE_DAY_RE);
+    if (!inline) continue;
+    const dayKey = GOOGLE_DAY_NAMES[inline[1].toLowerCase()];
     if (!dayKey) continue;
-    // Find the next non-empty line for the hours. Stop if it's another day
-    // name (means this day had no hours listed).
-    let hoursLine = '';
-    for (let j = i + 1; j < lines.length; j++) {
-      const next = lines[j].trim();
-      if (!next) continue;
-      if (GOOGLE_DAY_NAMES[next.toLowerCase()]) break;
-      hoursLine = next;
-      break;
+    let hoursLine = inline[2].trim();
+    if (!hoursLine) {
+      // Bare day name — find the next non-empty line for the hours. Stop if
+      // it's another day name (means this day had no hours listed).
+      for (let j = i + 1; j < lines.length; j++) {
+        const next = lines[j].trim();
+        if (!next) continue;
+        // Stop on any line that begins a new day entry — a bare day name or
+        // a same-line "Day <hours>" pair.
+        const nextInline = next.match(INLINE_DAY_RE);
+        if (nextInline && GOOGLE_DAY_NAMES[nextInline[1].toLowerCase()]) break;
+        hoursLine = next;
+        break;
+      }
     }
     if (hoursLine) {
       const parsed = parseHoursLine(hoursLine);
