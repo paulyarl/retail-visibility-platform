@@ -6582,6 +6582,14 @@ router.get('/campaigns/:id/pay-links', async (req: any, res: Response) => {
         createdAt: t.created_at,
         isExpired: !!isExpired,
         isPaid,
+        // Gallery metadata (diagnostic_gallery tokens) — powers the admin
+        // Gallery Links list (archetype badge, title, CTA).
+        galleryTitle: t.gallery_title || null,
+        gallerySubtitle: t.gallery_subtitle || null,
+        galleryArchetype: t.gallery_archetype || null,
+        frictionSummary: t.friction_summary || null,
+        ctaLabel: t.cta_label || null,
+        ctaAmountCents: t.cta_amount_cents ?? null,
       };
     });
 

@@ -10,6 +10,7 @@
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { ResponseType } from '../providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 import { clientLogger } from '../lib/client-logger';
 
 // ====================
@@ -6180,6 +6181,28 @@ export interface GalleryToken {
   shortUrl?: string | null;
 }
 
+/**
+ * The `token` payload returned by POST /campaigns/:id/gallery-token —
+ * camelCase minted-token view (distinct from the snake_case GalleryToken
+ * row shape used by listGalleryTokens).
+ */
+export interface GeneratedGalleryToken {
+  id: string;
+  token: string;
+  tokenType: string;
+  galleryUrl: string;
+  shortUrl: string | null;
+  shortCode: string | null;
+  expiresAt: string;
+  createdAt: string;
+  archetype: string | null;
+  galleryTitle: string | null;
+  gallerySubtitle: string | null;
+  ctaLabel: string | null;
+  ctaAmountCents: number | null;
+  screenshotCount: number;
+}
+
 export interface GalleryAnalytics {
   campaignId: string;
   totalTokens: number;
@@ -6389,7 +6412,7 @@ export interface PromptResolution {
 }
 
 interface MarketingOpsService {
-  generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GalleryToken>;
+  generateGalleryToken(campaignId: string, params: GalleryTokenParams): Promise<GeneratedGalleryToken>;
   getGalleryEligibility(campaignId: string): Promise<GalleryEligibility>;
   generateMultiGalleryToken(prospectId: string, expiryDays?: number): Promise<GalleryToken>;
   listGalleryTokens(campaignId: string): Promise<GalleryToken[]>;
@@ -6471,10 +6494,22 @@ MarketingOpsService.prototype.generateGalleryToken = async function (
   this: MarketingOpsService,
   campaignId: string,
   params: GalleryTokenParams,
-): Promise<GalleryToken> {
+): Promise<GeneratedGalleryToken> {
+  // The API schema (galleryTokenCreateSchema) is snake_case — the params
+  // interface is camelCase, so translate here or every field is silently
+  // dropped and the archetype defaults apply.
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/campaigns/${campaignId}/gallery-token`,
-    { method: 'POST', body: JSON.stringify(params) },
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        expires_in_days: params.expiryDays,
+        gallery_title: params.galleryTitle,
+        gallery_subtitle: params.gallerySubtitle,
+        friction_summary: params.frictionSummary,
+        cta_label: params.ctaLabel,
+      }),
+    },
     undefined,
     0,
   );
@@ -6482,7 +6517,16 @@ MarketingOpsService.prototype.generateGalleryToken = async function (
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate gallery token');
   }
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
-  return result.data?.data ?? result.data;
+  // The pay-links list that powers listGalleryTokens is cached under the
+  // URL-derived context key (`<url>:admin:admin`), not the semantic cacheKey
+  // argument — remove that entry or the post-generate refetch serves a stale
+  // list and the new token never appears in the panel.
+  await this.removeContextAwareCache(
+    `${BASE_URL}/campaigns/${campaignId}/pay-links:admin:admin`,
+    { context: AppContext.ADMIN, isolation: CacheIsolation.ADMIN },
+  );
+  const body = result.data?.data ?? result.data;
+  return body?.token ?? body;
 };
 
 MarketingOpsService.prototype.getGalleryEligibility = async function (
@@ -6525,7 +6569,9 @@ MarketingOpsService.prototype.listGalleryTokens = async function (
   this: MarketingOpsService,
   campaignId: string,
 ): Promise<GalleryToken[]> {
-  // Reuse the existing pay-links list endpoint, filtered client-side by token_type
+  // Reuse the existing pay-links list endpoint, filtered client-side by token_type.
+  // The endpoint responds { success, campaign, tokens } with camelCase rows —
+  // map them into the snake_case GalleryToken shape the panel renders.
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/campaigns/${campaignId}/pay-links`,
     {},
@@ -6535,9 +6581,28 @@ MarketingOpsService.prototype.listGalleryTokens = async function (
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch gallery tokens');
   }
-  const data = result.data?.data ?? result.data;
-  const all = Array.isArray(data) ? data : [];
-  return all.filter((t: any) => t.token_type === 'diagnostic_gallery');
+  const body = result.data?.data ?? result.data;
+  const rows = Array.isArray(body) ? body : Array.isArray(body?.tokens) ? body.tokens : [];
+  return rows
+    .filter((t: any) => (t.tokenType ?? t.token_type) === 'diagnostic_gallery')
+    .map((t: any): GalleryToken => ({
+      id: t.id,
+      token: t.token,
+      token_type: t.tokenType ?? t.token_type,
+      campaign_id: campaignId,
+      expires_at: t.expiresAt ?? t.expires_at ?? null,
+      viewed_at: t.viewedAt ?? t.viewed_at ?? null,
+      converted_at: t.convertedAt ?? t.converted_at ?? null,
+      gallery_archetype: t.galleryArchetype ?? t.gallery_archetype ?? null,
+      gallery_title: t.galleryTitle ?? t.gallery_title ?? null,
+      gallery_subtitle: t.gallerySubtitle ?? t.gallery_subtitle ?? null,
+      friction_summary: t.frictionSummary ?? t.friction_summary ?? null,
+      cta_label: t.ctaLabel ?? t.cta_label ?? null,
+      cta_amount_cents: t.ctaAmountCents ?? t.cta_amount_cents ?? null,
+      created_at: t.createdAt ?? t.created_at,
+      short_code: t.shortCode ?? t.short_code ?? null,
+      shortUrl: t.shortUrl ?? null,
+    }));
 };
 
 MarketingOpsService.prototype.getGalleryAnalytics = async function (
