@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   ShieldCheck,
   ShieldPlus,
@@ -216,7 +217,7 @@ export default function IdentityPacketCard({
   const [error, setError] = useState<string | null>(null);
   const [pushing, setPushing] = useState(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const [pushed, setPushed] = useState<{ publicUrl: string } | null>(null);
+  const [pushed, setPushed] = useState<{ seedId: string; publicUrl: string; published: boolean } | null>(null);
   const [showAddEvidence, setShowAddEvidence] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -257,7 +258,7 @@ export default function IdentityPacketCard({
     try {
       // Guarded lane — the server evaluates the seed gate (spec §6).
       const r = await directoryPresenceAdminService.createSeedFromCampaign(campaignId, false, 'guarded');
-      setPushed({ publicUrl: r.publicUrl });
+      setPushed({ seedId: r.seedId, publicUrl: r.publicUrl, published: r.published });
       await load();
       onSeedCreated?.();
     } catch (e: any) {
@@ -559,14 +560,20 @@ export default function IdentityPacketCard({
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span className="text-gray-700 dark:text-gray-200">
-              Draft seed exists · <span className="font-medium">{seed.status}</span>
+              Seed exists · <span className="font-medium">{seed.status}</span>
             </span>
-            {seed.publicUrl && (
+            <Link
+              href={`/settings/admin/directory/presence-seeds/${seed.id}`}
+              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              View seed <ArrowUpRight className="h-3 w-3" />
+            </Link>
+            {seed.publicUrl && ['published', 'invited', 'claimed'].includes(seed.status) && (
               <a
                 href={seed.publicUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:underline"
               >
                 View listing <ExternalLink className="h-3 w-3" />
               </a>
@@ -575,12 +582,18 @@ export default function IdentityPacketCard({
         ) : pushed ? (
           <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" /> Draft seed created.
-            {pushed.publicUrl && (
+            <Link
+              href={`/settings/admin/directory/presence-seeds/${pushed.seedId}`}
+              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              View seed <ArrowUpRight className="h-3 w-3" />
+            </Link>
+            {pushed.published && pushed.publicUrl && (
               <a
                 href={pushed.publicUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:underline"
               >
                 View listing <ExternalLink className="h-3 w-3" />
               </a>
