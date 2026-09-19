@@ -26,6 +26,8 @@ import {
   IconMedal,
   IconChartFunnel,
   IconTrendingUp,
+  IconSeedling,
+  IconPackages,
 } from '@tabler/icons-react';
 
 /**
@@ -53,9 +55,11 @@ export const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops/filter-review', label: 'Filter Review', icon: IconFilter, emoji: '🔍' },
   { href: '/settings/admin/marketing-ops/scorecards', label: 'Scorecards', icon: IconChartBar, emoji: '🏆' },
   { href: '/settings/admin/marketing-ops/gbp', label: 'GBP Monitor', icon: IconBuildingStore, emoji: '🏪' },
-  // Seed GTM analytics live under the Directory panel but belong to this
-  // motion (PG → seeds → claim funnel); surface them here so the funnel and
-  // growth engine aren't orphaned from Marketing Ops.
+  // Seed ops surfaces and GTM analytics live under the Directory panel but
+  // belong to this motion (PG → seeds → claim funnel); surface them here so
+  // they aren't orphaned from Marketing Ops.
+  { href: '/settings/admin/directory/presence-seeds', label: 'Presence Seeds', icon: IconSeedling, emoji: '🌱' },
+  { href: '/settings/admin/directory/batches', label: 'Batches', icon: IconPackages, emoji: '📦' },
   { href: '/settings/admin/directory/funnel', label: 'Seed Funnel', icon: IconChartFunnel, emoji: '🫗' },
   { href: '/settings/admin/growth-engine', label: 'Growth Engine', icon: IconTrendingUp, emoji: '📈' },
 ] as const;
