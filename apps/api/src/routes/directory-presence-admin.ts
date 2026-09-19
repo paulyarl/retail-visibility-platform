@@ -743,6 +743,42 @@ router.get('/presence-seeds/identity-packet', requirePlatformStaff, async (req: 
 });
 
 /**
+ * POST /api/admin/directory-presence/presence-seeds/identity-packet/decision
+ *
+ * Persist the operator's seed decision for a campaign — 'wait' records that
+ * the operator chose not to seed yet; 'clear' retracts a recorded decision.
+ * Advisory only: it never blocks Push. The rebuilt packet is returned so the
+ * Identity tab re-renders with the stored decision. Declared before
+ * /presence-seeds/:id so 'identity-packet' is not swallowed as an id.
+ */
+const seedDecisionSchema = z.object({
+  campaignId: z.string().min(1).max(255),
+  decision: z.enum(['wait', 'clear']),
+});
+
+router.post('/presence-seeds/identity-packet/decision', requirePlatformStaff, async (req: Request, res: Response) => {
+  const parsed = seedDecisionSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_input', details: parsed.error.flatten() });
+  }
+  try {
+    const by = (req as any).user?.userId || (req as any).user?.id || null;
+    const seedDecision = await IdentityPacketService.setSeedDecision(
+      parsed.data.campaignId,
+      parsed.data.decision,
+      by,
+    );
+    const packet = await IdentityPacketService.buildForCampaign(parsed.data.campaignId);
+    res.json({ success: true, seedDecision, packet });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/identity-packet/decision] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
  * POST /api/admin/directory-presence/presence-seeds/identity-evidence
  *
  * Record an operator-entered source on the Identity Packet ledger (see

@@ -11,6 +11,7 @@
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ValidationError, ConflictError, HttpError } from '../middleware/errorHandler';
@@ -2548,6 +2549,164 @@ export class MarketingCampaignService extends BaseService {
         });
       } catch (error) {
         logger.warn('resolveCampaignVerification: owner evidence capture failed (non-fatal)', ctx, {
+          campaignId,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    // 3. Seed back-fill — when a primary-linked seed exists, mirror the
+    //    verified facts into its NAP ledger + provenance so the seed report
+    //    reflects the same owner confirmation the campaign record just got.
+    //    Connected-contact gate (§20.4): 'unreachable' / 'wrong_business' can
+    //    produce no verified facts. Confirmed vs corrected is measured against
+    //    the seed's current provenance — same split as the anchor path.
+    if (!['unreachable', 'wrong_business'].includes(input.outcome)) {
+      try {
+        const links = await this.prisma.$queryRaw<{ seed_id: string }[]>`
+          SELECT seed_id FROM directory_seed_campaign_links
+          WHERE campaign_id = ${campaignId} AND link_role = 'primary' LIMIT 1`;
+        const seedId = links[0]?.seed_id;
+        if (seedId) {
+          const verified: Array<[string, string]> = (
+            [
+              [input.verifiedName, 'business_name'],
+              [input.verifiedAddress, 'address'],
+              [input.verifiedCity, 'city'],
+              [input.verifiedState, 'state'],
+              [input.verifiedPhone, 'phone'],
+              [input.verifiedWebsite, 'website'],
+              [input.verifiedEmail, 'email'],
+              [input.verifiedCategory, 'primary_category'],
+            ] as Array<[string | undefined, string]>
+          )
+            .filter(([v]) => v?.trim())
+            .map(([v, k]) => [v!.trim(), k]);
+
+          if (verified.length > 0) {
+            const seedRows = await this.prisma.$queryRaw<
+              { tenant_id: string | null; listing_id: string | null }[]
+            >`SELECT tenant_id, listing_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1`;
+            const tenantId = seedRows[0]?.tenant_id ?? null;
+            const listingId = seedRows[0]?.listing_id ?? null;
+
+            const provRows = await this.prisma.$queryRaw<{ field_key: string; value: string }[]>`
+              SELECT field_key, value FROM directory_field_provenance
+              WHERE seed_id = ${seedId} AND field_key = ANY(${verified.map(([, k]) => k)})`;
+            const current = new Map(provRows.map((r) => [r.field_key, String(r.value ?? '').trim()]));
+            const confirmed = verified.filter(([v, k]) => current.get(k) === v);
+            const corrected = verified.filter(([v, k]) => current.get(k) !== v);
+
+            const userId = ctx?.userId ?? 'system';
+            const sourceName = 'campaign_verification';
+            const note = `Campaign verification — outcome: ${input.outcome}${
+              input.reason ? `; reason: ${input.reason}` : ''
+            }`;
+
+            if (confirmed.length > 0) {
+              await this.prisma.$executeRaw`
+                INSERT INTO directory_seed_nap_verifications (
+                  id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
+                ) VALUES (
+                  ${randomUUID()}, ${seedId}, ${tenantId}, ${sourceName},
+                  ${JSON.stringify(Object.fromEntries(confirmed.map(([v, k]) => [k, { confirmed: v }])))}::jsonb,
+                  FALSE, now()
+                )`;
+            }
+            if (corrected.length > 0) {
+              await this.prisma.$executeRaw`
+                INSERT INTO directory_seed_nap_verifications (
+                  id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
+                ) VALUES (
+                  ${randomUUID()}, ${seedId}, ${tenantId}, ${sourceName},
+                  ${JSON.stringify(
+                    Object.fromEntries(
+                      corrected.map(([v, k]) => [k, { previous: current.get(k) ?? null, corrected: v }]),
+                    ),
+                  )}::jsonb,
+                  TRUE, now()
+                )`;
+              await this.prisma.$executeRaw`
+                UPDATE directory_presence_seeds
+                SET nap_owner_corrected = TRUE, updated_at = now()
+                WHERE id = ${seedId}`;
+            }
+            await this.prisma.$executeRaw`
+              UPDATE directory_presence_seeds
+              SET nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
+              WHERE id = ${seedId}`;
+
+            // Provenance + listing write-back requires a tenant_id (the
+            // provenance ID generator is tenant-scoped, and the anchor path
+            // skips the same write when the seed has no tenant).
+            if (tenantId) {
+              const { generateDirectoryFieldProvenanceId } = await import('../lib/id-generator');
+              for (const [v, k] of verified) {
+                const evidenceState = current.get(k) === v ? 'owner_confirmed' : 'owner_corrected';
+                await this.prisma.$executeRaw`
+                  INSERT INTO directory_field_provenance (
+                    id, seed_id, tenant_id, field_key, value,
+                    source_name, accessed_at, confidence, show_on_public,
+                    override_by, override_at, evidence_state, notes,
+                    created_at, updated_at
+                  ) VALUES (
+                    ${generateDirectoryFieldProvenanceId(tenantId)},
+                    ${seedId}, ${tenantId}, ${k}, ${v},
+                    ${sourceName}, CURRENT_DATE, 'high', TRUE,
+                    ${userId}, now(), ${evidenceState}, ${note},
+                    now(), now()
+                  )
+                  ON CONFLICT (seed_id, field_key) DO UPDATE SET
+                    value = EXCLUDED.value,
+                    source_name = EXCLUDED.source_name,
+                    accessed_at = EXCLUDED.accessed_at,
+                    confidence = EXCLUDED.confidence,
+                    show_on_public = EXCLUDED.show_on_public,
+                    override_by = EXCLUDED.override_by,
+                    override_at = EXCLUDED.override_at,
+                    evidence_state = EXCLUDED.evidence_state,
+                    notes = EXCLUDED.notes,
+                    updated_at = now()`;
+
+                // Keep the public listing in step for corrected core fields —
+                // same write-back the anchor path performs (§11.6).
+                if (evidenceState === 'owner_corrected' && listingId) {
+                  const col =
+                    k === 'business_name' ? 'business_name'
+                    : k === 'address' ? 'address'
+                    : k === 'city' ? 'city'
+                    : k === 'state' ? 'state'
+                    : k === 'phone' ? 'phone'
+                    : k === 'website' ? 'website'
+                    : k === 'email' ? 'email'
+                    : k === 'primary_category' ? 'primary_category'
+                    : null;
+                  if (col) {
+                    await this.prisma.$executeRawUnsafe(
+                      `UPDATE directory_listings_list SET ${col} = $1, updated_at = now() WHERE id = $2`,
+                      v,
+                      listingId,
+                    );
+                  }
+                }
+              }
+            }
+
+            // §5.1: an owner confirmation/correction is a report-version
+            // trigger. Best-effort — the seed ledger write must not fail on it.
+            try {
+              const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService');
+              await SeedIntelligenceReportService.getInstance().refreshReport(seedId);
+            } catch (refreshErr) {
+              logger.warn('resolveCampaignVerification: post-backfill report refresh failed', ctx, {
+                seedId,
+                error: (refreshErr as Error).message,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn('resolveCampaignVerification: seed back-fill failed (non-fatal)', ctx, {
           campaignId,
           error: (error as Error).message,
         });

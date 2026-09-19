@@ -215,7 +215,7 @@ export default function IdentityPacketCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pushing, setPushing] = useState(false);
-  const [waited, setWaited] = useState(false);
+  const [decisionBusy, setDecisionBusy] = useState(false);
   const [pushed, setPushed] = useState<{ publicUrl: string } | null>(null);
   const [showAddEvidence, setShowAddEvidence] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
@@ -264,6 +264,26 @@ export default function IdentityPacketCard({
       setError(e?.message || 'Failed to create seed');
     } finally {
       setPushing(false);
+    }
+  };
+
+  // Persisted seed decision — 'wait' is stored on the campaign (advisory only,
+  // Push stays enabled) and survives reloads; clicking again clears it.
+  const waited = packet?.seedDecision?.decision === 'wait';
+
+  const toggleWait = async () => {
+    setDecisionBusy(true);
+    setError(null);
+    try {
+      const r = await directoryPresenceAdminService.setIdentityPacketDecision(
+        campaignId,
+        waited ? 'clear' : 'wait',
+      );
+      setPacket(r.packet);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to record decision');
+    } finally {
+      setDecisionBusy(false);
     }
   };
 
@@ -579,8 +599,9 @@ export default function IdentityPacketCard({
               <ArrowUpRight className="h-3.5 w-3.5" /> {pushing ? 'Pushing…' : 'Push draft seed'}
             </button>
             <button
-              onClick={() => setWaited(true)}
-              disabled={waited}
+              onClick={toggleWait}
+              disabled={decisionBusy}
+              title={waited ? 'Clear the recorded wait decision' : 'Record a wait decision on this campaign'}
               className="inline-flex items-center gap-1.5 rounded border border-gray-300 dark:border-neutral-600 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800 disabled:opacity-50"
             >
               <PauseCircle className="h-3.5 w-3.5" /> {waited ? 'Waiting' : 'Wait'}
@@ -591,10 +612,10 @@ export default function IdentityPacketCard({
               </span>
             )}
             {waited && (
-              // Not persisted — this only acknowledges the packet for the current
-              // view. Copy must not imply a stored "wait" decision.
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Not seeding yet. The packet re-scores as you add evidence or resolve vetoes.
+                Waiting recorded
+                {packet?.seedDecision?.at ? ` ${new Date(packet.seedDecision.at).toLocaleDateString()}` : ''}
+                {' '}— not seeding yet. The packet re-scores as you add evidence or resolve vetoes.
               </span>
             )}
           </div>

@@ -176,6 +176,8 @@ export interface IdentityPacket {
     };
   };
   seed: { id: string; status: string; publicUrl: string | null } | null;
+  /** Persisted operator seed decision ('wait'), or null when none recorded. */
+  seedDecision: { decision: string; at: string; by: string | null } | null;
   generatedAt: string;
 }
 
@@ -2033,6 +2035,28 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       throw new Error(message || 'Failed to load identity packet');
     }
     return (result.data?.packet ?? result.data) as IdentityPacket;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/identity-packet/decision
+   *  Persist the operator's seed decision ('wait' | 'clear'). Returns the
+   *  stored decision plus the re-assembled packet. */
+  async setIdentityPacketDecision(
+    campaignId: string,
+    decision: 'wait' | 'clear',
+  ): Promise<{ seedDecision: IdentityPacket['seedDecision']; packet: IdentityPacket }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/admin/directory-presence/presence-seeds/identity-packet/decision',
+      { method: 'POST', body: JSON.stringify({ campaignId, decision }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const err = result.error as any;
+      const message = typeof err === 'string' ? err : err?.message;
+      throw new Error(message || 'Failed to record decision');
+    }
+    const data = result.data?.data ?? result.data;
+    return { seedDecision: data.seedDecision, packet: data.packet };
   }
 
   /** POST /api/admin/directory-presence/presence-seeds/identity-evidence

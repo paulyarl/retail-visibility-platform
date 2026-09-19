@@ -22,13 +22,15 @@ import {
   type IdentitySourceRef,
   type IdentitySourceTier,
 } from '../identityScoring';
+import type { AuthorityClass } from '../evidenceDimensions';
 
 const src = (
   name: string,
   tier: IdentitySourceTier,
   group: string,
   agrees = true,
-): IdentitySourceRef => ({ name, tier, independenceGroup: group, agrees });
+  authorityClass?: AuthorityClass,
+): IdentitySourceRef => ({ name, tier, independenceGroup: group, agrees, authorityClass });
 
 const field = (
   f: IdentityFieldEvidence['field'],
@@ -530,6 +532,80 @@ describe('scoreIdentityPacket', () => {
     expect(codes).toContain('missing_hours');
     expect(codes).toContain('low_operational_recency');
     expect(codes).toContain('no_authoritative_source');
+  });
+
+  it('no_authoritative_source honors an explicit authority class over the legacy tier', () => {
+    // A directory-tier source explicitly classed government is authoritative.
+    // The neutral name falls back to 'directory' under inference, so only the
+    // explicit class can suppress the signal — the legacy tier check would
+    // have fired it.
+    const p = scoreIdentityPacket({
+      identityStatus: 'confirmed',
+      operationalStatus: 'active',
+      fields: [
+        field('name', 'Arsema Market', [
+          src('Data Broker Feed', 'secondary_aggregator', 'broker:x', true, 'government'),
+        ]),
+        field('phone', '555-0100', [src('Google', 'major_aggregator', 'google')]),
+      ],
+    });
+    expect(p.qcSignals.map((s) => s.code)).not.toContain('no_authoritative_source');
+  });
+
+  it('no_authoritative_source is suppressed by an owner-class source', () => {
+    const p = scoreIdentityPacket({
+      identityStatus: 'confirmed',
+      operationalStatus: 'active',
+      fields: [
+        field('name', 'Arsema Market', [
+          src('Owner intake call', 'inferred', 'owner:intake', true, 'owner'),
+        ]),
+        field('phone', '555-0100', [src('Yelp', 'secondary_aggregator', 'yelp')]),
+      ],
+    });
+    expect(p.qcSignals.map((s) => s.code)).not.toContain('no_authoritative_source');
+  });
+
+  it('no_authoritative_source still fires on social/directory-only corroboration', () => {
+    const p = scoreIdentityPacket({
+      identityStatus: 'confirmed',
+      operationalStatus: 'active',
+      fields: [
+        field('name', 'Arsema Market', [
+          src('Facebook', 'secondary_aggregator', 'facebook', true, 'social'),
+          src('Yelp', 'secondary_aggregator', 'yelp', true, 'directory'),
+        ]),
+      ],
+    });
+    expect(p.qcSignals.map((s) => s.code)).toContain('no_authoritative_source');
+  });
+
+  it('no_authoritative_source fires when the only government source disagrees', () => {
+    const p = scoreIdentityPacket({
+      identityStatus: 'confirmed',
+      operationalStatus: 'active',
+      fields: [
+        field('name', 'Arsema Market', [
+          src('Google', 'major_aggregator', 'google'),
+          src('IN SoS', 'authoritative', 'registry:in', false, 'government'),
+        ]),
+      ],
+    });
+    expect(p.qcSignals.map((s) => s.code)).toContain('no_authoritative_source');
+  });
+
+  it('no_authoritative_source keeps the legacy tier fallback for unlabeled sources', () => {
+    // No explicit class — inferAuthorityClass maps first_party→owner and
+    // authoritative→government, preserving the pre-class semantics.
+    const p = scoreIdentityPacket({
+      identityStatus: 'confirmed',
+      operationalStatus: 'active',
+      fields: [
+        field('name', 'Arsema Market', [src('IN SoS', 'authoritative', 'registry:in')]),
+        field('phone', '555-0100', [src('Owner site', 'first_party', 'owner')]),
+      ],
+    });
+    expect(p.qcSignals.map((s) => s.code)).not.toContain('no_authoritative_source');
   });
 
   it('flags unsourced SNAP without vetoing the seed', () => {

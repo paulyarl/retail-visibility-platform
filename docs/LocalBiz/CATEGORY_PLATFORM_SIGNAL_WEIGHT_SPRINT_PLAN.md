@@ -158,3 +158,10 @@ What the verification pass confirmed, and what it found missing.
 - Confidence **blend band** (local + national both contributing) — spec §10.
 - Estimator `depth(p)` calibration + `τ`/`τ_gap` tuning against a real national sample.
 - Feedback loop (local deltas revising the national score) — behind operator review.
+
+## §8 Post-sprint micro-gaps (closed)
+
+- [x] **Seed back-fill** — `resolveCampaignVerification` now mirrors connected-call verified facts into the primary-linked seed (`directory_seed_nap_verifications` with the confirmed/corrected split, `nap_verified_at`/`nap_owner_corrected`, provenance upsert, listing sync for corrected core fields, best-effort report refresh). Non-fatal; gated on `outcome ∉ {unreachable, wrong_business}` (§20.4).
+- [x] **Persisted "Wait"** — migration 300 adds nullable `seed_decision`/`_at`/`_by` on `mkt_campaigns_list`; `POST /presence-seeds/identity-packet/decision` writes `'wait'|'clear'` and returns the rebuilt packet. Advisory only — never blocks Push.
+- [x] **`no_authoritative_source` on authority class** — the QC signal now resolves `s.authorityClass ?? inferAuthorityClass(name, tier)` and tests `government | owner`, so an explicit class on a directory-tier source counts and unlabeled sources keep the legacy tier semantics under inference.
+- [x] **Calibration ledger** — spec §10 now carries the provisional-constants table (`LOCAL_PRECEDENCE_CONFIDENCE` = 0.6, `MIN_SIGNAL_WEIGHT_FOR_GAP` = 0.3, `GUARANTEE_STRENGTH_THRESHOLD` = 2) with code sites; recalibrate against a real national sample before tuning.

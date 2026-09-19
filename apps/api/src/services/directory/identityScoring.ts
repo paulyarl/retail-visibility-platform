@@ -644,8 +644,16 @@ function collectQcSignals(
   }
 
   const corroborating = fields.filter((f) => f.independentSources > 0);
+  // Authority class is the standing axis — a government (registry) or owner
+  // (first-party) source is what "authoritative" means here. Explicit classes
+  // are honored; unlabeled sources infer (first_party→owner, authoritative→
+  // government), which preserves the legacy tier semantics under inference.
   const hasAuthoritative = corroborating.some((f) =>
-    f.sources.some((s) => s.agrees && (s.tier === 'authoritative' || s.tier === 'first_party')),
+    f.sources.some((s) => {
+      if (!s.agrees) return false;
+      const cls = s.authorityClass ?? inferAuthorityClass(s.name, s.tier);
+      return cls === 'government' || cls === 'owner';
+    }),
   );
   if (corroborating.length > 0 && !hasAuthoritative) {
     signals.push({

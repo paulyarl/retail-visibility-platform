@@ -296,4 +296,14 @@ Scoped to the scoring remit (§2). Anything not on this list is a non-goal.
 - **Blend band.** A middle confidence band where local *and* national both contribute (weighted by confidence) instead of a hard switch. Deferred from v1 — the threshold is simpler and the divergence signal already captures the disagreement. Recorded so the deferral is conscious.
 - **Feedback loop.** Aggregating local deltas to revise the national score is the same bootstrap as §5; keep behind operator review.
 - **Estimator normalization.** The exact `depth(p)` composite weights (review volume vs rating count vs profile completeness vs category density) need a calibration pass against a real national sample before τ and `τ_gap` can be set.
+
+### Provisional constants (pending calibration)
+
+All three ship as provisional defaults — each is marked `PROVISIONAL` at its code site. Do not tune silently; recalibrate against a real national sample and update code + this table together.
+
+| Constant | Value | Code site | Governs |
+|---|---|---|---|
+| `LOCAL_PRECEDENCE_CONFIDENCE` (τ) | `0.6` | `IntelligenceProfileService.ts` | Minimum confidence for a local/regional weight to outrank national; also gates divergence emission |
+| `MIN_SIGNAL_WEIGHT_FOR_GAP` (τ_gap) | `0.3` | `validators/business-analysis.schema.ts` | Floor below which `unable_to_verify` is inert — excluded from the coverage denominator, no `DS_MISSING_PROFILE` |
+| `GUARANTEE_STRENGTH_THRESHOLD` | `2` | `identityScoring.ts` | Total dimension strength that guarantees a seed (depth or breadth) |
 - **Explicitly out (non-goals, §2).** Discovery-benchmark gap weighting stays out — signal weight does not shape discovery. The pitch's platform selection is *in* as a reported read (§6), not an applied one.

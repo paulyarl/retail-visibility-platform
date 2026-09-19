@@ -75,6 +75,12 @@ export interface IdentityPacket {
   ownerContact: OwnerContact | null;
   score: IdentityPacketScore;
   seed: { id: string; status: string; publicUrl: string | null } | null;
+  /**
+   * Persisted operator seed decision (mkt_campaigns_list.seed_decision*), or
+   * null when none was recorded / the columns do not exist yet. 'wait' means
+   * the operator chose not to seed yet — advisory only, Push stays enabled.
+   */
+  seedDecision: { decision: string; at: string; by: string | null } | null;
   generatedAt: string;
 }
 
@@ -113,6 +119,8 @@ export interface AssembleInput {
    */
   manualEvidence?: IdentityEvidenceRow[];
   seed?: { id: string; status: string; publicUrl: string | null } | null;
+  /** Persisted operator seed decision (see IdentityPacket.seedDecision). */
+  seedDecision?: IdentityPacket['seedDecision'];
   /**
    * Resolved signal_weight(category, platform) keyed by platform key
    * (google, yelp, …), from the category's intelligence profiles (Phase 5).
@@ -419,6 +427,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     ownerContact: newestOwnerContact(manualEvidence),
     score,
     seed: input.seed ?? null,
+    seedDecision: input.seedDecision ?? null,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -584,6 +593,34 @@ class IdentityPacketService {
       });
     }
 
+    // Persisted seed decision (migration 300). Non-fatal: a DB that has not
+    // been migrated yet simply yields no decision.
+    let seedDecision: IdentityPacket['seedDecision'] = null;
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT seed_decision, seed_decision_at, seed_decision_by
+        FROM mkt_campaigns_list
+        WHERE id = ${campaignId}
+        LIMIT 1
+      `;
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (row?.seed_decision) {
+        seedDecision = {
+          decision: row.seed_decision,
+          at:
+            row.seed_decision_at instanceof Date
+              ? row.seed_decision_at.toISOString()
+              : String(row.seed_decision_at ?? ''),
+          by: row.seed_decision_by ?? null,
+        };
+      }
+    } catch (error) {
+      logger.warn('IdentityPacket: seed-decision lookup failed (non-fatal)', undefined, {
+        campaignId,
+        error: (error as Error).message,
+      });
+    }
+
     return assembleIdentityPacket({
       campaignId,
       campaign,
@@ -593,8 +630,36 @@ class IdentityPacketService {
       attributes,
       manualEvidence,
       seed,
+      seedDecision,
       signalWeights,
     });
+  }
+
+  /**
+   * Persist the operator's seed decision for a campaign ('wait' or 'clear').
+   * Advisory only — it never blocks Push; it survives reloads so the Identity
+   * tab reflects the last recorded decision.
+   */
+  async setSeedDecision(
+    campaignId: string,
+    decision: 'wait' | 'clear',
+    by: string | null,
+  ): Promise<IdentityPacket['seedDecision']> {
+    if (decision === 'clear') {
+      await prisma.$executeRaw`
+        UPDATE mkt_campaigns_list
+        SET seed_decision = NULL, seed_decision_at = NULL, seed_decision_by = NULL
+        WHERE id = ${campaignId}
+      `;
+      return null;
+    }
+    const at = new Date();
+    await prisma.$executeRaw`
+      UPDATE mkt_campaigns_list
+      SET seed_decision = ${decision}, seed_decision_at = ${at}, seed_decision_by = ${by}
+      WHERE id = ${campaignId}
+    `;
+    return { decision, at: at.toISOString(), by };
   }
 }
 
