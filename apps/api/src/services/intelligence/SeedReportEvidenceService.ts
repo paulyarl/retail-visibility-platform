@@ -348,12 +348,69 @@ export class SeedReportEvidenceService extends BaseService {
         }
       : null;
 
+    // Phase 7 — platform_signal_divergence (INT_*, display-only, spec §5).
+    // A confidence-gated local estimate that diverges from the national one
+    // is itself an observation: a market where a nationally-quiet platform
+    // over-indexes is a market characteristic. Emitted through the same
+    // registry validation as model-emitted signals — an unseeded code lands
+    // in quarantine, not in the report.
+    const divergenceSignals: ReportSignal[] = [];
+    try {
+      if (seedState.category) {
+        const { IntelligenceProfileService } = await import('./IntelligenceProfileService');
+        const divergent = await IntelligenceProfileService.getInstance().resolveSignalDivergences(
+          { category: seedState.category, city: seedState.city, state: seedState.state },
+          ctx,
+        );
+        divergent.forEach((w, i) => {
+          const obsId = `obs-div-${safeKey}-${String(i).padStart(2, '0')}`;
+          observations.push({
+            observation_id: obsId,
+            subject: 'seed',
+            field: `platform_signal_weight:${w.platform}`,
+            value: `${w.weight} (${w.scope})`,
+            state: 'observed',
+            confidence:
+              (w.confidence ?? 0) >= 0.8 ? 'high' : (w.confidence ?? 0) >= 0.5 ? 'medium' : 'low',
+            source_name: `intelligence-profile:${w.profileId}@v${w.profileVersion}`,
+            source_type: 'intelligence_profile',
+            source_url: null,
+            observed_at: null,
+            notes: w.basis ?? null,
+          });
+          divergenceSignals.push({
+            code: 'INT_PLATFORM_SIGNAL_DIVERGENCE',
+            family: 'INT',
+            basis: `${w.platform}: ${w.scope} signal weight ${w.weight} diverges from the national estimate (Δ ${
+              (w.divergence ?? 0) > 0 ? '+' : ''
+            }${w.divergence}) — local market diverges from the category norm`,
+            source_observation_ids: [obsId],
+          });
+        });
+      }
+    } catch (divErr) {
+      logger.warn('SeedReportEvidenceService: divergence signal emission failed (non-fatal)', ctx, {
+        error: (divErr as Error).message,
+        seedId,
+      });
+    }
+
+    const { validated: divergenceValidated, quarantined: divergenceQuarantined } =
+      await this.validateSignals(divergenceSignals, ctx);
+
     const evidence: ReportEvidenceOutput = {
       observations,
       identity_candidates: [identityCandidate],
       category_assessment: categoryAssessment,
       geographic_assessment: geographicAssessment,
-      signals: [],
+      signals: divergenceValidated.map((v) => ({
+        code: v.code,
+        family: 'INT' as const,
+        label: v.label,
+        basis: v.basis,
+        source_observation_ids: v.source_observation_ids,
+        registry_signal_id: v.registry_signal_id,
+      })),
       unresolved_questions: [],
       platform_observations: [],
     };
@@ -363,8 +420,8 @@ export class SeedReportEvidenceService extends BaseService {
       seed_id: seedId,
       evidence,
       observations_with_ids: observations,
-      validated_signals: [],
-      quarantined_signals: [],
+      validated_signals: divergenceValidated,
+      quarantined_signals: divergenceQuarantined,
       provenance_refs: provenanceRefs,
       valid: true,
       errors: [],

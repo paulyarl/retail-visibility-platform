@@ -213,6 +213,13 @@ export class CampaignTriageService extends BaseService {
     const auditData = (selectedAudit?.audit_data as SignalExtractorInput['auditData']) ?? null;
     const sourceAuditId = selectedAudit?.id ?? null;
 
+    // Phase 6 — signal-aligned gap gate. Resolved platform weights decide
+    // whether a render-control absence emits DS_MISSING_PROFILE; undefined
+    // keeps the legacy primary-platform set (no profile → byte-identical).
+    const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
+    const platformSignalWeights = await IntelligenceProfileService.getInstance()
+      .resolveSignalWeightMapForCampaign(campaign, auditData, ctx);
+
     const extractorInput: SignalExtractorInput = {
       campaign: {
         last_review_date: campaign.last_review_date,
@@ -224,6 +231,7 @@ export class CampaignTriageService extends BaseService {
       },
       auditData,
       bbb,
+      platformSignalWeights,
     };
     let signals: SignalCode[] = extractSignals(extractorInput);
 

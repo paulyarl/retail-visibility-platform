@@ -888,7 +888,7 @@ const playbookUpdateSchema = z.object({
 
 // ─── Signal registry schemas (Sprint 3) ──────────────────────────────────
 
-const signalCodePattern = /^[A-Z]{2}_[A-Z0-9_]+$/;
+const signalCodePattern = /^[A-Z]{2,}_[A-Z0-9_]+$/;
 const detectionSourceEnum = z.enum(['model_emitted', 'derived', 'operator_input']);
 
 const signalCreateSchema = z.object({

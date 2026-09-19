@@ -88,6 +88,7 @@ const INT_SIGNAL_LABELS: Record<string, string> = {
   INT_ACTIVE_OPERATIONAL_EVIDENCE: 'Active Operational Evidence',
   INT_CATEGORY_SPECIALIZATION: 'Category Specialization',
   INT_UNDEREXPOSED_CREDENTIAL: 'Underexposed Credential',
+  INT_PLATFORM_SIGNAL_DIVERGENCE: 'Platform Signal Divergence',
 };
 
 // ====================

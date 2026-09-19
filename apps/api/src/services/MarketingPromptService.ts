@@ -741,8 +741,16 @@ export class MarketingPromptService extends BaseService {
           // render-control coverage is too low for the assessment to mean
           // anything. Applied here rather than in the validator because this
           // path persists the RAW parsed JSON (not the Zod output).
+          // Phase 6: weighted by the category's resolved platform signal
+          // weights when a profile supplies them (undefined → uniform gate).
+          let platformSignalWeights: Record<string, number> | undefined;
+          if (schemaName === BUSINESS_ANALYSIS_SCHEMA_NAME) {
+            const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+            platformSignalWeights = await IntelligenceProfileService.getInstance()
+              .resolveSignalWeightMapForCampaign(campaign, candidateJson, ctx);
+          }
           parsedJson = schemaName === BUSINESS_ANALYSIS_SCHEMA_NAME
-            ? applyRenderControlCoverageGate(candidateJson)
+            ? applyRenderControlCoverageGate(candidateJson, platformSignalWeights)
             : candidateJson;
           break;
         }
@@ -1219,9 +1227,14 @@ export class MarketingPromptService extends BaseService {
           });
           if (campaignRow) {
             const latestAudit = campaignRow.mkt_audits_list?.[0] ?? null;
+            // Phase 6 — signal-aligned gap gate (undefined → legacy set).
+            const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+            const platformSignalWeights = await IntelligenceProfileService.getInstance()
+              .resolveSignalWeightMapForCampaign(campaignRow, latestAudit?.audit_data, ctx);
             const signalCodes = extractSignals({
               campaign: campaignRow,
               auditData: latestAudit?.audit_data as any,
+              platformSignalWeights,
             });
             const floorTrack = repairService.resolveTrackFromSignals(signalCodes);
             if (floorTrack === 'escalated' && recommendation.recommended_track === 'standard') {

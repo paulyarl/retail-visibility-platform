@@ -78,30 +78,32 @@ export function buildArchetypePrompt(
     // Malformed JSON — skip the co-occurring signal instruction
   }
   const coOccurringInstruction = buildCoOccurringSignalInstruction(fields);
+  const platformPremiseInstruction = buildPlatformPremiseInstruction(fields);
+  const tailInstructions = coOccurringInstruction + platformPremiseInstruction;
 
   switch (archetype) {
     case 'A1':
       return A1_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
+        .replace('{{close_line}}', closeLine) + tailInstructions;
     case 'A2':
       return A2_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
+        .replace('{{close_line}}', closeLine) + tailInstructions;
     case 'A3':
-      return buildA3Prompt(extractedFieldsJson, closeLine) + coOccurringInstruction;
+      return buildA3Prompt(extractedFieldsJson, closeLine) + tailInstructions;
     case 'A4':
       return A4_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
+        .replace('{{close_line}}', closeLine) + tailInstructions;
     case 'A5':
       return A5_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
+        .replace('{{close_line}}', closeLine) + tailInstructions;
     case 'A6':
       return A6_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
-        .replace('{{close_line}}', closeLine) + coOccurringInstruction;
+        .replace('{{close_line}}', closeLine) + tailInstructions;
   }
 }
 
@@ -294,6 +296,34 @@ which is more severe than this archetype's primary signal (severity: ${fields.pr
 Lead with or prominently acknowledge this stronger signal in your hook — it is
 the more felt problem. You can still reference the archetype's primary signal
 as a secondary observation, but the stronger signal should dominate the opener.`;
+}
+
+/**
+ * Build the platform-premise instruction (spec §2 "Reported, not applied").
+ * Injected when platform_premise is non-null — the confidence-gated "where"
+ * fact: the platform that matters AND where the business is weak. Tells the
+ * AI it may frame the hook as "your customers are on <platform>" grounded in
+ * the measured basis, but must not overstate it into a crisis claim.
+ * Returns empty string when no premise resolved.
+ */
+function buildPlatformPremiseInstruction(fields: any): string {
+  const p = fields?.platform_premise;
+  if (!p || typeof p !== 'object' || !p.platform) return '';
+  const scopeNote = p.scope === 'national'
+    ? 'a national-level category estimate'
+    : `a ${p.scope ?? 'local'} market measurement`;
+  const basisNote = p.basis ? ` The measurement basis: ${p.basis}.` : '';
+  return `
+
+PLATFORM PREMISE — WHERE THE CUSTOMERS ARE:
+Measured category intelligence shows ${p.platform} is where this market's
+customers look for this kind of business (signal weight ${p.signal_weight},
+${scopeNote}) — and the audit shows this business is weak there.${basisNote}
+You MAY frame the hook around that platform ("most of your customers find
+businesses like yours on ${p.platform}") because it is a measured fact, not
+a guess. Do NOT inflate it into a crisis claim, do NOT name a different
+platform as the lead, and do NOT recite the weight number to the owner —
+the weight is your evidence, not their vocabulary.`;
 }
 
 // ─── A1: Review Response Gap ────────────────────────────────────────────

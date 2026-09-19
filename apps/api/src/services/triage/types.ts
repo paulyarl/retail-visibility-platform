@@ -144,6 +144,15 @@ export interface SignalExtractorInput {
     bbbGrade?: string;
     unansweredBbbComplaints?: number;
   };
+  /**
+   * Resolved signal_weight(category, platform) per normalized platform key
+   * (Phase 6 — CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §7). When present, a
+   * render-control `business_specific_failure` only emits DS_MISSING_PROFILE
+   * for platforms at or above MIN_SIGNAL_WEIGHT_FOR_GAP — a low-signal
+   * platform's absence says nothing for the category. When absent, the
+   * legacy primary-platforms set applies (byte-identical pre-weight behavior).
+   */
+  platformSignalWeights?: Record<string, number>;
 }
 
 // ─── Playbook catalog row (DB shape) ─────────────────────────────────────

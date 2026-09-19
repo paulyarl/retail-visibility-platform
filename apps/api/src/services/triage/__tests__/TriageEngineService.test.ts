@@ -817,6 +817,62 @@ describe('extractSignals — emits SignalCode[] from campaign + audit + BBB', ()
     }));
     expect(signals).toContain('DS_MISSING_PROFILE');
   });
+
+  // ─── Phase 6 — signal-aligned gap gate (spec §7) ────────────────────────
+
+  it('weighted: business_specific_failure on a high-signal platform fires', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+        render_controls: [
+          { platform: 'google', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+      platformSignalWeights: { google: 0.95, yelp: 0.2 },
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+  });
+
+  it('weighted: business_specific_failure on a low-signal platform is inert', () => {
+    // Yelp (0.20) below τ_gap — it was in the legacy primary set, but the
+    // category's signal model says its absence says nothing.
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+        render_controls: [
+          { platform: 'yelp', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+      platformSignalWeights: { google: 0.95, yelp: 0.2 },
+    }));
+    expect(signals).not.toContain('DS_MISSING_PROFILE');
+  });
+
+  it('weighted: a platform absent from the weight map weighs 0 — inert', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+        render_controls: [
+          { platform: 'bbb', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+      platformSignalWeights: { google: 0.95 },
+    }));
+    expect(signals).not.toContain('DS_MISSING_PROFILE');
+  });
+
+  it('weighted: a platform at exactly τ_gap still gates (>= boundary)', () => {
+    const signals = extractSignals(makeInput({
+      auditData: {
+        platforms: {},
+        render_controls: [
+          { platform: 'bbb', determination: 'business_specific_failure', business_rendered: false, control_rendered: true },
+        ],
+      } as any,
+      platformSignalWeights: { bbb: 0.3 },
+    }));
+    expect(signals).toContain('DS_MISSING_PROFILE');
+  });
 });
 
 // ─── Extractor helpers ───────────────────────────────────────────────────

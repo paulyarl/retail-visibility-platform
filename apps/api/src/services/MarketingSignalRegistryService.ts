@@ -52,7 +52,8 @@ export interface SignalListFilters {
 
 // ─── Validation ──────────────────────────────────────────────────────────
 
-const CODE_PATTERN = /^[A-Z]{2}_[A-Z0-9_]+$/;
+// {2,} — the INT family is 3 letters; {2} would reject every INT_* code.
+const CODE_PATTERN = /^[A-Z]{2,}_[A-Z0-9_]+$/;
 
 function validateCode(code: string): void {
   if (!CODE_PATTERN.test(code)) {

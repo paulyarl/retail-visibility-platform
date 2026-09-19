@@ -35,6 +35,8 @@ import type {
 } from '../outreach-openers/archetype-selection';
 import type { SignalExtractorInput } from './types';
 import { isKnownSignalCode, signalLabel, type SignalCode } from './signal-taxonomy';
+import { MIN_SIGNAL_WEIGHT_FOR_GAP } from '../../validators/business-analysis.schema';
+import { normalizeSignalPlatformKey } from '../intelligence/IntelligenceProfileService';
 
 // ─── Thresholds (Sprint 2A §2A.1 + registry derived_rule defaults) ───────
 //
@@ -255,14 +257,17 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       }
     }
 
-    // DS_MISSING_PROFILE — business absent from a primary platform.
+    // DS_MISSING_PROFILE — business absent from a signal-bearing platform.
     //
     // When render_controls is present (Platform Availability Verification
     // directive ran), the signal fires ONLY when a control established
-    // business_specific_failure on a primary platform (google, yelp,
-    // facebook, bbb). This prevents bare render failures (bot defense, JS
-    // gating, rate limits) from firing the signal — the control proves the
-    // failure is attributable to the business, not the platform/analyst.
+    // business_specific_failure on a platform that matters: the resolved
+    // platform_signal_weights decide (>= MIN_SIGNAL_WEIGHT_FOR_GAP), or the
+    // legacy primary set (google, yelp, facebook, bbb) when no weights were
+    // supplied. This prevents bare render failures (bot defense, JS gating,
+    // rate limits) from firing the signal — the control proves the failure
+    // is attributable to the business, not the platform/analyst — and keeps
+    // a low-signal platform's absence inert (spec §7).
     //
     // When render_controls is absent (legacy imports pre-control-mechanism),
     // fall back to the original heuristic: !google or google.data_status in
@@ -270,12 +275,19 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
     if (!signals.has('DS_MISSING_PROFILE')) {
       const renderControls = (auditData as any).render_controls;
       if (Array.isArray(renderControls) && renderControls.length > 0) {
+        const weights = input.platformSignalWeights;
         const primaryPlatforms = new Set(['google', 'yelp', 'facebook', 'bbb']);
-        const hasBusinessSpecificFailure = renderControls.some(
-          (rc: any) =>
-            rc.determination === 'business_specific_failure' &&
-            primaryPlatforms.has(rc.platform),
-        );
+        const hasBusinessSpecificFailure = renderControls.some((rc: any) => {
+          if (rc?.determination !== 'business_specific_failure') return false;
+          // Signal-aligned (Phase 6): the platform's resolved signal weight
+          // decides whether its absence gates — below τ_gap the platform is
+          // not a signal surface for this category, so the failure is inert.
+          if (weights) {
+            const w = weights[normalizeSignalPlatformKey(rc.platform) ?? ''] ?? 0;
+            return w >= MIN_SIGNAL_WEIGHT_FOR_GAP;
+          }
+          return primaryPlatforms.has(rc.platform);
+        });
         if (hasBusinessSpecificFailure) {
           signals.add('DS_MISSING_PROFILE');
         }

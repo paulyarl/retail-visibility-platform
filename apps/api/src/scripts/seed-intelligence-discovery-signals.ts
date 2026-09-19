@@ -27,9 +27,9 @@ import { invalidateSignalRegistryCache } from '../services/triage/signal-taxonom
  * SEED_VERSION_MARKER — bump when signal definitions change to force
  * update-in-place of label/description on already-registered rows.
  */
-const SEED_VERSION_MARKER = '2026-09-15-v1';
+const SEED_VERSION_MARKER = '2026-09-18-v2-signal-divergence';
 
-const INTELLIGENCE_DISCOVERY_SIGNALS = [
+export const INTELLIGENCE_DISCOVERY_SIGNALS = [
   {
     code: 'INT_LOW_VISIBILITY',
     family: 'INT',
@@ -117,6 +117,19 @@ const INTELLIGENCE_DISCOVERY_SIGNALS = [
     description:
       'The business holds credentials, certifications, or affiliations that would build customer trust but are not visible on the platforms where customers discover the business.',
     detectionSource: 'model_emitted' as const,
+  },
+  {
+    // Spec: CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §5 — a confidence-gated
+    // local signal-weight estimate that diverges from the national one is
+    // itself an intelligence observation (a market where a nationally-quiet
+    // platform over-indexes is a market characteristic, not an error).
+    // Display-only per §S1 — never enters detected_signals or triage.
+    code: 'INT_PLATFORM_SIGNAL_DIVERGENCE',
+    family: 'INT',
+    label: 'Platform signal divergence',
+    description:
+      'A confidence-gated local signal-weight estimate diverges from the national category estimate for this platform — the local market reads differently than the national norm.',
+    detectionSource: 'derived' as const,
   },
 ];
 

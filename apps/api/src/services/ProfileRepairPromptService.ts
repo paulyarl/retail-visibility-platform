@@ -214,11 +214,16 @@ export class ProfileRepairPromptService extends BaseService {
     return lines.join('\n').trim();
   }
 
-  buildSeekVariables(campaign: any, latestAudit?: any): Record<string, string> {
+  buildSeekVariables(
+    campaign: any,
+    latestAudit?: any,
+    platformSignalWeights?: Record<string, number>,
+  ): Record<string, string> {
     const audit = latestAudit || campaign?.audits?.[0] || campaign?.mkt_audits_list?.[0] || null;
     const signalCodes = extractSignals({
       campaign,
       auditData: audit?.audit_data,
+      platformSignalWeights,
     });
 
     // Also include any pre-extracted detected_signals from campaign or triage results
@@ -303,8 +308,12 @@ export class ProfileRepairPromptService extends BaseService {
       }
 
       const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
+      // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
+      const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
+      const platformSignalWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightMapForCampaign(campaign, latestAudit?.audit_data, ctx);
       const targetTemplateId = templateId || this.resolveSeekTemplateId(campaign.repair_issue_type);
-      const seekVars = this.buildSeekVariables(campaign, latestAudit);
+      const seekVars = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
 
       const execution = await MarketingExecutionService.getInstance().executeSingle(
         {
@@ -345,6 +354,7 @@ export class ProfileRepairPromptService extends BaseService {
             const signalCodes = extractSignals({
               campaign,
               auditData: latestAudit?.audit_data as any,
+              platformSignalWeights,
             });
             const floorTrack = this.resolveTrackFromSignals(signalCodes);
             if (floorTrack === 'escalated' && recommendation.recommended_track === 'standard') {
@@ -653,6 +663,10 @@ export class ProfileRepairPromptService extends BaseService {
 
       const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
       const intake = campaign.mkt_dispute_intake?.[0] ?? null;
+      // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
+      const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
+      const platformSignalWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightMapForCampaign(campaign, latestAudit?.audit_data, ctx);
 
       let variablesUsed: Record<string, any> = {};
       if (template.prompt_type === 'recovery_resolution' || templateId === PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID) {
@@ -660,7 +674,7 @@ export class ProfileRepairPromptService extends BaseService {
       } else if (template.prompt_type === 'fulfill' || templateId === PROFILE_REPAIR_CITATION_PACKAGE_TEMPLATE_ID) {
         variablesUsed = this.buildFulfillVariables(campaign, latestAudit);
       } else {
-        variablesUsed = this.buildSeekVariables(campaign, latestAudit);
+        variablesUsed = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
       }
 
       const executionService = MarketingExecutionService.getInstance();
@@ -716,6 +730,10 @@ export class ProfileRepairPromptService extends BaseService {
 
       const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
       const intake = campaign.mkt_dispute_intake?.[0] ?? null;
+      // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
+      const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
+      const platformSignalWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightMapForCampaign(campaign, latestAudit?.audit_data, ctx);
 
       let variablesUsed: Record<string, any> = {};
       if (template.prompt_type === 'recovery_resolution' || templateId === PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID) {
@@ -723,7 +741,7 @@ export class ProfileRepairPromptService extends BaseService {
       } else if (template.prompt_type === 'fulfill' || templateId === PROFILE_REPAIR_CITATION_PACKAGE_TEMPLATE_ID) {
         variablesUsed = this.buildFulfillVariables(campaign, latestAudit);
       } else {
-        variablesUsed = this.buildSeekVariables(campaign, latestAudit);
+        variablesUsed = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
       }
 
       const execution = await promptService.createExecution(
@@ -785,6 +803,7 @@ export class ProfileRepairPromptService extends BaseService {
           const signalCodes = extractSignals({
             campaign,
             auditData: latestAudit?.audit_data as any,
+            platformSignalWeights,
           });
           const floorTrack = this.resolveTrackFromSignals(signalCodes);
           if (floorTrack === 'escalated' && recommendation?.recommended_track === 'standard') {

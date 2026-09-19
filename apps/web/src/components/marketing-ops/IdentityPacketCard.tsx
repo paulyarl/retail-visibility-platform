@@ -72,6 +72,48 @@ const BAND_META: Record<IdentityRecommendationBand, { label: string; cls: string
 
 const FIELD_LABEL: Record<string, string> = IDENTITY_FIELD_LABELS;
 
+/** Gate decision presentation (spec §2) — the server's verdict, not the band. */
+const GATE_DECISION_META: Record<string, { label: string; cls: string; blurb: string }> = {
+  guaranteed: {
+    label: 'Guaranteed',
+    cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
+    blurb: 'Signal strength clears the bar on depth alone — a strong presence is enough.',
+  },
+  earned: {
+    label: 'Earned',
+    cls: 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400',
+    blurb: 'Two or more evidence dimensions are satisfied — breadth earns the seed.',
+  },
+  rescued: {
+    label: 'Rescued by owner',
+    cls: 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400',
+    blurb: 'Owner confirmation carried a record that was short of earning.',
+  },
+  blocked: {
+    label: 'Blocked',
+    cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    blurb: 'The record does not clear the seed gate yet.',
+  },
+};
+
+const DIMENSION_LABEL: Record<string, string> = {
+  operational: 'Operational',
+  identity: 'Identity',
+  category: 'Category',
+  location: 'Location',
+};
+
+/** Human labels for gate blocker codes (veto codes + prerequisites). */
+const BLOCKER_LABEL: Record<string, string> = {
+  missing_required_field: 'A required field has no resolved value',
+  required_field_conflict: 'A required field has a blocking source conflict',
+  insufficient_dimensions: 'Fewer than 2 evidence dimensions have sources',
+  no_operational_evidence: 'No proven recent activity',
+};
+
+/** Strength threshold that guarantees a seed — mirrors GUARANTEE_STRENGTH_THRESHOLD in identityScoring. */
+const GATE_STRENGTH_BAR = 2;
+
 function Badge({ children, cls }: { children: React.ReactNode; cls: string }) {
   return <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{children}</span>;
 }
@@ -254,6 +296,9 @@ export default function IdentityPacketCard({
 
   const { score } = packet;
   const band = BAND_META[score.band];
+  // The gate decision is the server's verdict (spec §2); the band is the
+  // pre-gate fallback for packets scored before the gate existed.
+  const gateMeta = score.gate ? GATE_DECISION_META[score.gate.decision] : band;
   const blocked = score.vetoes.length > 0;
   // The SERVER gate (spec §2) decides pushability — the client must agree, or
   // the button enables a Push the API will reject with 409. Fall back to the
@@ -348,18 +393,100 @@ export default function IdentityPacketCard({
         />
         <div className="rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Recommendation
+            {score.gate ? 'Seed gate' : 'Recommendation'}
           </div>
           <div className="mt-1.5">
-            <Badge cls={band.cls}>{band.label}</Badge>
+            <Badge cls={gateMeta.cls}>{gateMeta.label}</Badge>
           </div>
-          <div className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">{band.blurb}</div>
+          <div className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">{gateMeta.blurb}</div>
         </div>
       </div>
       {blocked && (
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           Scores are informational — a hard veto blocks seeding regardless of how high they read.
         </p>
+      )}
+
+      {/* Seed gate — dimensions, strength, owner axis (spec §2) */}
+      {score.gate && (
+        <div className="rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Gate dimensions
+            </div>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+              {score.gate.satisfiedCount}/4 satisfied · strength {score.gate.totalStrength}/{GATE_STRENGTH_BAR}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {score.gate.dimensions.map((d) => (
+              <span
+                key={d.dimension}
+                title={
+                  d.satisfied
+                    ? `${d.sourceCount} source${d.sourceCount === 1 ? '' : 's'} · strength ${d.strength}`
+                    : 'No sources testify on this dimension yet'
+                }
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  d.satisfied
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                    : 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400'
+                }`}
+              >
+                {d.satisfied ? '✓' : '·'} {DIMENSION_LABEL[d.dimension] ?? d.dimension}
+                {d.satisfied && <span className="opacity-70">{d.strength}</span>}
+              </span>
+            ))}
+            {/* Owner axis — sits above the four dimensions (spec §2) */}
+            <span
+              title="Owner confirmation can rescue a record short of earning — it never overrides a veto"
+              className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                score.gate.ownerOverRule
+                  ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                  : 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400'
+              }`}
+            >
+              {score.gate.ownerOverRule ? '✓' : '·'} Owner
+              {score.gate.ownerOverRule && <span className="opacity-70">rescue</span>}
+            </span>
+          </div>
+          {/* Strength meter — dimension strength + supporting (activity) vs the guarantee bar */}
+          <div className="mt-2.5">
+            <div className="relative h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-neutral-700">
+              {(() => {
+                const scale = Math.max(GATE_STRENGTH_BAR, score.gate.totalStrength, 0.01);
+                const dimPct = Math.min(100, (score.gate.dimensionStrength / scale) * 100);
+                const supPct = Math.min(100 - dimPct, (score.gate.supportingStrength / scale) * 100);
+                const barPct = (GATE_STRENGTH_BAR / scale) * 100;
+                return (
+                  <>
+                    <div className="absolute left-0 top-0 h-full bg-blue-500" style={{ width: `${dimPct}%` }} />
+                    <div className="absolute top-0 h-full bg-sky-300 dark:bg-sky-500/60" style={{ left: `${dimPct}%`, width: `${supPct}%` }} />
+                    <div
+                      className="absolute top-0 h-full w-0.5 bg-gray-800 dark:bg-gray-200"
+                      style={{ left: `${barPct}%` }}
+                      title={`Guarantee bar at ${GATE_STRENGTH_BAR}`}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+              <span><span className="text-blue-500">■</span> presence {score.gate.dimensionStrength}</span>
+              <span><span className="text-sky-400">■</span> activity {score.gate.supportingStrength}</span>
+              <span>bar {GATE_STRENGTH_BAR} — depth alone can seed</span>
+            </div>
+          </div>
+          {score.gate.blockers.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {score.gate.blockers.map((b) => (
+                <li key={b} className="text-[11px] text-red-600 dark:text-red-400">
+                  {BLOCKER_LABEL[b] ?? b}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Vetoes */}
@@ -392,7 +519,14 @@ export default function IdentityPacketCard({
                     s.severity === 'error' ? 'bg-red-500' : s.severity === 'warn' ? 'bg-amber-500' : 'bg-gray-400'
                   }`}
                 />
-                <span>{s.message}</span>
+                <span>
+                  {s.field && (
+                    <span className="mr-1 rounded bg-amber-100/70 px-1 text-[10px] font-medium dark:bg-amber-900/40">
+                      {FIELD_LABEL[s.field] ?? s.field}
+                    </span>
+                  )}
+                  {s.message}
+                </span>
               </li>
             ))}
           </ul>

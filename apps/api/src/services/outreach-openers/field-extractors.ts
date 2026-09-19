@@ -57,6 +57,19 @@ export interface CommonFields {
   // acknowledge/lead with this signal instead of its default hook.
   // Null when the primary signal is already the strongest (or tied).
   strongest_co_occurring: TriggeredSignalEntry | null;
+  // ── Platform premise (spec: CATEGORY_PLATFORM_SIGNAL_WEIGHT §2) ──
+  // The "where" fact for the pitch — the platform that matters AND where
+  // the business is weak: argmax(signal_weight × gap_severity). REPORTED
+  // only — the pitch reads it; it never feeds back into scoring. Grounds
+  // the "customers are on this platform" premise in the measured basis.
+  // Null when no platform qualifies (nothing weak, or no weights resolved).
+  platform_premise?: {
+    platform: string;
+    signal_weight: number;
+    gap_severity: number;
+    scope: string | null;
+    basis: string | null;
+  } | null;
 }
 
 export interface A1Fields extends CommonFields {

@@ -49,6 +49,7 @@ const INT_SIGNAL_LABELS: Record<string, string> = {
   INT_ACTIVE_OPERATIONAL_EVIDENCE: 'Active Operational Evidence',
   INT_CATEGORY_SPECIALIZATION: 'Category Specialization',
   INT_UNDEREXPOSED_CREDENTIAL: 'Underexposed Credential',
+  INT_PLATFORM_SIGNAL_DIVERGENCE: 'Platform Signal Divergence',
 };
 
 // Re-export for backward compatibility (tests + existing imports).
@@ -533,7 +534,11 @@ export class MarketingExecutionService extends BaseService {
           const { default: repairService } = await import('./ProfileRepairPromptService');
 
           if (promptType === 'seek') {
-            const seekDefaults = repairService.buildSeekVariables(input.campaign, audit);
+            // Phase 6 — signal-aligned gap gate (undefined → legacy set).
+            const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
+            const platformSignalWeights = await IntelligenceProfileService.getInstance()
+              .resolveSignalWeightMapForCampaign(input.campaign, audit?.audit_data, ctx);
+            const seekDefaults = repairService.buildSeekVariables(input.campaign, audit, platformSignalWeights);
             if (!effectiveVariables.audit_signals || !String(effectiveVariables.audit_signals).trim()) {
               effectiveVariables.audit_signals = seekDefaults.audit_signals;
             }

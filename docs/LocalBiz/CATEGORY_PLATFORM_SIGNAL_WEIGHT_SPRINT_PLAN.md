@@ -46,7 +46,7 @@ What the verification pass confirmed, and what it found missing.
 
 ## §3 Phases
 
-**Progress:** Phase 1 ✅ (authority classes → dimensions; NAP corroborators + drift) · Phase 2 ✅ (operator evidence first-class) · Phase 3 ✅ (dimension gate + owner axis) · Phase 4 ✅ (server-side guarded lane) · Phase 5 ✅ (signal weight — derivation, resolution, consumption) · Phase 6–7 pending.
+**Progress:** Phase 1 ✅ (authority classes → dimensions; NAP corroborators + drift) · Phase 2 ✅ (operator evidence first-class) · Phase 3 ✅ (dimension gate + owner axis) · Phase 4 ✅ (server-side guarded lane) · Phase 5 ✅ (signal weight — derivation, resolution, consumption) · Phase 6 ✅ (render-control alignment) · Phase 7 ✅ (divergence signal seeded on local + prd, pitch framing, gate UI).
 
 **Gate constants (provisional):** `EARN_DIMENSION_COUNT = 2`, `GUARANTEE_STRENGTH_THRESHOLD = 2` — the single number to calibrate (spec §10). Strength = **dimension strength** (tier-weighted presence/citations per dimension) + **supporting strength** (proven recent activity via the operational recency axis). The threshold is *depth-or-breadth*: a single high-signal platform presence (e.g. Google = 2) guarantees on its own, with no second dimension and no activity; recency is supporting strength, not a prerequisite.
 
@@ -117,13 +117,14 @@ What the verification pass confirmed, and what it found missing.
 - `applyRenderControlCoverageGate`: weight attempted/rendered by signal weight.
 - Respect the existing `TriageEngineService.test.ts` control suite.
 
-**Done:** an unrendered Google control suppresses; an unrendered Yelp control is inert.
+**Done:** an unrendered Google control suppresses; an unrendered Yelp control is inert. `MIN_SIGNAL_WEIGHT_FOR_GAP = 0.3` (provisional τ_gap) in `business-analysis.schema.ts`; `applyRenderControlCoverageGate(audit, platformSignalWeights?)` weights each control's contribution and excludes below-τ_gap `unable_to_verify` controls from the denominator (emitted as `weighted_attempted` / `weighted_rendered` / `inert_controls` on `render_control_coverage`); `extractSignals` takes `platformSignalWeights` and gates `DS_MISSING_PROFILE` on `business_specific_failure` weight ≥ τ_gap instead of the hardcoded primary set. Wired at every call site via `IntelligenceProfileService.resolveSignalWeightMapForCampaign` (non-fatal; `undefined` → byte-identical legacy gate).
 
 ### Phase 7 — Divergence signal, pitch framing, UI
 
-- Emit `platform_signal_divergence` as a new `INT_*` code — registry seed **and** both hardcoded `INT_SIGNAL_LABELS` maps (F6); §S1 regression guard.
-- Pitch: `lead_platform = argmax(signal_weight × gap_severity)` using the effective weight, grounded in `basis`.
-- `IdentityPacketCard.tsx`: show the suppressed-conflict reason; display the dimensions.
+- ~~Emit `platform_signal_divergence` as a new `INT_*` code — registry seed **and** both hardcoded `INT_SIGNAL_LABELS` maps (F6); §S1 regression guard.~~ **Done:** `INT_PLATFORM_SIGNAL_DIVERGENCE` (detection_source `derived`) in `seed-intelligence-discovery-signals.ts` (marker `2026-09-18-v2-signal-divergence`) — **registered on local + prd** — + both `INT_SIGNAL_LABELS` maps. Resolver `resolveSignalDivergences` scans every measured platform, returns only `precedenceViaConfidence` + non-zero Δ — the §4 gate doubles as the emission gate. Emitted code-side in `buildSubstrateEvidence` (one `platform_signal_weight:<platform>` observation each) through `validateSignals` — unregistered codes quarantine. `int-discovery-signals-parity.test.ts` is the §S1 guard (seed/map parity + INT absent from `KNOWN_SIGNAL_CODES` + extractor).
+- ~~Pitch: `lead_platform = argmax(signal_weight × gap_severity)` using the effective weight, grounded in `basis`.~~ **Done:** `selectLeadPlatform` + `platformGapSeverity` (pure, in `IntelligenceProfileService`); `resolveSignalWeightsForCampaign` keeps `basis`; `platform_premise` on `CommonFields`; `buildPlatformPremiseInstruction` injected into all six archetype prompts (reported read — barred from crisis inflation + reciting the weight).
+- ~~`IdentityPacketCard.tsx`: show the suppressed-conflict reason; display the dimensions.~~ **Done:** gate decision replaces the band when `score.gate` exists; dimension chips + owner axis + stacked strength meter (bar at 2) + human-readable blockers; QC items carry a `FIELD_LABEL` chip so `conflict_outvoted_*` / `nap_drift_*` name their field.
+- **Bug found during seeding:** `CODE_PATTERN = /^[A-Z]{2}_…$/` (service + route) rejected every `INT_*` code — the 11 existing rows came from migration 199's SQL, bypassing `createSignal`. Relaxed to `{2,}` in `MarketingSignalRegistryService` + `marketing-ops.ts` `signalCodePattern`.
 
 ## §4 Test plan
 

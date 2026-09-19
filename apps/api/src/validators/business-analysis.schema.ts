@@ -24,6 +24,7 @@
  */
 
 import { z } from 'zod';
+import { normalizeSignalPlatformKey } from '../services/intelligence/IntelligenceProfileService';
 
 /**
  * Strip a trailing `%` and coerce to number.
@@ -737,13 +738,39 @@ export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
  */
 export const MIN_RENDER_CONTROL_COVERAGE_FOR_TIER = 0.5;
 
+/**
+ * τ_gap — the signal-weight floor below which a platform's absence is inert
+ * (CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §7). A platform whose resolved
+ * signal_weight for the category falls below this is not a signal surface:
+ * its `unable_to_verify` is excluded from the coverage denominator and its
+ * `business_specific_failure` cannot emit DS_MISSING_PROFILE.
+ *
+ * PROVISIONAL — calibration deferred to a real national sample (spec §10).
+ */
+export const MIN_SIGNAL_WEIGHT_FOR_GAP = 0.3;
+
 export interface RenderControlCoverage {
+  /** Controls attempted (raw count, unweighted). */
   attempted: number;
+  /** Controls whose control business rendered (raw count, unweighted). */
   rendered: number;
-  /** rendered / attempted, rounded to 2dp. 0 when nothing was attempted. */
+  /**
+   * The effective coverage rate the gate reads: weighted when platform
+   * signal weights were supplied, uniform otherwise. Rounded to 2dp; 0 when
+   * nothing signal-bearing was attempted.
+   */
   rate: number;
   /** True when the tier + fee were suppressed for insufficient coverage. */
   tier_suppressed: boolean;
+  /** Sum of attempted platforms' signal weights (weighted mode only). */
+  weighted_attempted?: number;
+  /** Sum of rendered platforms' signal weights (weighted mode only). */
+  weighted_rendered?: number;
+  /**
+   * Controls excluded as inert — `unable_to_verify` on a platform below
+   * MIN_SIGNAL_WEIGHT_FOR_GAP (weighted mode only).
+   */
+  inert_controls?: number;
 }
 
 /**
@@ -754,17 +781,52 @@ export interface RenderControlCoverage {
  * behaviour exactly — the gate never subtracts where no control existed
  * (spec §8 Regression).
  *
+ * When `platformSignalWeights` is supplied (resolved signal_weight per
+ * platform, Phase 6), each control contributes its platform's weight instead
+ * of a uniform 1: failing to render Google (0.95) tanks coverage while
+ * failing Yelp (0.20) barely moves it — and an `unable_to_verify` on a
+ * platform below MIN_SIGNAL_WEIGHT_FOR_GAP is inert, excluded from the
+ * denominator entirely. A platform absent from the map weighs 0. Omit the
+ * map and the gate is byte-identical to the pre-weight model.
+ *
  * Mutates and returns the passed audit object so callers can apply it inline
  * on the parsed payload before it is persisted.
  */
-export function applyRenderControlCoverageGate<T extends Record<string, any>>(audit: T): T {
+export function applyRenderControlCoverageGate<T extends Record<string, any>>(
+  audit: T,
+  platformSignalWeights?: Record<string, number>,
+): T {
   const a = audit as Record<string, any>;
   const controls = Array.isArray(a.render_controls) ? a.render_controls : null;
   if (!controls || controls.length === 0) return audit;
 
-  const attempted = controls.length;
-  const rendered = controls.filter((rc: any) => rc?.control_rendered === true).length;
-  const rate = Math.round((rendered / attempted) * 100) / 100;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  let rate: number;
+  let weighted: { attempted: number; rendered: number; inert: number } | null = null;
+
+  if (platformSignalWeights) {
+    let attemptedW = 0;
+    let renderedW = 0;
+    let inert = 0;
+    for (const rc of controls) {
+      const w = platformSignalWeights[normalizeSignalPlatformKey(rc?.platform) ?? ''] ?? 0;
+      // Inert — an unverifiable read on a platform that is not a signal
+      // surface for this category says nothing (spec §7).
+      if (rc?.determination === 'unable_to_verify' && w < MIN_SIGNAL_WEIGHT_FOR_GAP) {
+        inert += 1;
+        continue;
+      }
+      attemptedW += w;
+      if (rc?.control_rendered === true) renderedW += w;
+    }
+    rate = attemptedW > 0 ? round2(renderedW / attemptedW) : 0;
+    weighted = { attempted: round2(attemptedW), rendered: round2(renderedW), inert };
+  } else {
+    const attempted = controls.length;
+    const rendered = controls.filter((rc: any) => rc?.control_rendered === true).length;
+    rate = round2(rendered / attempted);
+  }
+
   const tierSuppressed = rate < MIN_RENDER_CONTROL_COVERAGE_FOR_TIER;
 
   if (tierSuppressed) {
@@ -773,10 +835,17 @@ export function applyRenderControlCoverageGate<T extends Record<string, any>>(au
   }
 
   a.render_control_coverage = {
-    attempted,
-    rendered,
+    attempted: controls.length,
+    rendered: controls.filter((rc: any) => rc?.control_rendered === true).length,
     rate,
     tier_suppressed: tierSuppressed,
+    ...(weighted
+      ? {
+          weighted_attempted: weighted.attempted,
+          weighted_rendered: weighted.rendered,
+          inert_controls: weighted.inert,
+        }
+      : {}),
   } satisfies RenderControlCoverage;
 
   return audit;

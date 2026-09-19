@@ -119,7 +119,12 @@ export class DeliverableSourceService extends BaseService {
       const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
       const auditData = (latestAudit?.audit_data ?? null) as any;
 
-      const signals = extractSignals({ campaign, auditData }) as SignalCode[];
+      // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
+      const { IntelligenceProfileService } = await import('../intelligence/IntelligenceProfileService');
+      const platformSignalWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightMapForCampaign(campaign, auditData, ctx);
+
+      const signals = extractSignals({ campaign, auditData, platformSignalWeights }) as SignalCode[];
       const hasModelSignals = Array.isArray(auditData?.detected_signals);
       const source: DeliverableSourceResolution['source'] =
         hasModelSignals ? 'model_emitted' : signals.length > 0 ? 'derived' : 'fallback';

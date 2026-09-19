@@ -231,6 +231,10 @@ export class OutreachOpenerService extends BaseService {
       triggered_signals: [],
       primary_signal_severity: 'borderline' as any,
       strongest_co_occurring: null,
+      // Platform premise — populated by resolveOpener when a lead platform
+      // qualifies (argmax signal_weight × gap_severity, spec §2). Null when
+      // nothing resolves → prompts carry no platform premise.
+      platform_premise: null,
     };
   }
 
@@ -279,6 +283,20 @@ export class OutreachOpenerService extends BaseService {
     try {
       const { extractSignals } = await import('./triage/signal-extractor');
       const { buildTriggeredSignalContext } = await import('./outreach-openers/signal-magnitude');
+      const {
+        IntelligenceProfileService,
+        selectLeadPlatform,
+      } = await import('./intelligence/IntelligenceProfileService');
+      // Phase 6/7 — resolve the full signal-weight resolution once; derive
+      // the number map for the gap gate AND the lead-platform premise from
+      // the same resolution (one interpretation of signal weight).
+      const resolvedWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightsForCampaign(campaign as any, auditResult.auditData, ctx);
+      let platformSignalWeights: Record<string, number> | undefined;
+      if (resolvedWeights) {
+        platformSignalWeights = {};
+        for (const [k, v] of resolvedWeights) platformSignalWeights[k] = v.weight;
+      }
       const signalCodes = extractSignals({
         campaign: {
           last_review_date: (campaign as any).last_review_date ?? null,
@@ -289,9 +307,25 @@ export class OutreachOpenerService extends BaseService {
           gbp_claimed: (campaign as any).gbp_claimed ?? null,
         },
         auditData: auditResult.auditData,
+        platformSignalWeights,
       });
       const signalContext = buildTriggeredSignalContext(signalCodes, auditResult.auditData);
       common.triggered_signals = signalContext.signals;
+      // Phase 7 — the reported "where" fact (spec §2): the platform that
+      // matters AND where the business is weak. Read-only premise for the
+      // pitch; null when nothing qualifies.
+      if (resolvedWeights) {
+        const lead = selectLeadPlatform(auditResult.auditData, resolvedWeights);
+        if (lead) {
+          common.platform_premise = {
+            platform: lead.platform,
+            signal_weight: lead.signalWeight,
+            gap_severity: lead.gapSeverity,
+            scope: lead.scope,
+            basis: lead.basis,
+          };
+        }
+      }
     } catch {
       // Signal extraction is best-effort — if it fails, the prompt still
       // works with empty triggered_signals (the dispatcher fills in

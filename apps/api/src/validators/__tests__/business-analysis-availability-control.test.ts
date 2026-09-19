@@ -191,3 +191,92 @@ describe('§6.4 — render-control coverage gate', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('§6.4 — signal-weighted coverage gate (Phase 6)', () => {
+  const weights = { google: 0.95, facebook: 0.8, apple: 0.55, bbb: 0.3, yelp: 0.2 };
+
+  it('an unrendered high-signal control tanks coverage — Google suppresses', () => {
+    const audit = baseAudit();
+    audit.render_controls = [
+      renderControl('google', false, 'unable_to_verify'),
+      renderControl('yelp', false, 'unable_to_verify'), // inert — below τ_gap
+    ];
+    const out = applyRenderControlCoverageGate(audit, weights);
+    expect(out.recommended_tier).toBeNull();
+    expect(out.render_control_coverage).toEqual({
+      attempted: 2,
+      rendered: 0,
+      rate: 0,
+      tier_suppressed: true,
+      weighted_attempted: 0.95,
+      weighted_rendered: 0,
+      inert_controls: 1,
+    });
+  });
+
+  it('an unrendered low-signal control is inert — Yelp excluded from the denominator', () => {
+    // Uniform coverage would read 1/3 = 0.33 → suppressed. Weighted: yelp
+    // (0.2 < τ_gap) drops out; bbb (0.3) counts but barely — 0.95/1.25 = 0.76.
+    const audit = baseAudit();
+    audit.render_controls = [
+      renderControl('google', true, 'platform_available'),
+      renderControl('yelp', false, 'unable_to_verify'),
+      renderControl('bbb', false, 'unable_to_verify'),
+    ];
+    const out = applyRenderControlCoverageGate(audit, weights);
+    expect(out.render_control_coverage.rate).toBe(0.76);
+    expect(out.render_control_coverage.tier_suppressed).toBe(false);
+    expect(out.render_control_coverage.inert_controls).toBe(1);
+    expect(out.recommended_tier).toBe('tier_3');
+  });
+
+  it('an unverifiable HIGH-signal platform still drags coverage proportionally', () => {
+    const audit = baseAudit();
+    audit.render_controls = [
+      renderControl('google', false, 'unable_to_verify'), // 0.95 attempted, not rendered
+      renderControl('yelp', true, 'platform_available'),   // 0.20 rendered
+    ];
+    const out = applyRenderControlCoverageGate(audit, weights);
+    // 0.2 / 1.15 = 0.17 — the unverifiable Google still dominates.
+    expect(out.render_control_coverage.rate).toBe(0.17);
+    expect(out.render_control_coverage.tier_suppressed).toBe(true);
+    expect(out.recommended_tier).toBeNull();
+  });
+
+  it('a platform absent from the weight map weighs 0 — no contribution', () => {
+    const audit = baseAudit();
+    audit.render_controls = [
+      renderControl('google', true, 'platform_available'),
+      renderControl('manta', false, 'unable_to_verify'), // unmeasured → inert
+    ];
+    const out = applyRenderControlCoverageGate(audit, { google: 0.95 });
+    expect(out.render_control_coverage.rate).toBe(1);
+    expect(out.render_control_coverage.inert_controls).toBe(1);
+    expect(out.recommended_tier).toBe('tier_3');
+  });
+
+  it('an all-inert control set suppresses — nothing signal-bearing was observed', () => {
+    const audit = baseAudit();
+    audit.render_controls = [
+      renderControl('yelp', false, 'unable_to_verify'),
+      renderControl('manta', false, 'unable_to_verify'),
+    ];
+    const out = applyRenderControlCoverageGate(audit, { yelp: 0.2 });
+    expect(out.render_control_coverage.rate).toBe(0);
+    expect(out.render_control_coverage.inert_controls).toBe(2);
+    expect(out.recommended_tier).toBeNull();
+  });
+
+  it('no weight map → the legacy uniform gate, byte-identical', () => {
+    const audit = baseAudit();
+    audit.render_controls = [
+      renderControl('google', true, 'platform_available'),
+      renderControl('yelp', false, 'unable_to_verify'),
+      renderControl('bbb', false, 'unable_to_verify'),
+    ];
+    const out = applyRenderControlCoverageGate(audit);
+    expect(out.render_control_coverage.rate).toBe(0.33);
+    expect(out.render_control_coverage.weighted_attempted).toBeUndefined();
+    expect(out.recommended_tier).toBeNull();
+  });
+});

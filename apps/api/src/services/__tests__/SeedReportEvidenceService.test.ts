@@ -22,6 +22,7 @@ const {
   mockGetSignalRegistryCache,
   mockSetSignalRegistryCache,
   mockAudit,
+  mockResolveSignalDivergences,
 } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
   mockExecuteRaw: vi.fn(),
@@ -29,6 +30,7 @@ const {
   mockGetSignalRegistryCache: vi.fn(),
   mockSetSignalRegistryCache: vi.fn(),
   mockAudit: vi.fn(),
+  mockResolveSignalDivergences: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -50,6 +52,15 @@ vi.mock('../../audit', () => ({
 vi.mock('../triage/signal-taxonomy', () => ({
   getSignalRegistryCache: mockGetSignalRegistryCache,
   setSignalRegistryCache: mockSetSignalRegistryCache,
+}));
+
+// Phase 7 — the substrate path lazily imports IntelligenceProfileService to
+// resolve platform-signal divergences; mock the singleton so tests control
+// what the resolver returns.
+vi.mock('../intelligence/IntelligenceProfileService', () => ({
+  IntelligenceProfileService: {
+    getInstance: () => ({ resolveSignalDivergences: mockResolveSignalDivergences }),
+  },
 }));
 
 vi.mock('../../lib/id-generator', () => ({
@@ -312,6 +323,9 @@ describe('SeedReportEvidenceService.buildSubstrateEvidence', () => {
       }
       return Promise.resolve([]);
     });
+    // Phase 7 defaults: no divergences resolved, no INT rows in registry cache.
+    mockResolveSignalDivergences.mockResolvedValue([]);
+    mockGetSignalRegistryCache.mockReturnValue([]);
   });
 
   it('builds observations from provenance rows with stable IDs', async () => {
@@ -339,6 +353,75 @@ describe('SeedReportEvidenceService.buildSubstrateEvidence', () => {
   it('throws NotFoundError for a missing seed', async () => {
     mockQueryRaw.mockResolvedValue([]);
     await expect(service.buildSubstrateEvidence('seed-missing', ctx)).rejects.toThrow('Seed not found');
+  });
+
+  // ─── Phase 7: INT_PLATFORM_SIGNAL_DIVERGENCE (spec §5) ───────────────
+
+  const divergenceRow = (over: Record<string, any> = {}) => ({
+    platform: 'google',
+    weight: 0.6,
+    basis: 'local estimate: 8 observations',
+    confidence: 0.8,
+    observations: 8,
+    scope: 'local',
+    profileId: 'ip-local',
+    profileVersion: 2,
+    divergence: -0.3,
+    precedenceViaConfidence: true,
+    ...over,
+  });
+
+  it('emits a validated divergence signal + observation when the registry carries the code', async () => {
+    mockResolveSignalDivergences.mockResolvedValue([divergenceRow()]);
+    mockGetSignalRegistryCache.mockReturnValue([
+      registryRow({
+        id: 'sig-div',
+        code: 'INT_PLATFORM_SIGNAL_DIVERGENCE',
+        label: 'Platform Signal Divergence',
+      }),
+    ]);
+    const result = await service.buildSubstrateEvidence('seed-1', ctx);
+    // 3 provenance observations + 1 divergence observation
+    expect(result.observations_with_ids).toHaveLength(4);
+    const divObs = result.observations_with_ids.find((o) =>
+      o.observation_id?.startsWith('obs-div-'),
+    );
+    expect(divObs).toBeTruthy();
+    expect(divObs!.field).toBe('platform_signal_weight:google');
+    expect(divObs!.source_type).toBe('intelligence_profile');
+    expect(result.validated_signals).toHaveLength(1);
+    expect(result.validated_signals[0].code).toBe('INT_PLATFORM_SIGNAL_DIVERGENCE');
+    expect(result.validated_signals[0].source_observation_ids).toEqual([
+      divObs!.observation_id,
+    ]);
+    expect(result.quarantined_signals).toHaveLength(0);
+    // The normalized evidence carries the signal too.
+    expect(result.evidence.signals[0].code).toBe('INT_PLATFORM_SIGNAL_DIVERGENCE');
+    expect(result.evidence.signals[0].registry_signal_id).toBe('sig-div');
+  });
+
+  it('quarantines the divergence signal when the code is not registered', async () => {
+    mockResolveSignalDivergences.mockResolvedValue([divergenceRow()]);
+    const result = await service.buildSubstrateEvidence('seed-1', ctx);
+    expect(result.validated_signals).toHaveLength(0);
+    expect(result.quarantined_signals).toHaveLength(1);
+    expect(result.quarantined_signals[0].code).toBe('INT_PLATFORM_SIGNAL_DIVERGENCE');
+    expect(result.evidence.signals).toHaveLength(0);
+  });
+
+  it('emits no signals when nothing diverges (legacy shape preserved)', async () => {
+    const result = await service.buildSubstrateEvidence('seed-1', ctx);
+    expect(result.evidence.signals).toEqual([]);
+    expect(result.validated_signals).toEqual([]);
+    expect(result.observations_with_ids).toHaveLength(3);
+  });
+
+  it('is non-fatal when divergence resolution throws', async () => {
+    mockResolveSignalDivergences.mockRejectedValue(new Error('profile db down'));
+    const result = await service.buildSubstrateEvidence('seed-1', ctx);
+    expect(result.valid).toBe(true);
+    expect(result.observations_with_ids).toHaveLength(3);
+    expect(result.evidence.signals).toEqual([]);
   });
 });
 

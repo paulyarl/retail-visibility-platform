@@ -324,6 +324,14 @@ export interface ResolvedSignalWeight extends PlatformSignalWeight {
   profileVersion: number;
   /** local.weight − national.weight, when both layers observed the platform. */
   divergence?: number | null;
+  /**
+   * True when the winner was chosen BECAUSE its confidence cleared
+   * LOCAL_PRECEDENCE_CONFIDENCE — i.e. the §4 gate fired. False for
+   * broadest-layer fallbacks (a thin local reading that wins only because
+   * nothing broader exists). Divergence emission reads this flag: the same
+   * confidence gates precedence and emission (spec §5).
+   */
+  precedenceViaConfidence: boolean;
 }
 
 /**
@@ -442,17 +450,21 @@ export function resolveSignalWeightsFromProfiles(
     const confident = (c: typeof local) =>
       c != null && (c.entry.confidence ?? 0) >= LOCAL_PRECEDENCE_CONFIDENCE;
 
-    const winner = confident(local)
-      ? { ...local!, scope: 'local' as const }
-      : confident(regional)
-        ? { ...regional!, scope: 'regional' as const }
-        : national
-          ? { ...national, scope: 'national' as const }
-          : regional
-            ? { ...regional, scope: 'regional' as const }
-            : local
-              ? { ...local, scope: 'local' as const }
-              : null;
+    // precedenceViaConfidence marks whether the §4 gate actually drove the
+    // choice — a local/regional scope can also win as a broadest-layer
+    // fallback when nothing confident exists, and that is NOT a cleared gate.
+    const winner: ({ scope: SignalWeightScope; precedenceViaConfidence: boolean } & NonNullable<typeof local>) | null =
+      confident(local)
+        ? { ...local!, scope: 'local', precedenceViaConfidence: true }
+        : confident(regional)
+          ? { ...regional!, scope: 'regional', precedenceViaConfidence: true }
+          : national
+            ? { ...national, scope: 'national', precedenceViaConfidence: false }
+            : regional
+              ? { ...regional, scope: 'regional', precedenceViaConfidence: false }
+              : local
+                ? { ...local, scope: 'local', precedenceViaConfidence: false }
+                : null;
 
     if (!winner) continue;
 
@@ -467,10 +479,98 @@ export function resolveSignalWeightsFromProfiles(
       profileId: winner.profile.id,
       profileVersion: winner.profile.version,
       divergence,
+      precedenceViaConfidence: winner.precedenceViaConfidence,
     });
   }
 
   return out;
+}
+
+// ─── Lead-platform selection (spec §2 "Reported, not applied") ───────────
+//
+// The pitch reads signal weight as the traffic fact — the "where" (which
+// platform the category's customers are on). It never feeds back into
+// scoring. Selection is the intersection of two facts, not weight alone:
+//
+//     lead_platform = argmax( signal_weight × gap_severity )
+//
+// — the platform that matters AND where the business is weak. Uses the
+// confidence-gated effective weight, so a national premise is never
+// asserted over a divergent local market.
+
+/** Severity points per gap/gate entry. non_negotiable hurts twice as much. */
+export const GAP_SEVERITY_POINTS = { non_negotiable: 1, recommended: 0.5 } as const;
+
+export interface LeadPlatformSelection {
+  /** Normalized platform key (google, yelp, …). */
+  platform: string;
+  /** signal_weight × gap_severity — the argmax score. */
+  score: number;
+  /** Confidence-gated effective weight — the traffic fact. */
+  signalWeight: number;
+  /** Accumulated gap severity — how weak the business is there. */
+  gapSeverity: number;
+  /** The profile's measured basis — grounds the "customers are here" premise. */
+  basis: string | null;
+  scope: SignalWeightScope | null;
+  profileId: string | null;
+}
+
+/**
+ * Accumulate gap severity per platform from the audit's gap_analysis and
+ * quality_gate_results. Only failed gates count — a passed gate is not a
+ * gap. Pure and DB-free for unit testing.
+ */
+export function platformGapSeverity(auditData: any): Map<string, number> {
+  const severity = new Map<string, number>();
+  const add = (platform: unknown, sev: unknown) => {
+    const key = normalizeSignalPlatformKey(typeof platform === 'string' ? platform : null);
+    if (!key) return;
+    const points =
+      sev === 'non_negotiable' ? GAP_SEVERITY_POINTS.non_negotiable
+      : sev === 'recommended' ? GAP_SEVERITY_POINTS.recommended
+      : 0;
+    if (points > 0) severity.set(key, (severity.get(key) ?? 0) + points);
+  };
+  for (const g of auditData?.gap_analysis ?? []) {
+    if (g && typeof g === 'object') add(g.platform, g.severity);
+  }
+  for (const q of auditData?.quality_gate_results ?? []) {
+    if (q && typeof q === 'object' && q.passed === false) add(q.platform, q.severity);
+  }
+  return severity;
+}
+
+/**
+ * Select the lead platform for the pitch: argmax(signal_weight × gap_severity)
+ * over platforms that BOTH carry a resolved signal weight AND show at least
+ * one gap. Returns null when no platform qualifies — either nothing is weak
+ * (no premise needed) or no weights resolved (no traffic fact to report).
+ */
+export function selectLeadPlatform(
+  auditData: any,
+  resolved: Map<string, ResolvedSignalWeight>,
+): LeadPlatformSelection | null {
+  if (!resolved || resolved.size === 0) return null;
+  const severity = platformGapSeverity(auditData);
+  let best: LeadPlatformSelection | null = null;
+  for (const [platform, gapSeverity] of severity) {
+    const w = resolved.get(platform);
+    if (!w || w.weight == null) continue;
+    const score = w.weight * gapSeverity;
+    if (!best || score > best.score) {
+      best = {
+        platform,
+        score,
+        signalWeight: w.weight,
+        gapSeverity,
+        basis: w.basis ?? null,
+        scope: w.scope ?? null,
+        profileId: w.profileId ?? null,
+      };
+    }
+  }
+  return best;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -2267,6 +2367,129 @@ export class IntelligenceProfileService extends BaseService {
         categoryKey: key,
       });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Resolve the confidence-gated platform signal divergences for a
+   * category/market — the platforms where a local (or regional) estimate
+   * outranks the national one BECAUSE its confidence cleared the §4 gate,
+   * and the measured delta is non-zero (spec §5).
+   *
+   * Unlike resolveSignalWeights this scans every platform the profiles
+   * measured — a divergence report should not depend on the caller guessing
+   * which platforms diverged. Returns [] when nothing diverges or no
+   * profiles resolve; failures are non-fatal (warn + []).
+   */
+  async resolveSignalDivergences(
+    input: { category: string; city?: string | null; state?: string | null },
+    ctx?: RequestCtx,
+  ): Promise<ResolvedSignalWeight[]> {
+    const key = normalizeCategoryKey(input.category);
+    if (!key) return [];
+    try {
+      const profiles = await this.prisma.mkt_intelligence_profiles.findMany({
+        where: { category_key: key, status: 'active' },
+        orderBy: { version: 'desc' },
+      });
+      const platforms = new Set<string>();
+      for (const p of profiles) {
+        for (const k of extractSignalWeightEntries(p.configuration_json).keys()) {
+          platforms.add(k);
+        }
+      }
+      if (platforms.size === 0) return [];
+      const resolved = resolveSignalWeightsFromProfiles(
+        profiles as IntelligenceProfile[],
+        { platforms: [...platforms], city: input.city, state: input.state },
+      );
+      return [...resolved.values()].filter(
+        (w) => w.precedenceViaConfidence && w.divergence != null && w.divergence !== 0,
+      );
+    } catch (error) {
+      logger.warn('IntelligenceProfileService.resolveSignalDivergences failed (non-fatal)', ctx, {
+        error: (error as Error).message,
+        categoryKey: key,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Convenience resolver for signal-weight consumers that hold a campaign
+   * row and an audit payload (Phase 6). Collects the platform keys the audit
+   * touched (platforms.* + render_controls.* + the core directory set) and
+   * returns a plain Record of normalized platform → signal_weight.
+   *
+   * Returns `undefined` when nothing resolved — no category, no profiles,
+   * or an empty weight set — so callers can pass the result straight into
+   * `platformSignalWeights` and get legacy behavior automatically. Failures
+   * are non-fatal (warn + undefined): a weight lookup must never break the
+   * consumer's primary path.
+   */
+  async resolveSignalWeightMapForCampaign(
+    campaign: { category?: string | null; city?: string | null; state?: string | null } | null | undefined,
+    auditData: any,
+    ctx?: RequestCtx,
+  ): Promise<Record<string, number> | undefined> {
+    const resolved = await this.resolveSignalWeightsForCampaign(campaign, auditData, ctx);
+    if (!resolved || resolved.size === 0) return undefined;
+    const out: Record<string, number> = {};
+    for (const [k, v] of resolved) out[k] = v.weight;
+    return out;
+  }
+
+  /**
+   * Full-resolution sibling of resolveSignalWeightMapForCampaign — returns
+   * the ResolvedSignalWeight objects (weight + basis + confidence + scope +
+   * divergence) instead of flattening to numbers. For consumers that need
+   * the metadata, e.g. the pitch's lead-platform premise which grounds the
+   * "customers are on this platform" claim in the measured `basis` (spec §2).
+   *
+   * Same non-fatal contract: `undefined` when nothing resolves.
+   */
+  async resolveSignalWeightsForCampaign(
+    campaign: { category?: string | null; city?: string | null; state?: string | null } | null | undefined,
+    auditData: any,
+    ctx?: RequestCtx,
+  ): Promise<Map<string, ResolvedSignalWeight> | undefined> {
+    if (!campaign?.category) return undefined;
+    try {
+      const platforms = new Set<string>(['google', 'yelp', 'facebook', 'bbb']);
+      for (const k of Object.keys(auditData?.platforms ?? {})) platforms.add(k);
+      const controls = (auditData as any)?.render_controls;
+      if (Array.isArray(controls)) {
+        for (const rc of controls) {
+          const p = normalizeSignalPlatformKey(rc?.platform);
+          if (p) platforms.add(p);
+        }
+      }
+      // Also scan gap_analysis / quality_gate_results — a platform the audit
+      // flagged weak is a lead-platform candidate even if it has no render
+      // control or platforms entry (spec §2: weight × gap_severity).
+      for (const g of auditData?.gap_analysis ?? []) {
+        const p = normalizeSignalPlatformKey(g?.platform);
+        if (p) platforms.add(p);
+      }
+      for (const q of auditData?.quality_gate_results ?? []) {
+        const p = normalizeSignalPlatformKey(q?.platform);
+        if (p) platforms.add(p);
+      }
+      const resolved = await this.resolveSignalWeights(
+        {
+          category: campaign.category,
+          platforms: [...platforms],
+          city: campaign.city ?? null,
+          state: campaign.state ?? null,
+        },
+        ctx,
+      );
+      return resolved.size === 0 ? undefined : resolved;
+    } catch (error) {
+      logger.warn('IntelligenceProfileService.resolveSignalWeightsForCampaign failed (non-fatal)', ctx, {
+        error: (error as Error).message,
+      });
+      return undefined;
     }
   }
 
