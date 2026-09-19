@@ -498,6 +498,14 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     return Array.from(vars);
   }, [template]);
 
+  // Interactive verification opt-in (spec §12) — caller-supplied variable,
+  // truthy means on; ''/'off'/'false'/'0'/'no' mean off (mirrors the
+  // server-side gate in interactive-verification-directive.ts).
+  const interactiveVerificationOn = useMemo(() => {
+    const v = (variables.interactive_verification ?? '').trim().toLowerCase();
+    return v !== '' && !['off', 'false', '0', 'no', 'none', 'disabled'].includes(v);
+  }, [variables.interactive_verification]);
+
   useEffect(() => {
     if (!selectedCampaign) return;
     setVariables((prev) => ({
@@ -809,6 +817,49 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                 ))}
               </div>
             )}
+            {/* Interactive verification (spec §12) — caller-supplied opt-in.
+                The toggle sends interactive_verification in the render payload;
+                it is never a body placeholder, so it works on every template
+                and scope with no seed or whitelist changes. */}
+            <div className="mt-4 rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={interactiveVerificationOn}
+                  onChange={(e) =>
+                    setVariables((prev) => ({
+                      ...prev,
+                      interactive_verification: e.target.checked ? 'on' : '',
+                    }))
+                  }
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-xs font-medium text-gray-600 dark:text-gray-300">
+                    Interactive verification — operator present
+                  </span>
+                  <span className="block text-xs text-gray-400 dark:text-gray-500">
+                    The rendered prompt tells the analyst it may pause and ask you to open blocked
+                    pages (e.g. Facebook, Yelp) and paste back observable fields. Applies on the
+                    server render.
+                  </span>
+                </span>
+              </label>
+              {interactiveVerificationOn && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Operator observations (optional — carried into the prompt with operator provenance)
+                  </label>
+                  <textarea
+                    value={variables.operator_observations ?? ''}
+                    onChange={(e) => setVariables((prev) => ({ ...prev, operator_observations: e.target.value }))}
+                    rows={3}
+                    placeholder={'{"platform": "facebook", "url": "…", "visibility_condition": "authenticated", "found": true, "fields": {…}, "notes": "…"}'}
+                    className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">

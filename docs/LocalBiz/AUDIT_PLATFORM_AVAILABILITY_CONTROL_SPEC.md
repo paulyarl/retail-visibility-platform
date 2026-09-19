@@ -26,6 +26,7 @@ This doc previously read "Not started — spec only". That was stale: the contro
 | §7.5 §6.1 rubric amendment (`google_profile_maintenance`) | **Shipped** | seed `GP_MAINTENANCE_RUBRIC_FROM/TO`; applied to all three audit templates (V2 ×2 + V1) |
 | §7.5 §6.3 / §6.4 scoring amendments | **Shipped** | B3/B4 above + `applyRenderControlCoverageGate` (`MIN_RENDER_CONTROL_COVERAGE_FOR_TIER = 0.5`) wired into the external-import path |
 | §8 render-rate measurement prerequisite | **No artefact in-repo** | cannot confirm the §8 graduated decision rule was ever applied per platform |
+| §12 interactive verification — phase 1 | **Shipped** | `interactive-verification-directive.ts`, `MarketingExecutionService.ts` preamble gate + two prefix hooks, `PromptWorkspaceClient` toggle + observations input (2026-09-19) |
 
 **Also shipped alongside (not separate spec items):**
 
@@ -469,7 +470,7 @@ Also add a **coverage qualifier**: `controls_rendered / controls_attempted`. Sup
 
 > The control mechanism is live (§0) but inert where it matters most: on Facebook and Yelp the *control* is blocked too, so every determination collapses to `unable_to_verify` and no signal fires. The analyst is the wrong render client on those platforms. §12 supplies one that is not blocked — the operator — without relaxing the "do not bypass bot defenses" constraint that makes the analyst path limited in the first place.
 
-**Status:** Not started — spec only
+**Status:** Phase 1 shipped — universal caller-supplied opt-in (2026-09-19). Phase 2 declined (2026-09-19): the "Execute Prompt" path is a single-shot `generateChatCompletion` with no browsing and no operator session — there is nothing for an operator pause to attach to. Both answer modes live on the "Get Resolved Prompt" (render) path: in-session ask-and-answer, and re-render with `operator_observations`. Revisit only if Direct API audits become real.
 **Depends on:** §3–§5 (shipped). Independent of §6 (outstanding).
 **Audience:** the **external import analyst** — the external model whose JSON result is imported via `importExternalResult()`. NOT an internal server-side AI (§12.4).
 
@@ -522,13 +523,13 @@ So the "pause" is a turn in an external conversation. The platform's only two re
 1. put the directive into the rendered text the operator copies out, and
 2. accept the observations back on the import side.
 
-**Injection point: render-time, not seeded.** The directive is emitted into the rendered prompt when the operator clicks to resolve — the render action at `marketing-ops.ts:3051` → `MarketingExecutionService.renderPrompt()` → `resolvePrompt()` — and prefixed only when interactive mode is on. It must **not** be baked into the seeded template body, for three reasons:
+**Injection point: render-time, not seeded.** The directive is emitted into the rendered prompt when the operator clicks to resolve — the render action `GET /prompts/templates/:id/render` (`marketing-ops.ts`) → `MarketingExecutionService.renderPrompt()` → `resolvePrompt()` — and prefixed only when interactive mode is on. It must **not** be baked into the seeded template body, for three reasons:
 
 1. **A seeded directive is always-on.** Every audit would be told it may pause — including one-shot, batch, and Direct API runs where no operator is present to answer. Render-time injection makes it a *mode*, selected at the moment an operator is actually available.
 2. **It matches the shared-directive contract.** Per AGENTS.md, shared directives are composed once by the prompt-composition layer and must never be copied into fragment bodies or seed transforms (the `report-directives.ts` pattern). The availability-control directive was seeded because it is unconditional; this one is conditional, so it belongs in the composed layer.
 3. **The directive text stays out of the body.** Only a one-line opt-in placeholder is seeded (§12.4.1); the directive itself is never duplicated into the body — so there is no tone drift between the two variants and no re-seed when the directive wording changes.
 
-**Single hook — and it is a prefix, not a suffix.** `baseRendered` is computed once (`MarketingExecutionService.ts:639`) before every amplification branch, and all **21 return sites** derive from it (`baseRendered`, `amplified`, `gsAmplified`, `noProfileAmplified`, or `baseRendered + …`). Prefixing `baseRendered` there is one line that every body-rendered branch inherits. Injecting per-branch is a 21-place change that will rot the first time a branch is added.
+**Two hooks — both prefixes, never a suffix.** `baseRendered` is computed once (`MarketingExecutionService.ts`) before every amplification branch, and every body-rendered return site derives from it — business audits, profile establishment, gold/bronze-standard scans, repair templates. The **only** branch that bypasses `baseRendered` is the composed intelligence path (`PromptComposerService` → a separately rendered `rendered`), which gets the same prefix at its own render site. Two prefix sites give the signal universal coverage — it applies to **all audits and scans**, not just `business_analysis`. Injecting per-branch is a ~21-place change that would rot the first time a branch is added.
 
 **Why prefix beats append.** The directive is a *mode header*: it tells the analyst, before it begins evaluating platforms, that interactive verification is available for this run. A capability notice governs how the whole run is approached; a trailing instruction only constrains the final answer — by the time the analyst reaches a trailing directive it has already decided what to do about the blocked platform. Prefixing also removes the ordering question entirely: the preamble is the first word and the output-schema suffix stays the last word, so the two never compete. (Contrast the two directives that are deliberately appended *after* the suffix — the candidate search-scope directive, "so it is the final word the analyst reads" (`MarketingExecutionService.ts:2382`), and the degraded gold-standard branch at line 758. Both are **output-shaping**; this one is not.)
 
@@ -537,37 +538,29 @@ So the "pause" is a turn in an external conversation. The platform's only two re
 - **Persona priming.** Template bodies open with their role definition ("You are a…"). The preamble sits ahead of it, so keep it short and mode-like — a run header, not a replacement persona, and it must not restate the task.
 - **Recency.** A top-of-prompt notice primes but does not remind. The extended `render_controls` shape (§12.5) belongs in the preamble, as part of the mode. Do **not** also add a trailing copy: two placements of the same rule is drift, and the body's existing Platform Availability directive already owns the recording obligation.
 
-**Composer branches bypass the prefix.** Intelligence-scope prompts build from a separately composed `rendered` value rather than `baseRendered`. Acceptable — `business_analysis` is a business-scope template rendered from its body, not a composed intelligence prompt.
+**Composer branches bypass `baseRendered` — they do not bypass the preamble.** Intelligence-scope discovery prompts build from a separately composed `rendered` value rather than `baseRendered`, so they receive the same prefix at their own render site. The signal is universal by design: an operator-attended run may pause on any audit or scan — business audits, profile establishment, gold/bronze-standard scans, and composed discovery prompts alike.
 
-#### 12.4.1 The opt-in is a Prompt Workspace variable
+#### 12.4.1 The opt-in is a caller-supplied variable — a universal signal
 
-The operator opts in by setting a variable in the Prompt Workspace; when it is set, the rendered prompt carries the directive and the external analyst is **on notice** that interactive mode is available for this run. When it is not set, the directive is absent and the analyst behaves exactly as today.
+The operator opts in per render; when `interactive_verification` is supplied truthy, the rendered prompt carries the directive and the external analyst is **on notice** that interactive mode is available for this run. When it is not set, the directive is absent and the analyst behaves exactly as today. The signal is **universal across the audit/scan surface**: every prompt routed through `resolvePrompt` — business audits, profile establishment, gold/bronze-standard scans, composed discovery prompts, and the repair renders (`ProfileRepairPromptService.renderPromptText` → `resolvePrompt`) — carries the preamble when the flag is on. Fulfill-type copy-paste paths that render outside the seam (`RecoveryResolutionService.renderPromptText`, opener/follow-up resolution, deliverable prompts, the bronze single-reason test-scan probe) intentionally do **not** carry it: the external agent there drafts copy rather than browsing platforms, so an operator render request would be meaningless.
 
 Framing matters here: the directive gives **notice of capability**, not a mandate to pause. "Interactive verification is available in this run — if a platform blocks you and the outcome would change, you may ask the operator" rather than "you must pause." The emit-when bounds (§12.6) remain hard MUSTs; *whether to invoke* the capability is the analyst's judgment. That is what keeps a notice from becoming an interview.
 
-**How the variable reaches the render.** `resolvePrompt()` already receives the caller's `variables`, so no new route parameter or plumbing is needed. Three details make it work, and one of them is a hard-failure hazard:
+**How the variable reaches the render (as shipped).** `resolvePrompt()` already receives the caller's `variables`; `buildInteractiveVerificationPreamble(effectiveVariables)` reads `interactive_verification` at the seam. The variable is **caller-supplied only — never declared in a template body**:
 
-1. **Declare the placeholder in the template body** — `{{interactive_verification}}`. `PromptWorkspaceClient.extractedVariables` scans the *body* for `{{var}}` (`PromptWorkspaceClient.tsx:493-499`) and renders one text input per match, so a body declaration is what makes it appear in the Variables panel with **zero UI work**. `buildVariablesPayload` then sends every declared variable, defaulting to `''` (line 542).
-2. **Add `interactive_verification` to `SCOPE_VARIABLES.business`** (`scope-utils.ts:36-41`). **This is required, not optional.** `renderTemplate` rejects any body-referenced variable that is neither whitelisted nor supplied by the caller (`MarketingExecutionService.ts:2652`):
-   ```ts
-   const outOfScope = Array.from(referenced).filter(
-     (v) => !allowed.includes(v) && !(variables && v in variables));
-   if (outOfScope.length > 0) throw new Error(`Template references out-of-scope variables for scope "${scope}"...`);
-   ```
-   The copy-paste path supplies it (the workspace sends every declared var), but **`executeSingle()` (Direct API) and `importExternalResult()` do not** — they pass only their own variable sets. Without the whitelist entry, both paths would **hard-fail on the audit template** the moment the placeholder is declared. This is the same reason `detected_signals` / `audit_results` / `prior_outreach` are supplied via override rather than declared (deliverable-source-material spec §7.2) — but those templates have a single service caller, whereas the audit template has three.
-3. **Blank means off.** The seam gate treats falsy / empty / `'off'` as disabled: the directive is not appended.
+1. **A Prompt Workspace toggle supplies it.** `PromptWorkspaceClient` renders an "Interactive verification — operator present" checkbox in the Variables panel; checked → `interactive_verification: 'on'` enters the render payload via `buildVariablesPayload`; unchecked → `''` → off. An optional `operator_observations` textarea appears when the toggle is on (§12.5 re-render path).
+2. **Never body-declared → no whitelist, no seed changes.** `renderTemplate`'s out-of-scope check validates only variables *referenced in the body* (the `outOfScope` filter in `MarketingExecutionService.ts`). A caller-supplied key that no body references is never checked — so no `SCOPE_VARIABLES` entries are needed on any scope, `executeSingle()` / Direct API cannot hard-fail on it, and the "off" render is **byte-identical** to a run without the feature. This was the original §12.4.1 "alternative"; universal coverage is what promoted it to primary — a body-placeholder plan would have required seeding `{{interactive_verification}}` into every audit and scan template plus whitelist entries in every scope, carrying the same hard-failure hazard on each.
+3. **Blank means off.** The seam gate treats falsy / empty / `'off'` / `'false'` / `'0'` / `'no'` as disabled.
 
-**Alternative if true byte-identity matters.** Declaring the placeholder in the body means a blank substitution still leaves the line (cosmetically empty) in the rendered prompt — so "off" is *not* strictly byte-identical to today (§12.10). The alternative is a dedicated workspace control (checkbox) that supplies `interactive_verification` as a caller-supplied override, which `renderTemplate` accepts via the `v in variables` clause without any body declaration. That costs a small `PromptWorkspaceClient` change but keeps the body untouched — no seed change, and a true byte-identical "off" path. Recommended only if the placeholder line in the body is judged unacceptable.
+**Version stamping.** The directive lives in `apps/api/src/services/interactive-verification-directive.ts` (a universal module — not under `intelligence/`, since the signal is scope-agnostic) carrying `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION`. The seam logs the version (`interactiveVerificationDirectiveVersion`) whenever the preamble is emitted, mirroring `REPORT_DIRECTIVES_VERSION` handling in `PromptComposerService`.
 
-**Version stamping.** Compose the directive in a shared module (sibling of `report-directives.ts`) carrying an `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION` constant, mirroring `REPORT_DIRECTIVES_VERSION`, so execution metadata can identify which directive version produced a run.
-
-**Phasing consequence.** Because the injection is render-time and conditional, the copy-paste bridge needs no runtime state at all — the operator is inside the session. Only the Direct API path (phase 2) needs job state: `mkt_prompt_executions_list.status` (`varchar(50)`, default `pending`, no CHECK constraint) gains `awaiting_operator`, the handoff requests are stored on the execution row, and a resume endpoint re-renders with `operator_observations` injected. Lower priority — that path has no browsing, so it is not where audits run today.
+**Phasing consequence.** Because the injection is render-time and conditional, the copy-paste bridge needs no runtime state at all — the operator is inside the session. A Direct API pause would have needed job state (`mkt_prompt_executions_list.status` gains `awaiting_operator`, handoff requests stored on the execution row, a resume endpoint re-rendering with `operator_observations`) — **declined 2026-09-19** (§12.9): that path has no browsing and no operator session, so the machinery would retrofit interactivity onto a path that cannot use it.
 
 ### 12.5 Contract
 
 **Output (the ask).** Reuse the shape that already exists — `unresolved_questions[]` from `REPORT_EVIDENCE_DIRECTIVE` (`field, question, reason, suggested_verification_method`). Do not invent `verification_handoff`. The interactive directive's addition is (a) a bound on *when* to emit and (b) the requirement that the ask be actionable: exact URL, exact fields wanted, and what a negative answer looks like.
 
-**Input (the answer).** `operator_observations` as a prompt variable:
+**Input (the answer).** `operator_observations` as a caller-supplied prompt variable — carried inside the preamble block by `buildInteractiveVerificationPreamble`, never body-declared:
 
 ```
 { platform, url, visibility_condition: public_logged_out | authenticated | unknown,
@@ -606,30 +599,29 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 
 ### 12.9 Implementation tasks
 
-**Phase 1 — render-time directive + Prompt Workspace opt-in (one seeded placeholder line; no migration):**
+**Phase 1 — universal caller-supplied opt-in (no seed changes, no migration) — SHIPPED 2026-09-19:**
 
-- [ ] New shared directives module (sibling of `report-directives.ts`) exporting `INTERACTIVE_VERIFICATION_DIRECTIVE` + `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION`. The **directive text** is never seeded — see §12.4
-- [ ] Encode the **notice framing** (§12.4.1), the emit-when rules (§12.6) and the authenticated / visibility-condition rule (§12.3) in the directive text
-- [ ] Document the extended `render_controls` entry shape (`attempted_by`, `visibility_condition`, `observed_at`, `observation_notes`) **in the directive** — the seeded `RENDER_CONTROLS_SCHEMA` example entry stays untouched, so the directive is where the external analyst learns the shape
-- [ ] Declare `{{interactive_verification}}` in the audit template body (both variants) so the Prompt Workspace renders the opt-in input with no UI work — this is the **only** seeded change, and it is a placeholder, not the directive
-- [ ] Add `'interactive_verification'` to `SCOPE_VARIABLES.business` (`scope-utils.ts:36-41`) — **required**; without it `renderTemplate` hard-fails on the Direct API and import paths (§12.4.1). Add a scope test alongside `MarketingExecutionService.scope.test.ts`
-- [ ] **Prefix** the directive onto `baseRendered` (`MarketingExecutionService.ts:639`) when the variable is truthy — one hook, inherited by all 21 return sites; never inject per-branch
-- [ ] Keep the preamble short and mode-like (run header, not persona, not a task restatement) and carry the extended `render_controls` shape in it — no trailing duplicate (§12.4)
-- [ ] The gate must hold on `executeSingle()` and `importExternalResult()` too — both share `resolvePrompt`, and a blank variable must mean "off" on every path
-- [ ] Accept `operator_observations` at the same seam, for the re-render path (§12.5)
-- [ ] Record the directive version on the execution, mirroring `REPORT_DIRECTIVES_VERSION` handling
-- [ ] Bump `SEED_VERSION_MARKER` and re-run local + prd (the placeholder declaration requires it); verify `updated_at` moved
+- [x] Shared directives module — `apps/api/src/services/interactive-verification-directive.ts` exporting `INTERACTIVE_VERIFICATION_DIRECTIVE`, `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION`, `isInteractiveVerificationEnabled`, `buildInteractiveVerificationPreamble`. The **directive text** is never seeded — see §12.4
+- [x] Notice framing (§12.4.1), emit-when rules (§12.6) and the authenticated / visibility-condition rule (§12.3) encoded in the directive text
+- [x] Extended `render_controls` entry shape (`attempted_by`, `visibility_condition`, `observed_at`, `observation_notes`) documented **in the directive** — plus a contract-agnostic recording clause for scans (evidence / `unresolved_questions`), since the signal is universal
+- [x] Prompt Workspace toggle — "Interactive verification — operator present" checkbox in the Variables panel supplies `interactive_verification: 'on'`; optional `operator_observations` textarea appears when on. Replaces the earlier body-placeholder plan — **no seeded change at all**
+- [x] ~~`'interactive_verification'` in `SCOPE_VARIABLES.business`~~ — **not needed**: caller-supplied, never body-referenced → the out-of-scope check never sees it (§12.4.1)
+- [x] **Prefix** the preamble onto `baseRendered` AND onto the composed-path `rendered` (`MarketingExecutionService.ts`) — two hooks giving universal coverage of all audits and scans; never inject per-branch
+- [x] Preamble is short and mode-like (run header, not persona, not a task restatement) and carries the extended `render_controls` shape — no trailing duplicate (§12.4)
+- [x] The gate holds on `executeSingle()` and `renderPrompt()` — both share `resolvePrompt`; a blank/absent variable means "off" on every path
+- [x] `operator_observations` accepted at the same seam — carried inside the preamble block when supplied (§12.5 re-render path)
+- [x] Directive version logged on emit (`interactiveVerificationDirectiveVersion` in the resolve-time `logger.info`), mirroring `REPORT_DIRECTIVES_VERSION` handling
+- [x] No `SEED_VERSION_MARKER` bump — nothing is seeded
+- [x] Tests — `InteractiveVerificationDirective.test.ts`: gate values, preamble emission + position, emit-when/provenance encoding, `operator_observations` block, and the caller-supplied-vs-out-of-scope interplay that removes the whitelist requirement
 
-**Phase 2 — platform-side pause (only if Direct API audits become real):**
+**Phase 2 — platform-side pause — DECLINED 2026-09-19.** The Direct API path ("Execute Prompt" → `executeSingle` → one `generateChatCompletion`) has no browsing and no operator session — an ask can neither be raised mid-generation nor answered mid-run, so `awaiting_operator` state, handoff storage, a resume endpoint, and a checklist UI would retrofit interactivity onto a path that cannot use it. The render path already supplies both §12.5 answer modes. Reopen only if Direct API audits become real (the original §12.4 condition):
 
-- [ ] `status: 'awaiting_operator'` on `mkt_prompt_executions_list`
-- [ ] Handoff-request storage + resume endpoint
-- [ ] Operator checklist UI — the ask rendered as an actionable list, not prose
-- [ ] Operator toggle for interactive mode at resolve time (phase 1 can ship with the flag passed by the render call; phase 2 gives it a control)
+- ~~`status: 'awaiting_operator'` on `mkt_prompt_executions_list`~~ — declined
+- ~~Handoff-request storage + resume endpoint~~ — declined
+- ~~Operator checklist UI — the ask rendered as an actionable list, not prose~~ — declined
+- [x] Operator toggle for interactive mode — shipped in phase 1 as the Prompt Workspace checkbox (the copy-paste path, where audits actually run)
 
-**Phase 3 — scoring (gated on phase 1 producing coverage):**
-
-- [ ] §6.1, §6.3, §6.4 amendments — all still outstanding (§0)
+**Phase 3 — scoring — SHIPPED 2026-09-18** (§0): §6.1 rubric split + `PLATFORM_GAP_CASCADE_DIRECTIVE`, §6.3/§6.4 via B3/B4 nullables + `applyRenderControlCoverageGate`. What it was gated on — phase 1 producing real render-control coverage — is now live.
 
 ### 12.10 Verification
 
@@ -646,9 +638,9 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 
 **Regression**
 
-- Interactive mode **off** → the directive is absent at every one of the 21 return sites; the only delta from today's render is the blank `{{interactive_verification}}` placeholder line (§12.4.1)
-- Direct API / batch / import runs do not receive the directive — the gate holds on `executeSingle()` and `importExternalResult()`, which share `resolvePrompt`
-- Direct API and import paths do **not** throw `out-of-scope variables for scope "business"` — the `SCOPE_VARIABLES.business` entry is what prevents this (§12.4.1)
+- Interactive mode **off** → the directive is absent at every return site **including the composed intelligence path**; the render is byte-identical to a run without the feature — nothing is body-declared (§12.4.1)
+- Direct API / batch / import runs do not receive the directive — the gate holds on `executeSingle()` and `renderPrompt()`, which share `resolvePrompt`
+- No path can throw `out-of-scope variables` for `interactive_verification` — it is caller-supplied and never body-referenced, so the check never sees it (§12.4.1)
 - No `operator_observations` supplied (legacy / one-shot run) → no behavioural change
 - The **directive text** never enters the body — only the opt-in placeholder does, so directive wording changes need no re-seed
 - Extractor suite `TriageEngineService.test.ts:731-812` passes unchanged (8 cases)
@@ -676,7 +668,7 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 | Operator asked to circumvent a control | Explicit permitted-request rule (§12.6); ask bounded to observables |
 | A pause makes audits worse than today | Fail-safe: decline/timeout → `not_attempted` → `unable_to_verify`; legacy runs byte-identical |
 | Operator-attributed signal confuses downstream weighting | Reuse `business_specific_failure` + `attempted_by` provenance; revisit only if weighting is needed |
-| Placeholder declared in the body without a scope-whitelist entry | Add `interactive_verification` to `SCOPE_VARIABLES.business` in the same change — `renderTemplate` hard-throws on the Direct API / import paths otherwise (§12.4.1) |
+| Signal bound to one template or scope, leaving other audits/scans uncovered | Caller-supplied variable read at the shared `resolvePrompt` seam — never body-declared, so every template and every scope inherits it with no per-template seeding or whitelist (§12.4.1) |
 | Opt-in is never used, so coverage never improves | Payoff is opt-in by design (§12.8); keep the workspace variable prominent, and consider defaulting it on for the copy-paste render path where an operator is present by definition |
 | Notice framing drifts into a mandate, turning audits into interviews | Directive is phrased as notice of capability, not an instruction to pause; emit-when bounds stay hard MUSTs (§12.4.1) |
 | Prefixing weakens the body's persona priming | Keep the preamble short and mode-like; it must not restate the task or the output contract (§12.4) |

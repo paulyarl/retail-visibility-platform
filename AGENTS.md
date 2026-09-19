@@ -70,6 +70,8 @@ The audit could not previously distinguish "this business is not discoverable on
 
 **Audit card:** `BusinessAnalysisAuditCard.tsx` renders a "Platform Availability (render control)" section + coverage badge, and shows "Tier suppressed" instead of a bare tier when the gate fired.
 
+**Interactive verification (spec §12, shipped 2026-09-19):** an optional caller-supplied `interactive_verification` variable puts the external analyst on notice that an operator is attending the run and may be asked to render blocked platforms (Facebook/Yelp login walls) and paste back observables. `interactive-verification-directive.ts` (services root — universal, scope-agnostic) exports the directive + `buildInteractiveVerificationPreamble`; `resolvePrompt` prefixes it onto `baseRendered` AND the composed-path `rendered` — the only two render sites. The variable is **never body-declared**, so no `SCOPE_VARIABLES` entries and no seed changes are needed; blank/`'off'` is byte-identical to a solo run. Opt-in UI is the "Interactive verification — operator present" checkbox in the Prompt Workspace Variables panel (+ `operator_observations` textarea for the re-render path). New render surfaces that bypass `resolvePrompt` must prefix `buildInteractiveVerificationPreamble(variables)` themselves — fulfill-type paths (recovery resolution, openers, deliverables, bronze test-scan) intentionally skip it since they don't browse platforms.
+
 ## Diagnostic Gallery — Eligibility, Rendering & the `preview_built` Gate
 
 Spec: `docs/LocalBiz/MARKETING_OPS_DIAGNOSTIC_GALLERY_SPEC.md`.
