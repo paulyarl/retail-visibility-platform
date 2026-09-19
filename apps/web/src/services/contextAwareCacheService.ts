@@ -109,6 +109,38 @@ export class ContextAwareCacheService {
   }
 
   /**
+   * Remove entries matching a glob pattern (`*` = wildcard, prefix semantics
+   * for suffixless patterns come from the caller). With a context, only that
+   * context's live manager is swept; without one, every instantiated context
+   * manager is swept so semantic patterns match regardless of where the entry
+   * landed.
+   */
+  async removeByPattern(pattern: string, options?: ContextAwareCacheOptions): Promise<number> {
+    if (options?.context) {
+      return this.getCacheManager(options.context, options).removeByPattern(pattern);
+    }
+
+    const managers: ContextAwareCacheManager[] = [
+      this.adminCache,
+      this.publicCache,
+      this.productCache,
+      this.shopCache,
+      this.storeCache,
+      this.systemCache,
+      this.directoryCache,
+      this.globalCache,
+      ...this.tenantCacheManagers.values(),
+      ...this.userCacheManagers.values(),
+    ];
+
+    let removed = 0;
+    for (const manager of managers) {
+      removed += await manager.removeByPattern(pattern);
+    }
+    return removed;
+  }
+
+  /**
    * Clear all cached data for a specific context
    */
   async clearContext(context: CacheContext, options?: Omit<ContextAwareCacheOptions, 'context'>): Promise<void> {

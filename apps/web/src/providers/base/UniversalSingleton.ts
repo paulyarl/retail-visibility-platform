@@ -445,29 +445,26 @@ export abstract class UniversalSingleton {
    */
   protected async invalidateCachePattern(pattern: string): Promise<void> {
     try {
-        // console.log(`[${this.constructor.name}] ----------------------------------------`);
-        // console.log(`[${this.constructor.name}] start         : invalidateCachePattern`);
-        // console.log(`[${this.constructor.name}] pattern       : ${pattern}`);
-        // console.log(`[${this.constructor.name}] end           : invalidateCachePattern  `);
-      
+      // Stored keys carry a `:context:isolation` suffix (and may embed the
+      // request URL after a `|` separator), so a caller pattern only ever
+      // matches as a PREFIX — normalize non-wildcard patterns accordingly.
+      const effectivePattern = pattern.includes('*') ? pattern : `${pattern}*`;
+
       // Get context and isolation from base class defaults
       const context = (this as any).defaultContext;
       const isolation = (this as any).defaultIsolation;
-      
-      // console.log(`[${this.constructor.name}] 🎯 Using context: ${context}, isolation: ${isolation}`);
-      
-      // Always use the enhanced parallel invalidation for both patterns and exact keys
-      // This ensures both IndexedDB and localStorage are invalidated reliably
-      if (pattern.includes('*')) {
-        // console.log(`[${this.constructor.name}] 🎯 Using pattern-based invalidation for: ${pattern}`);
-        // Use the new removeByPattern method that scans all storage layers with context
-        await this.cacheManager.removeByPattern(pattern, context, isolation);
-      } else {
-        // console.log(`[${this.constructor.name}] 🎯 Using exact-key invalidation for: ${pattern}`);
-        // For exact keys, we still want to use the enhanced parallel invalidation
-        // Convert exact key to pattern by adding * to match the key itself
-        await this.cacheManager.removeByPattern(pattern, context, isolation);
-      }
+
+      // Sweep the live context-aware managers — the singleton instances that
+      // actually serve reads (memory + IndexedDB + localStorage). Without a
+      // default context, every instantiated context manager is swept.
+      await this.contextCacheService.removeByPattern(effectivePattern, {
+        context: context as any,
+        isolation: isolation as any,
+      });
+
+      // Also sweep this service's own generic cache manager for entries stored
+      // without a context (plain getFromCache/setCache path).
+      await this.cacheManager.removeByPattern(effectivePattern);
     } catch (error) {
       clientLogger.warn(`[${this.constructor.name}] Enhanced cache invalidation failed for pattern '${pattern}':`, { detail: error });
     }

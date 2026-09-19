@@ -10,7 +10,6 @@
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { ResponseType } from '../providers/base/FlexibleApiSingleton';
-import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 import { clientLogger } from '../lib/client-logger';
 
 // ====================
@@ -6517,14 +6516,10 @@ MarketingOpsService.prototype.generateGalleryToken = async function (
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate gallery token');
   }
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
-  // The pay-links list that powers listGalleryTokens is cached under the
-  // URL-derived context key (`<url>:admin:admin`), not the semantic cacheKey
-  // argument — remove that entry or the post-generate refetch serves a stale
-  // list and the new token never appears in the panel.
-  await this.removeContextAwareCache(
-    `${BASE_URL}/campaigns/${campaignId}/pay-links:admin:admin`,
-    { context: AppContext.ADMIN, isolation: CacheIsolation.ADMIN },
-  );
+  // The pay-links list powers listGalleryTokens — clear its cached entry or
+  // the post-generate refetch serves a stale list and the new token never
+  // appears in the panel.
+  await this.invalidateCachePattern(`mkt-ops-gallery-tokens-${campaignId}`);
   const body = result.data?.data ?? result.data;
   return body?.token ?? body;
 };

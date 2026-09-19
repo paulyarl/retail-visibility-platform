@@ -660,6 +660,16 @@ export class ContextAwareCacheManager {
     return this.cacheManager.remove(key);
   }
 
+  /**
+   * Pattern removal delegated to the live inner CacheManager — this is the
+   * instance that actually serves gets/sets, so its memory cache, open
+   * IndexedDB connection, and localStorage prefix are all swept. (`*` is the
+   * only wildcard; other pattern chars are literal.)
+   */
+  async removeByPattern(pattern: string): Promise<number> {
+    return this.cacheManager.removeByPattern(pattern);
+  }
+
   getStats(): any {
     return this.cacheManager.getStats();
   }

@@ -278,6 +278,16 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
   }
 
   /**
+   * Compose the base of the stored cache key: the caller's semantic cacheKey
+   * first (so invalidateCachePattern can match it by prefix), then the URL to
+   * keep entries unique per endpoint/query. Previously the semantic key was
+   * dropped entirely, which made every pattern invalidation a silent no-op.
+   */
+  protected composeCacheKeyBase(cacheKey: string | undefined | null, url: string): string {
+    return cacheKey ? `${cacheKey}|${url}` : url;
+  }
+
+  /**
    * Enhanced context-aware cache get method
    */
   protected async getEnhancedContextCache<T>(key: string, context?: AppContext, isolation?: CacheIsolation, tenantId?: string, userId?: string): Promise<T | null> {
@@ -370,10 +380,12 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     // console.log(`[${this.constructor.name}] userId                : ${userId}`);
     // console.log(`[${this.constructor.name}] end                   :`);
 
-    // 🎯 STRATEGY 1: Return with context data, no cacheKey pollution
-    // Base method will generate enhanced cacheKey with this context
+    // 🎯 STRATEGY 1: Return with context data — forward the caller's cacheKey
+    // too, so the base method can compose it into the stored key and semantic
+    // invalidation patterns actually match. `??` preserves an explicit ttl: 0
+    // (always-fresh) that `||` would silently replace with the default TTL.
     const contextEnhancedRequestOptions: PublicRequestOptions = {
-      ttl: ttl || requestOptions?.ttl || this.cacheTTL,
+      ttl: ttl ?? requestOptions?.ttl ?? this.cacheTTL,
       requestTarget: requestOptions?.requestTarget,
       // 🚀 Context data for cacheKey generation in base method
       context,
@@ -385,7 +397,7 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     };
 
     // Use existing makeDefaultRequest - it will generate enhanced cacheKey with context
-    return this.makeDefaultRequest<T>(url, options, undefined, ttl, contextEnhancedRequestOptions);
+    return this.makeDefaultRequest<T>(url, options, cacheKey, ttl, contextEnhancedRequestOptions);
   }
 
   /**
@@ -410,9 +422,9 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
     // console.log(`[${this.constructor.name}] end:`);
 
-    // 🎯 STRATEGY 1: Return with context data only
+    // 🎯 STRATEGY 1: Return with context data + forwarded cacheKey
     const contextEnhancedRequestOptions: PublicRequestOptions = {
-      ttl: cacheOptions?.ttl || this.cacheTTL,
+      ttl: cacheOptions?.ttl ?? this.cacheTTL,
       requestTarget: cacheOptions?.requestTarget,
       // 🚀 Context data for cacheKey generation in base method
       context,
@@ -420,7 +432,7 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     };
 
     // Base method will generate enhanced cacheKey with this context
-    return this.makePublicRequest<T>(url, options, undefined, cacheOptions?.ttl, contextEnhancedRequestOptions);
+    return this.makePublicRequest<T>(url, options, cacheKey, cacheOptions?.ttl, contextEnhancedRequestOptions);
   }
 
   /**
@@ -452,9 +464,9 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     // console.log(`[${this.constructor.name}] userId: ${userId}`);
     // console.log(`[${this.constructor.name}] end:`);
 
-    // 🎯 STRATEGY 1: Return with context data only
+    // 🎯 STRATEGY 1: Return with context data + forwarded cacheKey
     const contextEnhancedRequestOptions: AuthenticatedRequestOptions = {
-      ttl: cacheOptions?.ttl || this.cacheTTL,
+      ttl: cacheOptions?.ttl ?? this.cacheTTL,
       // 🚀 Context data for cacheKey generation in base method
       context,
       isolation,
@@ -462,7 +474,7 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     };
 
     // Base method will generate enhanced cacheKey with this context
-    return this.makeAuthenticatedRequest<T>(url, options, undefined, cacheOptions?.ttl, contextEnhancedRequestOptions);
+    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, cacheOptions?.ttl, contextEnhancedRequestOptions);
   }
 
   /**
@@ -492,11 +504,12 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     // console.log(`[${this.constructor.name}] tenantId: ${tenantId}`);
     // console.log(`[${this.constructor.name}] end:`);
 
-    // 🎯 STRATEGY 1: Return with context data only
+    // 🎯 STRATEGY 1: Return with context data + forwarded cacheKey
     const contextEnhancedRequestOptions: TenantRequestOptions = {
       tenantId: tenantId || '',
-      ttl: cacheOptions?.ttl || this.cacheTTL,
+      ttl: cacheOptions?.ttl ?? this.cacheTTL,
       requestTarget: cacheOptions?.requestTarget,
+      cacheKey,
       // 🚀 Context data for cacheKey generation in base method
       context,
       isolation
@@ -526,9 +539,10 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
     // console.log(`[${this.constructor.name}] end:`);
 
-    // 🎯 STRATEGY 1: Return with context data only
+    // 🎯 STRATEGY 1: Return with context data + forwarded cacheKey
     const contextEnhancedRequestOptions: AdminRequestOptions = {
-      ttl: cacheOptions?.ttl || (5 * 60 * 1000), // 5 minutes for admin operations
+      cacheKey,
+      ttl: cacheOptions?.ttl ?? (5 * 60 * 1000), // 5 minutes for admin operations
       // 🚀 Context data for cacheKey generation in base method
       context,
       isolation
@@ -557,9 +571,10 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
     // console.log(`[${this.constructor.name}] end:`);
 
-    // 🎯 STRATEGY 1: Return with context data only
+    // 🎯 STRATEGY 1: Return with context data + forwarded cacheKey
     const contextEnhancedRequestOptions: ExternalRequestOptions = {
-      ttl: cacheOptions?.ttl || (60 * 60 * 1000), // 1 hour for external data
+      cacheKey: cacheOptions?.cacheKey,
+      ttl: cacheOptions?.ttl ?? (60 * 60 * 1000), // 1 hour for external data
       requestTarget: cacheOptions?.requestTarget,
       // 🚀 Context data for cacheKey generation in base method
       context,

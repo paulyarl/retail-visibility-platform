@@ -645,9 +645,19 @@ class CacheManager {
 
     // Fallback to default behavior for backward compatibility
     // console.log(`[CacheManager] 🗄️ Using default cache manager (no context provided)`);
-    
-    // Convert pattern to regex for matching
-    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+
+    // Lazily initialize IndexedDB — entries persisted by earlier sessions are
+    // invisible (and thus unremovable) until the connection is open.
+    if (this.indexedDBSupported && !this.db) {
+      await this.initializeDB();
+    }
+
+    // Convert pattern to regex for matching — escape regex metacharacters in
+    // the literal segments so keys containing ?, ., / etc. match literally
+    // and only `*` acts as a wildcard.
+    const regex = new RegExp(
+      '^' + pattern.split('*').map(seg => seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$'
+    );
     // console.log(`[CacheManager] 📝 Generated regex: ${regex}`);
 
     // Clear memory cache

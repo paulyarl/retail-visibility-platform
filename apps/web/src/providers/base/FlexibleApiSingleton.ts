@@ -379,7 +379,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         },
       },
       cacheKey,
-      ttl: ttl || this.cacheTTL,
+      ttl: ttl ?? this.cacheTTL,
       target: this.defaultRequestTarget
     };
   }
@@ -411,7 +411,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         },
       },
       cacheKey,
-      ttl: ttl || this.cacheTTL,
+      ttl: ttl ?? this.cacheTTL,
       target: this.defaultRequestTarget
     };
   }
@@ -439,7 +439,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           ...modifiedOptions.headers,
         },
       },
-      ttl: requestOptions?.ttl || this.cacheTTL,
+      ttl: requestOptions?.ttl ?? this.cacheTTL,
       target: requestOptions?.requestTarget || this.defaultRequestTarget
     };
   }
@@ -468,7 +468,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         },
       },
       cacheKey: requestOptions?.cacheKey,
-      ttl: requestOptions?.ttl || this.cacheTTL,
+      ttl: requestOptions?.ttl ?? this.cacheTTL,
       target: requestOptions?.requestTarget || this.defaultRequestTarget
     };
   }
@@ -497,7 +497,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         },
       },
       cacheKey: requestOptions?.cacheKey,
-      ttl: requestOptions?.ttl || this.cacheTTL,
+      ttl: requestOptions?.ttl ?? this.cacheTTL,
       target: requestOptions?.requestTarget || this.defaultRequestTarget
     };
   }
@@ -526,7 +526,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         },
       },
       cacheKey: requestOptions?.cacheKey,
-      ttl: requestOptions?.ttl || this.cacheTTL,
+      ttl: requestOptions?.ttl ?? this.cacheTTL,
       target: requestOptions?.requestTarget || this.defaultRequestTarget
     };
   }
@@ -563,7 +563,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         },
       },
       cacheKey: requestOptions?.cacheKey,
-      ttl: requestOptions?.ttl || this.cacheTTL,
+      ttl: requestOptions?.ttl ?? this.cacheTTL,
       target: requestOptions?.requestTarget || RequestTarget.EXTERNAL
     };
   }
@@ -592,7 +592,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         options,
         cacheKey,
         {
-          ttl: ttl || requestOptions?.ttl || this.cacheTTL,
+          ttl: ttl ?? requestOptions?.ttl ?? this.cacheTTL,
           // Use base class defaults - these will be applied in makeEnhancedPublicRequest
         }
       );
@@ -603,7 +603,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     const requestKey = this.getRequestKey('makePublicRequest', url, RequestType.PUBLIC);
 
     // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
-    let finalCacheKey = requestOptions?.cacheKey;
+    let finalCacheKey = requestOptions?.cacheKey || cacheKey;
     if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
       const context = (requestOptions as any).context;
       const isolation = (requestOptions as any).isolation;
@@ -611,7 +611,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const userId = (requestOptions as any).userId;
 
       finalCacheKey = this.generateCacheKey(
-        requestOptions?.cacheKey || url,
+        this.composeCacheKeyBase(requestOptions?.cacheKey || cacheKey, url),
         context,
         isolation,
         tenantId,
@@ -672,7 +672,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         options,
         cacheKey,
         {
-          ttl: ttl || this.cacheTTL,
+          ttl: ttl ?? this.cacheTTL,
           // Use base class defaults - these will be applied in makeEnhancedAuthenticatedRequest
         }
       );
@@ -687,7 +687,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const userId = requestOptions.userId;
 
       finalCacheKey = this.generateCacheKey(
-        requestOptions?.cacheKey || cacheKey || url,
+        this.composeCacheKeyBase(requestOptions?.cacheKey || cacheKey, url),
         context,
         isolation,
         undefined,  // tenantId
@@ -710,7 +710,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       url,
       options || {},
       finalCacheKey,
-      requestOptions?.ttl || ttl,
+      requestOptions?.ttl ?? ttl,
       requestOptions?.ssrAuth,
       requestOptions
     );
@@ -747,7 +747,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         options,
         requestOptions?.cacheKey,
         {
-          ttl: requestOptions?.ttl || this.cacheTTL,
+          ttl: requestOptions?.ttl ?? this.cacheTTL,
           tenantId: requestOptions?.tenantId || '',
           requestTarget: requestOptions?.requestTarget
         }
@@ -764,7 +764,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const userId = (requestOptions as any).userId;
 
       finalCacheKey = this.generateCacheKey(
-        requestOptions?.cacheKey || url,
+        this.composeCacheKeyBase(requestOptions?.cacheKey, url),
         context,
         isolation,
         tenantId,
@@ -825,7 +825,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         requestOptions?.cacheKey,
         {
           cacheKey: requestOptions?.cacheKey,
-          ttl: requestOptions?.ttl || this.cacheTTL,
+          ttl: requestOptions?.ttl ?? this.cacheTTL,
           requestTarget: requestOptions?.requestTarget
         }
       );
@@ -841,7 +841,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const userId = (requestOptions as any).userId;
 
       finalCacheKey = this.generateCacheKey(
-        requestOptions?.cacheKey || url,
+        this.composeCacheKeyBase(requestOptions?.cacheKey, url),
         context,
         isolation,
         tenantId,
@@ -926,7 +926,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         options,
         {
           cacheKey: requestOptions?.cacheKey,
-          ttl: requestOptions?.ttl || this.cacheTTL,
+          ttl: requestOptions?.ttl ?? this.cacheTTL,
           requestTarget: requestOptions?.requestTarget
         }
       );
@@ -942,7 +942,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const userId = (requestOptions as any).userId;
 
       finalCacheKey = this.generateCacheKey(
-        requestOptions?.cacheKey || url,
+        this.composeCacheKeyBase(requestOptions?.cacheKey, url),
         context,
         isolation,
         tenantId,
@@ -1037,7 +1037,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const userId = (requestOptions as any).userId;
 
       finalCacheKey = this.generateCacheKey(
-        cacheKey || url,
+        this.composeCacheKeyBase(cacheKey, url),
         context,
         isolation,
         tenantId,
@@ -1493,7 +1493,8 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
 
     // 🚀 OPTIMIZATION 3: Check cache as soon as we have the enhanced cacheKey (GET requests only)
-    if (cacheKey && method === 'GET') {
+    // ttl === 0 is an explicit always-fresh request — skip the cache read entirely.
+    if (cacheKey && method === 'GET' && ttl !== 0) {
       if (context || isolation) {
         // Use context-aware caching
         const cacheOptions: ContextAwareCacheOptions = {
@@ -1623,7 +1624,8 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
 
     // Cache successful responses ONLY for GET requests
-    if (response.ok && cacheKey && method === 'GET') {
+    // ttl === 0 is an explicit always-fresh request — do not store either.
+    if (response.ok && cacheKey && method === 'GET' && ttl !== 0) {
       const responseText = await response.text();
 
       // 🚀 OPTIMIZATION 5: Reuse already determined context/isolation for cache setting
@@ -1634,7 +1636,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           isolation: isolation as any,
           tenantId: undefined,
           userId: undefined,
-          ttl: ttl || this.cacheTTL
+          ttl: ttl ?? this.cacheTTL
         };
 
         // console.log(`[${this.constructor.name}] Setting context-aware cache for key: ${cacheKey}`);
