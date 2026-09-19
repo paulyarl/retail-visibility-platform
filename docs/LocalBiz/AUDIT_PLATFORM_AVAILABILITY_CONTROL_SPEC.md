@@ -470,7 +470,7 @@ Also add a **coverage qualifier**: `controls_rendered / controls_attempted`. Sup
 
 > The control mechanism is live (§0) but inert where it matters most: on Facebook and Yelp the *control* is blocked too, so every determination collapses to `unable_to_verify` and no signal fires. The analyst is the wrong render client on those platforms. §12 supplies one that is not blocked — the operator — without relaxing the "do not bypass bot defenses" constraint that makes the analyst path limited in the first place.
 
-**Status:** Phase 1 shipped — universal caller-supplied opt-in (2026-09-19). Phase 2 outstanding.
+**Status:** Phase 1 shipped — universal caller-supplied opt-in (2026-09-19). Phase 2 declined (2026-09-19): the "Execute Prompt" path is a single-shot `generateChatCompletion` with no browsing and no operator session — there is nothing for an operator pause to attach to. Both answer modes live on the "Get Resolved Prompt" (render) path: in-session ask-and-answer, and re-render with `operator_observations`. Revisit only if Direct API audits become real.
 **Depends on:** §3–§5 (shipped). Independent of §6 (outstanding).
 **Audience:** the **external import analyst** — the external model whose JSON result is imported via `importExternalResult()`. NOT an internal server-side AI (§12.4).
 
@@ -554,7 +554,7 @@ Framing matters here: the directive gives **notice of capability**, not a mandat
 
 **Version stamping.** The directive lives in `apps/api/src/services/interactive-verification-directive.ts` (a universal module — not under `intelligence/`, since the signal is scope-agnostic) carrying `INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION`. The seam logs the version (`interactiveVerificationDirectiveVersion`) whenever the preamble is emitted, mirroring `REPORT_DIRECTIVES_VERSION` handling in `PromptComposerService`.
 
-**Phasing consequence.** Because the injection is render-time and conditional, the copy-paste bridge needs no runtime state at all — the operator is inside the session. Only the Direct API path (phase 2) needs job state: `mkt_prompt_executions_list.status` (`varchar(50)`, default `pending`, no CHECK constraint) gains `awaiting_operator`, the handoff requests are stored on the execution row, and a resume endpoint re-renders with `operator_observations` injected. Lower priority — that path has no browsing, so it is not where audits run today.
+**Phasing consequence.** Because the injection is render-time and conditional, the copy-paste bridge needs no runtime state at all — the operator is inside the session. A Direct API pause would have needed job state (`mkt_prompt_executions_list.status` gains `awaiting_operator`, handoff requests stored on the execution row, a resume endpoint re-rendering with `operator_observations`) — **declined 2026-09-19** (§12.9): that path has no browsing and no operator session, so the machinery would retrofit interactivity onto a path that cannot use it.
 
 ### 12.5 Contract
 
@@ -614,16 +614,14 @@ This is what gives §6 teeth. Without an operator path, coverage on Facebook/Yel
 - [x] No `SEED_VERSION_MARKER` bump — nothing is seeded
 - [x] Tests — `InteractiveVerificationDirective.test.ts`: gate values, preamble emission + position, emit-when/provenance encoding, `operator_observations` block, and the caller-supplied-vs-out-of-scope interplay that removes the whitelist requirement
 
-**Phase 2 — platform-side pause (only if Direct API audits become real):**
+**Phase 2 — platform-side pause — DECLINED 2026-09-19.** The Direct API path ("Execute Prompt" → `executeSingle` → one `generateChatCompletion`) has no browsing and no operator session — an ask can neither be raised mid-generation nor answered mid-run, so `awaiting_operator` state, handoff storage, a resume endpoint, and a checklist UI would retrofit interactivity onto a path that cannot use it. The render path already supplies both §12.5 answer modes. Reopen only if Direct API audits become real (the original §12.4 condition):
 
-- [ ] `status: 'awaiting_operator'` on `mkt_prompt_executions_list`
-- [ ] Handoff-request storage + resume endpoint
-- [ ] Operator checklist UI — the ask rendered as an actionable list, not prose
-- [x] Operator toggle for interactive mode — shipped in phase 1 as the Prompt Workspace checkbox (the copy-paste path, where audits actually run). Phase 2 remainder: a resolve-time control for the Direct API path
+- ~~`status: 'awaiting_operator'` on `mkt_prompt_executions_list`~~ — declined
+- ~~Handoff-request storage + resume endpoint~~ — declined
+- ~~Operator checklist UI — the ask rendered as an actionable list, not prose~~ — declined
+- [x] Operator toggle for interactive mode — shipped in phase 1 as the Prompt Workspace checkbox (the copy-paste path, where audits actually run)
 
-**Phase 3 — scoring (gated on phase 1 producing coverage):**
-
-- [ ] §6.1, §6.3, §6.4 amendments — all still outstanding (§0)
+**Phase 3 — scoring — SHIPPED 2026-09-18** (§0): §6.1 rubric split + `PLATFORM_GAP_CASCADE_DIRECTIVE`, §6.3/§6.4 via B3/B4 nullables + `applyRenderControlCoverageGate`. What it was gated on — phase 1 producing real render-control coverage — is now live.
 
 ### 12.10 Verification
 
