@@ -404,7 +404,16 @@ const campaignUpdateSchema = campaignBaseSchema.partial().extend({
 });
 
 const stageTransitionSchema = z.object({
-  to_stage: z.enum(['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']),
+  // Includes the recovery-pipeline stages (recoveryStages.ts). The enum is
+  // only a shape gate — the authoritative check is the category-aware
+  // transition map inside MarketingCampaignService.transitionStage().
+  to_stage: z.enum([
+    'seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered',
+    'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded',
+    'audit_identified', 'framework_preview_generated', 'outreach_dispatched',
+    'awaiting_owner_intake', 'intake_submitted', 'final_resolution_drafted',
+    'owner_approved', 'resolved_and_closed',
+  ]),
   notes: z.string().optional(),
   trigger_type: z.enum(['manual', 'automated', 'system']).optional(),
   acknowledge_incomplete: z.boolean().optional(),

@@ -12,6 +12,13 @@
 > email From-name defaults (SES/SendGrid/Mailtrap/`unifiedConfig`), invoice/receipt/billing
 > `platformName` fallbacks, public-catalog payloads, and Clover conflict-resolution strings.
 > `pnpm checkweb` and `pnpm checkapi` pass.
+>
+> **Signup wizard** (`apps/web/src/app/auth/signup/wizard/page.tsx`) aligned to the same
+> model: a new slide 2 carries the free directory gateway ("You're Probably Already
+> Listed — claim free, Starter $19 to own it"), the tier picker offers
+> `directory_presence` and `presence` rungs, the Discovery slide's present-tense Google
+> over-claim is fixed, the mission slide is no longer Clover-gated, and the trial box /
+> submit button no longer contradict a free-tier pick. 8 benefit slides + data step = 9.
 **Subject:** The mission / vision / promise copy at the platform root (`/`), plus the public copy surfaces that repeat its framing.
 **Foundation:** `docs/PLATFORM_COPY_PLATFORM.md` — the one-page positioning, message architecture, voice rules, and claims ledger the replacement copy derives from. Read it first; this spec is the change list that follows from it.
 **Trigger:** The root copy was written before the V3 presence model, the free Directory Presence seeding gateway, the directory discovery surfaces, and the capability architecture shipped. It now describes a smaller, more Google-centric product than the one that exists.

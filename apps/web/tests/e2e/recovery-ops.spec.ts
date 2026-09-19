@@ -1,15 +1,11 @@
 /**
  * Recovery Ops E2E Test
  *
- * Tests the full recovery management cycle via the admin UI:
- *   1. Navigate to Marketing Ops → Recovery list
- *   2. Verify recovery campaigns are listed
- *   3. Open a recovery campaign detail page
- *   4. Verify the campaign cycle banner renders
- *   5. Verify the Channel Readiness widget renders
- *   6. Verify the AI Workspace panel renders (dual-mode)
- *   7. Verify the Actions section (Approve & Deliver, Regenerate)
- *   8. Verify the Delivery Status panel renders after approval
+ * UI render checks + a full API-driven happy-path test:
+ *   - Recovery list / detail / nav render checks (admin UI)
+ *   - Full cycle: create campaign → stage transitions → auto-minted intake
+ *     link → public token resolve → evidence attachment upload → intake
+ *     submit → external draft import → approve → delivery status = sent
  *
  * Sprint 4 — Recovery Production Readiness.
  */
@@ -174,6 +170,212 @@ test("Recovery tab on dashboard links to standalone recovery route", async ({ pa
     await recoveryTab.click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/marketing-ops\/recovery$/);
+  }
+});
+
+// ─── Full Recovery Cycle (API-driven happy path) ────────────────
+//
+// Drives the entire recovery pipeline end-to-end against the real API:
+//   create campaign → audit_identified → framework_preview_generated →
+//   outreach_dispatched (auto-mints intake link) → awaiting_owner_intake →
+//   public intake resolve → evidence attachment upload → intake submit →
+//   intake_submitted → external import of recovery_resolution draft →
+//   final_resolution_drafted → approve → resolved_and_closed →
+//   delivery status = sent.
+// Admin API calls authenticate via the x-auth0-email session header (the
+// same header the web proxy injects), which resolves to the users row.
+
+const ADMIN_API = `${API_URL}/api/admin/marketing-ops`;
+const PUBLIC_API = `${API_URL}/api/public/recovery/intake`;
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || EMAIL;
+
+const adminHeaders = { 'x-auth0-email': ADMIN_EMAIL };
+
+test("Full recovery cycle: create → dispatch → intake → import → approve → delivered", async ({ page }) => {
+  const api = await pwRequest.newContext({ baseURL: API_URL });
+  let campaignId: string | null = null;
+
+  try {
+    // ── 1. Create a business-scope recovery campaign ──────────────
+    const businessName = `E2E Recovery Co ${Date.now()}`;
+    const createRes = await api.post(ADMIN_API, {
+      headers: adminHeaders,
+      data: {
+        scope: 'business',
+        campaign_category: 'recovery_management',
+        business_name: businessName,
+        category: 'Restaurant',
+        city: 'Testville',
+        state: 'TS',
+        email: 'e2e-recovery-owner@example.com',
+        notes: 'E2E test campaign — customer dispute over service charge',
+      },
+    });
+
+    if (createRes.status() === 401 || createRes.status() === 403) {
+      test.skip(true, `Admin auth unavailable via x-auth0-email (${ADMIN_EMAIL}) — set TEST_ADMIN_EMAIL to a platform admin`);
+      return;
+    }
+    expect(createRes.ok(), `create campaign failed: ${await createRes.text()}`).toBeTruthy();
+
+    const campaign = (await createRes.json()).data;
+    campaignId = campaign.id;
+    expect(campaign.stage).toBe('audit_identified');
+
+    const getStage = async () => {
+      const res = await api.get(`${ADMIN_API}/${campaignId}`, { headers: adminHeaders });
+      expect(res.ok()).toBeTruthy();
+      return (await res.json()).data.stage as string;
+    };
+
+    // ── 2. Advance to outreach_dispatched → awaiting_owner_intake ─
+    // acknowledge_incomplete bypasses the playbook soft-gate (fresh
+    // campaigns may carry an assigned checklist). The outreach_dispatched
+    // hook auto-mints the intake link server-side.
+    for (const toStage of ['framework_preview_generated', 'outreach_dispatched', 'awaiting_owner_intake']) {
+      const res = await api.post(`${ADMIN_API}/${campaignId}/transition`, {
+        headers: adminHeaders,
+        data: { to_stage: toStage, trigger_type: 'manual', acknowledge_incomplete: true },
+      });
+      expect(res.ok(), `transition to ${toStage} failed: ${await res.text()}`).toBeTruthy();
+    }
+    expect(await getStage()).toBe('awaiting_owner_intake');
+
+    // ── 3. Intake link auto-minted at outreach_dispatched ─────────
+    const intakeRes = await api.get(`${ADMIN_API}/recovery/${campaignId}/intake?intakeKind=dispute`, {
+      headers: adminHeaders,
+    });
+    expect(intakeRes.ok(), `intake fetch failed: ${await intakeRes.text()}`).toBeTruthy();
+    const intake = (await intakeRes.json()).data;
+    const token = intake.access_token as string;
+    expect(token).toBeTruthy();
+    expect(intake.submitted_at).toBeNull();
+
+    // ── 4. Resolve the public token (owner-facing) ────────────────
+    const resolveRes = await api.get(`${PUBLIC_API}?token=${encodeURIComponent(token)}`);
+    expect(resolveRes.ok()).toBeTruthy();
+    const intakeCtx = (await resolveRes.json()).data;
+    expect(intakeCtx.campaignId).toBe(campaignId);
+    expect(intakeCtx.alreadySubmitted).toBe(false);
+    expect(intakeCtx.intakeKind).toBe('dispute');
+
+    // ── 5. Upload evidence attachment (best-effort — requires the
+    //        disputes storage bucket to be configured) ─────────────
+    // Allowed MIMEs default to pdf/png/jpeg — use a minimal valid PDF.
+    const minimalPdf = Buffer.from(
+      '%PDF-1.4\n' +
+      '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+      '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n' +
+      'trailer<</Root 1 0 R>>\n%%EOF',
+    );
+    const attachmentIds: string[] = [];
+    const uploadRes = await api.post(`${PUBLIC_API}/attachments`, {
+      multipart: {
+        token,
+        file: {
+          name: 'receipt-evidence.pdf',
+          mimeType: 'application/pdf',
+          buffer: minimalPdf,
+        },
+      },
+    });
+    if (uploadRes.ok()) {
+      const uploaded = (await uploadRes.json()).data;
+      expect(uploaded.attachmentId).toBeTruthy();
+      attachmentIds.push(uploaded.attachmentId);
+    } else {
+      const errText = await uploadRes.text();
+      expect(
+        errText.includes('Storage backend not configured') || errText.includes('Bucket not found'),
+        `attachment upload failed unexpectedly: ${errText}`,
+      ).toBeTruthy();
+      console.warn('[recovery-e2e] attachment storage unavailable — submitting intake without attachments');
+    }
+
+    // ── 6. Submit the owner intake (public, token-gated) ──────────
+    const submitRes = await api.post(`${PUBLIC_API}/submit`, {
+      data: {
+        token,
+        ownerStatement: 'We dispute this complaint — the service was completed on schedule and the customer was notified of the delay in advance.',
+        ownerEmail: 'e2e-recovery-owner@example.com',
+        ownerPhone: '+15555550100',
+        proposedResolution: 'Partial refund issued to the customer for the disputed charge',
+        statusFlag: 'PARTIAL_REFUND',
+        attachmentIds,
+      },
+    });
+    expect(submitRes.ok(), `intake submit failed: ${await submitRes.text()}`).toBeTruthy();
+    const submitData = (await submitRes.json()).data;
+    expect(submitData.stage).toBe('intake_submitted');
+    expect(await getStage()).toBe('intake_submitted');
+
+    // Evidence landed on the intake record
+    const intakeAfter = await api.get(`${ADMIN_API}/recovery/${campaignId}/intake?intakeKind=dispute`, {
+      headers: adminHeaders,
+    });
+    const intakeRow = (await intakeAfter.json()).data;
+    expect(intakeRow.submitted_at).toBeTruthy();
+    expect(intakeRow.owner_email).toBe('e2e-recovery-owner@example.com');
+    if (attachmentIds.length > 0) {
+      expect(intakeRow.mkt_dispute_attachments?.length).toBeGreaterThan(0);
+    }
+
+    // ── 7. Import an external recovery_resolution draft ───────────
+    const importRes = await api.post(`${ADMIN_API}/recovery/${campaignId}/import-result`, {
+      headers: adminHeaders,
+      data: {
+        raw_output: JSON.stringify({
+          recovery_resolution: {
+            deliverableText:
+              'Dear Review Team, we respectfully dispute this complaint. Our records show the service was completed on schedule, ' +
+              'the customer was notified of the delay in advance, and a partial refund was issued as a goodwill gesture.',
+            submissionGuide:
+              'Log in to the complaint platform, open the flagged review, select "Respond as owner", paste the drafted response, and submit.',
+          },
+        }),
+      },
+    });
+    expect(importRes.ok(), `import-result failed: ${await importRes.text()}`).toBeTruthy();
+    const importData = (await importRes.json()).data;
+    expect(importData.passed, `import validation failed: ${JSON.stringify(importData.errors)}`).toBe(true);
+    expect(importData.deliverableId).toBeTruthy();
+    expect(await getStage()).toBe('final_resolution_drafted');
+
+    // Draft retrievable with both sections
+    const draftRes = await api.get(`${ADMIN_API}/recovery/${campaignId}/draft`, { headers: adminHeaders });
+    expect(draftRes.ok()).toBeTruthy();
+    const draft = (await draftRes.json()).data;
+    expect(draft.status).toBe('drafted');
+    const sectionTypes = (draft.mkt_deliverable_section || []).map((s: any) => s.section_type);
+    expect(sectionTypes).toContain('response_draft');
+    expect(sectionTypes).toContain('submission_guide');
+
+    // ── 8. Approve → resolved_and_closed ──────────────────────────
+    const approveRes = await api.post(`${ADMIN_API}/recovery/${campaignId}/approve`, { headers: adminHeaders });
+    expect(approveRes.ok(), `approve failed: ${await approveRes.text()}`).toBeTruthy();
+    expect((await approveRes.json()).data.stage).toBe('resolved_and_closed');
+
+    // ── 9. Delivery tracking recorded ─────────────────────────────
+    const dsRes = await api.get(`${ADMIN_API}/recovery/${campaignId}/delivery-status`, { headers: adminHeaders });
+    expect(dsRes.ok()).toBeTruthy();
+    const ds = (await dsRes.json()).data;
+    expect(ds.deliverable?.delivery_status).toBe('sent');
+    expect(ds.deliverable?.delivered_at).toBeTruthy();
+    expect(ds.deliveryLog?.delivery_status).toBe('sent');
+    expect(ds.deliveryLog?.delivery_attempts).toBe(1);
+
+    // ── 10. Operator UI reflects the closed cycle ─────────────────
+    await page.goto(`${WEB_URL}/settings/admin/marketing-ops/recovery/${campaignId}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('text=Delivery Status').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Delivered').first()).toBeVisible({ timeout: 10000 });
+  } finally {
+    // Cleanup — best effort; FK cascades handle intake/deliverable rows.
+    if (campaignId) {
+      await api.delete(`${ADMIN_API}/${campaignId}`, { headers: adminHeaders }).catch(() => {});
+    }
+    await api.dispose();
   }
 });
 

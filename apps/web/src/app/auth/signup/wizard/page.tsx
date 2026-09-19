@@ -88,8 +88,8 @@ export default function SignupWizardPage() {
 
   // Check for existing authenticated user before showing data collection
   useEffect(() => {
-    // Only check when moving to step 8 (data collection)
-    if (step !== 8) return;
+    // Only check when moving to the final step (data collection)
+    if (step !== totalSteps) return;
     // Skip if still loading auth state
     if (authLoading) return;
     
@@ -146,29 +146,36 @@ export default function SignupWizardPage() {
     checkExistingUser();
   }, [step, isAuthenticated, user, authLoading, router]);
 
-  // Total steps: 7 benefit steps + 1 data collection = 8 total
-  const totalSteps = 8;
+  // Total steps: 8 benefit steps + 1 data collection = 9 total
+  const totalSteps = 9;
 
   const benefitSteps = [
     {
       image: '/images/wizard/step-01-mission.png',
       iconImage: '/images/wizard/icon-01-mission.png',
       title: "Big-Box Retailers Built This for Themselves. Now It's Yours.",
-      description: "Local retailers need a way to move shoppers from discovery to purchase — because big-box retailers built end-to-end inventory visibility and commerce infrastructure internally, leaving small retailers without an affordable path to compete. VisibleShelf changes that. No IT team required. Just your Clover POS and a few minutes.",
-      highlight: "Clover-connected • Google-visible • Zero IT required"
+      description: "Big-box retailers built end-to-end inventory visibility and commerce for themselves. Small retailers were left without an affordable path to compete — until now. VisibleShelf changes that: start with a free listing, add Clover when you're ready to sync inventory. No IT team required.",
+      highlight: "Free to start • Clover-connected • Google-visible"
+    },
+    {
+      image: '/images/wizard/step-08-get-started.png',
+      iconImage: '/images/wizard/icon-08-get-started.png',
+      title: "Directory — You May Already Be Listed",
+      description: "We build listings from public information, so your business may already be on VisibleShelf. Claim it free, correct your details, and keep it fresh — that part never costs anything. When you're ready, Starter ($19/mo) makes it yours: your logo, your story, your photos, richer layouts.",
+      highlight: "Free to claim • Starter $19/mo to own your listing"
     },
     {
       image: '/images/wizard/step-02-discovery.png',
       iconImage: '/images/wizard/icon-02-discovery.png',
       title: "Discovery — Get Found on Google",
-      description: "Your products are already showing up in Google Search, Google Shopping, and Google Maps — powered by real-time Clover inventory sync. No manual uploads. No spreadsheets. Just connect your POS and watch your store appear exactly where shoppers are already looking.",
+      description: "Your products show up in Google Search, Google Shopping, and Google Maps — powered by real-time Clover inventory sync. No manual uploads. No spreadsheets. Just connect your POS and watch your store appear exactly where shoppers are already looking.",
       highlight: "Real-time Google visibility + Directory listing"
     },
     {
       image: '/images/wizard/step-03-storefront.png',
       iconImage: '/images/wizard/icon-03-storefront.png',
       title: "Storefront — Own Your Platform Presence",
-      description: "Shoppers are finding you on Google — now give them a beautiful branded storefront to explore. Your full inventory, store hours, and contact details in one professional page. They can browse everything you carry and reach out directly. Your store, your brand, your way.",
+      description: "Shoppers are finding you on Google — now give them a branded storefront to explore. Your full inventory, store hours, and contact details in one professional page. They can browse everything you carry and reach out directly. Your store, your brand, your way.",
       highlight: "Branded storefront + Platform search & browse"
     },
     {
@@ -181,7 +188,7 @@ export default function SignupWizardPage() {
     {
       image: '/images/wizard/step-05-ecommerce.png',
       iconImage: '/images/wizard/icon-05-ecommerce.png',
-      title: "E-Commerce — Sell Online, Fully & Simply",
+      title: "E-commerce — Sell Online, Fully & Simply",
       description: "No physical store? No problem. Close the complete sale online with full payment collection and delivery fulfillment. Clean checkout with no deposit confusion. Built for online-only merchants who need straightforward e-commerce without the enterprise price tag or complexity.",
       highlight: "Full online payments + Delivery + Clean checkout"
     },
@@ -196,7 +203,7 @@ export default function SignupWizardPage() {
       image: '/images/wizard/step-07-enterprise.png',
       iconImage: '/images/wizard/icon-07-enterprise.png',
       title: "Enterprise — Complete Business Solution",
-      description: "Multi-location chains, franchises, and regional retailers need more than features — they need a platform that scales with them. Enterprise-grade analytics, dedicated onboarding, custom contracts, and unified billing across every location. White-label options for organisations that demand their own brand.",
+      description: "Multi-location chains, franchises, and regional retailers need more than features — they need a platform that scales with them. Enterprise-grade analytics, dedicated onboarding, custom contracts, and unified billing across every location. White-label options for organizations that demand their own brand.",
       highlight: "Multi-location + API access + Dedicated support"
     }
   ];
@@ -211,6 +218,16 @@ export default function SignupWizardPage() {
   ];
 
   const tierOptions = [
+    {
+      value: 'directory_presence',
+      label: 'Directory Presence (Free)',
+      description: 'Claimable listing on the VisibleShelf directory — claim it free, correct your details, keep it fresh'
+    },
+    {
+      value: 'presence',
+      label: 'Starter ($19/mo)',
+      description: 'Own your directory listing — your logo, story, photos, and richer layouts'
+    },
     { 
       value: 'discovery', 
       label: 'Discovery ($29/mo)',
@@ -333,8 +350,8 @@ export default function SignupWizardPage() {
   };
 
   const renderStep = () => {
-    // Benefit steps 1-7
-    if (step >= 1 && step <= 7) {
+    // Benefit steps 1-8
+    if (step >= 1 && step <= 8) {
       const benefit = benefitSteps[step - 1];
       return (
         <div>
@@ -435,8 +452,8 @@ export default function SignupWizardPage() {
       );
     }
 
-    // Data collection step (step 8)
-    if (step === 8) {
+    // Data collection step (step 9)
+    if (step === 9) {
       // Show loading state while checking for existing user
       if (checkingExistingUser || authLoading) {
         return (
@@ -452,7 +469,7 @@ export default function SignupWizardPage() {
         return (
           <div>
             <h3 className="text-xl font-semibold text-neutral-900 mb-6">
-              Welcome back, {user?.firstName || 'there'}! 👋
+              Welcome back, {user?.firstName || 'there'}.
             </h3>
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -582,9 +599,9 @@ export default function SignupWizardPage() {
               </div>
 
               <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
-                <h4 className="font-semibold text-neutral-900 mb-3">Which tier best aligns with your goals?</h4>
+                <h4 className="font-semibold text-neutral-900 mb-3">Which tier fits your goals?</h4>
                 <p className="text-sm text-neutral-600 mb-4">
-                  Based on the slides you just saw, which tier represents where you want to start your journey?
+                  Based on the slides you just saw, where do you want to start?
                 </p>
                 <div>
                   <label htmlFor="preferredTier" className="block text-sm font-medium text-neutral-700 mb-2">
@@ -790,9 +807,9 @@ export default function SignupWizardPage() {
             </div>
 
             <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
-              <h4 className="font-semibold text-neutral-900 mb-3">Which tier best aligns with your goals?</h4>
+              <h4 className="font-semibold text-neutral-900 mb-3">Which tier fits your goals?</h4>
               <p className="text-sm text-neutral-600 mb-4">
-                Based on the slides you just saw, which tier represents where you want to start your journey?
+                Based on the slides you just saw, where do you want to start?
               </p>
               <div>
                 <label htmlFor="preferredTier" className="block text-sm font-medium text-neutral-700 mb-2">
@@ -822,12 +839,12 @@ export default function SignupWizardPage() {
             </div>
 
             <div className="bg-primary-50 rounded-xl p-4">
-              <h4 className="font-semibold text-primary-900 mb-2">Start Your Free Trial</h4>
+              <h4 className="font-semibold text-primary-900 mb-2">Start Free, Upgrade When Ready</h4>
               <p className="text-primary-700 text-sm mb-2">
-                No credit card required. Full access to all features for 14 days.
+                A claimed directory listing costs nothing. Paid plans include a 14-day trial — no credit card required.
               </p>
               <div className="text-xs text-primary-600">
-                After your trial, continue with your selected tier or upgrade anytime.
+                Switch tiers or cancel anytime — your listing stays yours either way.
               </div>
             </div>
 
@@ -844,7 +861,7 @@ export default function SignupWizardPage() {
                 disabled={isLoading}
                 className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Creating Account...' : 'Create Account & Start Trial'}
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </button>
             </div>
           </form>
@@ -860,7 +877,7 @@ export default function SignupWizardPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-900 mb-2">Welcome aboard!</h2>
+        <h2 className="text-2xl font-bold text-neutral-900 mb-2">Welcome aboard.</h2>
         <p className="text-neutral-600 mb-6">
           Your account is being created. You'll be redirected to complete your setup.
         </p>
