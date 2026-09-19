@@ -15,19 +15,19 @@
  * be hidden behind a tab.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Loader2, Phone, Plus, Trash2, X, Clock, Check } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import marketingOpsService, {
   VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
   VerifiedSocialProfile, VerifiedDirectoryProfile, verificationClearsCampaign,
 } from '@/services/MarketingOpsService';
+import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
 import {
-  DAYS,
+  EMPTY_HOURS,
   type DayHours,
+  inferTimezoneFromState,
   parseHours,
-  formatHoursForDisplay,
-  parseGoogleHoursPaste,
 } from '@/lib/business-hours';
 
 /**
@@ -134,42 +134,29 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
   const [reason, setReason] = useState('');
 
   // ─── Opening hours (migration 296) ──────────────────────────────────────
-  // Paste the block straight from the GBP "Hours" section; it's parsed into
-  // the seed's day-map shape and rides the queue → campaign → seed listing
-  // journey. Prefilled from any hours already on the queue snapshot.
-  const [hoursPasteText, setHoursPasteText] = useState('');
+  // Shared BusinessHoursEditor (same as the seed edit page): paste the GBP
+  // "Hours" block and Parse & apply, or edit per day. `hours === null` means
+  // "not captured" — verifiedHours is then omitted and the listing keeps
+  // whatever the audit found. Prefilled from any hours already on the
+  // snapshot.
   const [hours, setHours] = useState<Record<string, DayHours> | null>(() => {
     const existing = snap.hours ?? nap.hours;
     return existing && typeof existing === 'object' ? parseHours(existing) : null;
   });
-  const [hoursParsedCount, setHoursParsedCount] = useState<number | null>(null);
-  const [hoursError, setHoursError] = useState<string | null>(null);
-
-  const handleHoursPasteChange = (text: string) => {
-    setHoursPasteText(text);
-    if (!text.trim()) {
-      setHoursError(null);
-      setHoursParsedCount(null);
-      return;
-    }
-    const parsed = parseGoogleHoursPaste(text);
-    if (!parsed) {
-      setHoursError('Could not parse any days — expected "Monday" then "- 9 AM–5 PM" per line.');
-      setHoursParsedCount(null);
-      return;
-    }
-    const openDays = DAYS.filter((d) => !parsed[d].closed).length;
-    setHours(parsed);
-    setHoursParsedCount(openDays);
-    setHoursError(null);
-  };
-
-  const clearHours = () => {
-    setHours(null);
-    setHoursPasteText('');
-    setHoursParsedCount(null);
-    setHoursError(null);
-  };
+  // Timezone: stored value wins; otherwise infer the majority zone from the
+  // verified state so a California prospect doesn't default to Eastern.
+  const storedHoursTimezone = (() => {
+    const existing = (snap.hours ?? nap.hours) as Record<string, any> | undefined;
+    return existing && typeof existing === 'object' && typeof existing.timezone === 'string'
+      ? existing.timezone
+      : null;
+  })();
+  const [hoursTimezone, setHoursTimezone] = useState<string>(
+    () => storedHoursTimezone ?? inferTimezoneFromState(nap.state ?? entry.state) ?? 'America/New_York',
+  );
+  // Locked once a timezone is authoritative (stored on the snapshot or picked
+  // by the operator) — until then, correcting the verified state re-infers it.
+  const hoursTimezoneLocked = useRef(!!storedHoursTimezone);
 
   const canCreateCampaign = verificationClearsCampaign(form.outcome);
   // Only operational / relocated outcomes carry identity fields — mirrors the
@@ -229,7 +216,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
         verifiedEmail: form.verifiedEmail || undefined,
         verifiedCategory: form.verifiedCategory || undefined,
         verifiedOwnerName: form.verifiedOwnerName || undefined,
-        verifiedHours: hours ?? undefined,
+        verifiedHours: hours ? { ...hours, timezone: hoursTimezone } : undefined,
         verifiedSocialProfiles: socialProfiles.filter((p) => p.platform.trim() && p.url.trim()),
         verifiedDirectoryProfiles: directoryProfiles.filter((p) => p.platform.trim() && p.url.trim()),
         ownerReceptivity: form.ownerReceptivity || undefined,
@@ -350,7 +337,13 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
                     type="text"
                     placeholder="State"
                     value={form.verifiedState}
-                    onChange={(e) => setForm((f) => ({ ...f, verifiedState: e.target.value }))}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setForm((f) => ({ ...f, verifiedState: v }));
+                      if (!hoursTimezoneLocked.current) {
+                        setHoursTimezone((cur) => inferTimezoneFromState(v) ?? cur);
+                      }
+                    }}
                     className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -492,42 +485,43 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
                   <Plus className="w-3 h-3" /> Add directory profile
                 </button>
 
-                {/* Opening hours — paste straight from the GBP "Hours" section.
-                    Parsed into the seed's day-map shape and carried through the
-                    campaign to the seed listing. */}
+                {/* Opening hours — the canonical editor (same component as the
+                    seed edit page): paste the GBP block, Parse & apply, then
+                    fine-tune per day. Travels to the listing via the campaign
+                    record's business_hours. */}
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 pt-1">
                   Opening hours{' '}
                   <span className="font-normal text-gray-400 dark:text-gray-500">
                     — paste from Google, travels to the listing
                   </span>
                 </label>
-                <textarea
-                  rows={4}
-                  value={hoursPasteText}
-                  onChange={(e) => handleHoursPasteChange(e.target.value)}
-                  placeholder={'Monday\n- 9 AM–5 PM\nTuesday\n- 9 AM–5 PM\n…'}
-                  className="w-full px-2 py-1.5 text-xs font-mono border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                />
-                {hoursError && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400">{hoursError}</p>
-                )}
-                {hours && !hoursError && (
-                  <div className="flex items-start gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400">
-                    <Check className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                <div className="rounded-lg border border-gray-200 dark:border-neutral-700 p-2.5">
+                  <BusinessHoursEditor
+                    compact
+                    hours={hours ?? EMPTY_HOURS}
+                    timezone={hoursTimezone}
+                    onHoursChange={setHours}
+                    onTimezoneChange={(tz) => {
+                      hoursTimezoneLocked.current = true;
+                      setHoursTimezone(tz);
+                    }}
+                  />
+                </div>
+                {hours ? (
+                  <p className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400">
+                    <Check className="w-3 h-3 flex-shrink-0" />
                     <span className="flex-1">
-                      Parsed{hoursParsedCount != null ? ` ${hoursParsedCount} open day${hoursParsedCount === 1 ? '' : 's'}` : ''}:{' '}
-                      <span className="text-gray-500 dark:text-gray-400">{formatHoursForDisplay(hours)}</span>
+                      Captured — will be written to the campaign record.
                       <button
                         type="button"
-                        onClick={clearHours}
+                        onClick={() => setHours(null)}
                         className="ml-2 text-gray-400 hover:text-red-600 underline"
                       >
                         clear
                       </button>
                     </span>
-                  </div>
-                )}
-                {!hours && !hoursPasteText && (
+                  </p>
+                ) : (
                   <p className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
                     <Clock className="w-3 h-3" /> No hours captured — the listing will fall back to the audit's hours.
                   </p>

@@ -139,16 +139,23 @@ export function parseHoursLine(line: string): DayHours | null {
   return { open, close, closed: false };
 }
 
+// A day-name range at the start of a line: "Mon–Fri 9 AM–5 PM". Checked before
+// the same-line pattern so the trailing day name isn't mistaken for hours text.
+const DAY_RANGE_RE = /^([A-Za-z]+)\s*[–—-]\s*([A-Za-z]+)\s*:?\s+(.+)$/;
+
+// A leading day name optionally followed by hours on the same line:
+// "Saturday\t9 AM–10 PM", "Monday: Closed", "Saturday - 9 AM–10 PM", or a bare
+// "Saturday" whose hours sit on the next non-empty line.
+const INLINE_DAY_RE = /^([A-Za-z]+)\s*[:–—-]?\s*(.*)$/;
+
 /**
  * Parse a Google Business Profile hours block into a per-day DayHours map.
  * Returns null when no day could be parsed (so the caller can show an error).
  *
- * Expected format (one day per block, hours on the following line):
- *   Saturday
- *   - 12 AM–8:30 PM
- *   Sunday
- *   - 9 AM–8:30 PM
- *   ...
+ * Accepted formats — the day order doesn't matter:
+ *   Saturday\n- 12 AM–8:30 PM   (stacked, GBP copy)
+ *   Saturday\t9 AM–10 PM        (day + hours on one line, tab/colon/space/dash)
+ *   Mon–Fri 9 AM–5 PM           (day range, applied to every day in the span)
  */
 export function parseGoogleHoursPaste(text: string): Record<string, DayHours> | null {
   if (!text.trim()) return null;
@@ -156,17 +163,49 @@ export function parseGoogleHoursPaste(text: string): Record<string, DayHours> | 
   let foundAny = false;
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
-    const dayKey = GOOGLE_DAY_NAMES[lines[i].trim().toLowerCase()];
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+
+    // Day range ("Mon–Fri 9 AM–5 PM") — expand to every day in the span,
+    // wrapping around the week when the end precedes the start.
+    const range = trimmed.match(DAY_RANGE_RE);
+    if (range) {
+      const start = GOOGLE_DAY_NAMES[range[1].toLowerCase()] as (typeof DAYS)[number] | undefined;
+      const end = GOOGLE_DAY_NAMES[range[2].toLowerCase()] as (typeof DAYS)[number] | undefined;
+      if (start && end && start !== end) {
+        const parsed = parseHoursLine(range[3]);
+        if (parsed) {
+          const startIdx = DAYS.indexOf(start);
+          const endIdx = DAYS.indexOf(end);
+          for (let d = startIdx; ; d = (d + 1) % DAYS.length) {
+            result[DAYS[d]] = { ...parsed };
+            foundAny = true;
+            if (d === endIdx) break;
+          }
+        }
+        continue;
+      }
+      // Not a real day range — fall through to the same-line parse.
+    }
+
+    const inline = trimmed.match(INLINE_DAY_RE);
+    if (!inline) continue;
+    const dayKey = GOOGLE_DAY_NAMES[inline[1].toLowerCase()];
     if (!dayKey) continue;
-    // Find the next non-empty line for the hours. Stop if it's another day
-    // name (means this day had no hours listed).
-    let hoursLine = '';
-    for (let j = i + 1; j < lines.length; j++) {
-      const next = lines[j].trim();
-      if (!next) continue;
-      if (GOOGLE_DAY_NAMES[next.toLowerCase()]) break;
-      hoursLine = next;
-      break;
+    let hoursLine = inline[2].trim();
+    if (!hoursLine) {
+      // Bare day name — find the next non-empty line for the hours. Stop if
+      // it's another day name (means this day had no hours listed).
+      for (let j = i + 1; j < lines.length; j++) {
+        const next = lines[j].trim();
+        if (!next) continue;
+        // Stop on any line that begins a new day entry — a bare day name or
+        // a same-line "Day <hours>" pair.
+        const nextInline = next.match(INLINE_DAY_RE);
+        if (nextInline && GOOGLE_DAY_NAMES[nextInline[1].toLowerCase()]) break;
+        hoursLine = next;
+        break;
+      }
     }
     if (hoursLine) {
       const parsed = parseHoursLine(hoursLine);
@@ -177,4 +216,71 @@ export function parseGoogleHoursPaste(text: string): Record<string, DayHours> | 
     }
   }
   return foundAny ? result : null;
+}
+
+// --- US state → timezone inference ----------------------------------------
+// Majority-zone mapping (several states span two zones — the zone covering
+// most of the population wins). Used to default the hours editor's timezone
+// picker; the operator can always override. Accepts abbreviations or full
+// names, any case. Returns null for unrecognized / non-US values so callers
+// can keep their own fallback.
+
+const STATE_TIMEZONES: Record<string, string> = {
+  al: 'America/Chicago', alabama: 'America/Chicago',
+  ak: 'America/Anchorage', alaska: 'America/Anchorage',
+  az: 'America/Phoenix', arizona: 'America/Phoenix',
+  ar: 'America/Chicago', arkansas: 'America/Chicago',
+  ca: 'America/Los_Angeles', california: 'America/Los_Angeles',
+  co: 'America/Denver', colorado: 'America/Denver',
+  ct: 'America/New_York', connecticut: 'America/New_York',
+  de: 'America/New_York', delaware: 'America/New_York',
+  dc: 'America/New_York', 'district of columbia': 'America/New_York',
+  fl: 'America/New_York', florida: 'America/New_York',
+  ga: 'America/New_York', georgia: 'America/New_York',
+  hi: 'Pacific/Honolulu', hawaii: 'Pacific/Honolulu',
+  id: 'America/Denver', idaho: 'America/Denver',
+  il: 'America/Chicago', illinois: 'America/Chicago',
+  in: 'America/New_York', indiana: 'America/New_York',
+  ia: 'America/Chicago', iowa: 'America/Chicago',
+  ks: 'America/Chicago', kansas: 'America/Chicago',
+  ky: 'America/New_York', kentucky: 'America/New_York',
+  la: 'America/Chicago', louisiana: 'America/Chicago',
+  me: 'America/New_York', maine: 'America/New_York',
+  md: 'America/New_York', maryland: 'America/New_York',
+  ma: 'America/New_York', massachusetts: 'America/New_York',
+  mi: 'America/New_York', michigan: 'America/New_York',
+  mn: 'America/Chicago', minnesota: 'America/Chicago',
+  ms: 'America/Chicago', mississippi: 'America/Chicago',
+  mo: 'America/Chicago', missouri: 'America/Chicago',
+  mt: 'America/Denver', montana: 'America/Denver',
+  ne: 'America/Chicago', nebraska: 'America/Chicago',
+  nv: 'America/Los_Angeles', nevada: 'America/Los_Angeles',
+  nh: 'America/New_York', 'new hampshire': 'America/New_York',
+  nj: 'America/New_York', 'new jersey': 'America/New_York',
+  nm: 'America/Denver', 'new mexico': 'America/Denver',
+  ny: 'America/New_York', 'new york': 'America/New_York',
+  nc: 'America/New_York', 'north carolina': 'America/New_York',
+  nd: 'America/Chicago', 'north dakota': 'America/Chicago',
+  oh: 'America/New_York', ohio: 'America/New_York',
+  ok: 'America/Chicago', oklahoma: 'America/Chicago',
+  or: 'America/Los_Angeles', oregon: 'America/Los_Angeles',
+  pa: 'America/New_York', pennsylvania: 'America/New_York',
+  ri: 'America/New_York', 'rhode island': 'America/New_York',
+  sc: 'America/New_York', 'south carolina': 'America/New_York',
+  sd: 'America/Chicago', 'south dakota': 'America/Chicago',
+  tn: 'America/Chicago', tennessee: 'America/Chicago',
+  tx: 'America/Chicago', texas: 'America/Chicago',
+  ut: 'America/Denver', utah: 'America/Denver',
+  vt: 'America/New_York', vermont: 'America/New_York',
+  va: 'America/New_York', virginia: 'America/New_York',
+  wa: 'America/Los_Angeles', washington: 'America/Los_Angeles',
+  wv: 'America/New_York', 'west virginia': 'America/New_York',
+  wi: 'America/Chicago', wisconsin: 'America/Chicago',
+  wy: 'America/Denver', wyoming: 'America/Denver',
+};
+
+export function inferTimezoneFromState(state: string | null | undefined): string | null {
+  if (!state) return null;
+  const key = state.trim().toLowerCase().replace(/\./g, '');
+  return STATE_TIMEZONES[key] ?? null;
 }

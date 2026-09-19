@@ -35,6 +35,7 @@ import {
   DAYS,
   type DayHours,
   EMPTY_HOURS,
+  inferTimezoneFromState,
   parseHours,
   formatHoursForDisplay,
 } from '@/lib/business-hours';
@@ -242,7 +243,11 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
     const snapshot = timeline.prospect.business_snapshot ?? {};
     const raw = snapshot.hours ?? snapshot.verified_nap?.hours;
     setEditHours(raw && typeof raw === 'object' ? parseHours(raw) : { ...EMPTY_HOURS });
-    setEditTimezone((raw && typeof raw === 'object' && raw.timezone) || 'America/New_York');
+    setEditTimezone(
+      (raw && typeof raw === 'object' && raw.timezone) ||
+        inferTimezoneFromState(timeline.prospect.state) ||
+        'America/New_York',
+    );
   }, [timeline]);
 
   const handleSaveHours = async () => {

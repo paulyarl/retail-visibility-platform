@@ -27,6 +27,7 @@ import {
   DAYS,
   type DayHours,
   EMPTY_HOURS,
+  inferTimezoneFromState,
   parseHours,
   formatHoursForDisplay,
 } from '@/lib/business-hours';
@@ -818,6 +819,18 @@ export default function PresenceSeedDetailPage() {
     ? reportQrChannels.find((c) => c.channel === reportQrDesignerChannel) ?? null
     : null;
 
+  // Whether the public /seed-report page will actually render for this seed.
+  // Mirrors the public route's rule: latest version with published_at set
+  // (listReportVersions returns version DESC) whose status is publicly
+  // eligible. The script footer's "Report link" is gated on this so it never
+  // presents a dead link before the report passes lint and publishes.
+  const latestPublishedVersion = reportVersions.find((v) => v.published_at);
+  const reportPubliclyAvailable =
+    !!latestPublishedVersion &&
+    (latestPublishedVersion.status === 'provisional' ||
+      latestPublishedVersion.status === 'complete' ||
+      latestPublishedVersion.status === 'claimed');
+
   // Public shelf page for a category name. Unclaimed seeds render on
   // /place/category shelves (primary + secondaries); claiming flips
   // listing_origin to 'claimed' and moves the listing onto
@@ -945,7 +958,11 @@ export default function PresenceSeedDetailPage() {
       })),
     );
     setEditHours(parseHours(listing?.business_hours));
-    setEditTimezone(listing?.business_hours?.timezone || 'America/New_York');
+    setEditTimezone(
+      listing?.business_hours?.timezone ||
+        inferTimezoneFromState(listing?.state) ||
+        'America/New_York',
+    );
     const hoursProv = provenance.find((p) => p.fieldKey === 'hours');
     setEditHoursSource(hoursProv?.sourceName ?? '');
     setEditHoursSourceUrl(hoursProv?.sourceUrl ?? '');
@@ -2687,15 +2704,25 @@ export default function PresenceSeedDetailPage() {
             )}
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <a
-                href={seedScript.callContext.report_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Report link
-              </a>
+              {reportPubliclyAvailable ? (
+                <a
+                  href={seedScript.callContext.report_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Report link
+                </a>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1 text-gray-400"
+                  title={`${seedScript.callContext.report_url} — no published report yet. Use Refresh report in the Report QR Kit section.`}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Report link (not published yet)
+                </span>
+              )}
               {seedScript.callContext.claim_url && (
                 <a
                   href={seedScript.callContext.claim_url}
