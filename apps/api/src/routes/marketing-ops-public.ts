@@ -190,6 +190,10 @@ router.get('/public/marketing/gallery/:token', async (req, res) => {
           id: s.id,
           fileName: s.file_name,
           signedUrl,
+          // Platform-fronted render path — the prospect's <img> uses this so
+          // the raw supabase.co URL never appears in the page. Resolved by
+          // the /gallery/:token/screenshots/:fileId endpoint (token-scoped).
+          imageUrl: `/preview/${token.token}/img/${s.id}`,
           mimeType: s.mime_type,
           fileSize: s.file_size,
           uploadedAt: s.uploaded_at,
@@ -450,6 +454,15 @@ router.get('/public/marketing/gallery/multi/:token', async (req, res) => {
       return res.status(404).json({ success: false, error: 'No eligible sibling galleries found' });
     }
 
+    // Stamp the platform-fronted render path on every screenshot — same
+    // /gallery/:token/screenshots/:fileId endpoint, scoped to the prospect's
+    // campaigns for multi tokens.
+    for (const section of galleryData.siblings ?? []) {
+      for (const s of section.screenshots ?? []) {
+        s.imageUrl = `/preview/${ptoken}/img/${s.id}`;
+      }
+    }
+
     return res.json({
       success: true,
       expired: false,
@@ -463,6 +476,81 @@ router.get('/public/marketing/gallery/multi/:token', async (req, res) => {
   } catch (error: any) {
     logger.error('[marketing-ops-public] GET /gallery/multi/:token error', undefined, { error: error.message });
     return res.status(500).json({ success: false, error: 'Failed to resolve multi-gallery' });
+  }
+});
+
+/**
+ * GET /api/public/marketing/gallery/:token/screenshots/:fileId
+ *
+ * Token-scoped screenshot render for the diagnostic gallery. Streams the
+ * bytes from the private disputes bucket so the prospect-facing page can
+ * use platform URLs (/preview/:token/img/:fileId) instead of raw Supabase
+ * signed URLs. The token is the trust boundary — no auth required.
+ *
+ * - Single-gallery tokens (diagnostic_gallery) are scoped to their campaign.
+ * - Multi-gallery tokens (multi_diagnostic_gallery) are scoped to every
+ *   campaign sharing the token's business_prospect_id.
+ * - 404 invalid/non-gallery token or file outside the token's scope
+ * - 410 expired token
+ */
+router.get('/public/marketing/gallery/:token/screenshots/:fileId', async (req, res) => {
+  try {
+    const { token: ptoken, fileId } = req.params;
+    const token = await prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: { token: ptoken },
+      select: { id: true, token_type: true, expires_at: true, campaign_id: true, metadata: true },
+    });
+    if (!token || (token.token_type !== 'diagnostic_gallery' && token.token_type !== 'multi_diagnostic_gallery')) {
+      return res.status(404).json({ success: false, error: 'Invalid or unknown token' });
+    }
+    if (token.expires_at && token.expires_at < new Date()) {
+      return res.status(410).json({ success: false, error: 'Gallery link expired' });
+    }
+
+    const file = await prisma.mkt_files_list.findFirst({
+      where: {
+        id: fileId,
+        file_type: 'diagnostic_screenshot',
+        ...(token.token_type === 'multi_diagnostic_gallery'
+          ? { mkt_campaigns_list: { business_prospect_id: (token.metadata as any)?.business_prospect_id ?? '' } }
+          : { campaign_id: token.campaign_id }),
+      },
+      select: { file_name: true, storage_path: true, mime_type: true },
+    });
+    if (!file) {
+      return res.status(404).json({ success: false, error: 'Screenshot not found' });
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const { StorageBuckets } = await import('../storage-config');
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ success: false, error: 'Storage not configured' });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data, error: downloadError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .download(file.storage_path);
+
+    if (downloadError || !data) {
+      logger.error('[marketing-ops-public] gallery screenshot download failed', undefined, {
+        error: downloadError?.message,
+        fileId,
+      });
+      return res.status(502).json({ success: false, error: 'Screenshot download failed' });
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.file_name)}`);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(buffer);
+  } catch (error: any) {
+    logger.error('[marketing-ops-public] GET /gallery/:token/screenshots/:fileId error', undefined, { error: error.message });
+    return res.status(500).json({ success: false, error: 'Failed to render screenshot' });
   }
 });
 

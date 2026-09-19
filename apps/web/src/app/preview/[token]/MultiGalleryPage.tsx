@@ -344,9 +344,9 @@ function SiblingSectionContent({
               <IconArrowRight size={16} />
             </ActionIcon>
           </Group>
-          {screenshots[currentSlide]?.signedUrl && (
+          {(screenshots[currentSlide]?.imageUrl || screenshots[currentSlide]?.signedUrl) && (
             <Image
-              src={screenshots[currentSlide].signedUrl}
+              src={screenshots[currentSlide].imageUrl || screenshots[currentSlide].signedUrl}
               alt={screenshots[currentSlide].fileName}
               radius="md"
               fit="contain"

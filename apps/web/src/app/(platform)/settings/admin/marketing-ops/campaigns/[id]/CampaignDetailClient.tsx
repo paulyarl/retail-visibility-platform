@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle, Phone, AlertTriangle, FlaskConical, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignDetail, CampaignStage, PipelineStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType, TriageResult, PromptExecution, OperatingStatusOutcome } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import type { DirectoryListing } from '@/hooks/directory/useDirectoryListing';
 import { getDirectoryListingUrl } from '@/utils/slug';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
-import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import { StageBadge, STAGE_LABELS, RECOVERY_STAGES } from '@/components/marketing-ops/StageBadge';
+import { pipelineForCampaign } from '@/components/marketing-ops/prospectQueueStageMaps';
 import ArchetypeBadge from '@/components/marketing-ops/ArchetypeBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
@@ -231,7 +232,7 @@ export default function CampaignDetailClient({
   const [linkingTenant, setLinkingTenant] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revenue, setRevenue] = useState<MarketingRevenue[]>([]);
-  const [readinessDialog, setReadinessDialog] = useState<{ toStage: CampaignStage } | null>(null);
+  const [readinessDialog, setReadinessDialog] = useState<{ toStage: PipelineStage } | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
   const [readinessEnriching, setReadinessEnriching] = useState(false);
   // Operating status verification — operator phone-verifies a prospect when
@@ -252,7 +253,7 @@ export default function CampaignDetailClient({
   const [mailerError, setMailerError] = useState<string | null>(null);
   // Soft gate for incomplete required checklist steps — operator may acknowledge and proceed.
   const [checklistIncompleteDialog, setChecklistIncompleteDialog] = useState<{
-    toStage: CampaignStage;
+    toStage: PipelineStage;
     incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   } | null>(null);
   // Hard gate for preview_built without a resolvable archetype (no
@@ -260,7 +261,7 @@ export default function CampaignDetailClient({
   // stranded: openers, headers, gallery defaults and deliverable sections all
   // derive from the archetype, and there is no back-edge to seed.
   const [missingAuditDialog, setMissingAuditDialog] = useState<{
-    toStage: CampaignStage;
+    toStage: PipelineStage;
     message: string;
     action?: string;
   } | null>(null);
@@ -269,7 +270,7 @@ export default function CampaignDetailClient({
   // (e.g. ?focus=preview_built from the openers workspace) to scroll the
   // pipeline into view and briefly highlight the target stage button.
   const pipelineRef = useRef<HTMLDivElement | null>(null);
-  const [focusedStage, setFocusedStage] = useState<CampaignStage | null>(null);
+  const [focusedStage, setFocusedStage] = useState<PipelineStage | null>(null);
   // Sprint 5: latest city_analysis execution for SyncReportCard
   const [cityScanExecutionId, setCityScanExecutionId] = useState<string | null>(null);
   // Latest per-issue repair seek execution for RepairBriefingCard (§3).
@@ -383,9 +384,10 @@ export default function CampaignDetailClient({
   // after 4s or on the first stage transition.
   useEffect(() => {
     if (!campaign || !focusStage) return;
-    const validStages = PIPELINE_STAGES as readonly string[];
+    const onRecoveryPipeline = pipelineForCampaign(campaign.campaign_category ?? null, campaign.repair_track ?? null) === 'recovery';
+    const validStages = (onRecoveryPipeline ? RECOVERY_STAGES : PIPELINE_STAGES) as readonly string[];
     if (!validStages.includes(focusStage)) return;
-    setFocusedStage(focusStage as CampaignStage);
+    setFocusedStage(focusStage as PipelineStage);
     // Scroll after the next paint so the pipeline bar is rendered.
     const t = setTimeout(() => {
       pipelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -627,7 +629,7 @@ export default function CampaignDetailClient({
     }
   };
 
-  const handleTransition = async (toStage: CampaignStage) => {
+  const handleTransition = async (toStage: PipelineStage) => {
     // Scope guard: only business-scope campaigns may advance through pipeline
     // stages. Category/city/intelligence-scope campaigns are aggregate scans
     // and must not move through the sales pipeline. The backend enforces the
@@ -659,7 +661,7 @@ export default function CampaignDetailClient({
     await runTransition(toStage);
   };
 
-  const runTransition = async (toStage: CampaignStage, acknowledgeIncomplete = false) => {
+  const runTransition = async (toStage: PipelineStage, acknowledgeIncomplete = false) => {
     setTransitioning(true);
     try {
       await marketingOpsService.transitionStage(campaignId, {
@@ -824,6 +826,13 @@ export default function CampaignDetailClient({
     { key: 'files', label: 'Files', count: campaign?.files?.length },
     { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
   ];
+
+  // Pipeline-aware stage stepper — recovery campaigns walk the recovery
+  // machine (audit_identified → … → resolved_and_closed), not the review
+  // funnel. Mirrors the API's pipelineFor(category, repair_track) dispatch.
+  const isRecoveryPipeline =
+    !!campaign && pipelineForCampaign(campaign.campaign_category ?? null, campaign.repair_track ?? null) === 'recovery';
+  const stepperStages: readonly PipelineStage[] = isRecoveryPipeline ? RECOVERY_STAGES : PIPELINE_STAGES;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
@@ -1165,9 +1174,10 @@ export default function CampaignDetailClient({
                 informational banner instead of the pipeline buttons. */}
             <div ref={pipelineRef} className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 mb-6 scroll-mt-4">
               {campaign.scope === 'business' ? (
+                <>
                 <div className="flex items-center gap-1 overflow-x-auto">
-                  {PIPELINE_STAGES.map((stage, idx) => {
-                    const currentIdx = PIPELINE_STAGES.indexOf(campaign.stage);
+                  {stepperStages.map((stage, idx) => {
+                    const currentIdx = stepperStages.indexOf(campaign.stage);
                     const isPast = idx < currentIdx;
                     const isCurrent = idx === currentIdx;
                     // Warning dot on preview_built when contact readiness is incomplete.
@@ -1199,13 +1209,26 @@ export default function CampaignDetailClient({
                             />
                           )}
                         </button>
-                        {idx < PIPELINE_STAGES.length - 1 && (
+                        {idx < stepperStages.length - 1 && (
                           <ChevronRight className="w-4 h-4 text-gray-300 dark:text-neutral-600 mx-0.5" />
                         )}
                       </div>
                     );
                   })}
                 </div>
+                {isRecoveryPipeline && (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Recovery pipeline — manage owner intake, the resolution draft &amp; delivery in the{' '}
+                    <Link
+                      href={`/settings/admin/marketing-ops/recovery/${campaignId}`}
+                      className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                    >
+                      Recovery workspace
+                    </Link>
+                    . The owner intake link is minted automatically on Outreach Dispatched.
+                  </p>
+                )}
+                </>
               ) : (
                 <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300 uppercase">

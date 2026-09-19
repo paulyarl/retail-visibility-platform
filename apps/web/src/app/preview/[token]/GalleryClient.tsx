@@ -274,9 +274,9 @@ export default function GalleryClient() {
             <Box style={{ position: 'relative' }}>
               {/* Screenshot image */}
               <Box style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa' }}>
-                {screenshots[currentSlide]?.signedUrl ? (
+                {(screenshots[currentSlide]?.imageUrl || screenshots[currentSlide]?.signedUrl) ? (
                   <Image
-                    src={screenshots[currentSlide].signedUrl!}
+                    src={(screenshots[currentSlide].imageUrl || screenshots[currentSlide].signedUrl)!}
                     alt={screenshots[currentSlide].fileName || `Screenshot ${currentSlide + 1}`}
                     fit="contain"
                     style={{ maxHeight: 500, width: '100%' }}

@@ -141,6 +141,19 @@ const nextConfig: NextConfig = {
         source: '/api/admin/tier-system/:path*',
         destination: '/api/admin/tier-system/:path*', // Pass through to Next.js
       },
+      // Diagnostic screenshot render routes stream through a Next.js handler
+      // (session-auth'd) so View/Download links stay on the platform domain
+      {
+        source: '/api/admin/marketing-ops/:campaignId/files/:fileId/render',
+        destination: '/api/admin/marketing-ops/:campaignId/files/:fileId/render', // Pass through to Next.js
+      },
+      // Prospect-facing gallery image URLs — /preview/<token>/img/<fileId>
+      // streams through the public token-scoped render endpoint so raw
+      // supabase.co signed URLs never appear in the page
+      {
+        source: '/preview/:token/img/:fileId',
+        destination: `${apiBaseUrl}/api/public/marketing/gallery/:token/screenshots/:fileId`,
+      },
       // Proxy public routes (no auth required)
       {
         source: '/public/:path*',

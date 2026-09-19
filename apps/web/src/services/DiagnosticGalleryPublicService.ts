@@ -13,6 +13,9 @@ export interface GalleryScreenshot {
   id: string;
   fileName: string;
   signedUrl: string | null;
+  /** Platform-fronted render path (/preview/<token>/img/<fileId>) — prefer
+   *  this over signedUrl so raw supabase.co URLs never appear in the page. */
+  imageUrl?: string | null;
   mimeType: string | null;
   fileSize: number | null;
   uploadedAt: string | null;

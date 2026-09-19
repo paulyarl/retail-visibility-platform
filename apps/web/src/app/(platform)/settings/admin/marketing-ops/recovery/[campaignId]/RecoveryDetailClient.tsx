@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle, Sparkles, Save, AlertCircle, FileText, Paperclip, MessageSquare, Copy, Upload, Play, X } from 'lucide-react';
+import { RefreshCw, CheckCircle, Sparkles, Save, AlertCircle, FileText, Paperclip, MessageSquare, Copy, Upload, Play, X, ChevronRight, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import recoveryOpsService, { DisputeIntake, RecoveryDraft } from '@/services/RecoveryOpsService';
-import { StageBadge } from '@/components/marketing-ops/StageBadge';
+import marketingOpsService, { CampaignDetail, PipelineStage } from '@/services/MarketingOpsService';
+import { StageBadge, RECOVERY_STAGES, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import { RECOVERY_TRANSITIONS } from '@/components/marketing-ops/prospectQueueStageMaps';
 import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 
 export default function RecoveryDetailClient({ campaignId }: { campaignId: string }) {
+  const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [intake, setIntake] = useState<DisputeIntake | null>(null);
   const [draft, setDraft] = useState<RecoveryDraft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,11 +49,20 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
     } | null;
   } | null>(null);
   const [resending, setResending] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+
+  // Escalated profile_repair campaigns share this page; their intake rows are
+  // keyed intake_kind='profile_repair', everything else uses 'dispute'.
+  const intakeKind = campaign?.campaign_category === 'profile_repair' ? 'profile_repair' : 'dispute';
 
   const fetchData = useCallback(async () => {
     try {
+      const camp = await marketingOpsService.getCampaign(campaignId);
+      setCampaign(camp);
+      const kind = camp?.campaign_category === 'profile_repair' ? 'profile_repair' : 'dispute';
       const [intakeResult, draftResult, deliveryResult] = await Promise.all([
-        recoveryOpsService.getIntake(campaignId),
+        recoveryOpsService.getIntake(campaignId, kind),
         recoveryOpsService.getDraft(campaignId),
         recoveryOpsService.getDeliveryStatus(campaignId).catch(() => null),
       ]);
@@ -158,7 +170,7 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
     setDownloadingAttachmentId(attachmentId);
     setActionMessage(null);
     try {
-      await recoveryOpsService.downloadAttachment(campaignId, attachmentId, fileName);
+      await recoveryOpsService.downloadAttachment(campaignId, attachmentId, fileName, intakeKind);
     } catch (err: any) {
       setActionMessage({ type: 'error', text: err.message || 'Failed to download attachment' });
     } finally {
@@ -181,11 +193,50 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
     }
   };
 
+  // Stage stepper — advances the campaign through the recovery machine.
+  // outreach_dispatched auto-mints the intake link server-side; the refetch
+  // picks it up so the Owner Intake panel shows it immediately.
+  const handleStageTransition = async (toStage: PipelineStage) => {
+    setTransitioning(true);
+    setActionMessage(null);
+    try {
+      await marketingOpsService.transitionStage(campaignId, {
+        to_stage: toStage,
+        trigger_type: 'manual',
+      });
+      await fetchData();
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to transition stage' });
+    } finally {
+      setTransitioning(false);
+    }
+  };
+
+  // Manual mint — for campaigns that haven't reached outreach_dispatched yet
+  // (or whose auto-generation failed). The reissue endpoint falls back to
+  // creating the intake row when none exists.
+  const handleGenerateLink = async () => {
+    setGeneratingLink(true);
+    setActionMessage(null);
+    try {
+      const result = await recoveryOpsService.reissueLink(campaignId, intakeKind);
+      await navigator.clipboard.writeText(result.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      setActionMessage({ type: 'success', text: 'Intake link generated and copied to clipboard.' });
+      await fetchData();
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to generate intake link' });
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
   const handleReissueLink = async () => {
     setReissuing(true);
     setActionMessage(null);
     try {
-      const result = await recoveryOpsService.reissueLink(campaignId);
+      const result = await recoveryOpsService.reissueLink(campaignId, intakeKind);
       // Update local intake state so the new token is reflected immediately.
       if (intake) {
         setIntake({ ...intake, access_token: result.token, expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() });
@@ -292,6 +343,67 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
           Refresh
         </button>
       </div>
+
+      {/* Stage Pipeline — advances the campaign through the recovery machine.
+          Only valid next stages are enabled (RECOVERY_TRANSITIONS); the API
+          remains authoritative. Reaching outreach_dispatched auto-mints the
+          owner intake link. */}
+      {campaign && (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {campaign.business_name || campaign.display_id || 'Recovery Campaign'}
+              </h3>
+              <StageBadge stage={campaign.stage} size="sm" />
+            </div>
+            <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+              {campaign.category}{campaign.city ? ` · ${campaign.city}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {RECOVERY_STAGES.map((stage, idx) => {
+              const currentStage = campaign.stage as string;
+              const currentIdx = (RECOVERY_STAGES as readonly string[]).indexOf(currentStage);
+              const isPast = currentIdx >= 0 && idx < currentIdx;
+              const isCurrent = idx === currentIdx;
+              const isValidNext = (RECOVERY_TRANSITIONS[currentStage] ?? []).includes(stage);
+              return (
+                <div key={stage} className="flex items-center flex-shrink-0">
+                  <button
+                    onClick={() => handleStageTransition(stage)}
+                    disabled={transitioning || isCurrent || !isValidNext}
+                    title={
+                      isCurrent
+                        ? 'Current stage'
+                        : isValidNext
+                          ? `Transition to ${STAGE_LABELS[stage] ?? stage}`
+                          : 'Not a valid transition from the current stage'
+                    }
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      isCurrent
+                        ? 'bg-blue-600 text-white'
+                        : isValidNext
+                          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-neutral-700 dark:text-gray-200 dark:hover:bg-neutral-600 cursor-pointer'
+                          : isPast
+                            ? 'bg-blue-50 text-blue-400 dark:bg-blue-900/20 dark:text-blue-500 cursor-not-allowed'
+                            : 'bg-gray-50 text-gray-400 dark:bg-neutral-800 dark:text-neutral-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {STAGE_LABELS[stage] ?? stage}
+                  </button>
+                  {idx < RECOVERY_STAGES.length - 1 && (
+                    <ChevronRight className="w-4 h-4 text-gray-300 dark:text-neutral-600 mx-0.5" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            Only valid next stages are enabled. The owner intake link is minted automatically on Outreach Dispatched — or generate it manually below.
+          </p>
+        </div>
+      )}
 
       {/* Campaign Cycle banner — makes the recovery outreach model explicit */}
       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
@@ -462,7 +574,22 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-400 dark:text-gray-500">No intake submitted yet.</p>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-400 dark:text-gray-500">No intake link yet.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  The link is minted automatically when the campaign reaches Outreach Dispatched.
+                  Generate it now to share with the owner manually.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGenerateLink}
+                  disabled={generatingLink}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <Link2 className="w-4 h-4" />
+                  {generatingLink ? 'Generating…' : 'Generate Intake Link'}
+                </button>
+              </div>
             )}
           </div>
 

@@ -49,6 +49,9 @@ export interface MultiGalleryScreenshot {
   id: string;
   fileName: string;
   signedUrl: string | null;
+  /** Platform-fronted render path — stamped by the public route (the
+   *  service stays token-agnostic, so it is filled in post-assembly). */
+  imageUrl?: string | null;
   mimeType: string | null;
   fileSize: number | null;
   uploadedAt: Date;

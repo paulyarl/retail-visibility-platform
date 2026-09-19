@@ -31,6 +31,21 @@ export type CampaignStage =
 
 // Recovery Management stages run on the same stage column; literals are
 // app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
+// Kept as a separate union (not merged into CampaignStage) so exhaustive
+// Record<CampaignStage, …> maps elsewhere don't need recovery keys.
+export type RecoveryStage =
+  | 'audit_identified'
+  | 'framework_preview_generated'
+  | 'outreach_dispatched'
+  | 'awaiting_owner_intake'
+  | 'intake_submitted'
+  | 'final_resolution_drafted'
+  | 'owner_approved'
+  | 'resolved_and_closed';
+
+/** Any stage a business-scope campaign can occupy, on either pipeline. */
+export type PipelineStage = CampaignStage | RecoveryStage;
+
 export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management'
   // Migration 262 — city/category proving ground (spec §4.2)
   | 'proving_ground'
@@ -1840,7 +1855,10 @@ export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
 }
 
 export interface StageTransitionInput {
-  to_stage: CampaignStage;
+  // Recovery-pipeline stages are legal targets for recovery_management /
+  // escalated profile_repair campaigns — the API validates against the
+  // category-aware transition map.
+  to_stage: PipelineStage;
   notes?: string;
   trigger_type?: 'manual' | 'automated' | 'system';
   acknowledge_incomplete?: boolean;

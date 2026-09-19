@@ -29,6 +29,12 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Platform-fronted render URL — streams through the same-origin route
+  // handler so the browser never sees the raw Supabase signed URL, and the
+  // link works even when the rollout fallback returned no signed URLs.
+  const fileRenderUrl = (fileId: string, download = false) =>
+    `/api/admin/marketing-ops/${campaignId}/files/${fileId}/render${download ? '?download=1' : ''}`;
+
   // Generate modal state
   const [expiryDays, setExpiryDays] = useState(3);
   const [galleryTitle, setGalleryTitle] = useState('');
@@ -241,25 +247,19 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xs font-mono text-gray-400">#{idx + 1}</span>
-                  {s.signed_url ? (
-                    <a
-                      href={s.signed_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0"
-                      title="View full size"
-                    >
-                      <img
-                        src={s.signed_url}
-                        alt={s.file_name}
-                        className="h-12 w-12 rounded object-cover border border-gray-200 dark:border-neutral-600"
-                      />
-                    </a>
-                  ) : (
-                    <div className="h-12 w-12 flex-shrink-0 rounded bg-gray-200 dark:bg-neutral-600 flex items-center justify-center">
-                      <ImageIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                  )}
+                  <a
+                    href={fileRenderUrl(s.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0"
+                    title="View full size"
+                  >
+                    <img
+                      src={fileRenderUrl(s.id)}
+                      alt={s.file_name}
+                      className="h-12 w-12 rounded object-cover border border-gray-200 dark:border-neutral-600"
+                    />
+                  </a>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{s.file_name}</p>
                     <p className="text-xs text-gray-500">
@@ -272,26 +272,22 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
                   <span className="text-xs text-gray-400">
                     {s.uploaded_at ? new Date(s.uploaded_at).toLocaleDateString() : '—'}
                   </span>
-                  {s.signed_url && (
-                    <a
-                      href={s.signed_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
-                      title="View"
-                    >
-                      <ExternalLink className="h-4 w-4 text-gray-500" />
-                    </a>
-                  )}
-                  {s.download_url && (
-                    <a
-                      href={s.download_url}
-                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
-                      title="Download"
-                    >
-                      <Download className="h-4 w-4 text-gray-500" />
-                    </a>
-                  )}
+                  <a
+                    href={fileRenderUrl(s.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
+                    title="View"
+                  >
+                    <ExternalLink className="h-4 w-4 text-gray-500" />
+                  </a>
+                  <a
+                    href={fileRenderUrl(s.id, true)}
+                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
+                    title="Download"
+                  >
+                    <Download className="h-4 w-4 text-gray-500" />
+                  </a>
                 </div>
               </div>
             ))}

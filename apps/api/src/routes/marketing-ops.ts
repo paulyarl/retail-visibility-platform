@@ -2926,6 +2926,59 @@ router.get('/:campaignId/files/diagnostic-screenshots', async (req: any, res: Re
   }
 });
 
+/**
+ * GET /:campaignId/files/:fileId/render
+ *
+ * Platform-fronted render/download for a diagnostic screenshot. Streams the
+ * bytes from the private disputes bucket through the API so the admin UI can
+ * link to a platform URL instead of a raw Supabase signed URL. The web app's
+ * same-origin route handler proxies this with the operator's session, so the
+ * URL the browser sees stays on the platform domain.
+ *
+ * ?download=1 forces Content-Disposition: attachment.
+ */
+router.get('/:campaignId/files/:fileId/render', async (req: any, res: Response) => {
+  try {
+    const { campaignId, fileId } = req.params;
+    const file = await prisma.mkt_files_list.findFirst({
+      where: { id: fileId, campaign_id: campaignId, file_type: 'diagnostic_screenshot' },
+      select: { file_name: true, storage_path: true, mime_type: true },
+    });
+    if (!file) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'File not found' });
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const { StorageBuckets } = await import('../storage-config');
+    const supabaseUrl = unifiedConfig.supabaseUrl;
+    const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ success: false, error: 'storage_not_configured' });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data, error: downloadError } = await supabase.storage
+      .from(StorageBuckets.DISPUTES.name)
+      .download(file.storage_path);
+
+    if (downloadError || !data) {
+      logger.error('Diagnostic screenshot render failed', getCtx(req), { error: downloadError?.message, campaignId, fileId });
+      return res.status(502).json({ success: false, error: 'storage_download_failed', message: downloadError?.message || 'no data' });
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const isDownload = req.query.download === '1' || req.query.download === 'true';
+
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(file.file_name)}`);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(buffer);
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.delete('/files/:id', async (req: any, res: Response) => {
   try {
     await MarketingFileService.deleteFile(req.params.id, getCtx(req));
