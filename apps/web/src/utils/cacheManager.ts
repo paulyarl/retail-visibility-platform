@@ -202,13 +202,13 @@ class CacheManager {
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log(`[CacheManager] Successfully upgraded database to version ${version}`);
+        // console.log(`[CacheManager] Successfully upgraded database to version ${version}`);
       };
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(this.storeName)) {
-          console.log(`[CacheManager] Creating store '${this.storeName}' in database version ${version}`);
+          // console.log(`[CacheManager] Creating store '${this.storeName}' in database version ${version}`);
           db.createObjectStore(this.storeName);
         }
       };
@@ -404,7 +404,7 @@ class CacheManager {
         localStorage.removeItem(entriesWithTimestamp[i].key);
       }
 
-      console.log(`[CacheManager] Cleaned up ${toRemove} old localStorage cache entries`);
+      // console.log(`[CacheManager] Cleaned up ${toRemove} old localStorage cache entries`);
     } catch (error) {
       clientLogger.warn('[CacheManager] localStorage cleanup failed:', { detail: error });
     }
@@ -739,10 +739,10 @@ class CacheManager {
             }
             cursor.continue();
           } else {
-            console.log(`[CacheManager] 📊 IndexedDB scan complete: ${allKeys.length} total keys, ${keysToDelete.length} matching`);
-            console.log(`[CacheManager] 📋 All IndexedDB keys:`, allKeys.slice(0, 10)); // Show first 10 keys
+            // console.log(`[CacheManager] 📊 IndexedDB scan complete: ${allKeys.length} total keys, ${keysToDelete.length} matching`);
+            // console.log(`[CacheManager] 📋 All IndexedDB keys:`, allKeys.slice(0, 10)); // Show first 10 keys
             if (allKeys.length > 10) {
-              console.log(`[CacheManager] 📋 ... and ${allKeys.length - 10} more keys`);
+              // console.log(`[CacheManager] 📋 ... and ${allKeys.length - 10} more keys`);
             }
             resolve();
           }
@@ -751,13 +751,13 @@ class CacheManager {
       });
       
       if (keysToDelete.length > 0) {
-        console.log(`[CacheManager] 🗑️ Deleting ${keysToDelete.length} keys from IndexedDB in parallel...`);
+        // console.log(`[CacheManager] 🗑️ Deleting ${keysToDelete.length} keys from IndexedDB in parallel...`);
         // Delete matching keys in parallel for better performance
         const deletePromises = keysToDelete.map(key => this.remove(key));
         await Promise.all(deletePromises);
-        console.log(`[CacheManager] ✅ Successfully deleted ${keysToDelete.length} keys from IndexedDB`);
+        // console.log(`[CacheManager] ✅ Successfully deleted ${keysToDelete.length} keys from IndexedDB`);
       } else {
-        console.log(`[CacheManager] ℹ️ No keys to delete from IndexedDB`);
+        // console.log(`[CacheManager] ℹ️ No keys to delete from IndexedDB`);
       }
       
       removedCount = keysToDelete.length;
@@ -767,7 +767,7 @@ class CacheManager {
       throw error;
     }
     
-    console.log(`[CacheManager] 🏁 END IndexedDB pattern removal, removed: ${removedCount}`);
+    // console.log(`[CacheManager] 🏁 END IndexedDB pattern removal, removed: ${removedCount}`);
     return removedCount;
   }
 
