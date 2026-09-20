@@ -668,7 +668,7 @@ export class OutreachOpenerService extends BaseService {
     primaryAngle?: string | null;
     executedBy?: string;
     operatorName?: string;
-    sourceBriefing: 'triage' | 'issue_audit' | 'business_audit';
+    sourceBriefing: 'triage' | 'issue_audit' | 'business_audit' | 'website_audit';
     executionId?: string;
   }, ctx?: RequestCtx): Promise<OpenerResult> {
     const closeVariant = DEFAULT_CLOSE_VARIANT;

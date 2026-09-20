@@ -845,9 +845,9 @@ const scorecardUpdateSchema = z.object({
 });
 
 // ─── Playbook Catalog + Triage schemas (Sprint 3) ───────────────────────
-const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07']);
+const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07', 'PB-08']);
 const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'profile_repair', 'triage_management']);
-const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5', 'A6']);
+const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7']);
 
 // ─── Matching rules DSL schema (§6.4) ────────────────────────────────────
 // Structured validation for the any/all/none/dual set-membership DSL.
@@ -4083,7 +4083,7 @@ const openerFromBriefingSchema = z.object({
   opener_text: z.string().min(10, 'opener_text must be at least 10 characters'),
   primary_angle: z.string().max(500).optional(),
   operator_name: z.string().max(120).optional(),
-  source_briefing: z.enum(['triage', 'issue_audit', 'business_audit']),
+  source_briefing: z.enum(['triage', 'issue_audit', 'business_audit', 'website_audit']),
   execution_id: z.string().optional(),
 });
 

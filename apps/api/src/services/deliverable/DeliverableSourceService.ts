@@ -76,8 +76,19 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
     'CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT',
     'WC_URL_MISMATCH', 'DS_BROKEN_PROFILE_LINK',
   ],
-  seo_content: ['WC_MISSING_SERVICE_PAGES', 'WC_MISSING_WEBSITE', 'DS_MISSING_SERVICE_MENU'],
-  lead_magnet: ['WC_MISSING_CTA', 'WC_MOBILE_FRICTION', 'RA_LOW_REVIEW_VOLUME'],
+  seo_content: [
+    'WC_MISSING_SERVICE_PAGES', 'WC_MISSING_WEBSITE', 'DS_MISSING_SERVICE_MENU',
+    // PB-08 website gap (spec §8.3) — the positioning report is content-shaped.
+    'WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN', 'WC_PARKED_DOMAIN',
+    'WC_UNFINISHED_SITE', 'WC_UNSECURED_WEBSITE', 'WC_LEGACY_BUILDER_SITE',
+    'WC_STALE_WEBSITE', 'WC_POOR_SITE_QUALITY', 'WC_CATEGORY_MISMATCH',
+  ],
+  lead_magnet: [
+    'WC_MISSING_CTA', 'WC_MOBILE_FRICTION', 'RA_LOW_REVIEW_VOLUME',
+    // PB-08 — the "you need a web presence" teaser.
+    'WC_MISSING_WEBSITE', 'WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN',
+    'WC_UNSECURED_WEBSITE',
+  ],
   product_visibility_preview: [
     'DS_MISSING_PRODUCT_CATALOG', 'WC_MISSING_PRODUCT_BROWSING',
     'WC_MISSING_AVAILABILITY_INQUIRY', 'WC_MISSING_PICKUP_DELIVERY',
@@ -113,7 +124,7 @@ export class DeliverableSourceService extends BaseService {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
-        include: { mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } } },
+        include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
       });
       if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
@@ -213,7 +224,7 @@ export class DeliverableSourceService extends BaseService {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
-        include: { mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } } },
+        include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
       });
       if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 

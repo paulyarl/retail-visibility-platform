@@ -412,8 +412,12 @@ export class MarketingOutreachService extends BaseService {
    * fetch timestamp. Soft-fails to null snapshot if no audits exist.
    */
   async buildFreshSnapshot(campaignId: string, _ctx?: RequestCtx): Promise<FreshSnapshot> {
+    // G-2: platform-filtered — reads audit row columns (review_count/rating/
+    // claimed), which only business_analysis audits populate. An unfiltered
+    // newest-audit read would return zeros once a website_positioning audit
+    // exists.
     const latestAudit = await this.prisma.mkt_audits_list.findFirst({
-      where: { campaign_id: campaignId },
+      where: { campaign_id: campaignId, platform: 'business_analysis' },
       orderBy: { created_at: 'desc' },
     });
 

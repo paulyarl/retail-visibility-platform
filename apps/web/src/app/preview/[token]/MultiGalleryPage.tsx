@@ -46,6 +46,7 @@ const ARCHETYPE_COLORS: Record<string, string> = {
   A4: 'grape',
   A5: 'teal',
   A6: 'indigo',
+  A7: 'cyan',
 };
 
 export default function MultiGalleryPage() {

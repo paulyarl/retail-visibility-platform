@@ -25,6 +25,7 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A4: 'Conversion / CTA Gap',
   A5: 'Multi-Signal Footprint',
   A6: 'Product Visibility Gap',
+  A7: 'Website Gap',
 };
 
 const CLOSE_VARIANT_LABELS: Record<CloseVariant, { label: string; hint: string }> = {

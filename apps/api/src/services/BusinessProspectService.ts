@@ -72,7 +72,8 @@ const ARCHETYPE_PRIORITY: Record<ArchetypeCodeWithA6, number> = {
   A6: 3, // Product visibility
   A3: 4, // Listing drift
   A4: 5, // CTA gap
-  A5: 6, // Dual/triage (bundle)
+  A7: 6, // Website gap
+  A5: 7, // Dual/triage (bundle)
 };
 
 // ─── Service ─────────────────────────────────────────────────────────────

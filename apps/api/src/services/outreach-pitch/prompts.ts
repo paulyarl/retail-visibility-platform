@@ -63,6 +63,27 @@ is quiet, specific, and useful. You are not a vendor. You are someone who did
 the homework for them.`;
 
 /**
+ * Persona preamble for A7 (Website Gap) campaigns. The auditor went looking
+ * for the business's website and found no owned, usable one — a social page,
+ * a free builder subdomain, a parked/unfinished domain, or a dead link.
+ * Leading with "reviews are going unanswered" would be wrong; there is no
+ * site to fix.
+ */
+const PERSONA_PREAMBLE_A7 = `You are a local-business visibility auditor. You went looking for this
+business's website and found there isn't a real one — either no site at
+all, a Facebook or Instagram page standing in for a website, a free builder
+page on someone else's subdomain, or a link that no longer loads. The
+business may have loyal regulars who walk in every week — but anyone
+searching for it online has nothing to land on that looks like it belongs
+to them.
+
+You're reaching out cold to the small business owner. The goal: prove you
+actually went looking, name the specific state you found in plain language,
+and offer a concrete deliverable — a web-presence report and a homepage
+mockup — not a sales pitch. The tone is quiet, specific, and useful. You
+are not a vendor. You are someone who did the homework for them.`;
+
+/**
  * Shared NAP context note — mirrors the one in outreach-openers/archetype-prompts.ts.
  * Tells the AI that city/state/phone/website_url are available for business
  * identification and cross-referencing public data, but must NOT be dumped
@@ -120,6 +141,24 @@ discoverability problem, not a review or booking problem.
 
 Output the subject line only — no preamble, no quotes, no explanation.`;
 
+// ─── Header (Subject Line) — A7 Website Gap ──────────────────────────────
+
+const HEADER_PROMPT_A7 = `${PERSONA_PREAMBLE_A7}
+
+Write the subject line for this cold first-touch outreach.
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write one subject line, 4–60 characters, that names the business and
+references the web-presence gap — no website, a social page used as the
+website, a free subdomain, or a dead link. No pricing, no jargon, no
+exclamation points, no emojis. Specificity over cleverness. Do NOT
+reference reviews or booking — this is a web-presence problem.
+
+Output the subject line only — no preamble, no quotes, no explanation.`;
+
 // ─── Closer ──────────────────────────────────────────────────────────────
 
 const CLOSER_PROMPT = `${PERSONA_PREAMBLE}
@@ -158,6 +197,26 @@ the remaining {{remaining}} sections are ready to deliver today." Vary the
 phrasing but keep the itch — the owner should feel that more evidence is
 one reply away. No pricing, no exclamation points, no emojis. Do NOT
 reference reviews or booking.
+
+Output the closer only — no preamble, no signoff, no explanation.`;
+
+// ─── Closer — A7 Website Gap ─────────────────────────────────────────────
+
+const CLOSER_PROMPT_A7 = `${PERSONA_PREAMBLE_A7}
+
+Write the closer line for this cold first-touch outreach pitch. The closer
+creates the itch — it tells the owner that more proof exists beyond the 3
+previews shown (the web-presence report, the homepage mockup, the build plan).
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write one closer line, ≤25 words, that conveys "the full website build
+plan — the positioning report and the remaining {{remaining}} sections — is
+ready to deliver today." Vary the phrasing but keep the itch — the owner
+should feel that more evidence is one reply away. No pricing, no exclamation
+points, no emojis. Do NOT reference reviews or booking.
 
 Output the closer only — no preamble, no signoff, no explanation.`;
 
@@ -238,6 +297,25 @@ booking — this is a product discoverability problem.
 
 Output the fix only — no preamble, no explanation.`;
 
+const WEBSITE_BUILD_FIX_PROMPT = `You are drafting a concrete web-presence fix for a small business. The
+operator pasted the current state (no website, a social page used as the
+website, a free builder subdomain, or a dead link); you produce the specific
+fix — the corresponding page or feature of the proposed website build that
+closes that gap. Tone: {{tone}}.
+
+Current state:
+{{evidence_text}}
+
+Business name: {{business_name}}
+
+Task: Write the proposed fix, ≤80 words. Name the exact change (the real
+site under the business's own domain, the homepage, the page the gap needs),
+what it lets the customer do that they couldn't before, and confirm it's
+ready to deliver. No exclamation points, no emojis, no pricing. Do NOT
+reference reviews or booking — this is a web-presence problem.
+
+Output the fix only — no preamble, no explanation.`;
+
 // ─── Builders ────────────────────────────────────────────────────────────
 
 /**
@@ -250,7 +328,8 @@ export function buildHeaderPrompt(extractedFieldsJson: string): string {
 
 /**
  * Sprint 2 (§5.6): Build the resolved header prompt for a specific archetype.
- * A6 → product-visibility header; A1–A5 or unknown → review-management header.
+ * A6 → product-visibility header; A7 → website-gap header; A1–A5 or unknown
+ * → review-management header.
  */
 export function buildHeaderPromptForArchetype(
   archetype: string,
@@ -258,6 +337,9 @@ export function buildHeaderPromptForArchetype(
 ): string {
   if (archetype === 'A6') {
     return HEADER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson);
+  }
+  if (archetype === 'A7') {
+    return HEADER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson);
   }
   return buildHeaderPrompt(extractedFieldsJson);
 }
@@ -283,6 +365,10 @@ export function buildCloserPromptForArchetype(
 ): string {
   if (archetype === 'A6') {
     return CLOSER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson)
+      .replace('{{remaining}}', String(remaining));
+  }
+  if (archetype === 'A7') {
+    return CLOSER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson)
       .replace('{{remaining}}', String(remaining));
   }
   return buildCloserPrompt(extractedFieldsJson, remaining);
@@ -335,6 +421,12 @@ export function buildPreviewSlotPrompt(
   }
   if (archetype === 'A6') {
     return PRODUCT_VISIBILITY_FIX_PROMPT
+      .replace('{{evidence_text}}', evidenceText)
+      .replace('{{business_name}}', businessName)
+      .replace('{{tone}}', toneStr);
+  }
+  if (archetype === 'A7') {
+    return WEBSITE_BUILD_FIX_PROMPT
       .replace('{{evidence_text}}', evidenceText)
       .replace('{{business_name}}', businessName)
       .replace('{{tone}}', toneStr);

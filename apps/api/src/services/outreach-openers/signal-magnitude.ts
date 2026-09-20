@@ -26,6 +26,7 @@
 import type { BusinessAnalysisAuditData } from './archetype-selection';
 import type { ArchetypeCode } from './archetype-selection';
 import { signalLabel, type SignalCode } from '../triage/signal-taxonomy';
+import { isSocialPlatformHost, isBuilderSubdomainHost } from '../triage/website-host-classification';
 
 // ─── Severity tiers ──────────────────────────────────────────────────────
 
@@ -95,6 +96,19 @@ const DEFAULT_SEVERITY: Record<string, SignalSeverity> = {
   VP_MISSING_PRODUCT_PHOTOS: 'material',
   VP_MISSING_STOREFRONT_PHOTOS: 'material',
   CP_MISSING_CONTACT_INFO: 'material',
+
+  // Website gap / positioning (PB-08 / A7)
+  // Absence-class: a pitchable gap, not a crisis — the business still has GBP.
+  WC_THIRD_PARTY_DOMAIN: 'material',
+  WC_BUILDER_SUBDOMAIN: 'material',
+  WC_PARKED_DOMAIN: 'material',
+  WC_UNFINISHED_SITE: 'material',
+  // Defect-class: a real site exists but is deficient.
+  WC_UNSECURED_WEBSITE: 'material',
+  WC_LEGACY_BUILDER_SITE: 'borderline',
+  WC_STALE_WEBSITE: 'material',
+  WC_POOR_SITE_QUALITY: 'material',
+  WC_CATEGORY_MISMATCH: 'material',
 
   // Cosmetic / Borderline — formatting, minor gaps, less urgent
   RA_LOW_REVIEW_VOLUME: 'borderline',
@@ -320,6 +334,26 @@ export function computePrimarySignalSeverity(
       // exists but no product browsing
       const hasWebsite = !!auditData.website?.url || auditData.website?.status === 'working';
       return hasWebsite ? 'material' : 'crisis';
+    }
+
+    case 'A7': {
+      // Website gap — crisis for no presence / third-party-only / broken,
+      // material for builder subdomain / parked / unfinished, else borderline.
+      const w = auditData.website;
+      const status = w?.status?.toLowerCase();
+      const absent = !w || (!w.url && (status === 'none_found' || status === 'unable_to_verify'));
+      if (absent) return 'crisis';
+      if (status === 'social_media_only' || isSocialPlatformHost(w?.url)) return 'crisis';
+      if (status === 'broken') return 'crisis';
+      if (isBuilderSubdomainHost(w?.url)) return 'material';
+      // Parked / unfinished are model-emitted only (no raw field) — read them
+      // off detected_signals when present.
+      const detected = (auditData as any)?.detected_signals;
+      if (Array.isArray(detected) &&
+        (detected.includes('WC_PARKED_DOMAIN') || detected.includes('WC_UNFINISHED_SITE'))) {
+        return 'material';
+      }
+      return 'borderline';
     }
   }
 }

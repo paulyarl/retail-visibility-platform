@@ -15,7 +15,7 @@ import type { SignalCode } from './signal-taxonomy';
 
 // ─── Playbook codes & categories ─────────────────────────────────────────
 
-export const PLAYBOOK_CODES = ['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07'] as const;
+export const PLAYBOOK_CODES = ['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07', 'PB-08'] as const;
 export type PlaybookCode = (typeof PLAYBOOK_CODES)[number];
 
 export const PLAYBOOK_CATEGORIES = [
@@ -26,9 +26,12 @@ export const PLAYBOOK_CATEGORIES = [
 ] as const;
 export type PlaybookCategory = (typeof PLAYBOOK_CATEGORIES)[number];
 
-// ─── Archetype (extended with A5 + A6) ───────────────────────────────────
-
-export type ArchetypeCodeWithA6 = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6';
+// ─── Archetype (extended with A5 + A6 + A7) ─────────────────────────────
+//
+// NOTE: the name is historical — the union is the full archetype set. The
+// `outreach-openers/archetype-selection.ts` `ArchetypeCode` union is the
+// parallel definition and must stay in lockstep (A7 = website gap).
+export type ArchetypeCodeWithA6 = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
 
 /** @deprecated use ArchetypeCodeWithA6 — kept for backward-compat with existing importers. */
 export type ArchetypeCodeWithA5 = ArchetypeCodeWithA6;
@@ -40,6 +43,7 @@ export const ARCHETYPE_LABELS: Record<ArchetypeCodeWithA6, string> = {
   A4: 'A4_CTA_GAP',
   A5: 'A5_DUAL_TRIAGE',
   A6: 'A6_PRODUCT_VISIBILITY_GAP',
+  A7: 'A7_WEBSITE_GAP',
 };
 
 // ─── Rules DSL (§6.4) ────────────────────────────────────────────────────

@@ -502,8 +502,79 @@ exclamation points, emojis, "just checking in", introducing new data.
 
 Output the follow-up only.`;
 
-// ─── Template registry ──────────────────────────────────────────────────
+// ─── A7: Website Gap ────────────────────────────────────────────────────
+//
+// Follow-up for businesses with no owned, usable website. 'doing' leads with
+// any change in web presence (a page went live, a domain got registered, the
+// dead link came back); 'telling' reminds the prospect of the web-presence
+// report + homepage mockup.
 
+const DOING_TEMPLATE_A7 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Data diff (what changed since the opener):
+{{data_diff}}
+
+Task: Write the follow-up, ~70 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Since the snapshot last week —"
+
+3. New proof (USE THE DATA DIFF):
+   - If a page went live: "noticed a page is up now — though it still
+     isn't a site customers can find under your own name."
+   - If the dead link is still dead: "the website link is still hitting a
+     dead page — anyone clicking through is still landing on nothing."
+   - If nothing changed: "the web-presence gap is still there — customers
+     still can't find a real site for you."
+   - Do NOT stack numbers. Lead with the single most relevant change.
+
+4. One line: "Updated the web-presence report and homepage mockup — new previews attached."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "reviews," "responses," "online booking," "scheduling,"
+"service menu," stacking stats, repeating the opener's hook verbatim,
+pricing/tier jargon, exclamation points, emojis.
+
+Output the follow-up only.`;
+
+const TELLING_TEMPLATE_A7 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write the follow-up, ~60 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Following up on the visibility snapshot from
+   last week —"
+
+3. Reminder:
+   "the three previews are still there — the web-presence report, the
+   homepage mockup, and the plan to get you a real site."
+
+4. Soft re-engagement: "Happy to walk through any of them if useful."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "reviews," "responses," "online booking," "scheduling,"
+"service menu," repeating the opener's hook, pricing/tier jargon,
+exclamation points, emojis, "just checking in", introducing new data.
+
+Output the follow-up only.`;
+
+// ─── Template registry ──────────────────────────────────────────────────
 const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = {
   A1: { doing: DOING_TEMPLATE_A1, telling: TELLING_TEMPLATE_A1 },
   A2: { doing: DOING_TEMPLATE_A2, telling: TELLING_TEMPLATE_A2 },
@@ -511,4 +582,5 @@ const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = 
   A4: { doing: DOING_TEMPLATE_A4, telling: TELLING_TEMPLATE_A4 },
   A5: { doing: DOING_TEMPLATE_A5, telling: TELLING_TEMPLATE_A5 },
   A6: { doing: DOING_TEMPLATE_A6, telling: TELLING_TEMPLATE_A6 },
+  A7: { doing: DOING_TEMPLATE_A7, telling: TELLING_TEMPLATE_A7 },
 };

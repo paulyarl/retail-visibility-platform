@@ -78,7 +78,7 @@ export class RecoveryResolutionService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
           mkt_dispute_intake: { include: { mkt_dispute_attachments: true } },
         },
       });
@@ -753,7 +753,7 @@ export class RecoveryResolutionService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
           mkt_dispute_intake: { include: { mkt_dispute_attachments: true } },
         },
       });

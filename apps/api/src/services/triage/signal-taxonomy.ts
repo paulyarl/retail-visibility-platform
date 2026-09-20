@@ -7,7 +7,7 @@
  * Registry-backed: at runtime, the active signals are loaded from
  * `mkt_signal_registry` (with a short-lived cache + invalidation on registry
  * writes) so new codes registered by admins are live without a deploy. The TS
- * union + fallback constants below seed/validate the 24 known codes; the DB
+ * union + fallback constants below seed/validate the known codes; the DB
  * registry is the runtime source of truth.
  *
  * Spec: docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md
@@ -28,7 +28,7 @@ export const FAMILY_LABELS: Record<SignalFamily, string> = {
   OX: 'Outreach Execution',
 };
 
-// ─── Canonical 39 signal codes (TS fallback / validation set) ────────────
+// ─── Canonical signal codes (TS fallback / validation set) ───────────────
 //
 // The DB registry (`mkt_signal_registry`) is the runtime source of truth.
 // This union exists so the extractor, engine, and tests have compile-time
@@ -63,6 +63,17 @@ export const KNOWN_SIGNAL_CODES = [
   'WC_MISSING_AVAILABILITY_INQUIRY',
   'WC_MISSING_PICKUP_DELIVERY',
   'WC_MOBILE_FRICTION',
+  // Website gap / positioning (PB-08 / A7) — absence-class
+  'WC_THIRD_PARTY_DOMAIN',
+  'WC_BUILDER_SUBDOMAIN',
+  'WC_PARKED_DOMAIN',
+  'WC_UNFINISHED_SITE',
+  // Website gap / positioning (PB-08 / A7) — defect-class (repair semantics)
+  'WC_UNSECURED_WEBSITE',
+  'WC_LEGACY_BUILDER_SITE',
+  'WC_STALE_WEBSITE',
+  'WC_POOR_SITE_QUALITY',
+  'WC_CATEGORY_MISMATCH',
   // Cross-Platform Consistency (CP)
   'CP_NAP_NAME_DRIFT',
   'CP_NAP_ADDRESS_DRIFT',
@@ -87,7 +98,7 @@ export const KNOWN_SIGNAL_CODES = [
 ] as const;
 
 /**
- * SignalCode is a branded string. The 24 known codes are in the union for
+ * SignalCode is a branded string. The known codes are in the union for
  * compile-time safety; unknown admin-registered codes are valid too (the
  * `string` fallback). Use `isKnownSignalCode()` to distinguish.
  */
@@ -103,7 +114,7 @@ export type DetectionSource = (typeof DETECTION_SOURCES)[number];
 // Operate on the code prefix. These are used by the engine's reasoning
 // builder and the UI's signal grouping. The registry's `family` column is
 // the authoritative source at runtime; these predicates are a fast
-// prefix-based fallback for the 24 known codes.
+// prefix-based fallback for the known codes.
 
 export function signalFamily(code: SignalCode): SignalFamily | null {
   const prefix = code.split('_')[0];
@@ -118,10 +129,21 @@ export function isRepairSignal(code: SignalCode): boolean {
   // DS_BROKEN_PROFILE_LINK, DS_OUTDATED_HOLIDAY_HOURS (hours drift is
   // repair-class — a missing special-hours schedule is a listing defect).
   // These are the "groupA" signals for PB-05 dual.
+  //
+  // PB-08 defect-class website codes (a real owned site exists but is
+  // deficient) are repair-class too — same treatment as WC_BROKEN_WEBSITE.
+  // The absence-class codes (WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN,
+  // WC_PARKED_DOMAIN, WC_UNFINISHED_SITE) are deliberately NOT repair-class,
+  // mirroring WC_MISSING_WEBSITE.
   if (code.startsWith('CP_')) return true;
   return (
     code === 'WC_URL_MISMATCH' ||
     code === 'WC_BROKEN_WEBSITE' ||
+    code === 'WC_UNSECURED_WEBSITE' ||
+    code === 'WC_LEGACY_BUILDER_SITE' ||
+    code === 'WC_STALE_WEBSITE' ||
+    code === 'WC_POOR_SITE_QUALITY' ||
+    code === 'WC_CATEGORY_MISMATCH' ||
     code === 'DS_BROKEN_PROFILE_LINK' ||
     code === 'DS_OUTDATED_HOLIDAY_HOURS'
   );
@@ -257,6 +279,15 @@ export const SIGNAL_LABELS: Record<string, string> = {
   WC_MISSING_AVAILABILITY_INQUIRY: 'Missing Availability Inquiry',
   WC_MISSING_PICKUP_DELIVERY: 'Missing Pickup/Delivery Pathway',
   WC_MOBILE_FRICTION: 'Mobile Friction',
+  WC_THIRD_PARTY_DOMAIN: 'Website Is a Third-Party/Social Page',
+  WC_BUILDER_SUBDOMAIN: 'Website on a Free Builder Subdomain',
+  WC_PARKED_DOMAIN: 'Parked / For-Sale Domain',
+  WC_UNFINISHED_SITE: 'Unfinished "Coming Soon" Site',
+  WC_UNSECURED_WEBSITE: 'Unsecured Website (HTTP / bad certificate)',
+  WC_LEGACY_BUILDER_SITE: 'Legacy / Low-Cost Builder Site',
+  WC_STALE_WEBSITE: 'Stale Website Content',
+  WC_POOR_SITE_QUALITY: 'Poor Website Quality',
+  WC_CATEGORY_MISMATCH: 'Website Content Category Mismatch',
   CP_NAP_NAME_DRIFT: 'NAP Name Drift',
   CP_NAP_ADDRESS_DRIFT: 'NAP Address Drift',
   CP_NAP_PHONE_DRIFT: 'NAP Phone Drift',

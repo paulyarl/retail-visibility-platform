@@ -74,14 +74,14 @@ function baseAudit(overrides: Partial<BusinessAnalysisAuditData> = {}): Business
 // ─── A6 selection ────────────────────────────────────────────────────────
 
 describe('Sprint 1 — selectArchetype: A6 Product Visibility Gap', () => {
-  it('selects A6 for product business with no website', () => {
+  it('routes a product business with no website to A7 (A6 split — PB-08)', () => {
     const audit = baseAudit({
       business_type: 'product',
       website: undefined,
     });
     const sel = selectArchetype(audit);
-    expect(sel.archetype).toBe('A6');
-    expect(sel.reason).toContain('product visibility gap');
+    expect(sel.archetype).toBe('A7');
+    expect(sel.reason).toContain('website gap');
   });
 
   it('selects A6 for hybrid business with website but no product browsing', () => {
@@ -152,17 +152,17 @@ describe('Sprint 1 — A6 priority: A2 > A1 > A6 > A3 > A4', () => {
     expect(sel.archetype).toBe('A1');
   });
 
-  it('A6 beats A3: product gap wins over listing drift', () => {
+  it('A3 beats A7: listing drift outranks a website gap (PB-08 rank 7)', () => {
     const audit = baseAudit({
       business_type: 'product',
-      website: undefined, // triggers A6
+      website: undefined, // a website gap — now A7, which sits below A3
       nap_consistency: {
         overall_status: 'minor_variations',
         name_variations: ['Indy African Market', 'Indy African Market LLC'],
       },
     });
     const sel = selectArchetype(audit);
-    expect(sel.archetype).toBe('A6');
+    expect(sel.archetype).toBe('A3');
   });
 
   it('A6 beats A4: product gap wins over CTA gap', () => {

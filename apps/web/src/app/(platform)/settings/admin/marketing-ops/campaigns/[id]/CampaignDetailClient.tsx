@@ -18,6 +18,7 @@ import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalys
 import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCategoryAnalysisAuditCard';
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
+import WebsitePositioningAuditCard from '@/components/marketing-ops/WebsitePositioningAuditCard';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import EnrichmentAuditCard from '@/components/marketing-ops/EnrichmentAuditCard';
 import CategoryIdentificationAuditCard from '@/components/marketing-ops/CategoryIdentificationAuditCard';
@@ -1501,6 +1502,19 @@ export default function CampaignDetailClient({
                 {repairExecution && (
                   <RepairBriefingCard execution={repairExecution} campaignId={campaignId} />
                 )}
+                {/* Website Positioning Briefing — the PB-08 / A7 audit rendered
+                    as a briefing (presence verdict, conversion-framed issues,
+                    recommended build, outreach ammunition). Reuses the same
+                    card as the Audits tab so both surfaces read identically.
+                    Only renders when a website_positioning audit exists. */}
+                {(() => {
+                  const websiteAudit = (campaign.audits ?? []).find(
+                    (a: Audit) => a.platform === 'website_positioning' && a.audit_data,
+                  );
+                  return websiteAudit ? (
+                    <WebsitePositioningAuditCard audit={websiteAudit} campaignId={campaignId} />
+                  ) : null;
+                })()}
                 {/* Repair Execution Card — Track A package configuration +
                     per-platform verification tracking (W2/W7). Only renders
                     for profile_repair campaigns. */}
@@ -2003,6 +2017,8 @@ export default function CampaignDetailClient({
                         </div>
                       ) : audit.platform === 'business_analysis' && audit.audit_data ? (
                         <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} />
+                      ) : audit.platform === 'website_positioning' && audit.audit_data ? (
+                        <WebsitePositioningAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'city_analysis' && audit.audit_data ? (
                         <CityAnalysisAuditCard key={audit.id} audit={audit} />
                       ) : audit.platform === 'intelligence_discovery' && audit.audit_data ? (

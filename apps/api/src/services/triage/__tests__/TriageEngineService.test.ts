@@ -506,9 +506,10 @@ describe('signal taxonomy — family predicates', () => {
 // ─── Signal taxonomy: known codes + labels ───────────────────────────────
 
 describe('signal taxonomy — known codes + labels', () => {
-  it('KNOWN_SIGNAL_CODES has 39 codes across 6 families', () => {
-    // 24 original + 7 sprint-1 product-visibility + 6 OX outreach-state = 37
-    expect(KNOWN_SIGNAL_CODES.length).toBe(39);
+  it('KNOWN_SIGNAL_CODES has 48 codes across 6 families', () => {
+    // 24 original + 7 sprint-1 product-visibility + 6 OX outreach-state
+    // + 2 QR + 9 PB-08 website-gap (WC_*) = 48
+    expect(KNOWN_SIGNAL_CODES.length).toBe(48);
     const families = new Set(KNOWN_SIGNAL_CODES.map((c) => c.split('_')[0]));
     expect(families.size).toBe(6);
     expect(Array.from(families).sort()).toEqual(['CP', 'DS', 'OX', 'RA', 'VP', 'WC']);

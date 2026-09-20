@@ -9,7 +9,7 @@
  *   - runCloserQualityGate  — closer checks (must contain a number, ≤25 words,
  *     archetype-aware itch keyword reference, no emoji/exclamation)
  *
- * Both gates accept an optional `archetype` param ('A1'–'A6'). When provided,
+ * Both gates accept an optional `archetype` param ('A1'–'A7'). When provided,
  * the "must reference the pain" check uses per-archetype itch keywords
  * instead of the legacy hardcoded "responses"/"replies" regex, so a
  * product-visibility (A6) closer that says "visibility plan" passes, while a
@@ -81,6 +81,12 @@ const ARCHETYPE_KEYWORDS: Record<string, ArchetypeKeywords> = {
     itchLabel: '"photos", "catalog", "visibility", "products", or "store"',
     offTopic: [/\breviews?\b/i, /\bbooking\b/i, /\breservations?\b/i],
     offTopicLabel: 'reviews or booking (this is a product-discoverability archetype, not a review or booking problem)',
+  },
+  A7: {
+    itch: [/\bwebsite\b/i, /\bsite\b/i, /\bdomain\b/i, /\bweb presence\b/i, /\bonline\b/i, /\bmockup\b/i, /\bpage\b/i],
+    itchLabel: '"website", "site", "domain", "web presence", "online", "mockup", or "page"',
+    offTopic: [/\breviews?\b/i, /\breplies?\b/i],
+    offTopicLabel: 'reviews (this is a web-presence archetype, not a review problem)',
   },
 };
 

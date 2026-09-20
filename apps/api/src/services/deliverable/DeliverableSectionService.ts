@@ -23,6 +23,9 @@ import {
   buildAvailabilityInquiryFlowPrompt,
   buildFulfillmentPathwayPrompt,
   buildHoursSyncPlanPrompt,
+  buildPositioningReportPrompt,
+  buildHomepageMockupPrompt,
+  buildDomainMigrationPlanPrompt,
 } from './prompts';
 import type { OwnerVoiceFields } from './prompts';
 import OwnerVoiceService from './OwnerVoiceService';
@@ -55,7 +58,11 @@ export type SectionType =
   | 'gbp_photo_optimization'
   | 'availability_inquiry_flow'
   | 'fulfillment_pathway'
-  | 'hours_sync_plan';
+  | 'hours_sync_plan'
+  // PB-08 — website-gap sections (A7):
+  | 'positioning_report'
+  | 'homepage_mockup'
+  | 'domain_migration_plan';
 
 export class DeliverableSectionService extends BaseService {
   private static instance: DeliverableSectionService;
@@ -96,10 +103,41 @@ export class DeliverableSectionService extends BaseService {
   //   A5    → existing sections + hours_sync_plan (product/hybrid only)
   //   A6    → mobile_catalog_preview + gbp_photo_optimization +
   //           availability_inquiry_flow + fulfillment_pathway + hours_sync_plan
+  //   A7    → positioning_report + homepage_mockup + domain_migration_plan
   //
   // The A3/A4/A5 additions are conditional on business type, so service-
   // business deliverables are byte-identical to pre-Sprint-2 behavior.
   // ====================
+
+  /**
+   * Describe the current web presence for A7 section prompts, from the
+   * business audit's website block + any model-emitted signals. Pure.
+   */
+  private describeWebPresence(auditData: any): { presenceState: string; gapFindings: string } {
+    const w = auditData?.website;
+    const status = w?.status?.toLowerCase();
+    const detected: string[] = Array.isArray(auditData?.detected_signals) ? auditData.detected_signals : [];
+    let presenceState = 'No owned website detected';
+    if (w?.url && status !== 'none_found') {
+      if (status === 'social_media_only') presenceState = `A social page is standing in for the website (${w.url})`;
+      else if (status === 'broken') presenceState = `The website link is dead (${w.url})`;
+      else if (detected.includes('WC_PARKED_DOMAIN')) presenceState = 'The domain is parked / not a live site';
+      else if (detected.includes('WC_UNFINISHED_SITE')) presenceState = 'The site is unfinished (coming-soon page)';
+      else if (detected.includes('WC_BUILDER_SUBDOMAIN')) presenceState = `The site is on a free builder subdomain (${w.url})`;
+      else presenceState = `A site exists at ${w.url}`;
+    }
+    const gapFindings = detected.filter((c) => c.startsWith('WC_')).join(', ');
+    return { presenceState, gapFindings };
+  }
+
+  /** Derive a must-have page list for the A7 homepage mockup prompt. */
+  private mustHavePages(auditData: any): string {
+    const type = auditData?.business_type;
+    if (type === 'product' || type === 'hybrid') {
+      return 'Home, Product Categories, Availability/Inquiry, Hours & Location, About, Contact';
+    }
+    return 'Home, Services, About, Hours & Location, Contact';
+  }
 
   async generateAllSections(campaignId: string, ctx?: RequestCtx): Promise<{ generated: string[]; errors: string[] }> {
     try {
@@ -151,6 +189,25 @@ export class DeliverableSectionService extends BaseService {
           }
         }
         logger.info('A6 deliverable sections generated', ctx, { campaignId, archetype, generated, errors: errors.length });
+        return { generated, errors };
+      }
+
+      // ─── A7: Website Gap — positioning report + homepage mockup + domain plan ─
+      if (archetype === 'A7') {
+        const a7Sections: SectionType[] = [
+          'positioning_report',
+          'homepage_mockup',
+          'domain_migration_plan',
+        ];
+        for (const sectionType of a7Sections) {
+          try {
+            await this.generateSection(campaignId, sectionType, ctx);
+            generated.push(sectionType);
+          } catch (e) {
+            errors.push(`${sectionType}: ${(e as Error).message}`);
+          }
+        }
+        logger.info('A7 deliverable sections generated', ctx, { campaignId, archetype, generated, errors: errors.length });
         return { generated, errors };
       }
 
@@ -365,6 +422,33 @@ export class DeliverableSectionService extends BaseService {
           );
           title = 'Hours Sync Plan';
           sectionIndex = 800;
+          break;
+        }
+
+        // ─── PB-08: Website-gap sections (A7) ──────────────────────────
+
+        case 'positioning_report': {
+          const { presenceState, gapFindings } = this.describeWebPresence(auditData);
+          prompt = buildPositioningReportPrompt(businessCtx, presenceState, gapFindings);
+          title = 'Web Presence Report';
+          sectionIndex = 900;
+          break;
+        }
+
+        case 'homepage_mockup': {
+          const { presenceState } = this.describeWebPresence(auditData);
+          const mustHave = this.mustHavePages(auditData);
+          prompt = buildHomepageMockupPrompt(businessCtx, presenceState, mustHave);
+          title = 'Homepage Mockup';
+          sectionIndex = 910;
+          break;
+        }
+
+        case 'domain_migration_plan': {
+          const { presenceState } = this.describeWebPresence(auditData);
+          prompt = buildDomainMigrationPlanPrompt(businessCtx, presenceState);
+          title = 'Domain Migration Plan';
+          sectionIndex = 920;
           break;
         }
 

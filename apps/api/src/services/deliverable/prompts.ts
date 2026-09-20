@@ -511,3 +511,114 @@ export function buildHoursSyncPlanPrompt(
     .replace('{{special_hours_status}}', specialHoursStatus || 'Not present on GBP')
     .replace('{{business_type}}', businessType || 'Unknown');
 }
+
+// ─── Website Gap (A7 — PB-08) ────────────────────────────────────────────
+
+const POSITIONING_REPORT_PROMPT = `You are preparing a web-presence positioning report for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Current web-presence state: {{presence_state}}
+Known website-gap findings: {{gap_findings}}
+
+Task: Write the positioning report the owner reads first. Cover:
+
+## Where You Stand Today
+[In plain language, describe the current web presence — no site, a social page standing in, a free subdomain, or a dead link — and what a customer experiences when they search for the business.]
+
+## What Customers Expect From a {{business_category}} Site
+[Benchmark against what a category-leading site must contain: the pages, the proof, the actions a customer should be able to take (menu/booking for restaurants, service pages + quote form for contractors, product browsing + hours for retailers).]
+
+## The Conversion Cost
+[One or two concrete consequences: "customers can't see your menu, so they call or leave", "the 2019 copyright makes people question whether you're still open".]
+
+## What We'll Build
+[A short scope summary: the pages and features the new site will have.]
+
+Keep it specific to this business and category. No pricing.
+
+Output as structured text.`;
+
+const HOMEPAGE_MOCKUP_PROMPT = `You are preparing a homepage mockup description for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Current web-presence state: {{presence_state}}
+Must-have pages: {{must_have_pages}}
+
+Task: Describe the proposed homepage in enough detail that the owner can picture it. Cover:
+
+## Above the Fold
+[Business name, one-line positioning, the single primary action (call / book / browse / order), hours or "open now" cue, city.]
+
+## The Sections, In Order
+[Each section: what it shows, why it earns its place for this category. Use the must-have pages as the anchor.]
+
+## What Makes It Look Like *This* Business
+[Category-specific trust signals: menu, service areas, product categories, project photos, testimonials, cultural/community context where relevant.]
+
+## What We Deliberately Left Out
+[What a generic template would include that this business doesn't need — keeps the build focused.]
+
+Output as structured text.`;
+
+const DOMAIN_MIGRATION_PLAN_PROMPT = `You are preparing a domain migration plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Current web-presence state: {{presence_state}}
+
+Task: Write the plan to move the business onto an owned domain and point every profile at it. Cover:
+
+## Domain
+[Recommend a domain pattern based on the business name and city. Note whether the business already owns one, and the check to run before buying.]
+
+## Build & Launch
+[The sequence: build the site on the new domain, verify it loads fast on mobile, then cut over.]
+
+## Point Every Profile At It
+[Checklist: Google Business Profile, Yelp, Facebook/Instagram, Apple Maps, Bing Places — replace the social page or free subdomain URL with the canonical domain on each.]
+
+## Redirects & Don't-Break-Anything
+[Keep the old links working, update email signatures and print materials, keep the social page alive as a secondary channel.]
+
+Keep it practical — the owner should be able to work through this in one sitting.
+
+Output as structured text.`;
+
+export function buildPositioningReportPrompt(
+  ctx: BusinessContextFields,
+  presenceState: string,
+  gapFindings: string,
+): string {
+  return POSITIONING_REPORT_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{presence_state}}', presenceState || 'No owned website detected')
+    .replace('{{gap_findings}}', gapFindings || 'None recorded');
+}
+
+export function buildHomepageMockupPrompt(
+  ctx: BusinessContextFields,
+  presenceState: string,
+  mustHavePages: string,
+): string {
+  return HOMEPAGE_MOCKUP_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{presence_state}}', presenceState || 'No owned website detected')
+    .replace('{{must_have_pages}}', mustHavePages || 'Home, Services/Products, About, Contact');
+}
+
+export function buildDomainMigrationPlanPrompt(
+  ctx: BusinessContextFields,
+  presenceState: string,
+): string {
+  return DOMAIN_MIGRATION_PLAN_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{presence_state}}', presenceState || 'No owned website detected');
+}

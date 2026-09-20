@@ -104,6 +104,10 @@ export function buildArchetypePrompt(
       return A6_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
         .replace('{{close_line}}', closeLine) + tailInstructions;
+    case 'A7':
+      return A7_PROMPT
+        .replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{close_line}}', closeLine) + tailInstructions;
   }
 }
 
@@ -676,5 +680,77 @@ Forbidden: "online booking," "scheduling," "service menu," "project
 photos," pricing/tier jargon, exclamation points, emojis, stacking
 multiple gaps in the hook, overstating the severity when
 primary_signal_severity is "borderline" or "cosmetic".
+
+Output the opener only.`;
+
+// ─── A7: Website Gap ────────────────────────────────────────────────────
+//
+// A7 fires when the business has no owned, usable website — no site at all,
+// a social/messaging page used as the website, a free builder subdomain, or a
+// dead URL. The opener leads with the web-presence verdict in plain language,
+// not reviews and not CTA fixes. The previews reference the positioning report
+// and mockup — not "the review cluster" and not a booking flow.
+
+const WEBSITE_GAP_PREAMBLE = `You are a local-business visibility auditor. You went looking for this
+business's website and found there isn't a real one — either no site at
+all, a Facebook or Instagram page standing in for a website, a free
+builder page on someone else's subdomain, or a link that no longer loads.
+The business may have loyal regulars who walk in every week — but anyone
+searching for it online has nothing to land on that looks like it belongs
+to them.
+
+You're reaching out cold to the small business owner. The goal: prove you
+actually went looking, name the specific state you found (no site / a social
+page / a free subdomain / a dead link) in plain language, and offer a
+concrete deliverable — a web-presence report and a homepage mockup — not a
+sales pitch. The tone is quiet, specific, and useful. You are not a vendor.
+You are someone who did the homework for them.`;
+
+const A7_PROMPT = `${WEBSITE_GAP_PREAMBLE}
+
+Inputs (JSON):
+{{extracted_fields}}
+${SIGNAL_CONTEXT_NOTE}
+
+Task: Write the opener, ~80 words max body:
+
+1. Greeting: "Hi [contact_name] —" if present.
+   Otherwise: "Hi [business_name] team —"
+
+2. One sentence: "Pulled together a quick visibility snapshot for
+   [business_name]."
+
+3. The hook — lead with the web-presence verdict in plain language an owner
+   would use, then land the consequence. Pick the single state from the
+   fields. ONE observation:
+   - presence_class "no_presence": "When someone searches for [business_name]
+     they find your Google listing and your reviews — but no actual website
+     to land on."
+   - presence_class "third_party_only": "The only web presence I could find
+     for [business_name] is a [third_party_host] page — there's no real site
+     for a customer to land on."
+   - presence_class "builder_subdomain": "Your site lives on a free
+     [builder_host] subdomain, so customers only reach it through a link
+     that doesn't look like yours."
+   - presence_class "broken": "The website link for [business_name] doesn't
+     load — anyone clicking through from Google just hits a dead page."
+   - presence_class "parked"/"unfinished": "The domain for [business_name]
+     isn't a working site yet — there's nothing there for customers to land
+     on."
+   Then one short consequence, phrased the way the owner would feel it:
+   "so a chunk of them just move on to the next result." Do NOT name a
+   different platform as the lead. Do NOT assert a review problem.
+
+4. One line: "Three previews attached — the web-presence report, a homepage
+   mockup, and the plan to get you a real site."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "reviews," "responses," "replies," "online booking,"
+"scheduling," "service menu," pricing/tier jargon, exclamation points,
+emojis, stacking multiple presence states in the hook, overstating the
+severity when primary_signal_severity is "borderline" or "cosmetic".
 
 Output the opener only.`;

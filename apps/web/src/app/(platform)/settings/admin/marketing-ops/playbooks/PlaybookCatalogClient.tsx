@@ -22,8 +22,8 @@ import marketingOpsService, {
 import RuleBuilder from './RuleBuilder';
 import ChecklistBuilderTab from './ChecklistBuilderTab';
 
-const ARCHETYPES = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
-const CATEGORIES = ['review_management', 'recovery_management', 'triage_management'];
+const ARCHETYPES = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
+const CATEGORIES = ['review_management', 'recovery_management', 'profile_repair', 'triage_management'];
 const PLAYBOOK_CODES = ['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07', 'PB-08'];
 const DETECTION_SOURCES = ['model_emitted', 'derived', 'operator_input'];
 
@@ -38,6 +38,7 @@ const FAMILY_COLORS: Record<string, string> = {
 const CATEGORY_COLORS: Record<string, string> = {
   review_management: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   recovery_management: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  profile_repair: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   triage_management: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
 };
 

@@ -51,6 +51,11 @@ const ARCHETYPE_DEFAULTS: Record<ArchetypeCode, Omit<GalleryArchetypeDefaults, '
     gallerySubtitle: 'Your products are invisible online. Here is the fix.',
     ctaLabel: 'Fix My Visibility',
   },
+  A7: {
+    galleryTitle: 'Web Presence Diagnostic',
+    gallerySubtitle: "Customers can't find a real website for you. Here is the fix.",
+    ctaLabel: 'See My Website Plan',
+  },
 };
 
 /**
@@ -104,6 +109,12 @@ export function resolveGalleryArchetypeDefaults(
       frictionSummary = {
         pain: 'product_invisibility',
         impact: 'Customers cannot browse or buy your products online.',
+      };
+      break;
+    case 'A7':
+      frictionSummary = {
+        pain: 'web_presence_gap',
+        impact: "Customers searching for the business find a social page or no site — not a place to land and buy.",
       };
       break;
   }

@@ -199,6 +199,7 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
                 <option value="A4">A4 — CTA Gap</option>
                 <option value="A5">A5 — Dual Triage</option>
                 <option value="A6">A6 — Product Visibility</option>
+                <option value="A7">A7 — Website Gap</option>
               </select>
             </div>
             <div>

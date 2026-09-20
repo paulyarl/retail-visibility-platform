@@ -30,6 +30,7 @@ import { GeographyGridService } from './intelligence/GeographyGridService';
 import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
 import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { WEBSITE_POSITIONING_SCHEMA_NAME } from '../validators/website-positioning.schema';
 import { discoveryContextSchema, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 
 // ─── INT signal labels (Migration 253 — GAP-E3, spec §8.4) ───────────────
@@ -523,10 +524,15 @@ export class MarketingExecutionService extends BaseService {
 
     if (input.campaign && campaignScope === 'business') {
       try {
-        let audit = input.campaign.audits?.[0] || input.campaign.mkt_audits_list?.[0];
+        // G-2: platform-filtered. This reader feeds business-audit-shaped
+        // consumers (profile repair seek/fulfill, fulfill services). An
+        // unfiltered newest-audit read would let a website_positioning (or
+        // any other) audit shadow business_analysis once it exists.
+        let audit = (input.campaign.audits ?? []).find((a: any) => a.platform === 'business_analysis')
+          || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'business_analysis');
         if (!audit && input.campaign.id) {
           audit = await this.prisma.mkt_audits_list.findFirst({
-            where: { campaign_id: input.campaign.id },
+            where: { campaign_id: input.campaign.id, platform: 'business_analysis' },
             orderBy: { created_at: 'desc' },
           });
         }
@@ -633,6 +639,29 @@ export class MarketingExecutionService extends BaseService {
               ? await resolveClaimUrlForCampaign(input.campaign.id)
               : null;
             effectiveVariables.claim_cta = buildClaimCta(claimUrl);
+          }
+        }
+        // 4. Website positioning audit (PB-08 / A7). Auto-source the
+        // campaign's website URL and the prior business_analysis audit's
+        // `website` block so the positioning pass consumes what the breadth
+        // audit already found (spec §6.2).
+        else if (outputSchemaName === WEBSITE_POSITIONING_SCHEMA_NAME) {
+          if (!effectiveVariables.website_url || !String(effectiveVariables.website_url).trim()) {
+            effectiveVariables.website_url = input.campaign.website_url ?? '';
+          }
+          if (!effectiveVariables.prior_website_findings || !String(effectiveVariables.prior_website_findings).trim()) {
+            const businessAudit = (input.campaign.audits ?? []).find((a: any) => a.platform === 'business_analysis')
+              || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'business_analysis')
+              || (input.campaign.id
+                ? await this.prisma.mkt_audits_list.findFirst({
+                    where: { campaign_id: input.campaign.id, platform: 'business_analysis' },
+                    orderBy: { created_at: 'desc' },
+                  })
+                : null);
+            const websiteBlock = (businessAudit?.audit_data as any)?.website;
+            effectiveVariables.prior_website_findings = websiteBlock
+              ? JSON.stringify(websiteBlock, null, 2)
+              : '(no prior business_analysis website findings — assess the site from scratch)';
           }
         }
       } catch (err) {

@@ -23,6 +23,7 @@ import {
   hasMaterialDrift,
 } from './signal-magnitude';
 import type { SignalCode } from '../triage/signal-taxonomy';
+import { isSocialPlatformHost, isBuilderSubdomainHost, thirdPartyPlatformLabel } from '../triage/website-host-classification';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -113,10 +114,13 @@ export interface A3Fields extends CommonFields {
   material_drift: boolean;
   /**
    * True when the website audit reports a dead/timeout/dns_error/redirect_loop
-   * status. PB-01 (Profile Repair & Listing Drift) fires for WC_BROKEN_WEBSITE,
-   * and a broken website is a harder, more provable hook than cosmetic NAP
-   * formatting. When true AND material_drift is false, the A3 prompt leads
-   * with the broken website instead of the NAP variations.
+   * status. A broken website is a harder, more provable hook than cosmetic NAP
+   * formatting, so the A3 prompt leads with it when material_drift is false.
+   *
+   * NOTE: this is *A3 context*, not a PB-01 rule. PB-01 matches NAP drift and
+   * WC_URL_MISMATCH; WC_BROKEN_WEBSITE routes to PB-08 (website gap) — the
+   * old comment here claimed PB-01 fires for it, which was wrong pre-PB-08 and
+   * is wronger now.
    */
   website_broken: boolean;
   /**
@@ -133,7 +137,7 @@ export interface A4Fields extends CommonFields {
   conversion_opportunities: string[];
 }
 
-export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields | A6Fields;
+export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields | A6Fields | A7Fields;
 
 /**
  * A5: Dual-Signal Footprint Triage. Combines repair (NAP/URL) and review-gap
@@ -165,6 +169,41 @@ export interface A6Fields extends CommonFields {
   photo_types: string[];
   missing_photo_types: string[];         // ['storefront','product'] — what's absent
   product_categories_sample: string[];   // from GBP or website, if visible
+}
+
+/**
+ * Presence classification for A7 — mirrors the website-positioning audit's
+ * `presence_classification` enum, derived server-side from the business
+ * audit's website block + detected signals.
+ */
+export type WebsitePresenceClass =
+  | 'no_presence'
+  | 'third_party_only'
+  | 'builder_subdomain'
+  | 'parked'
+  | 'unfinished'
+  | 'broken'
+  | 'present';
+
+/**
+ * A7: Website Gap. For businesses with no owned, usable website — no site,
+ * a social page used as the website, a free builder subdomain, a parked or
+ * unfinished domain, or a dead URL. Populated deterministically from the
+ * business audit's website block; the field shape lets the A7 prompt lead
+ * with the web-presence verdict.
+ */
+export interface A7Fields extends CommonFields {
+  presence_class: WebsitePresenceClass;
+  /** Raw website URL from the audit (may be a social page or builder subdomain). */
+  website_url: string | null;
+  /** Human-readable platform name when presence_class is third_party_only. */
+  third_party_host: string | null;
+  /** Builder subdomain host when presence_class is builder_subdomain. */
+  builder_host: string | null;
+  /** Defect-class website issue labels that fired (WC_* repair codes). */
+  issues: string[];
+  /** Resolved business category, when the caller supplies it. */
+  category: string | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -374,6 +413,55 @@ export function extractA6Fields(
   };
 }
 
+/**
+ * A7: Website Gap. Derives the presence classification from the audit's
+ * website block + detected signals, and collects the defect-class issue
+ * labels that fired. Pure — no DB access.
+ */
+export function extractA7Fields(
+  auditData: BusinessAnalysisAuditData,
+  common: CommonFields,
+): A7Fields {
+  const website = auditData.website;
+  const status = website?.status?.toLowerCase();
+  const triggeredCodes = new Set((common.triggered_signals ?? []).map((s) => s.code));
+  const detected: string[] = Array.isArray((auditData as any)?.detected_signals)
+    ? (auditData as any).detected_signals
+    : [];
+
+  const absent = !website || (!website.url && (status === 'none_found' || status === 'unable_to_verify'));
+  const thirdParty = status === 'social_media_only' || isSocialPlatformHost(website?.url);
+  const builder = !thirdParty && isBuilderSubdomainHost(website?.url);
+
+  let presenceClass: WebsitePresenceClass;
+  if (absent) presenceClass = 'no_presence';
+  else if (thirdParty) presenceClass = 'third_party_only';
+  else if (builder) presenceClass = 'builder_subdomain';
+  else if (status === 'broken' || isDeadUrl(website)) presenceClass = 'broken';
+  else if (detected.includes('WC_PARKED_DOMAIN')) presenceClass = 'parked';
+  else if (detected.includes('WC_UNFINISHED_SITE')) presenceClass = 'unfinished';
+  else presenceClass = 'present';
+
+  const DEFECT_CODES: SignalCode[] = [
+    'WC_UNSECURED_WEBSITE',
+    'WC_LEGACY_BUILDER_SITE',
+    'WC_STALE_WEBSITE',
+    'WC_POOR_SITE_QUALITY',
+    'WC_CATEGORY_MISMATCH',
+  ];
+  const issues = DEFECT_CODES.filter((c) => triggeredCodes.has(c));
+
+  return {
+    ...common,
+    presence_class: presenceClass,
+    website_url: website?.url ?? null,
+    third_party_host: thirdParty ? thirdPartyPlatformLabel(website?.url) : null,
+    builder_host: builder ? (website?.url ?? null) : null,
+    issues,
+    category: (auditData as any)?.category ?? null,
+  };
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────
 
 export function extractFields(
@@ -418,5 +506,7 @@ export function extractFields(
       return extractA5Fields(auditData, commonWithSeverity);
     case 'A6':
       return extractA6Fields(auditData, commonWithSeverity);
+    case 'A7':
+      return extractA7Fields(auditData, commonWithSeverity);
   }
 }

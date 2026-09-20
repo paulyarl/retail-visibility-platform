@@ -433,7 +433,7 @@ export class ProfileRepairPromptService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
         },
       });
 
@@ -780,7 +780,7 @@ export class ProfileRepairPromptService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
           mkt_dispute_intake: {
             where: { intake_kind: 'profile_repair' },
             include: { mkt_dispute_attachments: true },
@@ -851,7 +851,7 @@ export class ProfileRepairPromptService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
           mkt_dispute_intake: {
             where: { intake_kind: 'profile_repair' },
             include: { mkt_dispute_attachments: true },

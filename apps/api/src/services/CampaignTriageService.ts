@@ -235,6 +235,23 @@ export class CampaignTriageService extends BaseService {
     };
     let signals: SignalCode[] = extractSignals(extractorInput);
 
+    // §6.2 — website-audit signal union. The website audit owns the WC_*
+    // family; the business audit owns the rest. `selectAuditForTriage` reads
+    // ONE audit (latest business_analysis preferred), so a website audit's
+    // WC_* signals do not merge automatically — union them here. Runs before
+    // the operator add/remove overrides so an operator's removal still wins.
+    const websiteAudit = allAudits.find((a) => a.platform === 'website_positioning');
+    const websiteSignals = (websiteAudit?.audit_data as any)?.detected_signals;
+    if (Array.isArray(websiteSignals)) {
+      const merged = new Set(signals);
+      for (const code of websiteSignals) {
+        if (typeof code === 'string' && code.startsWith('WC_')) {
+          merged.add(code as SignalCode);
+        }
+      }
+      signals = Array.from(merged);
+    }
+
     if (operatorAddedSignals?.length) {
       const existing = new Set(signals);
       for (const code of operatorAddedSignals) {

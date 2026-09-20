@@ -24,7 +24,7 @@ import {
 } from '../outreach-openers/hook-library';
 import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
 
-const VALID_ARCHETYPES: ArchetypeCode[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
+const VALID_ARCHETYPES: ArchetypeCode[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
 
 // Signal codes registered in migrations 158 + 170
 const REGISTERED_SIGNALS = new Set([
@@ -59,6 +59,16 @@ const REGISTERED_SIGNALS = new Set([
   'WC_MISSING_PICKUP_DELIVERY',
   'VP_MISSING_STOREFRONT_PHOTOS',
   'VP_MISSING_PRODUCT_PHOTOS',
+  // PB-08 website-gap codes (migration 303)
+  'WC_THIRD_PARTY_DOMAIN',
+  'WC_BUILDER_SUBDOMAIN',
+  'WC_PARKED_DOMAIN',
+  'WC_UNFINISHED_SITE',
+  'WC_UNSECURED_WEBSITE',
+  'WC_LEGACY_BUILDER_SITE',
+  'WC_STALE_WEBSITE',
+  'WC_POOR_SITE_QUALITY',
+  'WC_CATEGORY_MISMATCH',
   // EF_ZERO_INDEXED_PRESENCE is the operator vocabulary alias;
   // DS_ZERO_INDEXED_PRESENCE is the registered signal code (migration 191).
   'EF_ZERO_INDEXED_PRESENCE',
@@ -66,8 +76,8 @@ const REGISTERED_SIGNALS = new Set([
 ]);
 
 describe('Hook Library catalog', () => {
-  it('has exactly 15 entries', () => {
-    expect(HOOK_LIBRARY).toHaveLength(15);
+  it('has exactly 16 entries', () => {
+    expect(HOOK_LIBRARY).toHaveLength(16);
   });
 
   it('every angle key is unique', () => {
@@ -76,7 +86,7 @@ describe('Hook Library catalog', () => {
   });
 
   it('HOOK_ANGLE_KEYS matches the library', () => {
-    expect(HOOK_ANGLE_KEYS).toHaveLength(15);
+    expect(HOOK_ANGLE_KEYS).toHaveLength(16);
     expect(HOOK_ANGLE_KEYS).toEqual(HOOK_LIBRARY.map((h) => h.angle));
   });
 

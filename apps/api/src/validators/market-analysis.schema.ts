@@ -94,6 +94,11 @@ import {
   type CategorySetEnrichmentOutput,
 } from './directory-enrichment.schema';
 import {
+  websitePositioningAuditSchema,
+  WEBSITE_POSITIONING_SCHEMA_NAME,
+  WEBSITE_POSITIONING_PROMPT_SUFFIX,
+} from './website-positioning.schema';
+import {
   deliverableSourceMaterialSchema,
   DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME,
   DELIVERABLE_SOURCE_MATERIAL_PROMPT_SUFFIX,
@@ -415,6 +420,15 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     // Distinct auditPlatform so the audit card can render per-market packets.
     auditPlatform: 'category_set_enrichment',
     promptSuffix: CATEGORY_SET_ENRICHMENT_PROMPT_SUFFIX,
+  },
+  [WEBSITE_POSITIONING_SCHEMA_NAME]: {
+    validator: websitePositioningAuditSchema,
+    // PB-08 / A7 — the dedicated website positioning pass. Imports land in
+    // mkt_audits_list with platform = 'website_positioning' (free-form
+    // VARCHAR(50)); triage unions its WC_* detected_signals into the signal
+    // set (spec §6.2).
+    auditPlatform: 'website_positioning',
+    promptSuffix: WEBSITE_POSITIONING_PROMPT_SUFFIX,
   },
 };
 

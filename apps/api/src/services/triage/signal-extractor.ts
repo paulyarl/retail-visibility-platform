@@ -37,6 +37,7 @@ import type { SignalExtractorInput } from './types';
 import { isKnownSignalCode, signalLabel, type SignalCode } from './signal-taxonomy';
 import { MIN_SIGNAL_WEIGHT_FOR_GAP } from '../../validators/business-analysis.schema';
 import { normalizeSignalPlatformKey } from '../intelligence/IntelligenceProfileService';
+import { isSocialPlatformHost, isBuilderSubdomainHost } from './website-host-classification';
 
 // ─── Thresholds (Sprint 2A §2A.1 + registry derived_rule defaults) ───────
 //
@@ -401,6 +402,15 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
     // verify (the Mwamba case: directory hinted a site, audit found none).
     const websiteAbsent = !website.url && (status === 'none_found' || status === 'unable_to_verify');
 
+    // §5 (PB-08/A7) — host classification. Runs before WC_MISSING_WEBSITE so
+    // the "website field is a social page" and "free builder subdomain" cases
+    // are distinguished from genuine absence: a URL exists, so the gap is
+    // ownership, not discovery. `social_media_only` is the analyst's explicit
+    // determination; the host sets catch it even when status wasn't set.
+    const thirdParty = status === 'social_media_only' || isSocialPlatformHost(website.url);
+    const builderSubdomain = !thirdParty && isBuilderSubdomainHost(website.url);
+    const frictionSuppressed = thirdParty || builderSubdomain;
+
     // WC_MISSING_WEBSITE — no website detected
     if (!signals.has('WC_MISSING_WEBSITE')) {
       if (
@@ -428,6 +438,31 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
         }
       }
 
+      // §5 — absence-class host codes (ownership gap, not discovery).
+      if (thirdParty && !signals.has('WC_THIRD_PARTY_DOMAIN')) {
+        signals.add('WC_THIRD_PARTY_DOMAIN');
+      }
+      if (builderSubdomain && !signals.has('WC_BUILDER_SUBDOMAIN')) {
+        signals.add('WC_BUILDER_SUBDOMAIN');
+      }
+
+      // §5 — WC_UNSECURED_WEBSITE: a real owned site served over plain HTTP
+      // or with an untrusted certificate. Only meaningful for an owned site —
+      // on a third-party/builder host the TLS is the platform's, not the
+      // business's, so it is not the business's defect to fix.
+      if (!frictionSuppressed && !signals.has('WC_UNSECURED_WEBSITE')) {
+        if ((website.https as unknown) === false || isNoLike(website.https)) {
+          signals.add('WC_UNSECURED_WEBSITE');
+        }
+      }
+
+      // §5.2 — friction suppression, extended. The conversion-friction codes
+      // below describe defects on an OWNED site. On a Facebook page or free
+      // builder subdomain they are noise that dilutes the headline absence
+      // signal (WC_THIRD_PARTY_DOMAIN / WC_BUILDER_SUBDOMAIN). WC_BROKEN_WEBSITE
+      // and WC_URL_MISMATCH still evaluate above — a third-party URL can itself
+      // be dead.
+      if (!frictionSuppressed) {
       // WC_MISSING_CTA — no call-to-action / click-to-call / booking
       if (!signals.has('WC_MISSING_CTA')) {
         const hasCta =
@@ -474,6 +509,7 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
           signals.add('WC_MISSING_PICKUP_DELIVERY');
         }
       }
+      } // end !frictionSuppressed (conversion-friction signals)
     }
   } else if (!signals.has('WC_MISSING_WEBSITE')) {
     // No website audit at all + campaign says no website

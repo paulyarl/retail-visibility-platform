@@ -2,11 +2,13 @@
  * Outreach Opener — Archetype Selection (deterministic, no LLM)
  *
  * Pure function over a campaign's latest `business_analysis` audit_data.
- * Selects one of 4 archetypes based on the strongest signal:
- *   A2 > A1 > A3 > A4
+ * Selects one of the archetypes based on the strongest signal:
+ *   A2 > A1 > A6 > A3 > A7 > A4
  *
  * Specificity + urgency wins. A recurring-theme negative beats a raw volume
- * gap; volume beats listing drift; listing drift beats a soft conversion gap.
+ * gap; volume beats product invisibility; product invisibility beats listing
+ * drift; listing drift beats a website gap; a website gap beats a soft
+ * conversion gap.
  *
  * A5_DUAL_TRIAGE is NOT produced by selectArchetype — it is only emitted by
  * the TriageEngineService (services/triage) for PB-05 multi-signal footprint
@@ -19,7 +21,9 @@
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6';
+import { isSocialPlatformHost, isBuilderSubdomainHost } from '../triage/website-host-classification';
+
+export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
 
 export interface NegativeReviewTheme {
   theme: string;
@@ -139,13 +143,19 @@ export interface ArchetypeSelection {
  * Deterministically select the best opener archetype from audit data.
  * No LLM, no async, no side effects — pure function.
  *
- * Priority: A2 > A1 > A6 > A3 > A4
+ * Priority: A2 > A1 > A6 > A3 > A7 > A4
  *
- * A6 (Product Visibility Gap) fires for product/hybrid businesses with no
- * product browsing. It sits above A3/A4 because product invisibility is more
- * urgent than listing drift or CTA gap for inventory businesses. A2/A1 still
- * win when reviews are the dominant pain — a grocery store with a cluster of
- * negative reviews should still get A2.
+ * A6 (Product Visibility Gap) fires for product/hybrid businesses whose site
+ * exists but has no product browsing. It sits above A3/A4 because product
+ * invisibility is more urgent than listing drift or CTA gap for inventory
+ * businesses. A2/A1 still win when reviews are the dominant pain — a grocery
+ * store with a cluster of negative reviews should still get A2.
+ *
+ * A7 (Website Gap) fires when the business has no owned, usable website —
+ * no site at all, a third-party/social page used as the website, a free
+ * builder subdomain, or a dead URL. It sits below A3 (listing drift is a
+ * sharper, more provable repair signal when both exist) and above A4 (a CTA
+ * gap presumes a site to fix; a website gap is the more fundamental problem).
  */
 export function selectArchetype(auditData: BusinessAnalysisAuditData): ArchetypeSelection {
   const metrics = auditData.combined_review_metrics;
@@ -177,19 +187,17 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
     };
   }
 
-  // A6: product visibility gap (product/hybrid business with no product browsing)
-  // Fires when business_type is product/hybrid AND either:
-  //   - has_product_browsing === false (website exists but no product browsing), OR
-  //   - no website detected (WC_MISSING_WEBSITE would fire, but for a product
-  //     business the lack of any online product presence is the dominant gap)
+  // A6: product visibility gap (product/hybrid business whose site exists but
+  // has no product browsing). The "no website at all" half of the original A6
+  // branch moved to A7 — a product business with no owned usable site is a
+  // website gap, not a product-browsing gap (spec §7 G-3 ordering fix).
   const businessType = auditData.business_type;
   if (businessType === 'product' || businessType === 'hybrid') {
-    const hasWebsite = !!website?.url || website?.status === 'working';
     const noProductBrowsing = website?.has_product_browsing === false;
-    if (!hasWebsite || noProductBrowsing) {
+    if (noProductBrowsing) {
       return {
         archetype: 'A6',
-        reason: `product visibility gap: ${businessType} business with ${!hasWebsite ? 'no website' : 'no product browsing'}`,
+        reason: `product visibility gap: ${businessType} business with no product browsing`,
       };
     }
   }
@@ -206,6 +214,35 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
       archetype: 'A3',
       reason: `listing inconsistency: ${nap.overall_status}`,
     };
+  }
+
+  // A7: website gap — no owned, usable website. Fires when the business has
+  // no site at all, uses a social/messaging page as its "website", sits on a
+  // free builder subdomain, or has a dead URL. Sits after A3 (listing drift is
+  // the sharper repair signal) and before A4 (a CTA gap presumes a site).
+  {
+    const websiteStatus = website?.status?.toLowerCase();
+    const hasWebsite = !!website?.url || websiteStatus === 'working';
+    const noOwnedUsableSite =
+      !hasWebsite ||
+      websiteStatus === 'none_found' ||
+      websiteStatus === 'social_media_only' ||
+      websiteStatus === 'broken' ||
+      isSocialPlatformHost(website?.url) ||
+      isBuilderSubdomainHost(website?.url);
+    if (noOwnedUsableSite) {
+      const detail = isSocialPlatformHost(website?.url)
+        ? 'website field is a social page'
+        : isBuilderSubdomainHost(website?.url)
+          ? 'website is on a free builder subdomain'
+          : websiteStatus === 'broken'
+            ? 'website URL is dead'
+            : 'no website found';
+      return {
+        archetype: 'A7',
+        reason: `website gap: ${detail}`,
+      };
+    }
   }
 
   // A4: conversion / CTA gap

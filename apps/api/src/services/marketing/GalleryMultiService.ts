@@ -14,7 +14,7 @@
  *
  * Ordering:
  *   - Primary sibling first
- *   - Then by archetype priority (A2 > A1 > A6 > A3 > A4 > A5)
+ *   - Then by archetype priority (A2 > A1 > A6 > A3 > A4 > A7 > A5)
  *   - Then by created_at ascending
  *
  * Pattern: singleton extends BaseService.
@@ -92,7 +92,8 @@ const ARCHETYPE_PRIORITY: Record<ArchetypeCode, number> = {
   A6: 3, // Product visibility
   A3: 4, // Listing drift
   A4: 5, // CTA gap
-  A5: 6, // Dual/triage (bundle)
+  A7: 6, // Website gap
+  A5: 7, // Dual/triage (bundle)
 };
 
 const ELIGIBLE_STAGES = new Set(['preview_built', 'shown']);

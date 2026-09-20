@@ -129,6 +129,14 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     'Quick note about {{business}}\'s online presence',
     '{{business}} — no way to browse your products before visiting',
   ],
+  // A7 — Website Gap (web presence)
+  A7: [
+    'Preview - what customers see when they look for you',
+    '{{business}} — customers can\'t find a real website',
+    '{{business}} — your website is a Facebook page',
+    'Quick note about {{business}}\'s website',
+    '{{business}} — the site link isn\'t loading',
+  ],
 };
 
 const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
@@ -177,6 +185,13 @@ const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
     'There are {{remaining}} more pieces staged. Say the word.',
     'I\'ve handled {{remaining}} more sections beyond these. Should I send them?',
   ],
+  A7: [
+    'The full website plan — the report, the mockup, and the {{remaining}} sections — is ready today.',
+    'I\'ve drafted the other {{remaining}} pieces of the build plan. Ready when you are.',
+    '{{remaining}} more pages are mapped out. Want them?',
+    'There are {{remaining}} more pieces staged. Say the word.',
+    'I\'ve handled {{remaining}} more sections beyond these. Should I send them?',
+  ],
 };
 
 const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
@@ -222,6 +237,13 @@ const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
     '— {{name}} | {{phone}}',
     'Text "catalog" to {{phone}} and I\'ll send the product mockup. — {{name}}',
   ],
+  A7: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the website plan. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "site" to {{phone}} and I\'ll send the homepage mockup. — {{name}}',
+  ],
 };
 
 const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
@@ -231,6 +253,7 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A4: 'Conversion / CTA Gap',
   A5: 'Multi-Signal Footprint',
   A6: 'Product Visibility Gap',
+  A7: 'Website Gap',
 };
 
 // ─── Structured footprint config (A5 + A3) ───────────────────────────
@@ -420,6 +443,21 @@ const PREVIEW_SLOT_CONFIGS: Record<OpenerArchetype, PreviewSlotConfig> = {
     evidencePlaceholder: 'Current online presence (paste what customers can/can\'t see today)...',
     fixPlaceholder: 'Proposed visibility fix (AI-drafted or imported)...',
     slotLabels: ['Storefront photos', 'Product browsing', 'Availability inquiry'],
+    useReviewEndpoint: false,
+  },
+  A7: {
+    sectionTitle: 'The Preview (3 web-presence fixes):',
+    sectionBlurb:
+      'Slot 1 is the highest-impact web-presence gap (rendered first). Paste the current state (no site, a social page, a free subdomain, a dead link), then AI-draft or import the proposed fix.',
+    firstSlotLabel: 'THE HIGHEST IMPACT - The most fundamental web-presence gap goes first',
+    firstSlotBadge: 'HIGHEST IMPACT FIRST',
+    firstSlotCheckboxLabel: 'highest-impact gap',
+    slotLabelPrefix: 'Fix #',
+    evidenceLabel: 'Current State',
+    fixLabel: 'Proposed Fix',
+    evidencePlaceholder: 'Current web presence (paste what customers see today — no site, a social page, a dead link)...',
+    fixPlaceholder: 'Proposed web-presence fix (AI-drafted or imported)...',
+    slotLabels: ['The website itself', 'Homepage', 'Domain & profiles'],
     useReviewEndpoint: false,
   },
 };

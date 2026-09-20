@@ -431,7 +431,7 @@ export type ReviewLogStatus = 'scheduled' | 'completed' | 'skipped';
 export type FollowUpOutcome = 'converted_paid' | 'customer_responded' | 'no_response' | 'duplicate' | 'out_of_scope' | 'other';
 
 // ─── Outreach Opener Types ──────────────────────────────────────────────
-export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6';
+export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
 export type OpenerSource = 'ai' | 'external' | 'ai_briefing';
 export type CloseVariant = 'soft' | 'direct_paid';
 
@@ -3994,7 +3994,7 @@ class MarketingOpsService extends AdminApiSingleton {
     opener_text: string;
     primary_angle?: string;
     operator_name?: string;
-    source_briefing: 'triage' | 'issue_audit' | 'business_audit';
+    source_briefing: 'triage' | 'issue_audit' | 'business_audit' | 'website_audit';
     execution_id?: string;
   }): Promise<OpenerResult> {
     const body: Record<string, any> = {

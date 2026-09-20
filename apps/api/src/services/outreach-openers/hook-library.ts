@@ -1,7 +1,7 @@
 /**
  * Hook Library — Server-side starter hook catalog (Light-Score Hooks)
  *
- * Code-defined, typed catalog of 15 proven first-touch hook angles, each
+ * Code-defined, typed catalog of first-touch hook angles, each
  * following the same five-beat shape:
  *   diagnostic hook → reassurance → bridge/quantified upside → audit offer → soft CTA
  *
@@ -42,6 +42,7 @@ export type HookAngle =
   | 'hours_sync'
   | 'website_foundation'
   | 'website_repair'
+  | 'third_party_presence'
   | 'product_category_pages'
   | 'availability_inquiry'
   | 'review_acquisition'
@@ -188,7 +189,7 @@ Want me to send it?
   {
     angle: 'website_foundation',
     label: 'Website creation or modernization',
-    archetypes: ['A4'],
+    archetypes: ['A4', 'A7'],
     signals: ['WC_MISSING_WEBSITE', 'EF_ZERO_INDEXED_PRESENCE'],
     subject: 'quick question about your website',
     body: `{{salutation}} I went looking for your website earlier and had a hard time finding one — or if it's there, it's not showing up where customers would expect.
@@ -216,8 +217,11 @@ Want me to sketch out what that could look like for you, no obligation?
   {
     angle: 'website_repair',
     label: 'Broken website repair',
-    archetypes: ['A3', 'A4'],
-    signals: ['WC_BROKEN_WEBSITE'],
+    archetypes: ['A3', 'A4', 'A7'],
+    signals: [
+      'WC_BROKEN_WEBSITE', 'WC_UNSECURED_WEBSITE', 'WC_LEGACY_BUILDER_SITE',
+      'WC_STALE_WEBSITE', 'WC_POOR_SITE_QUALITY', 'WC_CATEGORY_MISMATCH',
+    ],
     subject: 'your website link isn\'t loading',
     body: `{{salutation}} I clicked through to your website from Google earlier and hit a dead page — the link's there but it isn't loading.
 
@@ -238,6 +242,35 @@ Want me to send over what I found?
       soft_cta: 'Want me to send over what I found?',
     },
     phone_hook: 'I clicked through to your website from Google earlier and hit a dead page — the link\'s there but it isn\'t loading. Not uncommon — links break quietly and nobody notices for weeks. But anyone who searches for you, clicks through, and hits a dead page just moves on to the next result. I can run a quick Website Health Check that pinpoints what\'s broken — and if it\'s time for a fresh start, I build simple storefront sites that load fast, show off what you carry, and actually get people in the door. Takes about a day, yours to keep either way. Want me to send over what I found?',
+  },
+
+  // 4c. third_party_presence — the website field is a social page / free
+  //     builder subdomain / parked or unfinished domain (no owned site).
+  {
+    angle: 'third_party_presence',
+    label: 'Web presence is a social page or free subdomain',
+    archetypes: ['A7'],
+    signals: ['WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN', 'WC_PARKED_DOMAIN', 'WC_UNFINISHED_SITE'],
+    subject: 'your website is a Facebook page',
+    body: `{{salutation}} I went looking for your website and what I found was a social page standing in for one — nothing a customer can land on that actually looks like your business.
+
+Totally normal for a lot of great local shops.
+
+But when someone searches for {{category}} in {{city}} and the only thing that comes up is a social page, a chunk of them just keep scrolling to the next result — customers you'd otherwise have walking in the door.
+
+I do simple storefront websites for shops like yours — nothing fancy, just something that shows up under your own name, loads fast, shows off what you carry, and gets people in.
+
+Want me to sketch out what that could look like, no obligation?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'What I found was a social page standing in for a website',
+      reassurance: 'Totally normal for a lot of great local shops.',
+      quantified_upside: 'Customers keep scrolling to the next result when there is no real site',
+      audit_offer: 'Simple storefront website build — your own name, loads fast, shows what you carry',
+      soft_cta: 'Want me to sketch out what that could look like, no obligation?',
+    },
+    phone_hook: 'I went looking for your website and what I found was a social page standing in for one — nothing a customer can land on that actually looks like your business. Totally normal for a lot of great local shops. But when someone searches for {{category}} in {{city}} and the only thing that comes up is a social page, a chunk of them just keep scrolling to the next result. I do simple storefront websites for shops like yours — nothing fancy, just something that shows up under your own name, loads fast, shows off what you carry, and gets people in. Want me to sketch out what that could look like, no obligation?',
   },
 
   // 5. product_category_pages
