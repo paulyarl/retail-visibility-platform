@@ -43,6 +43,11 @@ doppler run --config local -- npx tsx src/scripts/seed-deliverable-layout-templa
 # — wires Category Intelligence + Gold Standard + Website Accessibility Verification
 #   directive into both variants. Bump SEED_VERSION_MARKER in the script to re-apply.
 doppler run --config local -- npx tsx src/scripts/seed-business-audit-v2-templates.ts
+
+# Website Positioning audit template (PB-08 / A7 website gap, spec:
+# docs/LocalBiz/WEBSITE_GAP_AUDIT_PLAYBOOK_SPEC.md) — seeds the
+# platform='website_positioning' audit template row.
+doppler run --config local -- npx tsx src/scripts/seed-website-positioning-audit-template.ts
 ```
 Repeat each command with `--config prd` for production.
 

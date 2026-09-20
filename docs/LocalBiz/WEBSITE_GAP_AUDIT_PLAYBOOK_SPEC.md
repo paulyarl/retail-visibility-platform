@@ -61,7 +61,7 @@ New `mkt_playbook_catalog` row:
 | fitd_default_fee_cents | 49900 ($499) |
 | retainer_pitch_title | Website Hosting & Care Plan |
 | retainer_fee_cents | 9900 ($99/mo) |
-| preview_deliverable_type | `seo_content` (existing type; a dedicated `website_mockup` type is OQ-2) |
+| preview_deliverable_type | `website_mockup` (resolved OQ-2; migration 305 corrects 303's `seo_content` seed) |
 | matching_rules | below |
 
 ```json
@@ -207,7 +207,9 @@ Covered in §7 — the assembled call script's hook stage ranks `HookTemplate`s 
 
 - `DeliverableSourceService.TYPE_GOVERNING_SIGNALS`: add the new WC codes to `seo_content` (all nine — the positioning report is content-shaped) and `lead_magnet` (`WC_MISSING_WEBSITE`, `WC_THIRD_PARTY_DOMAIN`, `WC_BUILDER_SUBDOMAIN`, `WC_UNSECURED_WEBSITE` — the "you need a web presence" teaser).
 - `DeliverableSectionService.generateAllSections`: add an `archetype === 'A7'` bundle mirroring the A6 block — section list drawn from the website audit's `build_scope.must_have_pages[]` + `positioning_gaps[]` (e.g., `positioning_report`, `homepage_mockup`, `domain_migration_plan`). New `SectionType` members as needed; see OQ-2.
-- A dedicated `website_mockup` DeliverableType remains OQ-2 — a visual homepage mockup is the strongest FITD artifact this playbook can offer.
+- **Resolved (OQ-2): two website deliverable types.** `website_mockup` is the FITD/preview artifact (fulfill `mpt-seed-fulfill-009`, landscape layout — the strongest visual the playbook can offer). `website_build_package` is the platform-centric delivery artifact (fulfill `mpt-seed-fulfill-010`, portrait) — the implementation-ready bundle the delivery platform ships: site map & page spec, navigation/CTA spec, domain & hosting direction, asset requirements (the intake checklist), platform implementation notes, QA/launch checklist, and the profile-cutover list. Both carry the full WC_* governing-signal set; the package is signal-gated like the mockup, not execution-imported like `citation_repair_package`.
+- **A7 section audit source:** `DeliverableSectionService` prefers the `website_positioning` audit (`presence_classification`, `issues[].conversion_implication`, `positioning_gaps`, `build_scope`) for all three A7 sections; the business-audit website block + static `business_type` heuristic is the fallback when no positioning audit exists.
+- **PB-08 has no repair track.** `repair_track` stays `null` on accept, override, and sibling creation — the `profile_repair` category is compatibility-only. This keeps PB-08 out of `RepairFulfillmentService` gates (repair access intake, repair read model, escalation) while leaving the manual track-switch escape hatch available.
 
 ### 8.4 Owner voice & sentiment
 
@@ -310,8 +312,8 @@ The §6.1 signal definitions go to the two V2 variants (`mpt-j9bbem3l`, `mpt-6oe
 
 ## 11. Ops checklist
 
-1. Apply `303_*.sql` against `local` **and** `prd` (`psql $DATABASE_URL -f …` under each Doppler config) — additive-only; PB-08 lands `is_active=false` (§9.2).
-2. Re-run `seed-business-audit-v2-templates.ts` under `--config local` + `--config prd` (marker bump forces re-sync).
+1. Apply `303_*.sql`, `304_*.sql`, and `305_*.sql` against `local` **and** `prd` (`psql $DATABASE_URL -f …` under each Doppler config) — additive-only; PB-08 lands `is_active=false` (§9.2). 305 corrects `preview_deliverable_type` to `website_mockup`.
+2. Re-run `seed-business-audit-v2-templates.ts`, `seed-deliverable-source-material-templates.ts`, and `seed-deliverable-layout-templates.ts` under `--config local` + `--config prd` (marker bumps force re-sync; the deliverable seeds add `mpt-seed-fulfill-010` + the build-package layout).
 3. Run the new `seed-website-positioning-audit-template.ts` under both configs.
 4. Verify live: `SELECT code, priority_rank, is_active FROM mkt_playbook_catalog ORDER BY priority_rank` shows PB-08 at 7 (inactive), PB-03 at 8; `mkt_signal_registry` holds the 9 new codes; `mkt_intake_definitions` holds `website_build`; template `updated_at` newer than the seed commit.
 5. **After the A7 code is deployed to prod:** `UPDATE mkt_playbook_catalog SET is_active = true WHERE code = 'PB-08'` against `local` + `prd`.
@@ -319,7 +321,7 @@ The §6.1 signal definitions go to the two V2 variants (`mpt-j9bbem3l`, `mpt-6oe
 ## 12. Open questions
 
 - **OQ-1 — Audit trigger.** Operator-triggered from Prompt Workspace (recommended for v1 — audits cost money, acceptance should gate them) vs. auto-run on PB-08 accept. Auto-wiring means a transition hook + execution-id plumbing.
-- **OQ-2 — `website_mockup` DeliverableType.** A visual homepage mockup is the strongest possible FITD artifact for this playbook and is not in the current union. Follow-up: add the type + a jsPDF layout template + `TYPE_GOVERNING_SIGNALS` entry, or fold positioning report into `seo_content`.
+- **OQ-2 — `website_mockup` DeliverableType.** ~~Open~~ **Resolved:** implemented as a real type end-to-end, plus `website_build_package` as the platform-centric delivery tier (see §8.3).
 - **OQ-3 — Absence-class in dual.** Should `WC_THIRD_PARTY_DOMAIN`/`WC_BUILDER_SUBDOMAIN` join PB-05's `groupA`? Current spec keeps them absence-class (like `WC_MISSING_WEBSITE`); a Facebook-page + review-drought business routes to PB-02. Cheap to revisit — pure JSONB edit.
 - **OQ-4 — Host list governance.** The social/builder host sets live in extractor code. Moving them to a registry `derived_rule` payload would make them admin-editable; not worth it until a second consumer exists.
 - **OQ-5 — Website-audit signal union.** ~~Open~~ **Resolved in §6.2** (gap sweep): union per family — website audit owns `WC_*`, business audit owns the rest; implemented as a second fetch in `loadSignalsAndPlaybooks`.
