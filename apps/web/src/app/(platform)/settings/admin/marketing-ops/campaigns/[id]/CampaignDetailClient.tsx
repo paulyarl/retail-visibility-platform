@@ -232,6 +232,7 @@ export default function CampaignDetailClient({
   const [demoResult, setDemoResult] = useState<DemoStorefrontResult | null>(null);
   const [linkingTenant, setLinkingTenant] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [napCopied, setNapCopied] = useState(false);
   const [revenue, setRevenue] = useState<MarketingRevenue[]>([]);
   const [readinessDialog, setReadinessDialog] = useState<{ toStage: PipelineStage } | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
@@ -807,6 +808,41 @@ export default function CampaignDetailClient({
     }
   };
 
+  // Search-sweep copy — a Google-ready NAP query: exact-match business name
+  // + full structured address + phone. One click and the operator can paste
+  // it into a browser search to sweep listings for this business.
+  const napSearchString = (() => {
+    if (!campaign) return '';
+    const street = [campaign.address_line1, campaign.address_line2].filter(Boolean).join(', ');
+    const locality = [
+      [campaign.address_city || campaign.city, campaign.address_state || campaign.state]
+        .filter(Boolean)
+        .join(', '),
+      campaign.address_zip,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const name = campaign.business_name || campaign.title;
+    return [
+      name ? `"${name}"` : null,
+      [street, locality].filter(Boolean).join(', ') || null,
+      campaign.phone,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  })();
+
+  const handleCopyNapSearch = async () => {
+    if (!napSearchString) return;
+    try {
+      await navigator.clipboard.writeText(napSearchString);
+      setNapCopied(true);
+      setTimeout(() => setNapCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
@@ -1037,10 +1073,26 @@ export default function CampaignDetailClient({
                     {campaign.business_name || campaign.category || campaign.city}
                   </p>
                 )}
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {campaign.scope} · {campaign.category} · {campaign.city}{campaign.state ? `, ${campaign.state}` : ''}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
-                  {campaign.display_id && ` · ${campaign.display_id}`}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {/* Canonical NAP display — structured business address fields
+                        first, market scope as the fallback (non-business scopes
+                        carry no address_* columns). */}
+                    {campaign.scope} · {campaign.category} · {campaign.address_city || campaign.city}{(campaign.address_state || campaign.state) ? `, ${campaign.address_state || campaign.state}` : ''}{campaign.address_zip ? ` ${campaign.address_zip}` : ''}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
+                    {campaign.display_id && ` · ${campaign.display_id}`}
+                  </p>
+                  {napSearchString && (
+                    <button
+                      type="button"
+                      onClick={handleCopyNapSearch}
+                      title={`Copy a search-ready NAP query:\n${napSearchString}`}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-gray-400 dark:text-gray-500 border border-transparent hover:border-gray-300 dark:hover:border-neutral-600 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <Copy className="w-3 h-3" />
+                      {napCopied ? 'Copied!' : 'Copy search'}
+                    </button>
+                  )}
+                </div>
                 {(campaign.secondary_categories?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                     <span className="text-xs text-gray-500 dark:text-gray-400">Secondary categories:</span>
