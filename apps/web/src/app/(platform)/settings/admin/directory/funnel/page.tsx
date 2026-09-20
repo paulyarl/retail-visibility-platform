@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
+import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
   type CohortFunnelResponse,
   type CohortFunnelReport,
@@ -15,6 +16,14 @@ import { TrendingUp, Funnel, AlertTriangle, CheckCircle, XCircle, MinusCircle, D
 export const dynamic = 'force-dynamic';
 
 export default function SeedFunnelPage() {
+  return (
+    <MarketingOpsNavShell>
+      <SeedFunnelClient />
+    </MarketingOpsNavShell>
+  );
+}
+
+function SeedFunnelClient() {
   const [report, setReport] = useState<CohortFunnelResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

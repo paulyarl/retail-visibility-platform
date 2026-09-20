@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
+import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
   DirectoryPresenceSeedSummary,
   DirectoryClaimRequest,
@@ -21,6 +22,14 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function DirectoryPresenceSeedsPage() {
+  return (
+    <MarketingOpsNavShell>
+      <PresenceSeedsContent />
+    </MarketingOpsNavShell>
+  );
+}
+
+function PresenceSeedsContent() {
   const [seeds, setSeeds] = useState<DirectoryPresenceSeedSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

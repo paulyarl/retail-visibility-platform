@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
+import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
   AnchorVerificationResult,
   AnchorVerificationResultType,
@@ -180,6 +181,14 @@ function ClaimQrPreview({ url }: { url: string }) {
 }
 
 export default function PresenceSeedDetailPage() {
+  return (
+    <MarketingOpsNavShell>
+      <PresenceSeedDetailClient />
+    </MarketingOpsNavShell>
+  );
+}
+
+function PresenceSeedDetailClient() {
   const params = useParams();
   const searchParams = useSearchParams();
   const seedId = decodeURIComponent(String(params?.id ?? ''));

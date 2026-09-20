@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
+import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
   CreateSeedRequest,
   DirectoryListingAttribute,
@@ -69,6 +70,14 @@ const US_STATES = [
 ];
 
 export default function NewPresenceSeedPage() {
+  return (
+    <MarketingOpsNavShell>
+      <NewPresenceSeedClient />
+    </MarketingOpsNavShell>
+  );
+}
+
+function NewPresenceSeedClient() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

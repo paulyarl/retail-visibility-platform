@@ -77,3 +77,20 @@ export default function MarketingOpsPageShell({
     </div>
   );
 }
+
+/**
+ * Nav-only variant — renders the Marketing Ops nav panel beside the page
+ * content without the shell's own title/breadcrumb header. For module pages
+ * that live outside /settings/admin/marketing-ops (presence seeds, batches,
+ * seed funnel, growth engine) and keep their own PageHeader.
+ */
+export function MarketingOpsNavShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col lg:flex-row gap-6">
+      <aside className="w-full lg:w-56 flex-shrink-0">
+        <MarketingOpsNavPanel />
+      </aside>
+      <main className="flex-1 min-w-0">{children}</main>
+    </div>
+  );
+}

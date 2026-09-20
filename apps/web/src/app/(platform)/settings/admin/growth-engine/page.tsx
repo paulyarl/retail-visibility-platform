@@ -14,8 +14,17 @@ import growthEngineAdminService, {
   NextSeekTarget,
 } from '@/services/GrowthEngineAdminService';
 import DailyDigestPanel from '@/components/marketing-ops/DailyDigestPanel';
+import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 
 export default function GrowthEngineDashboard() {
+  return (
+    <MarketingOpsNavShell>
+      <GrowthEngineClient />
+    </MarketingOpsNavShell>
+  );
+}
+
+function GrowthEngineClient() {
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
   const [funnelRaw, setFunnelRaw] = useState<FunnelMetrics | null>(null);
   const [niches, setNiches] = useState<NicheBreakdown[]>([]);
