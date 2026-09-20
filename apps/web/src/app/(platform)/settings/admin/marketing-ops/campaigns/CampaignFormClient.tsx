@@ -176,21 +176,29 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // ─── Deep-link pre-fill from search params ────────────────────────────
   // The Coverage page links here with ?scope=intelligence&focus=emerging&
   // kind=establishment&category=...&city=...&platform=... to pre-fill the
-  // form for a specific gap. Only applies in create mode. Runs once on mount.
+  // form for a specific gap; the Proving Grounds and Recovery pages link
+  // with ?scope=<scope>&campaignCategory=<category> for a pre-categorized
+  // campaign. Only applies in create mode. Runs once on mount.
   useEffect(() => {
     if (mode !== 'create') return;
-    const scope = searchParams.get('scope') as CampaignScope | null;
-    if (!scope) return;
+    const scopeParam = searchParams.get('scope') as CampaignScope | null;
+    if (!scopeParam || !SCOPES.includes(scopeParam)) return;
     const focus = searchParams.get('focus') as FormState['intelligence_focus'] | null;
     const kind = searchParams.get('kind') as FormState['intelligence_campaign_kind'] | null;
     const category = searchParams.get('category');
     const city = searchParams.get('city');
     const state = searchParams.get('state');
     const platform = searchParams.get('platform');
-    const campaignCategory = searchParams.get('campaignCategory') as CampaignCategory | null;
+    const campaignCategoryParam = searchParams.get('campaignCategory') as CampaignCategory | null;
+    // The category dropdown renders CATEGORIES plus the two scope-bound
+    // categories — an unrecognized param would submit an invalid value.
+    const campaignCategory =
+      campaignCategoryParam && [...CATEGORIES, 'proving_ground', 'directory_enrichment'].includes(campaignCategoryParam)
+        ? campaignCategoryParam
+        : null;
     setForm((prev) => ({
       ...prev,
-      scope,
+      scope: scopeParam,
       campaign_category: campaignCategory ?? prev.campaign_category,
       intelligence_focus: focus ?? prev.intelligence_focus,
       intelligence_campaign_kind: kind ?? prev.intelligence_campaign_kind,

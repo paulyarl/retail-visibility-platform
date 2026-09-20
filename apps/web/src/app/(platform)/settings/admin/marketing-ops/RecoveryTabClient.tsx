@@ -6,6 +6,12 @@ import Link from 'next/link';
 import recoveryOpsService, { RecoveryCampaign } from '@/services/RecoveryOpsService';
 import { StageBadge, RECOVERY_STAGES } from '@/components/marketing-ops/StageBadge';
 
+// Deep-link pre-fill (CampaignFormClient reads scope/campaignCategory) —
+// business scope + the recovery_management category, which starts the
+// campaign at audit_identified on the recovery pipeline.
+const NEW_RECOVERY_CAMPAIGN_HREF =
+  '/settings/admin/marketing-ops/campaigns/new?scope=business&campaignCategory=recovery_management';
+
 export default function RecoveryTabClient() {
   const [campaigns, setCampaigns] = useState<RecoveryCampaign[]>([]);
   const [byStage, setByStage] = useState<Record<string, RecoveryCampaign[]>>({});
@@ -56,11 +62,11 @@ export default function RecoveryTabClient() {
           Create a campaign with category &ldquo;Recovery Management&quot; to get started.
         </p>
         <Link
-          href="/settings/admin/marketing-ops/campaigns/new"
+          href={NEW_RECOVERY_CAMPAIGN_HREF}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
-          New Campaign
+          New Recovery Campaign
         </Link>
       </div>
     );
@@ -74,13 +80,22 @@ export default function RecoveryTabClient() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recovery Campaigns</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{total} campaign{total === 1 ? '' : 's'}</p>
         </div>
-        <button
-          onClick={fetchCampaigns}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={NEW_RECOVERY_CAMPAIGN_HREF}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            New Recovery Campaign
+          </Link>
+          <button
+            onClick={fetchCampaigns}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stage-grouped lists */}
