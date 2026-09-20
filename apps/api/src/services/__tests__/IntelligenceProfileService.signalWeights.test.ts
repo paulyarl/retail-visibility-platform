@@ -30,6 +30,7 @@ import {
   IntelligenceProfileService,
   selectLeadPlatform,
   platformGapSeverity,
+  serializeSignalWeightContextBlock,
 } from '../intelligence/IntelligenceProfileService';
 
 const profile = (over: Record<string, any> = {}) => ({
@@ -458,5 +459,47 @@ describe('selectLeadPlatform (argmax signal_weight × gap_severity)', () => {
       ],
     };
     expect(selectLeadPlatform(audit, resolved)!.platform).toBe('yelp');
+  });
+});
+
+describe('serializeSignalWeightContextBlock (triage prompt context)', () => {
+  it('emits the weights table sorted desc with scope + basis, the lead platform, and the reported-not-applied directive', () => {
+    const resolved = new Map<string, any>([
+      ['yelp', resolvedWeight({ platform: 'yelp', weight: 0.2, basis: 'basis for yelp', scope: 'local' })],
+      ['google', resolvedWeight({ platform: 'google', weight: 0.9 })],
+      ['bbb', resolvedWeight({ platform: 'bbb', weight: 0.3, basis: null })],
+    ]);
+    const lead = selectLeadPlatform(
+      { gap_analysis: [{ platform: 'google', severity: 'non_negotiable' }] },
+      resolved,
+    );
+
+    const block = serializeSignalWeightContextBlock(resolved, lead);
+
+    expect(block).toContain('=== PLATFORM SIGNAL WEIGHTS');
+    // Sorted by weight descending.
+    expect(block.indexOf('google: 0.9')).toBeLessThan(block.indexOf('bbb: 0.3'));
+    expect(block.indexOf('bbb: 0.3')).toBeLessThan(block.indexOf('yelp: 0.2'));
+    expect(block).toContain('google: 0.9 (national) — basis: basis for google');
+    expect(block).toContain('yelp: 0.2 (local) — basis: basis for yelp');
+    // Null basis omits the basis suffix rather than rendering 'null'.
+    expect(block).toContain('bbb: 0.3 (national)');
+    expect(block).not.toContain('basis: null');
+    expect(block).toContain('LEAD PLATFORM: google');
+    expect(block).toContain('DIRECTIVE: Reported context, not a scoring input');
+    expect(block).toContain('Never recite the raw weight number');
+  });
+
+  it('omits the LEAD PLATFORM line when nothing qualifies', () => {
+    const resolved = new Map<string, any>([
+      ['google', resolvedWeight({ platform: 'google', weight: 0.9 })],
+    ]);
+    const block = serializeSignalWeightContextBlock(resolved, null);
+    expect(block).toContain('google: 0.9');
+    expect(block).not.toContain('LEAD PLATFORM');
+  });
+
+  it('returns empty string when nothing resolved — legacy render preserved', () => {
+    expect(serializeSignalWeightContextBlock(new Map(), null)).toBe('');
   });
 });

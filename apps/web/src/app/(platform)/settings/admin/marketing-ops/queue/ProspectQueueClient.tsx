@@ -975,6 +975,33 @@ export default function ProspectQueueClient() {
                               )}
                             </div>
                           )}
+                          {/* Bronze reason attribution (Bronze Standard §7.4) —
+                              the catalog blind spot(s) that surfaced this
+                              prospect; rides business_snapshot from the
+                              discovery card's queue action. */}
+                          {(() => {
+                            const attribution = (entry.business_snapshot as any)?.bronze_attribution;
+                            if (!Array.isArray(attribution) || attribution.length === 0) return null;
+                            const tip = attribution.map((a: any) => `${a.reason_key}${a.basis ? ` — ${a.basis}` : ''}`).join('\n');
+                            return (
+                              <div className="flex flex-wrap items-center gap-1 mt-1 max-w-[180px]">
+                                {attribution.slice(0, 2).map((a: any) => (
+                                  <span
+                                    key={a.reason_key}
+                                    className="inline-block rounded px-1 py-0.5 text-[9px] font-mono bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700"
+                                    title={a.basis ? `${a.reason_key} — ${a.basis}` : a.reason_key}
+                                  >
+                                    bronze:{a.reason_key}
+                                  </span>
+                                ))}
+                                {attribution.length > 2 && (
+                                  <span className="text-[9px] text-gray-400" title={tip}>
+                                    +{attribution.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Rating */}

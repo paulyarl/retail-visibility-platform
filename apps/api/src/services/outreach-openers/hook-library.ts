@@ -74,6 +74,17 @@ export interface HookTemplate {
   archetypes: ArchetypeCode[];
   /** Signal-taxonomy codes that boost rank when detected. */
   signals: string[];
+  /**
+   * Canonical signal-weight platform keys this angle delivers on
+   * (google, yelp, facebook, apple, bbb, …). Feeds the platform-priority
+   * ranking boost (CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §2): a hook whose
+   * platform carries a high signal_weight × gap_severity score outranks
+   * one on a low-scoring platform at equal signal severity — when two
+   * platforms need repair, the pitch leads where the customers are.
+   * Omit for website-side or channel-agnostic angles (website is not a
+   * signal-weighted platform).
+   */
+  platforms?: string[];
   /** Email subject line — merge placeholders allowed. */
   subject: string;
   /** Five-beat body — merge placeholders allowed. */
@@ -118,6 +129,7 @@ export const HOOK_LIBRARY: HookTemplate[] = [
     label: 'Google Business Profile verification & optimization',
     archetypes: ['A3', 'A4'],
     signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_SERVICE_MENU', 'DS_OUTDATED_HOURS', 'DS_PHOTO_DEFICIT', 'DS_BROKEN_PROFILE_LINK', 'DS_OUTDATED_HOLIDAY_HOURS'],
+    platforms: ['google'],
     subject: 'quick question about your Google listing',
     body: `{{salutation}} I was looking up {{category}} in {{city}} earlier and noticed your Google listing is probably sitting around a C-minus for completeness — hours, categories, photos, that kind of thing.
 
@@ -148,6 +160,9 @@ Want me to send over what I found?
     label: 'Business-name and NAP normalization',
     archetypes: ['A3'],
     signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'WC_URL_MISMATCH'],
+    // NAP normalization fixes drift on every directory — score against the
+    // strongest weighted platform so it tracks wherever the gap matters most.
+    platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
     subject: 'your business shows up a little differently everywhere',
     body: `{{salutation}} Quick one — I pulled up your business across a few directories (Google, Yelp, Facebook) and noticed the name and phone number don't quite match everywhere.
 
@@ -176,6 +191,7 @@ Want me to send it over?
     label: 'Hours synchronization',
     archetypes: ['A3'],
     signals: ['DS_OUTDATED_HOURS', 'DS_OUTDATED_HOLIDAY_HOURS'],
+    platforms: ['google', 'yelp', 'facebook'],
     subject: 'are your hours right everywhere?',
     body: `{{salutation}} I noticed your posted hours aren't quite the same across your listings — one place says open, another's a little different.
 
@@ -403,6 +419,7 @@ Want me to send it over?
     label: 'Claim & verify your listing',
     archetypes: ['A3', 'A5'],
     signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_PROFILE'],
+    platforms: ['google'],
     subject: 'your Google listing isn\'t claimed yet',
     body: `{{salutation}} Quick one — I noticed your Google listing isn't claimed, which means anyone can suggest edits to it (and a couple of the directories already disagree with each other).
 
@@ -431,6 +448,7 @@ Want me to send the steps?
     label: 'Repair packages — fix the worst first, in phases',
     archetypes: ['A3', 'A5'],
     signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'DS_BROKEN_PROFILE_LINK', 'DS_CLAIMED_STATUS'],
+    platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
     subject: 'you don\'t have to fix all of it at once',
     body: `{{salutation}} I pulled up your listings and a few things are off — the name and phone don't match everywhere, and one of your profile links is dead.
 
@@ -457,6 +475,7 @@ Want me to send the priority list?
     label: 'Listing monitoring — keep it from drifting again',
     archetypes: ['A3', 'A5'],
     signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'DS_OUTDATED_HOURS', 'DS_OUTDATED_HOLIDAY_HOURS'],
+    platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
     subject: 'who keeps your listings in sync?',
     body: `{{salutation}} Quick question — once your listings are cleaned up, who keeps them that way?
 
@@ -539,6 +558,7 @@ Want me to send it over?
     label: 'Compliant review acquisition',
     archetypes: ['A1'],
     signals: ['RA_LOW_REVIEW_VOLUME', 'RA_REVIEW_DROUGHT'],
+    platforms: ['google', 'yelp', 'facebook'],
     subject: 'noticed you don\'t have many reviews up yet',
     body: `{{salutation}} I checked your online reviews and noticed there aren't many up yet.
 
@@ -567,6 +587,7 @@ Want me to walk you through how it works?
     label: 'Trust and testimonial amplification',
     archetypes: ['A1', 'A2'],
     signals: ['RA_UNADDRESSED_POSITIVE_BACKLOG'],
+    platforms: ['google', 'yelp', 'facebook'],
     subject: 'you\'ve got fans and nobody knows it',
     body: `{{salutation}} From what I found, people genuinely love your shop — good word of mouth, a few glowing mentions here and there.
 
@@ -595,6 +616,7 @@ Want me to show you what that'd look like?
     label: 'Local SEO',
     archetypes: ['A5', 'A6'],
     signals: ['RA_LOW_REVIEW_VOLUME', 'DS_MISSING_PROFILE'],
+    platforms: ['google'],
     subject: 'a quick look at how easy you are to find',
     body: `{{salutation}} I did a quick search for {{category}} near me in {{city}} and your shop wasn't showing up on the first page.
 
@@ -623,6 +645,10 @@ Want me to send mine over?
     label: 'Cross-platform profile expansion',
     archetypes: ['A3', 'A5'],
     signals: ['DS_MISSING_PROFILE', 'DS_BROKEN_PROFILE_LINK'],
+    // Expansion lands on whichever weighted platforms the business is
+    // missing — score across the full directory set so the boost follows
+    // the highest weight × gap surface.
+    platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb', 'nextdoor'],
     subject: 'you\'re on Google — but that might be it',
     body: `{{salutation}} Looked you up and found you on one platform, but not much beyond that — Yelp, Facebook, Nextdoor, that sort of thing.
 
@@ -651,6 +677,7 @@ Want me to send the list?
     label: 'Photo and storefront-content setup',
     archetypes: ['A6'],
     signals: ['DS_PHOTO_DEFICIT', 'VP_MISSING_PROJECT_PHOTOS'],
+    platforms: ['google', 'yelp', 'facebook'],
     subject: 'your listing could use a few more photos',
     body: `{{salutation}} Noticed your online listings are pretty light on photos — maybe none at all.
 
@@ -679,6 +706,7 @@ Want me to send it over?
     label: 'Mobile click-to-call optimization',
     archetypes: ['A4'],
     signals: ['WC_MOBILE_FRICTION', 'WC_MISSING_CTA'],
+    platforms: ['google'],
     subject: 'quick test on your listing from my phone',
     body: `{{salutation}} I tried calling your shop straight from your Google listing on my phone, and it wasn't a one-tap call — had to dig for the number.
 
@@ -707,6 +735,7 @@ Want me to send it?
     label: 'Reputation monitoring',
     archetypes: ['A1', 'A2'],
     signals: ['RA_UNANSWERED_COMPLAINTS', 'VP_STALE_SOCIAL_ACTIVITY'],
+    platforms: ['google', 'yelp', 'facebook', 'bbb'],
     subject: 'who\'s watching your reviews?',
     body: `{{salutation}} Quick question — is anyone keeping an eye on new reviews as they come in across your listings?
 
@@ -735,6 +764,7 @@ Want me to show you how it'd work for your shop?
     label: 'Zero footprint — no online presence found',
     archetypes: ['A3', 'A4'],
     signals: ['WC_MISSING_WEBSITE', 'DS_MISSING_PROFILE', 'CP_MISSING_CONTACT_INFO', 'EF_ZERO_INDEXED_PRESENCE', 'DS_ZERO_INDEXED_PRESENCE'],
+    platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
     subject: 'couldn\'t find you online at all',
     body: `{{salutation}} I went looking for {{business}} online — Google, your own website, the usual places — and honestly couldn't find much of anything.
 

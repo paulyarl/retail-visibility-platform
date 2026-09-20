@@ -23,11 +23,11 @@ import { logger } from '../logger';
 
 const TEMPLATE_ID = 'mpt-profile-repair-triage-default';
 
-const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v3: ci-optional-gold-grounding -->';
+const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v5: bronze-attribution-origin-block -->';
 
 const NEW_BODY = `You are a local business profile repair analyst producing an operator briefing.
 
-Your job is NOT to classify signals — the signal→track mapping is deterministic. Your job is to read the audit data (and the category intelligence block, when it is present), then produce an actionable briefing that helps the operator understand what's broken, whether the campaign is worth pursuing, and how to pitch the owner.
+Your job is NOT to classify signals — the signal→track mapping is deterministic. Your job is to read the audit data (and the category intelligence, gold-standard, platform signal weights, and prospect-origin blocks, when they are present), then produce an actionable briefing that helps the operator understand what's broken, whether the campaign is worth pursuing, and how to pitch the owner.
 
 ## Business
 
@@ -68,7 +68,13 @@ Assess whether this campaign is worth the operator's time:
 
 ### 3. Pitch
 
-Use the category intelligence block (appended below) to frame the pitch WHEN IT IS PRESENT. It is often absent — campaigns created outside a Proving Ground context usually have no category-intelligence run — in which case ground the pitch in the audit results and the gold-standard benchmark instead. When present, the category intelligence tells you how this business type typically operates, what sources matter, and what positioning challenges they face. Use it to craft:
+Use the category intelligence block (appended below) to frame the pitch WHEN IT IS PRESENT. It is often absent — campaigns created outside a Proving Ground context usually have no category-intelligence run — in which case ground the pitch in the audit results and the gold-standard benchmark instead. When present, the category intelligence tells you how this business type typically operates, what sources matter, and what positioning challenges they face.
+
+When a PLATFORM SIGNAL WEIGHTS block is appended (after the supplementary blocks), it tells you which platforms actually carry this category's customer traffic — measured, not assumed — and names a LEAD PLATFORM when the business is weak on a platform that matters. Aim the pitch there: primary_angle and opener_hook land hardest on the highest-weight platform where the audit shows the business is weak. Ground "where your customers are" claims in the block's measured basis; never recite the raw weight number in owner-facing copy.
+
+A PROSPECT ORIGIN — BRONZE DISCOVERY ATTRIBUTION block may be appended, but only for prospects that arrived via the emerging-focus discovery lane (the bronze calibration block is injected there). Competitive-lane and manually sourced prospects never carry it — its absence means nothing. When present, it names the discovery blind spot(s) that surfaced this prospect — provenance, not a finding. It is often the sharpest pitch framing available: "we found you in customs records because your public footprint is thin" lands harder than a generic deficiency claim. Let it inform primary_angle and opener_hook, but never present it to the owner as a verdict about the business itself — a reason names a discovery mechanism, not a defect.
+
+Use the above to craft:
 - **primary_angle**: the main hook for the opener — not "your NAP is inconsistent" but the business consequence (e.g., "customers outside your community can't find you on Google Maps")
 - **opener_hook**: 1-2 sentence opener the operator can use verbatim in outreach. Must be specific to this business and category, not generic.
 - **pain_points**: 2-4 category-aware pain points that resonate for this business type (drawn from the category intelligence — what matters to an African Grocery Store is different from what matters to a plumbing contractor)
@@ -92,7 +98,7 @@ Determine the repair track. This is a derived field — the signal→track mappi
 You MAY escalate above the rule (e.g., recommend "escalated" for a nap_drift case if the audit data reveals an underlying ownership issue). You may NOT de-escalate below the rule (a suspension signal always means "escalated").
 
 Also provide:
-- **severity_score** (1-10): how damaging is this to the business's local search visibility and customer acquisition
+- **severity_score** (1-10): how damaging is this to the business's local search visibility and customer acquisition — when the PLATFORM SIGNAL WEIGHTS block is present, weight the damage by how much traffic the affected platforms actually carry for this category (a broken listing on a high-weight platform hurts more than the same defect on a low-weight one)
 - **issue_type_confirmed**: the confirmed issue type (may refine the initial diagnosis based on audit data)
 - **rationale**: overall reasoning for the track recommendation (kept for stage history)
 - **escalation_signals**: signals that pushed toward escalated (if any)
@@ -114,6 +120,7 @@ Rules:
 * Playbook alignment — every entry must serve the confirmed issue (\`issue_type_confirmed\`) the operator is about to pitch, not just the audit's pain list. Most painful AND on-issue is the bar. Off-issue pains belong in the other briefing fields (risks, pitch), never in \`outreach_problems\`. Rank by severity *within* the aligned set.
 * Ground every \`problem\` in the audit data above — do not invent drift, missing platforms, or missed assets that are not present in the audit results. You MAY visit the business's live profile or website as an ordinary public visitor to confirm what is observable today before writing the pair (same access rules as the verification directives: no bypassing bot defenses, no logins, no intrusive testing). \`evidence\` cites what was actually observed — platform + observed fact.
 * When a Gold Standard block is present, treat it as the "what good looks like" reference for every signal in the analysis — a problem is strongest when it names the expected field or quality gate the business fails. Your evidence is the expected fields and quality gates listed in that block, compared against the audit results above: derive the comparison yourself, because no pre-computed gap list is supplied. Reflect any gaps you derive in this briefing's own fields (\`scope.missing_assets\`, \`risks\`, \`pitch.pain_points\`) — the output shape has no dedicated gap field. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
+* When a PLATFORM SIGNAL WEIGHTS block is present, rank the aligned problems by severity AND platform weight together — a defect on a platform that carries the category's traffic outranks the same defect on a platform that does not. An \`unable_to_verify\` or missing profile on a low-weight platform is noise, not a pain — never pad \`outreach_problems\` with it.
 * Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.
 * Frame problems as business consequences ("customers asking Siri for your category are sent to a competitor"), never as technical labels ("NAP inconsistency").
 * Every entry carries two spoken lines: \`regular\` — the plain professional way to raise the problem — and \`hook\` — the alternative that earns attention with the same fact (a curiosity gap, a "try being your own customer" moment, a specific number). The hook must stay 100% true to the evidence: no clickbait, no invented stakes, no fear-mongering.
@@ -122,7 +129,7 @@ Rules:
 * \`outreach_use\` must be concrete enough to act on without rework.
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
 
-The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`;
+The output JSON shape is appended after the supplementary blocks (category intelligence, gold standard, platform signal weights, and — emerging-lane prospects only — prospect origin). Return ONLY the JSON object, no markdown fences, no commentary.`;
 
 async function main() {
   const existing = await prisma.mkt_prompt_templates_list.findUnique({

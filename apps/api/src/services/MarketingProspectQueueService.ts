@@ -938,6 +938,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
             seek_batch_id: entry.seek_batch_id ?? undefined,
             discovery_signals: (entry.discovery_signals as string[]) ?? [],
             discovery_provenance: (entry.discovery_provenance as any[]) ?? [],
+            // Bronze reason attribution rides the business_snapshot (written
+            // by the discovery card's Queue/Verify action) — the catalog
+            // reason(s) directly responsible for the find (spec §7.4).
+            bronze_attribution: (snapshot.bronze_attribution as any[]) ?? undefined,
           };
           discoveryContext = validateDiscoveryContext(rawContext);
           if (!discoveryContext) {

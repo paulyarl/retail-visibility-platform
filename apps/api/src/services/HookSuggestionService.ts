@@ -31,6 +31,7 @@ import type { BusinessAnalysisAuditData } from './outreach-openers/archetype-sel
 import type { DetectedSignal } from './triage/types';
 import BusinessContextService from './deliverable/BusinessContextService';
 import { computeSignalSeverity, severityRank, type SignalSeverity } from './outreach-openers/signal-magnitude';
+import type { LeadPlatformSelection } from './intelligence/IntelligenceProfileService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -48,11 +49,19 @@ export interface HookSuggestionResult {
   archetypeSource: 'triage' | 'fallback';
   /**
    * The merge values used to resolve the hooks (business, city, category,
-   * salutation, sender_name, claim_url …), nulls omitted. Exposed so the
-   * Pitch Construction tab can pre-populate its Construction Variables from
-   * the same backend resolve that makes the hooks business-name-aware.
+   * salutation, sender_name, claim_url, lead_platform …), nulls omitted.
+   * Exposed so the Pitch Construction tab can pre-populate its Construction
+   * Variables from the same backend resolve that makes the hooks
+   * business-name-aware.
    */
   mergeContext: Record<string, string>;
+  /**
+   * Platforms ranked by signal_weight × gap_severity (spec §2) — the
+   * priority order the hook ranking followed. [0] is the lead platform:
+   * where the category's customers are AND the business shows gaps.
+   * Empty when no weights resolved.
+   */
+  platform_priorities: LeadPlatformSelection[];
   suggestions: RankedHook[];
 }
 
@@ -167,7 +176,35 @@ export class HookSuggestionService extends BaseService {
       category: category ? category.toLowerCase() : null,
       sender_name: senderName,
       claim_url: claimUrl,
+      lead_platform: null,
     };
+
+    // 6b. Platform-aware priority (CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §2):
+    //     rank platforms by signal_weight × gap_severity — the same formula
+    //     that picks the opener's lead platform, generalized to a ranking.
+    //     A hook attached to a high-scoring platform outranks one on a
+    //     low-scoring platform at equal signal severity, and the lead
+    //     platform becomes the {{lead_platform}} merge var for pitch copy.
+    //     Best-effort: unresolved → empty priorities → legacy ordering.
+    let platformPriorities: LeadPlatformSelection[] = [];
+    try {
+      const {
+        IntelligenceProfileService,
+        rankPlatformPriorities,
+        signalPlatformDisplayName,
+      } = await import('./intelligence/IntelligenceProfileService');
+      const resolvedWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightsForCampaign(campaign as any, auditData, ctx);
+      platformPriorities = rankPlatformPriorities(auditData, resolvedWeights);
+      const lead = platformPriorities[0];
+      if (lead) {
+        mergeContext.lead_platform = signalPlatformDisplayName(lead.platform);
+      }
+    } catch {
+      // Weight resolution is best-effort — hooks rank by severity alone and
+      // {{lead_platform}} stays a visible placeholder.
+    }
+    const platformScores = new Map(platformPriorities.map((p) => [p.platform, p.score]));
 
     // 7. Extract V3 emerging archetype for rank boost (after archetype affinity,
     //    before signal-match tie-break). Best-effort — no audit means no boost.
@@ -185,7 +222,7 @@ export class HookSuggestionService extends BaseService {
     }
 
     // 8. Rank + resolve
-    const ranked = this.rankHooks(resolved.archetype, signalCodes, emergingAngles, signalSeverity);
+    const ranked = this.rankHooks(resolved.archetype, signalCodes, emergingAngles, signalSeverity, platformScores);
     const suggestions: RankedHook[] = ranked.map((entry, idx) => ({
       ...entry.template,
       rank: idx + 1,
@@ -206,6 +243,7 @@ export class HookSuggestionService extends BaseService {
       archetype: resolved.archetype,
       archetypeSource: resolved.source,
       mergeContext: exposedMergeContext,
+      platform_priorities: platformPriorities,
       suggestions,
     };
   }
@@ -229,12 +267,21 @@ export class HookSuggestionService extends BaseService {
    *   3b. Sum of severity weights (quantity-quality hybrid)
    * This ensures a crisis-matching hook always ranks above a cosmetic-only
    * hook, regardless of how many cosmetic signals match.
+   *
+   * Both severity keys are scaled by (1 + platformScore), where
+   * platformScore is the hook platform's signal_weight × gap_severity
+   * (spec §2) — severity becomes platform-aware: the same problem on the
+   * platform that carries this category's traffic outranks one on a
+   * low-signal platform. A residual platformScore tie-break orders the
+   * signal-less tail by platform pull. When no weights resolve, every
+   * score is 0 and the ordering is byte-identical to legacy.
    */
   private rankHooks(
     archetype: ArchetypeCode,
     signalCodes: Set<string>,
     emergingAngles: HookAngle[] = [],
     signalSeverity: Map<string, SignalSeverity> = new Map(),
+    platformScores: Map<string, number> = new Map(),
   ): { template: HookTemplate; matchedSignals: string[] }[] {
     // Precompute emerging boost positions (lower = stronger boost)
     const emergingBoostPos = new Map<HookAngle, number>();
@@ -254,6 +301,12 @@ export class HookSuggestionService extends BaseService {
         ? Math.max(...matchedSeverities.map(severityRank))
         : 0;
       const severitySum = matchedSeverities.reduce((sum, sev) => sum + severityRank(sev), 0);
+      // Platform-aware score (spec §2): the hook's platforms' best
+      // signal_weight × gap_severity. 0 for untagged/unweighted hooks.
+      const platformScore = Math.max(
+        0,
+        ...(template.platforms ?? []).map((p) => platformScores.get(p) ?? 0),
+      );
       return {
         template,
         matchedSignals,
@@ -263,6 +316,7 @@ export class HookSuggestionService extends BaseService {
         signalCount: matchedSignals.length,
         maxSeverityRank,
         severitySum,
+        platformScore,
         catalogIdx,
       };
     }).sort((a, b) => {
@@ -277,13 +331,24 @@ export class HookSuggestionService extends BaseService {
       if (a.hasEmergingBoost && b.hasEmergingBoost) {
         return a.emergingBoost - b.emergingBoost;
       }
-      // 3a. Max severity among matched signals — crisis > material > cosmetic
-      if (a.maxSeverityRank !== b.maxSeverityRank) {
-        return b.maxSeverityRank - a.maxSeverityRank;
+      // 3a. Max severity among matched signals, scaled by platform pull —
+      //     the same problem on a high-weight platform outranks one on a
+      //     low-weight platform.
+      const aMax = a.maxSeverityRank * (1 + a.platformScore);
+      const bMax = b.maxSeverityRank * (1 + b.platformScore);
+      if (aMax !== bMax) {
+        return bMax - aMax;
       }
-      // 3b. Severity-weighted sum (quantity-quality hybrid within same max tier)
-      if (a.severitySum !== b.severitySum) {
-        return b.severitySum - a.severitySum;
+      // 3b. Severity-weighted sum, same platform scaling
+      const aSum = a.severitySum * (1 + a.platformScore);
+      const bSum = b.severitySum * (1 + b.platformScore);
+      if (aSum !== bSum) {
+        return bSum - aSum;
+      }
+      // 3c. Residual platform pull — orders signal-less hooks toward the
+      //     platform where the category's customers are.
+      if (a.platformScore !== b.platformScore) {
+        return b.platformScore - a.platformScore;
       }
       // 4. Catalog order (deterministic)
       return a.catalogIdx - b.catalogIdx;
@@ -306,7 +371,8 @@ export class HookSuggestionService extends BaseService {
       .replace(/\{\{city\}\}/g, ctx.city ?? '{{city}}')
       .replace(/\{\{category\}\}/g, ctx.category ?? '{{category}}')
       .replace(/\{\{sender_name\}\}/g, ctx.sender_name ?? '{{sender_name}}')
-      .replace(/\{\{claim_url\}\}/g, ctx.claim_url ?? '{{claim_url}}');
+      .replace(/\{\{claim_url\}\}/g, ctx.claim_url ?? '{{claim_url}}')
+      .replace(/\{\{lead_platform\}\}/g, ctx.lead_platform ?? '{{lead_platform}}');
   }
 
   // ─── Sender name resolution ───────────────────────────────────────────
@@ -368,6 +434,13 @@ interface MergeContext {
   category: string | null;
   sender_name: string | null;
   claim_url: string | null;
+  /**
+   * Display name of the lead platform (signal_weight × gap_severity argmax,
+   * spec §2) — "Google", "Yelp", … for pitch copy like "your customers are
+   * on {{lead_platform}}". Null when no weights resolve; the placeholder
+   * stays visible.
+   */
+  lead_platform: string | null;
 }
 
 // ─── Export singleton ───────────────────────────────────────────────────

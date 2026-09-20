@@ -20,7 +20,7 @@ import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEG
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
-import { IntelligenceProfileService, type PromptResolution } from './intelligence/IntelligenceProfileService';
+import { IntelligenceProfileService, type PromptResolution, type ResolvedSignalWeight } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
@@ -508,6 +508,13 @@ export class MarketingExecutionService extends BaseService {
     // Auto-source domain-specific variables if missing/empty in caller variables
     let effectiveVariables = { ...(input.variables || {}) };
 
+    // Hoisted for the signal_triage amplification path: the profile-repair
+    // seek auto-source below resolves these once; the amplification path
+    // reuses them for the platform signal-weight context block (no second
+    // resolution — one interpretation of signal weight per render).
+    let resolvedSignalWeights: Map<string, ResolvedSignalWeight> | undefined;
+    let seekAuditData: any = null;
+
     // Category-set enrichment (PG shelf sweep): auto-source {{markets}} from
     // the sweep payload on discovery_context.shelf_sweep.markets so the
     // category-scope set template can enumerate the residual markets. Runs
@@ -536,6 +543,7 @@ export class MarketingExecutionService extends BaseService {
             orderBy: { created_at: 'desc' },
           });
         }
+        seekAuditData = audit?.audit_data ?? null;
 
         // 1. Profile Repair templates
         if (isProfileRepair) {
@@ -543,9 +551,15 @@ export class MarketingExecutionService extends BaseService {
 
           if (promptType === 'seek') {
             // Phase 6 — signal-aligned gap gate (undefined → legacy set).
+            // Full resolution is retained on resolvedSignalWeights so the
+            // signal_triage amplification path can append the platform
+            // signal-weight context block without a second DB read.
             const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
-            const platformSignalWeights = await IntelligenceProfileService.getInstance()
-              .resolveSignalWeightMapForCampaign(input.campaign, audit?.audit_data, ctx);
+            resolvedSignalWeights = await IntelligenceProfileService.getInstance()
+              .resolveSignalWeightsForCampaign(input.campaign, audit?.audit_data, ctx);
+            const platformSignalWeights = resolvedSignalWeights
+              ? Object.fromEntries([...resolvedSignalWeights].map(([k, v]) => [k, v.weight]))
+              : undefined;
             const seekDefaults = repairService.buildSeekVariables(input.campaign, audit, platformSignalWeights);
             if (!effectiveVariables.audit_signals || !String(effectiveVariables.audit_signals).trim()) {
               effectiveVariables.audit_signals = seekDefaults.audit_signals;
@@ -1585,21 +1599,55 @@ export class MarketingExecutionService extends BaseService {
       const campaignCity = (input.campaign as any).city || null;
       const campaignState = (input.campaign as any).state || null;
       const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, campaignCity, campaignState, ctx);
+      const goldStandardBlock = goldStandard
+        ? profileService.serializeGoldStandard(goldStandard, 'target')
+        : '';
+
+      // Platform signal-weight context (spec §2) — the fix package's
+      // per-platform ordering follows weight × gap severity, same as the
+      // triage briefing and outreach surfaces. Lazy resolution: the seek
+      // auto-source only resolves weights for seek prompts; seekAuditData
+      // is already loaded for every business-scope campaign.
+      if (resolvedSignalWeights === undefined) {
+        try {
+          resolvedSignalWeights = await profileService.resolveSignalWeightsForCampaign(
+            input.campaign,
+            seekAuditData,
+            ctx,
+          );
+        } catch {
+          // Weight resolution is best-effort — the block is omitted.
+        }
+      }
+      const signalWeightBlock = profileService.serializeSignalWeightContext(
+        resolvedSignalWeights,
+        seekAuditData,
+      );
+
+      if (!goldStandardBlock && !signalWeightBlock) {
+        // No gold standard and no weights — return base render (degraded
+        // but functional).
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+      const amplified = baseRendered
+        + (goldStandardBlock ? '\n' + goldStandardBlock : '')
+        + (signalWeightBlock ? '\n' + signalWeightBlock : '');
+      if (signalWeightBlock) {
+        logger.info('Platform signal-weight context injected into fulfill prompt', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          weightedPlatforms: [...(resolvedSignalWeights?.keys() ?? [])].join(','),
+        });
+      }
       if (!goldStandard) {
-        // No active gold standard — return base render (degraded but functional).
         return {
-          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
           resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
         };
       }
-      const goldStandardBlock = profileService.serializeGoldStandard(goldStandard, 'target');
-      if (!goldStandardBlock) {
-        return {
-          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
-          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
-        };
-      }
-      const amplified = baseRendered + '\n' + goldStandardBlock;
       logger.info('Gold standard target injected into fulfill prompt', ctx, {
         campaignId: input.campaign.id,
         category,
@@ -1637,6 +1685,32 @@ export class MarketingExecutionService extends BaseService {
         };
       }
 
+      // Platform signal-weight context (CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC
+      // §2 "Reported, not applied") — the measured "where the category's
+      // customers are" fact plus the lead platform (weight × gap severity).
+      // Independent of the CI/gold-standard blocks: weights live on every
+      // active profile for the category, so the block can resolve even when
+      // neither does. Reuses the seek auto-source resolution — '' when
+      // nothing resolved (legacy render preserved).
+      const signalWeightBlock = profileService.serializeSignalWeightContext(
+        resolvedSignalWeights,
+        seekAuditData,
+      );
+      if (signalWeightBlock) {
+        logger.info('Platform signal-weight context injected into signal triage prompt', ctx, {
+          campaignId: input.campaign.id,
+          category,
+          weightedPlatforms: [...(resolvedSignalWeights?.keys() ?? [])].join(','),
+        });
+      }
+
+      // Bronze reason attribution (spec §7.4) — compact prospect-origin block.
+      // The full Discovery Leads block stays suppressed for triage (T5b), but
+      // attribution is provenance (how the prospect was found), not a
+      // hypothesis — it is pitch framing for the briefing's Pitch section.
+      // '' when the campaign carries no bronze attribution.
+      const bronzeOriginBlock = this.renderBronzeAttributionBlock(input.campaign);
+
       // CI is discovery-focus only (competitive → emerging). Resolving with no
       // focus would return the newest active row regardless of focus — which is
       // the gold_standards profile when no discovery profile exists, rendering
@@ -1656,7 +1730,9 @@ export class MarketingExecutionService extends BaseService {
           if (gsBlock) {
             // Discovery leads stay suppressed for signal_triage (T5b) —
             // repair signals are the sole hypothesis input for triage.
-            let gsAmplified = baseRendered + '\n' + gsBlock;
+            let gsAmplified = baseRendered + '\n' + gsBlock
+              + (signalWeightBlock ? '\n' + signalWeightBlock : '')
+              + (bronzeOriginBlock ? '\n\n' + bronzeOriginBlock : '');
             const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
             if (marketCtxBlock) {
               gsAmplified = gsAmplified + '\n' + marketCtxBlock;
@@ -1676,7 +1752,9 @@ export class MarketingExecutionService extends BaseService {
             };
           }
         }
-        let noProfileAmplified = baseRendered;
+        let noProfileAmplified = baseRendered
+          + (signalWeightBlock ? '\n' + signalWeightBlock : '')
+          + (bronzeOriginBlock ? '\n\n' + bronzeOriginBlock : '');
         const marketCtxNoProfile = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
         if (marketCtxNoProfile) {
           noProfileAmplified = noProfileAmplified + '\n' + marketCtxNoProfile;
@@ -1716,6 +1794,13 @@ export class MarketingExecutionService extends BaseService {
             goldStandardProfileId: goldStandard.id,
           });
         }
+      }
+
+      if (signalWeightBlock) {
+        amplified = amplified + '\n' + signalWeightBlock;
+      }
+      if (bronzeOriginBlock) {
+        amplified = amplified + '\n\n' + bronzeOriginBlock;
       }
 
       // Market context injection (seed gains market awareness): category
@@ -2067,11 +2152,12 @@ export class MarketingExecutionService extends BaseService {
     }
 
     // Drop if no signals AND no provenance AND no priority/fit/identity meta
-    // (nothing to render as leads).
+    // AND no bronze attribution (nothing to render as leads).
     const signals = Array.isArray(ctx.discovery_signals) ? ctx.discovery_signals : [];
     const provenance = Array.isArray(ctx.discovery_provenance) ? ctx.discovery_provenance : [];
+    const attribution = Array.isArray(ctx.bronze_attribution) ? ctx.bronze_attribution : [];
     const hasMeta = ctx.business_seek_priority || ctx.category_fit || ctx.identity_confidence;
-    if (signals.length === 0 && provenance.length === 0 && !hasMeta) return '';
+    if (signals.length === 0 && provenance.length === 0 && !hasMeta && attribution.length === 0) return '';
 
     // ─── Focus parenthetical ───────────────────────────────────────────
     const focusLabel =
@@ -2140,10 +2226,74 @@ export class MarketingExecutionService extends BaseService {
       lines.push('');
     }
 
+    // Bronze reason attribution (Bronze Standard System, spec §7.4) — the
+    // catalog reason(s) directly responsible for surfacing this prospect.
+    // Framed as context on HOW the business was found, not a finding.
+    if (attribution.length > 0) {
+      lines.push('Bronze attribution (the discovery blind spot that surfaced this business):');
+      for (const a of attribution) {
+        lines.push(`- ${a.reason_key}${a.basis ? ` — ${a.basis}` : ''}`);
+      }
+      lines.push('');
+    }
+
     // Absence rules paragraph (mandatory — spec §8.5)
     lines.push('Absence rules: "not found on a platform during discovery" is a discovery');
     lines.push('signal, not proof of absence. Re-verify platform absence yourself before');
     lines.push('emitting DS_MISSING_PROFILE or similar.');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Render the compact "Prospect Origin — Bronze Attribution" block for the
+   * signal_triage (profile-repair operator briefing) prompt — spec §7.4.
+   *
+   * The full Discovery Leads block is deliberately suppressed on the triage
+   * path (T5b: repair signals are the sole hypothesis input). Bronze
+   * attribution is not a hypothesis — it is provenance: the catalog blind
+   * spot that surfaced this prospect. That is pitch material ("we found you
+   * through customs manifests because your public footprint is thin"), so a
+   * narrow, non-hypothesis block is appended alongside the other
+   * supplementary blocks when the campaign carries discovery_context with
+   * attribution.
+   *
+   * Returns '' when there is no attribution — byte-identical render for
+   * campaigns that did not arrive via a bronze-attributed discovery find.
+   */
+  private renderBronzeAttributionBlock(campaign: any): string {
+    const rawContext = campaign?.discovery_context;
+    if (!rawContext || typeof rawContext !== 'object') return '';
+
+    let ctx: DiscoveryContext;
+    try {
+      ctx = discoveryContextSchema.parse(rawContext);
+    } catch {
+      return '';
+    }
+
+    const attribution = Array.isArray(ctx.bronze_attribution)
+      ? ctx.bronze_attribution.filter((a) => a && typeof a.reason_key === 'string' && a.reason_key.trim())
+      : [];
+    if (attribution.length === 0) return '';
+
+    const lines: string[] = [
+      '=== PROSPECT ORIGIN — BRONZE DISCOVERY ATTRIBUTION ===',
+      'This prospect was surfaced by the bronze-standard discovery pipeline. The',
+      'catalog blind spot(s) below record HOW the business was found — a discovery',
+      'mechanism, not an audit finding and not a defect claim.',
+      '',
+    ];
+    for (const a of attribution) {
+      lines.push(`- ${a.reason_key}${a.basis ? ` — ${a.basis}` : ''}`);
+    }
+    lines.push('');
+    lines.push(
+      'Use this as pitch framing: the reason names why mainstream discovery missed',
+      'this business, which is often the sharpest version of the outreach story',
+      '(e.g. "we found you in customs records because you have no web presence").',
+      'Never present it to the owner as a verdict about the business itself.',
+    );
 
     return lines.join('\n');
   }

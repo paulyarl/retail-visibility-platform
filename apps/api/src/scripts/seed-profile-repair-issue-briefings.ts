@@ -22,7 +22,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
-const BRIEFING_MARKER = 'ISSUE-SPECIFIC REPAIR BRIEFING — PRIMARY OUTPUT\n<!-- issue-briefing-v2: outreach-problems -->';
+const BRIEFING_MARKER = 'ISSUE-SPECIFIC REPAIR BRIEFING — PRIMARY OUTPUT\n<!-- issue-briefing-v3: signal-weight-priority -->';
 
 /**
  * §6. Operator Outreach Problems & Solutions — shared directive appended to
@@ -46,6 +46,7 @@ Produce \`outreach_problems\` — an array of ONE to THREE (1–3) problem-and-s
 Rules:
 * 1–3 entries — the most painful problems only, ranked by severity. One well-grounded pair beats three thin ones: if the audit surfaces a single real issue, return just that one. Never pad the count with duplicated, weak, or invented problems; never exceed three — when pains are numerous, the three most painful win. Each entry addresses a distinct customer-facing consequence — do not restate the same defect once per platform.
 * Playbook alignment — ${playbookBinding} Most painful AND on-issue is the bar. Off-issue pains belong in the other briefing fields (risks, pitch), never in \`outreach_problems\`. Rank by severity *within* the aligned set.
+* Platform signal weights — when the PLATFORM SIGNAL WEIGHTS block is appended below, rank the aligned problems by severity × platform weight: a gap on the LEAD PLATFORM (where the category's customers actually are) outranks an equal-severity gap on a low-signal platform, and the opener_hook and first outreach pair should lead with it. Never recite the raw weight to the owner — say "that's where your customers look first." A low-weight platform's absence is not a meaningful pain — do not pad the count with it. When the block is absent, rank by severity alone.
 * Ground every \`problem\` in the audit data above — do not invent drift, missing platforms, or missed assets that are not present in the audit results. You MAY visit the business's live profile or website as an ordinary public visitor to confirm what is observable today before writing the pair (same access rules as the verification directives: no bypassing bot defenses, no logins, no intrusive testing). \`evidence\` cites what was actually observed — platform + observed fact.
 * When a Gold Standard block is present, treat it as the "what good looks like" reference for every signal in the analysis — a problem is strongest when it names the expected field or quality gate the business fails. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
 * Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.

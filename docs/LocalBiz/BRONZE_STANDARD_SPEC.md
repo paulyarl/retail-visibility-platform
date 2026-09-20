@@ -1026,6 +1026,54 @@ provenance means "this was observed out-of-loop and persists until an
 operator removes it." Without this rule every re-scan would silently discard
 the highest-trust slots — the exact ground truth the design depends on.
 
+### 7.4 Reason attribution on prospects
+
+Calibration that never gets credited is a sunk cost — the operator cannot
+tell whether the catalog's hunt list actually surfaces prospects or is just
+prompt overhead. So when a bronze profile is active and a catalog reason is
+**directly responsible** for a prospect's finding, the emerging scan
+attributes the find in its output JSON.
+
+- **Per-candidate field.** `discovered_businesses[].bronze_attribution` (and
+  the mirrored `qualifying_businesses[]` records) is an array of
+  `{ reason_key, basis }` — the reason's catalog key plus a one-line basis
+  naming the vector or signal that produced the find.
+- **Causal, not resemblance.** Attribution is emitted only when the reason
+  *caused* the find: its `expected_vectors` surfaced the business, or its
+  signal vocabulary is what identifies the business as
+  category-qualified-but-invisible. A candidate mainstream discovery would
+  have found anyway carries no attribution, and a candidate that merely
+  resembles a bronze exemplar but was not reached through the reason's
+  vector gets none either.
+- **Conditional emission.** The instruction lives in the injected
+  `BRONZE STANDARD — MARKET CALIBRATION` block (`serializeBronzeStandard`,
+  `discovery` role), so a scan with no active bronze profile is
+  byte-identical to the pre-attribution contract. The field is optional +
+  nullable in `intelligence-discovery.schema.ts` — legacy payloads import
+  cleanly.
+- **Downstream carry.** The audit card renders attribution as a
+  `bronze: <reason_key>` chip and writes it into `business_snapshot` on
+  queue-add; `createCampaignFromQueue` folds it into `discovery_context`,
+  so the business audit's "Discovery leads" block can name the blind spot
+  that surfaced the prospect. It also spills into the **triage briefing**:
+  the signal_triage path keeps the full Discovery Leads block suppressed
+  (repair signals are the sole hypothesis input) but appends a compact
+  `PROSPECT ORIGIN — BRONZE DISCOVERY ATTRIBUTION` block — attribution is
+  provenance, not a hypothesis, and it is pitch framing for the briefing's
+  Pitch section. The block exists only for **emerging-lane** prospects —
+  the calibration block is injected on `focus === 'emerging'` alone, so
+  competitive-lane and manually sourced prospects never carry it and its
+  absence means nothing. (Competitive-lane attribution is a separate
+  question — the bronze block is framing, not a benchmark, there. It is
+  spec'd in `COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC.md` as an exposure
+  vocabulary, not a causal-find vocabulary.) No migration —
+  `business_snapshot` and `discovery_context`
+  are JSONB.
+
+This gives the catalog a falsifiable yield signal: reasons that repeatedly
+appear in attribution are load-bearing; reasons that never do are candidates
+for revision or deprecation (§3.5.6).
+
 ---
 
 ## 8. Evidence Rules

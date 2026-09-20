@@ -783,6 +783,31 @@ export class ManualOutreachScriptService extends BaseService {
       );
     }
 
+    // {{lead_platform}} — the platform where this category's customers are
+    // AND the audit shows gaps (signal_weight × gap_severity argmax, spec
+    // §2). Best-effort: unresolved leaves the placeholder visible like any
+    // other missing merge.
+    try {
+      const { default: BusinessContextService } = await import(
+        './deliverable/BusinessContextService'
+      );
+      const {
+        IntelligenceProfileService,
+        rankPlatformPriorities,
+        signalPlatformDisplayName,
+      } = await import('./intelligence/IntelligenceProfileService');
+      const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+      const auditData = auditResult?.auditData ?? null;
+      const resolvedWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightsForCampaign(campaign, auditData, ctx);
+      const lead = rankPlatformPriorities(auditData, resolvedWeights)[0] ?? null;
+      if (lead) {
+        merge.lead_platform = signalPlatformDisplayName(lead.platform);
+      }
+    } catch {
+      // Best-effort — {{lead_platform}} stays a visible placeholder.
+    }
+
     // Values are `string | null` internally; resolveMerge keeps the
     // placeholder on null. Cast to the outward shape.
     const out: Record<string, string> = {};

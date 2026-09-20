@@ -34,6 +34,7 @@ const {
   mockUsersFindUnique,
   mockGetClaimKitMeta,
   mockGetReportKitMeta,
+  mockResolveSignalWeights,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockResolveCampaignArchetype: vi.fn(),
@@ -53,7 +54,22 @@ const {
   mockUsersFindUnique: vi.fn(),
   mockGetClaimKitMeta: vi.fn(),
   mockGetReportKitMeta: vi.fn(),
+  mockResolveSignalWeights: vi.fn(),
 }));
+
+// The pure helpers (rankPlatformPriorities, signalPlatformDisplayName) run
+// for real — only the DB-touching service is stubbed.
+vi.mock('../intelligence/IntelligenceProfileService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../intelligence/IntelligenceProfileService')>();
+  return {
+    ...actual,
+    IntelligenceProfileService: {
+      getInstance: () => ({
+        resolveSignalWeightsForCampaign: mockResolveSignalWeights,
+      }),
+    },
+  };
+});
 
 // The shared outreach-link resolver (§5.1) resolves claim/report QR URLs
 // through these two kit services.
@@ -200,6 +216,7 @@ beforeEach(() => {
   mockGetLatestAuditData.mockResolvedValue(null);
   mockGetClaimKitMeta.mockResolvedValue(null);
   mockGetReportKitMeta.mockResolvedValue(null);
+  mockResolveSignalWeights.mockResolvedValue(undefined); // no weights → legacy order
 });
 
 // ─── Assembly tests ──────────────────────────────────────────────────────
@@ -980,5 +997,64 @@ describe('CallScriptService.assembleForSeed', () => {
     expect(result.callContext.qr_url_report_text).toBe('https://app.example.com/rt/abc123');
     // Canonical claim path — never the legacy /directory/claim form.
     expect(result.callContext.claim_url).not.toContain('/directory/claim/');
+  });
+});
+
+// ─── Platform-weighted ranking (spec §2 — signal_weight × gap_severity) ──
+
+describe('Platform-weighted phone-hook ranking', () => {
+  it('exposes the lead platform in callContext and boosts yelp-tagged hooks over google-only hooks', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A3',
+      source: 'fallback',
+      reason: 'test',
+    });
+    // Yelp is weak AND weighted; google carries a weight but shows no gap —
+    // the lead platform must be a verified weakness, not just high traffic.
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: { gap_analysis: [{ platform: 'yelp', severity: 'non_negotiable' }] },
+    });
+    mockResolveSignalWeights.mockResolvedValue(new Map([
+      ['google', { platform: 'google', weight: 0.9, scope: 'national' }],
+      ['yelp', { platform: 'yelp', weight: 0.4, scope: 'national' }],
+    ]));
+    // One signal matched by BOTH gbp_verification (google-only tag) and
+    // hours_sync / listing_monitoring (tagged incl. yelp → yelp's 0.4 score).
+    mockGetTriageResult.mockResolvedValue({
+      detectedSignals: [{ code: 'DS_OUTDATED_HOURS', label: 'Outdated Hours' }],
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+    const angles = result.hookOptions.map((h) => h.angle);
+
+    expect(result.callContext.platform_premise).toEqual({
+      platform: 'yelp',
+      display_name: 'Yelp',
+      signal_weight: 0.4,
+      gap_severity: 1,
+      scope: 'national',
+      basis: null,
+    });
+    expect(result.callContext.platform_priorities).toHaveLength(1);
+    expect(result.callContext.platform_priorities[0].platform).toBe('yelp');
+    // Equal severity: the yelp-scoring hooks outrank the google-only hook —
+    // the inverse of unweighted catalog order.
+    expect(angles.indexOf('hours_sync')).toBeLessThan(angles.indexOf('gbp_verification'));
+    expect(angles.indexOf('listing_monitoring')).toBeLessThan(angles.indexOf('gbp_verification'));
+  });
+
+  it('unresolved weights → legacy ordering, null premise, visible {{lead_platform}}', async () => {
+    mockResolveSignalWeights.mockResolvedValue(undefined);
+    mockGetTriageResult.mockResolvedValue({
+      detectedSignals: [{ code: 'DS_OUTDATED_HOURS', label: 'Outdated Hours' }],
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+    const angles = result.hookOptions.map((h) => h.angle);
+
+    expect(result.callContext.platform_premise).toBeNull();
+    expect(result.callContext.platform_priorities).toEqual([]);
+    // Legacy catalog order inside the same severity tier: gbp_verification first.
+    expect(angles.indexOf('gbp_verification')).toBeLessThan(angles.indexOf('hours_sync'));
   });
 });

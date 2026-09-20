@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   intelligenceDiscoverySchemaWithRefinements as schema,
   normalizeIntelligenceDiscoveryPayload,
+  validateDiscoveryContext,
   INTELLIGENCE_DISCOVERY_SCHEMA_NAME,
 } from '../../validators/intelligence-discovery.schema';
 
@@ -385,6 +386,73 @@ describe('intelligence_discovery schema — gold standard candidate fields', () 
     });
     const result = schema.safeParse(data);
     expect(result.success).toBe(true);
+  });
+});
+
+// ─── Bronze reason attribution (Bronze Standard System, spec §7.4) ────────
+
+describe('intelligence_discovery schema — bronze_attribution', () => {
+  it('accepts a candidate with bronze_attribution entries', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        bronze_attribution: [
+          { reason_key: 'trade_manifest_only', basis: 'US Customs bill-of-lading sweep surfaced the importer' },
+          { reason_key: 'endonym_only_name' },
+        ],
+      })],
+      qualifying_businesses: [validCandidate({
+        bronze_attribution: [
+          { reason_key: 'trade_manifest_only', basis: 'US Customs bill-of-lading sweep surfaced the importer' },
+          { reason_key: 'endonym_only_name' },
+        ],
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts null bronze_attribution (block present, no reason responsible)', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({ bronze_attribution: null })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts candidates without bronze_attribution (no bronze block / legacy)', () => {
+    const data = validDiscovery();
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a bronze_attribution entry missing reason_key', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        bronze_attribution: [{ basis: 'no key' }] as any,
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── validateDiscoveryContext — bronze attribution carry (spec §7.4) ──────
+
+describe('validateDiscoveryContext — bronze_attribution', () => {
+  it('keeps an attribution-only context (attribution counts as content)', () => {
+    const ctx = validateDiscoveryContext({
+      focus: 'emerging',
+      bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs sweep' }],
+    });
+    expect(ctx).not.toBeNull();
+    expect(ctx?.bronze_attribution?.[0]?.reason_key).toBe('trade_manifest_only');
+  });
+
+  it('drops attribution entries missing reason_key (invalid context → null)', () => {
+    const ctx = validateDiscoveryContext({
+      bronze_attribution: [{ basis: 'no key' }] as any,
+    });
+    expect(ctx).toBeNull();
   });
 });
 

@@ -59,6 +59,13 @@ export interface DiscoveredBusiness {
     source_url?: string;
     as_of?: string;
   }>;
+  /** Bronze Standard attribution (spec §7.4) — the catalog reason(s)
+   *  directly responsible for surfacing this business, emitted only when a
+   *  bronze market-calibration block was injected into the scan prompt. */
+  bronze_attribution?: Array<{
+    reason_key: string;
+    basis?: string | null;
+  }> | null;
   notes?: string;
   [key: string]: any;
 }
@@ -255,6 +262,10 @@ export default function IntelligenceDiscoveryAuditCard({
           // Sourced attributes ride the snapshot so queue → campaign → seed
           // carries the analyst-recorded evidence (migration 267).
           attributes: Array.isArray(biz.observed_attributes) ? biz.observed_attributes : [],
+          // Bronze reason attribution rides the snapshot so queue →
+          // campaign → audit ("Discovery leads") preserves which catalog
+          // reason surfaced this prospect (spec §7.4).
+          bronze_attribution: Array.isArray(biz.bronze_attribution) ? biz.bronze_attribution : undefined,
         },
         priority: biz.business_seek_priority === 'high' ? 'high' : 'normal',
         // Intelligence discovery columns
@@ -470,6 +481,21 @@ export default function IntelligenceDiscoveryAuditCard({
                             className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800"
                           >
                             {sig}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Bronze reason attribution — which catalog blind spot
+                        surfaced this business (spec §7.4) */}
+                    {Array.isArray(biz.bronze_attribution) && biz.bronze_attribution.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                        {biz.bronze_attribution.map((attr, ai) => (
+                          <span
+                            key={ai}
+                            title={attr.basis ?? undefined}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+                          >
+                            bronze: {attr.reason_key}
                           </span>
                         ))}
                       </div>

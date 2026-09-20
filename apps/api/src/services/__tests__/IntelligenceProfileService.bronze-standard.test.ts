@@ -310,6 +310,18 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       expect(block).toContain('=== END BRONZE STANDARD ===');
     });
 
+    it('discovery block carries the bronze_attribution directive (spec §7.4)', async () => {
+      const block = await service.serializeBronzeStandard(coverageProfile, 'discovery');
+      expect(block).toContain('ATTRIBUTION');
+      expect(block).toContain('bronze_attribution');
+      expect(block).toContain('reason_key');
+    });
+
+    it('establishment_reference block does NOT carry the attribution directive (it produces bronze output, not prospects)', async () => {
+      const block = await service.serializeBronzeStandard(coverageProfile, 'establishment_reference');
+      expect(block).not.toContain('bronze_attribution');
+    });
+
     it('emits the establishment_reference hunt list', async () => {
       const block = await service.serializeBronzeStandard(coverageProfile, 'establishment_reference');
       expect(block).toContain('=== BRONZE STANDARD — NATIONAL REFERENCE ===');

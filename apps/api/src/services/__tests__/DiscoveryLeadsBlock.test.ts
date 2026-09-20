@@ -26,6 +26,7 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     serializeGoldStandard: vi.fn(() => ''),
     resolveBronzeStandard: vi.fn(async () => null),
     serializeBronzeStandard: vi.fn(async () => ''),
+    serializeSignalWeightContext: vi.fn(() => ''),
     renderBusinessProfileBlock: vi.fn(
       (profile: any, _city?: string | null, headerTitle?: string) =>
         `\n${headerTitle ? `=== ${headerTitle} ===\n` : ''}PROFILE_BLOCK:${profile.id}:v${profile.version}`,
@@ -240,6 +241,31 @@ describe('Discovery Leads block (Migration 253 — GAP-E3)', () => {
     expect(renderedPrompt).toContain('- INT_UNKNOWN_NEW_CODE — INT_UNKNOWN_NEW_CODE');
   });
 
+  it('T3d-bronze: renders bronze attribution (spec §7.4) and survives on attribution-only context', async () => {
+    const template = makeTemplate('seek');
+    const campaign = makeCampaign({
+      discovery_context: {
+        focus: 'emerging',
+        bronze_attribution: [
+          { reason_key: 'trade_manifest_only', basis: 'US Customs bill-of-lading sweep surfaced the importer' },
+          { reason_key: 'endonym_only_name' },
+        ],
+      },
+    });
+
+    const { renderedPrompt, resolution } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: undefined,
+    });
+
+    expect(renderedPrompt).toContain('=== DISCOVERY LEADS (VERIFY — NOT FINDINGS) ===');
+    expect(renderedPrompt).toContain('Bronze attribution');
+    expect(renderedPrompt).toContain('- trade_manifest_only — US Customs bill-of-lading sweep surfaced the importer');
+    expect(renderedPrompt).toContain('- endonym_only_name');
+    expect(resolution.discovery_leads_injected).toBe(true);
+  });
+
   it('T3d: focus omission — context without focus renders without the focus parenthetical', async () => {
     const template = makeTemplate('seek');
     const campaign = makeCampaign({
@@ -383,6 +409,44 @@ describe('Discovery Leads block (Migration 253 — GAP-E3)', () => {
 
     expect(renderedPrompt).not.toContain('DISCOVERY LEADS');
     expect(resolution.discovery_leads_injected).toBeFalsy();
+  });
+
+  it('T5b-bronze: signal_triage still suppresses DISCOVERY LEADS but renders the compact bronze origin block (spec §7.4)', async () => {
+    const template = makeTemplate('seek', 'profile_repair');
+    const campaign = makeCampaign({
+      discovery_context: {
+        ...sampleContext,
+        bronze_attribution: [
+          { reason_key: 'trade_manifest_only', basis: 'customs sweep' },
+        ],
+      },
+    });
+
+    const { renderedPrompt } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: { audit_signals: 'DS_CLAIMED_STATUS' },
+    });
+
+    // Full leads block stays suppressed for triage (T5b invariant)…
+    expect(renderedPrompt).not.toContain('DISCOVERY LEADS');
+    // …but attribution is provenance, not a hypothesis — it renders as pitch
+    // framing for the operator briefing.
+    expect(renderedPrompt).toContain('=== PROSPECT ORIGIN — BRONZE DISCOVERY ATTRIBUTION ===');
+    expect(renderedPrompt).toContain('- trade_manifest_only — customs sweep');
+  });
+
+  it('T5b-bronze-absent: signal_triage renders no bronze origin block when context has no attribution', async () => {
+    const template = makeTemplate('seek', 'profile_repair');
+    const campaign = makeCampaign({ discovery_context: sampleContext });
+
+    const { renderedPrompt } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: { audit_signals: 'DS_CLAIMED_STATUS' },
+    });
+
+    expect(renderedPrompt).not.toContain('PROSPECT ORIGIN');
   });
 
   it('T5c: no block for intelligence-scope prompt even when context exists', async () => {

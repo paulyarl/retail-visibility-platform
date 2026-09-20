@@ -23,13 +23,29 @@ const {
   mockGetCampaign,
   mockGetForCampaign,
   mockGetLatestAuditData,
+  mockResolveSignalWeights,
 } = vi.hoisted(() => ({
   mockResolveCampaignArchetype: vi.fn(),
   mockGetTriageResult: vi.fn(),
   mockGetCampaign: vi.fn(),
   mockGetForCampaign: vi.fn(),
   mockGetLatestAuditData: vi.fn(),
+  mockResolveSignalWeights: vi.fn(),
 }));
+
+// The pure helpers (rankPlatformPriorities, signalPlatformDisplayName) run
+// for real — only the DB-touching service is stubbed.
+vi.mock('../intelligence/IntelligenceProfileService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../intelligence/IntelligenceProfileService')>();
+  return {
+    ...actual,
+    IntelligenceProfileService: {
+      getInstance: () => ({
+        resolveSignalWeightsForCampaign: mockResolveSignalWeights,
+      }),
+    },
+  };
+});
 
 vi.mock('../OutreachOpenerService', () => ({
   resolveCampaignArchetype: mockResolveCampaignArchetype,
@@ -130,6 +146,7 @@ beforeEach(() => {
   mockGetCampaign.mockResolvedValue(makeCampaign());
   mockGetForCampaign.mockResolvedValue(null); // no worksheet → inline fallback
   mockGetLatestAuditData.mockResolvedValue(null); // no audit → no emerging boost
+  mockResolveSignalWeights.mockResolvedValue(undefined); // no weights → legacy order
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────
@@ -519,5 +536,53 @@ describe('Emerging-archetype rank boost', () => {
 
     expect(result.suggestions).toHaveLength(23);
     expect(result.suggestions[0].angle).toBe('gbp_verification');
+  });
+});
+
+// ─── Platform-weighted ranking (spec §2 — signal_weight × gap_severity) ──
+
+describe('Platform-weighted ranking', () => {
+  it('boosts hooks on the lead platform above equal-severity hooks on ungapped platforms', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A3',
+      source: 'fallback',
+      reason: 'test',
+    });
+    // Yelp is weak AND weighted; google carries a weight but shows no gap —
+    // the lead platform must be a verified weakness, not just high traffic.
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: { gap_analysis: [{ platform: 'yelp', severity: 'non_negotiable' }] },
+    });
+    mockResolveSignalWeights.mockResolvedValue(new Map([
+      ['google', { platform: 'google', weight: 0.9, scope: 'national' }],
+      ['yelp', { platform: 'yelp', weight: 0.4, scope: 'national' }],
+    ]));
+    // One signal matched by BOTH gbp_verification (google-only tag) and
+    // hours_sync / listing_monitoring (tagged incl. yelp → yelp's 0.4 score).
+    mockGetTriageResult.mockResolvedValue(makeTriageResult(['DS_OUTDATED_HOURS']));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+    const angles = result.suggestions.map((s) => s.angle);
+
+    expect(result.platform_priorities).toHaveLength(1);
+    expect(result.platform_priorities[0].platform).toBe('yelp');
+    expect(result.mergeContext.lead_platform).toBe('Yelp');
+    // Equal severity across the three matched hooks: the yelp-scoring hooks
+    // outrank the google-only hook — the inverse of unweighted catalog order.
+    expect(angles.indexOf('hours_sync')).toBeLessThan(angles.indexOf('gbp_verification'));
+    expect(angles.indexOf('listing_monitoring')).toBeLessThan(angles.indexOf('gbp_verification'));
+  });
+
+  it('unresolved weights → legacy ordering and no lead_platform merge', async () => {
+    mockResolveSignalWeights.mockResolvedValue(undefined);
+    mockGetTriageResult.mockResolvedValue(makeTriageResult(['DS_OUTDATED_HOURS']));
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+    const angles = result.suggestions.map((s) => s.angle);
+
+    expect(result.platform_priorities).toEqual([]);
+    expect(result.mergeContext.lead_platform).toBeUndefined();
+    // Legacy catalog order inside the same severity tier: gbp_verification first.
+    expect(angles.indexOf('gbp_verification')).toBeLessThan(angles.indexOf('hours_sync'));
   });
 });

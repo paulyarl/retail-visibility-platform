@@ -120,6 +120,21 @@ const discoveredBusinessSchema = z.object({
       as_of: z.string().nullable().optional(),
     }).passthrough(),
   ).nullable().optional(),
+
+  // Bronze reason attribution (Bronze Standard System, spec §7.4) — present
+  // only when a "BRONZE STANDARD — MARKET CALIBRATION" block was injected
+  // into the prompt AND a catalog reason was directly responsible for the
+  // find (its expected_vectors surfaced the business, or its signal
+  // vocabulary is what qualifies the business as category-fit-but-invisible).
+  // A candidate mainstream discovery would have found anyway carries no
+  // attribution. Optional + nullable; legacy payloads import cleanly.
+  bronze_attribution: z.array(
+    z.object({
+      reason_key: z.string().min(1),
+      // One-line causal basis — which vector or signal produced the find.
+      basis: z.string().nullable().optional(),
+    }).passthrough(),
+  ).nullable().optional(),
 }).passthrough();
 
 // ─── Top-level schema ────────────────────────────────────────────────────
@@ -368,6 +383,9 @@ Return a single JSON object with this structure:
       "gold_standard_match": <true | false | null — ONLY when a GOLD STANDARD DISCOVERY BENCHMARK block is present in the prompt; null when no gold standard block>,
       "gold_standard_gate_results": [
         { "gate": "<gate name>", "passed": <true | false>, "platform": "<platform name, optional>" }
+      ],
+      "bronze_attribution": [
+        { "reason_key": "<catalog reason key from the BRONZE STANDARD block>", "basis": "<one line — which vector or signal produced this find>" }
       ]
     }
   ],
@@ -423,6 +441,7 @@ Rules:
 - OBSERVED ATTRIBUTES: For each candidate, record the attribute chips its platform profiles actually display (payments accepted, accessibility, ownership, service options, certifications) in observed_attributes — one entry per attribute with the platform, a snake_case key, a display label, the profile URL where it was observed, and the date observed. Never infer attributes from the business's category, name, or neighborhood — record only what the profile itself shows. Omit the field entirely when no attribute chips are observed.
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
+- BRONZE REASON ATTRIBUTION: When a "=== BRONZE STANDARD — MARKET CALIBRATION ===" block is present in the prompt, attribute each candidate to the catalog reason(s) DIRECTLY RESPONSIBLE for the find — the reason whose expected_vectors surfaced the business, or whose signal vocabulary is what identifies it as category-qualified-but-invisible. Emit one bronze_attribution entry per responsible reason with its reason_key exactly as given in the block and a one-line basis naming the vector or signal that produced the find. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway gets NO attribution, and a candidate that merely looks like a bronze exemplar but was not reached through the reason's vector gets none either. When NO bronze calibration block is present, or no reason was responsible for a candidate, OMIT bronze_attribution entirely.
 `;
 
 // ─── Discovery Context (Migration 253 — GAP-E3) ──────────────────────────
@@ -452,6 +471,16 @@ export const discoveryContextSchema = z.object({
   seek_batch_id: z.string().nullable().optional(),
   discovery_signals: z.array(z.string().regex(/^INT_/)).optional(),
   discovery_provenance: z.array(discoveryProvenanceSchema).optional(),
+  // Bronze Standard System (spec §7.4) — catalog reason(s) directly
+  // responsible for the prospect's discovery, carried forward from the
+  // scan's per-candidate bronze_attribution so the business audit's
+  // Discovery Leads block can name the blind spot that surfaced it.
+  bronze_attribution: z.array(
+    z.object({
+      reason_key: z.string().min(1),
+      basis: z.string().nullable().optional(),
+    }).passthrough(),
+  ).optional(),
 }).passthrough();
 
 export type DiscoveryContext = z.infer<typeof discoveryContextSchema>;
@@ -469,7 +498,8 @@ export function validateDiscoveryContext(raw: unknown): DiscoveryContext | null 
     const hasSignals = Array.isArray(parsed.discovery_signals) && parsed.discovery_signals.length > 0;
     const hasProvenance = Array.isArray(parsed.discovery_provenance) && parsed.discovery_provenance.length > 0;
     const hasMeta = parsed.business_seek_priority || parsed.category_fit || parsed.identity_confidence;
-    if (!hasSignals && !hasProvenance && !hasMeta) return null;
+    const hasBronzeAttribution = Array.isArray(parsed.bronze_attribution) && parsed.bronze_attribution.length > 0;
+    if (!hasSignals && !hasProvenance && !hasMeta && !hasBronzeAttribution) return null;
     return parsed;
   } catch {
     return null;

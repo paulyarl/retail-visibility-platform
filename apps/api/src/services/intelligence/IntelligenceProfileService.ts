@@ -542,6 +542,37 @@ export function platformGapSeverity(auditData: any): Map<string, number> {
 }
 
 /**
+ * Rank every platform that BOTH carries a resolved signal weight AND shows
+ * at least one audit gap, by signal_weight × gap_severity (descending).
+ * Generalizes the lead-platform formula — entry [0] IS the lead platform —
+ * so outreach surfaces (hook ranking, call scripts, pitch ordering) can
+ * order work across ALL weighted platforms, not just the argmax.
+ */
+export function rankPlatformPriorities(
+  auditData: any,
+  resolved: Map<string, ResolvedSignalWeight> | undefined,
+): LeadPlatformSelection[] {
+  if (!resolved || resolved.size === 0) return [];
+  const severity = platformGapSeverity(auditData);
+  const out: LeadPlatformSelection[] = [];
+  for (const [platform, gapSeverity] of severity) {
+    const w = resolved.get(platform);
+    if (!w || w.weight == null) continue;
+    out.push({
+      platform,
+      score: w.weight * gapSeverity,
+      signalWeight: w.weight,
+      gapSeverity,
+      basis: w.basis ?? null,
+      scope: w.scope ?? null,
+      profileId: w.profileId ?? null,
+    });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out;
+}
+
+/**
  * Select the lead platform for the pitch: argmax(signal_weight × gap_severity)
  * over platforms that BOTH carry a resolved signal weight AND show at least
  * one gap. Returns null when no platform qualifies — either nothing is weak
@@ -551,26 +582,77 @@ export function selectLeadPlatform(
   auditData: any,
   resolved: Map<string, ResolvedSignalWeight>,
 ): LeadPlatformSelection | null {
-  if (!resolved || resolved.size === 0) return null;
-  const severity = platformGapSeverity(auditData);
-  let best: LeadPlatformSelection | null = null;
-  for (const [platform, gapSeverity] of severity) {
-    const w = resolved.get(platform);
-    if (!w || w.weight == null) continue;
-    const score = w.weight * gapSeverity;
-    if (!best || score > best.score) {
-      best = {
-        platform,
-        score,
-        signalWeight: w.weight,
-        gapSeverity,
-        basis: w.basis ?? null,
-        scope: w.scope ?? null,
-        profileId: w.profileId ?? null,
-      };
-    }
+  return rankPlatformPriorities(auditData, resolved)[0] ?? null;
+}
+
+/**
+ * Owner/operator-facing display name for a canonical signal platform key
+ * (the audit platform vocabulary: google, yelp, facebook, apple, bbb, …).
+ * Aliases fold via normalizeSignalPlatformKey; unknown keys pass through
+ * capitalized so a new platform never renders as a raw snake_case slug.
+ */
+export function signalPlatformDisplayName(platform: string | null | undefined): string | null {
+  const key = normalizeSignalPlatformKey(platform);
+  if (!key) return null;
+  const NAMES: Record<string, string> = {
+    google: 'Google',
+    yelp: 'Yelp',
+    facebook: 'Facebook',
+    apple: 'Apple Maps',
+    bbb: 'BBB',
+    bing: 'Bing Places',
+    nextdoor: 'Nextdoor',
+  };
+  return NAMES[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/**
+ * Serialize the resolved signal weights as a prompt block for reported-use
+ * consumers (the triage briefing and repair seeks). This is the "where the
+ * category's customers are" context (spec §2 "Reported, not applied"): the
+ * analyst reads it to weight severity and aim the pitch at the platforms
+ * that carry this category's traffic. Read-only — the block never feeds
+ * back into scoring. Returns '' when nothing resolved.
+ */
+export function serializeSignalWeightContextBlock(
+  resolved: Map<string, ResolvedSignalWeight>,
+  lead: LeadPlatformSelection | null,
+): string {
+  if (!resolved || resolved.size === 0) return '';
+  const lines: string[] = [
+    '',
+    "=== PLATFORM SIGNAL WEIGHTS — WHERE THIS CATEGORY'S CUSTOMERS ARE ===",
+    'Measured signal weight per platform for this category (0–1): how much of the',
+    "category's customer attention, reviews, and profile depth each platform carries,",
+    'derived from gold-standard exemplars. (scope) shows which geographic layer',
+    'produced the estimate — a confident local reading outranks the national one.',
+    '',
+  ];
+  const sorted = [...resolved.values()].sort((a, b) => b.weight - a.weight);
+  for (const w of sorted) {
+    const basis = w.basis ? ` — basis: ${w.basis}` : '';
+    lines.push(`  ${w.platform}: ${w.weight} (${w.scope ?? 'national'})${basis}`);
   }
-  return best;
+  if (lead) {
+    lines.push('');
+    lines.push(
+      `LEAD PLATFORM: ${lead.platform} — the highest-weight platform where the audit ` +
+        'also shows gaps. The "your customers are on this platform" premise lands here.',
+    );
+  }
+  lines.push('');
+  lines.push(
+    'DIRECTIVE: Reported context, not a scoring input — use it to weight the briefing, ' +
+      'never as a defect by itself. The same problem is a bigger pain on a high-weight ' +
+      'platform than on a low-weight one, and an absence or unable_to_verify on a ' +
+      'low-weight platform is noise, not a selling point. Rank outreach_problems and ' +
+      "pitch.pain_points toward the platforms that carry this category's traffic, and " +
+      'prefer the lead platform named above for primary_angle / opener_hook when it aligns with the ' +
+      'confirmed issue. Never recite the raw weight number in owner-facing copy — the ' +
+      "weight is your evidence, not the owner's vocabulary.",
+  );
+  lines.push('');
+  return lines.join('\n');
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -2522,6 +2604,21 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   /**
+   * Serialize a resolved signal-weight set into the prompt block the triage
+   * briefing / repair seeks consume (spec §2 "Reported, not applied").
+   * Computes the lead platform (weight × gap severity) from the audit data.
+   * Returns '' when no weights resolved — callers skip the block silently
+   * (legacy render preserved).
+   */
+  serializeSignalWeightContext(
+    resolved: Map<string, ResolvedSignalWeight> | undefined,
+    auditData: any,
+  ): string {
+    if (!resolved || resolved.size === 0) return '';
+    return serializeSignalWeightContextBlock(resolved, selectLeadPlatform(auditData, resolved));
+  }
+
+  /**
    * Build the scan variables for a gold-standard scan prompt.
    *
    * The gold-standard scan template references {category} and {platform}.
@@ -2982,6 +3079,10 @@ export class IntelligenceProfileService extends BaseService {
       lines.push('');
       lines.push(
         'DIRECTIVE: This is the bronze standard for this market — what a hard-to-find business looks like here, and which vectors reach it. Use it to FRAME your research, not to filter candidates: filled slots are concrete calibration exemplars (a hidden business in this market looks like this, and this vector reveals it); empty slots state what is not yet covered; the vector log shows which vectors are proven here and which have not been executed. Low digital quality describes observable online fields only — never infer low revenue, low customer volume, poor products, or sales readiness.',
+      );
+      lines.push('');
+      lines.push(
+        'ATTRIBUTION: When a candidate in your output exists in your result set BECAUSE of a reason below — its expected_vectors surfaced the business, or its signal vocabulary is what identifies the business as category-qualified-but-invisible — record that reason in the candidate\'s bronze_attribution array as { "reason_key": "<key>", "basis": "<which vector or signal produced the find>" }. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway carries no bronze_attribution.',
       );
       lines.push('');
     }

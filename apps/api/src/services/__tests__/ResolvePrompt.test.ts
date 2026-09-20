@@ -23,6 +23,8 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     serializeGoldStandard: vi.fn((_profile: any, _role: string) => ''),
     resolveBronzeStandard: vi.fn(async () => null),
     serializeBronzeStandard: vi.fn((_profile: any, _role: string) => ''),
+    resolveSignalWeightsForCampaign: vi.fn(async () => undefined),
+    serializeSignalWeightContext: vi.fn((_resolved: any, _auditData: any) => ''),
     renderBusinessProfileBlock: vi.fn(
       (profile: any, _city?: string | null, headerTitle?: string) =>
         `\n${headerTitle ? `=== ${headerTitle} ===\n` : ''}PROFILE_BLOCK:${profile.id}:v${profile.version}`,
@@ -144,6 +146,8 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     // catalog service to an empty catalog.
     mockProfileService.resolveBronzeStandard.mockImplementation(async () => null);
     mockProfileService.serializeBronzeStandard.mockImplementation(() => '');
+    mockProfileService.resolveSignalWeightsForCampaign.mockImplementation(async () => undefined);
+    mockProfileService.serializeSignalWeightContext.mockImplementation(() => '');
     mockCatalogService.applicableReasons.mockImplementation(async () => []);
     mockCatalogService.currentRevision.mockImplementation(async () => 1);
     mockCatalogService.serializeCatalogBlock.mockImplementation(() => '');
@@ -278,6 +282,75 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     expect(renderedPrompt).toBe(baseRendered);
     expect(resolution.intelligence_mode).toBe('none');
     expect(mockProfileService.resolve).not.toHaveBeenCalled();
+  });
+
+  it('fulfill_target + resolved signal weights → injects platform context even with no gold standard', async () => {
+    // The fulfill prompt orders its per-platform fix sheets by
+    // signal_weight × gap severity — the block must render even when no
+    // gold-standard benchmark resolves.
+    mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+    const resolved = new Map<string, any>([
+      ['google', { platform: 'google', weight: 0.9, scope: 'national' }],
+      ['yelp', { platform: 'yelp', weight: 0.4, scope: 'national' }],
+    ]);
+    mockProfileService.resolveSignalWeightsForCampaign.mockResolvedValueOnce(resolved);
+    mockProfileService.serializeSignalWeightContext.mockReturnValueOnce(
+      '=== PLATFORM SIGNAL WEIGHTS ===\n  google: 0.9 (national)',
+    );
+
+    const auditData = { platforms: { yelp: { profile_status: 'missing' } } };
+    const template = makeTemplate('fulfill');
+    const campaign = {
+      ...makeCampaign('business', 'Auto Repair'),
+      mkt_audits_list: [{ platform: 'business_analysis', audit_data: auditData }],
+    };
+
+    const { renderedPrompt, resolution } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: undefined,
+    });
+
+    expect(renderedPrompt).toContain('PLATFORM SIGNAL WEIGHTS');
+    expect(mockProfileService.resolveSignalWeightsForCampaign)
+      .toHaveBeenCalledWith(campaign, auditData, undefined);
+    expect(mockProfileService.serializeSignalWeightContext)
+      .toHaveBeenCalledWith(resolved, auditData);
+    // No gold standard → no profile attribution, but the weight block landed.
+    expect(resolution.intelligence_mode).toBe('none');
+    expect(resolution.profile_id).toBeNull();
+  });
+
+  it('fulfill_target + gold standard + signal weights → weight block appended after the target block', async () => {
+    const goldStandard = { id: 'gs-auto-repair-001', version: 3, reference_platform: 'google' };
+    mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+    mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD TARGET ===\nExpected fields...');
+    const resolved = new Map<string, any>([
+      ['google', { platform: 'google', weight: 0.9, scope: 'local' }],
+    ]);
+    mockProfileService.resolveSignalWeightsForCampaign.mockResolvedValueOnce(resolved);
+    mockProfileService.serializeSignalWeightContext.mockReturnValueOnce('=== PLATFORM SIGNAL WEIGHTS ===');
+
+    const template = makeTemplate('fulfill');
+    const campaign = {
+      ...makeCampaign('business', 'Auto Repair'),
+      mkt_audits_list: [{ platform: 'business_analysis', audit_data: {} }],
+    };
+
+    const { renderedPrompt, resolution } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: undefined,
+    });
+
+    expect(renderedPrompt).toContain('GOLD STANDARD TARGET');
+    expect(renderedPrompt).toContain('PLATFORM SIGNAL WEIGHTS');
+    expect(renderedPrompt.indexOf('GOLD STANDARD TARGET'))
+      .toBeLessThan(renderedPrompt.indexOf('PLATFORM SIGNAL WEIGHTS'));
+    expect(resolution.intelligence_mode).toBe('profile');
+    expect(resolution.profile_id).toBe('gs-auto-repair-001');
+    expect(mockProfileService.serializeGoldStandard)
+      .toHaveBeenCalledWith(goldStandard, 'target');
   });
 
   it('retainer prompt → no amplification (gate: seek-only)', async () => {
@@ -457,6 +530,93 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       // CI resolution is focus-aware; the focus-less resolve is never used here.
       expect(mockProfileService.resolve).not.toHaveBeenCalled();
       expect(mockProfileService.resolveCategoryIntelligence).toHaveBeenCalledWith('African Grocery Store', 'Test City', undefined, undefined);
+    });
+
+    it('signal_triage + resolved signal weights → injects platform context even with no CI profile or gold standard', async () => {
+      // Signal weight is independent of the CI/gold-standard blocks: weights
+      // live on every active profile for the category, so the platform-context
+      // block must render even when neither benchmark resolves.
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+      const resolved = new Map<string, any>([
+        ['google', { platform: 'google', weight: 0.95, scope: 'national' }],
+        ['yelp', { platform: 'yelp', weight: 0.2, scope: 'national' }],
+      ]);
+      mockProfileService.resolveSignalWeightsForCampaign.mockResolvedValueOnce(resolved);
+      mockProfileService.serializeSignalWeightContext.mockReturnValueOnce(
+        '=== PLATFORM SIGNAL WEIGHTS ===\n  google: 0.95 (national)',
+      );
+
+      const auditData = { platforms: { google: { profile_status: 'unclaimed' } } };
+      const template = makeRepairTemplate();
+      const campaign = {
+        ...makeCampaign('business', 'African Grocery Store'),
+        mkt_audits_list: [{ platform: 'business_analysis', audit_data: auditData }],
+      };
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'nap_drift\nplatform_gap' },
+      });
+
+      expect(renderedPrompt).toContain('PLATFORM SIGNAL WEIGHTS');
+      expect(mockProfileService.resolveSignalWeightsForCampaign)
+        .toHaveBeenCalledWith(campaign, auditData, undefined);
+      expect(mockProfileService.serializeSignalWeightContext)
+        .toHaveBeenCalledWith(resolved, auditData);
+    });
+
+    it('signal_triage + resolved signal weights + gold standard → weight block appended after the benchmark', async () => {
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
+      const goldStandard = { id: 'gs-auto-repair-001', version: 3, reference_platform: 'google' };
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD BENCHMARK ===\nExpected fields...');
+      const resolved = new Map<string, any>([
+        ['google', { platform: 'google', weight: 0.9, scope: 'local' }],
+      ]);
+      mockProfileService.resolveSignalWeightsForCampaign.mockResolvedValueOnce(resolved);
+      mockProfileService.serializeSignalWeightContext.mockReturnValueOnce('=== PLATFORM SIGNAL WEIGHTS ===');
+
+      const template = makeRepairTemplate();
+      const campaign = {
+        ...makeCampaign('business', 'Auto Repair'),
+        mkt_audits_list: [{ platform: 'business_analysis', audit_data: {} }],
+      };
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'nap_drift' },
+      });
+
+      expect(renderedPrompt).toContain('GOLD STANDARD BENCHMARK');
+      expect(renderedPrompt).toContain('PLATFORM SIGNAL WEIGHTS');
+      expect(renderedPrompt.indexOf('GOLD STANDARD BENCHMARK'))
+        .toBeLessThan(renderedPrompt.indexOf('PLATFORM SIGNAL WEIGHTS'));
+    });
+
+    it('signal_triage + no resolved weights → no platform context block (legacy render)', async () => {
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
+      mockProfileService.resolveSignalWeightsForCampaign.mockResolvedValueOnce(undefined);
+      mockProfileService.serializeSignalWeightContext.mockReturnValueOnce('');
+
+      const template = makeRepairTemplate();
+      const campaign = {
+        ...makeCampaign('business', 'Unknown Niche'),
+        mkt_audits_list: [{ platform: 'business_analysis', audit_data: {} }],
+      };
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'nap_drift' },
+      });
+
+      expect(renderedPrompt).not.toContain('PLATFORM SIGNAL WEIGHTS');
+      expect(mockProfileService.serializeSignalWeightContext)
+        .toHaveBeenCalledWith(undefined, {});
     });
   });
 

@@ -63,6 +63,7 @@ import {
   resolveIntakeLinkVarsForCampaign,
 } from './outreach-openers/outreach-link-vars';
 import { computeSignalSeverity, severityRank, type SignalSeverity } from './outreach-openers/signal-magnitude';
+import { signalPlatformDisplayName, type LeadPlatformSelection } from './intelligence/IntelligenceProfileService';
 import type { BusinessAnalysisAuditData } from './outreach-openers/archetype-selection';
 import type { DetectedSignal } from './triage/types';
 import BusinessContextService from './deliverable/BusinessContextService';
@@ -87,6 +88,31 @@ export interface CallContext {
   team_signal: TeamSignalValue;
   gallery_short_url: string | null;
   channel_hint: ChannelHint;
+  /**
+   * Lead platform for the pitch (spec §2 — signal_weight × gap_severity
+   * argmax): where this category's customers are AND the audit shows gaps.
+   * Null when no weights resolve or nothing is weak. Read-only premise for
+   * the operator — never recite the raw weight on the call.
+   */
+  platform_premise: {
+    platform: string;
+    display_name: string | null;
+    signal_weight: number;
+    gap_severity: number;
+    scope: string | null;
+    basis: string | null;
+  } | null;
+  /**
+   * All gapped platforms ranked by signal_weight × gap_severity — the
+   * priority order the hook ranking followed. Empty when unresolved.
+   */
+  platform_priorities: Array<{
+    platform: string;
+    display_name: string | null;
+    score: number;
+    signal_weight: number;
+    gap_severity: number;
+  }>;
 }
 
 export interface AssembledCallScript {
@@ -262,6 +288,7 @@ export class CallScriptService extends BaseService {
       qr_url_report_social: linkVars.qr_url_report_social ?? null,
       qr_url_report_in_person: linkVars.qr_url_report_in_person ?? null,
       qr_url_report_text: linkVars.qr_url_report_text ?? null,
+      lead_platform: null,
     };
 
     // 4. Read worksheet for call context
@@ -316,8 +343,30 @@ export class CallScriptService extends BaseService {
         : 'borderline');
     }
 
+    // 5d. Platform-aware priority (CATEGORY_PLATFORM_SIGNAL_WEIGHT_SPEC §2) —
+    //     rank platforms by signal_weight × gap_severity. Feeds the hook
+    //     ranking boost below, the {{lead_platform}} merge var, and
+    //     callContext.platform_premise so the operator knows where the
+    //     category's customers are. Best-effort: unresolved → empty
+    //     priorities → legacy ordering.
+    let platformPriorities: LeadPlatformSelection[] = [];
+    try {
+      const { IntelligenceProfileService, rankPlatformPriorities } =
+        await import('./intelligence/IntelligenceProfileService');
+      const resolvedWeights = await IntelligenceProfileService.getInstance()
+        .resolveSignalWeightsForCampaign(campaign as any, auditDataForSeverity, ctx);
+      platformPriorities = rankPlatformPriorities(auditDataForSeverity, resolvedWeights);
+    } catch {
+      // Weight resolution is best-effort — hooks rank by severity alone.
+    }
+    const platformScores = new Map(platformPriorities.map((p) => [p.platform, p.score]));
+    const leadPlatform = platformPriorities[0] ?? null;
+    mergeContext.lead_platform = leadPlatform
+      ? signalPlatformDisplayName(leadPlatform.platform)
+      : null;
+
     // 6. Rank + resolve every hook (with emerging-archetype boost + severity weighting)
-    const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles, signalSeverity);
+    const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles, signalSeverity, platformScores);
 
     // 7. Select the hook for Stage 2
     const selectedAngle: HookAngle = (angle && isValidHookAngle(angle))
@@ -382,6 +431,23 @@ export class CallScriptService extends BaseService {
         team_signal: teamSignal,
         gallery_short_url: galleryShortUrl,
         channel_hint: channelHint,
+        platform_premise: leadPlatform
+          ? {
+              platform: leadPlatform.platform,
+              display_name: signalPlatformDisplayName(leadPlatform.platform),
+              signal_weight: leadPlatform.signalWeight,
+              gap_severity: leadPlatform.gapSeverity,
+              scope: leadPlatform.scope,
+              basis: leadPlatform.basis,
+            }
+          : null,
+        platform_priorities: platformPriorities.map((p) => ({
+          platform: p.platform,
+          display_name: signalPlatformDisplayName(p.platform),
+          score: p.score,
+          signal_weight: p.signalWeight,
+          gap_severity: p.gapSeverity,
+        })),
       },
       anchor: anchorBlock,
     };
@@ -865,6 +931,7 @@ export class CallScriptService extends BaseService {
     mergeContext: PhoneMergeContext,
     emergingAngles: HookAngle[] = [],
     signalSeverity: Map<string, SignalSeverity> = new Map(),
+    platformScores: Map<string, number> = new Map(),
   ): RankedPhoneHook[] {
     const emergingBoostPos = new Map<HookAngle, number>();
     emergingAngles.forEach((a, idx) => emergingBoostPos.set(a, idx));
@@ -881,6 +948,12 @@ export class CallScriptService extends BaseService {
         ? Math.max(...matchedSeverities.map(severityRank))
         : 0;
       const severitySum = matchedSeverities.reduce((sum, sev) => sum + severityRank(sev), 0);
+      // Platform-aware score (spec §2): the hook's platforms' best
+      // signal_weight × gap_severity. 0 for untagged/unweighted hooks.
+      const platformScore = Math.max(
+        0,
+        ...(template.platforms ?? []).map((p) => platformScores.get(p) ?? 0),
+      );
       return {
         template,
         hasArchetypeAffinity,
@@ -889,6 +962,7 @@ export class CallScriptService extends BaseService {
         signalCount: matchedSignals.length,
         maxSeverityRank,
         severitySum,
+        platformScore,
         catalogIdx,
         matchedSignals,
       };
@@ -904,13 +978,24 @@ export class CallScriptService extends BaseService {
       if (a.hasEmergingBoost && b.hasEmergingBoost) {
         return a.emergingBoost - b.emergingBoost;
       }
-      // 3a. Max severity among matched signals — crisis > material > cosmetic
-      if (a.maxSeverityRank !== b.maxSeverityRank) {
-        return b.maxSeverityRank - a.maxSeverityRank;
+      // 3a. Max severity among matched signals, scaled by platform pull —
+      //     the same problem on a high-weight platform outranks one on a
+      //     low-weight platform.
+      const aMax = a.maxSeverityRank * (1 + a.platformScore);
+      const bMax = b.maxSeverityRank * (1 + b.platformScore);
+      if (aMax !== bMax) {
+        return bMax - aMax;
       }
-      // 3b. Severity-weighted sum (within same max tier)
-      if (a.severitySum !== b.severitySum) {
-        return b.severitySum - a.severitySum;
+      // 3b. Severity-weighted sum, same platform scaling
+      const aSum = a.severitySum * (1 + a.platformScore);
+      const bSum = b.severitySum * (1 + b.platformScore);
+      if (aSum !== bSum) {
+        return bSum - aSum;
+      }
+      // 3c. Residual platform pull — orders signal-less hooks toward the
+      //     platform where the category's customers are.
+      if (a.platformScore !== b.platformScore) {
+        return b.platformScore - a.platformScore;
       }
       // 4. Catalog order (deterministic)
       return a.catalogIdx - b.catalogIdx;
@@ -1117,6 +1202,13 @@ interface PhoneMergeContext {
   qr_url_report_social: string | null;
   qr_url_report_in_person: string | null;
   qr_url_report_text: string | null;
+  /**
+   * Display name of the lead platform (signal_weight × gap_severity argmax,
+   * spec §2) — "Google", "Yelp", … for spoken lines like "your customers
+   * are on {{lead_platform}}". Null when no weights resolve; the
+   * placeholder stays visible.
+   */
+  lead_platform: string | null;
 }
 
 // ─── Re-exports for route layer ─────────────────────────────────────────
