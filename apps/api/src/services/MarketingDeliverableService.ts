@@ -461,6 +461,7 @@ export class MarketingDeliverableService extends BaseService {
       citation_repair_package: 'Citation & Profile Repair Package',
       repair_completion_report: 'Repair Completion Report',
       product_visibility_preview: 'Product Visibility Preview',
+      website_mockup: 'Website Mockup',
     };
     return labels[type] || type;
   }
