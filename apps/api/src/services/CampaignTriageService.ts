@@ -360,7 +360,12 @@ export class CampaignTriageService extends BaseService {
     // Re-categorize the campaign + apply FITD fee + stamp the effective playbook.
     // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
     // For non-profile_repair playbooks, clear repair_track (not applicable).
-    const targetRepairTrack = playbook.category === 'profile_repair' ? 'standard' : null;
+    // PB-08 is profile_repair by category but is NOT a repair-track campaign —
+    // it is a website acquisition/build motion. Assigning 'standard' would pull
+    // it into RepairFulfillmentService's gates (profile_repair_access intake,
+    // repair execution read model, escalation). Keep it null.
+    const targetRepairTrack =
+      playbook.category === 'profile_repair' && playbook.code !== 'PB-08' ? 'standard' : null;
     await this.assertNoSiblingPlaybookConflict(campaignId, playbook.code, ctx);
 
     await this.prisma.mkt_campaigns_list.update({
@@ -422,7 +427,9 @@ export class CampaignTriageService extends BaseService {
     // + stamp the effective playbook.
     // For profile_repair playbooks, set repair_track to 'standard' (review pipeline).
     // For non-profile_repair playbooks, clear repair_track (not applicable).
-    const overrideRepairTrack = overridePlaybook.category === 'profile_repair' ? 'standard' : null;
+    // PB-08 excluded — website acquisition has no repair track (see accept path).
+    const overrideRepairTrack =
+      overridePlaybook.category === 'profile_repair' && overridePlaybook.code !== 'PB-08' ? 'standard' : null;
     await this.assertNoSiblingPlaybookConflict(campaignId, overridePlaybook.code, ctx);
 
     await this.prisma.mkt_campaigns_list.update({

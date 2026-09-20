@@ -167,8 +167,11 @@ export class BusinessProspectService extends BaseService {
       siblingCategory = playbook.category;
       estimatedFeeCents = playbook.fitdDefaultFeeCents;
       siblingPlaybookCode = playbook.code;
-      // For profile_repair playbooks, default to standard track
-      if (playbook.category === 'profile_repair' && !siblingRepairTrack) {
+      // For profile_repair playbooks, default to standard track — except
+      // PB-08, which shares the category but has no repair track (website
+      // acquisition/build; assigning 'standard' would engage repair
+      // fulfillment flows that don't apply).
+      if (playbook.category === 'profile_repair' && playbook.code !== 'PB-08' && !siblingRepairTrack) {
         siblingRepairTrack = 'standard';
       }
     } else {

@@ -17,6 +17,7 @@ const {
   mockCampaignsList,
   mockStageHistory,
   mockTriageResults,
+  mockGetPlaybookByCode,
 } = vi.hoisted(() => ({
   mockCampaignsList: {
     findUnique: vi.fn(),
@@ -30,6 +31,7 @@ const {
     findUnique: vi.fn(),
     create: vi.fn(),
   },
+  mockGetPlaybookByCode: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -53,16 +55,36 @@ vi.mock('../../lib/id-generator', () => ({
 
 vi.mock('../MarketingPlaybookCatalogService', () => ({
   default: {
-    getPlaybookByCode: vi.fn().mockResolvedValue({
-      id: 'pbk-pb01',
-      code: 'PB-01',
-      category: 'profile_repair',
-      archetype: 'A3',
-      fitdDefaultFeeCents: 14900,
-      matchingRules: { any: [], all: [], none: [], dual: null, confidence: 0.85 },
-    }),
+    getPlaybookByCode: mockGetPlaybookByCode,
   },
 }));
+
+const PB01_PLAYBOOK = {
+  id: 'pbk-pb01',
+  code: 'PB-01',
+  category: 'profile_repair',
+  archetype: 'A3',
+  fitdDefaultFeeCents: 14900,
+  matchingRules: { any: [], all: [], none: [], dual: null, confidence: 0.85 },
+};
+
+const PB08_PLAYBOOK = {
+  id: 'pbk-pb08',
+  code: 'PB-08',
+  category: 'profile_repair',
+  archetype: 'A7',
+  fitdDefaultFeeCents: 49900,
+  matchingRules: { any: [], all: [], none: [], dual: null, confidence: 0.88 },
+};
+
+const PB03_PLAYBOOK = {
+  id: 'pbk-pb03',
+  code: 'PB-03',
+  category: 'profile_repair',
+  archetype: 'A4',
+  fitdDefaultFeeCents: 19900,
+  matchingRules: { any: [], all: [], none: [], dual: null, confidence: 0.70 },
+};
 
 import { BusinessProspectService } from '../BusinessProspectService';
 
@@ -157,7 +179,10 @@ describe('initializeProspectFromCampaign', () => {
 // ─── createSiblingCampaign ───────────────────────────────────────────────
 
 describe('createSiblingCampaign', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetPlaybookByCode.mockResolvedValue(PB01_PLAYBOOK);
+  });
 
   it('creates a sibling with copied business identity + profile_repair category', async () => {
     mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
@@ -261,6 +286,7 @@ describe('createSiblingCampaign', () => {
   });
 
   it('allows coexistence of profile_repair siblings with different playbooks (PB-01 vs PB-03)', async () => {
+    mockGetPlaybookByCode.mockResolvedValue(PB03_PLAYBOOK);
     mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
     // Existing sibling using PB-01 — creating a PB-03 sibling must NOT conflict
     mockCampaignsList.findMany.mockResolvedValue([]);
@@ -287,6 +313,35 @@ describe('createSiblingCampaign', () => {
       }),
     );
     expect(result.id).toBe('mkt-sibling-pb03');
+  });
+
+  it('leaves repair_track null for a PB-08 website-gap sibling (profile_repair category, no repair track)', async () => {
+    mockGetPlaybookByCode.mockResolvedValue(PB08_PLAYBOOK);
+    mockCampaignsList.findUnique.mockResolvedValue({ ...sourceCampaign });
+    mockCampaignsList.findMany.mockResolvedValue([]);
+    mockCampaignsList.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...data, id: 'mkt-sibling-001' }),
+    );
+    mockStageHistory.create.mockResolvedValue({});
+    mockTriageResults.findUnique.mockResolvedValue(null);
+    mockTriageResults.create.mockResolvedValue({});
+
+    await BusinessProspectService.getInstance().createSiblingCampaign({
+      sourceCampaignId: 'mkt-source-001',
+      archetype: 'A7',
+      playbookCode: 'PB-08',
+    });
+
+    expect(mockCampaignsList.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          campaign_category: 'profile_repair',
+          playbook_code: 'PB-08',
+          repair_track: null,
+          estimated_fee_cents: 49900,
+        }),
+      }),
+    );
   });
 
   it('auto-initializes prospect_id on source campaign if missing', async () => {

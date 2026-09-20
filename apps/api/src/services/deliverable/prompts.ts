@@ -561,7 +561,7 @@ Output as structured text.`;
 const DOMAIN_MIGRATION_PLAN_PROMPT = `You are preparing a domain migration plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current web-presence state: {{presence_state}}
-
+{{build_scope}}
 Task: Write the plan to move the business onto an owned domain and point every profile at it. Cover:
 
 ## Domain
@@ -613,6 +613,7 @@ export function buildHomepageMockupPrompt(
 export function buildDomainMigrationPlanPrompt(
   ctx: BusinessContextFields,
   presenceState: string,
+  buildScope?: string,
 ): string {
   return DOMAIN_MIGRATION_PLAN_PROMPT
     .replace('{{business_name}}', ctx.businessName)
@@ -620,5 +621,6 @@ export function buildDomainMigrationPlanPrompt(
     .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
     .replace('{{business_city}}', ctx.city ?? '')
     .replace('{{business_state}}', ctx.state ?? '')
-    .replace('{{presence_state}}', presenceState || 'No owned website detected');
+    .replace('{{presence_state}}', presenceState || 'No owned website detected')
+    .replace('{{build_scope}}', buildScope ? `Recommended build scope: ${buildScope}` : '');
 }

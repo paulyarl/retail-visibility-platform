@@ -2682,6 +2682,10 @@ export default function CampaignDetailClient({
                     ['lead_magnet', 'Lead Magnet'],
                     ['product_visibility_preview', 'Product Visibility Preview'],
                     ['website_mockup', 'Website Mockup'],
+                    // PB-08 — platform-centric build package: the delivery
+                    // artifact behind the mockup (site map, copy spec,
+                    // domain/hosting, QA/launch checklist, profile cutover).
+                    ['website_build_package', 'Website Build Package'],
                     // W6c/W8 — execution-driven (imported fulfill output) and
                     // assembled (platform_status grid) types, neither
                     // signal-gated. Offered on profile_repair campaigns —

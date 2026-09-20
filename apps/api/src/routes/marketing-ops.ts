@@ -1037,7 +1037,7 @@ const cycleEngagementSchema = z.object({
 
 const deliverableTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'website_mockup', 'citation_repair_package', 'repair_completion_report']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'website_mockup', 'website_build_package', 'citation_repair_package', 'repair_completion_report']),
   category: z.string().max(100).optional(),
   layout_spec: z.any(),
   page_size: z.string().max(20).optional(),
@@ -1050,7 +1050,7 @@ const deliverableTemplateUpdateSchema = deliverableTemplateCreateSchema.partial(
 const deliverableCreateSchema = z.object({
   execution_id: z.string().optional(),
   template_id: z.string().optional(),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'website_mockup', 'citation_repair_package', 'repair_completion_report']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'website_mockup', 'website_build_package', 'citation_repair_package', 'repair_completion_report']),
   status: z.enum(['preview', 'paid', 'archived']),
   file_name: z.string().min(1).max(255),
   storage_path: z.string().min(1).max(500),
@@ -3715,7 +3715,7 @@ router.delete('/branding/:id', async (req: any, res: Response) => {
 const deliverableGenerateSchema = z.object({
   template_id: z.string().optional(),
   execution_id: z.string().optional(),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'website_mockup', 'citation_repair_package', 'repair_completion_report']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'website_mockup', 'website_build_package', 'citation_repair_package', 'repair_completion_report']),
   is_preview: z.boolean().default(true),
   content: z.string().optional(),
   // G-6: platform-staff override for a type whose governing signals did not fire.

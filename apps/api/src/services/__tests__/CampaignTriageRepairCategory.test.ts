@@ -92,6 +92,19 @@ const reviewManagementPlaybook = {
   fitd_default_fee_cents: 19900,
 };
 
+// PB-08 shares the profile_repair category but is a website acquisition/build
+// motion — it must NOT get repair_track='standard' (that would engage
+// RepairFulfillmentService's gates: repair intake, repair read model, etc).
+const pb08WebsiteGapPlaybook = {
+  ...profileRepairPlaybook,
+  id: 'pbk-pb08',
+  code: 'PB-08',
+  name: 'Website Acquisition & Build',
+  archetype: 'A7',
+  archetype_label: 'A7_WEBSITE_GAP',
+  fitd_default_fee_cents: 49900,
+};
+
 const triageResultRow = (playbook: any) => ({
   id: 'mct-test-001',
   campaign_id: 'mkt-001',
@@ -165,6 +178,26 @@ describe('acceptTriage — repair_track for profile_repair', () => {
       }),
     );
   });
+
+  it('leaves repair_track null when accepting PB-08 (profile_repair category, website build motion)', async () => {
+    mockTriageResults.findUnique.mockResolvedValue(triageResultRow(pb08WebsiteGapPlaybook));
+    mockTriageResults.update.mockResolvedValue(triageResultRow(pb08WebsiteGapPlaybook));
+    mockCampaignsList.update.mockResolvedValue({});
+
+    await CampaignTriageService.acceptTriage({ campaignId: 'mkt-001' });
+
+    expect(mockCampaignsList.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mkt-001' },
+        data: expect.objectContaining({
+          campaign_category: 'profile_repair',
+          playbook_code: 'PB-08',
+          repair_track: null,
+          estimated_fee_cents: 49900,
+        }),
+      }),
+    );
+  });
 });
 
 // ─── overrideTriage ──────────────────────────────────────────────────────
@@ -216,6 +249,31 @@ describe('overrideTriage — repair_track for profile_repair', () => {
         where: { id: 'mkt-001' },
         data: expect.objectContaining({
           campaign_category: 'review_management',
+          repair_track: null,
+        }),
+      }),
+    );
+  });
+
+  it('leaves repair_track null when overriding to PB-08', async () => {
+    mockGetPlaybookByCode.mockResolvedValue(pb08WebsiteGapPlaybook);
+
+    mockTriageResults.findUnique.mockResolvedValue(triageResultRow(profileRepairPlaybook));
+    mockTriageResults.update.mockResolvedValue(triageResultRow(pb08WebsiteGapPlaybook));
+    mockCampaignsList.update.mockResolvedValue({});
+
+    await CampaignTriageService.overrideTriage({
+      campaignId: 'mkt-001',
+      playbookCode: 'PB-08',
+      reason: 'no website — website gap playbook',
+    });
+
+    expect(mockCampaignsList.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mkt-001' },
+        data: expect.objectContaining({
+          campaign_category: 'profile_repair',
+          playbook_code: 'PB-08',
           repair_track: null,
         }),
       }),

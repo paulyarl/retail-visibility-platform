@@ -110,10 +110,50 @@ export class DeliverableSectionService extends BaseService {
   // ====================
 
   /**
-   * Describe the current web presence for A7 section prompts, from the
-   * business audit's website block + any model-emitted signals. Pure.
+   * Latest website_positioning audit data for A7 section prompts. The
+   * positioning audit owns the WC_* dimension — when present, its
+   * presence_classification, issues[].conversion_implication, positioning_gaps
+   * and build_scope are the canonical inputs (spec §8.3); the derived
+   * describeWebPresence/mustHavePages paths are the fallback for campaigns
+   * that haven't run it yet.
    */
-  private describeWebPresence(auditData: any): { presenceState: string; gapFindings: string } {
+  private async getWebsitePositioningAuditData(campaignId: string): Promise<any | null> {
+    const row = await this.prisma.mkt_audits_list.findFirst({
+      where: { campaign_id: campaignId, platform: 'website_positioning' },
+      orderBy: { created_at: 'desc' },
+      select: { audit_data: true },
+    });
+    return (row?.audit_data as any) ?? null;
+  }
+
+  /**
+   * Describe the current web presence for A7 section prompts. Prefers the
+   * website_positioning audit (presence_classification + conversion-framed
+   * issues + positioning gaps); falls back to the business audit's website
+   * block + any model-emitted signals. Pure over its inputs.
+   */
+  private describeWebPresence(auditData: any, websiteAudit?: any): { presenceState: string; gapFindings: string } {
+    if (websiteAudit?.presence_classification) {
+      const PRESENCE_LABELS: Record<string, string> = {
+        no_presence: 'No owned website exists',
+        third_party_only: 'A social/third-party page is standing in for the website',
+        builder_subdomain: 'The site lives on a free builder subdomain',
+        parked: 'The domain is parked / not a live site',
+        unfinished: 'The site is unfinished (coming-soon page)',
+        broken: 'The website link is dead',
+        present: 'A working site exists',
+      };
+      const presenceState = PRESENCE_LABELS[websiteAudit.presence_classification] ?? String(websiteAudit.presence_classification);
+      const issues = (websiteAudit.issues ?? []).map((i: any) =>
+        i?.conversion_implication ? `${i.issue} — ${i.conversion_implication}` : i?.issue,
+      );
+      const gaps = (websiteAudit.positioning_gaps ?? []).map((g: any) =>
+        g?.gap_description ?? (g?.field ? `${g.field}: expected ${g.expected}, found ${g.actual}` : null),
+      );
+      const gapFindings = [...issues, ...gaps].filter(Boolean).join('; ');
+      return { presenceState, gapFindings: gapFindings || 'None recorded' };
+    }
+
     const w = auditData?.website;
     const status = w?.status?.toLowerCase();
     const detected: string[] = Array.isArray(auditData?.detected_signals) ? auditData.detected_signals : [];
@@ -130,8 +170,12 @@ export class DeliverableSectionService extends BaseService {
     return { presenceState, gapFindings };
   }
 
-  /** Derive a must-have page list for the A7 homepage mockup prompt. */
-  private mustHavePages(auditData: any): string {
+  /** Must-have page list for the A7 homepage mockup prompt — prefers the
+   *  website_positioning audit's build_scope, falls back to a business-type
+   *  heuristic. */
+  private mustHavePages(auditData: any, websiteAudit?: any): string {
+    const fromAudit = websiteAudit?.build_scope?.must_have_pages;
+    if (Array.isArray(fromAudit) && fromAudit.length > 0) return fromAudit.join(', ');
     const type = auditData?.business_type;
     if (type === 'product' || type === 'hybrid') {
       return 'Home, Product Categories, Availability/Inquiry, Hours & Location, About, Contact';
@@ -428,7 +472,8 @@ export class DeliverableSectionService extends BaseService {
         // ─── PB-08: Website-gap sections (A7) ──────────────────────────
 
         case 'positioning_report': {
-          const { presenceState, gapFindings } = this.describeWebPresence(auditData);
+          const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
+          const { presenceState, gapFindings } = this.describeWebPresence(auditData, websiteAudit);
           prompt = buildPositioningReportPrompt(businessCtx, presenceState, gapFindings);
           title = 'Web Presence Report';
           sectionIndex = 900;
@@ -436,8 +481,9 @@ export class DeliverableSectionService extends BaseService {
         }
 
         case 'homepage_mockup': {
-          const { presenceState } = this.describeWebPresence(auditData);
-          const mustHave = this.mustHavePages(auditData);
+          const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
+          const { presenceState } = this.describeWebPresence(auditData, websiteAudit);
+          const mustHave = this.mustHavePages(auditData, websiteAudit);
           prompt = buildHomepageMockupPrompt(businessCtx, presenceState, mustHave);
           title = 'Homepage Mockup';
           sectionIndex = 910;
@@ -445,8 +491,13 @@ export class DeliverableSectionService extends BaseService {
         }
 
         case 'domain_migration_plan': {
-          const { presenceState } = this.describeWebPresence(auditData);
-          prompt = buildDomainMigrationPlanPrompt(businessCtx, presenceState);
+          const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
+          const { presenceState } = this.describeWebPresence(auditData, websiteAudit);
+          const scope = websiteAudit?.build_scope;
+          const buildScope = scope
+            ? [scope.recommended, scope.scope_notes].filter(Boolean).join(' — ')
+            : undefined;
+          prompt = buildDomainMigrationPlanPrompt(businessCtx, presenceState, buildScope);
           title = 'Domain Migration Plan';
           sectionIndex = 920;
           break;

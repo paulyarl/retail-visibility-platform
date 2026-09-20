@@ -34,7 +34,11 @@ export type DeliverableType =
   | 'product_visibility_preview'
   // PB-08 (website gap) — the visual homepage mockup, the strongest FITD
   // artifact the website playbook offers (spec OQ-2).
-  | 'website_mockup';
+  | 'website_mockup'
+  // PB-08 (website gap) — the platform-centric build package: page structure,
+  // copy spec, domain/hosting direction, nav/CTA spec, asset requirements,
+  // and QA/launch checklist. The delivery artifact behind the mockup preview.
+  | 'website_build_package';
 
 export interface DeliverableTemplateInput {
   name: string;
@@ -462,6 +466,7 @@ export class MarketingDeliverableService extends BaseService {
       repair_completion_report: 'Repair Completion Report',
       product_visibility_preview: 'Product Visibility Preview',
       website_mockup: 'Website Mockup',
+      website_build_package: 'Website Build Package',
     };
     return labels[type] || type;
   }

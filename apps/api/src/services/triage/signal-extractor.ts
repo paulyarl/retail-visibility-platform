@@ -512,8 +512,16 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       } // end !frictionSuppressed (conversion-friction signals)
     }
   } else if (!signals.has('WC_MISSING_WEBSITE')) {
-    // No website audit at all + campaign says no website
-    if (!campaign.has_website || campaign.has_website === 'no') {
+    // No website audit block — fall back to the campaign columns. A social
+    // or builder-subdomain URL in campaign.website_url is an ownership gap
+    // (WC_THIRD_PARTY_DOMAIN / WC_BUILDER_SUBDOMAIN), not genuine absence —
+    // the directory or seed row recorded *a* URL, just not an owned one.
+    // WC_MISSING_WEBSITE is reserved for the no-URL case.
+    if (isSocialPlatformHost(campaign.website_url)) {
+      if (!signals.has('WC_THIRD_PARTY_DOMAIN')) signals.add('WC_THIRD_PARTY_DOMAIN');
+    } else if (isBuilderSubdomainHost(campaign.website_url)) {
+      if (!signals.has('WC_BUILDER_SUBDOMAIN')) signals.add('WC_BUILDER_SUBDOMAIN');
+    } else if (!campaign.has_website || campaign.has_website === 'no') {
       signals.add('WC_MISSING_WEBSITE');
     }
   }

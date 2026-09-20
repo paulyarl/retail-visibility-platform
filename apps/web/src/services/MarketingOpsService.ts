@@ -95,7 +95,8 @@ export type DeliverableType =
   | 'citation_repair_package'
   | 'repair_completion_report'
   | 'product_visibility_preview'
-  | 'website_mockup';
+  | 'website_mockup'
+  | 'website_build_package';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 

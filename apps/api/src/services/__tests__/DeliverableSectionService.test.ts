@@ -39,9 +39,10 @@ vi.mock('../ai-providers', () => ({
   default: aiMock,
 }));
 
-vi.mock('../../middleware/errorHandler', () => ({
-  NotFoundError: class NotFoundError extends Error {},
-}));
+// NOTE: the real errorHandler is intentionally NOT mocked. BaseService.handleError
+// does `error instanceof HttpError`; a partial mock exporting only NotFoundError
+// makes vitest throw "No 'HttpError' export is defined" and masks the real error
+// message (the "no audit data" test then fails on the mock, not the assertion).
 
 import { DeliverableSectionService } from '../deliverable/DeliverableSectionService';
 

@@ -1,11 +1,11 @@
 /**
  * Seed script: Deliverable Source Material prompt templates
  *
- * Seeds 8 templates (spec §6.1):
+ * Seeds 9 templates (spec §6.1):
  *   - mpt-review-intake                  (seek)   review_intake              §5.7
  *   - mpt-deliverable-source-material    (seek)   deliverable_source_material §5.1
- *   - mpt-seed-fulfill-004..009          (fulfill) raw_json                  §5.2
- *     (009 = Website Mockup — PB-08 / A7, spec OQ-2)
+ *   - mpt-seed-fulfill-004..010          (fulfill) raw_json                  §5.2
+ *     (009 = Website Mockup, 010 = Website Build Package — PB-08 / A7)
  *
  * Idempotent — deterministic IDs, update-in-place. Bump SEED_VERSION_MARKER
  * to force a body re-sync on already-seeded rows.
@@ -31,7 +31,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V4 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V5 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -113,6 +113,7 @@ Signal -> deliverable type:
 - lead_magnet               <- WC_MISSING_CTA, WC_MOBILE_FRICTION, RA_LOW_REVIEW_VOLUME
 - product_visibility_preview <- DS_MISSING_PRODUCT_CATALOG, WC_MISSING_PRODUCT_BROWSING, WC_MISSING_AVAILABILITY_INQUIRY, WC_MISSING_PICKUP_DELIVERY
 - website_mockup             <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
+- website_build_package      <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
 
 RULES
 - Ground every field in the supplied audit results or parsed review intake. Do not
@@ -268,6 +269,57 @@ ${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
+// PB-08 (website gap) — the platform-centric build package: the delivery
+// artifact behind the website_mockup preview. Where the mockup sells the
+// outcome, this package is what the operator actually hands to the platform
+// to ship the site — page structure + copy spec, domain/hosting direction,
+// nav/CTA spec, asset requirements, platform implementation notes, and the
+// QA/launch + profile-cutover checklist.
+const FULFILL_010 = `${SEED_VERSION_MARKER}
+You are producing a website build package for {{business_name}}, a {{category}}
+business in {{city}} — the implementation-ready bundle the delivery platform
+needs to ship the site.
+
+Build package source material:
+{{website_build_package}}
+
+TASK
+Produce the complete build package, grounded in the supplied material:
+
+1. SITE MAP & PAGE SPEC — one entry per must-have page: page name, its job,
+   and the specific content blocks it needs (grounded in the positioning gaps
+   and category expectations — what a great {{category}} site must show).
+2. NAVIGATION & CTA SPEC — the nav order, the primary CTA (call / visit /
+   inquire — whichever fits the business), and where each CTA appears.
+3. DOMAIN & HOSTING DIRECTION — the recommended domain pattern, whether the
+   business already owns a domain, and the hosting/platform recommendation
+   (a managed small-business builder unless the source says otherwise).
+4. ASSET REQUIREMENTS — the photos, logo, copy, and business details the
+   owner must supply before the build can start (the intake checklist).
+5. PLATFORM IMPLEMENTATION NOTES — anything platform-specific: template
+   family to start from, integrations (maps, hours, ordering/booking links),
+   and mobile requirements.
+6. QA & LAUNCH CHECKLIST — the pre-launch verification list: mobile render,
+   NAP match against profiles, HTTPS, contact path works, analytics hooked.
+7. PROFILE CUTOVER — every profile/directory that must point at the new
+   domain once live (Google Business Profile, Yelp, Facebook/Instagram,
+   Apple Maps, Bing Places — adapt to what the source material shows).
+
+RULES
+- Ground every section in the supplied source material. Do not invent assets,
+  capabilities, pricing, or platform features.
+- Absence is not a defect to explain away — if the source lacks a field, write
+  the requirement, not a fabricated fact.
+- Output JSON: { "site_map": [{ "page", "purpose", "key_content": [...] }],
+  "nav_and_cta": { "nav_order": [...], "primary_cta", "cta_placements": [...] },
+  "domain_hosting": { "domain_recommendation", "ownership_state", "platform_recommendation" },
+  "asset_requirements": [...], "platform_notes": [...],
+  "launch_checklist": [...], "profile_cutover": [...] }
+
+${CLAIM_CTA}
+
+${FULFILL_TONE}`;
+
 const SEED_TEMPLATES: SeedTemplate[] = [
   {
     id: 'mpt-review-intake',
@@ -295,6 +347,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
   { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-009', name: 'Fulfill: Website Mockup', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_009, variables: ['business_name', 'category', 'city', 'website_mockup', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-010', name: 'Fulfill: Website Build Package', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_010, variables: ['business_name', 'category', 'city', 'website_build_package', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {

@@ -183,6 +183,36 @@ describe('signal-extractor — website gap derivation (§5)', () => {
     const signals = extractSignals(inp);
     expect(signals).not.toContain('WC_THIRD_PARTY_DOMAIN');
   });
+
+  // Campaign-column fallback — no audit website block, only the campaign's
+  // website_url / has_website columns (e.g. a PB-08 sibling re-triaged before
+  // its own audit lands). Host classification still applies.
+  it('emits WC_THIRD_PARTY_DOMAIN when campaign.website_url is a social page (no audit)', () => {
+    const signals = extractSignals(input(
+      { website_url: 'https://facebook.com/mybusiness', has_website: 'yes' },
+      null,
+    ));
+    expect(signals).toContain('WC_THIRD_PARTY_DOMAIN');
+    expect(signals).not.toContain('WC_MISSING_WEBSITE');
+  });
+
+  it('emits WC_BUILDER_SUBDOMAIN when campaign.website_url is a builder subdomain (no audit)', () => {
+    const signals = extractSignals(input(
+      { website_url: 'https://myshop.wixsite.com/store', has_website: 'yes' },
+      null,
+    ));
+    expect(signals).toContain('WC_BUILDER_SUBDOMAIN');
+    expect(signals).not.toContain('WC_MISSING_WEBSITE');
+  });
+
+  it('still emits WC_MISSING_WEBSITE when no audit and no URL (genuine absence)', () => {
+    const signals = extractSignals(input(
+      { website_url: null, has_website: 'no' },
+      null,
+    ));
+    expect(signals).toContain('WC_MISSING_WEBSITE');
+    expect(signals).not.toContain('WC_THIRD_PARTY_DOMAIN');
+  });
 });
 
 // ─── isRepairSignal ──────────────────────────────────────────────────────

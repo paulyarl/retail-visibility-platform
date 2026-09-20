@@ -19,6 +19,7 @@ const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   repair_completion_report: 'Repair Completion Report',
   product_visibility_preview: 'Product Visibility Preview',
   website_mockup: 'Website Mockup',
+  website_build_package: 'Website Build Package',
 };
 
 const DELIVERABLE_TYPE_COLORS: Record<DeliverableType, string> = {
@@ -35,9 +36,10 @@ const DELIVERABLE_TYPE_COLORS: Record<DeliverableType, string> = {
   repair_completion_report: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-400',
   product_visibility_preview: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
   website_mockup: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400',
+  website_build_package: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
 };
 
-const ALL_TYPES: DeliverableType[] = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'recovery_resolution', 'reinstatement_appeal', 'citation_repair_package', 'repair_completion_report', 'product_visibility_preview', 'website_mockup'];
+const ALL_TYPES: DeliverableType[] = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'recovery_resolution', 'reinstatement_appeal', 'citation_repair_package', 'repair_completion_report', 'product_visibility_preview', 'website_mockup', 'website_build_package'];
 
 export default function DeliverableTemplateLibraryClient() {
   const [templates, setTemplates] = useState<DeliverableTemplate[]>([]);

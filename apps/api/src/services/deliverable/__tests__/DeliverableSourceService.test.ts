@@ -20,7 +20,7 @@ import {
 const MODAL_TYPES = [
   'review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards',
   'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview',
-  'website_mockup',
+  'website_mockup', 'website_build_package',
 ];
 
 describe('signal → deliverable type mapping (§3.2)', () => {

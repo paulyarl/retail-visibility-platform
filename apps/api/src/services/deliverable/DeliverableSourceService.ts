@@ -55,6 +55,7 @@ export const FULFILL_TEMPLATE_BY_TYPE: Record<string, string> = {
   lead_magnet: 'mpt-seed-fulfill-007',
   product_visibility_preview: 'mpt-seed-fulfill-008',
   website_mockup: 'mpt-seed-fulfill-009',
+  website_build_package: 'mpt-seed-fulfill-010',
 };
 
 // ─── Signal → deliverable type mapping (spec §3.2) ───────────────────────
@@ -98,6 +99,15 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
   // absence or deficiency: no site, third-party/builder/parked/unfinished,
   // broken, or a poor-quality owned site.
   website_mockup: [
+    'WC_MISSING_WEBSITE', 'WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN',
+    'WC_PARKED_DOMAIN', 'WC_UNFINISHED_SITE', 'WC_BROKEN_WEBSITE',
+    'WC_UNSECURED_WEBSITE', 'WC_LEGACY_BUILDER_SITE', 'WC_STALE_WEBSITE',
+    'WC_POOR_SITE_QUALITY', 'WC_CATEGORY_MISMATCH',
+  ],
+  // PB-08 (website gap) — the platform-centric build package: the delivery
+  // artifact behind the website_mockup preview. Same WC_* governing set —
+  // any website absence or deficiency can justify the full build package.
+  website_build_package: [
     'WC_MISSING_WEBSITE', 'WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN',
     'WC_PARKED_DOMAIN', 'WC_UNFINISHED_SITE', 'WC_BROKEN_WEBSITE',
     'WC_UNSECURED_WEBSITE', 'WC_LEGACY_BUILDER_SITE', 'WC_STALE_WEBSITE',
@@ -512,6 +522,7 @@ export class DeliverableSourceService extends BaseService {
       case 'lead_magnet': return 'offer';
       case 'product_visibility_preview': return 'product_visibility';
       case 'website_mockup': return 'website_mockup';
+      case 'website_build_package': return 'website_build_package';
       case 'service_menu': return 'services';
       case 'gbp_audit': return 'gbp_audit';
       default: return 'source_material';

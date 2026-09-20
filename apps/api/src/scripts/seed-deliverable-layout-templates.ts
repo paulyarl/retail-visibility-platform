@@ -23,7 +23,7 @@
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { logger } from '../logger';
 
-const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V4';
+const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V5';
 
 const CLAIM_CTA =
   'Claim your listing and correct your details here — it takes about two minutes and there is no cost.';
@@ -90,6 +90,16 @@ const TEMPLATES: LayoutTemplate[] = [
     id: 'mdt-default-website-mockup', name: 'Default — Website Mockup',
     deliverableType: 'website_mockup', pageSize: 'letter', orientation: 'landscape',
     title: 'Website Mockup', subtitle: 'What your new site will look like, section by section',
+    nextStep: RETAINER_NEXT_STEP,
+  },
+  // PB-08 (website gap) — the platform-centric build package: the delivery
+  // artifact behind the mockup. Portrait — it's a working spec (site map,
+  // copy spec, domain/hosting, asset checklist, QA/launch, profile cutover),
+  // not a visual preview.
+  {
+    id: 'mdt-default-website-build-package', name: 'Default — Website Build Package',
+    deliverableType: 'website_build_package', pageSize: 'letter', orientation: 'portrait',
+    title: 'Website Build Package', subtitle: 'Everything the platform needs to ship your site',
     nextStep: RETAINER_NEXT_STEP,
   },
   // Profile Repair Fulfillment Sprint (W5c) — the shared Track A package

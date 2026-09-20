@@ -118,6 +118,29 @@ const websiteMockupSourceSchema = z.object({
   build_scope: z.string().nullable().optional(),
 }).passthrough();
 
+// PB-08 (website gap) — source block for the platform-centric build package.
+// The delivery artifact behind website_mockup: implementation-ready material
+// for actually shipping the site, not just previewing it.
+const websiteBuildPackageSourceSchema = z.object({
+  presence_state: z.string().nullable().optional(),
+  ownership: z.string().nullable().optional(),
+  positioning_gaps: z.array(z.string()).optional(),
+  category_expectations: z.array(z.string()).optional(),
+  must_have_pages: z.array(z.string()).optional(),
+  build_scope: z.string().nullable().optional(),
+  page_structure: z.array(z.object({
+    page: z.string(),
+    purpose: z.string().nullable().optional(),
+    key_content: z.array(z.string()).optional(),
+  }).passthrough()).optional(),
+  nav_and_cta: z.array(z.string()).optional(),
+  domain_hosting_direction: z.string().nullable().optional(),
+  asset_requirements: z.array(z.string()).optional(),
+  platform_notes: z.string().nullable().optional(),
+  launch_checklist: z.array(z.string()).optional(),
+  profile_cutover: z.array(z.string()).optional(),
+}).passthrough();
+
 export const deliverableSourceMaterialSchema = z.object({
   // The canonical signal set the analyst consumed (filtered to deliverable-
   // relevant families — spec G-12).
@@ -133,6 +156,7 @@ export const deliverableSourceMaterialSchema = z.object({
     lead_magnet: leadMagnetSourceSchema.nullable().optional(),
     product_visibility_preview: productVisibilitySourceSchema.nullable().optional(),
     website_mockup: websiteMockupSourceSchema.nullable().optional(),
+    website_build_package: websiteBuildPackageSourceSchema.nullable().optional(),
   }).passthrough(),
 
   data_quality: z.object({
@@ -164,7 +188,8 @@ Return your response as JSON matching this exact schema:
     "seo_content": { "service_pages": [{ "service": "<string>", "target_terms": ["<string>"], "differentiators": ["<string>"], "local_context": "<string|null>" }], "public_narrative": "<string|null>" } | null,
     "lead_magnet": { "offer": { "title": "<string>", "promise": "<string>", "audience": "<string|null>" }, "friction_points": ["<string>"], "conversion_opportunities": ["<string>"] } | null,
     "product_visibility_preview": { "product_categories": ["<string>"], "catalog_gaps": ["<string>"], "browsing_gaps": ["<string>"], "availability_inquiry_present": <boolean|null>, "pickup_delivery_present": <boolean|null>, "photo_types_missing": ["<string>"] } | null,
-    "website_mockup": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>" } | null
+    "website_mockup": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>" } | null,
+    "website_build_package": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>", "page_structure": [{ "page": "<string>", "purpose": "<string|null>", "key_content": ["<string>"] }], "nav_and_cta": ["<string>"], "domain_hosting_direction": "<string|null>", "asset_requirements": ["<string>"], "platform_notes": "<string|null>", "launch_checklist": ["<string>"], "profile_cutover": ["<string>"] } | null
   },
   "data_quality": { "verified_fields": ["<string>"], "unavailable_fields": ["<string>"], "limitations": ["<string>"] }
 }
